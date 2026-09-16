@@ -59,6 +59,7 @@ vi.mock("../../lib/mail", () => ({
 
 vi.mock("../../lib/runtime", () => ({
   getAppPlatform: () => "windows",
+  isTauriRuntime: () => true,
 }));
 
 vi.mock("../../lib/vaultGate", () => ({

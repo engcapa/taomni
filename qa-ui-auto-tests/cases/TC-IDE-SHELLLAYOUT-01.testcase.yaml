@@ -1,0 +1,49 @@
+id: TC-IDE-SHELLLAYOUT-01
+title: "Project, editor, and bottom tool window shell layout parity (browser portion)"
+description: |
+  ED-SHELLLAYOUT-001 / WP-SHELL-LAYOUT-01: Shell layout alignment with IntelliJ IDEA.
+  Verifies default S0 structure (Project tree open, bottom dock closed, right pane closed),
+  toggling bottom tool windows (Problems, Run), keyboard return to editor,
+  and Shift+F12 Restore Tool Window Layout returning to default S0 chrome while
+  retaining active editor buffers and open files.
+covers: [F25.1, F25.5]
+tags: [code-workspace, shell-layout, bottom-dock, idea-parity, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 150
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-tools"]'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+
+  # Add the browser-VFS preview folder (/preview prefilled in the prompt).
+  - click: '[data-testid="code-workspace-tree-add-folder"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"]'
+
+  # S0 Initial state: Project open, bottom dock closed
+  - assert_visible: '[data-testid="code-workspace-tree"]'
+  - assert_not_visible: '[data-testid="code-workspace-bottom-dock-body"]'
+
+  # Open README.txt into the editor
+  - dblclick: '[data-testid="code-workspace-tree-file"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - assert_visible: '[data-testid="code-workspace-editor-tab-strip"]'
+  - screenshot: tc-ide-shelllayout-01-s0-initial.png
+
+  # Open Run tasks bottom tool window
+  - click: '[data-testid="code-workspace-bottom-tab-run"]'
+  - wait_for: '[data-testid="code-workspace-run-panel"]'
+  - assert_visible: '[data-testid="code-workspace-bottom-dock-body"]'
+  - screenshot: tc-ide-shelllayout-02-run-dock-open.png
+
+  # Restore default tool window layout via Shift+F12
+  - press: Shift+F12
+  - wait_for: '[data-testid="code-workspace-tree"]'
+  - assert_not_visible: '[data-testid="code-workspace-bottom-dock-body"]'
+  - assert_visible: '[data-testid="code-workspace-editor-pane"]'
+  - screenshot: tc-ide-shelllayout-03-restored-s0.png

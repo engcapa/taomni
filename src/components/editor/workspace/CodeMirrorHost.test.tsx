@@ -6,6 +6,7 @@ import { undoDepth } from "@codemirror/commands";
 import { startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
 import { foldedRanges } from "@codemirror/language";
+import { closeSearchPanel, openSearchPanel } from "@codemirror/search";
 import { CodeMirrorHost, documentTextIdentity } from "./CodeMirrorHost";
 import { textIdentityFromString } from "./workspaceLayoutPersistence";
 import {
@@ -103,13 +104,13 @@ describe("CodeMirrorHost search", () => {
 
     const search = await screen.findByRole("searchbox", { name: "Find" });
     fireEvent.input(search, { target: { value: "alpha" } });
-    expect(screen.getByText("2 matches")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Next match" }));
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Previous match" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next match" }));
     expect(screen.getByText("2 / 2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous match" }));
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
 
     // Native type=search clear — no custom × button.
     fireEvent.input(search, { target: { value: "" } });
@@ -123,17 +124,17 @@ describe("CodeMirrorHost search", () => {
 
     const search = await screen.findByRole("searchbox", { name: "Find" });
     fireEvent.input(search, { target: { value: "alpha" } });
-    expect(screen.getByText("4 matches")).toBeInTheDocument();
+    expect(screen.getByText("1 / 4")).toBeInTheDocument();
 
     const wholeWord = screen.getByRole("button", { name: "Match whole word" });
     fireEvent.click(wholeWord);
     expect(wholeWord).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("3 matches")).toBeInTheDocument();
+    expect(screen.getByText("1 / 3")).toBeInTheDocument();
 
     const matchCase = screen.getByRole("button", { name: "Match case" });
     fireEvent.click(matchCase);
     expect(matchCase).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("1 matches")).toBeInTheDocument();
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
 
     const regexp = screen.getByRole("button", { name: "Use regular expression" });
     fireEvent.click(regexp);
@@ -149,6 +150,7 @@ describe("CodeMirrorHost search", () => {
     fireEvent.input(await screen.findByRole("searchbox", { name: "Find" }), {
       target: { value: "alpha" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Show replace" }));
     fireEvent.input(screen.getByRole("textbox", { name: "Replace" }), {
       target: { value: "omega" },
     });
@@ -2172,13 +2174,13 @@ describe("ED-REPAIR-008 irreversible clipboard owner loss and multi-split isolat
 
     act(() => { port!.execute("paste"); });
 
-    // Focus moves to search input
-    const search = document.createElement("input");
-    document.body.appendChild(search);
-    act(() => { search.focus(); });
+    // Real production Find panel must irreversibly revoke the pending owner.
+    act(() => { openSearchPanel(view); });
+    const search = view.dom.querySelector<HTMLInputElement>('input[name="search"]')!;
+    await waitFor(() => expect(search).toHaveFocus());
 
     // Focus returns back to the editor before the promise settles
-    act(() => { content.focus(); });
+    act(() => { closeSearchPanel(view); content.focus(); });
     expect(view.hasFocus).toBe(true);
 
     // Pending read settles
@@ -2193,7 +2195,6 @@ describe("ED-REPAIR-008 irreversible clipboard owner loss and multi-split isolat
     // Document must be unchanged, undo depth must be 0
     expect(view.state.doc.toString()).toBe("hello world");
     expect(owner.getHistoryState("search-focus.ts").undoDepth).toBe(0);
-    search.remove();
   });
 
   it("rejects pending paste when active leaf moves to another group and returns (leaf A -> B -> A) (ED-REPAIR-008-A1)", async () => {

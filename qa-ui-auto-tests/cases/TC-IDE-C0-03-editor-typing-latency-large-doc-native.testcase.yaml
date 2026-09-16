@@ -117,7 +117,7 @@ steps:
   # 1 MiB saves fan out tree refreshes that can detach the row node between
   # resolve and click. The tab-strip assert proves the switch.
   - wait: 5
-  - click: '[data-testid="code-workspace-tree-file"][data-path="Stress5MiB.txt"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="Stress5MiB.txt"]'
   - assert_text:
       selector: '[data-testid="code-workspace-editor-tab-strip"]'
       contains: "Stress5MiB.txt"

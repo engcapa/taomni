@@ -1,0 +1,10 @@
+# Browser renderer checks against this checkout's `pnpm dev` server.
+# Select --mode browser explicitly. Native/OS behavior remains unverified.
+app:
+  base_url: http://localhost:5000
+  mode: browser
+worker:
+  parallel: 1
+report:
+  dir: qa-ui-auto-report/browser
+  keep_runs: 5

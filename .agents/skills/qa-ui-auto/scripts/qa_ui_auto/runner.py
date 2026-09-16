@@ -62,7 +62,12 @@ def _browser_context(headless: bool):
         _close_browser()
         _playwright = sync_playwright().start()
         _browser = _playwright.chromium.launch(headless=headless)
-    return _browser.new_context(viewport={"width": 1440, "height": 900})
+    # Clipboard-read/write are granted so clipboard cases can exercise the
+    # real renderer path: TC-IDE-COMPARE-01 seeds text and expects the shared
+    # compare dialog to render it, while C3 cases still prove the typed
+    # fallback/denial contracts through their own observation seams.
+    return _browser.new_context(viewport={"width": 1440, "height": 900},
+                                permissions=["clipboard-read", "clipboard-write"])
 
 
 atexit.register(_close_browser)

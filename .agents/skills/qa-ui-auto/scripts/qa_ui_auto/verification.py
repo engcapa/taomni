@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import platform
+import shlex
 import subprocess
 from collections import Counter
 from pathlib import Path
@@ -11,6 +12,7 @@ from pathlib import Path
 from .feature_catalog import load_features
 from .provenance import digest_file, input_digest, execution_identity, source_input, conditions_identity
 from .testcase import TestCase, discover
+from .report_paths import summaries
 
 PLATFORMS = ("Linux", "Windows", "macOS")
 LINUX_VERBS = {"native_set_writable", "assert_native_process_delta", "native_process_snapshot",
@@ -21,6 +23,13 @@ REVIEW_TAGS = {"needs-review", "legacy-imported"}
 
 def host_platform() -> str:
     return "macOS" if platform.system() == "Darwin" else platform.system()
+
+
+def shell_command(argv: list[str]) -> str:
+    """Render copyable commands for the host shell without expanding arguments."""
+    if platform.system() == "Windows":
+        return "& " + " ".join("'" + arg.replace("'", "''") + "'" for arg in argv)
+    return shlex.join(argv)
 
 
 def native_support(case: TestCase, target: str) -> str | None:
@@ -61,7 +70,8 @@ def changed_files(root: Path, base: str) -> list[str]:
     return sorted(names - {""})
 
 
-def plan(cases: list[TestCase], features, changes: list[str] | None, target: str) -> dict:
+def plan(cases: list[TestCase], features, changes: list[str] | None, target: str,
+         requested_ids: set[str] | None = None) -> dict:
     from .diff_impact import _file_matches
     affected = set()
     unmapped = []
@@ -71,11 +81,13 @@ def plan(cases: list[TestCase], features, changes: list[str] | None, target: str
         if source_input(name) and not owners:
             unmapped.append(name)
     shared = any(name.startswith(("src-tauri/", "src/lib/", "src/stores/", "src/hooks/",
-                                 ".agents/skills/qa-ui-auto/")) or name in {
+                                 ".agents/skills/qa-ui-auto/scripts/",
+                                 ".agents/skills/qa-ui-auto/schema/",
+                                 ".agents/skills/qa-ui-auto/assets/")) or name in {
                                      "package.json", "pnpm-lock.yaml", "vite.config.ts"}
                  for name in changes or [])
     broad = changes is None or shared or bool(unmapped)
-    selected = [c for c in cases if broad or affected.intersection(c.covers)
+    selected = [c for c in cases if broad or c.id in (requested_ids or set()) or affected.intersection(c.covers)
                 or (c.source_path and c.source_path.as_posix() in (changes or []))]
     commands = []
     gaps = []
@@ -83,7 +95,7 @@ def plan(cases: list[TestCase], features, changes: list[str] | None, target: str
         eligible = [c for c in selected if mode in c.modes]
         # A mapped renderer edit uses browser for shared cases, but retains native-only boundaries.
         if mode == "native" and not broad:
-            eligible = [c for c in eligible if "browser" not in c.modes or (
+            eligible = [c for c in eligible if c.id in (requested_ids or set()) or "browser" not in c.modes or (
                 c.source_path and c.source_path.as_posix() in (changes or []))]
         runnable = []
         for case in eligible:
@@ -98,8 +110,13 @@ def plan(cases: list[TestCase], features, changes: list[str] | None, target: str
                                       "--filter", ",".join(runnable)]})
     return {"schema": "qa-ui-auto.plan.v1", "platform": target, "changed_files": changes,
             "affected_features": sorted(affected), "unmapped_source_files": unmapped,
-            "selection_reason": "shared/unmapped changes: broaden selected scope" if broad else "mapped feature changes",
+            "selection_reason": ("shared/unmapped changes: review affected scope" if shared or unmapped else
+                                 "explicit case selection" if requested_ids else
+                                 "no diff supplied: all cases in the selected catalog scope" if changes is None else
+                                 "mapped feature changes"),
             "commands": commands, "native_gaps": gaps,
+            "selected_cases": [c.id for c in selected],
+            "selection_requires_review": shared or bool(unmapped) or (changes is None and not requested_ids),
             "performance": "assess changed hot paths; functional timings are not product performance measurements",
             "backend_tests": "run affected Rust unit/integration tests" if any(
                 n.startswith("src-tauri/") for n in changes or []) else None}
@@ -108,9 +125,13 @@ def plan(cases: list[TestCase], features, changes: list[str] | None, target: str
 def load_observations(report_dirs: list[Path], identity: dict, config: dict | None = None) -> tuple[dict, list[dict]]:
     observations = {}
     rejected = []
+    visited = set()
     for root in report_dirs:
-        paths = [root] if root.is_file() else sorted(root.glob("run-*/summary.json"))
+        paths = summaries(root)
         for path in paths:
+            if path in visited:
+                continue
+            visited.add(path)
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
                 if data.get("dry_run") is not False:
@@ -128,25 +149,40 @@ def load_observations(report_dirs: list[Path], identity: dict, config: dict | No
                     raise ValueError("summary hash does not match execution receipt")
                 if data.get("mode") not in ("browser", "native") or data.get("platform") not in (*PLATFORMS, "Darwin"):
                     raise ValueError("missing or unsupported execution mode/platform")
-                current = data.get("identity") == identity and data.get("identity_stable") is True
+                stale_reasons = []
+                recorded_identity = data.get("identity")
+                if not isinstance(recorded_identity, dict):
+                    stale_reasons.append("execution identity unavailable")
+                else:
+                    stale_reasons.extend(key.removesuffix("_sha256") + " changed"
+                                         for key in sorted(recorded_identity.keys() | identity.keys())
+                                         if key not in recorded_identity or key not in identity
+                                         or recorded_identity[key] != identity[key])
+                if data.get("identity_stable") is not True:
+                    stale_reasons.append("inputs changed during execution")
                 expected_config = config
                 if expected_config is None:
                     from .config import load_config
                     config_path = Path(data.get("config_path", "")).resolve()
                     if config_path.is_relative_to(Path.cwd().resolve()) and config_path.is_file():
                         expected_config = load_config(config_path)
-                current = current and expected_config is not None and data.get("conditions_sha256") == (
-                    conditions_identity(expected_config, data["mode"]) if expected_config is not None else None)
+                if expected_config is None:
+                    stale_reasons.append("execution config unavailable")
+                elif data.get("conditions_sha256") != conditions_identity(expected_config, data["mode"]):
+                    stale_reasons.append("execution config changed")
                 if data["mode"] == "native":
                     native = data.get("native_identity", {})
-                    current = current and native.get("identifier") == "com.taomni.app.qa" and (
-                        native.get("source_sha256") == identity["source_sha256"])
+                    if native.get("identifier") != "com.taomni.app.qa":
+                        stale_reasons.append("native QA identifier differs")
+                    if native.get("source_sha256") != identity["source_sha256"]:
+                        stale_reasons.append("native build source changed")
+                current = not stale_reasons
                 target = "macOS" if data["platform"] == "Darwin" else data["platform"]
                 for result in data.get("cases", []):
                     if result.get("status") not in ("passed", "failed", "skipped"):
                         raise ValueError("invalid case outcome")
                     key = (result["id"], data["mode"], target)
-                    item = {"status": result["status"], "current": current,
+                    item = {"status": result["status"], "current": current, "stale_reasons": stale_reasons,
                             "case_sha256": result.get("case_sha256"), "report": str(path),
                             "finished_at": data.get("finished_at", ""),
                             "duration_sec": result.get("duration_sec"),
@@ -176,9 +212,16 @@ def coverage_status(cases, features, observations, targets) -> dict:
                 valid = [v for v in candidates if v["current"] and v["case_sha256"] == case_hash]
                 latest = max(valid, key=lambda v: v["finished_at"], default=None)
                 state = latest["status"] if latest else "stale" if candidates else "unverified"
+                evidence = latest or max(candidates, key=lambda v: v["finished_at"], default=None)
+                reason = evidence.get("reason") if evidence else None
+                if state == "stale":
+                    reasons = list(evidence.get("stale_reasons", []))
+                    if evidence["case_sha256"] != case_hash:
+                        reasons.append("case changed")
+                    reason = "; ".join(reasons) or "execution inputs differ"
                 key = f"{mode}:{target}"
-                cells[key] = {"status": state, "report": latest["report"] if latest else None,
-                              "reason": latest.get("reason") if latest else None}
+                cells[key] = {"status": state, "report": evidence["report"] if evidence else None,
+                              "reason": reason}
                 if mode == "native":
                     cells[key]["automation_gap"] = native_support(case, target)
                 if state != "passed" or not reviewed:
@@ -202,6 +245,7 @@ def main(argv=None) -> int:
     parser.add_argument("command", choices=["plan", "status"])
     parser.add_argument("--diff", help="git base ref; include local changes")
     parser.add_argument("--feature")
+    parser.add_argument("--case", action="append", help="exact case ID, repeatable; explicit scope, not full affected coverage")
     parser.add_argument("--tag", help="comma-separated OR tags; use smoke for a quick plan")
     parser.add_argument("--cases", default="qa-ui-auto-tests/cases")
     parser.add_argument("--features", default="qa-ui-auto-tests/feature-list.md")
@@ -223,6 +267,12 @@ def main(argv=None) -> int:
         if args.tag:
             tags = set(args.tag.split(","))
             cases = [c for c in cases if tags.intersection(c.tags)]
+        requested_ids = set(args.case or [])
+        if requested_ids:
+            missing = requested_ids - {c.id for c in cases}
+            if missing:
+                raise ValueError("unknown or filtered-out case IDs: " + ", ".join(sorted(missing)))
+            cases = [c for c in cases if c.id in requested_ids]
         targets = args.platform.split(",") if args.platform else list(PLATFORMS)
         if any(target not in PLATFORMS for target in targets):
             raise ValueError(f"platforms must be drawn from {PLATFORMS}")
@@ -230,27 +280,42 @@ def main(argv=None) -> int:
             target = args.platform or host_platform()
             if target not in PLATFORMS:
                 raise ValueError("plan requires one target platform")
-            data = plan(cases, features, changed_files(Path.cwd(), args.diff) if args.diff else None, target)
+            data = plan(cases, features, changed_files(Path.cwd(), args.diff) if args.diff else None,
+                        target, requested_ids)
+            for command in data["commands"]:
+                command["argv"].extend(["--cases", args.cases])
+                if args.config:
+                    command["argv"].extend(["--config", args.config])
         else:
             identity = execution_identity(Path.cwd())
             from .config import load_config
             expected_config = load_config(args.config) if args.config else None
             observations, rejected = load_observations([Path(p) for p in args.reports or ["qa-ui-auto-report"]], identity, expected_config)
-            data = coverage_status(cases, features, observations, targets)
+            status_features = features
+            if not args.feature and (requested_ids or args.tag):
+                covered = {fid for case in cases for fid in case.covers}
+                status_features = [f for f in features if f.id in covered]
+            data = coverage_status(cases, status_features, observations, targets)
             data.update(identity=identity, rejected_reports=rejected)
+        data["selection_scope"] = {"feature": args.feature, "tags": args.tag,
+                                   "case_ids": sorted(requested_ids), "cases_dir": args.cases,
+                                   "limited": bool(args.feature or args.tag or requested_ids)}
         rendered = json.dumps(data, indent=2, ensure_ascii=False)
         if not args.json:
             if args.command == "plan":
                 rendered = data["selection_reason"] + "\n" + "\n".join(
-                    " ".join(command["argv"]) for command in data["commands"])
+                    shell_command(command["argv"]) for command in data["commands"])
                 rendered += "\nNative gaps: " + json.dumps(data["native_gaps"], ensure_ascii=False)
                 rendered += "\nUnmapped source files: " + ", ".join(data["unmapped_source_files"])
+                rendered += f"\nSelected cases: {len(data['selected_cases'])}; broad selection needs review: {data['selection_requires_review']}"
             else:
                 rendered = "| Feature | Written | Reviewed | Observed execution |\n|---|---:|---:|---|\n"
                 rendered += "\n".join(f"| {f['id']} | {f['written']} | {f['reviewed']} | "
                                       + ", ".join(f"{k}={v}" for k, v in f["execution"].items()) + " |"
                                       for f in data["features"])
                 rendered += f"\n\nUnmet case/target checks: {len(data['gaps'])}; rejected reports: {len(rejected)}\n{data['scope']}"
+            if data["selection_scope"]["limited"]:
+                rendered += "\nExplicitly limited scope; does not establish full affected coverage."
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(rendered + "\n", encoding="utf-8")

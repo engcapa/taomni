@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
   "fixtureId": "gradle-multi-module",
-  "generatedAt": "2026-09-13T22:58:41.738Z",
+  "generatedAt": "2026-09-04T00:03:02.774Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "/Library/Java/JavaVirtualMachines/zulu-25.jdk/Contents/Home/bin/java",
-      "version": "25.0.3",
+      "path": "/data/dev/jdk-21/bin/java",
+      "version": "21.0.4",
       "info": {
-        "line": "openjdk version \"25.0.3\" 2026-04-21 LTS",
-        "major": 25,
-        "version": "25.0.3"
+        "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
+        "major": 21,
+        "version": "21.0.4"
       }
     },
     "jdtls": {
-      "home": "/usr/local/opt/jdtls/libexec",
-      "version": "1.61.0.202609031315.jar"
+      "home": "~/.local/share/jdtls",
+      "version": "1.61.0.202607102111.jar"
     },
     "gradle": {
-      "version": "9.7.1",
-      "home": "/usr/local/opt/gradle"
+      "version": "9.5.1",
+      "home": "~/.gradle/wrapper/dists/gradle-9.5.1-bin/bvvv0hnjcinfezlom7fy9dbyi/gradle-9.5.1"
     },
-    "mavenCliDetected": "Apache Maven 3.9.16 (2bdd9fddda4b155ebf8000e807eb73fd829a51d5)"
+    "mavenCliDetected": "Apache Maven 3.9.9 (8e8579a9e76f7d015ee5ec7bfcdc97d260186937)"
   },
-  "buildModelFingerprint": "a2de52e46c0b0ecbb709342ad92473ed21237f9e4dceb6136a415da56f1622cc",
+  "buildModelFingerprint": "8baa21c80eaa134a8e373ed42551b34c23b4616f3d3546c3a70a5f041687e882",
   "scenarios": [
     {
       "caseId": "cross-module-type",
@@ -36,23 +36,32 @@
       "scopeRequested": "default",
       "requests": [
         {
-          "attempts": 81,
-          "msTotal": 0,
-          "itemCount": 12,
+          "attempts": 1,
+          "msTotal": 4553,
+          "itemCount": 1,
           "isIncomplete": false,
-          "satisfied": false,
-          "matchedDetail": null,
-          "evaluationReason": "no item labelled GCore; saw GraphicsConfigTemplate - java.awt, GraphicsConfiguration - java.awt, GarbageCollectorMXBean - java.lang.management, GarbageCollectionNotificationInfo - com.sun.management, GarbageCollectorMXBean - com.sun.management, GarbageCollectionNotifInfoCompositeData - com.sun.management.internal, GarbageCollectorExtImpl - com.sun.management.internal, GapContent - javax.swing.text, GraphicComponent - sun.font, GeneralCompositePipe - sun.java2d.pipe, G1CollectedHeap - sun.jvm.hotspot.gc.g1, GarbageCollectorImpl - sun.management"
+          "satisfied": true,
+          "matchedDetail": "org.example.gcore.GCore",
+          "evaluationReason": null
         }
       ],
-      "resolve": null,
-      "acceptance": null,
+      "resolve": {
+        "ms": 324,
+        "additionalEditCount": 1,
+        "additionalEditTexts": [
+          "\n\nimport org.example.gcore.GCore;\n\n"
+        ]
+      },
+      "acceptance": {
+        "originalSha256": "e5c2a8e5c40fc5d66063513c842464b18e34a0e1d6887f4220cff7f3fb66cc30",
+        "appliedSha256": "6c43305d6bb7c450cd76c8dd1cc553e68d5e370cb54d76306963fb77db3ce1e3",
+        "revertedSha256": "e5c2a8e5c40fc5d66063513c842464b18e34a0e1d6887f4220cff7f3fb66cc30",
+        "revertRestoresOriginalHash": true
+      },
       "notes": null
     }
   ],
-  "failures": [
-    "cross-module-type: no item labelled GCore; saw GraphicsConfigTemplate - java.awt, GraphicsConfiguration - java.awt, GarbageCollectorMXBean - java.lang.management, GarbageCollectionNotificationInfo - com.sun.management, GarbageCollectorMXBean - com.sun.management, GarbageCollectionNotifInfoCompositeData - com.sun.management.internal, GarbageCollectorExtImpl - com.sun.management.internal, GapContent - javax.swing.text, GraphicComponent - sun.font, GeneralCompositePipe - sun.java2d.pipe, G1CollectedHeap - sun.jvm.hotspot.gc.g1, GarbageCollectorImpl - sun.management"
-  ],
+  "failures": [],
   "providerChannels": {
     "declaredTypeInfoChannel": false,
     "declaredStaticDataChannel": false,
@@ -115,16 +124,15 @@
       }
     ],
     "importProgress": {
-      "events": 32,
-      "beginTokens": 11,
+      "events": 30,
+      "beginTokens": 8,
       "titles": [
-        "Building",
         "Synchronizing projects",
-        "Detect installed JVMs",
+        "Building",
         "Initialize Workspace",
-        "Check JDK Index",
-        "Validate documents",
-        "Publish Diagnostics"
+        "Detect installed JVMs",
+        "Searching...",
+        "Validate documents"
       ],
       "anyWithPercentage": true
     },
@@ -133,6 +141,6 @@
     }
   },
   "analysisTiming": {
-    "firstCompletionSatisfiedMs": null
+    "firstCompletionSatisfiedMs": 8130
   }
 }

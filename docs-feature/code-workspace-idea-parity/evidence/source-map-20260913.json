@@ -1,0 +1,569 @@
+[
+  {
+    "path": "src/layouts/MainLayout.tsx",
+    "symbol": "openCodeWorkspaceInfo",
+    "line": 2157,
+    "sha256": "791ed0cd5bcac2fb8d75b56fe2d464d48e4f485a62abc68fbbb8f8d4be66fd16",
+    "group": "SHELL"
+  },
+  {
+    "path": "src/components/editor/CodeWorkspaceTab.tsx",
+    "symbol": "useWorkspaceActionsController({",
+    "line": 15024,
+    "sha256": "86b46292384f5fff7201720c0b58745f68f8361824fa5d12a4aa1d2c8b6b20d2",
+    "group": "SHELL"
+  },
+  {
+    "path": "src/stores/codeWorkspaceStore.ts",
+    "symbol": "createDefaultCodeWorkspaceUi",
+    "line": 128,
+    "sha256": "13c05bc04c884b573223724c3ad4ba33ba24d1ac733683fb7ca2114a50da9b36",
+    "group": "SHELL"
+  },
+  {
+    "path": "src/components/editor/workspace/panels/BottomDock.tsx",
+    "symbol": "BottomDock",
+    "line": 4,
+    "sha256": "d245f662e42acdf33531248cc743f4fb7512e07436eecc2545e6b3c4a0847cf1",
+    "group": "SHELL"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceActionHost.ts",
+    "symbol": "class WorkspaceActionHost",
+    "line": 341,
+    "sha256": "f23118d3b426de479e0be9a43a6ee4106b9e22f57ccad4576419b8eb70b72d27",
+    "group": "SHELL"
+  },
+  {
+    "path": "src/components/editor/workspace/ProjectTree.tsx",
+    "symbol": "onToggleDir(root.id, displayPath)",
+    "line": 313,
+    "sha256": "7dc7316dfb0a39e785149367e43e900426d6b536343e9df85e6eed2b8e4b7bb5",
+    "group": "TREE"
+  },
+  {
+    "path": "src/components/editor/CodeWorkspaceTab.tsx",
+    "symbol": "const handleTreeKeyDown",
+    "line": 4024,
+    "sha256": "86b46292384f5fff7201720c0b58745f68f8361824fa5d12a4aa1d2c8b6b20d2",
+    "group": "TREE"
+  },
+  {
+    "path": "src/components/editor/workspace/projectTreeNavigation.ts",
+    "symbol": "navigateProjectTree",
+    "line": 19,
+    "sha256": "ea39354837440977b013c3d0c77aa0568060add104ebe9f394053c2b7eedc0ae",
+    "group": "TREE"
+  },
+  {
+    "path": "src/components/editor/workspace/useWorkspaceTreeData.ts",
+    "symbol": "useWorkspaceTreeData",
+    "line": 46,
+    "sha256": "0144237488756d2fd37e4195de5f6621d696a5523751bad7b42a2d9f86f98d1b",
+    "group": "TREE"
+  },
+  {
+    "path": "src/components/editor/workspace/useWorkspaceFileActions.ts",
+    "symbol": "const renameSelected",
+    "line": 386,
+    "sha256": "db364220b2058cbe14b698d37ea4f5862fcafa36382e1dc58104f9d734a39cf6",
+    "group": "TREE"
+  },
+  {
+    "path": "src/lib/editor/workspace.ts",
+    "symbol": "workspaceListDir",
+    "line": 394,
+    "sha256": "4f510afa0511680b0105290cf9a8a3c486e10134d76b7d7143e91d7e7c4d2aa7",
+    "group": "TREE"
+  },
+  {
+    "path": "src-tauri/src/workspace.rs",
+    "symbol": "pub fn workspace_read_file",
+    "line": 2112,
+    "sha256": "080732365295ea497950ba2cf2fdea6bfd531407d00777e327e114966b193315",
+    "group": "TREE"
+  },
+  {
+    "path": "src/components/editor/workspace/EditorGroup.tsx",
+    "symbol": "export function",
+    "line": 282,
+    "sha256": "aeefc8fd5b11a8843af3a5ccfe5acbee1a8303bb2b9f6e58a04efcd6a938bf72",
+    "group": "TABS"
+  },
+  {
+    "path": "src/stores/codeWorkspaceStore.ts",
+    "symbol": "layoutRevision",
+    "line": 122,
+    "sha256": "13c05bc04c884b573223724c3ad4ba33ba24d1ac733683fb7ca2114a50da9b36",
+    "group": "TABS"
+  },
+  {
+    "path": "src/components/editor/workspace/recursiveLayoutTree.ts",
+    "symbol": "atomicSplitLeaf",
+    "line": 672,
+    "sha256": "7bbde9be72c9d22bce48adc42bc7ee6d98805fb3718bb99e488e2a3c887900b6",
+    "group": "TABS"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceTabPolicy.ts",
+    "symbol": "TabPolicy",
+    "line": 17,
+    "sha256": "d104ae4eaaa0b75f4b20cccdc218175bb6be0c7c472b36f477b17ef78a9e59a9",
+    "group": "TABS"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceLayoutPersistence.ts",
+    "symbol": "readWorkspaceLayoutSnapshot",
+    "line": 452,
+    "sha256": "a71ae2c904d75979aa681b9fd0d5979788b29dfb56749d3c82bcde14739eaf2c",
+    "group": "TABS"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceDocumentTransactionOwner.ts",
+    "symbol": "class WorkspaceDocumentTransactionOwner",
+    "line": 192,
+    "sha256": "067809eaa6bedd02432cc68b1d06f71f495d7769014ec08dd5cb6b83375f3cf6",
+    "group": "TABS"
+  },
+  {
+    "path": "src/components/editor/workspace/CodeMirrorHost.tsx",
+    "symbol": "createLspHyperlinkExtension({",
+    "line": 1930,
+    "sha256": "423acd419d7f34ff7f1907ab5bbbc977d51ba8b542ed0140590f2ad0623081e6",
+    "group": "EDIT"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceEditorCommands.ts",
+    "symbol": "export",
+    "line": 41,
+    "sha256": "76a6964b46a75b7bbb7d76ff5f17d9c2cd58ebbc03b5d8fa062c801050924f71",
+    "group": "EDIT"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceDocumentTransactionOwner.ts",
+    "symbol": "class WorkspaceDocumentTransactionOwner",
+    "line": 192,
+    "sha256": "067809eaa6bedd02432cc68b1d06f71f495d7769014ec08dd5cb6b83375f3cf6",
+    "group": "EDIT"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceCodeMirrorKeymap.ts",
+    "symbol": "export",
+    "line": 115,
+    "sha256": "1a6c8439598f3415e450dce168a006fad9cb5c0f85f28d1d9a07d7c66988c735",
+    "group": "EDIT"
+  },
+  {
+    "path": "src/lib/clipboard.ts",
+    "symbol": "export",
+    "line": 11,
+    "sha256": "4b2eb09b8d33535437cccbe10398f7a1c003ea66badab03a3f6382a9fb685049",
+    "group": "EDIT"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceStyleController.ts",
+    "symbol": "createWorkspaceStyleController",
+    "line": 593,
+    "sha256": "390cf777dd8b427a8afbcaaafe25d099ed2b2b26c4847d6f1072151fbe61ca2d",
+    "group": "SAVE"
+  },
+  {
+    "path": "src/components/editor/workspace/saveNormalizationPipeline.ts",
+    "symbol": "export",
+    "line": 23,
+    "sha256": "84a280289978d3bb1d2b1ad6019bffad04f92341a6277ace75e4d250138f6ebe",
+    "group": "SAVE"
+  },
+  {
+    "path": "src/components/editor/workspace/saveCommit.ts",
+    "symbol": "export",
+    "line": 23,
+    "sha256": "56dc881f4c45d0efe37120d7933037736f48840d7fb718032a09bac216652bc9",
+    "group": "SAVE"
+  },
+  {
+    "path": "src/components/editor/CodeWorkspaceTab.tsx",
+    "symbol": "commitOpenBufferPreparedSave",
+    "line": 5442,
+    "sha256": "86b46292384f5fff7201720c0b58745f68f8361824fa5d12a4aa1d2c8b6b20d2",
+    "group": "SAVE"
+  },
+  {
+    "path": "src-tauri/src/workspace.rs",
+    "symbol": "pub fn workspace_write_file_encoded",
+    "line": 2331,
+    "sha256": "080732365295ea497950ba2cf2fdea6bfd531407d00777e327e114966b193315",
+    "group": "SAVE"
+  },
+  {
+    "path": "src/components/editor/workspace/LocalHistoryDialog.tsx",
+    "symbol": "LocalHistoryDialog",
+    "line": 10,
+    "sha256": "62ca30d81b9cba8c0b30d4c57123d6ef575448c47686caa7339f2435093db83b",
+    "group": "SAVE"
+  },
+  {
+    "path": "src/components/editor/workspace/ExternalFileConflictDialog.tsx",
+    "symbol": "ExternalFileConflictDialog",
+    "line": 5,
+    "sha256": "43f403e576fb73567ba0c416c87de5f0e37479ecd05c9a12106f14b284d595fd",
+    "group": "SAVE"
+  },
+  {
+    "path": "src/components/editor/workspace/useWorkspaceNavigation.ts",
+    "symbol": "export function useWorkspaceNavigation",
+    "line": 105,
+    "sha256": "a4545556c7bd9c8ca2b6d11357bb74567d8c7b7780fb2b510e2534e24178c274",
+    "group": "NAV"
+  },
+  {
+    "path": "src/components/editor/workspace/SearchEverywhere.tsx",
+    "symbol": "SearchEverywhere",
+    "line": 45,
+    "sha256": "1017e5fcd56166b07fba67c12f85e7da0e6717048953a8ed1094664e771e527b",
+    "group": "NAV"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceSemanticQueryHost.ts",
+    "symbol": "class WorkspaceSemanticQueryHost",
+    "line": 84,
+    "sha256": "0703ae29752c6a62a344b97a5c5eb7a1fe20c2c7c31a989bddd2770a70c0a767",
+    "group": "NAV"
+  },
+  {
+    "path": "src/components/editor/workspace/Breadcrumbs.tsx",
+    "symbol": "Breadcrumbs",
+    "line": 45,
+    "sha256": "1d4e5fc02ace7d3db4983964817651f00ae4cae5b2b10ab88e3331ca30013453",
+    "group": "NAV"
+  },
+  {
+    "path": "src/components/editor/workspace/panels/ReferencesPanel.tsx",
+    "symbol": "ReferencesPanel",
+    "line": 33,
+    "sha256": "2fc4310450f8c63f324bb6573a0cac2edf379ef8406168a24414c80345c57b5e",
+    "group": "NAV"
+  },
+  {
+    "path": "src/components/editor/workspace/panels/HierarchyPanel.tsx",
+    "symbol": "HierarchyPanel",
+    "line": 42,
+    "sha256": "c17201a8f4f032f9717e75fc795f23e6bcb9089ae4664668e1182fd48daf1575",
+    "group": "NAV"
+  },
+  {
+    "path": "src/lib/editor/lsp.ts",
+    "symbol": "lspReferences",
+    "line": 1493,
+    "sha256": "b9f911e6a2a1c1309db7469062261c513b5bccbf2e666a788a4596cf49b5d2b2",
+    "group": "NAV"
+  },
+  {
+    "path": "src/components/editor/workspace/editorSearchPanel.ts",
+    "symbol": "class WorkspaceSearchPanel",
+    "line": 344,
+    "sha256": "bce82714facec1a5f030b29c66ed040d050471be3cefaf7317003e4d9939f68e",
+    "group": "SEARCH"
+  },
+  {
+    "path": "src/components/editor/workspace/lspHyperlink.ts",
+    "symbol": "private clearMod",
+    "line": 157,
+    "sha256": "7db0effd15a2f26215993b4f19ebfd65b113d983123cf402c209e177408c461d",
+    "group": "SEARCH"
+  },
+  {
+    "path": "src/components/editor/workspace/panels/FindInFilesPanel.tsx",
+    "symbol": "const commitReplacePreview",
+    "line": 769,
+    "sha256": "5c2eb43b1c153d0835f4b3f4327160de3b40c88cda39e09f4c8dd3aa779079b6",
+    "group": "SEARCH"
+  },
+  {
+    "path": "src/components/editor/workspace/panels/ReplacePreviewDialog.tsx",
+    "symbol": "ReplacePreviewDialog",
+    "line": 17,
+    "sha256": "3c7c7014ddf1f4596b8afff9c455e8c6d1a84751d86c2d4ccef0e7ad567bdf52",
+    "group": "SEARCH"
+  },
+  {
+    "path": "src/components/editor/CodeWorkspaceTab.tsx",
+    "symbol": "onReplaceMatches={async",
+    "line": 19532,
+    "sha256": "86b46292384f5fff7201720c0b58745f68f8361824fa5d12a4aa1d2c8b6b20d2",
+    "group": "SEARCH"
+  },
+  {
+    "path": "src/lib/editor/workspaceSearch.ts",
+    "symbol": "workspaceSearchStart",
+    "line": 53,
+    "sha256": "4ba466add64aa81cb373859a013b601037b298d641c31f48e4f1e2b70a0beafc",
+    "group": "SEARCH"
+  },
+  {
+    "path": "src-tauri/src/workspace_search.rs",
+    "symbol": "workspace_search_start",
+    "line": 300,
+    "sha256": "08e6d261acdb62140aa459ea571b7518056884fb7ed47065a2d245bd59ed1261",
+    "group": "SEARCH"
+  },
+  {
+    "path": "src/components/editor/workspace/useWorkspaceLspSession.ts",
+    "symbol": "export function useWorkspaceLspSession",
+    "line": 202,
+    "sha256": "9ac0434185c1139a83e9fd8ed5bd9ea48a6e70ad9643c23c0d91b21b7ab51b03",
+    "group": "LANG"
+  },
+  {
+    "path": "src/components/editor/workspace/lspCompletion.ts",
+    "symbol": "class LspCompletionController",
+    "line": 798,
+    "sha256": "0a8988f6f6eaf78082a9f7c59c6837d87bc0cfd608df8662b28205dbbd370e37",
+    "group": "LANG"
+  },
+  {
+    "path": "src/components/editor/workspace/completionScopeAdapter.ts",
+    "symbol": "export",
+    "line": 5,
+    "sha256": "2ffd17f98b534581eda43e566f34d3febdc1d746284cef2c89aa17240e375b8c",
+    "group": "LANG"
+  },
+  {
+    "path": "src/hooks/useProjectFacts.ts",
+    "symbol": "export",
+    "line": 4,
+    "sha256": "c0fcf5248816564ac9591cb412320f4db3769f0c30f39d6361bae69e2e4ddf5a",
+    "group": "LANG"
+  },
+  {
+    "path": "src/stores/projectFactsStore.ts",
+    "symbol": "export",
+    "line": 14,
+    "sha256": "1bd032ac328d1607cf5371accb4993d021409c8bc63d16baed3a3daef2b76df3",
+    "group": "LANG"
+  },
+  {
+    "path": "src/lib/editor/lsp.ts",
+    "symbol": "lspOpenDocument",
+    "line": 488,
+    "sha256": "b9f911e6a2a1c1309db7469062261c513b5bccbf2e666a788a4596cf49b5d2b2",
+    "group": "LANG"
+  },
+  {
+    "path": "src-tauri/src/lsp.rs",
+    "symbol": "lsp_open_document",
+    "line": 5573,
+    "sha256": "79c7c74669bacc7bfc2d61406ea507c1851e307c8c5f272ef61ab7b228e8a2b0",
+    "group": "LANG"
+  },
+  {
+    "path": "src/components/editor/workspace/inspectionProfile.ts",
+    "symbol": "defaultInspectionProfile",
+    "line": 56,
+    "sha256": "ab7ec19676bdb65e3f05009bfe0a8a35d8d681f9fbaf495ae43f2d9ae4045a7f",
+    "group": "LANG"
+  },
+  {
+    "path": "src/components/editor/CodeWorkspaceTab.tsx",
+    "symbol": "id: \"workspace.renameSymbol\"",
+    "line": 13834,
+    "sha256": "86b46292384f5fff7201720c0b58745f68f8361824fa5d12a4aa1d2c8b6b20d2",
+    "group": "REFACTOR"
+  },
+  {
+    "path": "src/components/editor/workspace/RefactoringPreviewDialog.tsx",
+    "symbol": "RefactoringPreviewDialog",
+    "line": 20,
+    "sha256": "2d775696e8d32d2177947194fb555258801fc6047983a58627a1ffd14752c608",
+    "group": "REFACTOR"
+  },
+  {
+    "path": "src/components/editor/workspace/refactorPlan.ts",
+    "symbol": "export",
+    "line": 21,
+    "sha256": "ba20f5fa2de7d3db4ab3ccee8f8490692aac0e474f99ec1935e20aab954136e4",
+    "group": "REFACTOR"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceEditHistory.ts",
+    "symbol": "export",
+    "line": 13,
+    "sha256": "1e205fc4b59410b0ff7e150d809c0fbe43b047d41b09b626dd4f6379c9664eb9",
+    "group": "REFACTOR"
+  },
+  {
+    "path": "src/components/editor/workspace/safeDelete.ts",
+    "symbol": "buildSafeDeleteWorkspaceEdit",
+    "line": 59,
+    "sha256": "df793a601c8ead787f592fffd27a042f762802bf0d1b193ed84d0032e1af9c56",
+    "group": "REFACTOR"
+  },
+  {
+    "path": "src/components/editor/workspace/reformatWorkflow.ts",
+    "symbol": "planReformat",
+    "line": 42,
+    "sha256": "141b684439973d395e9ad942e35cc12b0e84ef2812fa55a045e6a17b12f77160",
+    "group": "REFACTOR"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceSemanticEditing.ts",
+    "symbol": "smartCompletionGate",
+    "line": 34,
+    "sha256": "bd6a1b9509bf440735572a341bfd498cd611b1d4aedeb79624fdaaeb6e462403",
+    "group": "REFACTOR"
+  },
+  {
+    "path": "src/components/editor/CodeWorkspaceTab.tsx",
+    "symbol": "id: \"workspace.openGit\"",
+    "line": 14567,
+    "sha256": "86b46292384f5fff7201720c0b58745f68f8361824fa5d12a4aa1d2c8b6b20d2",
+    "group": "GIT"
+  },
+  {
+    "path": "src/components/editor/workspace/useWorkspaceGitSnapshots.ts",
+    "symbol": "useWorkspaceGitSnapshots",
+    "line": 129,
+    "sha256": "da0d732584ae91cb6667b1d12317427eee747eb84cf77c30269abaaad4d0b681",
+    "group": "GIT"
+  },
+  {
+    "path": "src/components/git/WorkspaceGitManager.tsx",
+    "symbol": "await gitStage",
+    "line": 499,
+    "sha256": "8e55e2b04103c16c9b9a1483e4bbdd6b1f289ed776f9e97f7c8d23856043dfa1",
+    "group": "GIT"
+  },
+  {
+    "path": "src/components/git/DiffViewer.tsx",
+    "symbol": "DiffViewer",
+    "line": 23,
+    "sha256": "29b0e6e8088f5083a821f2b6729dca2f81f205ba44a683df13110e1e3cbc30c5",
+    "group": "GIT"
+  },
+  {
+    "path": "src/lib/git.ts",
+    "symbol": "export function gitCommit",
+    "line": 235,
+    "sha256": "bc123389732c98f8da6200ea55f246dcbdef9848c03de1f9445b1555b236d314",
+    "group": "GIT"
+  },
+  {
+    "path": "src-tauri/src/git.rs",
+    "symbol": "git_commit",
+    "line": 390,
+    "sha256": "c15d09b951e8b991963ea5937dfbbce8f43a65cac3157a422bcdda908f75812b",
+    "group": "GIT"
+  },
+  {
+    "path": "src/components/editor/CodeWorkspaceTab.tsx",
+    "symbol": "const debug = useCodeDebugSession",
+    "line": 17761,
+    "sha256": "86b46292384f5fff7201720c0b58745f68f8361824fa5d12a4aa1d2c8b6b20d2",
+    "group": "RUN"
+  },
+  {
+    "path": "src/components/editor/workspace/panels/RunPanel.tsx",
+    "symbol": "onRun",
+    "line": 15,
+    "sha256": "b84d54d69b10116852b9dd85ba24be8eb9198607872d49bd8a403cb89c689c96",
+    "group": "RUN"
+  },
+  {
+    "path": "src/components/editor/workspace/panels/BuildPanel.tsx",
+    "symbol": "export function BuildPanel",
+    "line": 80,
+    "sha256": "c02e5c7f27e0b8a1a2cd6cd8a4ddf8f434e851b444d6290764d87908fd4b922d",
+    "group": "RUN"
+  },
+  {
+    "path": "src/components/editor/workspace/panels/TestsPanel.tsx",
+    "symbol": "export function TestsPanel",
+    "line": 109,
+    "sha256": "2b354a225d68d7f18b040b097666439edff1f951be9eea7d3617949cba69bfd3",
+    "group": "RUN"
+  },
+  {
+    "path": "src/components/editor/workspace/panels/CoveragePanel.tsx",
+    "symbol": "CoveragePanel",
+    "line": 5,
+    "sha256": "d6be8bcbc2c7be3388f2cab0e52de0503f80e114dd2ee162a67e625e5a095200",
+    "group": "RUN"
+  },
+  {
+    "path": "src/components/editor/workspace/useCodeDebugSession.ts",
+    "symbol": "dapStartSession",
+    "line": 7,
+    "sha256": "2cb436ac0e9ef200a6de0175ab214ee3fc2d01e2a6613d739a0dccf6bb9d2fc7",
+    "group": "RUN"
+  },
+  {
+    "path": "src/lib/editor/dap.ts",
+    "symbol": "dapStartSession",
+    "line": 28,
+    "sha256": "41af3d8d8a482b777ef50d55fa824ae4b25bacbaccbf9491f0578993005a8aa7",
+    "group": "RUN"
+  },
+  {
+    "path": "src-tauri/src/dap.rs",
+    "symbol": "pub async fn dap_start_session",
+    "line": 858,
+    "sha256": "d0145b9a5e2ce81728c644ebd6165add894cb96e49a631ac479994072f7cb721",
+    "group": "RUN"
+  },
+  {
+    "path": "src-tauri/src/workspace_execution.rs",
+    "symbol": "workspace_execution_model",
+    "line": 3902,
+    "sha256": "7060088d1756386ad591684d581f99a0c20043cb2bf8cc437d736248d6ec5a7a",
+    "group": "RUN"
+  },
+  {
+    "path": "src/components/editor/workspace/KeymapSettingsDialog.tsx",
+    "symbol": "KeymapSettingsDialog",
+    "line": 18,
+    "sha256": "8c1633c9bdf6ad6490b97add196fde570260b1b41e1419239d1c61dea5dbd4b7",
+    "group": "SET"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceKeymapScheme.ts",
+    "symbol": "KEYMAP_SCHEME_STORAGE_PREFIX",
+    "line": 40,
+    "sha256": "12185fa5e903ff6f8d372b5b0769ebe6570db96a44e0116ff651b7b2c457f63b",
+    "group": "SET"
+  },
+  {
+    "path": "src/components/editor/workspace/WorkspaceEditorAppearanceSettingsDialog.tsx",
+    "symbol": "WorkspaceEditorAppearanceSettingsDialog",
+    "line": 10,
+    "sha256": "e085a816eb5cd2f74adbcb0460fa2e2c799d53bfd116bd48c482c3a1d83937b0",
+    "group": "SET"
+  },
+  {
+    "path": "src/components/editor/workspace/editorAppearanceProfile.ts",
+    "symbol": "DEFAULT_EDITOR_APPEARANCE_PROFILE",
+    "line": 82,
+    "sha256": "842ed14d4e7ff3c132ec127cbf477321fb08c2df41e4120fd59acc62ee1215cc",
+    "group": "SET"
+  },
+  {
+    "path": "src/components/editor/workspace/CodeStyleSettingsDialog.tsx",
+    "symbol": "CodeStyleSettingsDialog",
+    "line": 29,
+    "sha256": "87e5d664e5f2e766a8a6ebe5032f217a3d13d157e3a9b2488e30de888ba488e2",
+    "group": "SET"
+  },
+  {
+    "path": "src/components/editor/workspace/editorConfigResolver.ts",
+    "symbol": "export",
+    "line": 24,
+    "sha256": "fe252ef31d1220096d3f06ad794a9eb355cdd9ffd01accd2efb269c37cc09ca2",
+    "group": "SET"
+  },
+  {
+    "path": "src/components/editor/workspace/workspaceStyleController.ts",
+    "symbol": "createWorkspaceStyleController",
+    "line": 593,
+    "sha256": "390cf777dd8b427a8afbcaaafe25d099ed2b2b26c4847d6f1072151fbe61ca2d",
+    "group": "SET"
+  }
+]

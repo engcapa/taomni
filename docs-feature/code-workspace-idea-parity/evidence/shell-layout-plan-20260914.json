@@ -1,0 +1,180 @@
+{
+  "kind": "P1-planning-not-product-evidence",
+  "reference_id": "REF-SHELL-LAYOUT-LINUX-20260914",
+  "head": "0694a03f839827402a628f6c7b2ccbb0c997dd0e",
+  "branch": "docs/code-workspace-idea-audit-20260913",
+  "initial_worktree": "clean",
+  "scope": "REQ-03 WP-SHELL-LAYOUT-01 only",
+  "task_board": "claudedocs/code-workspace-idea-parity-backlog-shell-layout.md",
+  "task_id": "ED-SHELLLAYOUT-001",
+  "task_state_authority": "board metadata only; no owner/claim",
+  "worktree_at_audit": [
+    " M docs-feature/code-workspace-idea-parity/capability-matrix.md",
+    " M docs-feature/code-workspace-idea-parity/index.md",
+    " M docs-feature/code-workspace-idea-parity/overall-audit-plan-20260913.md",
+    " M docs-feature/code-workspace-idea-parity/source-audit.md",
+    "?? claudedocs/code-workspace-idea-parity-backlog-shell-layout.md",
+    "?? docs-feature/code-workspace-idea-parity/evidence/shell-layout-artifacts-20260914.json",
+    "?? docs-feature/code-workspace-idea-parity/evidence/shell-layout-plan-20260914.json",
+    "?? docs-feature/code-workspace-idea-parity/handoff-p2-shell-layout.md",
+    "?? docs-feature/code-workspace-idea-parity/references/shell-layout-2026.2.2-linux.md",
+    "?? docs-feature/code-workspace-idea-parity/shell-layout-design.md",
+    "?? docs-feature/code-workspace-idea-parity/shell-layout-wireframe.drawio",
+    "?? docs-feature/code-workspace-idea-parity/shell-layout-wireframe.png"
+  ],
+  "source_files": [
+    {
+      "path": "src/layouts/MainLayout.tsx",
+      "sha256": "ad485fcdb33fd56fbae3f52c57b6718dec3d8791db85f093aa1c2da056a5a8ff"
+    },
+    {
+      "path": "src/components/editor/CodeWorkspaceTab.tsx",
+      "sha256": "8aca46810b4b50978755def58b68d9d0c8f8e522bf14d737d0aa64db7b0b9ce7"
+    },
+    {
+      "path": "src/stores/codeWorkspaceStore.ts",
+      "sha256": "b45d3345f1eadfa3d5e1679200d1662f7cf0878380cd57b03d46babc816bae76"
+    },
+    {
+      "path": "src/components/editor/workspace/panels/BottomDock.tsx",
+      "sha256": "e3d7c21a87ca78fd846eb3be5822b619f8c53c7e63346186885402c491db52f6"
+    },
+    {
+      "path": "src/components/editor/workspace/FileTreePane.tsx",
+      "sha256": "5ea602bf431a3a14ce19a09f9d9e35f6deefa4c5d4823937df97c1ee987447ea"
+    },
+    {
+      "path": "src/components/editor/workspace/ProjectTree.tsx",
+      "sha256": "ba801f8d3f923f859874db4e2a661d0ecc2b01ff1b900e6d2697166d8f855370"
+    },
+    {
+      "path": "src/components/editor/workspace/EditorGroup.tsx",
+      "sha256": "75a00da20e0f5fa85632e586dfc28c0ad16b79e2f865835ad7cc4c4a1c82e7bc"
+    },
+    {
+      "path": "src/components/editor/workspace/CodeMirrorHost.tsx",
+      "sha256": "e40227781ac16d28141db5af5b01d5b04f18a84aebb27b94766c9b35cc4308cf"
+    },
+    {
+      "path": "src/components/editor/workspace/useWorkspaceActionsController.ts",
+      "sha256": "0e02a0ead00c23d18b0b888d94dd229c9b51616d80b2e3e051e41346be7b7333"
+    },
+    {
+      "path": "src/components/editor/workspace/workspaceActionHost.ts",
+      "sha256": "11ddea59eefd42d48fcd3991734ba8cb1bc63c06e4bf9007707aee4590f2c8ac"
+    },
+    {
+      "path": "src/components/editor/workspace/toolWindowRegistry.ts",
+      "sha256": "41109593d3a0da1043ccc3e1a44da2274289f4ed60fb9be6b0e4a7641f174014"
+    },
+    {
+      "path": "src/components/editor/workspace/workspaceLayoutPersistence.ts",
+      "sha256": "776829f0c0e9543d718d76b3812564f4679f598f95a3a6aa7118d5e58d3e595b"
+    },
+    {
+      "path": "src/components/editor/workspace/editorAppearanceProfile.ts",
+      "sha256": "92d5096b204007ab88b37c8b3ee3fa4817488db352935a90c630db1141718b9e"
+    },
+    {
+      "path": "src/components/editor/workspace/editorAppearanceExtension.ts",
+      "sha256": "514e417559417814888f288aa3576fb1cb57b19b7a74f7e9ed0af7518eb2f40f"
+    },
+    {
+      "path": "src/components/editor/workspace/editorSearchPanel.ts",
+      "sha256": "41a4229bfc935d0f7bc7aeb1fa58251ff115789ce12f715697837d48b2424ddc"
+    },
+    {
+      "path": "src/components/editor/workspace/lspHyperlink.ts",
+      "sha256": "133ee6f7cc6da419e92a69232ccc54002584fbc6489e342d5d4df5d2a6096848"
+    },
+    {
+      "path": ".agents/skills/qa-ui-auto/scripts/qa_ui_auto/fixtures/project_tree.py",
+      "sha256": "98fa8467499441540d80ef42aa5215f3e64f5487bacb4b6925bb335c346def46"
+    }
+  ],
+  "prior_cards": {
+    "ED-TREEOPEN-001": "done; historical Linux native and visual incomparable; switch races unrun",
+    "ED-FINDFOCUS-001": "implemented; original provider gaps retained"
+  },
+  "idea_product_identity": {
+    "path": "/data-raw-hdd/dev/idea-IU-253.30387.90/product-info.json",
+    "sha256": "49f4876c2e28c1e78132a6d1eadfc81185f3390b9c9736d1d5220257d9e73298",
+    "name": "IntelliJ IDEA",
+    "version": "2026.2.2",
+    "buildNumber": "262.10315.125",
+    "productCode": "IU"
+  },
+  "settings": "r2 current GUI theme/scheme/UI font/zoom/keymap + readonly Xft96; current editor Font page/lineHeight/density/effective monitor scale still incomplete; see reference §5–6",
+  "current_client_sizes": [
+    [
+      1400,
+      1000
+    ],
+    [
+      800,
+      700
+    ]
+  ],
+  "capture": "/usr/bin/python3 Xlib/XTEST/Pillow; same IDEA PID; not physical keyboard/IME",
+  "fixtures_match_seed": true,
+  "tree_artifacts_recheck": {
+    "entries": 187,
+    "missing": [],
+    "mismatches": []
+  },
+  "executed": [
+    {
+      "command": "qa_ui_auto plan --case TC-IDE-TREEOPEN-01-project-tree-open-focus-native --case TC-IDE-C4-02 --case TC-IDE-C4-03 --platform Linux --json",
+      "result": "exit 0; 3 candidate cases; no executions",
+      "raw": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/qa-plan.json"
+    },
+    {
+      "command": "task_board.py --doc claudedocs/code-workspace-idea-parity-backlog-shell-layout.md validate",
+      "result": "latest exit 0; 1 task; earlier authoring validation failures preserved in chat, final metadata corrected"
+    },
+    {
+      "command": "task_board.py --doc claudedocs/code-workspace-idea-parity-backlog-shell-layout.md list --claimable",
+      "result": "exit 0; No matching tasks"
+    }
+  ],
+  "execution_counts": {
+    "product_tests": 0,
+    "product_builds": 0,
+    "taomni_launches": 0,
+    "browser_runners": 0,
+    "native_runners": 0,
+    "formal_comparisons": 0,
+    "qa_readonly_plan": 1
+  },
+  "known_gaps": [
+    "BL-SL-01 current Font/lineHeight/density/effective scale and true min/max/overflow reference values",
+    "Menu/restore exact focus offsets and post-restore direct input still unobserved",
+    "BL-SL-03 P2 retained Taomni baseline unrun"
+  ],
+  "platforms": {
+    "Linux": "IDEA partial only; Taomni current-platform acceptance unrun",
+    "Windows": "unverified for this package",
+    "macOS": "unverified for this package"
+  },
+  "desktop_returned": true,
+  "artifact_manifest": "shell-layout-artifacts-20260914.json",
+  "note": "Intermediate ready statement was incorrect and corrected during P1 before any claim. No product acceptance or matched verdict.",
+  "documentation_validation": {
+    "links_checked": "pending refresh",
+    "issues": [],
+    "xml": "well formed",
+    "board": "valid; 1 deferred task; claimable empty",
+    "diff_check": "passed",
+    "product_test_skill_paths_changed": false
+  },
+  "prototype": {
+    "revision": "v2",
+    "preview": "docs-feature/code-workspace-idea-parity/shell-layout-wireframe.png",
+    "editable": "docs-feature/code-workspace-idea-parity/shell-layout-wireframe.drawio",
+    "renderer": "Pillow from same layout nodes; not drawio CLI export",
+    "decision": "User explicitly accepted v2 default structure: new Project open/bottom closed, existing snapshots restored; illustrative values not accepted as measurements"
+  },
+  "desktop_return_time": "2026-09-14T21:22:00+08:00",
+  "desktop_second_round": "explicitly authorized; 21:12–21:22; own fixture window closed, old Tree window preserved",
+  "second_round_reference": "Major missing actions observed; r2-23 Font page not reached. No product verdict."
+}

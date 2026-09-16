@@ -5,7 +5,9 @@ import type {
   EditorGroupId,
   EditorSplitOrientation,
   RightPaneTabId,
+  ShellChromeState,
 } from "../../../stores/codeWorkspaceStore";
+import { DEFAULT_SHELL_CHROME_STATE } from "../../../stores/codeWorkspaceStore";
 import { fileKey } from "./codeWorkspaceModel";
 import {
   DEFAULT_WORKSPACE_TAB_POLICY_V3,
@@ -151,6 +153,7 @@ export interface WorkspaceLayoutSnapshotV2 {
    * write overwrites the snapshot.
    */
   tabPolicyBackup?: unknown;
+  shellChromeState?: ShellChromeState;
   layoutRecovered?: boolean;
 }
 
@@ -237,8 +240,8 @@ function cloneLayoutTree(node: LayoutNode): LayoutNode {
 export function defaultWorkspaceLayoutSnapshot(): WorkspaceLayoutSnapshotV2 {
   return {
     version: 2,
-    bottomDockOpen: true,
-    bottomDockTab: "references",
+    bottomDockOpen: false,
+    bottomDockTab: "problems",
     rightPaneOpen: false,
     rightPaneTab: "outline",
     languagePanelOpen: true,
@@ -248,6 +251,10 @@ export function defaultWorkspaceLayoutSnapshot(): WorkspaceLayoutSnapshotV2 {
     expandedDirKeys: [],
     layoutTreeV2: createSingleLeafLayout("primary", [], null),
     tabPolicy: { ...DEFAULT_WORKSPACE_TAB_POLICY_V3 },
+    shellChromeState: {
+      ...DEFAULT_SHELL_CHROME_STATE,
+      bottomHeightByTool: { ...DEFAULT_SHELL_CHROME_STATE.bottomHeightByTool },
+    },
     editorGroups: {
       primary: createEmptyPersistedGroup(),
       secondary: createEmptyPersistedGroup(),
@@ -325,6 +332,60 @@ function normalizeWorkspaceViewStates(value: unknown): WorkspaceViewStates {
     if (Object.keys(perFile).length > 0) normalized[leafId] = perFile;
   }
   return normalized;
+}
+
+function normalizeShellChromeState(value: unknown): ShellChromeState {
+  const fallback: ShellChromeState = {
+    ...DEFAULT_SHELL_CHROME_STATE,
+    bottomHeightByTool: { ...DEFAULT_SHELL_CHROME_STATE.bottomHeightByTool },
+  };
+  if (!value || typeof value !== "object") {
+    // Check legacy localStorage fallback for bottom height
+    if (typeof window !== "undefined") {
+      try {
+        const legacy = window.localStorage.getItem("taomni.codeWorkspace.bottomDockHeight.v1");
+        const parsed = legacy ? Number(legacy) : NaN;
+        if (Number.isFinite(parsed) && parsed >= 49 && parsed <= 849) {
+          return {
+            ...fallback,
+            bottomHeightPx: Math.round(parsed),
+          };
+        }
+      } catch {
+        // Ignore storage failure
+      }
+    }
+    return fallback;
+  }
+  const source = value as Record<string, unknown>;
+  const projectWidthPx = typeof source.projectWidthPx === "number" && Number.isFinite(source.projectWidthPx) && source.projectWidthPx >= 0
+    ? Math.round(source.projectWidthPx)
+    : fallback.projectWidthPx;
+  const rightWidthPx = typeof source.rightWidthPx === "number" && Number.isFinite(source.rightWidthPx) && source.rightWidthPx >= 0
+    ? Math.round(source.rightWidthPx)
+    : fallback.rightWidthPx;
+  const bottomHeightPx = typeof source.bottomHeightPx === "number" && Number.isFinite(source.bottomHeightPx) && source.bottomHeightPx >= 49 && source.bottomHeightPx <= 849
+    ? Math.round(source.bottomHeightPx)
+    : fallback.bottomHeightPx;
+
+  const bottomHeightByTool: Partial<Record<BottomDockTabId, number>> = {
+    ...fallback.bottomHeightByTool,
+  };
+  if (source.bottomHeightByTool && typeof source.bottomHeightByTool === "object") {
+    for (const [k, v] of Object.entries(source.bottomHeightByTool as Record<string, unknown>)) {
+      if (typeof v === "number" && Number.isFinite(v) && v >= 49 && v <= 849) {
+        bottomHeightByTool[k as BottomDockTabId] = Math.round(v);
+      }
+    }
+  }
+
+  return {
+    version: 1,
+    projectWidthPx,
+    rightWidthPx,
+    bottomHeightPx,
+    bottomHeightByTool,
+  };
 }
 
 export function normalizeWorkspaceLayoutSnapshot(value: unknown): WorkspaceLayoutSnapshotV2 {
@@ -431,7 +492,7 @@ export function normalizeWorkspaceLayoutSnapshot(value: unknown): WorkspaceLayou
 
   return {
     version: 2,
-    bottomDockOpen: source.bottomDockOpen !== false,
+    bottomDockOpen: source.bottomDockOpen === undefined ? fallback.bottomDockOpen : source.bottomDockOpen !== false,
     bottomDockTab,
     rightPaneOpen: source.rightPaneOpen === true,
     rightPaneTab,
@@ -443,6 +504,7 @@ export function normalizeWorkspaceLayoutSnapshot(value: unknown): WorkspaceLayou
     layoutTreeV2,
     tabPolicy: policyMigration.policy,
     ...(policyBackup != null ? { tabPolicyBackup: policyBackup } : {}),
+    shellChromeState: normalizeShellChromeState(source.shellChromeState),
     editorGroups: normalizedGroups,
     viewStates: normalizeWorkspaceViewStates(source.viewStates),
     layoutRecovered,
@@ -585,7 +647,7 @@ export function snapshotFromWorkspaceUi(input: {
   tabPolicy?: WorkspaceTabPolicyV3;
   /** ED-IMPROVE-007 per-leaf/file view snapshots; normalized on write. */
   viewStates?: WorkspaceViewStates;
-
+  shellChromeState?: ShellChromeState;
 }): WorkspaceLayoutSnapshotV2 {
   const toPersisted = (group: CodeWorkspaceEditorGroupState): PersistedEditorGroup => ({
     openOrder: group.openOrder.slice(0, MAX_RESTORED_OPEN_FILES),
@@ -622,6 +684,7 @@ export function snapshotFromWorkspaceUi(input: {
     expandedDirKeys: input.expandedDirKeys,
     layoutTreeV2: layoutTree,
     tabPolicy: input.tabPolicy ?? { ...DEFAULT_WORKSPACE_TAB_POLICY_V3 },
+    shellChromeState: input.shellChromeState,
     editorGroups: persistedGroups,
     viewStates: input.viewStates ?? {},
   });

@@ -107,7 +107,7 @@ describe("buildEditorContextMenuItems", () => {
       ["editor-context-goto-declaration", "Go to Declaration", "Ctrl+B"],
       ["editor-context-goto-type-definition", "Go to Type Definition", "Ctrl+Shift+B"],
       ["editor-context-goto-implementation", "Go to Implementation", "Ctrl+Alt+B"],
-      ["editor-context-find-usages", "Find Usages", "Shift+F12"],
+      ["editor-context-find-usages", "Find Usages", "Alt+F7"],
       ["editor-context-call-hierarchy", "Call Hierarchy", "Ctrl+Alt+H"],
       ["editor-context-type-hierarchy", "Type Hierarchy", "Ctrl+H"],
       ["editor-context-rename", "Rename Symbol…", "Shift+F6"],

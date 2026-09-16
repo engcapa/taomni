@@ -2,6 +2,14 @@
 
 ## Daily Work
 
+Use [efficient-verification.md](efficient-verification.md) to distinguish quick
+iteration, current-platform completion and release scope. Native compilation is
+a stable-input completion step unless an early native-only probe is needed.
+`plan/status --case ID` (repeatable) narrows to exact cases and discloses limited
+scope; do not copy a whole-feature recommendation into every edit/test loop.
+Read existing timings with `costs --reports <task-root>` before blaming product
+performance for slow verification. Costs never replaces receipt validation.
+
 Use affected unit/component tests and browser cases for pure renderer changes.
 Add selected native cases when IPC payloads, persistence, processes, native APIs,
 WebView behavior or OS integration can change, including frontend callers.
@@ -34,6 +42,13 @@ not current execution proof. Current means matching source, runner and case
 fingerprints with stable inputs during execution. Native additionally requires a
 QA ID and matching build-source fingerprint. A legacy QA binary may still run,
 but cannot establish current-source coverage until rebuilt.
+
+`--reports` accepts either a summary file or a report root. Root discovery is
+recursive for nested task directories, while known checkout/profile trees are
+excluded; overlapping roots are deduplicated. This matches `costs` and lets a
+follow-up agent pass `qa-ui-auto-report` without guessing the case-specific
+`runs` directory. Stale cells retain the historical report path and changed-input
+reason; rejected dry-runs remain visible separately.
 
 For each source/case/mode/OS, the latest current run wins, including failures and
 skips; an older pass must not conceal a newer failure. Browser results prove a

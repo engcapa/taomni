@@ -35,21 +35,21 @@ steps:
       selector: '[data-testid="code-workspace-tree-dir"]'
       timeout_sec: 30
   - click: '[data-testid="code-workspace-view-tree"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
+  - click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
   - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
+  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main"] [data-testid="code-workspace-tree-dir-arrow"]'
   - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"]'
+  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"] [data-testid="code-workspace-tree-dir-arrow"]'
   - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com"]'
+  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com"] [data-testid="code-workspace-tree-dir-arrow"]'
   - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example"]'
+  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example"] [data-testid="code-workspace-tree-dir-arrow"]'
   - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example/single"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example/single"]'
+  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example/single"] [data-testid="code-workspace-tree-dir-arrow"]'
   - wait_for:
       selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/App.java"]'
       timeout_sec: 60
-  - click: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/App.java"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/App.java"]'
   - press: Control+Shift+N
   - wait_for: '[data-testid="code-workspace-search-everywhere"]'
   - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'

@@ -1,0 +1,139 @@
+{
+  "record_kind": "planning-provenance-not-product-evidence",
+  "captured_at": "2026-09-14T15:29:15.142612+08:00",
+  "scope": [
+    "REQ-02",
+    "CW-PROJ-002",
+    "CW-PROJ-003(menu open/cancel only)"
+  ],
+  "head": "7bbb7094148e65c389903076cd3b4dec0d04a004",
+  "branch": "docs/code-workspace-idea-audit-20260913",
+  "initial_worktree": "clean; verified before any tracked document edits",
+  "host": {
+    "os": "Ubuntu Linux 24.04 x86_64",
+    "kernel": "6.14.0-37-generic",
+    "session": "X11 / Cinnamon",
+    "display": ":0"
+  },
+  "production_diff_from_handoff_head": "none",
+  "source_files_sha256": {
+    "src/components/editor/CodeWorkspaceTab.tsx": "e82ab9659c3c18c2d044cedf9a74539b03668fd8d8b755e28aeda6bfa7a04ec2",
+    "src/components/editor/workspace/ProjectTree.tsx": "ab21db45d6c684caebd449d5d2038bad448f3e44c8bc3c67f0d5987100108369",
+    "src/components/editor/workspace/EditorGroup.tsx": "f7b69e9bee58551c396d0f0938f5afad1dc7029132032f26d9b35f8eda04885c",
+    "src/components/editor/workspace/CodeMirrorHost.tsx": "936420efcd4b0852c189c0c8cf8c88bd591aa178a30feb037c9ddca300d523e4",
+    "src/components/editor/workspace/editorSearchPanel.ts": "41a4229bfc935d0f7bc7aeb1fa58251ff115789ce12f715697837d48b2424ddc",
+    "src/components/editor/workspace/lspHyperlink.ts": "133ee6f7cc6da419e92a69232ccc54002584fbc6489e342d5d4df5d2a6096848",
+    "src/components/editor/workspace/useWorkspaceFileActions.ts": "9a42c7f2caefa8f40b02757083d15b2a3b7ca8a6180dbc2b90ffb34be047f4e1",
+    "src/components/editor/workspace/useWorkspaceTreeData.ts": "d2c15a4ba1680d95d6a14e29675efb148110acb15c03a5820f30ba16f225e4a3",
+    "src/stores/codeWorkspaceStore.ts": "b45d3345f1eadfa3d5e1679200d1662f7cf0878380cd57b03d46babc816bae76",
+    "src/components/editor/workspace/workspaceTabPolicy.ts": "66e202cc518e3cc7eecdc1dd7c1642a30802d25b654ca3414ea4bed99f689b3d",
+    "src/components/editor/workspace/workspaceDocumentTransactionOwner.ts": "9e9f89ce5ed9c8e847758417662b310892b915ba5e0b49811d66c81a1cb5974c",
+    "src/components/editor/workspace/workspaceLayoutPersistence.ts": "776829f0c0e9543d718d76b3812564f4679f598f95a3a6aa7118d5e58d3e595b",
+    "src/components/ContextMenu.tsx": "353c2e1a094add941a363765ecf4d9edfc70eb7cf091ab03949f6c14478032db",
+    "src/lib/editor/workspace.ts": "b7d5a84dc4302f31db8a86026271685854684e448c53d9a62cbccf877257fc0b",
+    "src-tauri/src/workspace.rs": "dad5b7c347fd3ffde6aa97062a9e8e3ec2263b4ce4ceb55405138f1ca98e749c"
+  },
+  "existing_cards": [
+    {
+      "board": "claudedocs/code-workspace-idea-parity-backlog-2026-09-main-repair.md",
+      "id": "ED-REPAIR-009",
+      "status": "done",
+      "spec": "claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-009"
+    },
+    {
+      "board": "claudedocs/code-workspace-idea-parity-backlog-find-focus.md",
+      "id": "ED-FINDFOCUS-001",
+      "status": "implemented",
+      "spec": "docs-issue/code-workspace-find-focus-design.md#ed-findfocus-001"
+    },
+    {
+      "board": "claudedocs/code-workspace-idea-parity-backlog.md",
+      "id": "ED-TABS-001",
+      "status": "done",
+      "spec": "claudedocs/code-workspace-idea-specs/tabs-and-multiview.md#ed-tabs-001"
+    },
+    {
+      "board": "claudedocs/code-workspace-idea-parity-backlog.md",
+      "id": "ED-TABS-002",
+      "status": "done",
+      "spec": "claudedocs/code-workspace-idea-specs/tabs-and-multiview.md#ed-tabs-002"
+    },
+    {
+      "board": "claudedocs/code-workspace-idea-parity-backlog.md",
+      "id": "ED-TABS-003",
+      "status": "done",
+      "spec": "claudedocs/code-workspace-idea-specs/tabs-and-multiview.md#ed-tabs-003"
+    },
+    {
+      "board": "claudedocs/code-workspace-idea-parity-backlog.md",
+      "id": "ED-MULTIVIEW-002",
+      "status": "done",
+      "spec": "claudedocs/code-workspace-idea-specs/tabs-and-multiview.md#ed-multiview-002"
+    },
+    {
+      "board": "claudedocs/code-workspace-idea-parity-backlog.md",
+      "id": "ED-MULTIVIEW-003",
+      "status": "done",
+      "spec": "claudedocs/code-workspace-idea-specs/tabs-and-multiview.md#ed-multiview-003"
+    },
+    {
+      "board": "claudedocs/code-workspace-idea-parity-backlog-2026-09-tree-e2e.md",
+      "id": "ED-TREE-001",
+      "status": "done",
+      "spec": "docs-issue/project-tree-keyboard-idea-alignment-design.md#ed-tree-001"
+    }
+  ],
+  "historical_raw": {
+    "qa-ui-auto-report/project-tree-e2e/idea": "missing on this host",
+    "qa-ui-auto-report/overall-audit-20260913": "missing on this host"
+  },
+  "qa_readonly": {
+    "plan": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/qa-plan.json",
+    "status": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/qa-status.json",
+    "identity": {
+      "source_sha256": "227e3a831301a0550fe4893e67f34c17718e674d19eb7e9420f96c7adef0b85f",
+      "runner_sha256": "e5081e48ab279b114041bbd062f74a7eba69371ad42dd76a8c849d19d7357c6b"
+    },
+    "selected": "TC-IDE-TREE-01-project-tree-keyboard-native",
+    "native:Linux": "unverified",
+    "status_ok": false
+  },
+  "executed_product_tests": 0,
+  "product_builds": 0,
+  "taomni_launches": 0,
+  "browser_native_runner_launches": 0,
+  "delegation": false,
+  "claims": false,
+  "commits_pushes": false,
+  "idea_reference": {
+    "id": "REF-TREE-OPEN-FOCUS-LINUX-20260914",
+    "version": "IntelliJ IDEA Ultimate 2026.2.2",
+    "build": "IU-262.10315.125",
+    "reference": "docs-feature/code-workspace-idea-parity/references/project-tree-open-focus-linux-2026.2.2.md",
+    "artifact_inventory": "docs-feature/code-workspace-idea-parity/evidence/tree-open-focus-artifacts-20260914.json",
+    "clean_recapture": "r2-10..27 main sequence valid; first-session 70..72 foreign-focus attempts invalid",
+    "desktop_returned": true,
+    "restored_seed_hashes": true
+  },
+  "decision": {
+    "id": "DEC-TOF-01",
+    "source": "explicit user choice in this conversation",
+    "value": "首包修订单击合同；single select / double or Enter formal open; other preview policies and global default retained"
+  },
+  "new_task": {
+    "board": "claudedocs/code-workspace-idea-parity-backlog-tree-open-focus.md",
+    "id": "ED-TREEOPEN-001",
+    "author_status": "ready",
+    "claimed": false
+  },
+  "final_audit_at": "2026-09-14T16:01:04.213620+08:00",
+  "final_production_hash_check": "all 15 unchanged; git diff HEAD src/src-tauri/qa-ui-auto-tests/.agents empty",
+  "planning_checks": {
+    "task_board_validate": "passed: 1 task",
+    "task_board_list_claimable": "passed: ED-TREEOPEN-001",
+    "git_diff_check": "passed",
+    "links": "new Markdown targets resolve; 35 existing P0 raw-image link occurrences unavailable on host, preserved and documented",
+    "note": "metadata/doc checks only; no product AC executed",
+    "diagram": "drawio/SVG XML parsed; headless derivative layout reviewed, no GUI launch"
+  }
+}

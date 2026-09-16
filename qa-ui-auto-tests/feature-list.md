@@ -5123,6 +5123,18 @@ controls:
     selector: '[data-testid="code-workspace-debug-target"]'
     kind: interactive
     optional: true       # desktop-only and requires an available adapter
+  - id: bottom-dock
+    selector: '[data-testid="code-workspace-bottom-dock"]'
+    kind: display
+    optional: true
+  - id: bottom-dock-body
+    selector: '[data-testid="code-workspace-bottom-dock-body"]'
+    kind: display
+    optional: true
+  - id: bottom-dock-resize
+    selector: '[data-testid="code-workspace-bottom-dock-resize"]'
+    kind: interactive
+    optional: true
   - id: run-tab
     selector: '[data-testid="code-workspace-bottom-tab-run"]'
     kind: interactive
@@ -5135,6 +5147,22 @@ controls:
   - id: debug-tab
     selector: '[data-testid="code-workspace-bottom-tab-debug"]'
     kind: interactive
+  - id: bottom-tab-overflow
+    selector: '[data-testid="code-workspace-bottom-tab-overflow"]'
+    kind: interactive
+    optional: true       # rendered only when dock tabs exceed the header width
+  - id: bottom-tab-overflow-menu
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+    kind: display
+    optional: true       # mounted while the overflow dropdown is open
+  - id: bottom-tab-overflow-tests
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
+    kind: interactive
+    optional: true       # Tests entry inside the overflow dropdown
+  - id: bottom-tab-overflow-debug
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-debug"]'
+    kind: interactive
+    optional: true       # Debug entry inside the overflow dropdown
   - id: run-panel
     selector: '[data-testid="code-workspace-run-panel"]'
     kind: display
@@ -5768,6 +5796,9 @@ status: partial
 area: code-workspace/editor-shell
 components: [CodeWorkspaceTab, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog, RefactorRecoveryReviewDialog]
 files:
+  - src/components/editor/workspace/CodeMirrorHost.tsx
+  - src/components/editor/workspace/editorSearchPanel.ts
+  - src/components/editor/workspace/lspHyperlink.ts
   - src/components/editor/CodeWorkspaceTab.tsx
   - src/components/editor/workspace/RefactorRecoveryReviewDialog.tsx
   - src/components/editor/workspace/refactorPlan.ts
@@ -5779,6 +5810,11 @@ files:
   - src/components/editor/workspace/EditorGroup.tsx
   - src/components/editor/workspace/HighlightingWidget.tsx
   - src/components/editor/workspace/FileTreePane.tsx
+  - src/components/editor/workspace/ProjectTree.tsx
+  - src/components/editor/workspace/ProjectTree.css
+  - src/components/editor/workspace/projectTreeNavigation.ts
+  - src/components/editor/workspace/useWorkspaceFileActions.ts
+  - src/components/editor/workspace/useWorkspaceTreeData.ts
   - src/components/editor/workspace/TabSwitcher.tsx
   - src/components/editor/workspace/KeymapSettingsDialog.tsx
   - src/components/editor/workspace/ClipboardHistoryPopup.tsx
@@ -5792,6 +5828,27 @@ files:
   - src/components/editor/workspace/FileTemplateSettingsDialog.tsx
   - src/components/editor/workspace/NewJavaClassDialog.tsx
 controls:
+  - id: editor-find-panel
+    selector: '[data-testid="code-workspace-editor-search"]'
+    kind: display
+  - id: editor-find-input
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    kind: interactive
+  - id: editor-replace-input
+    selector: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+    kind: interactive
+  - id: editor-find-expand
+    selector: '[data-testid="code-workspace-editor-search"] button[aria-label="Show replace"]'
+    kind: interactive
+  - id: editor-find-more
+    selector: '[data-testid="code-workspace-editor-search"] button[aria-label="More search options"]'
+    kind: interactive
+  - id: editor-find-count
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    kind: display
+  - id: editor-find-close
+    selector: '[data-testid="code-workspace-editor-search"] button[aria-label="Close find and replace"]'
+    kind: interactive
   - id: tree-add-folder
     selector: '[data-testid="code-workspace-tree-add-folder"]'
     kind: interactive
@@ -5891,6 +5948,10 @@ controls:
     selector: '[data-testid="code-workspace-editor-tab-strip"]'
     kind: display
     optional: true       # only with an open buffer
+  - id: editor-split-layout
+    selector: '[data-testid="code-workspace-editor-split"]'
+    kind: display
+    optional: true       # appears after a real split action
   # ED-IMPROVE-007: per-leaf identity selectors used by the view-state restore
   # case; the pane attribute is set by EditorGroup and the tab strip activates
   # a leaf without moving its caret.

@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile>
+  <diagram name="Tree open focus">
+    <mxGraphModel pageWidth="1100" pageHeight="540" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="tree" value="1  TREE OWNS FOCUS&#10;README sole formal tab&#10;example selected (blue)&#10;Single click: select only&#10;Arrows: navigate / expand" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#e4edff;strokeColor=#536078;fontColor=#15233b;fontSize=14;align=left;spacing=18;">
+          <mxGeometry as="geometry" x="20" y="60" width="290" height="190" />
+        </mxCell>
+        <mxCell id="pending" value="2  OPEN PENDING&#10;Capture workspace / leaf / file&#10;Read or reuse loaded buffer&#10;Wait for matching view + snapshot&#10;Tree keeps focus until ready" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#fff0d5;strokeColor=#536078;fontColor=#15233b;fontSize=14;align=left;spacing=18;">
+          <mxGeometry as="geometry" x="400" y="60" width="290" height="190" />
+        </mxCell>
+        <mxCell id="editor" value="3  EDITOR OWNS FOCUS&#10;README + example formal tabs&#10;example selected (inactive gray)&#10;Caret in exact active leaf&#10;Direct input -&gt; undo -&gt; restore" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#e2f1e6;strokeColor=#536078;fontColor=#15233b;fontSize=14;align=left;spacing=18;">
+          <mxGeometry as="geometry" x="780" y="60" width="290" height="190" />
+        </mxCell>
+        <mxCell id="cancel" value="REVOKED / FAILED&#10;No late focus or stale data commit&#10;Error can retry; preserve dirty data" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#ffe5e5;strokeColor=#536078;fontColor=#15233b;fontSize=14;align=left;spacing=18;">
+          <mxGeometry as="geometry" x="400" y="340" width="290" height="110" />
+        </mxCell>
+        <mxCell id="menu" value="TREE MENU&#10;Return tree -&gt; right click&#10;Esc returns tree; Open enters flow&#10;Outside click keeps new target" vertex="1" parent="1" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#ece8ff;strokeColor=#536078;fontColor=#15233b;fontSize=14;align=left;spacing=18;">
+          <mxGeometry as="geometry" x="780" y="340" width="290" height="110" />
+        </mxCell>
+        <mxCell id="e0" value="Enter / double click" edge="1" parent="1" source="tree" target="pending" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;strokeColor=#536078;fontSize=12;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e1" value="live + ready" edge="1" parent="1" source="pending" target="editor" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;strokeColor=#536078;fontSize=12;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e2" value="new intent / failure" edge="1" parent="1" source="pending" target="cancel" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;strokeColor=#536078;fontSize=12;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e3" value="return to tree" edge="1" parent="1" source="editor" target="menu" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;strokeColor=#536078;fontSize=12;">
+          <mxGeometry as="geometry" relative="1" />
+        </mxCell>
+        <mxCell id="e4" value="Esc" edge="1" parent="1" source="menu" target="tree" style="edgeStyle=orthogonalEdgeStyle;rounded=0;endArrow=block;strokeColor=#536078;fontSize=12;exitX=0.5;exitY=1;entryX=0.5;entryY=1;">
+          <mxGeometry as="geometry" relative="1">
+            <Array as="points">
+              <mxPoint x="925" y="480" />
+              <mxPoint x="165" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -246,6 +246,44 @@ describe("workspaceLayoutPersistence", () => {
     restored = readWorkspaceLayoutSnapshot("ws-corrupt")!;
     expect(restored.tabPolicyBackup).toBeUndefined();
   });
+
+  it("round-trips shellChromeState and preserves individual tool heights", () => {
+    writeWorkspaceLayoutSnapshot("ws-chrome-roundtrip", {
+      ...defaultWorkspaceLayoutSnapshot(),
+      shellChromeState: {
+        version: 1,
+        projectWidthPx: 480,
+        rightWidthPx: 300,
+        bottomHeightPx: 400,
+        bottomHeightByTool: {
+          problems: 450,
+          run: 330,
+        },
+      },
+    });
+
+    const restored = readWorkspaceLayoutSnapshot("ws-chrome-roundtrip");
+    expect(restored?.shellChromeState).toEqual({
+      version: 1,
+      projectWidthPx: 480,
+      rightWidthPx: 300,
+      bottomHeightPx: 400,
+      bottomHeightByTool: {
+        problems: 450,
+        run: 330,
+      },
+    });
+  });
+
+  it("falls back to legacy bottomDockHeight.v1 when shellChromeState is missing", () => {
+    window.localStorage.setItem("taomni.codeWorkspace.bottomDockHeight.v1", "260");
+    const normalized = normalizeWorkspaceLayoutSnapshot({
+      version: 2,
+      bottomDockOpen: true,
+    });
+    expect(normalized.shellChromeState?.bottomHeightPx).toBe(260);
+    expect(normalized.shellChromeState?.projectWidthPx).toBe(452);
+  });
 });
 
 // ---------------------------------------------------------------------------

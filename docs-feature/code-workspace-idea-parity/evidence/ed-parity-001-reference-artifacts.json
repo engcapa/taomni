@@ -1,0 +1,895 @@
+{
+  "reference_id": "REF-PARITY-001-LINUX-20260915",
+  "head": "05156e0f3b5e3e7702fa5092f9c4d41eafdd1c59",
+  "idea": "IU-262.10315.125",
+  "platform": "Linux/X11",
+  "sessions": [
+    "2026-09-15T12:58:21+08:00/2026-09-15T13:04:02+08:00",
+    "2026-09-15T13:08:01+08:00/2026-09-15T13:09:42+08:00"
+  ],
+  "taomni_executed": false,
+  "files": [
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/00-initial.json",
+      "sha256": "1070a85000d50a80f618b3a527423fd1ca7114e56e26797ad0f2e91c6030b4d5",
+      "bytes": 392,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/00-initial.png",
+      "sha256": "427d00ed253d9293b85025fb16e9917c5218aaa8b8f9162a830acb440023460a",
+      "bytes": 125673,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/01-open.json",
+      "sha256": "26f6d5f7c74a16c870ce097683a7037f3c12d850a6840ee612e6b42023c76cb6",
+      "bytes": 401,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/01-open.png",
+      "sha256": "39936668af1e43e673d434cff4756b9d253cfbb6aaf79edcfead9819e4a54db5",
+      "bytes": 118027,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/02-home.json",
+      "sha256": "2c2a9ae2fe5490f86289c3f418d8b4877db00c4963ee3f96e075a064e2175576",
+      "bytes": 403,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/02-home.png",
+      "sha256": "999f7b5bf4a56e6d95f4469b5d63675fb9c7dbc655a0537131ef40baaef51267",
+      "bytes": 118026,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/03-find.json",
+      "sha256": "39b19d4e3103aa31493335c453e34a88d717649adc3a3836cee35dd4048f5996",
+      "bytes": 400,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/03-find.png",
+      "sha256": "0de4526cdf02723e83e18792c306ca793868cd760e7b49bda2844f93034ed9be",
+      "bytes": 124340,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/04-select.json",
+      "sha256": "be351ae44947f98e0978651777b625c1ac25ffaa0a64e8a5c6b8ad6369996b62",
+      "bytes": 402,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/04-select.png",
+      "sha256": "d75ed9fd00390740697429c78671798ea7d500992781a2769ea26af549717259",
+      "bytes": 124273,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/05-query.json",
+      "sha256": "c24170fa771c8303eb9b7e91063f41e56431c8bd702c77f948033537bc58ac31",
+      "bytes": 386,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/05-query.png",
+      "sha256": "6f65278e9539917d8162d1a3f5b45b9143d4ef2cff8d9af28e959b0785023af3",
+      "bytes": 125299,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/06-next.json",
+      "sha256": "131f7400f775f805521a669a9916923bad4dd200b4dc7dcf46fa72000483f351",
+      "bytes": 386,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/06-next.png",
+      "sha256": "47331d37776d1d229e707962281502dc416b69db7c6ffb5571293126ee3e3519",
+      "bytes": 125388,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/07-prev.json",
+      "sha256": "87c2641ee58bd298c8eeb8fb182a254fb2b1ccef0ec29a2926bf794438bfecf9",
+      "bytes": 403,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/07-prev.png",
+      "sha256": "6f65278e9539917d8162d1a3f5b45b9143d4ef2cff8d9af28e959b0785023af3",
+      "bytes": 125299,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/08-escape.json",
+      "sha256": "fdbdf8562423629e35cf610789520e149de4428d7af1c78668adf2f56e0d23ec",
+      "bytes": 388,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/08-escape.png",
+      "sha256": "ea9bdea329148b7c55be5285fb8f6a3aeaefa82279680f7db97e3217a07deed9",
+      "bytes": 120060,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/09-repeat.json",
+      "sha256": "c931697af53c81dda61dbb118d284140dc586884f0e344e71cb80267ddde8c63",
+      "bytes": 402,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/09-repeat.png",
+      "sha256": "548b8fa47881e34d86e4421a1158f9a9abf052885a7bbe7cf2d64a59d386bd66",
+      "bytes": 125261,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/10-repeat-close.json",
+      "sha256": "fe60d54e9e12398fde55f9634e3aca4066d933ca217d0a626766aec65974c327",
+      "bytes": 394,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/10-repeat-close.png",
+      "sha256": "ea9bdea329148b7c55be5285fb8f6a3aeaefa82279680f7db97e3217a07deed9",
+      "bytes": 120060,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/11-java-open.json",
+      "sha256": "9fe751dbb61a0fe3821ba2da15b50019d35630b8551d417d05a3639e3a7678ba",
+      "bytes": 381,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/11-java-open.png",
+      "sha256": "2e119434f3b49aa606a596c72569a24a61bc624bd87dd381757809ddd5f366e9",
+      "bytes": 18868,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/12-new-window.json",
+      "sha256": "4993a73dd6e752d9024fe0953a83f435349379c0a671181f91b513029053d03c",
+      "bytes": 409,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/12-new-window.png",
+      "sha256": "e353cb1696d1e56ed3e2e29d60ba6b24f7718d3eb82b6899eea1d8d7b1401e81",
+      "bytes": 37517,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/13-java-state.json",
+      "sha256": "9da6e7b9b7e46288815e76fb240d7c364afeee6cb1e0d99d8f25b2a8ffc26b48",
+      "bytes": 362,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/13-java-state.png",
+      "sha256": "e353cb1696d1e56ed3e2e29d60ba6b24f7718d3eb82b6899eea1d8d7b1401e81",
+      "bytes": 37517,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/14-trust.json",
+      "sha256": "e1b1fa6a3c7ca42e3f17c886e4a0e1fb77795612d1437dd1b0d0790720e028a6",
+      "bytes": 395,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/14-trust.png",
+      "sha256": "b41363bc6a10dae694e005cb08b36b18c1a3062aecbd6bb56a06733fca827492",
+      "bytes": 19624,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/15-project-ready.json",
+      "sha256": "b18e572c6c419862bd5c708671dcfc161f00f4e8449d37f1e2259307510c8d08",
+      "bytes": 384,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/15-project-ready.png",
+      "sha256": "0618bb222d8db883869ce80b688a86e1bdf3c6544c0cfd0f4d7c415a7ae1c8e4",
+      "bytes": 136522,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/16-load-maven.json",
+      "sha256": "80223e0899ea54bf20a7d5ae6c546df1607eecc8082d3e58257aef55500b6bd8",
+      "bytes": 419,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/16-load-maven.png",
+      "sha256": "6277d05e026c09c6d95bf3bf82fe2960b2676fc3e9604d829f38d3d0c1b704d1",
+      "bytes": 120382,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/17-goto-file.json",
+      "sha256": "219a5632577999907a75aedeee846c565495caf4a8a1abb5b1b36060dc8185f2",
+      "bytes": 436,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/17-goto-file.png",
+      "sha256": "6617c6f34ec0d3eac3ddc2f3f210470c7fc8bafbc863145261120b06fe3797d1",
+      "bytes": 127072,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/18-main-search.json",
+      "sha256": "e30db42a5120face5b6ee5fda1bb9a72b7e04a384a405839ef8b08e2b61a7ed7",
+      "bytes": 408,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/18-main-search.png",
+      "sha256": "9638ac418f71566c53379ecd322162ad1d1156c292192d1637384c6593db188f",
+      "bytes": 128262,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/19-main-open.json",
+      "sha256": "854db46988c7ad8cbe8ec7591e4922f983147058db2cf6615085d2c576006dc8",
+      "bytes": 407,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/19-main-open.png",
+      "sha256": "db599a940d4480e6b1202de65cd5e0e0705199af8a10e494a1fbfac4614498b6",
+      "bytes": 122302,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/20-main-visible.json",
+      "sha256": "3f52ed2488a8084edc4ae7ff2820c6e194b251d2edc516c0b93f3bc2582200b7",
+      "bytes": 383,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/20-main-visible.png",
+      "sha256": "db599a940d4480e6b1202de65cd5e0e0705199af8a10e494a1fbfac4614498b6",
+      "bytes": 122302,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/21-goto.json",
+      "sha256": "2c4f7024d0d17106406af526738c7b1cf90b8df56f0bcadc944934c905c9f905",
+      "bytes": 431,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/21-goto.png",
+      "sha256": "8980d0252473c7afa8b5375ce275e0f8395e9f8cd2e0c03cba5747aeed61aa9d",
+      "bytes": 124958,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/23-select-query.json",
+      "sha256": "7353f21505109818fca5fa8656cac82e54765074df07e2a4bf408710f80e1038",
+      "bytes": 424,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/23-select-query.png",
+      "sha256": "20a8710780257c25b684cba0d1ad2902257fd77ed1396fdfc92220a0c7176e5e",
+      "bytes": 124417,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/24-main-java.json",
+      "sha256": "bca8905734966799516b3cd8f332a3377a650f9b42b347af7fdc5fba88abcced",
+      "bytes": 411,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/24-main-java.png",
+      "sha256": "641ba3b39c2d1b23cf729377753920e30c1b7bfb3c0b5ae19b81bbe9f599ef4b",
+      "bytes": 124779,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/25-open-main.json",
+      "sha256": "c9f3e346edd8747e44e5cf79a22feebc7f0ba2e1672e2a5d391613c64933d396",
+      "bytes": 400,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/25-open-main.png",
+      "sha256": "a470222e4137a9f107b71829afef224fa7faf97c39a46a94b13f65934d04318c",
+      "bytes": 127262,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/26-home.json",
+      "sha256": "2eb908b1c1ddc516c3cc3d98a378fdd17180b89cb5018fba50de0c030ef056e5",
+      "bytes": 405,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/26-home.png",
+      "sha256": "eb437a719b6194115ec0bdf19717df687133896357e06c0a9ee9078b04ddb7b7",
+      "bytes": 129033,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/27-find.json",
+      "sha256": "8d086605e9106f8b57960c54c8c93607db399ee0120a0b1fcd6a227ab5b008c8",
+      "bytes": 402,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/27-find.png",
+      "sha256": "528b5ee31a93fe7f03e14d780498c527cfb565f438a0f59cdfa9eed7e3aba338",
+      "bytes": 137178,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/28-query-select.json",
+      "sha256": "ff86949c55f5a61dcf37bdcf7b88e6844ed1dc81984334660bba755c95cf3558",
+      "bytes": 410,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/28-query-select.png",
+      "sha256": "25a54b707fd94f8dc045df1223400c244aef5f1b3b628c162fd2fc8c56c15604",
+      "bytes": 137597,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/29-greet.json",
+      "sha256": "cc1d244996765426c4a547ce589375f72d1243e510ef0b2e6a3fec5ba7dd60ea",
+      "bytes": 389,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/29-greet.png",
+      "sha256": "3093e6fdf7b78016f6ded9e6b0f458025a49f4f5b635313333e03f3f1e234115",
+      "bytes": 135453,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/30-next.json",
+      "sha256": "daf215f89de5b91f016601cb3b2830af670b1cb356aa749b6b4c1fa2ea77dab1",
+      "bytes": 388,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/30-next.png",
+      "sha256": "f6eb370f520c6360deaf68aa501cc24b991c99c2260898a856edd476a6b927c8",
+      "bytes": 135896,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/31-prev.json",
+      "sha256": "44982a8991593d7a5d3245feea630467de69ee5dc2f5b24237a6f8dd20370c18",
+      "bytes": 405,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/31-prev.png",
+      "sha256": "9ec1015b36910b234595f0035db2a5f66a774bcb6a6d321e042a6dbb04501128",
+      "bytes": 135426,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/32-escape.json",
+      "sha256": "2d63f081034c5da327f965174f4f6e6ca666b493ea3664a6020012806c3633cc",
+      "bytes": 390,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/32-escape.png",
+      "sha256": "4d5fc96984d1adf1e06848a6076f411e5793c1a30ba281553343ca8fe41d4062",
+      "bytes": 130515,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/33-hover.json",
+      "sha256": "a9aecd295fc31ce01b42c351a5f377c8d2a0c72b3623f925aaffa9b4b7a90b6e",
+      "bytes": 399,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/33-hover.png",
+      "sha256": "44b336c87100ecdb58538035419d87ecf8612ec9af9461c56ac0f6ad2c18c2f7",
+      "bytes": 129824,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/34-mod-hover.json",
+      "sha256": "d0c861ce6f99ff226a092d94731fbb2bb571f885e2049a130192d4fa45273cda",
+      "bytes": 397,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/34-mod-hover.png",
+      "sha256": "44b336c87100ecdb58538035419d87ecf8612ec9af9461c56ac0f6ad2c18c2f7",
+      "bytes": 129824,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/35-release.json",
+      "sha256": "51e7a0d16cb829c684437ea829ac4e051fb4a5aa1abc2252601524306a286b4d",
+      "bytes": 398,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/35-release.png",
+      "sha256": "8adf04c9644bedd9c63d51d3e19c28895aa174c713fc2543ad14f88897546bd8",
+      "bytes": 129769,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/36-definition.json",
+      "sha256": "27fd4ad8ccd9d282db2d22ff0082404951678bdc921d0fa1c72de22974d56bbd",
+      "bytes": 408,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/36-definition.png",
+      "sha256": "9f6057110830cb592837138610af7c5c824b5c675d87c8bab7ba43a42f0736af",
+      "bytes": 128027,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/37-back.json",
+      "sha256": "48b10446219cb4384f9bf4bb092cd9b2467de62be967565bbdb8be1414213ebd",
+      "bytes": 418,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/37-back.png",
+      "sha256": "5b832984b41278aed8f1304d6183af14f29e46c7054a676bd4f6dade7599c758",
+      "bytes": 132177,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/38-repeat-find.json",
+      "sha256": "f6fae76a3af8a12cb15587eae49918c3323e09506275e6b1aff17af5a8d4a090",
+      "bytes": 409,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/38-repeat-find.png",
+      "sha256": "d86c73dda60c54fb9e70ebfeda0d446cfbf700e6316bf237c52f0feed63d0776",
+      "bytes": 136019,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/39-repeat-escape.json",
+      "sha256": "80d10a02a9f84e4dcaa0fda20c91e64f76234b5606ac7faae2d6dd436b338709",
+      "bytes": 397,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/39-repeat-escape.png",
+      "sha256": "014312bd34b8c3b22c6db3871c44964c39328894ad08fd1ab2dac0c2d655fc02",
+      "bytes": 131959,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/40-back-alt.json",
+      "sha256": "f2074f8b09eabb6e4a72f1c68f2929fa837cb558ad36a7b423afa02d8c090a1b",
+      "bytes": 405,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/40-back-alt.png",
+      "sha256": "6e6008e443b5a73c2cf880c4f6db810df3f2e42d460335430f2f9762ad5f05f7",
+      "bytes": 131314,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/41-main-find.json",
+      "sha256": "8ee74dbf8c041dd77c4409ebf0ccd486f5e311d932b1455628d92d4a745191f6",
+      "bytes": 407,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/41-main-find.png",
+      "sha256": "367bf4b3d694901d37f2849e20fd7a861776cc486aa7d302316fb3051dd194eb",
+      "bytes": 136180,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/42-main-escape.json",
+      "sha256": "e0612bb20c275e418c9a3e7a72a27d716964ea16ddeb4d83305747d89807405d",
+      "bytes": 395,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/42-main-escape.png",
+      "sha256": "095a568ed503a71d1a4ce21ce5e0bc3f623144a7263c25e0f8de7b3e3a27c048",
+      "bytes": 131425,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/43-definition-repeat.json",
+      "sha256": "a0d3e2b46899b960714e2c28eff27cf856a560d4ff2ea7154f132c4b50e1d640",
+      "bytes": 415,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/43-definition-repeat.png",
+      "sha256": "014312bd34b8c3b22c6db3871c44964c39328894ad08fd1ab2dac0c2d655fc02",
+      "bytes": 131959,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/44-back-repeat.json",
+      "sha256": "92912dea74bdbc9ac035df03032f1cabe17b5abc77ffecd768f10bcecc503887",
+      "bytes": 408,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/44-back-repeat.png",
+      "sha256": "095a568ed503a71d1a4ce21ce5e0bc3f623144a7263c25e0f8de7b3e3a27c048",
+      "bytes": 131425,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/45-end.json",
+      "sha256": "dceb0f1792ae2b540b62da1796d998d56bd8a1cf71631fff9757beec22c15a9f",
+      "bytes": 360,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/45-end.png",
+      "sha256": "9d60859e7e95ce1eb392f1f16c6ff9189559800be45ff9f409aaf61b770651a1",
+      "bytes": 131294,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/capture.py",
+      "sha256": "90d095f851f7632e417243568d76c44437f26373fe0d95b2ac550b0a56adab5a",
+      "bytes": 4221,
+      "kind": "diagnostic-or-collector"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/f0-source-hash.json",
+      "sha256": "e9194922a48fbdba546d9e4d4486e3e6ffd649c5694824882e6e2dc43b198010",
+      "bytes": 200,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/final-hashes.json",
+      "sha256": "fd7b5c88eb5143e5054e682edd0dc32a6d05bd894eaafddb80a65af2ee7b0f3e",
+      "bytes": 796,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/fixture-manifest.json",
+      "sha256": "9100184d6a896ea7be8436b6f1a586983ee93d510fc2a50fd890901d790b6645",
+      "bytes": 388,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/idea-diagnostic-excerpt.txt",
+      "sha256": "d091fa8ee86eaef10d501574efcd2fb93690a176a64a87066b457e3130919111",
+      "bytes": 4895,
+      "kind": "diagnostic-or-collector"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/measurements.json",
+      "sha256": "95bc68d140ab0208b25eec50c55ad1f3d04e07cc2370cc03a7ea9e8e6d532858",
+      "bytes": 710,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-00-initial-cursor.json",
+      "sha256": "06cd8537e4fe68d58382ba1c0cd1f63de45e97f19a10165b44e5709d9ff3c1dd",
+      "bytes": 87,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-00-initial-cursor.png",
+      "sha256": "90be638ff0af9ad35dc05354d56403b9a0d903cba8a6004ee7cb5cd87f867e94",
+      "bytes": 790,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-00-initial.json",
+      "sha256": "8829011dad437f59208e59d9fc5d869e6ec506ce276ffa9a6d2d187491f78814",
+      "bytes": 367,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-00-initial.png",
+      "sha256": "bb62858c1315af7ec7181bd397096787008b6fc2912a1b0159200dfa42e91360",
+      "bytes": 133007,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-01-unselect-cursor.json",
+      "sha256": "06cd8537e4fe68d58382ba1c0cd1f63de45e97f19a10165b44e5709d9ff3c1dd",
+      "bytes": 87,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-01-unselect-cursor.png",
+      "sha256": "90be638ff0af9ad35dc05354d56403b9a0d903cba8a6004ee7cb5cd87f867e94",
+      "bytes": 790,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-01-unselect.json",
+      "sha256": "3aa87f72c8c17d51c723adb56b9747ef4d415ce5dd5f50074f4b959cf1860fd9",
+      "bytes": 394,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-01-unselect.png",
+      "sha256": "1f5e12a854bb1c92613d6fdf92376b328264d3e3dbc656535ce6cdb307f0cbcf",
+      "bytes": 132399,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-02-away-cursor.json",
+      "sha256": "f8b266744f5305dafd99e901a0770bf8997967fd20a85b21f9266abfe6df9a4a",
+      "bytes": 89,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-02-away-cursor.png",
+      "sha256": "80daadd54183bfa6cca5aac5445e6be540546e0c7eed888f45b80af4fc347480",
+      "bytes": 673,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-02-away.json",
+      "sha256": "35ae93facbb49f01430d02d213380cdb6d376a58332553c6189eff1f96d4678b",
+      "bytes": 401,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-02-away.png",
+      "sha256": "4a95980aae88a90824cd9aea8172b72800a14148befa38f09efa9e7fd6303970",
+      "bytes": 131344,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-03-hold-cursor.json",
+      "sha256": "f8b266744f5305dafd99e901a0770bf8997967fd20a85b21f9266abfe6df9a4a",
+      "bytes": 89,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-03-hold-cursor.png",
+      "sha256": "80daadd54183bfa6cca5aac5445e6be540546e0c7eed888f45b80af4fc347480",
+      "bytes": 673,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-03-hold.json",
+      "sha256": "e70de63606752a3f0ee91f43554a69bf387878b7c1a871e43820651d59382b6c",
+      "bytes": 395,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-03-hold.png",
+      "sha256": "835389ea3a8b256b4f7e8e5047cc7d0826811c95818debd14785602206d56786",
+      "bytes": 131448,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-04-hover-cursor.json",
+      "sha256": "0e0d939908d535b2146a765894b8c2c1622af706f2d3191b0df52f64b48a1542",
+      "bytes": 88,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-04-hover-cursor.png",
+      "sha256": "8505ed1f478020e37096edbc3534c48d7dd630dd8e9e7feb64355e94c9d64861",
+      "bytes": 946,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-04-hover.json",
+      "sha256": "5b5f03dbfd8d6c27b8c93d1d1b372c1ba94a24cfb4dd975f6b3c32f631ca2dc6",
+      "bytes": 402,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-04-hover.png",
+      "sha256": "8c1462d50ea85b6e8d3e2c985ec2fa6e9aff6c4727734dfd8d1d0b2dccfdf133",
+      "bytes": 131292,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-05-release-cursor.json",
+      "sha256": "db7642d371ddcb4467a9d9a64085ef26377649a62254c355ad8a593a8a5eb127",
+      "bytes": 89,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-05-release-cursor.png",
+      "sha256": "80daadd54183bfa6cca5aac5445e6be540546e0c7eed888f45b80af4fc347480",
+      "bytes": 673,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-05-release.json",
+      "sha256": "bb83f981374d1c74021de9f5df95f418c0ac3148abf01e3a77d667041b2493e1",
+      "bytes": 401,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-05-release.png",
+      "sha256": "835389ea3a8b256b4f7e8e5047cc7d0826811c95818debd14785602206d56786",
+      "bytes": 131448,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-06-held-cursor.json",
+      "sha256": "db7642d371ddcb4467a9d9a64085ef26377649a62254c355ad8a593a8a5eb127",
+      "bytes": 89,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-06-held-cursor.png",
+      "sha256": "80daadd54183bfa6cca5aac5445e6be540546e0c7eed888f45b80af4fc347480",
+      "bytes": 673,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-06-held.json",
+      "sha256": "9db5ce131109c149fc8e906d4adce34edf1689d87f9042ba2a5c9e8923f70f06",
+      "bytes": 395,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-06-held.png",
+      "sha256": "4a95980aae88a90824cd9aea8172b72800a14148befa38f09efa9e7fd6303970",
+      "bytes": 131344,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-07-hover-cursor.json",
+      "sha256": "63c09e534ad579625ef154681c1df36786066bc5cc658ff74ab1bdcef023dc8d",
+      "bytes": 88,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-07-hover-cursor.png",
+      "sha256": "8505ed1f478020e37096edbc3534c48d7dd630dd8e9e7feb64355e94c9d64861",
+      "bytes": 946,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-07-hover.json",
+      "sha256": "9a3088642fcde6a5b9d66a7291db64006e9518973818688b683b1f1ad304816c",
+      "bytes": 402,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-07-hover.png",
+      "sha256": "8c1462d50ea85b6e8d3e2c985ec2fa6e9aff6c4727734dfd8d1d0b2dccfdf133",
+      "bytes": 131292,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-08-find-cursor.json",
+      "sha256": "9ff45df56904673c528817aca9dd1ec1810d814a843542aabd563e18b1b3086d",
+      "bytes": 88,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-08-find-cursor.png",
+      "sha256": "90be638ff0af9ad35dc05354d56403b9a0d903cba8a6004ee7cb5cd87f867e94",
+      "bytes": 790,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-08-find.json",
+      "sha256": "2131a5e424532272277d0d5738dd7a52ec51fe0ba28002acc08bcfb6e4c4a83d",
+      "bytes": 386,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-08-find.png",
+      "sha256": "136ea4426dfbd3333b2381775c0caa7e02058e4042944a028386b21c1f64770d",
+      "bytes": 135955,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-09-release-cursor.json",
+      "sha256": "9ff45df56904673c528817aca9dd1ec1810d814a843542aabd563e18b1b3086d",
+      "bytes": 88,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-09-release-cursor.png",
+      "sha256": "90be638ff0af9ad35dc05354d56403b9a0d903cba8a6004ee7cb5cd87f867e94",
+      "bytes": 790,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-09-release.json",
+      "sha256": "cfd28fd2b612bcb09749c604cba57254f9418b800c4bca75b50f6de43f1c2c72",
+      "bytes": 401,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-09-release.png",
+      "sha256": "89dacdc0df0cc41d28ef0b10a5b6b5bfd6e7025f946aeb6d740790bfc453a32b",
+      "bytes": 135971,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-10-escape-cursor.json",
+      "sha256": "59fd811062d855e560e17ef04ebbb70dd4861823bf7773cd377030c7704f362a",
+      "bytes": 89,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-10-escape-cursor.png",
+      "sha256": "80daadd54183bfa6cca5aac5445e6be540546e0c7eed888f45b80af4fc347480",
+      "bytes": 673,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-10-escape.json",
+      "sha256": "26019e9a0b8a51726365d4b34f5998e0f8973ce8c8c5cc19a0ba027a112e3b19",
+      "bytes": 393,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-10-escape.png",
+      "sha256": "ae84c845c9a69e2985f1763540172b2b82b5932abc4e17a56d0f95dce7e8cfe4",
+      "bytes": 131123,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-11-end-cursor.json",
+      "sha256": "59fd811062d855e560e17ef04ebbb70dd4861823bf7773cd377030c7704f362a",
+      "bytes": 89,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-11-end-cursor.png",
+      "sha256": "80daadd54183bfa6cca5aac5445e6be540546e0c7eed888f45b80af4fc347480",
+      "bytes": 673,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-11-end.json",
+      "sha256": "4ec4d4c39c5775041288dfd2e0acbf7934991d25dc5474c3562f63e74b0df774",
+      "bytes": 363,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-11-end.png",
+      "sha256": "ae84c845c9a69e2985f1763540172b2b82b5932abc4e17a56d0f95dce7e8cfe4",
+      "bytes": 131123,
+      "kind": "original-observation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/r2-review.png",
+      "sha256": "bd0ea2c4b9cc245789ba782d68063621f0573cd171b9d70f82c2263e5e201c1f",
+      "bytes": 59707,
+      "kind": "derived-review"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/review-sheet.png",
+      "sha256": "0b58ee97a88ff7cc0db3d945ea0d81da43d7084ad8c05bec82c429aa14c6fced",
+      "bytes": 283017,
+      "kind": "derived-review"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-001/20260915-linux/settings-readonly.json",
+      "sha256": "e54d355b462a57da3bbadf2d988485f41481bbd6596714f07816afa7b65a6889",
+      "bytes": 1254,
+      "kind": "original-observation"
+    }
+  ]
+}

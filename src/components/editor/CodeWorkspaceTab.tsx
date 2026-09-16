@@ -335,7 +335,7 @@ import {
 import { EditorAiRewriteDialog } from "./workspace/EditorAiRewriteDialog";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { readText, readTextResult, writeText } from "../../lib/clipboard";
-import { useContextMenu } from "../ContextMenu";
+import { useContextMenu, type ContextMenuCloseReason } from "../ContextMenu";
 import { useChatStore } from "../../stores/chatStore";
 import {
   type EditorCommandId,
@@ -488,7 +488,7 @@ import {
   type ResourceCleanupHandlers,
   type ResourceCleanupOutcome,
 } from "./workspace/workspaceResourceRecoveryCoordinator";
-import { BottomDock } from "./workspace/panels/BottomDock";
+import { BottomDock, BOTTOM_DOCK_MIN_HEIGHT, BOTTOM_DOCK_MAX_HEIGHT } from "./workspace/panels/BottomDock";
 import {
   ReferencesPanel,
   type ReferencesResultState,
@@ -642,6 +642,7 @@ import {
 } from "./workspace/executionPlan";
 import { FileTreePane } from "./workspace/FileTreePane";
 import { ProjectTree } from "./workspace/ProjectTree";
+import { navigateProjectTree } from "./workspace/projectTreeNavigation";
 import { MarkdownPreview } from "./workspace/MarkdownPreview";
 import { IconButton, LspStatusPill } from "./workspace/workspaceChrome";
 import { OutlinePane } from "./workspace/OutlinePane";
@@ -1406,10 +1407,15 @@ export function CodeWorkspaceTab({
   const setLeafActiveTab = useCodeWorkspaceStore((s) => s.setLeafActiveTab);
   const setLayoutNodeRatios = useCodeWorkspaceStore((s) => s.setLayoutNodeRatios);
   const seedTreeExpandIfEmpty = useCodeWorkspaceStore((s) => s.seedTreeExpandIfEmpty);
+  const setShellChromeState = useCodeWorkspaceStore((s) => s.setShellChromeState);
+  const setBottomDockHeightForTool = useCodeWorkspaceStore((s) => s.setBottomDockHeightForTool);
+  const restoreDefaultToolWindowLayout = useCodeWorkspaceStore((s) => s.restoreDefaultToolWindowLayout);
   // The effect below initializes a missing instance after commit. Keeping the
   // render path read-only avoids notifying external-store subscribers during
   // render when a workspace is mounted for the first time.
   const workspaceUi = useCodeWorkspaceStore((s) => selectCodeWorkspaceUi(s, workspaceInstanceId));
+  const projectPanelRef = useRef<PanelImperativeHandle>(null);
+  const lastProjectPanelSizeRef = useRef(workspaceUi.shellChromeState?.projectWidthPx ?? 452);
 
   useEffect(() => {
     ensureWorkspaceUi(workspaceInstanceId);
@@ -1438,6 +1444,9 @@ export function CodeWorkspaceTab({
       if (snapshot.layoutRecovered) {
         setStatusMessage("Recovered invalid workspace layout into a single editor leaf");
       }
+      if (snapshot.shellChromeState?.projectWidthPx) {
+        lastProjectPanelSizeRef.current = snapshot.shellChromeState.projectWidthPx;
+      }
       setTabPolicy(snapshot.tabPolicy ?? { ...DEFAULT_WORKSPACE_TAB_POLICY_V3 });
       patchWorkspaceUi(workspaceInstanceId, {
         bottomDockOpen: snapshot.bottomDockOpen,
@@ -1450,6 +1459,7 @@ export function CodeWorkspaceTab({
         expandedRootIds: snapshot.expandedRootIds,
         expandedDirKeys: snapshot.expandedDirKeys,
         layoutTreeV2: snapshot.layoutTreeV2,
+        shellChromeState: snapshot.shellChromeState,
         editorGroups: Object.fromEntries(
           Object.entries(snapshot.editorGroups).map(([id, g]) => [
             id,
@@ -1549,6 +1559,19 @@ export function CodeWorkspaceTab({
     token: object;
     port: EditorCommandPort;
   }>());
+  interface TreeOpenIntent {
+    workspaceInstanceId: string;
+    groupId: EditorGroupId;
+    requestedFileKey: string;
+    canonicalFileKey?: string;
+    interactionEpoch: number;
+    requestId: number;
+  }
+  const treeInteractionEpochRef = useRef(0);
+  const treeOpenRequestIdRef = useRef(0);
+  const pendingTreeOpenIntentRef = useRef<TreeOpenIntent | null>(null);
+  const tryGrantTreeFocusRef = useRef<(intent: TreeOpenIntent, canonicalKey: string) => boolean>(() => false);
+
   const [editorCommandContextRevision, setEditorCommandContextRevision] = useState(0);
   const registerEditorCommandPort = useCallback((
     groupId: EditorGroupId,
@@ -1562,6 +1585,15 @@ export function CodeWorkspaceTab({
         port: registration.port,
       });
       setEditorCommandContextRevision((revision) => revision + 1);
+      if (pendingTreeOpenIntentRef.current) {
+        const intent = pendingTreeOpenIntentRef.current;
+        if (intent.groupId === groupId) {
+          const expectedKey = intent.canonicalFileKey ?? intent.requestedFileKey;
+          if (expectedKey === registration.fileKey) {
+            tryGrantTreeFocusRef.current(intent, registration.fileKey);
+          }
+        }
+      }
       return;
     }
     if (
@@ -1634,6 +1666,15 @@ export function CodeWorkspaceTab({
     }
     return activeEditorCommandState();
   }, [activeEditorCommandState, editorCommandOwnerFor]);
+  const handleReturnToEditor = useCallback(() => {
+    const owner = activeEditorCommandOwner();
+    if (owner?.port?.focus) {
+      owner.port.focus({ preventScroll: true });
+      return;
+    }
+    const cmContent = document.querySelector<HTMLElement>(".cm-editor .cm-content");
+    cmContent?.focus({ preventScroll: true });
+  }, [activeEditorCommandOwner]);
   /**
    * Resolve a provider-action invocation target. Context-menu payloads carry
    * the clicked file and position; keyboard/palette invocations fall back to
@@ -1732,8 +1773,6 @@ export function CodeWorkspaceTab({
       languagePanelOpen: typeof open === "function" ? open(prev) : open,
     });
   }, [patchWorkspaceUi, workspaceInstanceId]);
-  const projectPanelRef = useRef<PanelImperativeHandle>(null);
-  const lastProjectPanelSizeRef = useRef(24);
   const rightPanelRef = useRef<PanelImperativeHandle>(null);
   const lastRightPanelSizeRef = useRef(20);
   const setRightPaneOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
@@ -3048,13 +3087,13 @@ export function CodeWorkspaceTab({
     ) => {
       const isCurrent = options.isCurrent ?? (() => true);
       if (!isCurrent()) {
-        return;
+        return null;
       }
       // Switching tabs before the input idle timer fires must never show an
       // older buffer snapshot in the newly activated editor.
       flushPendingEditorText();
       if (!isCurrent()) {
-        return;
+        return null;
       }
       const key = fileKey(ref);
       const pendingClosedFile = pendingClosedFilesRef.current.get(key);
@@ -3120,22 +3159,23 @@ export function CodeWorkspaceTab({
         }
       }
       if (!isCurrent()) {
-        return;
+        return null;
       }
       // A close can have committed the layout before its LSP/buffer cleanup
       // finishes. Reopening the entry must wait for that cleanup so a late
       // buffer teardown cannot erase the newly visible editor.
       if (pendingClosedFile?.cleanup) {
         await pendingClosedFile.cleanup;
-        if (!isCurrent()) return;
+        if (!isCurrent()) return null;
         const latest = openFilesRef.current[key];
         if (pendingClosedFile.didCloseCompleted && latest && !latest.loading) {
           await syncLspDocument(latest, "open");
-          if (!isCurrent()) return;
+          if (!isCurrent()) return null;
         }
       }
       if (openFilesRef.current[key] && !openFilesRef.current[key].loading) {
-        return;
+        const existing = openFilesRef.current[key];
+        return { canonicalFileKey: existing?.key ?? key, groupId, error: existing?.error ?? null };
       }
       // Library sources (JDK / dependency classes) have no file to read: ask the
       // language server again so history and Recent Files can reopen them.
@@ -3150,7 +3190,7 @@ export function CodeWorkspaceTab({
             lspDescriptorForPath(library.originRootPath, library.originFilePath),
             library.uri,
           );
-          if (!isCurrent()) return;
+          if (!isCurrent()) return null;
           const info: LibraryBufferInfo = {
             ...library,
             title: contents.title || library.title,
@@ -3161,6 +3201,7 @@ export function CodeWorkspaceTab({
           libraryBuffersRef.current[key] = info;
           setOpenFiles((current) => ({ ...current, [key]: makeLibraryFile(info, contents.text) }));
           setStatusMessage(`Opened ${info.title}`);
+          return { canonicalFileKey: key, groupId, error: null };
         } catch (err) {
           const message = errorMessage(err);
           setOpenFiles((current) => ({
@@ -3172,8 +3213,8 @@ export function CodeWorkspaceTab({
             },
           }));
           setStatusMessage(message);
+          return { canonicalFileKey: key, groupId, error: message };
         }
-        return;
       }
       setOpenFiles((current) => ({
         ...current,
@@ -3184,7 +3225,7 @@ export function CodeWorkspaceTab({
           ? await workspaceReadFile(findRoot(ref.rootId)?.path ?? "", ref.path)
           : await workspaceReadLooseFile(ref.path);
         if (!isCurrent()) {
-          return;
+          return null;
         }
         const nextRef = ref.kind === "root" ? { ...ref, path: file.path } : { ...ref, path: file.path };
         const meta = fileMeta(nextRef, rootsRef.current, looseFilesRef.current);
@@ -3226,9 +3267,10 @@ export function CodeWorkspaceTab({
           pinnedKeys: group.pinnedKeys.map((item) => (item === key ? fileKey(nextRef) : item)),
         }));
         setStatusMessage(`Opened ${meta.subtitle}`);
+        return { canonicalFileKey: fileKey(nextRef), groupId, error: null };
       } catch (err) {
         if (!isCurrent()) {
-          return;
+          return null;
         }
         const message = errorMessage(err);
         setOpenFiles((current) => ({
@@ -3241,6 +3283,7 @@ export function CodeWorkspaceTab({
           },
         }));
         setStatusMessage(message);
+        return { canonicalFileKey: key, groupId, error: message };
       }
     },
     [
@@ -3255,6 +3298,96 @@ export function CodeWorkspaceTab({
       workspaceInstanceId,
     ],
   );
+
+  const tryGrantTreeFocus = useCallback((intent: TreeOpenIntent, canonicalKey: string): boolean => {
+    if (pendingTreeOpenIntentRef.current?.requestId !== intent.requestId) {
+      return false;
+    }
+    if (treeInteractionEpochRef.current !== intent.interactionEpoch) {
+      pendingTreeOpenIntentRef.current = null;
+      return false;
+    }
+    const store = useCodeWorkspaceStore.getState();
+    const currentUi = selectCodeWorkspaceUi(store, workspaceInstanceId);
+    if (currentUi.activeEditorGroupId !== intent.groupId) {
+      return false;
+    }
+    if (currentUi.editorGroups[intent.groupId]?.activeKey !== canonicalKey) {
+      return false;
+    }
+    const active = document.activeElement;
+    if (active && active instanceof HTMLElement) {
+      if (active.matches("input, textarea, select, [contenteditable='true']") && !active.closest(".cm-editor")) {
+        pendingTreeOpenIntentRef.current = null;
+        return false;
+      }
+    }
+    const owner = editorCommandPortsRef.current.get(intent.groupId);
+    if (owner && owner.fileKey === canonicalKey && owner.port.focus) {
+      const focused = owner.port.focus({ preventScroll: true });
+      if (focused) {
+        pendingTreeOpenIntentRef.current = null;
+        return true;
+      }
+    }
+    return false;
+  }, [workspaceInstanceId]);
+
+  useEffect(() => {
+    tryGrantTreeFocusRef.current = tryGrantTreeFocus;
+  }, [tryGrantTreeFocus]);
+
+  const requestTreeOpen = useCallback(async (
+    ref: CodeWorkspaceFileRef,
+    options: {
+      targetGroupId?: EditorGroupId;
+      split?: boolean;
+      preview?: boolean;
+    } = {},
+  ) => {
+    flushPendingEditorText();
+    treeInteractionEpochRef.current += 1;
+    const epoch = treeInteractionEpochRef.current;
+    const requestId = ++treeOpenRequestIdRef.current;
+
+    const currentUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    let targetGroupId = options.targetGroupId ?? currentUi.activeEditorGroupId;
+
+    if (options.split) {
+      splitLayoutLeaf(workspaceInstanceId, currentUi.activeEditorGroupId, "vertical");
+      const nextUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+      targetGroupId = nextUi.activeEditorGroupId !== currentUi.activeEditorGroupId
+        ? nextUi.activeEditorGroupId
+        : currentUi.activeEditorGroupId;
+    }
+
+    const reqKey = fileKey(ref);
+    const intent: TreeOpenIntent = {
+      workspaceInstanceId,
+      groupId: targetGroupId,
+      requestedFileKey: reqKey,
+      interactionEpoch: epoch,
+      requestId,
+    };
+    pendingTreeOpenIntentRef.current = intent;
+
+    const result = await openFile(ref, {
+      groupId: targetGroupId,
+      preview: options.preview ?? false,
+      isCurrent: () => pendingTreeOpenIntentRef.current?.requestId === requestId,
+    });
+
+    if (pendingTreeOpenIntentRef.current?.requestId !== requestId) {
+      return;
+    }
+    if (!result || result.error) {
+      pendingTreeOpenIntentRef.current = null;
+      return;
+    }
+
+    intent.canonicalFileKey = result.canonicalFileKey;
+    tryGrantTreeFocus(intent, result.canonicalFileKey);
+  }, [flushPendingEditorText, openFile, splitLayoutLeaf, tryGrantTreeFocus, workspaceInstanceId]);
 
   const removeRecoveryEntry = useCallback((entry: WorkspaceRecoveryEntry) => {
     pendingWorkspaceRecoveryKeysRef.current.delete(entry.key);
@@ -3643,6 +3776,7 @@ export function CodeWorkspaceTab({
       editorGroups: persistableGroups,
       layoutTreeV2: workspaceUi.layoutTreeV2,
       tabPolicy: tabPolicyRef.current,
+      shellChromeState: workspaceUi.shellChromeState,
       // ED-REPAIR-009: Preserve captured snapshot identities without re-stamping from live text.
       viewStates: enrichViewStatesWithIdentity(
         viewStatesRef.current,
@@ -3666,6 +3800,7 @@ export function CodeWorkspaceTab({
     splitOrientation,
     workspaceInstanceId,
     workspaceUi.layoutTreeV2,
+    workspaceUi.shellChromeState,
   ]);
 
   persistWorkspaceLayoutNowRef.current = persistWorkspaceLayoutNow;
@@ -3689,6 +3824,7 @@ export function CodeWorkspaceTab({
     splitOrientation,
     workspaceInstanceId,
     workspaceUi.layoutTreeV2,
+    workspaceUi.shellChromeState,
     tabPolicyRevision,
     viewStateRevision,
   ]);
@@ -3767,11 +3903,37 @@ export function CodeWorkspaceTab({
     onStatus: setStatusMessage,
   });
 
+  const treeContextMenuSessionRef = useRef<{
+    workspaceInstanceId: string;
+    selection: TreeSelection | null;
+    consumed: boolean;
+  } | null>(null);
+
+  const handleTreeContextMenuClose = useCallback((reason?: ContextMenuCloseReason) => {
+    const session = treeContextMenuSessionRef.current;
+    treeContextMenuSessionRef.current = null;
+    if (!session || session.consumed) {
+      return;
+    }
+    if (reason === "escape") {
+      const pane = treePaneRef.current;
+      if (pane) {
+        const item = pane.querySelector<HTMLElement>("[role='treeitem'][data-selected='true']");
+        if (item) {
+          item.focus({ preventScroll: true });
+        } else {
+          const tree = pane.querySelector<HTMLElement>("[data-testid='code-workspace-tree']");
+          tree?.focus({ preventScroll: true });
+        }
+      }
+    }
+  }, []);
+
   const {
     show: openTreeContextMenu,
     showAt: openTreeContextMenuAt,
     render: treeContextMenu,
-  } = useContextMenu();
+  } = useContextMenu({ onClose: handleTreeContextMenuClose });
   const {
     showAt: openEditorContextMenuAt,
     render: editorContextMenu,
@@ -4022,63 +4184,53 @@ export function CodeWorkspaceTab({
 
   const handleTreeKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
     const pane = treePaneRef.current;
-    if (!pane) return;
-    // Ignore when typing in the filter input.
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
-    const rows = Array.from(pane.querySelectorAll<HTMLElement>(
-      "[data-testid='code-workspace-tree-root'], [data-testid='code-workspace-tree-dir'], [data-testid='code-workspace-tree-file'], [data-testid='code-workspace-flat-file']",
-    ));
-    if (rows.length === 0) return;
-    const selectedIndex = Math.max(0, rows.findIndex((row) => row.dataset.selected === "true"));
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    const target = event.target;
+    if (!pane || !(target instanceof HTMLElement) || event.nativeEvent.isComposing) return;
+    const tree = pane.querySelector<HTMLElement>("[data-testid='code-workspace-tree']");
+    if (!tree || (target !== pane && !tree.contains(target))) return;
+    if (target.closest("input, textarea, select, [contenteditable='true']")) return;
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey &&
+      navigateProjectTree(tree, event.key, { onSelect: setSelected, onToggleRoot: toggleRoot, onToggleDir: toggleDir })) {
       event.preventDefault();
-      const next = event.key === "ArrowDown"
-        ? Math.min(rows.length - 1, selectedIndex + 1)
-        : Math.max(0, selectedIndex - 1);
-      rows[next]?.click();
-      rows[next]?.focus();
+      treeInteractionEpochRef.current += 1;
+      pendingTreeOpenIntentRef.current = null;
       return;
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      if (selected?.kind === "file" && (event.ctrlKey || event.metaKey)) {
-        const current = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-        // §8.16.4 N6.6: tree Ctrl+Enter splits the active recursive leaf.
-        splitLayoutLeaf(workspaceInstanceId, current.activeEditorGroupId, "vertical");
-        const next = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-        const targetGroupId: EditorGroupId | undefined = next.activeEditorGroupId !== current.activeEditorGroupId
-          ? next.activeEditorGroupId
-          : undefined;
-        void openFile(selected.ref, targetGroupId ? { groupId: targetGroupId } : undefined);
-      } else if (selected?.kind === "file") void openFile(selected.ref);
-      else rows[selectedIndex]?.click();
+      if (selected?.kind === "file") {
+        void requestTreeOpen(selected.ref, { split: event.ctrlKey || event.metaKey });
+      } else if (selected?.kind === "root") toggleRoot(selected.rootId);
+      else if (selected?.kind === "dir") toggleDir(selected.rootId, selected.path);
+      return;
+    }
+    if ((event.nativeEvent as KeyboardEvent).isComposing) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleReturnToEditor();
       return;
     }
     if (event.key === "F2") {
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.rename", { focus: "tree", payload: { selection: selected ?? undefined } });
-      return;
-    }
-    if (event.key === "Delete") {
+    } else if (event.key === "Delete") {
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.delete", { focus: "tree", payload: { selection: selected ?? undefined } });
-      return;
     }
-    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-      // Expand/collapse by re-clicking directory/root rows.
-      const row = rows[selectedIndex];
-      if (!row) return;
-      if (row.dataset.testid === "code-workspace-tree-dir" || row.dataset.testid === "code-workspace-tree-root") {
-        event.preventDefault();
-        row.click();
-      }
-    }
-  }, [openFile, selected, workspaceInstanceId]);
+  }, [handleReturnToEditor, requestTreeOpen, selected, setSelected, toggleDir, toggleRoot]);
 
   const showTreeContextMenu = useCallback(
     (event: React.MouseEvent, selection: TreeSelection) => {
       setSelected(selection);
+      treeContextMenuSessionRef.current = {
+        workspaceInstanceId,
+        selection,
+        consumed: false,
+      };
       const run = (commandId: string, payload: WorkspaceTreeCommandPayload) => () => {
+        if (treeContextMenuSessionRef.current) {
+          treeContextMenuSessionRef.current.consumed = true;
+        }
         workspaceCommandRunnerRef.current(commandId, { focus: "tree", payload });
       };
       const clipboardItems = (
@@ -4101,7 +4253,25 @@ export function CodeWorkspaceTab({
           onClick: () => void pasteTreeClipboard(directory),
         },
       ];
-      if (selection.kind === "file" && selection.ref.kind === "root") {
+      if (selection.kind === "file") {
+        if (selection.ref.kind === "loose") {
+          const ref = selection.ref;
+          const absolute = normalizeFsPath(ref.path);
+          openTreeContextMenu(event, [
+            { label: "Open", onClick: run("workspace.tree.open", { selection }) },
+            { separator: true, label: "" },
+            { label: "Copy Path", onClick: () => void writeText(absolute) },
+            {
+              label: "Reveal in Explorer",
+              onClick: () => {
+                void invoke("sftp_open_path", { path: absolute })
+                  .then(() => setStatusMessage(`Opened ${absolute}`))
+                  .catch((err) => setStatusMessage(errorMessage(err)));
+              },
+            },
+          ]);
+          return;
+        }
         const ref = selection.ref;
         const dir = parentPath(ref.path);
         openTreeContextMenu(event, [
@@ -4185,6 +4355,7 @@ export function CodeWorkspaceTab({
       pasteTreeClipboard,
       revealInExplorer,
       stageTreeClipboard,
+      workspaceInstanceId,
     ],
   );
 
@@ -11711,23 +11882,138 @@ export function CodeWorkspaceTab({
       if (!languagePanelOpen) {
         panel.collapse();
       } else {
-        panel.resize(`${lastProjectPanelSizeRef.current}%`);
+        panel.resize(`${lastProjectPanelSizeRef.current}px`);
       }
     });
     return () => cancelAnimationFrame(frame);
   }, [languagePanelOpen]);
 
   const handleProjectPanelResize = useCallback((size: PanelSize) => {
-    const percentage = size.asPercentage;
-    if (percentage > 2) {
-      lastProjectPanelSizeRef.current = percentage;
+    const pixels = size.inPixels > 0 ? Math.round(size.inPixels) : 0;
+    if (pixels > 40) {
+      lastProjectPanelSizeRef.current = pixels;
+      setShellChromeState(workspaceInstanceId, {
+        projectWidthPx: pixels,
+      });
     }
     // Avoid store churn when the panel is already in the desired open/collapsed state.
     setLanguagePanelOpen((open) => {
-      const next = percentage > 2;
+      const next = size.asPercentage > 2 && (pixels > 40 || size.inPixels === 0);
       return open === next ? open : next;
     });
-  }, [setLanguagePanelOpen]);
+  }, [setLanguagePanelOpen, setShellChromeState, workspaceInstanceId]);
+
+  const [workspaceContainerHeight, setWorkspaceContainerHeight] = useState<number>(() => {
+    return typeof window !== "undefined" ? window.innerHeight : 800;
+  });
+
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        setWorkspaceContainerHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const maxBottomDockHeight = useMemo(() => {
+    // 40px top toolbar header + 37px minimum reserved editor sliver = 77px
+    const available = Math.max(BOTTOM_DOCK_MIN_HEIGHT, workspaceContainerHeight - 77);
+    return Math.min(BOTTOM_DOCK_MAX_HEIGHT, available);
+  }, [workspaceContainerHeight]);
+
+  const currentBottomDockHeight = useMemo(() => {
+    const chrome = workspaceUi.shellChromeState;
+    if (!chrome) return 323;
+    if (chrome.bottomHeightByTool && bottomDockTab in chrome.bottomHeightByTool) {
+      return chrome.bottomHeightByTool[bottomDockTab] ?? 323;
+    }
+    return chrome.bottomHeightPx ?? 323;
+  }, [workspaceUi.shellChromeState, bottomDockTab]);
+
+  const handleBottomDockHeightChange = useCallback((height: number) => {
+    setBottomDockHeightForTool(workspaceInstanceId, bottomDockTab, height);
+  }, [bottomDockTab, setBottomDockHeightForTool, workspaceInstanceId]);
+
+  const handleActivateToolWindow = useCallback((toolId: string) => {
+    if (toolId === "project") {
+      const treeHasFocus = treePaneRef.current?.contains(document.activeElement);
+      if (!languagePanelOpen) {
+        setLanguagePanelOpen(true);
+        requestAnimationFrame(() => {
+          treePaneRef.current?.focus();
+        });
+      } else if (treeHasFocus) {
+        setLanguagePanelOpen(false);
+        handleReturnToEditor();
+      } else {
+        treePaneRef.current?.focus();
+      }
+      return;
+    }
+
+    if (toolId === "outline" || toolId === "structure") {
+      if (rightPaneOpen && rightPaneTab === "outline") {
+        setRightPaneOpen(false);
+        handleReturnToEditor();
+      } else {
+        setRightPaneTab("outline");
+        setRightPaneOpen(true);
+      }
+      return;
+    }
+
+    const bottomDockEl = document.querySelector('[data-testid="code-workspace-bottom-dock"]');
+    const dockHasFocus = bottomDockEl?.contains(document.activeElement);
+    if (!bottomDockOpen || bottomDockTab !== toolId) {
+      setBottomDockTab(toolId as BottomDockTabId);
+      setBottomDockOpen(true);
+      requestAnimationFrame(() => {
+        const el = document.querySelector<HTMLElement>(
+          '[data-testid="code-workspace-bottom-dock"] [tabindex="0"], [data-testid="code-workspace-bottom-dock"] button, [data-testid="code-workspace-bottom-dock"] input'
+        );
+        el?.focus();
+      });
+    } else if (dockHasFocus) {
+      setBottomDockOpen(false);
+      handleReturnToEditor();
+    } else {
+      const el = document.querySelector<HTMLElement>(
+        '[data-testid="code-workspace-bottom-dock"] [tabindex="0"], [data-testid="code-workspace-bottom-dock"] button, [data-testid="code-workspace-bottom-dock"] input'
+      );
+      el?.focus();
+    }
+  }, [
+    bottomDockOpen,
+    bottomDockTab,
+    handleReturnToEditor,
+    languagePanelOpen,
+    rightPaneOpen,
+    rightPaneTab,
+    setBottomDockOpen,
+    setBottomDockTab,
+    setLanguagePanelOpen,
+    setRightPaneOpen,
+    setRightPaneTab,
+  ]);
+
+  const handleRestoreToolWindowLayout = useCallback(() => {
+    restoreDefaultToolWindowLayout(workspaceInstanceId);
+    lastProjectPanelSizeRef.current = 452;
+    try {
+      projectPanelRef.current?.resize("452px");
+    } catch {
+      // ignore
+    }
+    requestAnimationFrame(() => {
+      handleReturnToEditor();
+    });
+    setStatusMessage("Restored default tool window layout");
+  }, [handleReturnToEditor, restoreDefaultToolWindowLayout, setStatusMessage, workspaceInstanceId]);
 
   const toggleOutlinePane = useCallback(() => {
     if (rightPaneOpen && rightPaneTab === "outline") {
@@ -14016,7 +14302,43 @@ export function CodeWorkspaceTab({
       category: "View",
       keybinding: "Alt+1",
       keywords: ["project", "explorer", "files", "tree", "sidebar", "collapse"],
-      run: toggleProjectTree,
+      run: () => handleActivateToolWindow("project"),
+    },
+    {
+      id: "workspace.activateToolWindow",
+      title: "Activate Tool Window",
+      category: "View",
+      keywords: ["tool", "window", "panel", "dock", "activate"],
+      run: (context) => {
+        const payload = context.payload as { toolId?: string } | undefined;
+        const toolId = payload?.toolId ?? "project";
+        handleActivateToolWindow(toolId);
+      },
+    },
+    {
+      id: "workspace.returnToEditor",
+      title: "Focus Editor",
+      category: "View",
+      keybinding: "Escape",
+      keywords: ["focus", "editor", "escape", "return"],
+      when: (context) => context.focus !== "editor" && context.focus !== "modal" && context.focus !== "search" && context.focus !== "completion" && context.focus !== "snippet",
+      run: handleReturnToEditor,
+    },
+    {
+      id: "workspace.restoreToolWindowLayout",
+      title: "Restore Default Layout",
+      category: "View",
+      keybinding: "Shift+F12",
+      keywords: ["layout", "restore", "default", "tool", "window", "reset"],
+      run: handleRestoreToolWindowLayout,
+    },
+    {
+      id: "workspace.showProblems",
+      title: "Problems",
+      category: "View",
+      keybinding: "Alt+6",
+      keywords: ["problems", "errors", "warnings", "diagnostics", "inspections"],
+      run: () => handleActivateToolWindow("problems"),
     },
     {
       id: "workspace.toggleDocumentationPane",
@@ -14091,7 +14413,7 @@ export function CodeWorkspaceTab({
       id: "workspace.findReferences",
       title: "Find Usages",
       category: "Navigation",
-      keybinding: "Shift+F12",
+      keybinding: "Alt+F7",
       keywords: ["usages", "references", "callers"],
       when: (context) => context.focus === "editor"
         && (!!activeCapabilities || !lspFilesRef.current[activeKey ?? ""]?.status)
@@ -14455,11 +14777,9 @@ export function CodeWorkspaceTab({
       id: "workspace.showRunTasks",
       title: "Show Run Tasks",
       category: "Run",
+      keybinding: "Alt+4",
       keywords: ["run", "task", "script"],
-      run: () => {
-        setBottomDockTab("run");
-        setBottomDockOpen(true);
-      },
+      run: () => handleActivateToolWindow("run"),
     },
     {
       id: "workspace.showAnalysis",
@@ -14695,9 +15015,12 @@ export function CodeWorkspaceTab({
       category: "File",
       when: (context) => context.focus === "tree",
       run: (context) => {
+        if (treeContextMenuSessionRef.current) {
+          treeContextMenuSessionRef.current.consumed = true;
+        }
         const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
         const selection = payload?.selection ?? selected;
-        if (selection?.kind === "file") void openFile(selection.ref);
+        if (selection?.kind === "file") void requestTreeOpen(selection.ref);
       },
     },
     {
@@ -15002,7 +15325,7 @@ export function CodeWorkspaceTab({
     const node = target instanceof Node ? target : null;
     const element = node instanceof Element ? node : node?.parentElement;
     return Boolean(element?.closest?.(
-      '[data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu]',
+      '[data-testid="code-workspace-editor-search"], [data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu], [data-testid="code-workspace-search-everywhere"]',
     ));
   }, []);
 
@@ -15269,6 +15592,7 @@ export function CodeWorkspaceTab({
     // and Windows/Linux Ctrl+Tab share one code path and no second window
     // listener competes with the host dispatch below.
     const handleWorkspaceCommand = (event: KeyboardEvent) => {
+      if (event.isComposing) return;
       // Navigation bar and popup controls own their keyboard state. They are
       // rendered in the workspace or a portal, so the window capture listener
       // must not turn Home/arrows/Enter/Escape into editor actions first.
@@ -19308,9 +19632,8 @@ export function CodeWorkspaceTab({
           <Panel
             panelRef={projectPanelRef}
             id="project"
-            defaultSize="24%"
-            minSize="12%"
-            maxSize="45%"
+            defaultSize={`${workspaceUi.shellChromeState?.projectWidthPx ?? 452}px`}
+            minSize={0}
             collapsible
             collapsedSize={0}
             onResize={handleProjectPanelResize}
@@ -19361,7 +19684,7 @@ export function CodeWorkspaceTab({
                   onToggleRoot={toggleRoot}
                   onToggleDir={toggleDir}
                   onSelect={setSelected}
-                  onOpenFile={(ref, options) => { void openFile(ref, options); }}
+                  onOpenFile={(ref, options) => { void requestTreeOpen(ref, options); }}
                   onContextMenu={showTreeContextMenu}
                 />
               </FileTreePane>
@@ -19376,7 +19699,7 @@ export function CodeWorkspaceTab({
           <Panel
             id="editor"
             defaultSize={languagePanelOpen ? "56%" : "80%"}
-            minSize={languagePanelOpen ? "30%" : "40%"}
+            minSize="37px"
             className="min-w-0"
           >
           {workspaceUi.layoutTreeV2.type === "split" ? (
@@ -19472,6 +19795,10 @@ export function CodeWorkspaceTab({
       </div>
       <BottomDock
         open={bottomDockOpen}
+        height={currentBottomDockHeight}
+        maxHeight={maxBottomDockHeight}
+        onHeightChange={handleBottomDockHeightChange}
+        onEscape={handleReturnToEditor}
         activeTab={bottomDockTab}
         tabs={[
           {
@@ -20348,6 +20675,7 @@ export function CodeWorkspaceTab({
                   editorGroups: persistableGroups,
                   layoutTreeV2: nextLayoutTreeV2,
                   tabPolicy: policy,
+                  shellChromeState: workspaceUi.shellChromeState,
                 }), {
                   onIssue: (message) => {
                     persistenceIssue = message;

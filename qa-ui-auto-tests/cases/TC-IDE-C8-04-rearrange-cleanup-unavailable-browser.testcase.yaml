@@ -22,7 +22,7 @@ steps:
   - wait_for: '[data-testid="text-input-dialog"]'
   - click: '[data-testid="text-input-dialog-confirm"]'
   - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - click: '[data-testid="code-workspace-tree-file"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - fill:

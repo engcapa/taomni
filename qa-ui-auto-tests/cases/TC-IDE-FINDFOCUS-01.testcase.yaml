@@ -1,0 +1,388 @@
+id: TC-IDE-FINDFOCUS-01
+title: Focused F0 Find navigation, recovery, Replace and split remount
+description: ED-FINDFOCUS-001 / V-FF-03 self-check. Exact UTF-8/LF F0 is created through UI in isolated browser VFS. True
+  focus before chords; automatic first match, Enter/Shift+Enter, Esc selection, repeat, invalid/zero recovery, retained Replace/undo
+  and split. Does not prove native disk, IME or provider. Second F0 tree is [54,58), corrected against original bytes.
+covers:
+- F25.1
+- F25.5
+tags:
+- code-workspace
+- find-focus
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: /preview
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- right_click: '[data-testid="code-workspace-tree-root"]'
+- click_menu: New Directory...
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: fixture
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- right_click: '[data-testid="code-workspace-tree-root"]'
+- click_menu: New Directory...
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: fixture/src
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- right_click: '[data-testid="code-workspace-tree-root"]'
+- click_menu: New Directory...
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: fixture/src/main
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- right_click: '[data-testid="code-workspace-tree-root"]'
+- click_menu: New Directory...
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: fixture/docs
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- right_click: '[data-testid="code-workspace-tree-root"]'
+- click_menu: New Directory...
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: fixture/tests
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: fixture/README.md
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: '# project-tree-e2e
+
+
+      Disposable project tree reference and verification fixture.
+
+
+      Keep this content when browsing, collapsing, selecting and reopening files.
+
+      '
+- press: Control+s
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'false'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: fixture/src/main/example.txt
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: 'Project tree example
+
+      The editor buffer should survive tree navigation.
+
+      '
+- press: Control+s
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'false'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: fixture/docs/notes.txt
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: 'Reference notes
+
+      Second file for selection and editor tab checks.
+
+      '
+- press: Control+s
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'false'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: fixture/tests/sample.txt
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: 'Example test data
+
+      '
+- press: Control+s
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'false'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: /preview/fixture
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: Control+f
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('.cm-workspace-search-input')
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    value: tree
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 2
+- assert_not_visible: '[data-testid="code-workspace-editor-search"] .cm-workspace-replace-row'
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 2 / 2
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('.cm-workspace-search-input')
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equal: 3
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(1)'
+    regex: ^Project\ tree\ example$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(2)'
+    regex: ^The\ editor\ buffer\ should\ survive\ tree\ navigation\.$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(3)'
+    regex: ^$
+- press: Shift+Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 2
+- screenshot: find-1.png
+- press: Escape
+- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('.cm-content')
+    expect_truthy: true
+- eval_readonly:
+    expression: window.getSelection().toString() === 'tree'
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equal: 3
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(1)'
+    regex: ^Project\ tree\ example$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(2)'
+    regex: ^The\ editor\ buffer\ should\ survive\ tree\ navigation\.$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(3)'
+    regex: ^$
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: Control+f
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('.cm-workspace-search-input')
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    value: tree
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 2
+- assert_not_visible: '[data-testid="code-workspace-editor-search"] .cm-workspace-replace-row'
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 2 / 2
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('.cm-workspace-search-input')
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equal: 3
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(1)'
+    regex: ^Project\ tree\ example$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(2)'
+    regex: ^The\ editor\ buffer\ should\ survive\ tree\ navigation\.$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(3)'
+    regex: ^$
+- press: Shift+Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 2
+- screenshot: find-2.png
+- press: Escape
+- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('.cm-content')
+    expect_truthy: true
+- eval_readonly:
+    expression: window.getSelection().toString() === 'tree'
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equal: 3
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(1)'
+    regex: ^Project\ tree\ example$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(2)'
+    regex: ^The\ editor\ buffer\ should\ survive\ tree\ navigation\.$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(3)'
+    regex: ^$
+- press: Control+f
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    value: no-result
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 0 matches
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Use regular expression"]'
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    value: '['
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: Invalid pattern
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    value: tree
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 2
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Use regular expression"]'
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    value: ''
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 0 matches
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    value: tree
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 2
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="More search options"]'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Find in selection"]'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Find in selection"]'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Select all occurrences"]'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="More search options"]'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Show replace"]'
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+    value: bush
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Preserve case"]'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Replace all matches"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: Project bush example
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Close find and replace"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_count:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equal: 3
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(1)'
+    regex: ^Project\ tree\ example$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(2)'
+    regex: ^The\ editor\ buffer\ should\ survive\ tree\ navigation\.$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(3)'
+    regex: ^$
+- press: Control+s
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'false'
+- click: '[data-testid="code-workspace-split-right"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    equal: 2
+- click: '[data-testid="code-workspace-editor-pane"]:last-child .cm-content'
+- press: Control+Home
+- press: Control+f
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    value: tree
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 2
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 2 / 2
+- press: Escape
+- click: '[data-testid="code-workspace-split-unsplit-all"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equal: 3
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(1)'
+    regex: ^Project\ tree\ example$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(2)'
+    regex: ^The\ editor\ buffer\ should\ survive\ tree\ navigation\.$
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(3)'
+    regex: ^$
+- screenshot: after-split.png

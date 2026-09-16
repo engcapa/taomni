@@ -152,6 +152,13 @@
 
 ## code-workspace/editor-shell (F25.5)
 
+- `[data-testid="code-workspace-editor-search"]` — display — F25.5.editor-find-panel
+- `[data-testid="code-workspace-editor-search"] input[name="search"]` — interactive — F25.5.editor-find-input
+- `[data-testid="code-workspace-editor-search"] input[name="replace"]` — interactive — F25.5.editor-replace-input
+- `[data-testid="code-workspace-editor-search"] button[aria-label="Show replace"]` — interactive — F25.5.editor-find-expand
+- `[data-testid="code-workspace-editor-search"] button[aria-label="More search options"]` — interactive — F25.5.editor-find-more
+- `[data-testid="code-workspace-editor-search"] .cm-workspace-search-status` — display — F25.5.editor-find-count
+- `[data-testid="code-workspace-editor-search"] button[aria-label="Close find and replace"]` — interactive — F25.5.editor-find-close
 - `[data-testid="code-workspace-tree-add-folder"]` — interactive [optional] — F25.5.tree-add-folder
 - `[data-testid="code-workspace-tree-pane"]` — display [optional] — F25.5.tree-pane
 - `[data-testid="code-workspace-tree-root"]` — interactive [optional] — F25.5.tree-root-row
@@ -177,6 +184,7 @@
 - `[data-testid="code-workspace-editor-pane"]` — display — F25.5.editor-pane
 - `[data-testid="code-workspace-editor"]` — display [optional] — F25.5.editor-host
 - `[data-testid="code-workspace-editor-tab-strip"]` — display [optional] — F25.5.editor-tab-strip
+- `[data-testid="code-workspace-editor-split"]` — display [optional] — F25.5.editor-split-layout
 - `[data-editor-group-id="primary"] [data-testid="code-workspace-editor-tab-strip"]` — interactive [optional] — F25.5.editor-leaf-primary-tab-strip
 - `[data-editor-group-id="secondary"]` — display [optional] — F25.5.editor-leaf-secondary-pane
 - `[data-editor-group-id="secondary"] .cm-content` — interactive [optional] — F25.5.editor-leaf-secondary-content
@@ -334,10 +342,17 @@
 - `[data-testid="code-workspace-run-target"]` — interactive [optional] — F25.1.run-current-target
 - `[data-testid="code-workspace-active-run-configuration"]` — interactive [optional] — F25.1.active-run-configuration
 - `[data-testid="code-workspace-debug-target"]` — interactive [optional] — F25.1.debug-current-target
+- `[data-testid="code-workspace-bottom-dock"]` — display [optional] — F25.1.bottom-dock
+- `[data-testid="code-workspace-bottom-dock-body"]` — display [optional] — F25.1.bottom-dock-body
+- `[data-testid="code-workspace-bottom-dock-resize"]` — interactive [optional] — F25.1.bottom-dock-resize
 - `[data-testid="code-workspace-bottom-tab-run"]` — interactive — F25.1.run-tab
 - `[data-testid="code-workspace-bottom-tab-build"]` — interactive — F25.1.build-tab
 - `[data-testid="code-workspace-bottom-tab-tests"]` — interactive — F25.1.tests-tab
 - `[data-testid="code-workspace-bottom-tab-debug"]` — interactive — F25.1.debug-tab
+- `[data-testid="code-workspace-bottom-tab-overflow"]` — interactive [optional] — F25.1.bottom-tab-overflow
+- `[data-testid="code-workspace-bottom-tab-overflow-menu"]` — display [optional] — F25.1.bottom-tab-overflow-menu
+- `[data-testid="code-workspace-bottom-tab-overflow-tests"]` — interactive [optional] — F25.1.bottom-tab-overflow-tests
+- `[data-testid="code-workspace-bottom-tab-overflow-debug"]` — interactive [optional] — F25.1.bottom-tab-overflow-debug
 - `[data-testid="code-workspace-run-panel"]` — display — F25.1.run-panel
 - `[data-testid="run-panel-custom-command"]` — interactive — F25.1.custom-command
 - `[data-testid="run-panel-add-custom-task"]` — interactive — F25.1.add-custom-task

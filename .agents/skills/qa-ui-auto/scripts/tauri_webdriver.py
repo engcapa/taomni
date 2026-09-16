@@ -415,6 +415,47 @@ class NativeSession:
                 raise
         return f"clicked {selector}"
 
+    def count(self, selector: str) -> int:
+        using, value = selector_strategy(selector)
+        elements = self.request("POST", self.endpoint("/elements"),
+                                {"using": using, "value": value})
+        if not isinstance(elements, list):
+            raise WebDriverError(f"invalid element list for {selector}: {elements!r}")
+        return len(elements)
+
+    def right_click(self, selector: str) -> str:
+        element = self.find(selector, interactive=True)
+        origin = {"element-6066-11e4-a52e-4f735466cecf": element}
+        # Scroll only; dispatch the actual context click through W3C input.
+        self.request("POST", self.endpoint("/execute/sync"), {
+            "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
+            "args": [origin],
+        })
+        try:
+            self.request("POST", self.endpoint("/actions"), {"actions": [{
+                "type": "pointer", "id": "context-mouse",
+                "parameters": {"pointerType": "mouse"},
+                "actions": [
+                    {"type": "pointerMove", "duration": 0, "origin": origin, "x": 0, "y": 0},
+                    {"type": "pointerDown", "button": 2},
+                    {"type": "pointerUp", "button": 2},
+                ],
+            }]})
+        finally:
+            self.request("DELETE", self.endpoint("/actions"))
+        return f"right-clicked {selector}"
+
+    def focus(self, selector: str) -> str:
+        """Focus for locator-scoped keys without activating a button/tree row."""
+        element = self.find(selector)
+        focused = self.request("POST", self.endpoint("/execute/sync"), {
+            "script": "arguments[0].focus(); return document.activeElement === arguments[0];",
+            "args": [{"element-6066-11e4-a52e-4f735466cecf": element}],
+        })
+        if focused is not True:
+            raise WebDriverError(f"element could not receive focus: {selector}")
+        return f"focused {selector}"
+
     def dblclick(self, selector: str) -> str:
         try:
             element = self.find(selector, interactive=True)
@@ -747,16 +788,29 @@ class NativeSession:
             return f"typed {len(text)} chars"
         seq: list[dict[str, Any]] = []
         for ch in text:
-            seq.append({"type": "keyDown", "value": ch})
-            seq.append({"type": "keyUp", "value": ch})
+            if ch.isupper():
+                shift = self.MODIFIER_MAP["Shift"]
+                seq.append({"type": "keyDown", "value": shift})
+                seq.append({"type": "keyDown", "value": ch})
+                seq.append({"type": "keyUp", "value": ch})
+                seq.append({"type": "keyUp", "value": shift})
+            else:
+                seq.append({"type": "keyDown", "value": ch})
+                seq.append({"type": "keyUp", "value": ch})
             # Let WebKit deliver the input transaction and CodeMirror finish
             # its scheduled measure before the next native character arrives.
             seq.append({"type": "pause", "duration": 20})
-        self.request(
-            "POST",
-            self.endpoint("/actions"),
-            {"actions": [{"type": "key", "id": "keyboard", "actions": seq}]},
-        )
+        try:
+            self.request(
+                "POST",
+                self.endpoint("/actions"),
+                {"actions": [{"type": "key", "id": "keyboard", "actions": seq}]},
+            )
+        finally:
+            try:
+                self.request("DELETE", self.endpoint("/actions"))
+            except WebDriverError:
+                pass
         return f"typed {len(text)} chars"
 
     def wait_absent(self, selector: str, timeout: float = 5.0) -> None:

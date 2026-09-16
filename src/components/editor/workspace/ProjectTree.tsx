@@ -3,6 +3,7 @@
  * Presentation + expand/open callbacks only — load/mutate logic stays in the shell.
  */
 import { Fragment, type MouseEvent, type ReactNode } from "react";
+import "./ProjectTree.css";
 import {
   ChevronDown,
   ChevronRight,
@@ -185,16 +186,21 @@ function renderMatchingFlatFiles(
                 data-testid="code-workspace-flat-file"
                 data-root-id={root.id}
                 data-path={entry.path}
+                data-tree-kind="file"
                 data-active={active || undefined}
                 data-selected={isSelected || undefined}
+                role="treeitem"
+                aria-level={2}
+                aria-selected={isSelected}
                 className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
                 title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
                 onClick={() => {
                   onSelect({ kind: "file", ref });
-                  // Permanent editor tab — do not replace a previous preview tab.
-                  onOpenFile(ref);
                 }}
-                onDoubleClick={() => onOpenFile(ref)}
+                onDoubleClick={() => {
+                  onSelect({ kind: "file", ref });
+                  onOpenFile(ref, { preview: false });
+                }}
                 onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
               >
                 <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
@@ -294,21 +300,42 @@ function renderEntries(
             data-testid="code-workspace-tree-dir"
             data-root-id={root.id}
             data-path={displayPath}
+            data-tree-kind="dir"
             data-selected={isSelected || undefined}
+            role="treeitem"
+            aria-level={depth + 1}
+            aria-expanded={isExpanded}
+            aria-selected={isSelected}
             className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
             style={rowStyle}
             title={`${root.name} / ${displayPath}`}
             onClick={() => {
               onSelect({ kind: "dir", rootId: root.id, path: displayPath });
+            }}
+            onDoubleClick={() => {
+              onSelect({ kind: "dir", rootId: root.id, path: displayPath });
               onToggleDir(root.id, displayPath);
             }}
             onContextMenu={(event) => onContextMenu(event, { kind: "dir", rootId: root.id, path: displayPath })}
           >
-            {isExpanded ? (
-              <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-            ) : (
-              <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-            )}
+            <span
+              role="button"
+              tabIndex={-1}
+              aria-label={isExpanded ? "Collapse directory" : "Expand directory"}
+              data-testid="code-workspace-tree-dir-arrow"
+              className="inline-flex items-center justify-center p-0.5 -m-0.5 rounded hover:bg-[var(--taomni-code-active-line-bg)]"
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelect({ kind: "dir", rootId: root.id, path: displayPath });
+                onToggleDir(root.id, displayPath);
+              }}
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+              )}
+            </span>
             <Folder className="w-3.5 h-3.5 shrink-0 text-[#d59d32]" />
             <span className="truncate">{displayName}</span>
             {(changeCount > 0 || childState?.loading || chain?.loading) && (
@@ -339,17 +366,22 @@ function renderEntries(
         data-testid="code-workspace-tree-file"
         data-root-id={root.id}
         data-path={entry.path}
+        data-tree-kind="file"
         data-active={active || undefined}
         data-selected={isSelected || undefined}
+        role="treeitem"
+        aria-level={depth + 1}
+        aria-selected={isSelected}
         className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
         style={rowStyle}
         title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
         onClick={() => {
           onSelect({ kind: "file", ref });
-          // Permanent editor tab — keep previously opened tabs switchable.
-          onOpenFile(ref);
         }}
-        onDoubleClick={() => onOpenFile(ref)}
+        onDoubleClick={() => {
+          onSelect({ kind: "file", ref });
+          onOpenFile(ref, { preview: false });
+        }}
         onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
       >
         <span className="w-3.5 shrink-0" />
@@ -403,17 +435,39 @@ export function ProjectTree(props: ProjectTreeProps) {
               type="button"
               data-testid="code-workspace-tree-root"
               data-root-id={root.id}
+              data-tree-kind="root"
               data-selected={selectedRoot || undefined}
+              role="treeitem"
+              aria-level={1}
+              aria-expanded={expanded}
+              aria-selected={selectedRoot}
               className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 px-2 text-left font-semibold hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
               title={root.path}
-              onClick={() => onToggleRoot(root.id)}
+              onClick={() => onSelect({ kind: "root", rootId: root.id })}
+              onDoubleClick={() => {
+                onSelect({ kind: "root", rootId: root.id });
+                onToggleRoot(root.id);
+              }}
               onContextMenu={(event) => onContextMenu(event, { kind: "root", rootId: root.id })}
             >
-              {expanded ? (
-                <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-              ) : (
-                <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-              )}
+              <span
+                role="button"
+                tabIndex={-1}
+                aria-label={expanded ? "Collapse root" : "Expand root"}
+                data-testid="code-workspace-tree-root-arrow"
+                className="inline-flex items-center justify-center p-0.5 -m-0.5 rounded hover:bg-[var(--taomni-code-active-line-bg)]"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelect({ kind: "root", rootId: root.id });
+                  onToggleRoot(root.id);
+                }}
+              >
+                {expanded ? (
+                  <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                )}
+              </span>
               <Folder className="w-3.5 h-3.5 shrink-0 text-[#d59d32]" />
               <span className="truncate">{root.name}</span>
               <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] font-normal text-[var(--taomni-code-muted)]">
@@ -455,16 +509,24 @@ export function ProjectTree(props: ProjectTreeProps) {
                 key={file.id}
                 type="button"
                 data-testid="code-workspace-tree-loose-file"
+                data-tree-kind="loose-file"
+                data-loose-id={file.id}
                 data-path={file.path}
                 data-active={active || undefined}
                 data-selected={selectedLoose || undefined}
+                role="treeitem"
+                aria-level={1}
+                aria-selected={selectedLoose}
                 className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
                 title={file.path}
                 onClick={() => {
                   onSelect({ kind: "file", ref });
-                  onOpenFile(ref);
                 }}
-                onDoubleClick={() => onOpenFile(ref)}
+                onDoubleClick={() => {
+                  onSelect({ kind: "file", ref });
+                  onOpenFile(ref, { preview: false });
+                }}
+                onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
               >
                 <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                 <span className="truncate">{file.name}</span>
