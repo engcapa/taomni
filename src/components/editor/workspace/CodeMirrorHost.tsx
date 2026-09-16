@@ -63,6 +63,7 @@ import {
   closeCompletion,
   completionStatus,
   startCompletion,
+  type Completion,
   type CompletionContext,
   type CompletionResult,
   type CompletionSource,
@@ -70,10 +71,10 @@ import {
 import {
   createLiveTemplateCompletionSource,
   expandLiveTemplateAt,
+  isProviderTemplateSnippet,
   liveTemplateLanguageForPath,
+  matchLiveTemplateAbbreviation,
   plainTemplateAbbreviations,
-  providerOwnedExactAbbreviationAt,
-  providerSnippetAbbreviations,
   type LiveTemplateLanguage,
   type LiveTemplateSourceOptions,
 } from "./liveTemplates";
@@ -2344,58 +2345,120 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const renderedDocCompartment = useRef(new Compartment());
   const presentResolveGateRef = useRef<((request: CompletionResolveGateRequest) => void) | null>(null);
 
+  interface ActiveProviderTemplateState {
+    workspaceId: string;
+    fileKey: string;
+    documentRevision: number;
+    lspSessionGeneration: number;
+    from: number;
+    to: number;
+    items: Map<string, Completion>;
+  }
+
   /**
-   * Plain abbreviations the language provider owns: jdtls ships the Eclipse
+   * Plain abbreviations the language provider currently offers: jdtls ships the Eclipse
    * Java editor templates as snippet proposals, and those exact IDs win over
-   * the app's live templates (which then only fill provider gaps). Learned from
-   * completion results and reset when the LSP session generation changes.
+   * the app's live templates when valid for the current revision and caret range.
+   * Merged per active result, not permanently suppressed across the whole session.
    */
-  const providerOwnedTemplatesRef = useRef<{ generation: number; labels: Set<string> } | null>(null);
+  const currentProviderTemplatesRef = useRef<ActiveProviderTemplateState | null>(null);
+  const pendingTriggerOriginRef = useRef<{ pos: number; char: string; docLength: number } | null>(null);
+
   const providerOwnedAbbreviations = useCallback(
     (language: LiveTemplateLanguage): ReadonlySet<string> | undefined => {
       if (language !== "java") return undefined;
-      const generation = getCompletionIdentityRef.current?.()?.lspSessionGeneration ?? -1;
-      const state = providerOwnedTemplatesRef.current;
-      return state && state.generation === generation ? state.labels : undefined;
+      const current = currentProviderTemplatesRef.current;
+      if (!current) return undefined;
+      const identity = getCompletionIdentityRef.current?.();
+      if (!identity) return undefined;
+      if (
+        current.workspaceId !== identity.workspaceId
+        || current.fileKey !== identity.fileKey
+        || current.documentRevision !== identity.documentRevision
+        || current.lspSessionGeneration !== identity.lspSessionGeneration
+      ) {
+        return undefined;
+      }
+      return new Set(current.items.keys());
     },
     [],
   );
+
   const liveTemplateSourceOptions = useMemo<LiveTemplateSourceOptions>(
     () => ({ providerOwnedAbbreviations }),
     [providerOwnedAbbreviations],
   );
-  const trackProviderOwnedTemplates = useCallback((result: CompletionResult | null): void => {
-    if (!result || result.options.length === 0) return;
-    const labels = providerSnippetAbbreviations(result.options);
-    if (labels.size === 0) return;
-    const generation = getCompletionIdentityRef.current?.()?.lspSessionGeneration ?? -1;
-    const previous = providerOwnedTemplatesRef.current;
-    const state = previous && previous.generation === generation
-      ? previous
-      : { generation, labels: new Set<string>() };
-    const learned = new Set<string>();
-    for (const label of labels) {
-      if (!state.labels.has(label)) {
-        state.labels.add(label);
-        learned.add(label);
+
+  const getValidActiveProviderCandidate = useCallback(
+    (
+      view: EditorView,
+      language: LiveTemplateLanguage,
+    ): { completion: Completion; from: number; to: number } | null => {
+      if (language !== "java") return null;
+      const current = currentProviderTemplatesRef.current;
+      if (!current) return null;
+      const identity = getCompletionIdentityRef.current?.();
+      if (!identity) return null;
+      if (
+        current.workspaceId !== identity.workspaceId
+        || current.fileKey !== identity.fileKey
+        || current.documentRevision !== identity.documentRevision
+        || current.lspSessionGeneration !== identity.lspSessionGeneration
+      ) {
+        return null;
       }
-    }
-    providerOwnedTemplatesRef.current = state;
-    if (learned.size === 0) return;
-    // A provider-owned exact label may already sit in an open popup from the
-    // live-template source (the two sources resolve at different times). Re-run
-    // the sources once so the app's duplicate entry disappears and the
-    // provider's template owns the abbreviation for the rest of the session.
-    const appAbbreviations = plainTemplateAbbreviations("java");
-    if (![...learned].some((label) => appAbbreviations.has(label))) return;
-    // The status check runs after this source's own result is applied: during
-    // the wrapper call the source itself still counts as pending.
-    window.setTimeout(() => {
-      const view = viewRef.current;
-      if (!view || completionStatus(view.state) === null) return;
-      startCompletion(view);
-    }, 0);
-  }, []);
+      const pos = view.state.selection.main.head;
+      if (!view.state.selection.main.empty) return null;
+      const plain = matchLiveTemplateAbbreviation(view.state.doc, pos, language);
+      if (!plain?.exact) return null;
+      const candidate = current.items.get(plain.template.abbreviation);
+      if (!candidate) return null;
+      return { completion: candidate, from: plain.from, to: plain.to };
+    },
+    [],
+  );
+
+  const trackProviderOwnedTemplates = useCallback(
+    (result: CompletionResult | null, contextPos: number): void => {
+      const identity = getCompletionIdentityRef.current?.();
+      if (!result || result.options.length === 0 || !identity) {
+        currentProviderTemplatesRef.current = null;
+        return;
+      }
+      const snippets = new Map<string, Completion>();
+      for (const option of result.options) {
+        if (isProviderTemplateSnippet(option) && option.label) {
+          snippets.set(option.label, option);
+        }
+      }
+      if (snippets.size === 0) {
+        currentProviderTemplatesRef.current = null;
+        return;
+      }
+      currentProviderTemplatesRef.current = {
+        workspaceId: identity.workspaceId,
+        fileKey: identity.fileKey,
+        documentRevision: identity.documentRevision,
+        lspSessionGeneration: identity.lspSessionGeneration,
+        from: result.from,
+        to: contextPos,
+        items: snippets,
+      };
+
+      const appAbbreviations = plainTemplateAbbreviations("java");
+      const hasCollision = [...snippets.keys()].some((label) => appAbbreviations.has(label));
+      if (!hasCollision) return;
+
+      // The status check runs after this source's own result is applied: during
+      // the wrapper call the source itself still counts as pending.
+      window.setTimeout(() => {
+        const view = viewRef.current;
+        if (!view || completionStatus(view.state) === null) return;
+        startCompletion(view);
+      }, 0);
+    },
+    [],
+  );
 
   const buildAutocompletionExtension = useCallback(() => {
     const policy = completionController?.getPolicy();
@@ -2417,10 +2480,19 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       onResolveGate: (request) => presentResolveGateRef.current?.(request),
       controller: completionControllerRef.current,
       getView: () => viewRef.current,
+      consumeTriggerOrigin: (pos, docLength) => {
+        const pending = pendingTriggerOriginRef.current;
+        if (!pending) return null;
+        pendingTriggerOriginRef.current = null;
+        if (pending.pos === pos && pending.docLength === docLength) {
+          return pending.char;
+        }
+        return null;
+      },
     });
     const trackedLspSource: CompletionSource = async (context: CompletionContext) => {
       const result = await lspSource(context);
-      trackProviderOwnedTemplates(result);
+      trackProviderOwnedTemplates(result, context.pos);
       return result;
     };
 
@@ -2883,20 +2955,31 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           if (!update.docChanged || update.transactions.every((tr) => !tr.isUserEvent("input.type"))) {
             return;
           }
-          if (completionControllerRef.current && !completionControllerRef.current.shouldAutoTrigger(1, false)) {
+          if (completionControllerRef.current && !completionControllerRef.current.shouldAutoTrigger(0, false, "trigger")) {
             return;
           }
           const triggers = completionTriggersRef.current;
           if (!triggers.length) return;
           let typedTrigger = false;
+          let lastTriggerChar = "";
           update.changes.iterChanges((_fromA, _toA, _fromB, _toB, inserted) => {
             if (typedTrigger) return;
             const text = inserted.toString();
             if (!text) return;
             const last = text[text.length - 1];
-            if (last && triggers.includes(last)) typedTrigger = true;
+            if (last && triggers.includes(last)) {
+              typedTrigger = true;
+              lastTriggerChar = last;
+            }
           });
-          if (typedTrigger) startCompletion(update.view);
+          if (typedTrigger) {
+            pendingTriggerOriginRef.current = {
+              pos: update.view.state.selection.main.head,
+              char: lastTriggerChar,
+              docLength: update.view.state.doc.length,
+            };
+            startCompletion(update.view);
+          }
         }),
         // §8.19.4: closing the completion popup ends the repeated-Basic-call
         // sequence, so the next explicit invocation is a fresh ordinal-1
@@ -2905,6 +2988,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           const previous = completionStatus(update.startState);
           const current = completionStatus(update.state);
           if (previous === current || previous === null || current !== null) return;
+          pendingTriggerOriginRef.current = null;
           if (basicCompletionReopenRef.current) return;
           const identity = getCompletionIdentityRef.current();
           if (identity) resetBasicCompletionSession(identity.workspaceId, identity.fileKey);
@@ -2996,14 +3080,27 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
               if (view.composing) return false;
               if (acceptCompletion(view)) return true;
               const language = liveTemplateLanguageForPath(pathRef.current);
-              if (expandLiveTemplateAt(view, language, liveTemplateSourceOptions)) return true;
-              if (providerOwnedExactAbbreviationAt(view, language, liveTemplateSourceOptions)) {
-                // The provider owns this exact abbreviation (e.g. jdtls's
-                // Eclipse soutm): open its completion instead of expanding the
-                // app template or inserting indentation.
-                startCompletion(view);
+              const providerCandidate = getValidActiveProviderCandidate(view, language);
+              if (providerCandidate) {
+                const { completion, from, to } = providerCandidate;
+                if (typeof completion.apply === "function") {
+                  completion.apply(view, completion, from, to);
+                } else if (typeof completion.apply === "string") {
+                  view.dispatch({
+                    changes: { from, to, insert: completion.apply },
+                    selection: { anchor: from + completion.apply.length },
+                    userEvent: "input.complete",
+                  });
+                } else {
+                  view.dispatch({
+                    changes: { from, to, insert: completion.label },
+                    selection: { anchor: from + completion.label.length },
+                    userEvent: "input.complete",
+                  });
+                }
                 return true;
               }
+              if (expandLiveTemplateAt(view, language, liveTemplateSourceOptions)) return true;
               if (activeLspSnippetChoices(view)) return cycleLspSnippetChoice(view);
               return advanceLspSnippetTabstop(view);
             },

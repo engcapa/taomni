@@ -161,18 +161,61 @@ describe("CodeMirrorHost LSP completion acceptance", () => {
       expect(popup?.textContent ?? "").toContain("print current method to standard out");
       expect(popup?.textContent ?? "").not.toContain("Prints current method name to System.out");
     });
-    // Tab with the popup dismissed routes to provider completion instead of
-    // expanding the app template or inserting indentation.
+    // Under DEC-01 A, a single Tab on exact abbreviation with popup dismissed
+    // immediately expands the current valid provider candidate (no second Tab needed).
     fireEvent.keyDown(content, { key: "Escape" });
     await waitFor(() => expect(document.querySelector(".cm-tooltip-autocomplete")).toBeNull());
     fireEvent.keyDown(content, { key: "Tab" });
-    await waitFor(() => {
-      const popup = document.querySelector(".cm-tooltip-autocomplete");
-      expect(popup?.textContent ?? "").toContain("print current method to standard out");
-    });
-    expect(view.state.doc.toString()).toBe("soutm");
-    // Accept the provider template.
-    fireEvent.keyDown(content, { key: "Tab" });
     await waitFor(() => expect(view.state.doc.toString()).toBe('System.out.println("App.main()");'));
+    // Single undo restores the exact abbreviation
+    act(() => { undo(view); });
+    expect(view.state.doc.toString()).toBe("soutm");
+  });
+
+  it("immediately expands local template with single Tab when provider returns empty or fails (DEC-01 A / AC-01, AC-02)", async () => {
+    let revision = 0;
+    const complete = vi.fn(async () => ({
+      status: {
+        path: "App.java", uri: "file:///App.java", presetId: "java", languageId: "java",
+        displayName: "Java", available: true, active: true, selectedCommandId: null,
+        selectedCommand: null, installHint: null, error: null,
+      },
+      isIncomplete: false,
+      items: [],
+    }));
+    const rendered = render(<CodeMirrorHost
+      path="App.java"
+      doc="sout"
+      visible
+      diagnostics={[]}
+      reveal={null}
+      onChange={() => { revision += 1; }}
+      onSave={vi.fn()}
+      onHover={async () => null}
+      onDefinition={async () => false}
+      onReferences={async () => undefined}
+      onComplete={complete}
+      onCompleteResolve={async () => null}
+      completionTriggers={["."]}
+      hoverDocumentationDelayMs={0}
+      getCompletionIdentity={() => ({
+        workspaceId: "workspace", fileKey: "App.java", filePath: "App.java",
+        uri: "file:///App.java", languageId: "java", documentRevision: revision,
+        lspSessionGeneration: 1,
+      })}
+      onCompletionDiagnostic={vi.fn()}
+    />);
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(content)!;
+    await waitFor(() => expect(content).toHaveAttribute("data-language", "java"));
+    act(() => {
+      view.focus();
+      view.dispatch({ selection: { anchor: 4 } });
+    });
+    // Single Tab immediately expands the local sout live template
+    fireEvent.keyDown(content, { key: "Tab" });
+    await waitFor(() => expect(view.state.doc.toString()).toBe("System.out.println();"));
+    act(() => { undo(view); });
+    expect(view.state.doc.toString()).toBe("sout");
   });
 });

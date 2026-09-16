@@ -233,14 +233,33 @@ describe("provider-owned abbreviations", () => {
 
   it("collects provider snippet labels and app plain abbreviations", () => {
     const labels = providerSnippetAbbreviations([
-      { label: "soutm", type: "text" },
-      { label: "println()", type: "method" },
-      { label: "sysout", type: "text" },
+      { label: "soutm", type: "text", rawKind: 15 },
+      { label: "println()", type: "method", rawKind: 2 },
+      { label: "sysout", type: "text", isTemplateSnippet: true },
+      { label: "plainText", type: "text", rawKind: 1 },
+      { label: "refItem", type: "text", rawKind: 18 },
     ]);
     expect([...labels].sort()).toEqual(["soutm", "sysout"]);
+    expect(labels.has("plainText")).toBe(false);
+    expect(labels.has("refItem")).toBe(false);
     const appAbbreviations = plainTemplateAbbreviations("java");
     expect(appAbbreviations.has("soutm")).toBe(true);
     expect(appAbbreviations.has("soutp")).toBe(true);
+  });
+
+  it("does not suppress local templates when provider set is empty or undefined (AC-01 fallback)", () => {
+    const emptyOptions = {
+      providerOwnedAbbreviations: () => undefined,
+    };
+    const view = makeView("soutm");
+    expect(expandLiveTemplateAt(view, "java", emptyOptions)).toBe(true);
+    expect(view.state.doc.toString()).toContain('System.out.println("');
+    view.destroy();
+
+    const viewSout = makeView("sout");
+    expect(expandLiveTemplateAt(viewSout, "java", emptyOptions)).toBe(true);
+    expect(viewSout.state.doc.toString()).toBe("System.out.println();");
+    viewSout.destroy();
   });
 });
 
