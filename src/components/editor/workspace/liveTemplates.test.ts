@@ -15,6 +15,9 @@ import {
   matchLiveTemplateAbbreviation,
   matchPostfixTemplate,
   materializeTemplateBody,
+  plainTemplateAbbreviations,
+  providerOwnedExactAbbreviationAt,
+  providerSnippetAbbreviations,
   refreshLiveTemplatePreferencesCache,
   LIVE_TEMPLATES,
 } from "./liveTemplates";
@@ -30,6 +33,19 @@ afterEach(() => {
 function docAt(text: string, pos = text.length) {
   const state = EditorState.create({ doc: text });
   return { state, pos };
+}
+
+function makeView(doc: string, head = doc.length) {
+  const parent = document.createElement("div");
+  document.body.appendChild(parent);
+  const view = new EditorView({
+    state: EditorState.create({
+      doc,
+      selection: { anchor: head },
+    }),
+    parent,
+  });
+  return view;
 }
 
 describe("liveTemplateLanguageForPath", () => {
@@ -142,19 +158,6 @@ describe("createLiveTemplateCompletionSource", () => {
 });
 
 describe("expandLiveTemplateAt", () => {
-  function makeView(doc: string, head = doc.length) {
-    const parent = document.createElement("div");
-    document.body.appendChild(parent);
-    const view = new EditorView({
-      state: EditorState.create({
-        doc,
-        selection: { anchor: head },
-      }),
-      parent,
-    });
-    return view;
-  }
-
   it("expands sout with Tab-equivalent call", () => {
     const view = makeView("sout");
     expect(expandLiveTemplateAt(view, "java")).toBe(true);
@@ -174,6 +177,70 @@ describe("expandLiveTemplateAt", () => {
     expect(expandLiveTemplateAt(view, "java")).toBe(false);
     expect(view.state.doc.toString()).toBe("sou");
     view.destroy();
+  });
+});
+
+describe("provider-owned abbreviations", () => {
+  const providerOptions = {
+    providerOwnedAbbreviations: (language: string) => (
+      language === "java" ? new Set(["sout", "soutm"]) : undefined
+    ),
+  };
+
+  it("filters provider-owned plain templates from the completion source", () => {
+    const source = createLiveTemplateCompletionSource(() => "App.java", providerOptions);
+    const state = EditorState.create({ doc: "sout" });
+    const result = source(new CompletionContext(state, 4, false));
+    expect(result).not.toBeNull();
+    if (!result || "then" in result) throw new Error("expected sync result");
+    const labels = result.options.map((o) => o.label);
+    expect(labels).not.toContain("sout");
+    expect(labels).not.toContain("soutm");
+    // The provider has no soutp/soutv, so the app keeps filling those gaps.
+    expect(labels).toContain("soutp");
+    expect(labels).toContain("soutv");
+  });
+
+  it("keeps non-Java languages untouched by the Java provider set", () => {
+    const source = createLiveTemplateCompletionSource(() => "src/a.ts", providerOptions);
+    const state = EditorState.create({ doc: "clg" });
+    const result = source(new CompletionContext(state, 3, false));
+    expect(result).not.toBeNull();
+    if (!result || "then" in result) throw new Error("expected sync result");
+    expect(result.options.some((o) => o.label === "clg")).toBe(true);
+  });
+
+  it("does not expand a provider-owned exact abbreviation with Tab", () => {
+    const view = makeView("soutm");
+    expect(expandLiveTemplateAt(view, "java", providerOptions)).toBe(false);
+    expect(view.state.doc.toString()).toBe("soutm");
+    expect(providerOwnedExactAbbreviationAt(view, "java", providerOptions)).toBe(true);
+    view.destroy();
+  });
+
+  it("still expands app-owned abbreviations and postfix forms", () => {
+    const plain = makeView("soutp");
+    expect(expandLiveTemplateAt(plain, "java", providerOptions)).toBe(true);
+    expect(plain.state.doc.toString()).toBe("System.out.println();");
+    expect(providerOwnedExactAbbreviationAt(plain, "java", providerOptions)).toBe(false);
+    plain.destroy();
+
+    const postfix = makeView("list.sout");
+    expect(expandLiveTemplateAt(postfix, "java", providerOptions)).toBe(true);
+    expect(postfix.state.doc.toString()).toBe("System.out.println(list);");
+    postfix.destroy();
+  });
+
+  it("collects provider snippet labels and app plain abbreviations", () => {
+    const labels = providerSnippetAbbreviations([
+      { label: "soutm", type: "text" },
+      { label: "println()", type: "method" },
+      { label: "sysout", type: "text" },
+    ]);
+    expect([...labels].sort()).toEqual(["soutm", "sysout"]);
+    const appAbbreviations = plainTemplateAbbreviations("java");
+    expect(appAbbreviations.has("soutm")).toBe(true);
+    expect(appAbbreviations.has("soutp")).toBe(true);
   });
 });
 

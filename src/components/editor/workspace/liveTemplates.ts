@@ -43,6 +43,35 @@ export interface LiveTemplate {
   postfix?: boolean;
 }
 
+/**
+ * Provider-owned plain abbreviations for the active language. When the
+ * language provider already offers an exact template for an abbreviation
+ * (jdtls ships the Eclipse Java editor templates as snippet proposals), the
+ * provider's proposal wins and the app's live template only fills the gaps the
+ * provider does not cover. Postfix forms stay app-owned: the provider has no
+ * postfix completion.
+ */
+export interface LiveTemplateSourceOptions {
+  providerOwnedAbbreviations?: (
+    language: LiveTemplateLanguage,
+  ) => ReadonlySet<string> | undefined;
+}
+
+function providerOwnedPlainAbbreviations(
+  language: LiveTemplateLanguage,
+  options: LiveTemplateSourceOptions | undefined,
+): ReadonlySet<string> | undefined {
+  const owned = options?.providerOwnedAbbreviations?.(language);
+  return owned && owned.size > 0 ? owned : undefined;
+}
+
+function yieldsToProvider(
+  template: LiveTemplate,
+  owned: ReadonlySet<string> | undefined,
+): boolean {
+  return !!owned && !template.postfix && owned.has(template.abbreviation);
+}
+
 /** High boost so exact live templates beat ordinary LSP members. */
 export const LIVE_TEMPLATE_EXACT_BOOST = 800;
 export const LIVE_TEMPLATE_PREFIX_BOOST = 450;
@@ -1241,6 +1270,7 @@ export function applyLiveTemplate(
 export function expandLiveTemplateAt(
   view: EditorView,
   language: LiveTemplateLanguage,
+  options?: LiveTemplateSourceOptions,
 ): boolean {
   const pos = view.state.selection.main.head;
   if (!view.state.selection.main.empty) return false;
@@ -1251,16 +1281,58 @@ export function expandLiveTemplateAt(
     return true;
   }
 
+  const owned = providerOwnedPlainAbbreviations(language, options);
   const plain = matchLiveTemplateAbbreviation(view.state.doc, pos, language);
   // When several templates share a prefix, only expand on exact abbreviation.
   if (plain?.exact) {
     // Disambiguate: if another longer template also starts with this exact
     // abbr as a prefix of a longer one the user might still be typing — but
-    // exact means they typed the full abbr, so expand the exact one.
+    // exact means they typed the full abbr, so expand the exact one. A
+    // provider-owned abbreviation stays with the provider instead.
+    if (yieldsToProvider(plain.template, owned)) return false;
     applyLiveTemplate(view, plain);
     return true;
   }
   return false;
+}
+
+/**
+ * True when the caret sits right after an exact plain abbreviation whose
+ * template is provider-owned, so Tab must route to provider completion instead
+ * of expanding the app template (or inserting indentation).
+ */
+export function providerOwnedExactAbbreviationAt(
+  view: EditorView,
+  language: LiveTemplateLanguage,
+  options?: LiveTemplateSourceOptions,
+): boolean {
+  const owned = providerOwnedPlainAbbreviations(language, options);
+  if (!owned) return false;
+  const pos = view.state.selection.main.head;
+  if (!view.state.selection.main.empty) return false;
+  const plain = matchLiveTemplateAbbreviation(view.state.doc, pos, language);
+  return !!plain?.exact && yieldsToProvider(plain.template, owned);
+}
+
+/**
+ * Abbreviations of provider snippet proposals. LSP CompletionItemKind.Snippet
+ * maps to the `text` completion type; jdtls's Eclipse templates arrive that
+ * way. Non-template snippets only matter when their label collides with an app
+ * abbreviation, in which case the provider's exact label still wins.
+ */
+export function providerSnippetAbbreviations(
+  options: readonly Completion[],
+): Set<string> {
+  const labels = new Set<string>();
+  for (const option of options) {
+    if (option.type === "text" && option.label) labels.add(option.label);
+  }
+  return labels;
+}
+
+/** Plain (non-postfix) abbreviations the app offers for a language. */
+export function plainTemplateAbbreviations(language: LiveTemplateLanguage): Set<string> {
+  return new Set(templatesFor(language, false).map((template) => template.abbreviation));
 }
 
 function boostForMatch(match: LiveTemplateMatch): number {
@@ -1324,6 +1396,7 @@ function matchToCompletion(match: LiveTemplateMatch): Completion {
  */
 export function createLiveTemplateCompletionSource(
   pathOf: () => string | null | undefined,
+  options?: LiveTemplateSourceOptions,
 ): CompletionSource {
   return (context: CompletionContext): CompletionResult | null => {
     // Never trigger live templates inside string literals or comments.
@@ -1332,12 +1405,14 @@ export function createLiveTemplateCompletionSource(
     }
 
     const language = liveTemplateLanguageForPath(pathOf());
+    const owned = providerOwnedPlainAbbreviations(language, options);
     // Require at least one character unless explicit (Ctrl+Space).
     const listed = listLiveTemplateCompletions(context.state.doc, context.pos, language);
     if (!listed) {
       if (!context.explicit) return null;
       // Explicit invoke with no prefix: show a short starter set for the language.
       const starters = templatesFor(language, false)
+        .filter((template) => !yieldsToProvider(template, owned))
         .slice(0, 30)
         .map((template): LiveTemplateMatch => ({
           from: context.pos,
@@ -1354,6 +1429,13 @@ export function createLiveTemplateCompletionSource(
       };
     }
 
+    // Provider-owned plain abbreviations yield to the provider's exact
+    // templates; postfix matches stay app-owned.
+    const matches = owned
+      ? listed.matches.filter((match) => !yieldsToProvider(match.template, owned))
+      : listed.matches;
+    if (!matches.length) return null;
+
     // For non-explicit automatic typing:
     // Only offer templates if:
     // 1) Postfix template (e.g. list.for), OR
@@ -1361,9 +1443,9 @@ export function createLiveTemplateCompletionSource(
     // 3) Typed prefix is at least 2 characters long (e.g. "so" -> sout).
     // Single-character prefix (like typing "s" or "i" or "t") MUST NOT hijack autocomplete popup!
     if (!context.explicit) {
-      const isPostfix = listed.matches[0]?.template.postfix ?? false;
-      const hasExact = listed.matches.some((m) => m.exact);
-      const longestTyped = Math.max(...listed.matches.map((m) => m.typed.length));
+      const isPostfix = matches[0]?.template.postfix ?? false;
+      const hasExact = matches.some((m) => m.exact);
+      const longestTyped = Math.max(...matches.map((m) => m.typed.length));
       if (!isPostfix && !hasExact && longestTyped < 2) {
         return null;
       }
@@ -1373,11 +1455,11 @@ export function createLiveTemplateCompletionSource(
       from: listed.from,
       // For postfix, `from` spans the whole `expr.abbr`; CM filters against label
       // which is only the abbreviation, so disable client filter and re-query.
-      options: listed.matches
+      options: matches
         .sort((a, b) => boostForMatch(b) - boostForMatch(a))
         .map(matchToCompletion),
-      filter: !listed.matches[0]?.template.postfix,
-      validFor: listed.matches[0]?.template.postfix ? undefined : /^[\w$]*$/,
+      filter: !matches[0]?.template.postfix,
+      validFor: matches[0]?.template.postfix ? undefined : /^[\w$]*$/,
     };
   };
 }
