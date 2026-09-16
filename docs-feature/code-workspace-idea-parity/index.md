@@ -4,7 +4,12 @@
 
 首次 P0 基线：`audit/plan` 整体 Code Workspace，起始分支 `main`、HEAD `27f99b6116f4f6aae906d324cb84e8359695e17a`。首次评估已经完成，之后已有多轮 P1–P3；后续无需重新执行首次 P0。
 
-## 当前任务入口（2026-09-15）
+## 当前任务入口（2026-09-16）
+
+**2026-09-16 P1 完成：** [ED-PARITY-002](save-race-baseline-plan.md#ed-parity-002)，来源 REQ-11 / CW-EDIT-003；[Windows 真实参考与 fixture](references/ed-parity-002-reference.md)、[完整 P2 提示词](handoff-p2-ed-parity-002.md)、[静态检查](evidence/ed-parity-002-p1-static.md)、[源码/工件身份](evidence/ed-parity-002-p1-identity.json)。唯一板同卡 ready/planning_required=false，无开发 owner；P2 建立 W1/W2 原生时点/字节保留基线，watcher await 风险待运行归因。仅 P1 规划就绪，不是 Taomni 功能/UI/交互已对齐。产品测试/构建/启动/领取/实现均未执行；IDEA 本轮独占采样已结束并归还桌面。实时状态继续以 backlog.md 为准。
+
+下段 ED-PARITY-001 的 ready 是当时 P1 快照，后续执行状态读取新板，不据此重复规划或领取 done 卡。
+
 
 **2026-09-15 P1 完成：** [ED-PARITY-001](find-provider-accessibility-plan.md#ed-parity-001)（REQ-01 / CW-SEARCH-001、CW-SHELL-002、CW-NAV-002）已完成补证设计、独立 DEC/AC/V 与保留断言；[Linux 真实参照](references/ed-parity-001-reference.md#observed)、[完整 P2 提示词](handoff-p2-ed-parity-001.md)、[静态核对](evidence/ed-parity-001-p1-static.md)。唯一板同卡 ready/planning_required=false，无开发owner；用户已确认播报保留未验证。两段IDEA采样结束并归还桌面。本结论只是P1规划就绪，不是Taomni功能/UI/交互已对齐，产品测试/构建/领取/实现均未执行。
 

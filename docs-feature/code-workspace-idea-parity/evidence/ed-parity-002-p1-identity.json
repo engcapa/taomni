@@ -1,0 +1,305 @@
+{
+  "kind": "P1 source identity and IDEA artifacts; NOT product evidence",
+  "task": "ED-PARITY-002",
+  "board": "docs-feature/code-workspace-idea-parity/backlog.md",
+  "date": "2026-09-16",
+  "head": "149be0e882ef638cae6b1d08984eaa21275966c6",
+  "initial_worktree": "clean",
+  "idea": {
+    "version": "2026.2.2",
+    "build": "IU-262.10315.125",
+    "edition": "Ultimate (productCode IU); license state not sampled",
+    "platform": "Windows",
+    "product_info_sha256": "e4cb8371ae3c12fd117b89beb05ae707e739c2fce474ffd95eb67a9c6febd426",
+    "session": {
+      "end_epoch": 1789567603.678436,
+      "input_stopped": true,
+      "final_title": "fixture – example.txt",
+      "initial_window_rect": [
+        119,
+        70,
+        1821,
+        929
+      ],
+      "client_rect": [
+        0,
+        0,
+        1686,
+        851
+      ],
+      "dpi": 96
+    }
+  },
+  "source_sha256": {
+    "src/components/editor/CodeWorkspaceTab.tsx": "5e25fb7a70f6db20291744feed584924397c41714ddaab2e64c477c597b167cb",
+    "src/components/editor/workspace/saveCommit.ts": "56dc881f4c45d0efe37120d7933037736f48840d7fb718032a09bac216652bc9",
+    "src/components/editor/workspace/workspaceStyleController.ts": "390cf777dd8b427a8afbcaaafe25d099ed2b2b26c4847d6f1072151fbe61ca2d",
+    "src/components/editor/workspace/saveObservationContract.ts": "17878836e02a099d0bac81ac3870c9087c9067e429a068d93d7af78b94333fd0",
+    "src/components/editor/workspace/ExternalFileConflictDialog.tsx": "43f403e576fb73567ba0c416c87de5f0e37479ecd05c9a12106f14b284d595fd",
+    "src/components/editor/CodeWorkspaceTab.test.tsx": "da3b8688c7728f82b60a1a0805bf9ec9ea7059e1079fa89a19d6e9af6c2ee79c",
+    "src/lib/editor/workspace.ts": "4f510afa0511680b0105290cf9a8a3c486e10134d76b7d7143e91d7e7c4d2aa7",
+    "src-tauri/src/workspace.rs": "080732365295ea497950ba2cf2fdea6bfd531407d00777e327e114966b193315",
+    "qa-ui-auto-tests/cases/TC-IDE-C0-01-save-transaction-stale-snapshot-and-disk-verification.testcase.yaml": "493b10cd3c1f3e05fbc29cc554e4b28ab4e4b604b37623ef793374815a719bf1",
+    "qa-ui-auto-tests/cases/TC-IDE-C0-02-save-receipt-state-and-accessibility.testcase.yaml": "d5cce70d7efdbe9bf67b0fa81efed9fc1603620fb19a7e190e152045fcc42b66"
+  },
+  "fixtures": {
+    "B0": {
+      "text": "alpha Alpha ALPHA\ntree tree\nline three\n",
+      "byte_length": 39,
+      "sha256": "2b7edc22ece15ead9636ecf67c54fa5e48bb7c4325409a7651fda976073ae88d"
+    },
+    "B1": {
+      "text": "alpha Alpha ALPHA\ntree tree\nline three\nS",
+      "byte_length": 40,
+      "sha256": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"
+    },
+    "B2": {
+      "text": "alpha Alpha ALPHA\ntree tree\nline three\nSX",
+      "byte_length": 41,
+      "sha256": "75699982db826f8191ba939313abc59ee80b767b1e2a51776a17f81585317900"
+    },
+    "E1": {
+      "text": "EXTERNAL\n",
+      "byte_length": 9,
+      "sha256": "c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9"
+    },
+    "E2": {
+      "text": "EXTERNAL2\n",
+      "byte_length": 10,
+      "sha256": "b3a7075e2a505acfe6bdd269373017ea279cbb953423cac0b3807f748ab63183"
+    },
+    "E3": {
+      "text": "EXTERNAL3\n",
+      "byte_length": 10,
+      "sha256": "2e3a9327efd33db88ae1f1d119dd6b0dcc3909bb87b41e9867029936338e9bff"
+    },
+    "E3S": {
+      "text": "EXTERNAL3\nS",
+      "byte_length": 11,
+      "sha256": "5f84e2263d0cd1ceb0907844d737106a0f3efa3db04c299b9814409eeeceb7cb"
+    }
+  },
+  "artifacts": [
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/01-idea.png",
+      "sha256": "e4a2d7b3291aa6c79da1bd590106a27148b00e253fb397b8d8a3f5e6efc4a5b5",
+      "bytes": 110853,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:02:29.628841+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/02-open.png",
+      "sha256": "67fd6e9199c1dea88b3c01177eaacaa41eb17ea6d9abfb49455fbf45a2e00725",
+      "bytes": 110825,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:02:54.519005+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/03-dirty-S.json",
+      "sha256": "1b0d5325c35042b9158259e9c60ae08c7814129d93c1f2f122434b20b4bd5b8b",
+      "bytes": 419,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:03:22.454985+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/03-dirty-S.png",
+      "sha256": "d6128699e78ff1cede027896b06033504f80e9c38a3bc4bd906aa316a3774734",
+      "bytes": 112098,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:03:22.453980+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/04-saved-S.json",
+      "sha256": "614431da9e867c403e626de13f1f410f899611e9c028539e9e659611da7c38ec",
+      "bytes": 421,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:03:23.017372+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/04-saved-S.png",
+      "sha256": "dda91f0c55dd258ba9ca2f45d9b5008c29add89a8c98a51e7b0f6740e6aef970",
+      "bytes": 111987,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:03:23.017372+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/05-dirty-X.json",
+      "sha256": "44329747abe65fb393486f207afcd2f43bb9fa68776359cd4f737825f7aba7ff",
+      "bytes": 421,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:03:23.158159+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/05-dirty-X.png",
+      "sha256": "5c6a2fbc54ead700982ae2d93160eb5b316fbfa76c55f715e91107d6216daf9e",
+      "bytes": 112361,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:03:23.157616+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/06-undo-X.json",
+      "sha256": "2fdf78165529789774cdd5e38bdeadfd0293baf3b54b639c524d37e4b90a9f29",
+      "bytes": 420,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:03:23.616481+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/06-undo-X.png",
+      "sha256": "88669f8a201f69edad70733eff57645c4eaa82d291648bf29417ccda82874ad6",
+      "bytes": 111528,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:03:23.616481+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/07-external.png",
+      "sha256": "cf0d8a0ef05772f649eac1c2eb37b703493aca61ba91845aa95031957a6cf0b8",
+      "bytes": 110275,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:03:45.528398+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/08-sync.png",
+      "sha256": "db2d00e483d73514e0918468f96e753e7382a787126691aa5ec246e7ac791a8b",
+      "bytes": 21329,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:04:05.246979+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/09-conflict-full.png",
+      "sha256": "2510ecb5facb694bd304ef05eccfdcd5eeda47f2032995e2945958d635c7aef9",
+      "bytes": 114799,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:04:30.180052+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/10-esc.json",
+      "sha256": "67b74edac61f6ae95a549e6edad413e046ced7423352f9a442f06ca4b92c6386",
+      "bytes": 291,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:04:30.633091+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/10-esc.png",
+      "sha256": "74485fd8190cd5347bf93b2f82b9191a40588545d40b33c8be66492e2f0f2dc0",
+      "bytes": 110665,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:04:30.633091+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/11-guard-stop.png",
+      "sha256": "950c211a2ae45ad1ea5cfc841003895797ee57b4cb0d8c8e9af5828dde99fd34",
+      "bytes": 110717,
+      "kind": "diagnostic",
+      "recorded_at": "2026-09-16T14:05:22.478844+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/12-conflict-second.json",
+      "sha256": "96dbbd5fbdc07516e863f5dc2967803f02457b13ed77680601541c71a314e78e",
+      "bytes": 195,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:05:48.063203+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/12-conflict-second.png",
+      "sha256": "2bb0bcb91fcad630894c9bde18f9858affcf9527d82f3700527e198ef51604ce",
+      "bytes": 114928,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:05:48.062087+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/13-esc-second.json",
+      "sha256": "b589336a1617f3e46516fd80a85e8c1c3550c41958202fe1963dfb720a812447",
+      "bytes": 294,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:16.229052+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/13-esc-second.png",
+      "sha256": "0404df8ec4c735847c9ab8eaa21f5e752da5d608141f4543fc8c3b7955d02ef6",
+      "bytes": 110940,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:16.228052+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/14-load-disk.json",
+      "sha256": "4a385e08d2f316a982e1debec1c5d318f66d7a0415e6dd0d11084631ede38011",
+      "bytes": 294,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:17.384449+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/14-load-disk.png",
+      "sha256": "94ba020f2c1845924905b92374356a7d2e18a2f241585257eacf52443cfd7820",
+      "bytes": 108969,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:17.383450+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/15-save-second.json",
+      "sha256": "324a7038d8c4ff5e2d032e68daafa308c173dd8cc063fa4a9d5a9cbf6350bed8",
+      "bytes": 296,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:18.049828+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/15-save-second.png",
+      "sha256": "b4d044ce8c8187f6d65eab78593a28fa99c493ac9745c766472f328aa32b87cb",
+      "bytes": 108858,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:18.048827+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/16-X-second.json",
+      "sha256": "317dbeebf969d33ae941a6b3b8eb6a0680683bab5fe779d4ae31b90ad3b9d447",
+      "bytes": 296,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:18.417646+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/16-X-second.png",
+      "sha256": "76d0696638b7c76b5f132acbc1173fa883c63c3843962ae2990ff9e521fd1096",
+      "bytes": 109354,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:18.417066+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/17-undo-second.json",
+      "sha256": "aa60bf9c34c135190fd29bc53b29c1e09cd1e74b6a9c544ba9fabb7ac29577bf",
+      "bytes": 296,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:18.867964+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/17-undo-second.png",
+      "sha256": "b4d044ce8c8187f6d65eab78593a28fa99c493ac9745c766472f328aa32b87cb",
+      "bytes": 108858,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:18.866965+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/18-return.png",
+      "sha256": "d0db9725793dbce552c724e8a260e399401b4d9cfcf5ae343350520778ea186d",
+      "bytes": 109676,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:43.677929+00:00"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-002/20260916/session.json",
+      "sha256": "b6a80d9e08f02456937edd042c080b7ab4c5b840d68efe25b79e354f7b8535aa",
+      "bytes": 261,
+      "kind": "raw-idea-observation",
+      "recorded_at": "2026-09-16T14:06:43.678941+00:00"
+    }
+  ],
+  "product_checks_executed": false,
+  "handoff_head": "2901d541cbbf3a610b1c7873f73391b1529884bb",
+  "external_head_change": {
+    "from": "149be0e882ef638cae6b1d08984eaa21275966c6",
+    "to": "2901d541cbbf3a610b1c7873f73391b1529884bb",
+    "agent_git_mutation": false,
+    "audited_source_hashes_unchanged": true,
+    "qa_plan_rechecked": true,
+    "remaining_native_gap": "native_click requires Linux/X11",
+    "changed_runner_identity": true
+  }
+}

@@ -21,16 +21,13 @@
 
 ## ED-PARITY-002 保存期间继续输入的字节与 dirty 保留基线
 
-- 来源：REQ-11 / CW-EDIT-003；[P0 需求](overall-audit-plan-20260913.md#req-11)、[历史只读材料](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-main-repair.md)。
-- 已知依据：P0 的 REQ-11 未采 native 保存；后续卡有局部 save/undo 证据，须先检查能否覆盖本序列，不能将缺证据直接写成保存 bug。
-- 本包边界：仅取一个文件保存期间继续输入的成功/冲突序列，补当前端磁盘字节与 dirty 的可观察基线；发现反例后才设计修复。不扩到全部 Local History、剪贴板或 IME。
-- 生产 owner 候选（待核）：CodeWorkspaceTab.tsx 保存 caller、saveCommit.ts、workspaceStyleController.ts、workspace.rs；按真实副作用选择必要消费者。
-- IDEA/fixture（待核）：F1/F5 隔离文件；冻结编码/EOL、保存前后内容和并发输入时点，先复用现有保存用例。
-- ED-PARITY-002-A1：保存结果对应冻结内容，期间新输入仍保留且 dirty 正确；冲突/失败不会错误清 dirty 或覆盖用户新文本。
-- ED-PARITY-002-A2：同 fixture 的 IDEA/Taomni 功能、视觉、交互分别有结论和准确证据身份；缺侧或不支持明确标记，不能声称 matched。
-- ED-PARITY-002-A3：一次 undo、编码/EOL、failed/unknown effect 和取消零写入契约继续成立。
-- 验证起点：V1→A1，V2→A2，V3→A3；所需种类为 `document`、`code-audit`、`native`。具体 case/命令、环境和可复用证据由 P1 核对后写入；本次均未执行。
-- ready 前置：核对当前生产及后续交付是否已覆盖目标；确认参考和运行环境；给每个 AC 可观察的正常/错误/取消/恢复断言及消费者回归；依赖只引用本板实际必要的卡。当前无已确认的跨卡依赖，`depends_on=[]` 不代表外部环境已经就绪。
+2026-09-16 P1 已细化至[本卡设计](save-race-baseline-plan.md#ed-parity-002)，来源仍为 [REQ-11](overall-audit-plan-20260913.md#req-11) / CW-EDIT-003。沿用已完成 P0，不重复 ED-SAVE/ED-AUDIT-004/ED-REPAIR-001 历史修复或豁免。
+
+- 仅一个文件保存中输入的冻结字节/live dirty、冲突/取消/恢复保留基线。源码已有单 writer/receipt/owner/recovery；watcher await 后旧快照 merge 为待运行归因风险，不能写成已复现缺陷。
+- 本卡 ED-PARITY-002-DEC-01..07、A1..A3、V1..V4、S0..S8、生产责任与共享消费者见设计。
+- [Windows IDEA 真实参照与精确 fixture](references/ed-parity-002-reference.md)、[完整 P2 提示词](handoff-p2-ed-parity-002.md)、[文档检查](evidence/ed-parity-002-p1-static.md)。IDEA 内部竞争/unknown 未实采；有效字体/zoom 未核，不签精确视觉 matched。
+- Required evidence 为 document/code-audit/native/unit/typecheck；原三种保留，增加定向回归和 scoped typecheck。P2 负责尚不存在的 W1/W2 native 采集及 Windows 用例适配；不能把旧 Linux 用例直接执行或把模拟当原生字节。
+- P1 author 后 ready、planning_required=false；状态只看[唯一板](backlog.md)，无开发 owner/claimed_at/baseline。所有产品验证仍未执行，ready 不是产品通过。本轮桌面时段已结束，后续输入重新确认时段。
 
 <a id="ed-parity-003"></a>
 

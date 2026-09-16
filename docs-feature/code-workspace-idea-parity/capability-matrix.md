@@ -289,6 +289,8 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 ### CW-EDIT-003 — 保存、编码、换行和规范化
 
+**2026-09-16 P1 规划增量（不刷新下列 2026-09-13 三维结论）：** 唯一新板 [ED-PARITY-002](backlog.md) 的[保留基线设计](save-race-baseline-plan.md#ed-parity-002)、[Windows IDEA 参照](references/ed-parity-002-reference.md)、[P2 交接](handoff-p2-ed-parity-002.md)已齐；ready/planning_required=false 仅为规划就绪。真实 IDEA 已采保存/undo/冲突/Esc/加载磁盘；内部写入竞争和有效 UI 字体/zoom 未证明。当前生产存在 watcher await 后使用旧 live snapshot 的待复现风险，P2 必测 W2；现有 native TC-IDE-C0-01 缺 W1/W2 且包含 Windows 不支持的 native_click。P2 补真实时序/字节证据，不继承旧豁免、不重复历史修复。P1 未启动 Taomni 或跑产品测试/构建，没有关闭任何三维差距。
+
 - **IDEA目标结果：** 保存实际字节符合编码/EOL/EditorConfig；dirty并发、只读失败和重试清楚且不丢内容。目标为需求；除I0明确事实外，细节未冒充实测。
 - **Fixture / 入口：** [F1/F5](references/fixture-catalog.md)；Save / Ctrl+S / status encoding,EOL / format on save。
 - **完整采样序列（未列为已执行的步骤均待采）：** 编辑→保存→读取字节→切EOL/BOM→保存中继续输入→写失败/unknown→取消重试→恢复。每次保存初始/关键状态/退出后的原图或录屏，分别记录focus、caret/selection、菜单/弹层、错误、取消、undo与恢复；不适用项说明原因。
