@@ -5,6 +5,15 @@ import {
   type CompletionResult,
   type CompletionSource,
 } from "@codemirror/autocomplete";
+
+declare module "@codemirror/autocomplete" {
+  interface Completion {
+    /** LSP CompletionItemKind preserved from provider response */
+    rawKind?: number | null;
+    /** Explicit template / snippet source origin */
+    isTemplateSnippet?: boolean;
+  }
+}
 import type { Extension, Text } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
@@ -98,6 +107,7 @@ export interface LspCompletionHooks {
   onResolveGate?: (request: CompletionResolveGateRequest) => void;
   controller?: LspCompletionController;
   getView?: () => EditorView | null;
+  consumeTriggerOrigin?: (pos: number, docLength: number) => string | null;
 }
 
 /**
@@ -866,9 +876,14 @@ export class LspCompletionController {
     return snap;
   }
 
-  shouldAutoTrigger(prefixLength: number, explicit: boolean): boolean {
+  shouldAutoTrigger(
+    prefixLength: number,
+    explicit: boolean,
+    reason?: CompletionInvocationReason,
+  ): boolean {
     if (explicit) return true;
     if (!this.preferences.autoTrigger) return false;
+    if (reason === "trigger") return true;
     return prefixLength >= this.preferences.minPrefixLength;
   }
 
@@ -1852,10 +1867,14 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
       && word.from > 0
       && preWordChar.trim().length > 0
       && triggers.includes(preWordChar);
-    if (!context.explicit && !word && !triggerOnly) return null;
+    const triggerOriginChar = hooks.consumeTriggerOrigin?.(context.pos, context.state.doc.length) ?? null;
+    const isTriggerOrigin = triggerOriginChar !== null;
+    const effectiveExplicit = context.explicit && !isTriggerOrigin;
+
+    if (!effectiveExplicit && !word && !triggerOnly && !isTriggerOrigin) return null;
     // Suppress word-based LSP autocompletion inside string literals or comments
     // unless user explicitly invoked completion (Ctrl+Space) or typed a trigger character.
-    if (!context.explicit && !triggerOnly && !afterTrigger && isInsideStringOrComment(context.state, context.pos)) {
+    if (!effectiveExplicit && !triggerOnly && !afterTrigger && !isTriggerOrigin && isInsideStringOrComment(context.state, context.pos)) {
       return null;
     }
 
@@ -1876,17 +1895,24 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
     // mapping a response that became stale while the user kept typing.
     context.addEventListener("abort", () => {}, { onDocChange: true });
 
+    const effectiveTrigger = isTriggerOrigin || triggerOnly || afterTrigger;
+    const reason: CompletionInvocationReason = effectiveExplicit
+      ? "explicit"
+      : effectiveTrigger
+        ? "trigger"
+        : "typing";
+
     // Check auto-trigger preference
-    if (!context.explicit && hooks.controller) {
+    if (!effectiveExplicit && hooks.controller) {
       const typedLen = word ? word.text.length : 0;
-      if (!hooks.controller.shouldAutoTrigger(typedLen, false)) {
+      if (!hooks.controller.shouldAutoTrigger(typedLen, false, reason)) {
         return null;
       }
     }
 
     // For plain non-trigger typing (e.g. typing identifiers in Java without `.` or `:`),
     // settle briefly so rapid typing does not spam heavy LSP queries on every keystroke.
-    if (!context.explicit && !triggerOnly && !afterTrigger) {
+    if (!effectiveExplicit && !effectiveTrigger) {
       const delayMs = hooks.controller?.getTriggerDelayMs() ?? 120;
       await new Promise<void>((resolve) => {
         const timer = window.setTimeout(resolve, delayMs);
@@ -1908,19 +1934,11 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
     // request with an empty list, which silenced every completion at a
     // space-prefixed identifier. Typing keeps triggerKind 2 only for a real
     // member-access trigger (`obj.t`); plain identifier typing stays Invoked.
-    const triggerCharacter = !context.explicit && triggerOnly
-      ? charBefore
-      : !context.explicit && afterTrigger
+    const triggerCharacter = !effectiveExplicit && (isTriggerOrigin || triggerOnly)
+      ? (triggerOriginChar ?? charBefore)
+      : !effectiveExplicit && afterTrigger
         ? preWordChar
         : null;
-    // §8.19.4 invocation evidence: explicit repeated calls at one caret carry
-    // requestedScope:"expanded" into the provider adapter; typing/trigger
-    // popups inherit the live sequence without advancing it.
-    const reason: CompletionInvocationReason = context.explicit
-      ? "explicit"
-      : (triggerOnly || afterTrigger)
-        ? "trigger"
-        : "typing";
     const position = lspPositionFromOffset(context.state.doc, context.pos);
     const invocationOrdinal = recordBasicCompletionInvocation({
       workspaceId: token.workspaceId,
@@ -2085,6 +2103,8 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
         sortText: item.sortText ?? undefined,
         boost,
         type: completionKindToType(item.kind),
+        rawKind: item.kind,
+        isTemplateSnippet: item.kind === 15 || item.insertTextFormat === 2,
         detail: truncatedDetail,
         info: showDoc && (item.documentation || resolveItem)
           ? () => completionInfo(item, resolveItem, token, isStillCurrent)

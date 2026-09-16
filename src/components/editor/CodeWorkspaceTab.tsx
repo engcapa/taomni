@@ -15898,7 +15898,7 @@ export function CodeWorkspaceTab({
       // same text the caret is in (IDEA-like: no empty popup mid-edit).
       // Bail before any wait loop when this buffer has no usable language server.
       if (!shouldLiveSyncLsp(file.languagePath, lspFilesRef.current[file.key])) return null;
-      const live = await ensureLspDocumentSynced(file.key);
+      const live = await ensureLspDocumentSynced(file.key, true);
       if (!live) return null;
       if (!isLspFeatureReady(lspFilesRef.current[live.key])) return null;
       if (openFilesRef.current[live.key]?.text !== live.text) return null;
@@ -19648,10 +19648,9 @@ export function CodeWorkspaceTab({
           orientation="horizontal"
           id={`code-workspace-${workspaceInstanceId}`}
           className="flex-1 min-h-0 min-w-0"
-          onLayoutChanged={(_layout, meta) => {
+          onLayoutChanged={() => {
             // Pointer drags report here only on release (never per move), which
             // is the library's intended persistence point for saved layouts.
-            if (!meta?.isUserInteraction) return;
             if (lastProjectPanelSizeRef.current > 40) {
               setShellChromeState(workspaceInstanceId, {
                 projectWidthPx: lastProjectPanelSizeRef.current,
