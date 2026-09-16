@@ -1314,18 +1314,25 @@ export function providerOwnedExactAbbreviationAt(
   return !!plain?.exact && yieldsToProvider(plain.template, owned);
 }
 
+export function isProviderTemplateSnippet(option: Completion): boolean {
+  if (option.isTemplateSnippet !== undefined) return option.isTemplateSnippet;
+  if (option.rawKind !== undefined) return option.rawKind === 15;
+  return option.type === "text";
+}
+
 /**
- * Abbreviations of provider snippet proposals. LSP CompletionItemKind.Snippet
- * maps to the `text` completion type; jdtls's Eclipse templates arrive that
- * way. Non-template snippets only matter when their label collides with an app
- * abbreviation, in which case the provider's exact label still wins.
+ * Abbreviations of provider snippet proposals. LSP CompletionItemKind.Snippet (15)
+ * represents template snippets. Non-template text/references (kinds 1, 18) must
+ * never claim an app template abbreviation.
  */
 export function providerSnippetAbbreviations(
   options: readonly Completion[],
 ): Set<string> {
   const labels = new Set<string>();
   for (const option of options) {
-    if (option.type === "text" && option.label) labels.add(option.label);
+    if (isProviderTemplateSnippet(option) && option.label) {
+      labels.add(option.label);
+    }
   }
   return labels;
 }
