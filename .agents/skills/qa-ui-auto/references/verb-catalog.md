@@ -103,6 +103,23 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_native_process_delta` | `{pattern, baseline, max_delta, timeout_sec?}` | Native Linux only. Counts `/proc/*/cmdline` entries containing `pattern`, writes `native-process-observation.json`, and requires the count increase from `baseline` to remain within `0..max_delta`. |
 | `assert_system_clipboard` | `{equals \| contains \| readable, timeout_sec?}` | Native Linux/X11 only: reads the real CLIPBOARD selection from a separate process, never from the app's DOM or in-process state. The only step that can prove a copy actually crossed the OS boundary. An unresponsive owner is reported as unreadable, never as an empty string. Exactly one assertion key. |
 
+## Save-race time-point gate (isolated QA build only)
+
+These verbs control `window.__taomniQaSaveGate`, installed only by the isolated
+QA bundle (`pnpm build --mode qa`, used by the `com.taomni.app.qa` binary; the
+normal build compiles the install branch away). They never fabricate acks or
+hashes: the production byte writer, its real ack and the real watched-files
+notify all run; only an explicit delivery point is held while the runner types
+into the live editor. Against a production binary the gate is absent and the
+verbs fail loudly.
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `save_race_arm` | `{stage, filePath?, workspaceId?, fileKey?, transactionId?, timeoutMs?}` | One-shot arm for the next matching save transaction. `stage` ∈ `prepare` (after the history await, before the byte writer), `ack` (the real writer was invoked; its real ack is withheld), `watcher` (real ack delivered and the real watched-files notify invoked; merge not yet run), `fault` (withhold one REAL successful write response as a recorded QA transport fault so the production unknown-effect read-back path runs). Optional identity fields narrow the match; omitted fields match any value. |
+| `save_race_wait_entered` | `{stage, timeout_sec?}` | Blocks until the armed stage is genuinely entered (enter time and live revision are recorded in-page). Fails on timeout with the last gate status. |
+| `save_race_release` | `{reason?}` or null | Releases the held delivery point; the production transaction continues. Fails when nothing is held. |
+| `save_race_trace` | `{artifact?, expect_contains?, expect_events?, require_ack_hashes?, require_settled_kind?}` | Fetches the in-page timeline and writes it under the case directory (default `save-race-trace.json`). `expect_contains` checks an ordered subsequence, `expect_events` an exact sequence; `require_ack_hashes` proves `ack-delivered` carries the real native `writtenHash`; `require_settled_kind` asserts the last `commit-settled` production result kind. |
+
 ## Last-resort escape hatch
 
 | Verb | Args | Notes |

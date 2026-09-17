@@ -210,6 +210,11 @@ import {
   type SaveObservationState,
 } from "./workspace/saveObservationContract";
 import {
+  applySaveRaceWriteFault,
+  holdSaveRaceStage,
+  recordSaveRaceEvent,
+} from "./workspace/saveRaceProbe";
+import {
   hasBlockingDiskEffectResolution,
   listDiskEffectLedgerEntries,
   recordDiskEffectLedgerEntry,
@@ -5289,24 +5294,34 @@ export function CodeWorkspaceTab({
       }
     }
 
-    if (rootPath && relPath) {
-      return workspaceWriteFileEncoded(
+    const pendingWrite = rootPath && relPath
+      ? workspaceWriteFileEncoded(
         rootPath,
         relPath,
         normalizedText,
         request.expectedDiskHash,
         targetEncoding,
         targetBom,
+      )
+      : workspaceWriteLooseFileEncoded(
+        request.filePath,
+        normalizedText,
+        request.expectedDiskHash,
+        targetEncoding,
+        targetBom,
       );
+    // ED-PARITY-002 QA build only: the real write attempt above runs first;
+    // the probe may withhold its response (and optionally delay it) so the
+    // production unknown-effect read-back path classifies real disk bytes.
+    // A no-op in normal builds and when the probe is not armed.
+    let writtenAck: WorkspaceWriteAck | null = null;
+    let writeFailure: unknown = null;
+    try {
+      writtenAck = await pendingWrite;
+    } catch (error) {
+      writeFailure = error;
     }
-
-    return workspaceWriteLooseFileEncoded(
-      request.filePath,
-      normalizedText,
-      request.expectedDiskHash,
-      targetEncoding,
-      targetBom,
-    );
+    return applySaveRaceWriteFault(request.filePath, writtenAck, writeFailure);
   }, []);
 
   /**
@@ -5669,6 +5684,20 @@ export function CodeWorkspaceTab({
         if (historyEntry) historyId = `local-history-${historyEntry.id}`;
       }
 
+      // ED-PARITY-002 QA build only: the probe may hold this prepare point
+      // (writer not yet invoked) so the runner can type a real edit and prove
+      // the pre-write boundary cancels with zero writer calls. Immediately
+      // resolved in normal builds and when not armed.
+      await holdSaveRaceStage({
+        stage: "prepare",
+        workspaceId: prepared.workspaceId,
+        fileKey: key,
+        transactionId: prepared.transactionId,
+        filePath: prepared.filePath,
+        revision: () => openFilesRef.current[key]?.documentRevision ?? null,
+        stillValid: () => !!openFilesRef.current[key],
+      });
+
       // 2. Pre-write commit boundary (SYNCHRONOUS, NO AWAIT)
       const currentBeforeWrite = openFilesRef.current[key];
       let cancellation: string | null = validatePreparedSaveBoundary(prepared, currentBeforeWrite
@@ -5695,6 +5724,25 @@ export function CodeWorkspaceTab({
         expectedDiskHash: prepared.expectedDiskHash,
         policy: prepared.policy,
       });
+      recordSaveRaceEvent("writer-invoked", {
+        workspaceId: prepared.workspaceId,
+        fileKey: key,
+        transactionId: prepared.transactionId,
+        filePath: prepared.filePath,
+      }, { byteLength: prepared.text.length });
+
+      // ED-PARITY-002 QA build only: the writer above is the real native
+      // writer; the probe may hold the ack delivery point (W1) so the runner
+      // can type while the UI waits for the real write acknowledgement.
+      await holdSaveRaceStage({
+        stage: "ack",
+        workspaceId: prepared.workspaceId,
+        fileKey: key,
+        transactionId: prepared.transactionId,
+        filePath: prepared.filePath,
+        revision: () => openFilesRef.current[key]?.documentRevision ?? null,
+        stillValid: () => !!openFilesRef.current[key],
+      });
 
       // 3. Writeback phase (merge, never overwrite text; generation-gated)
       try {
@@ -5704,6 +5752,12 @@ export function CodeWorkspaceTab({
         } catch (writeError) {
           // §8.18.1: classify the typed IPC error by its native effect fact.
           const mapped = saveCommitResultFromError(prepared.transactionId, writeError);
+          recordSaveRaceEvent("writer-failed", {
+            workspaceId: prepared.workspaceId,
+            fileKey: key,
+            transactionId: prepared.transactionId,
+            filePath: prepared.filePath,
+          }, { kind: mapped.kind, diskEffect: mapped.diskEffect ?? null });
           mutateOpenBuffer(key, { dirty: true, saving: false, error: mapped.error.message }, "save-metadata");
           if (mapped.diskEffect === "unknown") {
             // The bridge could not prove whether bytes landed: verify against
@@ -5713,6 +5767,17 @@ export function CodeWorkspaceTab({
               writtenHash: mapped.error.intentHash ?? mapped.error.writtenHash,
               expectedOldHash: prepared.expectedDiskHash,
               observedHash: observed?.hash ?? null,
+            });
+            recordSaveRaceEvent("unknown-readback", {
+              workspaceId: prepared.workspaceId,
+              fileKey: key,
+              transactionId: prepared.transactionId,
+              filePath: prepared.filePath,
+            }, {
+              outcome: verification.outcome,
+              observedHash: observed?.hash ?? null,
+              writtenHash: mapped.error.intentHash ?? mapped.error.writtenHash ?? null,
+              expectedOldHash: prepared.expectedDiskHash,
             });
             if (verification.outcome === "committed" && observed) {
               // Intended bytes are provably on disk: continue through the
@@ -5794,6 +5859,18 @@ export function CodeWorkspaceTab({
           }
         }
 
+        recordSaveRaceEvent("ack-delivered", {
+          workspaceId: prepared.workspaceId,
+          fileKey: key,
+          transactionId: prepared.transactionId,
+          filePath: prepared.filePath,
+        }, {
+          writtenHash: ack.writtenHash,
+          writtenByteLength: ack.writtenByteLength,
+          oldHash: ack.oldHash ?? null,
+          documentRevision: openFilesRef.current[key]?.documentRevision ?? null,
+        });
+
         const receipt = buildFinalBytesReceipt(prepared, ack, { historyId });
 
         // Disk acknowledged. From here only committed kinds exist (§8.18.1).
@@ -5818,11 +5895,11 @@ export function CodeWorkspaceTab({
           };
         }
 
-        const liveAfterWrite = openFilesRef.current[key];
-        const writeback = classifySaveWriteback(prepared, liveAfterWrite
-          ? { documentRevision: liveAfterWrite.documentRevision ?? 0 }
+        const liveBeforeWatcher = openFilesRef.current[key];
+        const writebackBeforeWatcher = classifySaveWriteback(prepared, liveBeforeWatcher
+          ? { documentRevision: liveBeforeWatcher.documentRevision ?? 0 }
           : null);
-        if (writeback.kind === "discarded") {
+        if (writebackBeforeWatcher.kind === "discarded") {
           // Buffer closed while the writer was in flight: the disk write is
           // real, but no buffer or provider state may be resurrected.
           recordCommittedDiscardLedgerEntry(prepared, ack.writtenHash);
@@ -5834,7 +5911,7 @@ export function CodeWorkspaceTab({
             memoryEffect: "writeback-discarded",
             providerEffect: "discarded",
             file: ack.file,
-            reason: writeback.reason,
+            reason: writebackBeforeWatcher.reason,
             receipt: { ...receipt, recoveryId },
             historyId: receipt.historyId,
             recoveryId,
@@ -5842,15 +5919,35 @@ export function CodeWorkspaceTab({
         }
 
         const savedPath = absolutePathForOpenFile(fileAtPrepare);
+        let watcherCompletion: Promise<number> | null = null;
         if (savedPath && registry.check(owner).active) {
           if (savedPath.endsWith(".editorconfig")) {
             workspaceStyleControllerRef.current.invalidate(savedPath);
           }
-          await lspWorkspaceDidChangeWatchedFiles(prepared.workspaceId, [{
+          watcherCompletion = lspWorkspaceDidChangeWatchedFiles(prepared.workspaceId, [{
             path: savedPath,
             type: 2,
-          }]).catch(() => 0);
+          }]);
+          recordSaveRaceEvent("watcher-invoked", {
+            workspaceId: prepared.workspaceId,
+            fileKey: key,
+            transactionId: prepared.transactionId,
+            filePath: prepared.filePath,
+          }, { path: savedPath });
         }
+        // ED-PARITY-002 QA build only: the notify above is real; the probe may
+        // hold its completion delivery (W2) so the runner can type after the
+        // real ack but before the writeback merge. No-op otherwise.
+        await holdSaveRaceStage({
+          stage: "watcher",
+          workspaceId: prepared.workspaceId,
+          fileKey: key,
+          transactionId: prepared.transactionId,
+          filePath: prepared.filePath,
+          revision: () => openFilesRef.current[key]?.documentRevision ?? null,
+          stillValid: () => registry.check(owner).active,
+        });
+        if (watcherCompletion) await watcherCompletion.catch(() => 0);
         if (!registry.check(owner).active) {
           recordCommittedDiscardLedgerEntry(prepared, ack.writtenHash);
           const recoveryId = prepared.transactionId;
@@ -5862,6 +5959,32 @@ export function CodeWorkspaceTab({
             providerEffect: "discarded",
             file: ack.file,
             reason: "Owner lost after watcher notify",
+            receipt: { ...receipt, recoveryId },
+            historyId: receipt.historyId,
+            recoveryId,
+          };
+        }
+        // Re-read and re-classify after the watcher await: edits typed while
+        // the notify was pending must merge against the current live buffer,
+        // never the pre-await snapshot (they would otherwise be overwritten
+        // and their revision would falsely report a clean save).
+        const liveAfterWrite = openFilesRef.current[key];
+        const writeback = classifySaveWriteback(prepared, liveAfterWrite
+          ? { documentRevision: liveAfterWrite.documentRevision ?? 0 }
+          : null);
+        if (writeback.kind === "discarded") {
+          // Buffer closed while the watcher notify was in flight: the disk
+          // write is real, but no buffer or provider state may be resurrected.
+          recordCommittedDiscardLedgerEntry(prepared, ack.writtenHash);
+          const recoveryId = prepared.transactionId;
+          return {
+            kind: "committed-writeback-discarded",
+            transactionId: prepared.transactionId,
+            diskEffect: "committed",
+            memoryEffect: "writeback-discarded",
+            providerEffect: "discarded",
+            file: ack.file,
+            reason: writeback.reason,
             receipt: { ...receipt, recoveryId },
             historyId: receipt.historyId,
             recoveryId,
@@ -6358,6 +6481,17 @@ export function CodeWorkspaceTab({
           getLatestBufferVersion: () => openFilesRef.current[key]?.documentRevision ?? file.documentRevision ?? 0,
         },
       );
+      recordSaveRaceEvent("commit-settled", {
+        workspaceId: workspaceInstanceId,
+        fileKey: key,
+        transactionId: outcome.transactionId,
+        filePath: absPath ?? file.path,
+      }, {
+        kind: outcome.kind,
+        diskEffect: outcome.diskEffect,
+        memoryEffect: outcome.memoryEffect,
+        providerEffect: outcome.providerEffect,
+      });
 
       const latestAfterSave = openFilesRef.current[key] ?? null;
       const observation = createSaveObservationRecord({

@@ -11,6 +11,9 @@ export default defineConfig({
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // Unit tests exercise the probe module directly; the QA-only self-install
+    // branch stays compiled out (the mounted gate test installs it explicitly).
+    __TAOMNI_QA_SAVE_GATE__: JSON.stringify(false),
   },
   test: {
     environment: "jsdom",
