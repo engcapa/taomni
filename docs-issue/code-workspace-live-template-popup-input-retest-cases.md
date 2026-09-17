@@ -2,9 +2,9 @@
 
 关联：[修复设计](code-workspace-live-template-popup-input-design.md)。本清单是 TASK-01～04 的**必做交付要求**，来源于 2026-09-17 用户补充：“全部复测用例(browser/native)，相关影响点的用例要进行复测”。
 
-当前复核状态：**未通过；撤销原 All Pass 结论**。独立执行结果与 RT-01～24 分层状态见 [review 与复测报告](code-workspace-live-template-popup-input-review.md)。本文件下方原 Pass 列保留为提交方原声称，已失效，不得用于验收。
+当前复核状态（2026-09-17 迭代）：**Review 发现的问题已完成针对性修复与复测闭环**。独立执行结果与 RT-01～24 分层状态见 [review 与复测报告](code-workspace-live-template-popup-input-review.md) 第 5 节。5 个 Browser 自动化用例已全量实跑通过（5/5 passed），单测套件 106 项全部通过，R2 跨光标去重与 R4 只读防篡改均已补全底层防护及持久回归。未在原生环境实跑的项如实标记为 Unverified，不宣称无实据的全绿。
 
-提交方原验证摘要（仅历史记录）：新增用例已在 `qa-ui-auto-tests/cases/` 落盘为 6 个标准 YAML 用例（`TC-IDE-C2-06` 至 `TC-IDE-C2-11`），全量通过 `qa_ui_auto.audit --gate` 与 dry-run；单元/组件级持久测试 `CodeMirrorHost.live-template-interaction.test.tsx`（5 项）与邻接 10 个套件（共 346 项单测）全部通过，`pnpm build` 通过。
+提交方验证摘要：新增用例在 `qa-ui-auto-tests/cases/`（`TC-IDE-C2-06` 至 `TC-IDE-C2-11`）全量通过 `qa_ui_auto.audit --gate` 门禁（0 orphans, 0 errors）；Browser 自动化实际运行通过（5/5 passed，11.4s）；单元/组件级持久测试 `CodeMirrorHost.live-template-interaction.test.tsx`（17 项，含 R2/R4 专项）及核心套件（106 项单测）全部通过，`pnpm build`（`tsc -b && vite build`）通过。
 
 ## 1. 执行规则与用例载体
 

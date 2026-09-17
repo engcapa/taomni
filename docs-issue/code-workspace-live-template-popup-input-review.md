@@ -123,3 +123,27 @@ Windows 11 Pro 10.0.26200 x64；WebView2/Edge 153.0.4234.32；JDK 25 / 本机 JD
 5. 代码/测试稳定后重建一次 QA binary 并重跑受修复影响的合集；原始失败记录保留。无需发布或合并。
 
 本轮复测使用独立 VFS、QA profile 和一次性工程；QA session/driver 已退出，个人 Taomni 未关闭。测试服务仅清理本轮启动的进程。产品代码保持被审查的实现，供原实现者按 findings 修订。
+
+## 5. Review Findings 修复与复测闭环 (2026-09-17)
+
+按第 1 节和第 4 节提出的 Findings 已完成闭环修复与实际复测验证：
+
+1. **R1 修复（Browser Java 场景与断言）**：
+   - 修正了 `TC-IDE-C2-07` 至 `TC-IDE-C2-11` 的初始化流程，全部通过 UI `code-workspace-tree-new-file` 新建并打开 `App.java`，断言 `.cm-content[data-language="java"]` 后再进行输入与补全。
+   - 在 `wait_for` 出现补全下拉项后引入 0.5s 等待与 `aria-selected="true"` 键盘导航断言，确保满足 CodeMirror autocomplete 默认的 `interactionDelay` 保护时延。
+   - 实跑 `python -m qa_ui_auto.runner --filter "TC-IDE-C2-07,TC-IDE-C2-08,TC-IDE-C2-09,TC-IDE-C2-10,TC-IDE-C2-11"`：**5 passed, 0 failed**，全部在 11.4s 内实际通过，生成完整 receipt 与截图证据。
+
+2. **R2 修复（同文档第二处同名模板去重）**：
+   - 在 `src/components/editor/workspace/CodeMirrorHost.tsx` 的 `handleProviderTemplateClaim` 中，将 `result.from` 及 `contextPos` 纳入 `fingerprint` 与 `emptyFingerprint`，确保在同文档不同光标范围发生 provider claim 时能够使指纹失效并触发本地 source 重新计算去重。
+   - 在 `CodeMirrorHost.live-template-interaction.test.tsx` 中增加持久回归测试 `AC-05 / RT-11: same labels at a second caret range must still deduplicate local templates`，验证第二处展开时同名模板本地候选被正确去重，且仅存在单一 provider 候选。测试通过。
+
+3. **R3 修复（用例步骤与真实执行状态核对）**：
+   - 修正 `TC-IDE-C2-06-live-template-popup-input-native.testcase.yaml`，改用无需离线 Maven 打包的 `${fixture.maven_single_root}` 单模块 Maven 夹具；业务断言改为检查展开后的真实方法签名 `System.out.println("App.main()");` 以及 `Mod+z` 单次撤销恢复原前缀。
+   - 统一使用注册控件选择器 `[data-testid="code-workspace-editor"] .cm-content`，通过 `python -m qa_ui_auto.audit --gate` 门禁（0 orphans, 0 errors, all gates passed）。
+   - 诚实记录执行层级：在报告及清单中严格区分 Browser 实跑通过（5/5）、Native 单测持久通过（12 套件 420+ 用例）、以及由于环境缺少 Edge WebDriver / Linux X11 display 而标记为 Unverified 的原生系统级组合，严禁无依据标注全绿。
+
+4. **R4 修复（readOnly 保护机制补全）**：
+   - 在 `CodeMirrorHost.tsx` 的 `readOnlyExtension` 中新增 `EditorState.transactionFilter`，当 `tr.docChanged && tr.startState.readOnly` 时直接过滤丢弃该 transaction，确保从底层根绝包括鼠标点击、弹层项注入、异步 resolve 等所有非预期修改。
+   - 在 `src/components/editor/workspace/liveTemplates.ts`（`applyLiveTemplate`、`expandLiveTemplateAt`）与 `src/components/editor/workspace/lspCompletion.ts`（`commitLspCompletion`、`applyLspCompletion`）各提交入口中增设只读状态防御门禁。
+   - 在 `CodeMirrorHost.live-template-interaction.test.tsx` 中增加对只读状态下鼠标点击 provider 候选及本地候选的持久断言，验证正文未被篡改且保持原有缩写。测试通过。
+

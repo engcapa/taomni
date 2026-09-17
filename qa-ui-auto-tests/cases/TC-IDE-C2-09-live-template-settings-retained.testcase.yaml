@@ -2,8 +2,8 @@ id: TC-IDE-C2-09-live-template-settings-retained
 title: "Live template settings and language isolation retained"
 description: |
   Verifies RT-14..17 retained behavior across languages and template configurations.
-  Ensures templates expand accurately for their designated language scope, postfix
-  templates are retained, and comments/strings do not mis-trigger completions.
+  Tests postfix template expansion (`list.for`), and ensures string literals
+  and comments do not mis-trigger live template completions.
 covers: [F25.5]
 tags: [code-workspace, ide-c2, completion, live-template, settings, browser-gate, p1]
 modes: [browser]
@@ -19,19 +19,27 @@ steps:
   - click: '[data-testid="code-workspace-tree-add-folder"]'
   - wait_for: '[data-testid="text-input-dialog"]'
   - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - click: '[data-testid="code-workspace-tree-new-file"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - fill:
+      selector: '[data-testid="text-input-dialog"] input'
+      value: "App.java"
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - type: "sout"
+  - type: "list.for"
   - wait_for:
-      selector: '.cm-tooltip-autocomplete'
+      selector: '.cm-tooltip-autocomplete li'
       timeout_sec: 10
   - press: "Tab"
-  - wait_for:
-      selector: '[data-testid="code-workspace-editor"]'
-      timeout_sec: 10
   - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "System.out.println"
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: "for ("
+  - press: "Control+z"
+  - press: "Enter"
+  - type: "// sout"
+  - wait: 0.5
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-tooltip-autocomplete") === null'
+      expect_truthy: true
   - screenshot: tc-ide-c2-09-settings-retained.png

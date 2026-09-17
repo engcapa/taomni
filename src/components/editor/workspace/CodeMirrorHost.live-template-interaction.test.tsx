@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { undo } from "@codemirror/commands";
-import { completionStatus, selectedCompletionIndex, startCompletion } from "@codemirror/autocomplete";
+import { closeCompletion, completionStatus, currentCompletions, selectedCompletionIndex, startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
 import type { LspCompletionItem } from "../../../lib/editor/lsp";
 import { CodeMirrorHost } from "./CodeMirrorHost";
@@ -1214,11 +1214,138 @@ describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / A
     act(() => {
       view.focus();
       view.dispatch({ selection: { anchor: 18 } });
+      startCompletion(view);
     });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
+
+    const option = document.querySelector(".cm-tooltip-autocomplete li");
+    if (option) {
+      fireEvent.mouseDown(option, { button: 0 });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+    }
+
+    // Mouse click in readOnly does not modify document
+    expect(view.state.doc.toString()).toBe("class App {\n  sout\n}");
+
+    // Enter in readOnly does not modify document
+    fireEvent.keyDown(content, { key: "Enter" });
+    expect(view.state.doc.toString()).toBe("class App {\n  sout\n}");
 
     // Tab in readOnly does not modify document
     fireEvent.keyDown(content, { key: "Tab" });
     expect(view.state.doc.toString()).toBe("class App {\n  sout\n}");
+  });
+
+  it("AC-05 / RT-11: same labels at a second caret range must still deduplicate local templates", async () => {
+    let revision = 0;
+    const doc = "class App {\n void first() { soutm }\n void second() { soutm }\n}";
+    const providerSoutm: LspCompletionItem = {
+      label: "soutm",
+      kind: 15,
+      detail: "PROVIDER current method",
+      documentation: null,
+      insertText: 'System.out.println("ACTUAL_METHOD");',
+      insertTextFormat: 2,
+      filterText: null,
+      sortText: "0",
+      textEdit: null,
+      additionalTextEdits: [],
+      raw: { label: "soutm" },
+    };
+
+    const complete = vi.fn(async () => ({
+      status: {
+        path: "App.java",
+        uri: "file:///App.java",
+        presetId: "java",
+        languageId: "java",
+        displayName: "Java",
+        available: true,
+        active: true,
+        selectedCommandId: null,
+        selectedCommand: null,
+        installHint: null,
+        error: null,
+      },
+      isIncomplete: false,
+      items: [providerSoutm],
+    }));
+
+    const rendered = render(
+      <CodeMirrorHost
+        path="App.java"
+        doc={doc}
+        visible
+        diagnostics={[]}
+        reveal={null}
+        onChange={() => { revision++; }}
+        onSave={vi.fn()}
+        onHover={async () => null}
+        onDefinition={async () => false}
+        onReferences={async () => undefined}
+        onComplete={complete}
+        onCompleteResolve={async () => providerSoutm}
+        completionTriggers={["."]}
+        hoverDocumentationDelayMs={0}
+        onCompletionDiagnostic={vi.fn()}
+        getCompletionIdentity={() => ({
+          workspaceId: "workspace",
+          fileKey: "App.java",
+          filePath: "App.java",
+          uri: "file:///App.java",
+          languageId: "java",
+          documentRevision: revision,
+          lspSessionGeneration: 1,
+        })}
+      />,
+    );
+
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(content)!;
+    await waitFor(() => expect(content).toHaveAttribute("data-language", "java"));
+
+    const openAt = async (pos: number) => {
+      act(() => {
+        view.focus();
+        view.dispatch({ selection: { anchor: pos } });
+        startCompletion(view);
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 450));
+      });
+    };
+
+    // First location
+    await openAt(doc.indexOf("soutm") + 5);
+    const firstCompletions = currentCompletions(view.state)
+      .filter((c) => c.label === "soutm")
+      .map((c) => c.detail);
+    expect(firstCompletions).toEqual(["PROVIDER current method"]);
+
+    act(() => {
+      closeCompletion(view);
+    });
+
+    // Second location (different range in same document without doc change)
+    await openAt(doc.lastIndexOf("soutm") + 5);
+    const secondCompletions = currentCompletions(view.state)
+      .filter((c) => c.label === "soutm")
+      .map((c) => c.detail);
+
+    // Second range must ALSO deduplicate local template and only show provider template
+    expect(secondCompletions).toEqual(["PROVIDER current method"]);
+
+    // Enter accepts at second location
+    fireEvent.keyDown(content, { key: "Enter" });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(view.state.doc.toString()).toContain('void second() { System.out.println("ACTUAL_METHOD"); }');
   });
 
   it("AC-03 / RT-22: normal LSP members (non-snippets) do not claim live templates", async () => {

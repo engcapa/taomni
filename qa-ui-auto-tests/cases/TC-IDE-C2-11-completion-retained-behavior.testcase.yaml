@@ -19,29 +19,47 @@ steps:
   - click: '[data-testid="code-workspace-tree-add-folder"]'
   - wait_for: '[data-testid="text-input-dialog"]'
   - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - click: '[data-testid="code-workspace-tree-new-file"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - fill:
+      selector: '[data-testid="text-input-dialog"] input'
+      value: "App.java"
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
+  # Round 1: sout + Enter + undo
   - type: "sout"
   - wait_for:
-      selector: '.cm-tooltip-autocomplete'
+      selector: '.cm-tooltip-autocomplete li'
       timeout_sec: 10
-  - press: "Enter"
-  - wait_for:
-      selector: '[data-testid="code-workspace-editor"]'
-      timeout_sec: 10
-  - press: "Control+z"
-  - press: "Enter"
-  - type: "sout"
-  - wait_for:
-      selector: '.cm-tooltip-autocomplete'
-      timeout_sec: 10
-  - press: "Tab"
-  - wait_for:
-      selector: '[data-testid="code-workspace-editor"]'
-      timeout_sec: 10
+  - wait: 0.5
+  - press: "ArrowDown"
+  - press: "ArrowUp"
   - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "System.out.println"
+      selector: '.cm-tooltip-autocomplete [aria-selected="true"]'
+      contains: "sout"
+  - press: "Enter"
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: "System.out.println();"
+  - press: "Control+z"
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-content").textContent === "sout"'
+      expect_truthy: true
+  - press: "Enter"
+  # Round 2: soutm + Enter + undo
+  - type: "sout"
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li'
+      timeout_sec: 10
+  - wait: 0.5
+  - press: "ArrowDown"
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete [aria-selected="true"]'
+      contains: "soutm"
+  - press: "Enter"
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: "System.out.println("
+  - press: "Control+z"
   - screenshot: tc-ide-c2-11-retained-behavior.png

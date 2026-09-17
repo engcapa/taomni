@@ -3,23 +3,24 @@ title: "Java Live Template popup input interaction on native"
 description: |
   Native verification for RT-01..06 on Windows/Desktop. Opens real Java workspace,
   types `sout`, waits for provider proposals and confirms autocomplete popup
-  is stable and operable (not disabled). Navigates with arrows, accepts with Enter
-  without spurious newlines, and verifies undo restores abbreviation.
+  is stable and operable (not disabled). Navigates with ArrowDown to `soutm`,
+  accepts with Enter without spurious newlines, asserts provider method name
+  resolution (`App.main()`), and verifies undo restores abbreviation.
 covers: [F25.5]
 tags: [code-workspace, ide-c2, completion, live-template, native-gate, p0]
 modes: [native]
-fixtures: [reset_db, java25_projects]
+fixtures: [reset_db, java_sample_projects]
 timeout_sec: 600
 steps:
   - open: "${cfg.app.base_url}"
-  - vault_first_run: "qa-native-java25-password"
+  - vault_first_run: "qa-native-c206-password"
   - wait_for: '[data-testid="welcome-panel"]'
   - seed_storage:
       key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-java25-completion","name":"maven-java25","roots":[{"id":"maven-java25","name":"maven-java25","path":"${fixture.java25_maven_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-java25","path":"src/main/java/com/example/app/App.java"},"lastOpenedAt":1788537600000,"isGitRepo":false}]'
+      value: '[{"id":"qa-c2-06","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1788566400000,"isGitRepo":false}]'
   - reload_window: null
   - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.java25_maven_root}"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
   - assert_text:
       selector: '[data-testid="code-workspace-lsp-status-pill"]'
@@ -29,19 +30,22 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
+      keys: ["Mod+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "Home", "Enter", "ArrowUp"]
   - type: "sout"
   - wait_for:
       selector: '.cm-tooltip-autocomplete'
-      timeout_sec: 15
-  - wait: 2
+      timeout_sec: 30
+  - wait: 1
   - eval_readonly:
       expression: 'document.querySelector(".cm-tooltip-autocomplete")?.classList.contains("cm-tooltip-autocomplete-disabled") === false'
       expect_truthy: true
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["ArrowDown", "ArrowUp"]
+      keys: ["ArrowDown"]
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete [aria-selected="true"]'
+      contains: "soutm"
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
@@ -51,9 +55,12 @@ steps:
       timeout_sec: 10
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
-      contains: "System.out.println"
+      contains: 'System.out.println("App.main()");'
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
       keys: ["Mod+z"]
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "sout"
   - screenshot: tc-ide-c2-06-live-template-native.png

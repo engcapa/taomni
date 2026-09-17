@@ -1528,6 +1528,7 @@ function readOnlyExtension(readOnly: boolean): Extension {
     ? [
       EditorState.readOnly.of(true),
       EditorView.contentAttributes.of({ "aria-readonly": "true" }),
+      EditorState.transactionFilter.of((tr) => (tr.docChanged && tr.startState.readOnly ? [] : tr)),
     ]
     : [];
 }
@@ -2512,7 +2513,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
 
       if (!result || result.options.length === 0) {
         currentProviderTemplatesRef.current = null;
-        const emptyFingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:`;
+        const from = result?.from ?? 0;
+        const emptyFingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:${from}:${contextPos}:`;
         if (lastCollisionFingerprintRef.current !== "" && lastCollisionFingerprintRef.current !== emptyFingerprint) {
           lastCollisionFingerprintRef.current = emptyFingerprint;
           scheduleLocalRefresh(capturedIdentity, capturedPolicyGen);
@@ -2529,7 +2531,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
 
       if (snippets.size === 0) {
         currentProviderTemplatesRef.current = null;
-        const emptyFingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:`;
+        const emptyFingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:${result.from}:${contextPos}:`;
         if (lastCollisionFingerprintRef.current !== "" && lastCollisionFingerprintRef.current !== emptyFingerprint) {
           lastCollisionFingerprintRef.current = emptyFingerprint;
           scheduleLocalRefresh(capturedIdentity, capturedPolicyGen);
@@ -2552,7 +2554,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         .filter((label) => appAbbreviations.has(label))
         .sort();
 
-      const fingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:${collidingLabels.join(",")}`;
+      const fingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:${result.from}:${contextPos}:${collidingLabels.join(",")}`;
 
       if (fingerprint === lastCollisionFingerprintRef.current) {
         return;
