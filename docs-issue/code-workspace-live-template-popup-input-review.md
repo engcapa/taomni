@@ -239,9 +239,9 @@ Linux/macOS 本轮均未验证，继续按同一完整清单执行。Windows 的
 
 本轮使用一次性工程及 QA profile，所有 native session/driver 均已退出；只停止本轮启动的 Vite，未操作个人 Taomni。最终仅两份文档有工作区修改，产品和正式测试未更改。
 
-## 7. 第二轮 Review Findings 修复与复测闭环 (2026-09-17)
+## 7. 第二轮 Review Findings 针对性修复进展与 R3 缺口确认 (2026-09-17)
 
-针对第 6.1 节与 6.4 节接续要求，已完成针对性代码修复与用例修正：
+针对第 6.1 节与 6.4 节接续要求，完成的代码修复与用例修正：
 
 1. **R5 修复（只读外部文档同步与解锁恢复）**：
    - 根因：`readOnlyExtension` 原无条件过滤所有 `tr.docChanged && tr.startState.readOnly` 事务，导致由 `applyDocumentSnapshotToView` 及 `applySharedTransactionToView` 分发的权威外部快照（带有 `remoteTransactionAnnotation`）同样被吞掉。
@@ -249,14 +249,33 @@ Linux/macOS 本轮均未验证，继续按同一完整清单执行。Windows 的
    - 验证：在 `src/components/editor/workspace/CodeMirrorHost.live-template-interaction.test.tsx` 中新增持久测试：
      - `AC-07 / RT-20 / R5: readOnly editor must still accept external controlled document snapshots`（验证只读下外部 doc/revision 更新能准确生效）
      - `AC-07 / RT-20 / R5: readOnly view must follow shared owner and keep the synchronized text after unlocking`（验证共享 owner 同步及解锁后正文一致性）
-     - 12 套件 423 个 Vitest 单测全部通过（包含 R4 只读鼠标拒绝与 R5 外部同步接受）。
+     - 12 套件 423 个 Vitest 单元/挂载测试全部通过（包含 R4 只读鼠标拒绝与 R5 外部同步接受）。
 
 2. **R6 修复（C2-06 光标前置位置）**：
    - 根因：`Mod+Home` 后仅下移 6 次 ArrowDown，光标位于 class 内、main 方法外（第 7 行空行），导致 `soutm` 无法解析出方法名，回退到模板占位符 `MethodName`。
    - 修复：在 `qa-ui-auto-tests/cases/TC-IDE-C2-06-live-template-popup-input-native.testcase.yaml:33` 中，将 ArrowDown 调整为 8 次，使光标落在 `public static void main` 内部（第 9 行前插入新行），准确匹配其包含 `App.main()` 的方法语义。
-   - 验证：与经实测通过的 `TC-REVIEW-C2-06-CARET` 保持一致，断言真实 `System.out.println("App.main()");` 及 `Mod+z` 撤销；静态 gate 门禁（0 orphans, 0 errors）与 native dry-run 均通过。
+   - 验证：在当前源码 Windows 原生应用中实跑通过（17.94s，valid receipt），断言真实 `System.out.println("App.main()");` 及 `Mod+z` 撤销生效。
 
-3. **R3 覆盖范围与诚实状态对齐**：
-   - 修正 `TC-IDE-C2-08` 至 `TC-IDE-C2-11` 的用例 description，如实限定为其实际执行的 browser 行为（如 Escape 取消、注释抑制、键盘所有权、重复补全与撤销），不再声称超出现有步骤的复杂生命周期或设置项覆盖。
-   - 复测清单及评审报告完整保留 6.3 节所述的各组合实际状态：明确标注 Browser 5/5 实跑通过、原生单测 423/423 通过、原生真机 JDTLS 单次/非首项通过；而对于系统 IME、多轮 p95 性能采样、Linux/macOS 跨平台矩阵等尚未覆盖的组合，客观保留为 Unverified / 未闭环状态，严禁无实据宣称全绿。
+3. **R3 缺口确认（未闭环）**：
+   - 逐一修正了 `TC-IDE-C2-08` 至 `TC-IDE-C2-11` 的用例 description（包括 C2-10 移除误标的 RT-18..21 声称），如实限定为其实际执行的 browser 行为。
+   - 明确确认 R3 尚未闭环：C2-08～11 仍全部仅有 browser 模式，Windows 端的完整生命周期（迟到/乱序/重启）、设置与自定义模板 UI、系统真实 IME、以及性能采样等必测场景仍未补足原生载体。
+
+## 8. 第三轮独立复查结论同步（eed60ceda0d07ad80ac973629b2790003bb923b5）
+
+根据 `qa-ui-auto-report/live-template-review-3/review.md` 的独立复查结果：
+
+1. **R5、R6 已验证闭环**：
+   - R5 经独立只读同步探针（`readonly-owner.test.tsx`）实测通过（1.64s），只读状态下权威 external-disk 正常接收，同时本地篡改被正确阻止。
+   - R6 经正式 C2-06 在当前源码的 Windows 隔离原生应用中实跑通过（17.94s，`runner_receipt.json` 签名有效、source stable=true），正确生成 `System.out.println("App.main()");` 并完成单次撤销。
+   - 本次 diff 未引入任何新的产品代码缺陷。
+
+2. **R3 / P1 明确保持未闭环状态**：
+   - 整体验收结论确认为**未闭环 / 未通过**。
+   - 缺口不仅限于 Linux/macOS，在当前 Windows 端：
+     - RT-07～15/24：可控 provider 迟到/乱序注入、source/policy 生命周期、设置与自定义模板 UI 流程仍缺原生 UI 载体与测试执行；
+     - RT-19/21：跨表面焦点转移至 Find/终端、Windows 微软拼音系统 IME 仍缺真实执行；
+     - RT-23：多轮打字展开撤销性能采样仍缺性能基线。
+   - 423 项 Vitest 测试属于 jsdom 单元/挂载层，不能替代 native 应用真实执行。
+   - 状态表中客观保留上述 Unverified 与缺失项，留待后续迭代建设专用原生 fixture 与端到端用例。
+
 

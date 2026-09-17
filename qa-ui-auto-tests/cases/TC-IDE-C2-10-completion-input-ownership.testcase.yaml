@@ -1,9 +1,9 @@
 id: TC-IDE-C2-10-completion-input-ownership
 title: "Editor keyboard input ownership and focus surface boundaries"
 description: |
-  Verifies RT-18..21 keyboard input ownership rules. With popup closed, Arrow keys
-  and Enter execute normal navigation and newlines without interception.
-  When popup is active, arrow keys and Enter are owned by the completion popup.
+  Browser verification for editor keyboard input ownership: normal arrow navigation
+  and Enter newlines when popup is closed vs ArrowDown navigation and Enter acceptance
+  when completion popup is active.
 covers: [F25.5]
 tags: [code-workspace, ide-c2, completion, input-ownership, browser-gate, p1]
 modes: [browser]

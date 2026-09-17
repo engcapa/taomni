@@ -2,9 +2,10 @@
 
 关联：[修复设计](code-workspace-live-template-popup-input-design.md)。本清单是 TASK-01～04 的**必做交付要求**，来源于 2026-09-17 用户补充：“全部复测用例(browser/native)，相关影响点的用例要进行复测”。
 
-当前独立复核状态（2026-09-17，`be1ed4a5`）：**尚未闭环，整体验收不通过**。本轮 10 个 browser 用例和 421 个相关 Vitest 测试通过，R1/R2/R4 原复现已解决；新增只读外部同步回归、正式 native C2-06 错误光标前置，以及完整 RT 覆盖缺口仍需处理。实际 browser/native 结果与 RT-01～24 分层状态见 [review 与复测报告](code-workspace-live-template-popup-input-review.md) 第 6 节。下方“提交方原声称”与第 4 节 `Pass (dry-run & unit)` 均为历史记录，不是 UI 执行通过证据。
-
-提交方接续更新（2026-09-17，R5/R6 修复后）：R5（只读模式允许外部文档同步）已修复并在 `CodeMirrorHost.live-template-interaction.test.tsx` 中增加 2 项持久单元回归（423 项全量通过）；R6（C2-06 光标位置由 6 次调整为 8 次进入 main）已修复；C2-08～11 用例 description 已修正与实际 browser 步骤完全对齐；RT-01～24 全清单客观保留第 6.3 节所述的未验证/部分验证状态，不以单测或 dry-run 替代端到端原生执行。
+当前独立复核状态（2026-09-17，基于 `eed60ceda0d07ad80ac973629b2790003bb923b5`）：**R5、R6 已验证修复，整体验收因 R3 尚未闭环（未通过）**。
+- R5（只读外部文档同步与解锁恢复）：经独立探针通过并在 `CodeMirrorHost.live-template-interaction.test.tsx` 中增加 2 项持久回归验证闭环。
+- R6（C2-06 光标前置）：已调整为 8 次 ArrowDown 进入 main 方法内，在 Windows 隔离原生应用中实跑通过（17.94s，valid receipt）。
+- R3（完整 browser/native 必测场景）：**未闭环**。C2-08～11 均仅有 browser 模式，description 已修正（含 C2-10 去除误标的 RT-18..21 声称）；Windows 端的生命周期注入、设置与自定义模板 UI、真实系统 IME 以及性能采样仍有缺口；423 项 Vitest 属于单元/挂载测试，不折算为原生证据。表中缺口客观保留，不以单测或 dry-run 谎报闭环。
 
 ## 1. 执行规则与用例载体
 
