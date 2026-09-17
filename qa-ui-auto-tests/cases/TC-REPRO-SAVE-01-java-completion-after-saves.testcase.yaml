@@ -1,0 +1,80 @@
+id: TC-REPRO-SAVE-01-java-completion-after-saves
+title: "Regression: Java member completion must survive repeated Ctrl+S saves"
+description: |
+  Regression test: Java completion works right after opening and continues
+  suggesting members after repeated Ctrl+S saves. Proves member completion on
+  `names.` once, then runs several edit+save cycles, querying `names.`
+  after each save and asserting the LSP method row appears.
+covers: [F25.5]
+tags: [code-workspace, completion, native-gate, regression]
+modes: [native]
+fixtures: [reset_db, java_sample_projects]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-completion-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-save-cycle","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1788566400000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Mod+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "Home", "Shift+End"]
+  - type: "        names."
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 120
+  - screenshot: baseline-names-members.png
+  - press: Escape
+  # Cycle 1
+  - press: Home
+  - press: Shift+End
+  - type: "        names.size();"
+  - press: "Mod+s"
+  - press: Home
+  - press: Shift+End
+  - type: "        names."
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 20
+  - screenshot: cycle1-names-members.png
+  - press: Escape
+  # Cycle 2
+  - press: Home
+  - press: Shift+End
+  - type: "        names.get(0);"
+  - press: "Mod+s"
+  - press: Home
+  - press: Shift+End
+  - type: "        names."
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 20
+  - screenshot: cycle2-names-members.png
+  - press: Escape
+  # Cycle 3
+  - press: Home
+  - press: Shift+End
+  - type: "        names.clear();"
+  - press: "Mod+s"
+  - press: Home
+  - press: Shift+End
+  - type: "        names.isEmpty();"
+  - press: "Mod+s"
+  - press: Home
+  - press: Shift+End
+  - type: "        names."
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 20
+  - screenshot: cycle3-names-members.png

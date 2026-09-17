@@ -7847,6 +7847,108 @@ end_of_record
         expect(optionEl.textContent).not.toContain("StaleServerCandidate");
       }
     });
+
+    it("never notifies jdtls with didSave and completes on the fast path after saving", async () => {
+      const { EditorView } = await import("@codemirror/view");
+      const { startCompletion } = await import("@codemirror/autocomplete");
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-completion-after-save",
+        workspaceInstanceId: "instance-completion-after-save",
+        name: "Completion After Save",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/App.java" },
+      };
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/App.java", "System."));
+      workspaceMocks.workspaceWriteFileEncoded.mockResolvedValue(writeAck(file(
+        "src/App.java",
+        "System.out.",
+        { hash: "hash-system" },
+      )));
+
+      const javaStatus = documentStatus({
+        path: "src/App.java",
+        uri: "file:///repo/app/src/App.java",
+        presetId: "jdtls",
+        languageId: "java",
+        displayName: "Java",
+        available: true,
+        active: true,
+      });
+      lspMocks.lspOpenDocument.mockResolvedValue(javaStatus);
+      lspMocks.lspChangeDocument.mockResolvedValue(javaStatus);
+
+      lspMocks.lspCompletion.mockResolvedValue({
+        status: javaStatus,
+        isIncomplete: false,
+        items: [{
+          label: "out",
+          kind: 7,
+          detail: "PrintStream",
+          documentation: null,
+          insertText: "out",
+          insertTextFormat: 1,
+          filterText: null,
+          sortText: null,
+          textEdit: null,
+          additionalTextEdits: [],
+          raw: {},
+        }],
+      });
+
+      const rendered = renderWorkspace(workspace);
+      await screen.findByTitle("app / src/App.java");
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+      expect(content).not.toBeNull();
+      const view = EditorView.findFromDOM(content!);
+      expect(view).not.toBeNull();
+
+      // First completion before save
+      act(() => {
+        view!.dispatch({ selection: { anchor: view!.state.doc.length } });
+        startCompletion(view!);
+      });
+      await waitFor(() => {
+        expect(lspMocks.lspCompletion).toHaveBeenCalled();
+      });
+
+      // Make document dirty and save via Ctrl+S
+      act(() => {
+        view!.dispatch({
+          changes: { from: view!.state.doc.length, insert: "out." },
+          selection: { anchor: view!.state.doc.length + 4 },
+          userEvent: "input.type",
+        });
+      });
+      await waitFor(() => expect(screen.getByTestId("code-workspace-save-observation")).toHaveAttribute("data-dirty", "true"));
+
+      const changesAtSave = lspMocks.lspChangeDocument.mock.calls.length;
+      fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+      await waitFor(() =>
+        expect(screen.getByTestId("code-workspace-save-observation")).toHaveAttribute("data-dirty", "false"),
+      );
+      // Eclipse JDT LS degrades completions after didSave and can answer the
+      // first post-save query from the pre-edit document. The save flow's
+      // workspace/didChangeWatchedFiles notification owns the provider rebuild,
+      // so didSave must never be sent and no recovery didChange is needed.
+      expect(lspMocks.lspSaveDocument).not.toHaveBeenCalled();
+      const changesAfterRecovery = lspMocks.lspChangeDocument.mock.calls.length;
+
+      // Trigger completion after saving without typing any new characters:
+      // the buffer is already synced, so completion must reach lspCompletion
+      // directly (fast path) without another didChange round trip.
+      act(() => {
+        startCompletion(view!);
+      });
+
+      await waitFor(() => {
+        expect(lspMocks.lspCompletion.mock.calls.length).toBeGreaterThan(1);
+      });
+      expect(lspMocks.lspChangeDocument.mock.calls.length).toBe(changesAfterRecovery);
+      expect(lspMocks.lspChangeDocument.mock.calls.length).toBeGreaterThanOrEqual(changesAtSave);
+    });
   });
 
   describe("N2.6 Ctrl+Tab Switcher", () => {

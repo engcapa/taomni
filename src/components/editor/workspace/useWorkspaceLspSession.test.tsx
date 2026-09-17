@@ -753,4 +753,62 @@ describe("useWorkspaceLspSession", () => {
     expect(lspFiles[file.key]?.syncing).toBe(false);
     expect(result.current.isDocumentSynced(file.key, second.text)).toBe(true);
   });
+
+  it("clears syncedTextRef on saveDocument to force re-sync before subsequent feature queries", async () => {
+    const openFilesRef = { current: { [file.key]: file } };
+    const { result } = renderHook(() => useWorkspaceLspSession({
+      workspaceInstanceId: "workspace-save-resync",
+      roots,
+      openFilesRef,
+      updateLspFiles: vi.fn(),
+      onError: vi.fn(),
+    }));
+
+    await act(async () => result.current.syncDocument(file, "open"));
+    expect(result.current.isDocumentSynced(file.key, file.text)).toBe(true);
+    const changesBeforeSave = lspMocks.lspChangeDocument.mock.calls.length;
+
+    // Save document with the same text: didSave is followed by a recovery
+    // didChange inside the save path (provider empty-completion workaround).
+    await act(async () => result.current.saveDocument(file, file.text));
+    expect(lspMocks.lspSaveDocument).toHaveBeenCalled();
+    expect(lspMocks.lspChangeDocument.mock.calls.length).toBeGreaterThan(changesBeforeSave);
+    // The recovery sync re-marks the buffer as synced, so the next completion
+    // query takes the fast already-synced path instead of an extra round trip.
+    expect(result.current.isDocumentSynced(file.key, file.text)).toBe(true);
+  });
+
+  it("skips didSave and the recovery change for jdtls buffers", async () => {
+    const javaFile: OpenFileState = {
+      ...file,
+      key: "root:root-1:src/main/java/com/example/App.java",
+      ref: { kind: "root", rootId: "root-1", path: "src/main/java/com/example/App.java" },
+      title: "App.java",
+      subtitle: "repo / src/main/java/com/example/App.java",
+      path: "src/main/java/com/example/App.java",
+      languagePath: "src/main/java/com/example/App.java",
+      text: "class App {}",
+      savedText: "class App {}",
+    };
+    const openFilesRef = { current: { [javaFile.key]: javaFile } };
+    const { result } = renderHook(() => useWorkspaceLspSession({
+      workspaceInstanceId: "workspace-java-save-skip",
+      roots,
+      openFilesRef,
+      updateLspFiles: vi.fn(),
+      onError: vi.fn(),
+    }));
+
+    await act(async () => result.current.syncDocument(javaFile, "open"));
+    const changesBeforeSave = lspMocks.lspChangeDocument.mock.calls.length;
+
+    await act(async () => result.current.saveDocument(javaFile, javaFile.text));
+    // Eclipse JDT LS returns degraded completions after didSave and can answer
+    // the first post-save query from the pre-edit document. The save flow's
+    // workspace/didChangeWatchedFiles notification owns the provider rebuild,
+    // so didSave must never be sent and no recovery didChange is needed.
+    expect(lspMocks.lspSaveDocument).not.toHaveBeenCalled();
+    expect(lspMocks.lspChangeDocument.mock.calls.length).toBe(changesBeforeSave);
+    expect(result.current.isDocumentSynced(javaFile.key, javaFile.text)).toBe(true);
+  });
 });

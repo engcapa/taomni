@@ -2761,7 +2761,27 @@ async fn notify_watched_file_sessions(
     sessions.sort_by(|left, right| left.0.cmp(&right.0));
     let mut notified = 0;
     for (_, session) in sessions {
-        let params = match session.watched_file_params(changes).await {
+        // A provider that holds an open document for a path already owns that
+        // document's content through didOpen/didChange. Reporting a watched-file
+        // change for it makes reload-prone servers (Eclipse JDT LS) re-read the
+        // file from disk and discard in-memory edits that arrived after the
+        // write — the user's post-save typing vanished from the provider model.
+        let session_changes: Vec<LspWatchedFileChange> = {
+            let opened = session.opened_documents.read().await;
+            changes
+                .iter()
+                .filter(|change| {
+                    !file_operation_uri(&change.path)
+                        .map(|uri| opened.contains(&uri))
+                        .unwrap_or(false)
+                })
+                .cloned()
+                .collect()
+        };
+        if session_changes.is_empty() {
+            continue;
+        }
+        let params = match session.watched_file_params(&session_changes).await {
             Ok(Some(params)) => params,
             Ok(None) => continue,
             Err(error) => {
