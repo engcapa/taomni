@@ -1,0 +1,41 @@
+id: TC-IDE-C2-08-completion-source-lifecycle
+title: "Completion source lifecycle, stability, and cancellation"
+description: |
+  Verifies RT-07..13 and RT-24 lifecycle guarantees. Opening and dismissing
+  the completion popup via Escape leaves no pending restart loops, does not
+  reopen unexpectedly, and ensures subsequent typing and caret movement
+  proceed with full stability.
+covers: [F25.5]
+tags: [code-workspace, ide-c2, completion, lifecycle, browser-gate, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-tools"]'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - click: '[data-testid="code-workspace-tree-add-folder"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - type: "sout"
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete'
+      timeout_sec: 10
+  - press: "Escape"
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-tooltip-autocomplete") === null'
+      expect_truthy: true
+  - type: " // cancelled"
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-tooltip-autocomplete") === null'
+      expect_truthy: true
+  - screenshot: tc-ide-c2-08-lifecycle.png

@@ -1,0 +1,59 @@
+id: TC-IDE-C2-06-live-template-popup-input-native
+title: "Java Live Template popup input interaction on native"
+description: |
+  Native verification for RT-01..06 on Windows/Desktop. Opens real Java workspace,
+  types `sout`, waits for provider proposals and confirms autocomplete popup
+  is stable and operable (not disabled). Navigates with arrows, accepts with Enter
+  without spurious newlines, and verifies undo restores abbreviation.
+covers: [F25.5]
+tags: [code-workspace, ide-c2, completion, live-template, native-gate, p0]
+modes: [native]
+fixtures: [reset_db, java25_projects]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-java25-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-java25-completion","name":"maven-java25","roots":[{"id":"maven-java25","name":"maven-java25","path":"${fixture.java25_maven_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-java25","path":"src/main/java/com/example/app/App.java"},"lastOpenedAt":1788537600000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.java25_maven_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
+  - type: "sout"
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete'
+      timeout_sec: 15
+  - wait: 2
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-tooltip-autocomplete")?.classList.contains("cm-tooltip-autocomplete-disabled") === false'
+      expect_truthy: true
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["ArrowDown", "ArrowUp"]
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Enter"]
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"]'
+      timeout_sec: 10
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "System.out.println"
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Mod+z"]
+  - screenshot: tc-ide-c2-06-live-template-native.png

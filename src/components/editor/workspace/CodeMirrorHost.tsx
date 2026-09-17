@@ -2364,6 +2364,13 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const currentProviderTemplatesRef = useRef<ActiveProviderTemplateState | null>(null);
   const pendingTriggerOriginRef = useRef<{ pos: number; char: string; docLength: number } | null>(null);
 
+  const completionPolicyGenerationRef = useRef(0);
+  const localRefreshTimerRef = useRef<number | null>(null);
+  const lastCollisionFingerprintRef = useRef<string>("");
+  const activeQueryCounterRef = useRef(0);
+  const lastAppliedQueryIdRef = useRef(0);
+  const trackedLspSourceRef = useRef<CompletionSource | null>(null);
+
   const providerOwnedAbbreviations = useCallback(
     (language: LiveTemplateLanguage): ReadonlySet<string> | undefined => {
       if (language !== "java") return undefined;
@@ -2378,6 +2385,13 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         || current.lspSessionGeneration !== identity.lspSessionGeneration
       ) {
         return undefined;
+      }
+      const view = viewRef.current;
+      if (view) {
+        const pos = view.state.selection.main.head;
+        if (pos < current.from || pos > current.to) {
+          return undefined;
+        }
       }
       return new Set(current.items.keys());
     },
@@ -2411,6 +2425,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       if (!view.state.selection.main.empty) return null;
       const plain = matchLiveTemplateAbbreviation(view.state.doc, pos, language);
       if (!plain?.exact) return null;
+      if (plain.from !== current.from || plain.to !== current.to) return null;
       const candidate = current.items.get(plain.template.abbreviation);
       if (!candidate) return null;
       return { completion: candidate, from: plain.from, to: plain.to };
@@ -2418,55 +2433,147 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     [],
   );
 
-  const trackProviderOwnedTemplates = useCallback(
-    (result: CompletionResult | null, contextPos: number): void => {
-      const identity = getCompletionIdentityRef.current?.();
-      if (!result || result.options.length === 0 || !identity) {
+  const buildAutocompletionConfig = useCallback(
+    (localSource: CompletionSource, lspSource: CompletionSource) => {
+      const policy = completionController?.getPolicy();
+      const autoPopup = policy?.autoPopup ?? true;
+      const delayMs = policy?.delayMs ?? 100;
+      const maxVisibleItems = policy?.maxVisibleItems ?? 100;
+      const docDelayMs = policy?.documentation?.delayMs ?? hoverDocumentationDelayMs ?? 75;
+
+      return autocompletion({
+        activateOnTyping: autoPopup,
+        activateOnTypingDelay: delayMs,
+        defaultKeymap: true,
+        icons: true,
+        maxRenderedOptions: maxVisibleItems,
+        interactionDelay: docDelayMs,
+        positionInfo: positionCompletionInfo,
+        optionClass: (completion) => (
+          completion.type ? `cm-completion-type-${completion.type}` : ""
+        ),
+        override: [localSource, lspSource],
+      });
+    },
+    [completionController, hoverDocumentationDelayMs],
+  );
+
+  const scheduleLocalRefresh = useCallback(
+    (scope: CompletionRequestIdentity, policyGen: number) => {
+      if (localRefreshTimerRef.current !== null) {
+        window.clearTimeout(localRefreshTimerRef.current);
+        localRefreshTimerRef.current = null;
+      }
+      localRefreshTimerRef.current = window.setTimeout(() => {
+        localRefreshTimerRef.current = null;
+        const view = viewRef.current;
+        if (!view) return;
+        if (completionStatus(view.state) === null) return;
+        if (completionPolicyGenerationRef.current !== policyGen) return;
+        const identity = getCompletionIdentityRef.current?.();
+        if (
+          !identity
+          || identity.workspaceId !== scope.workspaceId
+          || identity.fileKey !== scope.fileKey
+          || identity.documentRevision !== scope.documentRevision
+          || identity.lspSessionGeneration !== scope.lspSessionGeneration
+        ) {
+          return;
+        }
+        const trackedSource = trackedLspSourceRef.current;
+        if (!trackedSource) return;
+
+        const newLocalSource = createLiveTemplateCompletionSource(
+          () => pathRef.current,
+          liveTemplateSourceOptions,
+        );
+        view.dispatch({
+          effects: completionCompartment.current.reconfigure(
+            buildAutocompletionConfig(newLocalSource, trackedSource),
+          ),
+        });
+      }, 0);
+    },
+    [buildAutocompletionConfig, liveTemplateSourceOptions],
+  );
+
+  const handleProviderTemplateClaim = useCallback(
+    (
+      result: CompletionResult | null,
+      contextPos: number,
+      capturedIdentity: CompletionRequestIdentity,
+      capturedPolicyGen: number,
+    ): void => {
+      const language = liveTemplateLanguageForPath(pathRef.current);
+      if (language !== "java") {
         currentProviderTemplatesRef.current = null;
         return;
       }
+
+      if (!result || result.options.length === 0) {
+        currentProviderTemplatesRef.current = null;
+        const emptyFingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:`;
+        if (lastCollisionFingerprintRef.current !== "" && lastCollisionFingerprintRef.current !== emptyFingerprint) {
+          lastCollisionFingerprintRef.current = emptyFingerprint;
+          scheduleLocalRefresh(capturedIdentity, capturedPolicyGen);
+        }
+        return;
+      }
+
       const snippets = new Map<string, Completion>();
       for (const option of result.options) {
         if (isProviderTemplateSnippet(option) && option.label) {
           snippets.set(option.label, option);
         }
       }
+
       if (snippets.size === 0) {
         currentProviderTemplatesRef.current = null;
+        const emptyFingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:`;
+        if (lastCollisionFingerprintRef.current !== "" && lastCollisionFingerprintRef.current !== emptyFingerprint) {
+          lastCollisionFingerprintRef.current = emptyFingerprint;
+          scheduleLocalRefresh(capturedIdentity, capturedPolicyGen);
+        }
         return;
       }
+
       currentProviderTemplatesRef.current = {
-        workspaceId: identity.workspaceId,
-        fileKey: identity.fileKey,
-        documentRevision: identity.documentRevision,
-        lspSessionGeneration: identity.lspSessionGeneration,
+        workspaceId: capturedIdentity.workspaceId,
+        fileKey: capturedIdentity.fileKey,
+        documentRevision: capturedIdentity.documentRevision,
+        lspSessionGeneration: capturedIdentity.lspSessionGeneration,
         from: result.from,
         to: contextPos,
         items: snippets,
       };
 
       const appAbbreviations = plainTemplateAbbreviations("java");
-      const hasCollision = [...snippets.keys()].some((label) => appAbbreviations.has(label));
-      if (!hasCollision) return;
+      const collidingLabels = [...snippets.keys()]
+        .filter((label) => appAbbreviations.has(label))
+        .sort();
 
-      // The status check runs after this source's own result is applied: during
-      // the wrapper call the source itself still counts as pending.
-      window.setTimeout(() => {
-        const view = viewRef.current;
-        if (!view || completionStatus(view.state) === null) return;
-        startCompletion(view);
-      }, 0);
+      const fingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:${collidingLabels.join(",")}`;
+
+      if (fingerprint === lastCollisionFingerprintRef.current) {
+        return;
+      }
+
+      const hadPreviousCollisions = lastCollisionFingerprintRef.current !== "" && !lastCollisionFingerprintRef.current.endsWith(":");
+      lastCollisionFingerprintRef.current = fingerprint;
+
+      if (collidingLabels.length === 0 && !hadPreviousCollisions) {
+        return;
+      }
+
+      scheduleLocalRefresh(capturedIdentity, capturedPolicyGen);
     },
-    [],
+    [scheduleLocalRefresh],
   );
 
-  const buildAutocompletionExtension = useCallback(() => {
-    const policy = completionController?.getPolicy();
-    const autoPopup = policy?.autoPopup ?? true;
-    const delayMs = policy?.delayMs ?? 100;
-    const maxVisibleItems = policy?.maxVisibleItems ?? 100;
-    const docDelayMs = policy?.documentation?.delayMs ?? hoverDocumentationDelayMs ?? 75;
-
+  const getOrCreateTrackedLspSource = useCallback(() => {
+    if (trackedLspSourceRef.current) {
+      return trackedLspSourceRef.current;
+    }
     const lspSource = createLspCompletionSource({
       identity: () => getCompletionIdentityRef.current(),
       fetch: (position, trigger, token, invocation) =>
@@ -2490,29 +2597,58 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         return null;
       },
     });
+
     const trackedLspSource: CompletionSource = async (context: CompletionContext) => {
+      const queryId = ++activeQueryCounterRef.current;
+      const queryPos = context.pos;
+      const capturedIdentity = getCompletionIdentityRef.current?.();
+      const capturedPolicyGen = completionPolicyGenerationRef.current;
+
       const result = await lspSource(context);
-      trackProviderOwnedTemplates(result, context.pos);
+
+      if (context.aborted) {
+        return result;
+      }
+      const view = viewRef.current;
+      if (!view) {
+        return result;
+      }
+      if (completionPolicyGenerationRef.current !== capturedPolicyGen) {
+        return result;
+      }
+      if (queryId < lastAppliedQueryIdRef.current) {
+        return result;
+      }
+      lastAppliedQueryIdRef.current = queryId;
+
+      const currentIdentity = getCompletionIdentityRef.current?.();
+      if (
+        !capturedIdentity
+        || !currentIdentity
+        || capturedIdentity.workspaceId !== currentIdentity.workspaceId
+        || capturedIdentity.fileKey !== currentIdentity.fileKey
+        || capturedIdentity.documentRevision !== currentIdentity.documentRevision
+        || capturedIdentity.lspSessionGeneration !== currentIdentity.lspSessionGeneration
+      ) {
+        return result;
+      }
+
+      handleProviderTemplateClaim(result, queryPos, capturedIdentity, capturedPolicyGen);
       return result;
     };
 
-    return autocompletion({
-      activateOnTyping: autoPopup,
-      activateOnTypingDelay: delayMs,
-      defaultKeymap: true,
-      icons: true,
-      maxRenderedOptions: maxVisibleItems,
-      interactionDelay: docDelayMs,
-      positionInfo: positionCompletionInfo,
-      optionClass: (completion) => (
-        completion.type ? `cm-completion-type-${completion.type}` : ""
-      ),
-      override: [
-        createLiveTemplateCompletionSource(() => pathRef.current, liveTemplateSourceOptions),
-        trackedLspSource,
-      ],
-    });
-  }, [completionController, hoverDocumentationDelayMs, liveTemplateSourceOptions, trackProviderOwnedTemplates]);
+    trackedLspSourceRef.current = trackedLspSource;
+    return trackedLspSource;
+  }, [handleProviderTemplateClaim]);
+
+  const buildAutocompletionExtension = useCallback(() => {
+    const trackedSource = getOrCreateTrackedLspSource();
+    const localSource = createLiveTemplateCompletionSource(
+      () => pathRef.current,
+      liveTemplateSourceOptions,
+    );
+    return buildAutocompletionConfig(localSource, trackedSource);
+  }, [buildAutocompletionConfig, getOrCreateTrackedLspSource, liveTemplateSourceOptions]);
   const lastParameterInfoNonceRef = useRef(parameterInfoRequestNonce);
   const requestParameterInfoRef = useRef<(() => boolean) | null>(null);
   const activeHoverResizeSessionRef = useRef<WindowResizeSession | null>(null);
@@ -2985,9 +3121,17 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         // sequence, so the next explicit invocation is a fresh ordinal-1
         // request. The editor.basicCompletion toggle suppresses this once.
         EditorView.updateListener.of((update) => {
+          if (update.docChanged && localRefreshTimerRef.current !== null) {
+            window.clearTimeout(localRefreshTimerRef.current);
+            localRefreshTimerRef.current = null;
+          }
           const previous = completionStatus(update.startState);
           const current = completionStatus(update.state);
           if (previous === current || previous === null || current !== null) return;
+          if (localRefreshTimerRef.current !== null) {
+            window.clearTimeout(localRefreshTimerRef.current);
+            localRefreshTimerRef.current = null;
+          }
           pendingTriggerOriginRef.current = null;
           if (basicCompletionReopenRef.current) return;
           const identity = getCompletionIdentityRef.current();
@@ -3077,7 +3221,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             key: "Tab",
             run: (view) => {
               // ED-AUDIT-011: Tab during IME composition selects the candidate.
-              if (view.composing) return false;
+              if (view.composing || view.state.readOnly) return false;
               if (acceptCompletion(view)) return true;
               const language = liveTemplateLanguageForPath(pathRef.current);
               const providerCandidate = getValidActiveProviderCandidate(view, language);
@@ -3109,7 +3253,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             key: "Shift-Tab",
             run: (view) => {
               // ED-AUDIT-011: Shift-Tab during composition belongs to the IME.
-              if (view.composing) return false;
+              if (view.composing || view.state.readOnly) return false;
               return retreatLspSnippetTabstop(view);
             },
           },
@@ -3644,6 +3788,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       clipboardContextByView.delete(view);
       compositionActiveRef.current = false;
       clearPendingCompositionFinalize();
+      if (localRefreshTimerRef.current !== null) {
+        window.clearTimeout(localRefreshTimerRef.current);
+        localRefreshTimerRef.current = null;
+      }
       if (currentCompositionSessionRef.current) {
         finalizeSession(currentCompositionSessionRef.current);
       } else if (transactionOwnerRef.current && fileKeyRef.current) {
@@ -4024,6 +4172,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     ) {
       return;
     }
+    if (localRefreshTimerRef.current !== null) {
+      window.clearTimeout(localRefreshTimerRef.current);
+      localRefreshTimerRef.current = null;
+    }
+    completionPolicyGenerationRef.current += 1;
+    lastCollisionFingerprintRef.current = "";
     renderedCompletionPolicyRef.current = { autoPopup, delayMs, maxVisibleItems, docDelayMs };
     view.dispatch({
       effects: completionCompartment.current.reconfigure(buildAutocompletionExtension()),
