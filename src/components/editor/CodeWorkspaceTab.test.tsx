@@ -44,6 +44,7 @@ import { EditorView } from "@codemirror/view";
 import { globalEditorConfigResolver } from "./workspace/editorConfigResolver";
 import { acquireClipboardStore, resetWorkspaceClipboardStores } from "./workspace/workspaceClipboardSession";
 import * as workspaceSearchModule from "../../lib/editor/workspaceSearch";
+import { installSaveRaceProbe, uninstallSaveRaceProbe } from "./workspace/saveRaceProbe";
 
 const workspaceMocks = vi.hoisted(() => ({
   workspaceListDir: vi.fn(),
@@ -403,6 +404,20 @@ function writeAck(
     atomicReplaceUsed: true,
     ...overrides,
   };
+}
+
+/** ED-PARITY-002 QA-only save-race gate installed by installSaveRaceProbe. */
+interface SaveRaceGateForTest {
+  arm(request: Record<string, unknown>): { ok: boolean; reason?: string };
+  status(): { held: null | { stage: string; transactionId: string } };
+  release(request?: { reason?: string }): { ok: boolean; reason?: string };
+  trace(): Array<{ event: string; revision?: number | null; detail?: Record<string, unknown> }>;
+}
+
+function saveRaceGate(): SaveRaceGateForTest {
+  const control = (window as unknown as { __taomniQaSaveGate?: SaveRaceGateForTest }).__taomniQaSaveGate;
+  if (!control) throw new Error("save race gate is not installed");
+  return control;
 }
 
 function entry(
@@ -8284,6 +8299,346 @@ end_of_record
         (call) => call.includes("initial_text\ninitial_text\n"),
       );
       expect(staleDidSave).toBe(false);
+    });
+
+    it("preserves edits typed while the post-ack watcher notify is awaiting (W2)", async () => {
+      // W2 timing: the writer ack has already been delivered, the watcher
+      // notify is still awaiting, and the writeback merge has not happened.
+      // Edits typed in that window must survive the merge (RISK-01).
+      let releaseWatcher: () => void = () => {};
+      const watcherDeferred = new Promise<number>((resolve) => {
+        releaseWatcher = () => resolve(0);
+      });
+      lspMocks.lspWorkspaceDidChangeWatchedFiles.mockReturnValue(watcherDeferred);
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        writtenPath: string,
+        text: string,
+      ) => writeAck(
+        file(writtenPath, text, { hash: `hash-saved-${writtenPath}` }),
+        { oldHash: `hash-${writtenPath}` },
+      ));
+
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-save-race-watcher",
+        workspaceInstanceId: "instance-save-race-watcher",
+        name: "Save Race Watcher",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+      };
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "initial_text\n"));
+
+      const rendered = renderWorkspace(workspace);
+      await screen.findByTitle("app / src/main.ts");
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+      expect(content).not.toBeNull();
+      const view = EditorView.findFromDOM(content!);
+      expect(view).not.toBeNull();
+
+      // Dirty the buffer (Ctrl+D) so a save transaction can start.
+      fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+      await waitFor(() => {
+        const fileState = selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-race-watcher",
+        ).openFiles["root:app:src/main.ts"];
+        expect(fileState?.text).toBe("initial_text\ninitial_text\n");
+        expect(fileState?.dirty).toBe(true);
+      });
+
+      // Ctrl+S: historySnapshot resolves, the real writer is invoked and its
+      // ack is delivered; the commit then awaits the watcher notify.
+      fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+      await waitFor(() => expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledWith(
+        "/repo/app",
+        "src/main.ts",
+        "initial_text\ninitial_text\n",
+        "hash-src/main.ts",
+        "UTF-8",
+        false,
+      ));
+      await waitFor(() => expect(lspMocks.lspWorkspaceDidChangeWatchedFiles).toHaveBeenCalled());
+
+      // W2 input through the real editor entry: append a single character.
+      act(() => {
+        view!.dispatch({
+          changes: { from: view!.state.doc.length, insert: "X" },
+          selection: { anchor: view!.state.doc.length + 1 },
+          userEvent: "input.type",
+        });
+      });
+      await waitFor(() => {
+        const fileState = selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-race-watcher",
+        ).openFiles["root:app:src/main.ts"];
+        expect(fileState?.text).toBe("initial_text\ninitial_text\nX");
+        expect(fileState?.dirty).toBe(true);
+      });
+
+      // Release the watcher await; the writeback merge now runs.
+      await act(async () => {
+        releaseWatcher();
+      });
+
+      await waitFor(() => {
+        const fileState = selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-race-watcher",
+        ).openFiles["root:app:src/main.ts"];
+        expect(fileState?.savedText).toBe("initial_text\ninitial_text\n");
+        expect(fileState?.text).toBe("initial_text\ninitial_text\nX");
+        expect(fileState?.dirty).toBe(true);
+        expect(fileState?.saving).toBe(false);
+      });
+      // The visible editor document must not roll back to the snapshot.
+      expect(view!.state.doc.toString()).toBe("initial_text\ninitial_text\nX");
+
+      const staleObservation = screen.getByTestId("code-workspace-save-observation");
+      expect(staleObservation).toHaveAttribute("data-state", "stale");
+      expect(staleObservation).toHaveAttribute("data-result-kind", "saved-stale-snapshot");
+      expect(staleObservation).toHaveAttribute("data-dirty", "true");
+
+      // The provider must never see the snapshot as didSave while the live
+      // buffer holds newer text; only the current buffer may be synced.
+      expect(lspMocks.lspSaveDocument).not.toHaveBeenCalledWith(
+        expect.anything(),
+        "initial_text\ninitial_text\n",
+      );
+    });
+
+    it("QA gate W0: cancels with zero writer calls and keeps the edit typed during the prepare hold", async () => {
+      installSaveRaceProbe();
+      try {
+        const workspace: CodeWorkspaceTabInfo = {
+          repoRoot: "/repo/app",
+          workspaceId: "ws-save-gate-w0",
+          workspaceInstanceId: "instance-save-gate-w0",
+          name: "Save Gate W0",
+          roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+          looseFiles: [],
+          initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+        };
+        workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+        workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "gate_text\n"));
+
+        const rendered = renderWorkspace(workspace);
+        await screen.findByTitle("app / src/main.ts");
+        const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+        expect(content).not.toBeNull();
+        const view = EditorView.findFromDOM(content!);
+        expect(view).not.toBeNull();
+
+        fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w0",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\n"));
+
+        const control = saveRaceGate();
+        expect(control.arm({
+          stage: "prepare",
+          filePath: "/repo/app/src/main.ts",
+          timeoutMs: 15_000,
+        })).toMatchObject({ ok: true });
+        fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+        await waitFor(() => expect(control.status().held?.stage).toBe("prepare"));
+        // W0: the writer must not have been invoked yet.
+        expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+
+        act(() => {
+          view!.dispatch({
+            changes: { from: view!.state.doc.length, insert: "X" },
+            selection: { anchor: view!.state.doc.length + 1 },
+            userEvent: "input.type",
+          });
+        });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w0",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\nX"));
+
+        control.release();
+        await waitFor(() => {
+          const fileState = selectCodeWorkspaceUi(
+            useCodeWorkspaceStore.getState(),
+            "instance-save-gate-w0",
+          ).openFiles["root:app:src/main.ts"];
+          expect(fileState?.text).toBe("gate_text\ngate_text\nX");
+          expect(fileState?.dirty).toBe(true);
+          expect(fileState?.saving).toBe(false);
+        });
+        expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+        expect(useAppStore.getState().statusMessage).toContain("Save cancelled");
+        expect(control.trace().map((entryTrace) => entryTrace.event))
+          .toEqual(["arm", "enter", "release", "commit-settled"]);
+      } finally {
+        uninstallSaveRaceProbe();
+      }
+    });
+
+    it("QA gate W1: keeps edits typed after the real writer was invoked and before its ack is delivered", async () => {
+      installSaveRaceProbe();
+      try {
+        workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+          _root: string,
+          writtenPath: string,
+          text: string,
+        ) => writeAck(
+          file(writtenPath, text, { hash: `hash-saved-${writtenPath}` }),
+          { oldHash: `hash-${writtenPath}` },
+        ));
+        const workspace: CodeWorkspaceTabInfo = {
+          repoRoot: "/repo/app",
+          workspaceId: "ws-save-gate-w1",
+          workspaceInstanceId: "instance-save-gate-w1",
+          name: "Save Gate W1",
+          roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+          looseFiles: [],
+          initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+        };
+        workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+        workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "gate_text\n"));
+
+        const rendered = renderWorkspace(workspace);
+        await screen.findByTitle("app / src/main.ts");
+        const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+        expect(content).not.toBeNull();
+        const view = EditorView.findFromDOM(content!);
+        expect(view).not.toBeNull();
+
+        fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w1",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\n"));
+
+        const control = saveRaceGate();
+        expect(control.arm({
+          stage: "ack",
+          filePath: "/repo/app/src/main.ts",
+          timeoutMs: 15_000,
+        })).toMatchObject({ ok: true });
+        fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+        await waitFor(() => expect(control.status().held?.stage).toBe("ack"));
+        // W1: the real writer was invoked; only its ack delivery is held.
+        expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(1);
+
+        act(() => {
+          view!.dispatch({
+            changes: { from: view!.state.doc.length, insert: "X" },
+            selection: { anchor: view!.state.doc.length + 1 },
+            userEvent: "input.type",
+          });
+        });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w1",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\nX"));
+
+        control.release();
+        await waitFor(() => {
+          const fileState = selectCodeWorkspaceUi(
+            useCodeWorkspaceStore.getState(),
+            "instance-save-gate-w1",
+          ).openFiles["root:app:src/main.ts"];
+          expect(fileState?.savedText).toBe("gate_text\ngate_text\n");
+          expect(fileState?.text).toBe("gate_text\ngate_text\nX");
+          expect(fileState?.dirty).toBe(true);
+          expect(fileState?.saving).toBe(false);
+        });
+        expect(screen.getByTestId("code-workspace-save-observation"))
+          .toHaveAttribute("data-result-kind", "saved-stale-snapshot");
+        expect(control.trace().map((entryTrace) => entryTrace.event))
+          .toEqual(["arm", "writer-invoked", "enter", "release", "ack-delivered", "watcher-invoked", "commit-settled"]);
+      } finally {
+        uninstallSaveRaceProbe();
+      }
+    });
+
+    it("QA gate W2: keeps edits typed after the ack and before the watcher completion", async () => {
+      installSaveRaceProbe();
+      try {
+        workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+          _root: string,
+          writtenPath: string,
+          text: string,
+        ) => writeAck(
+          file(writtenPath, text, { hash: `hash-saved-${writtenPath}` }),
+          { oldHash: `hash-${writtenPath}` },
+        ));
+        const workspace: CodeWorkspaceTabInfo = {
+          repoRoot: "/repo/app",
+          workspaceId: "ws-save-gate-w2",
+          workspaceInstanceId: "instance-save-gate-w2",
+          name: "Save Gate W2",
+          roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+          looseFiles: [],
+          initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+        };
+        workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+        workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "gate_text\n"));
+
+        const rendered = renderWorkspace(workspace);
+        await screen.findByTitle("app / src/main.ts");
+        const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+        expect(content).not.toBeNull();
+        const view = EditorView.findFromDOM(content!);
+        expect(view).not.toBeNull();
+
+        fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w2",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\n"));
+
+        const control = saveRaceGate();
+        expect(control.arm({
+          stage: "watcher",
+          filePath: "/repo/app/src/main.ts",
+          timeoutMs: 15_000,
+        })).toMatchObject({ ok: true });
+        fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+        await waitFor(() => expect(control.status().held?.stage).toBe("watcher"));
+        // W2: the real writer acked and the real watcher notify was invoked.
+        expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(1);
+        expect(lspMocks.lspWorkspaceDidChangeWatchedFiles).toHaveBeenCalledTimes(1);
+        expect(control.trace().map((entryTrace) => entryTrace.event))
+          .toEqual(["arm", "writer-invoked", "ack-delivered", "watcher-invoked", "enter"]);
+
+        act(() => {
+          view!.dispatch({
+            changes: { from: view!.state.doc.length, insert: "X" },
+            selection: { anchor: view!.state.doc.length + 1 },
+            userEvent: "input.type",
+          });
+        });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w2",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\nX"));
+
+        control.release();
+        await waitFor(() => {
+          const fileState = selectCodeWorkspaceUi(
+            useCodeWorkspaceStore.getState(),
+            "instance-save-gate-w2",
+          ).openFiles["root:app:src/main.ts"];
+          expect(fileState?.savedText).toBe("gate_text\ngate_text\n");
+          expect(fileState?.text).toBe("gate_text\ngate_text\nX");
+          expect(fileState?.dirty).toBe(true);
+          expect(fileState?.saving).toBe(false);
+        });
+        expect(control.trace().map((entryTrace) => entryTrace.event))
+          .toEqual(["arm", "writer-invoked", "ack-delivered", "watcher-invoked", "enter", "release", "commit-settled"]);
+        expect(screen.getByTestId("code-workspace-save-observation"))
+          .toHaveAttribute("data-result-kind", "saved-stale-snapshot");
+      } finally {
+        uninstallSaveRaceProbe();
+      }
     });
 
     it("discards writeback and never recreates a closed buffer when writer resolves after close", async () => {

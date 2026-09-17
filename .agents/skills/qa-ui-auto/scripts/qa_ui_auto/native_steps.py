@@ -45,6 +45,7 @@ from typing import Any, Callable
 
 from .steps import StepError
 from .native_assertions import assert_count, assert_menu_items
+from . import save_race
 
 
 class NativeStepContext:
@@ -1390,9 +1391,53 @@ def _do_native_set_writable(ctx: NativeStepContext, args: Any) -> str:
     return _native_set_writable(ctx, args)
 
 
+@_verb("host_delete_file")
+def _do_host_delete_file(ctx: NativeStepContext, args: Any) -> str:
+    return _host_delete_file(ctx, args)
+
+
 @_verb("host_write_file")
 def _do_host_write_file(ctx: NativeStepContext, args: Any) -> str:
     return _host_write_file(ctx, args)
+
+
+def _host_delete_file(ctx: NativeStepContext, args: Any) -> str:
+    """Host-side deletion, scoped to the retained report root.
+
+    Drives the unreadable-read-back branch of a controlled response fault: the
+    real target is removed by the host while the app's response is withheld,
+    so the production read-back genuinely fails.
+    """
+    if not isinstance(args, dict) or "path" not in args:
+        raise StepError("host_delete_file: expected {path}")
+    requested = Path(str(args["path"])).expanduser()
+    try:
+        target = requested.resolve(strict=True)
+    except OSError as exc:
+        raise StepError(f"host_delete_file: cannot resolve {requested}: {exc}") from exc
+    report_root = ctx.case_dir.parent.resolve()
+    if not target.is_relative_to(report_root):
+        raise StepError(f"host_delete_file: target must stay inside report root {report_root}")
+    before = hashlib.sha256(target.read_bytes()).hexdigest()
+    target.unlink()
+    artifact = ctx.case_dir / "native-host-delete-observations.json"
+    observations: list[dict[str, Any]] = []
+    if artifact.exists():
+        try:
+            loaded = json.loads(artifact.read_text(encoding="utf-8"))
+            if isinstance(loaded, list):
+                observations = loaded
+        except (OSError, json.JSONDecodeError):
+            observations = []
+    observations.append({
+        "platform": platform.system().lower(),
+        "path": str(target),
+        "sha256Before": before,
+        "sha256After": None,
+        "verifiedAtUnixMs": int(time.time() * 1000),
+    })
+    artifact.write_text(json.dumps(observations, indent=2, sort_keys=True), encoding="utf-8")
+    return f"host deleted {target} (was sha256 {before[:12]})"
 
 
 @_verb("native_keys")
@@ -1968,6 +2013,34 @@ def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
     # The reload dropped the console hook along with the old document.
     ctx.session.install_console_hook()
     return "reloaded; welcome-panel visible"
+
+
+# ED-PARITY-002 save-race time-point collector: QA-build-only verbs driving the
+# in-page gate installed by src/components/editor/workspace/saveRaceProbe.ts.
+# A production binary without the gate fails these steps explicitly.
+@_verb("save_race_arm")
+def _do_save_race_arm(ctx: NativeStepContext, args: Any) -> str:
+    return save_race.arm(ctx, args)
+
+
+@_verb("save_race_wait_entered")
+def _do_save_race_wait_entered(ctx: NativeStepContext, args: Any) -> str:
+    return save_race.wait_entered(ctx, args)
+
+
+@_verb("save_race_release")
+def _do_save_race_release(ctx: NativeStepContext, args: Any) -> str:
+    return save_race.release(ctx, args)
+
+
+@_verb("save_race_trace")
+def _do_save_race_trace(ctx: NativeStepContext, args: Any) -> str:
+    return save_race.trace(ctx, args)
+
+
+@_verb("save_race_note")
+def _do_save_race_note(ctx: NativeStepContext, args: Any) -> str:
+    return save_race.note(ctx, args)
 
 
 @_verb("vault_first_run")

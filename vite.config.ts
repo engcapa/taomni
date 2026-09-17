@@ -16,11 +16,15 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8")
   version: string;
 };
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [tailwindcss(), react(), ...(isTauriBuild ? [] : [sshProxyPlugin(), sftpProxyPlugin(), rdpProxyPlugin()])],
   clearScreen: false,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // ED-PARITY-002: the isolated QA build (`pnpm build --mode qa`) is the only
+    // bundle that can install the save-race probe control object. Normal builds
+    // compile the install branch away, so there is no runtime entry to it.
+    __TAOMNI_QA_SAVE_GATE__: JSON.stringify(mode === "qa"),
   },
   optimizeDeps: {
     include: ["zmodem.js"],
@@ -70,4 +74,4 @@ export default defineConfig({
       ignored: ["**/qa-ui-auto-report/**", "**/qa-ui-auto-tests/cases/**"],
     },
   },
-});
+}));

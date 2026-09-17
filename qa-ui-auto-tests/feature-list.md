@@ -6244,6 +6244,18 @@ controls:
     selector: '[data-testid="workspace-recovery-discard-all"]'
     kind: interactive
     optional: true       # buffers tab only; disabled with no entries
+  - id: workspace-recovery-disk-results-tab
+    selector: '[data-testid="workspace-recovery-disk-results-tab"]'
+    kind: interactive
+    optional: true       # enabled while unresolved disk-effect rows exist
+  - id: workspace-recovery-disk-results
+    selector: '[data-testid="workspace-recovery-disk-results"]'
+    kind: display
+    optional: true       # disk tab body; rows grouped by path
+  - id: workspace-recovery-disk-result-row
+    selector: '[data-testid="workspace-recovery-disk-result-row"]'
+    kind: display
+    optional: true       # one row per ledger entry (before/intended/observed + Reopen/Acknowledge)
   - id: split-down
     selector: '[data-testid="code-workspace-split-down"]'
     kind: interactive
