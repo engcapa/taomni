@@ -1,9 +1,8 @@
 id: TC-IDE-C2-09-live-template-settings-retained
 title: "Live template settings and language isolation retained"
 description: |
-  Verifies RT-14..17 retained behavior across languages and template configurations.
-  Tests postfix template expansion (`list.for`), and ensures string literals
-  and comments do not mis-trigger live template completions.
+  Browser verification for Java postfix template expansion (`list.for` -> Tab)
+  and suppression of live template autocomplete popups within comments.
 covers: [F25.5]
 tags: [code-workspace, ide-c2, completion, live-template, settings, browser-gate, p1]
 modes: [browser]

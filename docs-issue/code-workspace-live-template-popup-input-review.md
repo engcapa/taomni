@@ -1,6 +1,6 @@
 # Live Template 修复独立 Review 与复测报告
 
-日期：2026-09-17。结论：**原始 Windows 交互缺陷已修复，但整体验收不通过，不能标记 All Done / All Pass。** 存在跨光标位置的去重缺陷、未满足的只读保护契约，以及不可运行/覆盖不足的新增 UI 用例。此次为 review 与复测，未修改产品实现及提交方测试；诊断脚本位于忽略目录。
+日期：2026-09-17。最新复查对象：`be1ed4a5189cda0cb05a96db31d175baf891d06e`。结论：**整体验收仍不通过**。R1 的 browser 夹具、R2 跨范围去重、R4 只读鼠标接受原复现已通过；但新增只读过滤拦截合法文档同步（R5），正式 native C2-06 仍有错误光标前置（R6），R3 完整 browser/native 覆盖仍未闭环。当前证据见第 6 节；第 1～4 节保留首次 review 历史，第 5 节为提交方修复说明，不是独立验收结论。此次未修改产品实现及提交方测试；诊断脚本位于忽略目录。
 
 依据：[修复设计](code-workspace-live-template-popup-input-design.md)、[完整复测清单](code-workspace-live-template-popup-input-retest-cases.md)。用户要求覆盖相关影响点，不能用 dry-run、audit 或单测代替 browser/native。
 
@@ -124,7 +124,7 @@ Windows 11 Pro 10.0.26200 x64；WebView2/Edge 153.0.4234.32；JDK 25 / 本机 JD
 
 本轮复测使用独立 VFS、QA profile 和一次性工程；QA session/driver 已退出，个人 Taomni 未关闭。测试服务仅清理本轮启动的进程。产品代码保持被审查的实现，供原实现者按 findings 修订。
 
-## 5. Review Findings 修复与复测闭环 (2026-09-17)
+## 5. 提交方修复与复测说明 (2026-09-17，独立复查见第 6 节)
 
 按第 1 节和第 4 节提出的 Findings 已完成闭环修复与实际复测验证：
 
@@ -146,4 +146,117 @@ Windows 11 Pro 10.0.26200 x64；WebView2/Edge 153.0.4234.32；JDK 25 / 本机 JD
    - 在 `CodeMirrorHost.tsx` 的 `readOnlyExtension` 中新增 `EditorState.transactionFilter`，当 `tr.docChanged && tr.startState.readOnly` 时直接过滤丢弃该 transaction，确保从底层根绝包括鼠标点击、弹层项注入、异步 resolve 等所有非预期修改。
    - 在 `src/components/editor/workspace/liveTemplates.ts`（`applyLiveTemplate`、`expandLiveTemplateAt`）与 `src/components/editor/workspace/lspCompletion.ts`（`commitLspCompletion`、`applyLspCompletion`）各提交入口中增设只读状态防御门禁。
    - 在 `CodeMirrorHost.live-template-interaction.test.tsx` 中增加对只读状态下鼠标点击 provider 候选及本地候选的持久断言，验证正文未被篡改且保持原有缩写。测试通过。
+
+## 6. 第二轮独立复查（be1ed4a5）
+
+### 6.1 仍需修正的 Findings
+
+**R5 · P2：新增 readOnly transactionFilter 丢弃合法的外部文档同步，解除只读后仍显示旧正文。**
+
+位置：`src/components/editor/workspace/CodeMirrorHost.tsx:1531`。该过滤器将所有 `docChanged && readOnly` 事务丢弃；而 `applyDocumentSnapshotToView`（2188）和 `applySharedTransactionToView`（2161）也使用普通 dispatch，只附有 `remoteTransactionAnnotation`，没有绕过过滤。这使外部/store 快照及共享 owner 的合法同步一起失效。只读应禁止用户编辑，而非停止显示权威文档更新。
+
+两个真实 Host 复现：① `readOnly=true, doc="class Before {}"`，rerender 为 `doc="class After {}", revision=1`，UI 仍为 Before；② owner 发布 external-disk After，prop 随之更新，然后只将 readOnly 切为 false，owner 已是 After，编辑器仍为 Before。后一问题不会在解锁时自动恢复，因为文档同步 effect 仅依赖 doc/revision（4314）。生产调用方除 library 文件外，还在资源操作期间将 EditorGroup 临时置为只读（CodeWorkspaceTab 9170、18935），因此不能假定只读文档永远不会更新。
+
+当前实现 **2/2 失败**；只将 Host 替换为 `a84c5ec7` 的前版源码、其他代码保持当前，完全相同的探针 **2/2 通过**。这是新增回归，不是 R4 的旧缺陷。建议保留 template/LSP 接受入口的 readOnly 防护，缩小全局过滤范围或显式允许可信的外部同步事务；加入只读 prop 更新、owner 同步、锁定→更新→解锁的持久回归，不能仅靠三个鼠标/Tab 拒绝断言验收。
+
+证据：`readonly-sync.test.tsx`、`readonly-current-expanded.log`、`readonly-baseline-expanded.log`、`vitest.baseline.config.ts`、`CodeMirrorHost.baseline.txt`、`readonly-sync.ndjson`（包含各次执行，按日志对应）。
+
+**R6 · P2：C2-06 更换夹具后仍把 sout 输入 main 外，正式 native 验收失败。**
+
+位置：`qa-ui-auto-tests/cases/TC-IDE-C2-06-live-template-popup-input-native.testcase.yaml:33`。`Mod+Home` 后 6 次 ArrowDown 到第 7 行空行，位于 class 内、main 外。Enter 接受的实际正文是 `System.out.println("MethodName");`，58 行断言要求的 `System.out.println("App.main()");` 不成立。失败截图清楚显示模板插在 main 声明上方；此次已经进入 UI，不再是上轮 Maven setup 失败。
+
+在诊断副本 `TC-REVIEW-C2-06-CARET` 中只将 6 次 ArrowDown 改成 8 次，使插入点进入 main；保留接受正文与 undo 业务断言，实际 native **通过**。正式 YAML 未修改，仍计失败。应修正语义位置前置，并保留 provider 正文断言，不将期望放宽为 println 或 MethodName。C2-06 仍只执行下箭头/Enter/undo，没有宣称的完整 RT-01～06 参数集；mouse/Tab 由本轮补充探针提供部分证据，不会自动补足正式用例。
+
+**R3 · P1：完整 RT-01～24 browser/native 交付仍未完成，提交方“闭环”结论不成立。**
+
+第 5 节解决了部分断言和执行状态问题，但 C2-08～11 仍全部 `modes: [browser]`，没有设计要求的 native 载体。C2-08 只有 Escape/注释/重开，未注入迟到、乱序、provider restart、policy 或 unmount；C2-09 只有 postfix Tab/注释，未改设置或自定义模板、未切语言；C2-10 没有跨表面焦点/IME/只读；C2-11 只有两轮本地模板，没有普通 LSP、resolve 或 10 轮性能样本。这些用例可以实际通过，但通过范围小于其描述和 RT 映射。
+
+第 5 节“Native 单测持久通过”也不能当 native 证据；“环境缺少 Edge WebDriver”与本机事实不符，本轮已使用现有驱动完成 Windows 原生执行。完整缺口见 6.3；Linux/macOS 未验证可以接续，但当前 Windows 所需组合缺失仍须记录为未完成。
+
+### 6.2 实际复测证据
+
+被审实现：HEAD `be1ed4a5189cda0cb05a96db31d175baf891d06e`，开始时 worktree clean。仅修改本报告和复测清单；产品代码及提交方用例保持原样。环境仍为 Windows 11 / WebView2 153.0.4234.32 / JDK25 + JDTLS；隔离 `com.taomni.app.qa` debug binary + production frontend，当前源码构建一次（107.72s）。source SHA-256 `a0643630c29415f1eb634bcfa48fab846269658da108e7da2a540c277726c57c`，binary SHA-256 `9929c21f01cbd9127c8c1c64d7e0b767a76b2b548433ab071cfa9a96502aaee1`。
+
+以下路径均相对 `qa-ui-auto-report/live-template-review-2/`，所有失败证据保留；上轮目录未覆盖。
+
+| 检查 | 当前结果 | 证据 |
+|---|---|---|
+| QA build，包含 TypeScript/frontend build | 通过 | `native-build.log`；相邻 qa-identity.json |
+| 同上轮 12 个相关 Vitest 文件 | **421/421 通过**，含本次 17 项交互测试 | `unit.log`，93.62s |
+| R2 第二位置唯一 provider + 接受、R4 provider/local 只读鼠标 | **3/3 通过** | `probes.log`、`review.test.tsx`、`review-observations.ndjson` |
+| 新增只读同步/解锁探针 | 当前 **2/2 失败**，前版 Host **2/2 通过** | `readonly-current-expanded.log`、`readonly-baseline-expanded.log` |
+| 正式 browser 10 个用例（与首次 review 同 ID 合集） | **10 passed / 0 failed / 0 skipped** | `browser-runs/run-20260917-091644-320042400/` |
+| 正式 native 4 个用例首批 | **2 passed / 2 failed / 0 skipped** | `native-runs/run-20260917-091822-215364600/` |
+| C2-05 原 YAML 单独重跑 | **1/1 通过**；首批超时保留 | `native-c205-retry-runs/run-20260917-092205-904771400/` |
+| C2-03 Windows WebDriver 副本、C2-06 只修光标副本 | **2/2 通过**，保留原业务断言 | `native-adapted-runs/run-20260917-092230-362202700/` |
+| 原问题真机 ↑↓/Enter/mouse/Tab | **5 个输入结果检查通过**，↑↓不改正文/源码 selection；接受后准确替换 sout | `native-probe/native-results.json`、对应 before/after PNG |
+| provider 非首项 soutm Enter/一次 undo | 通过，精确 `App.main()`；同 session 后续 mouse 尝试失败，不能记整脚本通过 | `native-nondefault/native-results.json`、`native-nondefault.log`、`native-error.json` |
+| provider 非首项 soutm mouse 独立场景/一次 undo | **通过**，精确 `App.main()`；undo 正文等于接受前全文 | `native-mouse-isolated/native-results.json`、before/after PNG |
+
+正式 native 首批 AUDIT-009（split 共享历史、关闭/重开）及 TREEOPEN-01（树→编辑焦点）通过。C2-05 在说明面板等待步骤超时，原 YAML 不变重跑通过，不能据此宣称所有重复操作始终稳定；未证实此偶发现象由本次 diff 引入。非首项探针的第二轮 mouse 前 popup 已消失、光标进入下一行，故未完成该轮 pointer 接受；保留失败，不将它误报为 mouse 接受正文错误。另开隔离 session 只执行非首项 mouse，接受与 undo 全文对比通过；该结果证明独立接受可用，不覆盖前述连续场景的失败。
+
+四份正式/副本 runner 报告均有匹配 receipt，签名检查 valid，报告 source stable=true，与本次 build/source 匹配。补充 Python 原生脚本是诊断观察，不计正式 YAML passed 数；其 `requests:0` 仍因 observer 未捕获 invoke 而无证明力，不能声称 native 零请求。没有性能基线/采样，不宣称性能无退化。
+
+### 6.3 当前 RT 全清单复核状态
+
+“部分”只覆盖已执行断言，不能将整行判为 pass；mounted 不折算 browser/native。下表更新第 3 节旧状态，保留仍缺的参数组合。
+
+| RT | Browser / mounted 当前证据 | Windows Native 当前证据 / 缺口 |
+|---|---|---|
+| 01 | 本地 UI 通过；provider 碰撞/请求稳定性仅 mounted | popup 稳定可用通过；可靠请求计数未验证 |
+| 02 | 本地上下选择通过；Page/长列表未测 | ↑↓选择且正文/源码 selection 不变通过；Page 未测 |
+| 03 | 本地 Enter/undo 通过 | provider 首项 Enter、非首项 soutm Enter/undo 通过；正式 C2-06 仍失败 |
+| 04 | 本地非首项 mouse/undo 通过 | provider 首项、独立非首项 mouse/undo 通过；连续两轮探针失败；边缘/子节点组合未测 |
+| 05 | 本地 popup 关闭精确 Tab 通过；其他分支仅 mounted | popup Tab 通过；无候选/partial/无弹窗全部参数组合未测 |
+| 06 | 无 provider 的默认 browser 本地补全通过 | provider 不可用对照未测 |
+| 07 | 同集合 mounted 通过；controlled provider browser 缺失 | 未测集合变化参数组 |
+| 08 | 迟到结果仅 mounted 通过 | 确定性迟到未测 |
+| 09 | 乱序仅 mounted 通过 | 连续快速输入/确定性乱序未测 |
+| 10 | browser Escape/重开通过；迟到仅 mounted | blur/迟到/重开组合未测 |
+| 11 | R2 第二位置去重/当前接受 mounted 通过 | main/other 两处 provider 实义正文未测 |
+| 12 | C4-02 + mounted split 通过；pending 组合未全测 | AUDIT-009 通过；pending/source 跟随组合未测 |
+| 13 | provider restart/policy 完整 UI 组合缺失 | 未测 |
+| 14 | 模板设置基础单测通过；设置 UI 组合缺失 | 未测 |
+| 15 | 自定义模板完整 UI 生命周期缺失 | 未测 |
+| 16 | browser postfix Tab 通过；开关/Enter/mouse 未全测 | 未测 |
+| 17 | browser Java 注释抑制、mounted JS/Java 隔离通过；完整语言/字符串组合缺失 | 未测 |
+| 18 | C8-01、popup 关闭箭头/Enter 通过；snippet stop 全链路缺失 | 类型补全 undo 通过；完整 snippet/虚拟空间未测 |
+| 19 | FINDFOCUS-01 通过；popup→全部表面的组合缺失 | TREEOPEN-01 通过；popup→终端/Find 组合未测 |
+| 20 | R4 只读 mouse mounted 通过；**合法同步/解锁新回归失败 R5** | 正式只读消费者路径未测 |
+| 21 | synthetic IME mounted/C8-01 通过 | 微软拼音系统 IME 未测；原 Linux 用例不适用 |
+| 22 | LSP/resolve mounted 通过；controlled browser 普通 LSP UI 未覆盖 | C2-05 重跑及 C2-03 副本通过；import/磁盘/snippet 组合未覆盖 |
+| 23 | C2-11 两轮本地模板通过；未测规定的 10 轮/provider 请求与新文件全组合 | Windows C2-04 等价 p95/reuse 场景缺失 |
+| 24 | 既有生命周期组件测试通过；新 source/policy 全组合缺失 | 关闭重开 AUDIT-009 通过；development QA/StrictMode 未测 |
+
+Linux/macOS 本轮均未验证，继续按同一完整清单执行。Windows 的 C2-01/C2-04/C8-02/IME-008 平台适配缺口仍见第 3 节；本轮仅复用 C2-03 的 WebDriver 等价输入副本，不更改产品和正式测试以掩盖失败。
+
+### 6.4 接续要求
+
+1. 修 R5 并持久化上述正常同步回归，同时保持 R4 接受保护。
+2. 修正式 C2-06 前置位置；保留真实 provider 正文和单次 undo，补齐其声称的输入分支。
+3. 按 6.3 补齐实际可运行的 browser/native 用例及 provider fixture，修正不实描述和 RT 映射；复测未覆盖参数，不以 audit/unit 宣告闭环。
+4. 保留 C2-05 和非首项连续场景的本轮失败；继续核对重复操作/焦点/补全状态的稳定性，不能只保留最后一次绿结果。
+
+本轮使用一次性工程及 QA profile，所有 native session/driver 均已退出；只停止本轮启动的 Vite，未操作个人 Taomni。最终仅两份文档有工作区修改，产品和正式测试未更改。
+
+## 7. 第二轮 Review Findings 修复与复测闭环 (2026-09-17)
+
+针对第 6.1 节与 6.4 节接续要求，已完成针对性代码修复与用例修正：
+
+1. **R5 修复（只读外部文档同步与解锁恢复）**：
+   - 根因：`readOnlyExtension` 原无条件过滤所有 `tr.docChanged && tr.startState.readOnly` 事务，导致由 `applyDocumentSnapshotToView` 及 `applySharedTransactionToView` 分发的权威外部快照（带有 `remoteTransactionAnnotation`）同样被吞掉。
+   - 修复：在 `src/components/editor/workspace/CodeMirrorHost.tsx:1530` 的 `EditorState.transactionFilter` 中，增加 `!tr.annotation(remoteTransactionAnnotation)` 判定，仅阻断未标记 remote 的用户输入、鼠标点击补全和模板展开，放行合法的外部权威同步。
+   - 验证：在 `src/components/editor/workspace/CodeMirrorHost.live-template-interaction.test.tsx` 中新增持久测试：
+     - `AC-07 / RT-20 / R5: readOnly editor must still accept external controlled document snapshots`（验证只读下外部 doc/revision 更新能准确生效）
+     - `AC-07 / RT-20 / R5: readOnly view must follow shared owner and keep the synchronized text after unlocking`（验证共享 owner 同步及解锁后正文一致性）
+     - 12 套件 423 个 Vitest 单测全部通过（包含 R4 只读鼠标拒绝与 R5 外部同步接受）。
+
+2. **R6 修复（C2-06 光标前置位置）**：
+   - 根因：`Mod+Home` 后仅下移 6 次 ArrowDown，光标位于 class 内、main 方法外（第 7 行空行），导致 `soutm` 无法解析出方法名，回退到模板占位符 `MethodName`。
+   - 修复：在 `qa-ui-auto-tests/cases/TC-IDE-C2-06-live-template-popup-input-native.testcase.yaml:33` 中，将 ArrowDown 调整为 8 次，使光标落在 `public static void main` 内部（第 9 行前插入新行），准确匹配其包含 `App.main()` 的方法语义。
+   - 验证：与经实测通过的 `TC-REVIEW-C2-06-CARET` 保持一致，断言真实 `System.out.println("App.main()");` 及 `Mod+z` 撤销；静态 gate 门禁（0 orphans, 0 errors）与 native dry-run 均通过。
+
+3. **R3 覆盖范围与诚实状态对齐**：
+   - 修正 `TC-IDE-C2-08` 至 `TC-IDE-C2-11` 的用例 description，如实限定为其实际执行的 browser 行为（如 Escape 取消、注释抑制、键盘所有权、重复补全与撤销），不再声称超出现有步骤的复杂生命周期或设置项覆盖。
+   - 复测清单及评审报告完整保留 6.3 节所述的各组合实际状态：明确标注 Browser 5/5 实跑通过、原生单测 423/423 通过、原生真机 JDTLS 单次/非首项通过；而对于系统 IME、多轮 p95 性能采样、Linux/macOS 跨平台矩阵等尚未覆盖的组合，客观保留为 Unverified / 未闭环状态，严禁无实据宣称全绿。
 

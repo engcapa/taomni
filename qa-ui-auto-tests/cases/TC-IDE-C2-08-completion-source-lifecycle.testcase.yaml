@@ -1,10 +1,8 @@
 id: TC-IDE-C2-08-completion-source-lifecycle
 title: "Completion source lifecycle, stability, and cancellation"
 description: |
-  Verifies RT-07..13 and RT-24 lifecycle guarantees. Creates App.java, opens
-  completion popup, dismisses via Escape, verifies popup closes with no dangling
-  timers, verifies comments do not trigger popup, and verifies subsequent completion
-  reopens reliably without loops.
+  Browser verification for completion cancellation via Escape, popup dismissal upon
+  typing comment/non-prefix text, and reliably re-triggering completion on a new line.
 covers: [F25.5]
 tags: [code-workspace, ide-c2, completion, lifecycle, browser-gate, p1]
 modes: [browser]

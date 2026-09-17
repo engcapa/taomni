@@ -5,6 +5,7 @@ import { closeCompletion, completionStatus, currentCompletions, selectedCompleti
 import { EditorView } from "@codemirror/view";
 import type { LspCompletionItem } from "../../../lib/editor/lsp";
 import { CodeMirrorHost } from "./CodeMirrorHost";
+import { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactionOwner";
 
 describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / AC-01..05)", () => {
   afterEach(cleanup);
@@ -1438,4 +1439,40 @@ describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / A
       expect(view.state.doc.toString()).toContain("System.out.println();");
     });
   });
+
+  it("AC-07 / RT-20 / R5: readOnly editor must still accept external controlled document snapshots", async () => {
+    const props = {
+      path: "App.java", doc: "class Before {}", visible: true, readOnly: true,
+      diagnostics: [], reveal: null, onChange: vi.fn(), onSave: vi.fn(),
+      onHover: vi.fn(async () => null), onDefinition: vi.fn(async () => false),
+      onReferences: vi.fn(async () => undefined), getCompletionIdentity: () => null,
+      onCompletionDiagnostic: vi.fn(),
+    };
+    const r = render(<CodeMirrorHost {...props} />);
+    const content = r.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(content)!;
+    r.rerender(<CodeMirrorHost {...props} doc="class After {}" documentRevision={1} />);
+    await waitFor(() => expect(view.state.doc.toString()).toBe("class After {}"));
+    expect(props.onChange).not.toHaveBeenCalled();
+  });
+
+  it("AC-07 / RT-20 / R5: readOnly view must follow shared owner and keep the synchronized text after unlocking", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const props = {
+      path: "App.java", fileKey: "App.java", viewId: "readonly-view", transactionOwner: owner,
+      doc: "class Before {}", documentRevision: 0, visible: true, readOnly: true,
+      diagnostics: [], reveal: null, onChange: vi.fn(), onSave: vi.fn(),
+      onHover: vi.fn(async () => null), onDefinition: vi.fn(async () => false),
+      onReferences: vi.fn(async () => undefined), getCompletionIdentity: () => null,
+      onCompletionDiagnostic: vi.fn(),
+    };
+    const r = render(<CodeMirrorHost {...props} />);
+    const view = EditorView.findFromDOM(r.container.querySelector<HTMLElement>(".cm-content")!)!;
+    act(() => { owner.replaceDocument("App.java", "disk-watcher", "class After {}", "external-disk"); });
+    r.rerender(<CodeMirrorHost {...props} doc="class After {}" documentRevision={1} />);
+    r.rerender(<CodeMirrorHost {...props} doc="class After {}" documentRevision={1} readOnly={false} />);
+    await waitFor(() => expect(view.state.doc.toString()).toBe("class After {}"));
+    expect(props.onChange).not.toHaveBeenCalled();
+  });
 });
+

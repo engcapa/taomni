@@ -1528,7 +1528,9 @@ function readOnlyExtension(readOnly: boolean): Extension {
     ? [
       EditorState.readOnly.of(true),
       EditorView.contentAttributes.of({ "aria-readonly": "true" }),
-      EditorState.transactionFilter.of((tr) => (tr.docChanged && tr.startState.readOnly ? [] : tr)),
+      EditorState.transactionFilter.of((tr) => (
+        tr.docChanged && tr.startState.readOnly && !tr.annotation(remoteTransactionAnnotation) ? [] : tr
+      )),
     ]
     : [];
 }

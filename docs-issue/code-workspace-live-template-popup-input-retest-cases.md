@@ -2,9 +2,9 @@
 
 关联：[修复设计](code-workspace-live-template-popup-input-design.md)。本清单是 TASK-01～04 的**必做交付要求**，来源于 2026-09-17 用户补充：“全部复测用例(browser/native)，相关影响点的用例要进行复测”。
 
-当前复核状态（2026-09-17 迭代）：**Review 发现的问题已完成针对性修复与复测闭环**。独立执行结果与 RT-01～24 分层状态见 [review 与复测报告](code-workspace-live-template-popup-input-review.md) 第 5 节。5 个 Browser 自动化用例已全量实跑通过（5/5 passed），单测套件 106 项全部通过，R2 跨光标去重与 R4 只读防篡改均已补全底层防护及持久回归。未在原生环境实跑的项如实标记为 Unverified，不宣称无实据的全绿。
+当前独立复核状态（2026-09-17，`be1ed4a5`）：**尚未闭环，整体验收不通过**。本轮 10 个 browser 用例和 421 个相关 Vitest 测试通过，R1/R2/R4 原复现已解决；新增只读外部同步回归、正式 native C2-06 错误光标前置，以及完整 RT 覆盖缺口仍需处理。实际 browser/native 结果与 RT-01～24 分层状态见 [review 与复测报告](code-workspace-live-template-popup-input-review.md) 第 6 节。下方“提交方原声称”与第 4 节 `Pass (dry-run & unit)` 均为历史记录，不是 UI 执行通过证据。
 
-提交方验证摘要：新增用例在 `qa-ui-auto-tests/cases/`（`TC-IDE-C2-06` 至 `TC-IDE-C2-11`）全量通过 `qa_ui_auto.audit --gate` 门禁（0 orphans, 0 errors）；Browser 自动化实际运行通过（5/5 passed，11.4s）；单元/组件级持久测试 `CodeMirrorHost.live-template-interaction.test.tsx`（17 项，含 R2/R4 专项）及核心套件（106 项单测）全部通过，`pnpm build`（`tsc -b && vite build`）通过。
+提交方接续更新（2026-09-17，R5/R6 修复后）：R5（只读模式允许外部文档同步）已修复并在 `CodeMirrorHost.live-template-interaction.test.tsx` 中增加 2 项持久单元回归（423 项全量通过）；R6（C2-06 光标位置由 6 次调整为 8 次进入 main）已修复；C2-08～11 用例 description 已修正与实际 browser 步骤完全对齐；RT-01～24 全清单客观保留第 6.3 节所述的未验证/部分验证状态，不以单测或 dry-run 替代端到端原生执行。
 
 ## 1. 执行规则与用例载体
 
@@ -18,12 +18,12 @@
 
 | 载体代号 | 已落盘 YAML / id | 模式 | 内容与覆盖 |
 |---|---|---|---|
-| P-N | `TC-IDE-C2-06-live-template-popup-input-native` | native | RT-01～06，真实 provider 原缺陷与接受 |
-| P-B | `TC-IDE-C2-07-live-template-popup-input-browser` | browser | RT-01～06，可控 provider 对照与无反馈请求 |
-| L | `TC-IDE-C2-08-completion-source-lifecycle` | browser、native | RT-07～13、RT-24，异步/取消/配置/重挂载 |
-| S | `TC-IDE-C2-09-live-template-settings-retained` | browser、native | RT-14～17，模板偏好、postfix、语言、禁用 |
-| K | `TC-IDE-C2-10-completion-input-ownership` | browser、native | RT-18～21，键盘/焦点/IME/只读 |
-| R | `TC-IDE-C2-11-completion-retained-behavior` | browser、native | RT-22～23，普通 LSP、resolve/undo/输入负载 |
+| P-N | `TC-IDE-C2-06-live-template-popup-input-native` | native | 目标 RT-01～06；实际仅下箭头/Enter/undo，光标前置失败，未覆盖 mouse/Tab 等组合 |
+| P-B | `TC-IDE-C2-07-live-template-popup-input-browser` | browser | 本地模板 ↑↓/Enter/mouse/Tab/undo；没有可控 provider 碰撞/请求计数 |
+| L | `TC-IDE-C2-08-completion-source-lifecycle` | 当前仅 browser；native 待补 | 目标 RT-07～13、RT-24；实际 Escape/注释/重开，缺异步/配置/重挂载组合 |
+| S | `TC-IDE-C2-09-live-template-settings-retained` | 当前仅 browser；native 待补 | 目标 RT-14～17；实际 postfix Tab/注释，无设置、自定义、语言切换 |
+| K | `TC-IDE-C2-10-completion-input-ownership` | 当前仅 browser；native 待补 | 目标 RT-18～21；实际普通箭头/Enter 和弹窗接受，缺跨表面焦点/IME/只读 |
+| R | `TC-IDE-C2-11-completion-retained-behavior` | 当前仅 browser；native 待补 | 目标 RT-22～23；实际 2 轮本地模板，缺普通 LSP/resolve/10 轮及性能采样 |
 
 模式不同的 provider 依赖与断言不能共用时，将双模式载体拆成 `-browser` / `-native` 两个实际 ID，并同步本清单和执行命令；这是 TASK-04 的内部决定，不减少用例。
 
