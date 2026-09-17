@@ -1255,6 +1255,7 @@ export function applyLiveTemplate(
   view: EditorView,
   match: LiveTemplateMatch,
 ): void {
+  if (view.state.readOnly) return;
   const body = materializeTemplateBody(match.template, match.expr);
   const completion: Completion = {
     label: match.template.abbreviation,
@@ -1272,6 +1273,7 @@ export function expandLiveTemplateAt(
   language: LiveTemplateLanguage,
   options?: LiveTemplateSourceOptions,
 ): boolean {
+  if (view.state.readOnly) return false;
   const pos = view.state.selection.main.head;
   if (!view.state.selection.main.empty) return false;
 

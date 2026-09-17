@@ -1511,6 +1511,9 @@ export function commitLspCompletion(
   reportDiagnostic?: ((kind: CompletionAcceptanceDiagnostic, detail?: string) => void) | undefined,
   excludedSymbols?: readonly SymbolPatternRule[],
 ): boolean {
+  if (view.state.readOnly) {
+    return false;
+  }
   if (!isStillCurrent(token)) {
     reportDiagnostic?.("identity-mismatch", "accept");
     recordCompletionTelemetry(token, "stale", { reason: "accept" });
@@ -1633,6 +1636,9 @@ function applyLspCompletion(
   onResolveGate?: ((request: CompletionResolveGateRequest) => void) | undefined,
   excludedSymbols?: readonly SymbolPatternRule[],
 ): void {
+  if (view.state.readOnly) {
+    return;
+  }
   if (item.additionalTextEdits?.length) {
     commitLspCompletion(view, item, from, to, token, isStillCurrent, reportDiagnostic, excludedSymbols);
     return;

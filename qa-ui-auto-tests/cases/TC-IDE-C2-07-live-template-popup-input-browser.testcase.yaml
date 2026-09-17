@@ -1,0 +1,72 @@
+id: TC-IDE-C2-07-live-template-popup-input-browser
+title: "Live Template popup input interaction in browser"
+description: |
+  Browser verification for RT-01..06. Creates a real Java file in browser preview,
+  types `sout`, verifies autocomplete popup displays Java templates, navigates
+  with ArrowDown/ArrowUp, accepts with Enter, verifies undo with Control+z,
+  and verifies mouse click accept on non-default candidate with undo.
+covers: [F25.5]
+tags: [code-workspace, ide-c2, completion, live-template, browser-gate, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-tools"]'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - click: '[data-testid="code-workspace-tree-add-folder"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - click: '[data-testid="code-workspace-tree-new-file"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - fill:
+      selector: '[data-testid="text-input-dialog"] input'
+      value: "App.java"
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - type: "sout"
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li'
+      timeout_sec: 10
+  - wait: 0.5
+  - press: "ArrowDown"
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete [aria-selected="true"]'
+      contains: "soutm"
+  - press: "ArrowUp"
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete [aria-selected="true"]'
+      contains: "sout"
+  - press: "Enter"
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: "System.out.println();"
+  - press: "Control+z"
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-content").textContent === "sout"'
+      expect_truthy: true
+  - press: "End"
+  - press: "Control+Space"
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li'
+      timeout_sec: 10
+  - wait: 0.5
+  - click: '.cm-tooltip-autocomplete li:nth-of-type(2)'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: "System.out.println("
+  - press: "Control+z"
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-content").textContent === "sout"'
+      expect_truthy: true
+  - press: "Escape"
+  - press: "End"
+  - press: "Tab"
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: "System.out.println();"
+  - screenshot: tc-ide-c2-07-live-template-browser.png
