@@ -34,4 +34,17 @@ steps:
       selector: '[data-testid="code-workspace-find-scope-notice"]'
       contains: "build backend"
       timeout_sec: 10
+  # Directory scope exposes a separate target input; keep the module failure
+  # assertion above and verify this renderer-owned scope control independently.
+  - select_option:
+      selector: '[data-testid="code-workspace-find-scope-select"]'
+      label: "Directory"
+  - assert_visible: '[data-testid="code-workspace-find-directory-input"]'
+  - fill:
+      selector: '[data-testid="code-workspace-find-directory-input"]'
+      value: src
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-find-directory-input"]'
+      name: value
+      equals: src
   - screenshot: tc-ide-d1-01-scope-unresolved.png

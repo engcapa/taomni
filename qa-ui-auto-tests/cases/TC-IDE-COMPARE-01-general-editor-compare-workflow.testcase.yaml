@@ -30,6 +30,21 @@ steps:
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
 
+  # Browser local history is intentionally empty. The real tab action still
+  # has to open the dialog and keep both snapshot mutations disabled; native
+  # history entries and their enabled actions are covered by TC-IDE-C0-01.
+  - right_click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key] button[title]'
+  - assert_menu_items:
+      - Local History
+  - click_menu: Local History
+  - wait_for: '[data-testid="code-workspace-local-history-dialog"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-local-history-dialog"]'
+      contains: No snapshots yet
+  - assert_disabled: '[data-testid="code-workspace-local-history-compare"]'
+  - assert_disabled: '[data-testid="code-workspace-local-history-restore"]'
+  - click: '[data-testid="code-workspace-local-history-dialog"] button[aria-label="Close local history"]'
+
   # Clipboard source: the runner's Chromium context grants clipboard-read/
   # write, so the browser path reports real clipboard text instead of a
   # read-failed contract. Seed a controlled fixture through the page's
@@ -60,7 +75,18 @@ steps:
       selector: '[data-testid^="compare-right-line-"]'
       contains: "Browser preview"
   - assert_enabled: '[data-testid="compare-copy-left"]'
-  - click: '[data-testid="compare-dialog-close"]'
+  - click: '[data-testid="compare-copy-left"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-compare-dialog"]'
+      contains: Copied
+  - click: '[data-testid="compare-copy-right"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-compare-dialog"]'
+      contains: Copied
+  - click: '[data-testid="compare-apply-left-to-right"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: "seeded clipboard line"
 
   # File source: choose a missing browser-VFS path and preserve a typed
   # read-failed surface rather than collapsing it into success.

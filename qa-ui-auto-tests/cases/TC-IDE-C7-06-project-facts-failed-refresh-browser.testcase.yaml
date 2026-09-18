@@ -30,6 +30,7 @@ steps:
       selector: '[data-testid="project-facts-status-badge"]'
       contains: "Facts Failed"
       timeout_sec: 30
+  - assert_visible: '[data-testid="project-facts-failed-icon"]'
   - click: '[data-testid="project-facts-refresh-btn"]'
   - assert_text:
       selector: '[data-testid="project-facts-status-badge"]'

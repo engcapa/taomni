@@ -38,9 +38,33 @@ steps:
       value: "needle"
   - press: Enter
   - wait_for: '[data-testid="code-workspace-find-file-group"]'
+  - assert_visible: '[data-testid="code-workspace-find-match-hit"]'
   - fill:
       selector: '[aria-label="Replace text"]'
       value: "thread"
+  - click: '[data-testid="code-workspace-find-replace-all"]'
+  - wait_for: '[data-testid="code-workspace-replace-preview"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-replace-counts"]'
+      contains: "2 of 2"
+      timeout_sec: 10
+  - assert_visible: '[data-testid="code-workspace-replace-file-toggle"]'
+  # This file-level control is a custom toggle rather than an input[type=checkbox].
+  - click: '[data-testid="code-workspace-replace-file-toggle"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-replace-counts"]'
+      contains: "0 of 2"
+      timeout_sec: 10
+  - assert_text:
+      selector: '[data-testid="code-workspace-replace-preview"]'
+      contains: "Every occurrence is excluded"
+  - click: '[data-testid="code-workspace-replace-cancel"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "second needle line"
+      timeout_sec: 10
+
+  # Reopen the frozen preview to cover the per-occurrence exclusion branch.
   - click: '[data-testid="code-workspace-find-replace-all"]'
   - wait_for: '[data-testid="code-workspace-replace-preview"]'
   - assert_text:

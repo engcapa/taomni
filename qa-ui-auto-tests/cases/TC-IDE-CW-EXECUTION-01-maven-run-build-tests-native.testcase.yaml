@@ -1,0 +1,290 @@
+id: TC-IDE-CW-EXECUTION-01-maven-run-build-tests-native
+title: "Maven Run, Build, Tests, and run-configuration lifecycle"
+description: |
+  Native Code Workspace regression gate for the provider-backed Maven execution
+  surface. Opens the isolated Maven sample in the packaged app, runs the
+  discovered Java main class, builds and rebuilds the project, edits and resets
+  the provider configuration, creates and deletes a named copy, then discovers
+  and runs the JUnit test. The second test run changes only the retained copy of
+  the fixture to prove structured failure details and rerun behavior without
+  touching a checked-in project.
+  Highest claim on green: L2 packaged native execution and JDTLS/JUnit
+  provider-backed UI on the current platform.
+covers: [F25.1, F25.5]
+tags: [code-workspace, execution, maven, run-configuration, build, tests, native-gate, p0]
+modes: [native]
+fixtures: [reset_db, java_sample_projects, jdtls_required, java_test_bundle]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-code-workspace-execution-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.codeWorkspace.lspJavaBundles.v1
+      value: '{"javaDebugPath":"${fixture.java_debug_bundle_path}","javaTestPath":"${fixture.java_test_bundle_path}"}'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-cw-execution","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1789259400000,"isGitRepo":false}]'
+  - host_write_file:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/App.java"
+      text: |
+        package com.example.single;
+
+        import java.util.Arrays;
+        import java.util.List;
+
+        public class App {
+            public static void main(String[] args) {
+                List<String> names = Arrays.asList("alpha", "beta");
+                System.out.println(names.size());
+            }
+        }
+  - host_write_file:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java"
+      text: |
+        package com.example.single;
+
+        public class QuickFixTarget {
+            void quickFixTargets() {
+                // Execution uses a clean source set; diagnostic behavior has
+                // dedicated provider fixtures in the Analysis cases.
+            }
+        }
+  - host_write_file:
+      path: "${fixture.maven_single_root}/src/test/java/com/example/single/AppTest.java"
+      text: |
+        package com.example.single;
+
+        import org.junit.Test;
+        import org.junit.Assert;
+
+        public class AppTest {
+            @Test
+            public void appHasMain() {
+                Assert.assertTrue(App.class.getDeclaredMethods().length > 0);
+            }
+        }
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-tab"]'
+      timeout_sec: 60
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: 'System.out.println(names.size());'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+
+  # Provider run configuration: edit, save, reset, copy, select, and delete.
+  - click: '[data-testid="code-workspace-bottom-tab-run"]'
+  - wait_for: '[data-testid="code-workspace-run-panel"]'
+  - wait_for:
+      selector: '[data-testid^="run-panel-configuration-run:"]'
+      timeout_sec: 90
+  - assert_visible: '[data-testid^="run-panel-configuration-source-"]'
+  - click: '[data-testid^="run-panel-configuration-edit-run:"]'
+  - wait_for: '[data-testid="run-configuration-editor"]'
+  - assert_visible: '[data-testid="run-configuration-name"]'
+  - assert_visible: '[data-testid="run-configuration-cwd"]'
+  - assert_visible: '[data-testid="run-configuration-args"]'
+  - assert_visible: '[data-testid="run-configuration-vm-options"]'
+  - assert_visible: '[data-testid="run-configuration-env-file"]'
+  - assert_visible: '[data-testid="run-configuration-before-launch"]'
+  - assert_visible: '[data-testid="run-configuration-env"]'
+  - fill:
+      selector: '[data-testid="run-configuration-name"]'
+      value: "QA Maven Main"
+  - fill:
+      selector: '[data-testid="run-configuration-cwd"]'
+      value: "${fixture.maven_single_root}"
+  - fill:
+      selector: '[data-testid="run-configuration-args"]'
+      value: "qa-argument"
+  - fill:
+      selector: '[data-testid="run-configuration-vm-options"]'
+      value: "-Dqa.execution=true"
+  - fill:
+      selector: '[data-testid="run-configuration-env-file"]'
+      value: ".env.qa"
+  - fill:
+      selector: '[data-testid="run-configuration-env"]'
+      value: "QA_EXECUTION=enabled"
+  - click: '[data-testid="run-configuration-save"]'
+  - wait_for:
+      selector: '[data-testid^="run-panel-configuration-run:"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid^="run-panel-configuration-run:"]'
+      contains: "QA Maven Main"
+      timeout_sec: 30
+  - click: '[data-testid="run-configuration-reset"]'
+  - eval_readonly:
+      expression: "!String(document.evaluate(\"//*[contains(@data-testid,'run-configuration-name')]\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes('QA Maven Main')"
+      expect_truthy: true
+  - click: '[data-testid^="run-panel-configuration-copy-run:"]'
+  - wait_for: '[data-testid="run-configuration-editor"]'
+  - eval_readonly:
+      expression: "String(document.evaluate(\"//*[contains(@data-testid,'run-configuration-name')]\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes('copy')"
+      expect_truthy: true
+  - fill:
+      selector: '[data-testid="run-configuration-name"]'
+      value: "QA Maven Copy"
+  - click: '[data-testid="run-configuration-save"]'
+  - assert_text:
+      selector: '[data-testid^="run-panel-configurations-"]'
+      contains: "QA Maven Copy"
+      timeout_sec: 30
+  - click: '[data-testid="run-configuration-delete"]'
+  - assert_not_visible: '[data-testid="run-configuration-editor"]'
+  - assert_not_visible: '[data-testid^="run-panel-configuration-run:"][data-configuration-kind="missing"]'
+
+  # Execute the real Maven main class; the terminal output is the boundary
+  # assertion rather than a disabled-control check.
+  - click: '[data-testid^="run-panel-configuration-java-main:"]'
+  - wait_for:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      timeout_sec: 120
+  - assert_pattern:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: '(?s).*\b2\b.*'
+      timeout_sec: 60
+
+  # Build and rebuild use the structured targets and the real Maven process.
+  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow-build"]'
+  - assert_visible: '[data-testid="code-workspace-build-panel"]'
+  - wait_for:
+      selector: '[data-testid^="build-panel-target-build:"]'
+      timeout_sec: 90
+  - click: '[data-testid="build-panel-build-project"]'
+  - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - assert_pattern:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: '(?s).*BUILD SUCCESS.*'
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow-build"]'
+  - assert_visible: '[data-testid="code-workspace-build-panel"]'
+  - assert_not_visible: '[data-testid="build-panel-execution-error"]'
+  - click: '[data-testid="build-panel-rebuild-project"]'
+  - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - assert_pattern:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: '(?s).*BUILD SUCCESS.*'
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow-build"]'
+  - assert_visible: '[data-testid="code-workspace-build-panel"]'
+  - assert_not_visible: '[data-testid="build-panel-execution-error"]'
+  - click: '[data-testid^="build-panel-target-build:"]'
+  - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - assert_pattern:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: '(?s).*BUILD SUCCESS.*'
+      timeout_sec: 60
+
+  # Java test discovery, execution, result ingestion, failure details, rerun.
+  - fill:
+      selector: '[data-testid="code-workspace-tree-filter"]'
+      value: "AppTest.java"
+  - wait_for:
+      selector: '[data-testid="code-workspace-flat-file"][data-path="src/test/java/com/example/single/AppTest.java"]'
+      timeout_sec: 30
+  - dblclick: '[data-testid="code-workspace-flat-file"][data-path="src/test/java/com/example/single/AppTest.java"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
+  - assert_visible: '[data-testid="code-workspace-tests-panel"]'
+  - click: '[data-testid="tests-refresh"]'
+  - click: '[data-testid="tests-load-results"]'
+  - wait_for:
+      selector: '[data-testid^="tests-item-"]'
+      timeout_sec: 60
+  - click: '[data-testid^="tests-run-"]'
+  - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - assert_pattern:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: '(?s).*BUILD SUCCESS.*'
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
+  - wait_for:
+      selector: '[data-testid="tests-result-summary"]'
+      timeout_sec: 120
+  - assert_text:
+      selector: '[data-testid="tests-result-summary"]'
+      contains: "1 passed"
+      timeout_sec: 60
+  - assert_visible: '[data-testid^="tests-result-"]'
+  - click: '[data-testid^="tests-rerun-"]'
+  - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
+  - wait_for:
+      selector: '[data-testid="tests-result-summary"]'
+      timeout_sec: 120
+  - assert_text:
+      selector: '[data-testid="tests-result-summary"]'
+      contains: "1 passed"
+      timeout_sec: 60
+
+  # Change only the copied project on disk to exercise the provider failure
+  # path and the result-to-source details action.
+  - host_write_file:
+      path: "${fixture.maven_single_root}/src/test/java/com/example/single/AppTest.java"
+      text: |
+        package com.example.single;
+
+        import org.junit.Test;
+        import org.junit.Assert;
+
+        public class AppTest {
+            @Test
+            public void appHasMain() {
+                Assert.fail("qa-execution-failure");
+            }
+        }
+  - click: '[data-testid="tests-refresh"]'
+  - wait_for:
+      selector: '[data-testid^="tests-item-"]'
+      timeout_sec: 120
+  - click: '[data-testid^="tests-run-"]'
+  - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - assert_pattern:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: '(?s).*BUILD FAILURE.*'
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
+  - wait_for:
+      selector: '[data-testid^="tests-failure-details-"]'
+      timeout_sec: 120
+  - assert_text:
+      selector: '[data-testid="tests-result-summary"]'
+      contains: "1 failed"
+      timeout_sec: 60
+  - click: '[data-testid^="tests-failure-details-"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "qa-execution-failure"
+      timeout_sec: 30
+  - screenshot: tc-ide-cw-execution-01-maven.png

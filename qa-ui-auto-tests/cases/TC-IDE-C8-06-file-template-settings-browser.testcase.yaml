@@ -30,8 +30,24 @@ steps:
       selector: '[data-testid="file-template-settings-dialog"]'
       timeout_sec: 20
   - wait_for: '[data-testid="file-template-editor-textarea"]'
+  - fill:
+      selector: '[data-testid="file-template-editor-textarea"]'
+      value: "custom template marker"
+  - eval_readonly:
+      expression: 'document.querySelector("[data-testid" + String.fromCharCode(61) + "\"file-template-editor-textarea\"]")?.value === "custom template marker"'
+      expect_truthy: true
+  - click: '[data-testid="file-template-reset-button"]'
+  - eval_readonly:
+      expression: 'document.querySelector("[data-testid" + String.fromCharCode(61) + "\"file-template-editor-textarea\"]")?.value.includes("public class")'
+      expect_truthy: true
+  - click: '[data-testid="file-template-tab-interface"]'
+  - eval_readonly:
+      expression: 'document.querySelector("[data-testid" + String.fromCharCode(61) + "\"file-template-editor-textarea\"]")?.value.includes("public interface")'
+      expect_truthy: true
   - click: '[data-testid="file-template-save-button"]'
-  - wait: 0.2
+  - assert_text:
+      selector: '[data-testid="file-template-settings-dialog"]'
+      contains: "Saved!"
   - click: '[data-testid="file-template-close-button"]'
   - wait: 0.2
   - screenshot: tc-ide-c8-06-file-template-settings.png

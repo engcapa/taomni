@@ -109,6 +109,34 @@ steps:
   - assert_text:
       selector: '[data-testid="clipboard-history-entry-0"]'
       contains: "Browser preview uses an in-memory virtual local filesystem."
+  - fill:
+      selector: '[data-testid="clipboard-history-search"]'
+      value: "Browser preview uses"
+  - wait_for: '[data-testid="clipboard-history-entry-0"]'
+  - fill:
+      selector: '[data-testid="clipboard-history-search"]'
+      value: "no clipboard entry matches this"
+  - wait_for: '[data-testid="clipboard-history-empty"]'
+  - fill:
+      selector: '[data-testid="clipboard-history-search"]'
+      value: "Browser preview uses"
+  - wait_for: '[data-testid="clipboard-history-entry-0"]'
+  - press:
+      key: Escape
+      selector: '[data-testid="clipboard-history-search"]'
+  - press:
+      key: ArrowRight
+      selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+  - press:
+      key: Mod+Shift+v
+      selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+  - wait_for: '[data-testid="clipboard-history-popup"]'
+  - click: '[data-testid="clipboard-history-close"]'
+  - assert_not_visible: '[data-testid="clipboard-history-popup"]'
+  - press:
+      key: Mod+Shift+v
+      selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
+  - wait_for: '[data-testid="clipboard-history-popup"]'
   - screenshot: tc-ide-c3-history.png
   - click: '[data-testid="clipboard-history-entry-0"]'
   - assert_not_visible: '[data-testid="clipboard-history-popup"]'

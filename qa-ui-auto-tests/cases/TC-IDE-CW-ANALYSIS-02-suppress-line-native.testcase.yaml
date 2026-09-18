@@ -1,0 +1,35 @@
+id: TC-IDE-CW-ANALYSIS-02-suppress-line-native
+title: "Provider diagnostic can be hidden locally for one line"
+description: |
+  Native provider gate for the Problems context menu. It uses a real jdtls
+  diagnostic and verifies the line-scoped local suppression action removes the
+  diagnostic from the open-files view without claiming a source edit.
+covers: [F25.2]
+tags: [code-workspace, analysis, problems, suppression, jdtls, native-gate, p1]
+modes: [native]
+native_platforms: [Windows, Linux]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 360
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: qa-analysis-line-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-analysis-line","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1789259400000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      timeout_sec: 90
+  - click: '[data-testid="code-workspace-bottom-tab-problems"]'
+  - wait_for: '[data-testid="code-workspace-problems-panel"]'
+  - assert_text: {selector: '[data-testid="code-workspace-problems-panel"]', contains: "StringUtils cannot be resolved", timeout_sec: 30}
+  - right_click: '[data-testid="problems-diagnostic-row"]'
+  - wait_for: '[data-testid="context-menu-item-hide-this-diagnostic-locally-line"]'
+  - click: '[data-testid="context-menu-item-hide-this-diagnostic-locally-line"]'
+  - wait_for: '[data-testid="code-workspace-problems-panel"]'
+  - assert_text: {selector: '[data-testid="code-workspace-problems-panel"]', contains: "No problems in open files", timeout_sec: 15}
+  - screenshot: tc-ide-cw-analysis-02-suppress-line.png

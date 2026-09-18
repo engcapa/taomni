@@ -28,6 +28,7 @@ steps:
   - wait_for: '[data-testid="code-workspace-tree-file"]'
   - dblclick: '[data-testid="code-workspace-tree-file"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - assert_visible: '[data-testid="code-workspace-file-status"]'
 
   # Set the editor to the product's 200% equivalent before exercising save.
   - click: '[data-testid="code-workspace-tab"]'

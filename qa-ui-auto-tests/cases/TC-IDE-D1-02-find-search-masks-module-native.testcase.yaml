@@ -46,6 +46,17 @@ steps:
       selector: '[data-testid="code-workspace-find-scope-select"]'
       label: "Module"
   - assert_visible: '[data-testid="code-workspace-find-module-select"]'
+  - select_option:
+      selector: '[data-testid="code-workspace-find-module-select"]'
+      label: "maven-single"
+  - click: '[data-testid="code-workspace-find-module-select"]'
+  - native_keys:
+      selector: '[data-testid="code-workspace-find-module-select"]'
+      keys: ["ArrowDown"]
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-find-module-select"]'
+      name: value
+      equals: maven-single
   - native_keys:
       selector: '[aria-label="Search query"]'
       keys: ["Enter"]

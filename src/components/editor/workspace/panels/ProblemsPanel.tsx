@@ -190,6 +190,7 @@ export function ProblemsPanel({
                 <button
                   key={`${diagnostic.range.start.line}:${diagnostic.range.start.character}:${diagnostic.message}:${index}`}
                   type="button"
+                  data-testid="problems-diagnostic-row"
                   className="min-h-7 w-full min-w-0 flex items-start gap-2 px-4 py-1 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
                   onClick={() => onOpenProblem(file.key, original)}
                   onContextMenu={(event) => contextMenu.show(event, [

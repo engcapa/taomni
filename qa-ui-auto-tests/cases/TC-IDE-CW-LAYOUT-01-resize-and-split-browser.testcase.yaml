@@ -1,0 +1,79 @@
+id: TC-IDE-CW-LAYOUT-01-resize-and-split-browser
+title: "Code Workspace project tree, editor split, and bottom dock layout"
+description: |
+  Browser renderer regression for the workspace shell layout. It verifies the
+  project/editor splitter and bottom dock splitter respond to pointer and
+  keyboard resizing, split scrolling can be toggled, split close preserves a
+  live editor, and every dock tab remains reachable through the overflow menu.
+  Native OS focus and terminal PTY behavior are covered separately.
+covers: [F25.1, F25.5]
+tags: [code-workspace, shell-layout, splitter, split, bottom-dock, browser-gate, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-tools"]'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - assert_visible: '[data-testid="code-workspace-tree-pane"]'
+  - assert_visible: '[data-testid="code-workspace-project-resize-handle"]'
+  - click: '[data-testid="code-workspace-tree-add-folder"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+
+  # Move the project/editor boundary with a real pointer drag and exercise
+  # both editor split orientations and the synchronized-scroll toggle.
+  - drag_to:
+      from: '[data-testid="code-workspace-project-resize-handle"]'
+      to: '[data-testid="code-workspace-editor-pane"]'
+  - click: '[data-testid="code-workspace-split-right"]'
+  - wait_for: '[data-testid="code-workspace-editor-split"]'
+  - assert_count: {selector: '[data-testid="code-workspace-editor-pane"]', min: 2}
+  - click: '[data-testid="code-workspace-split-sync-scroll"]'
+  - click: '[data-testid="code-workspace-split-down"]'
+  - assert_count: {selector: '[data-testid="code-workspace-editor-pane"]', min: 3}
+  - click: '[data-testid="code-workspace-split-close"]'
+  - assert_count: {selector: '[data-testid="code-workspace-editor-pane"]', min: 2}
+  - click: '[data-testid="code-workspace-split-unsplit-all"]'
+  - assert_count: {selector: '[data-testid="code-workspace-editor-pane"]', equal: 1}
+
+  # Open a bottom tool window, resize it by pointer and then by its accessible
+  # separator keyboard contract. The persisted height must stay in bounds.
+  - click: '[data-testid="code-workspace-bottom-tab-run"]'
+  - wait_for: '[data-testid="code-workspace-bottom-dock-resize"]'
+  - assert_attribute: {selector: '[data-testid="code-workspace-bottom-dock-resize"]', name: aria-valuemin, equals: "49"}
+  - eval_readonly:
+      expression: "Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '\"code-workspace-bottom-dock-resize\"]')?.getAttribute('aria-valuemax')) > Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '\"code-workspace-bottom-dock-resize\"]')?.getAttribute('aria-valuemin'))"
+      expect_truthy: true
+  - eval_readonly:
+      expression: "Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '\"code-workspace-bottom-dock-resize\"]')?.getAttribute('aria-valuenow')) > 48"
+      expect_truthy: true
+  - drag_to:
+      from: '[data-testid="code-workspace-bottom-dock-resize"]'
+      to: '[data-testid="code-workspace-editor-pane"]'
+  - press: {selector: '[data-testid="code-workspace-bottom-dock-resize"]', key: ArrowUp}
+  - press: {selector: '[data-testid="code-workspace-bottom-dock-resize"]', key: ArrowDown}
+  - eval_readonly:
+      expression: "Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '\"code-workspace-bottom-dock-resize\"]')?.getAttribute('aria-valuenow')) < 850"
+      expect_truthy: true
+
+  # Switch every standard panel and reach hidden panels through overflow.
+  - click: '[data-testid="code-workspace-bottom-tab-build"]'
+  - wait_for: '[data-testid="code-workspace-build-panel"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
+  - wait_for: '[data-testid="code-workspace-tests-panel"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+  - click: '[data-testid="code-workspace-bottom-tab-overflow-debug"]'
+  - wait_for: '[data-testid="debug-panel"]'
+  - click: '[data-testid="code-workspace-bottom-tab-terminal"]'
+  - wait_for: '[data-testid="code-workspace-bottom-dock-body"]'
+  - screenshot: tc-ide-cw-layout-01-resize-and-split.png

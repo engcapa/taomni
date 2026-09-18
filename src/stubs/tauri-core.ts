@@ -2811,6 +2811,15 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "workspace_detect_tasks": {
       return [] as T;
     }
+    case "workspace_java_run_targets": {
+      return [] as T;
+    }
+    case "workspace_task_tree": {
+      return [] as T;
+    }
+    case "workspace_dependency_tree": {
+      return [] as T;
+    }
     case "workspace_execution_model": {
       return {
         projects: [],

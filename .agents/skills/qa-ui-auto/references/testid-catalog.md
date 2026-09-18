@@ -131,6 +131,10 @@
 - `[data-testid="workspace-editor-appearance-reset"]` — interactive [optional] — F25.3.appearance-reset
 - `[data-testid="workspace-editor-appearance-cancel"]` — interactive [optional] — F25.3.appearance-cancel
 - `[data-testid="workspace-editor-appearance-apply"]` — interactive [optional] — F25.3.appearance-apply
+- `[data-testid="workspace-editor-appearance-clipboard-history-enabled"]` — interactive [optional] — F25.3.appearance-clipboard-history-enabled
+- `[data-testid="workspace-editor-appearance-clipboard-max-items"]` — interactive [optional] — F25.3.appearance-clipboard-max-items
+- `[data-testid="workspace-editor-appearance-clipboard-max-bytes"]` — interactive [optional] — F25.3.appearance-clipboard-max-bytes
+- `[data-testid="workspace-editor-appearance-clipboard-clear"]` — interactive [optional] — F25.3.appearance-clipboard-clear
 - `[data-testid="workspace-intelligence-settings-dialog"]` — display [optional] — F25.3.intelligence-dialog
 - `[data-testid="workspace-quick-doc-hover-enabled"]` — interactive [optional] — F25.3.intelligence-quick-doc-hover-enabled
 - `[data-testid="workspace-quick-doc-hover-delay"]` — interactive [optional] — F25.3.intelligence-quick-doc-hover-delay
@@ -143,6 +147,11 @@
 - `[data-testid="workspace-intelligence-settings-apply"]` — interactive [optional] — F25.3.intelligence-apply
 - `[data-testid="workspace-tab-switcher"]` — display [optional] — F25.3.tab-switcher
 - `[data-testid="keymap-cheatsheet-dialog"]` — display [optional] — F25.3.keymap-cheatsheet
+- `[data-testid="keymap-search-input"]` — interactive [optional] — F25.3.keymap-search-input
+- `[data-testid^="keymap-category-"]` — interactive [optional] — F25.3.keymap-category
+- `[data-testid^="keymap-item-"]` — display [optional] — F25.3.keymap-item
+  ↳ `[data-testid="keymap-item-workspace.renameSymbol"]` — alias
+- `[data-testid="keymap-cheatsheet-footer-close"]` — interactive [optional] — F25.3.keymap-cheatsheet-footer-close
 - `[data-testid="editor-context-cut"]` — interactive [optional] — F25.3.context-cut
 - `[data-testid="editor-context-copy"]` — interactive [optional] — F25.3.context-copy
 - `[data-testid="editor-context-paste"]` — interactive [optional] — F25.3.context-paste
@@ -165,7 +174,7 @@
 - `[data-testid="code-workspace-tree-file"]` — interactive [optional] — F25.5.tree-file-row
 - `[data-testid="code-workspace-tree-dir"]` — interactive [optional] — F25.5.tree-dir-row
 - `[data-testid="code-workspace-view-tree"]` — display [optional] — F25.5.tree-view
-- `[data-testid="new-java-class-package"]` — interactive [optional] — F25.5.new-java-class-package
+- `[data-testid="new-java-class-package"]` — display [optional] — F25.5.new-java-class-package
 - `[data-testid="new-java-class-submit"]` — interactive [optional] — F25.5.new-java-class-submit
 - `[data-testid="external-file-conflict-dialog"]` — display [optional] — F25.5.external-file-conflict-dialog
 - `[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]` — interactive [optional] — F25.5.external-file-conflict-dismiss
@@ -221,6 +230,7 @@
 - `[data-testid="project-facts-stale-icon"]` — display [optional] — F25.5.project-facts-stale-icon
 - `[data-testid="project-facts-failed-icon"]` — display [optional] — F25.5.project-facts-failed-icon
 - `[data-testid="code-workspace-tree-new-file"]` — interactive [optional] — F25.5.tree-new-file
+- `[data-testid="code-workspace-tree-new-directory"]` — interactive [optional] — F25.5.tree-new-directory
 - `[data-testid="code-workspace-search-everywhere"]` — display [optional] — F25.5.search-everywhere
 - `[data-testid="code-workspace-find-in-files-panel"]` — display [optional] — F25.5.find-panel
 - `[aria-label="Search query"]` — interactive [optional] — F25.5.find-query-input
@@ -277,8 +287,10 @@
 - `[data-testid="code-workspace-problems-panel"]` — display [optional] — F25.5.problems-panel
 - `[data-testid="problems-scope-project"]` — interactive [optional] — F25.5.problems-scope-project
 - `[data-testid="problems-full-project-note"]` — display [optional] — F25.5.problems-full-project-note
+- `[data-testid="problems-diagnostic-row"]` — interactive [optional] — F25.5.problems-diagnostic-row
 - `[data-testid="keymap-settings-close"]` — interactive [optional] — F25.5.keymap-settings-close
 - `[data-testid="clipboard-history-popup"]` — display [optional] — F25.5.clipboard-history-popup
+- `[data-testid="clipboard-history-empty"]` — display [optional] — F25.5.clipboard-history-empty
 - `[data-testid="clipboard-history-search"]` — interactive [optional] — F25.5.clipboard-history-search
 - `[data-testid="clipboard-history-entry-0"]` — interactive [optional] — F25.5.clipboard-history-entry-0
 - `[data-testid="clipboard-history-close"]` — interactive [optional] — F25.5.clipboard-history-close
@@ -322,6 +334,8 @@
 - `[data-testid="auto-import-reset-button"]` — interactive [optional] — F25.5.auto-import-reset-button
 - `[data-testid="auto-import-candidate-dialog"]` — display [optional] — F25.5.auto-import-candidate-dialog
 - `[data-testid="file-template-settings-dialog"]` — display [optional] — F25.5.file-template-settings-dialog
+- `[data-testid^="file-template-tab-"]` — interactive [optional] — F25.5.file-template-tab
+  ↳ `[data-testid="file-template-tab-interface"]` — alias
 - `[data-testid="file-template-close-button"]` — interactive [optional] — F25.5.file-template-close-button
 - `[data-testid="file-template-editor-textarea"]` — interactive [optional] — F25.5.file-template-editor-textarea
 - `[data-testid="file-template-save-button"]` — interactive [optional] — F25.5.file-template-save-button
@@ -329,7 +343,6 @@
 - `[data-testid="new-java-class-dialog"]` — display [optional] — F25.5.new-java-class-dialog
 - `[data-testid="new-java-class-name-input"]` — interactive [optional] — F25.5.new-java-class-name-input
 - `[data-testid="new-java-class-kind-select"]` — interactive [optional] — F25.5.new-java-class-kind-select
-- `[data-testid="new-java-class-confirm"]` — interactive [optional] — F25.5.new-java-class-confirm
 - `[data-testid="new-java-class-cancel"]` — interactive [optional] — F25.5.new-java-class-cancel
 
 ## code-workspace/execution (F25.1)
@@ -348,12 +361,14 @@
 - `[data-testid="code-workspace-bottom-dock"]` — display [optional] — F25.1.bottom-dock
 - `[data-testid="code-workspace-bottom-dock-body"]` — display [optional] — F25.1.bottom-dock-body
 - `[data-testid="code-workspace-bottom-dock-resize"]` — interactive [optional] — F25.1.bottom-dock-resize
+- `[data-testid="code-workspace-project-resize-handle"]` — interactive [optional] — F25.1.project-resize-handle
 - `[data-testid="code-workspace-bottom-tab-run"]` — interactive — F25.1.run-tab
 - `[data-testid="code-workspace-bottom-tab-build"]` — interactive — F25.1.build-tab
 - `[data-testid="code-workspace-bottom-tab-tests"]` — interactive — F25.1.tests-tab
 - `[data-testid="code-workspace-bottom-tab-debug"]` — interactive — F25.1.debug-tab
 - `[data-testid="code-workspace-bottom-tab-overflow"]` — interactive [optional] — F25.1.bottom-tab-overflow
 - `[data-testid="code-workspace-bottom-tab-overflow-menu"]` — display [optional] — F25.1.bottom-tab-overflow-menu
+- `[data-testid="code-workspace-bottom-tab-overflow-build"]` — interactive [optional] — F25.1.bottom-tab-overflow-build
 - `[data-testid="code-workspace-bottom-tab-overflow-tests"]` — interactive [optional] — F25.1.bottom-tab-overflow-tests
 - `[data-testid="code-workspace-bottom-tab-overflow-debug"]` — interactive [optional] — F25.1.bottom-tab-overflow-debug
 - `[data-testid="code-workspace-run-panel"]` — display — F25.1.run-panel
@@ -363,6 +378,8 @@
 - `[data-testid="run-panel-configure-tools"]` — interactive — F25.1.configure-tools
 - `[data-testid="run-panel-refresh"]` — interactive — F25.1.refresh-run-targets
 - `[data-testid^="run-panel-configuration-run:"]` — interactive [optional] — F25.1.run-configuration
+- `[data-testid^="run-panel-configuration-java-main:"]` — interactive [optional] — F25.1.run-configuration-java-main
+- `[data-testid^="run-panel-configurations-"]` — display [optional] — F25.1.run-configurations-root
 - `[data-testid^="run-panel-configuration-edit-run:"]` — interactive [optional] — F25.1.run-configuration-edit
 - `[data-testid^="run-panel-configuration-copy-run:"]` — interactive [optional] — F25.1.run-configuration-copy
 - `[data-testid^="run-panel-configuration-source-"]` — display [optional] — F25.1.run-configuration-source
@@ -390,6 +407,8 @@
 - `[data-testid="tests-load-results"]` — interactive [optional] — F25.1.tests-load-results
 - `[data-testid="tests-result-summary"]` — display [optional] — F25.1.tests-result-summary
 - `[data-testid^="tests-result-"]` — display [optional] — F25.1.tests-result
+- `[data-testid^="tests-item-"]` — display [optional] — F25.1.tests-item
+- `[data-testid^="tests-run-"]` — interactive [optional] — F25.1.tests-run
 - `[data-testid^="tests-rerun-"]` — interactive [optional] — F25.1.tests-rerun
 - `[data-testid^="tests-failure-details-"]` — interactive [optional] — F25.1.tests-failure-details
 - `[data-testid="debug-panel"]` — display — F25.1.debug-panel
@@ -516,6 +535,8 @@
 - `[data-testid="workspace-debug-skip-constructors"]` — interactive [optional] — F25.1.skip-constructors
 - `[data-testid="code-workspace-split-sync-scroll"]` — interactive [optional] — F25.1.split-sync-scroll
 - `[data-testid="code-workspace-split-right"]` — interactive [optional] — F25.1.split-right
+- `[data-testid="code-workspace-quick-doc-resize-handle"]` — interactive [optional] — F25.1.quick-doc-resize-handle
+- `[data-testid="debug-split-resize-handle"]` — interactive [optional] — F25.1.debug-split-resize-handle
 - `[data-testid="workspace-keymap-settings-dialog"]` — display [optional] — F25.1.keymap-settings-dialog
 - `[data-testid="references-show-more"]` — interactive [optional] — F25.1.references-panel-show-more
 - `[data-testid="references-pin-toggle"]` — interactive [optional] — F25.1.references-pin-toggle
@@ -534,8 +555,8 @@
 - `[data-testid="analysis-baseline-export"]` — interactive [optional] — F25.2.analysis-baseline-export
 - `[data-testid="analysis-baseline-clear"]` — interactive [optional] — F25.2.analysis-baseline-clear
 - `[data-testid="analysis-inspection-suppressions"]` — display — F25.2.analysis-inspection-suppressions
-- `[data-testid="context-menu-item-suppress-for-line"]` — interactive [optional] — F25.2.problems-suppress-line
-- `[data-testid="context-menu-item-suppress-for-file"]` — interactive [optional] — F25.2.problems-suppress-file
+- `[data-testid="context-menu-item-hide-this-diagnostic-locally-line"]` — interactive [optional] — F25.2.problems-suppress-line
+- `[data-testid="context-menu-item-hide-this-diagnostic-locally-whole-file"]` — interactive [optional] — F25.2.problems-suppress-file
 - `[data-testid="context-menu-item-add-to-inspection-baseline"]` — interactive [optional] — F25.2.problems-add-baseline
 - `[data-testid="analysis-data-flow"]` — display — F25.2.analysis-data-flow
 - `[data-testid="references-semantic-index"]` — display [optional] — F25.2.references-semantic-index
@@ -1320,12 +1341,14 @@
 - `[data-testid="terminal-appearance-settings"]` — display — F5.2.appearance-root
 - `[data-testid="terminal-theme-select"]` — interactive — F5.2.theme-select
 - `[data-testid^="terminal-theme-option-"]` — interactive [optional] — F5.2.theme-options
+  ↳ `[data-testid="terminal-theme-option-kanagawa-wave"]` — alias
 - `[data-testid="terminal-context-set-local-default-theme"]` — interactive [optional] — F5.2.local-default-theme
 - `[data-testid^="terminal-context-theme-option-"]` — interactive [optional] — F5.2.context-theme-options
 - `[data-testid="terminal-preview"]` — display — F5.2.preview
 - `[data-testid="terminal-preview-cursor"]` — display — F5.2.preview-cursor
 - `input[aria-label="Terminal font size"]` — interactive — F5.2.font-size
-- `select[aria-label="Terminal font"]` — interactive — F5.2.font-family
+- `[role="combobox"][aria-label="Terminal font"]` — interactive — F5.2.font-family
+- `[role="listbox"] button[role="option"]` — interactive [optional] — F5.2.font-options
 - `button[aria-label="Decrease text size"]` — interactive — F5.2.font-size-decrease
 - `button[aria-label="Increase text size"]` — interactive — F5.2.font-size-increase
 - `input[aria-label="Enable font ligatures"]` — interactive — F5.2.font-ligatures-toggle

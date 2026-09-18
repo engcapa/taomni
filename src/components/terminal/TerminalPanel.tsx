@@ -3660,6 +3660,7 @@ export function TerminalPanel({
     <div
       ref={panelRef}
       data-testid="terminal-pane"
+      data-terminal-active={activeForShortcuts || undefined}
       data-input-locked={inputLocked || undefined}
       className={panelClasses}
       style={{

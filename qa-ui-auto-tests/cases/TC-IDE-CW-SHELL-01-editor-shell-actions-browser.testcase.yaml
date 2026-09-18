@@ -1,0 +1,113 @@
+id: TC-IDE-CW-SHELL-01-editor-shell-actions-browser
+title: "Code Workspace editor shell actions and unavailable diagnostics"
+description: |
+  Browser regression for editor-shell actions that do not require a native
+  provider or OS filesystem. It verifies file-encoding reload, clipboard
+  history filtering and close, New Java Class kind/cancel routing, and the
+  explicit no-provider diagnostic navigation state. The final Configure
+  Inspections action proves the shared Language Servers settings owner; it
+  does not claim provider-backed diagnostics.
+covers: [F25.5]
+tags: [code-workspace, editor-shell, encoding, clipboard, highlighting, browser-gate, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 240
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-tools"]'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - click: '[data-testid="code-workspace-tree-add-folder"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+
+  # A file that is clean can be reloaded through the status-bar encoding owner.
+  - click: '[data-testid="status-bar-workspace-encoding"]'
+  - wait_for: '[data-testid="file-encoding-dialog"]'
+  - assert_enabled: '[data-testid="file-encoding-reload"]'
+  - click: '[data-testid="file-encoding-reload"]'
+  - wait_for:
+      selector: '[data-testid="file-encoding-dialog"]'
+      state: detached
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Reloaded"
+
+  # Clipboard history owns its own searchable listbox. Filter to a known entry,
+  # verify the empty result state, then close through the explicit button.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press:
+      key: Mod+Home
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+  - press:
+      key: Mod+a
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+  - press:
+      key: Mod+c
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+  - press:
+      key: Mod+Shift+v
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+  - wait_for: '[data-testid="clipboard-history-popup"]'
+  - fill:
+      selector: '[data-testid="clipboard-history-search"]'
+      value: "Browser preview"
+  - wait_for: '[data-testid="clipboard-history-entry-0"]'
+  - fill:
+      selector: '[data-testid="clipboard-history-search"]'
+      value: "no entry should match this"
+  - wait_for: '[data-testid="clipboard-history-empty"]'
+  - fill:
+      selector: '[data-testid="clipboard-history-search"]'
+      value: "Browser preview"
+  - wait_for: '[data-testid="clipboard-history-entry-0"]'
+  - press:
+      key: Escape
+      selector: '[data-testid="clipboard-history-search"]'
+  - press:
+      key: ArrowRight
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+  - press:
+      key: Mod+Shift+v
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+  - wait_for: '[data-testid="clipboard-history-popup"]'
+  - click: '[data-testid="clipboard-history-close"]'
+  - assert_not_visible: '[data-testid="clipboard-history-popup"]'
+
+  # New Java Class is a renderer-owned dialog even when the browser provider is
+  # unavailable. Exercise a non-default kind and the cancellation boundary.
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: New Java Class...
+  - press: Enter
+  - wait_for: '[data-testid="new-java-class-dialog"]'
+  - select_option:
+      selector: '[data-testid="new-java-class-kind-select"]'
+      value: interface
+  - assert_attribute:
+      selector: '[data-testid="new-java-class-kind-select"]'
+      name: value
+      equals: interface
+  - click: '[data-testid="new-java-class-cancel"]'
+  - wait_for:
+      selector: '[data-testid="new-java-class-dialog"]'
+      state: detached
+
+  # Browser preview has no language server. The navigation controls must be
+  # present but disabled, while Configure Inspections routes to the shared
+  # Language Servers settings surface.
+  - wait_for: '[data-testid="code-workspace-highlighting-widget"]'
+  - assert_disabled: '[data-testid="highlighting-widget-prev-error"]'
+  - assert_disabled: '[data-testid="highlighting-widget-next-error"]'
+  - click: '[data-testid="highlighting-widget-level-button"]'
+  - wait_for: '[data-testid="highlighting-widget-open-settings"]'
+  - click: '[data-testid="highlighting-widget-open-settings"]'
+  - wait_for: '[data-testid="language-servers-settings"]'
+  - screenshot: tc-ide-cw-shell-01-editor-shell-actions.png

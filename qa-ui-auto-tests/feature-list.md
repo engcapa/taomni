@@ -1128,6 +1128,8 @@ controls:
     selector: '[data-testid^="terminal-theme-option-"]'
     kind: interactive
     optional: true       # only visible while the preview dropdown is open
+    aliases:
+      - '[data-testid="terminal-theme-option-kanagawa-wave"]'
   - id: local-default-theme
     selector: '[data-testid="terminal-context-set-local-default-theme"]'
     kind: interactive
@@ -1147,8 +1149,12 @@ controls:
     selector: 'input[aria-label="Terminal font size"]'
     kind: interactive
   - id: font-family
-    selector: 'select[aria-label="Terminal font"]'
+    selector: '[role="combobox"][aria-label="Terminal font"]'
     kind: interactive
+  - id: font-options
+    selector: '[role="listbox"] button[role="option"]'
+    kind: interactive
+    optional: true       # only while the custom font picker is open
   - id: font-size-decrease
     selector: 'button[aria-label="Decrease text size"]'
     kind: interactive
@@ -5135,6 +5141,10 @@ controls:
     selector: '[data-testid="code-workspace-bottom-dock-resize"]'
     kind: interactive
     optional: true
+  - id: project-resize-handle
+    selector: '[data-testid="code-workspace-project-resize-handle"]'
+    kind: interactive
+    optional: true       # mounted while the project tree pane is open
   - id: run-tab
     selector: '[data-testid="code-workspace-bottom-tab-run"]'
     kind: interactive
@@ -5155,6 +5165,10 @@ controls:
     selector: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
     kind: display
     optional: true       # mounted while the overflow dropdown is open
+  - id: bottom-tab-overflow-build
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-build"]'
+    kind: interactive
+    optional: true       # Build entry inside the overflow dropdown
   - id: bottom-tab-overflow-tests
     selector: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
     kind: interactive
@@ -5186,6 +5200,14 @@ controls:
     selector: '[data-testid^="run-panel-configuration-run:"]'
     kind: interactive
     optional: true       # requires a language fixture with a detected run target
+  - id: run-configuration-java-main
+    selector: '[data-testid^="run-panel-configuration-java-main:"]'
+    kind: interactive
+    optional: true       # requires a Java source file with a discovered main class
+  - id: run-configurations-root
+    selector: '[data-testid^="run-panel-configurations-"]'
+    kind: display
+    optional: true       # rendered for each workspace root with execution targets
   - id: run-configuration-edit
     selector: '[data-testid^="run-panel-configuration-edit-run:"]'
     kind: interactive
@@ -5291,6 +5313,14 @@ controls:
     selector: '[data-testid^="tests-result-"]'
     kind: display
     optional: true       # requires a Surefire/Failsafe/Gradle JUnit report
+  - id: tests-item
+    selector: '[data-testid^="tests-item-"]'
+    kind: display
+    optional: true       # rendered after provider-backed Java test discovery
+  - id: tests-run
+    selector: '[data-testid^="tests-run-"]'
+    kind: interactive
+    optional: true       # rendered for each discovered test target
   - id: tests-rerun
     selector: '[data-testid^="tests-rerun-"]'
     kind: interactive
@@ -5765,6 +5795,14 @@ controls:
     selector: '[data-testid="code-workspace-split-right"]'
     kind: interactive
     optional: true       # rendered on the editor toolbar; enabled with an open buffer
+  - id: quick-doc-resize-handle
+    selector: '[data-testid="code-workspace-quick-doc-resize-handle"]'
+    kind: interactive
+    optional: true       # mounted only while Quick Documentation is open
+  - id: debug-split-resize-handle
+    selector: '[data-testid="debug-split-resize-handle"]'
+    kind: interactive
+    optional: true       # mounted only while a live debugger session has a dual-column view
   - id: keymap-settings-dialog
     selector: '[data-testid="workspace-keymap-settings-dialog"]'
     kind: display
@@ -5876,8 +5914,8 @@ controls:
     optional: true       # tree view container used by template flows
   - id: new-java-class-package
     selector: '[data-testid="new-java-class-package"]'
-    kind: interactive
-    optional: true       # package input inside the New Java Class dialog
+    kind: display
+    optional: true       # derived package summary inside the New Java Class dialog
   - id: new-java-class-submit
     selector: '[data-testid="new-java-class-submit"]'
     kind: interactive
@@ -6100,6 +6138,10 @@ controls:
     selector: '[data-testid="code-workspace-tree-new-file"]'
     kind: interactive
     optional: true       # enabled when a workspace root is available
+  - id: tree-new-directory
+    selector: '[data-testid="code-workspace-tree-new-directory"]'
+    kind: interactive
+    optional: true       # enabled when a workspace root/directory is selected
   - id: search-everywhere
     selector: '[data-testid="code-workspace-search-everywhere"]'
     kind: display
@@ -6328,6 +6370,10 @@ controls:
     selector: '[data-testid="problems-full-project-note"]'
     kind: display
     optional: true       # "On-the-fly diagnostics only" honest gate note
+  - id: problems-diagnostic-row
+    selector: '[data-testid="problems-diagnostic-row"]'
+    kind: interactive
+    optional: true       # rendered when a provider diagnostic is available
   - id: keymap-settings-close
     selector: '[data-testid="keymap-settings-close"]'
     kind: interactive
@@ -6336,6 +6382,10 @@ controls:
     selector: '[data-testid="clipboard-history-popup"]'
     kind: display
     optional: true       # §8.19.5 Clipboard history ring popup
+  - id: clipboard-history-empty
+    selector: '[data-testid="clipboard-history-empty"]'
+    kind: display
+    optional: true       # filtered or cleared history state
   - id: clipboard-history-search
     selector: '[data-testid="clipboard-history-search"]'
     kind: interactive
@@ -6511,6 +6561,12 @@ controls:
     selector: '[data-testid="file-template-settings-dialog"]'
     kind: display
     optional: true
+  - id: file-template-tab
+    selector: '[data-testid^="file-template-tab-"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="file-template-tab-interface"]'
   - id: file-template-close-button
     selector: '[data-testid="file-template-close-button"]'
     kind: interactive
@@ -6537,10 +6593,6 @@ controls:
     optional: true
   - id: new-java-class-kind-select
     selector: '[data-testid="new-java-class-kind-select"]'
-    kind: interactive
-    optional: true
-  - id: new-java-class-confirm
-    selector: '[data-testid="new-java-class-confirm"]'
     kind: interactive
     optional: true
   - id: new-java-class-cancel
@@ -6613,11 +6665,11 @@ controls:
     selector: '[data-testid="analysis-inspection-suppressions"]'
     kind: display
   - id: problems-suppress-line
-    selector: '[data-testid="context-menu-item-suppress-for-line"]'
+    selector: '[data-testid="context-menu-item-hide-this-diagnostic-locally-line"]'
     kind: interactive
     optional: true       # requires a provider diagnostic in Problems
   - id: problems-suppress-file
-    selector: '[data-testid="context-menu-item-suppress-for-file"]'
+    selector: '[data-testid="context-menu-item-hide-this-diagnostic-locally-whole-file"]'
     kind: interactive
     optional: true       # requires a provider diagnostic in Problems
   - id: problems-add-baseline
@@ -6760,6 +6812,22 @@ controls:
     selector: '[data-testid="workspace-editor-appearance-apply"]'
     kind: interactive
     optional: true
+  - id: appearance-clipboard-history-enabled
+    selector: '[data-testid="workspace-editor-appearance-clipboard-history-enabled"]'
+    kind: interactive
+    optional: true
+  - id: appearance-clipboard-max-items
+    selector: '[data-testid="workspace-editor-appearance-clipboard-max-items"]'
+    kind: interactive
+    optional: true
+  - id: appearance-clipboard-max-bytes
+    selector: '[data-testid="workspace-editor-appearance-clipboard-max-bytes"]'
+    kind: interactive
+    optional: true
+  - id: appearance-clipboard-clear
+    selector: '[data-testid="workspace-editor-appearance-clipboard-clear"]'
+    kind: interactive
+    optional: true
   - id: intelligence-dialog
     selector: '[data-testid="workspace-intelligence-settings-dialog"]'
     kind: display
@@ -6807,6 +6875,24 @@ controls:
   - id: keymap-cheatsheet
     selector: '[data-testid="keymap-cheatsheet-dialog"]'
     kind: display
+    optional: true
+  - id: keymap-search-input
+    selector: '[data-testid="keymap-search-input"]'
+    kind: interactive
+    optional: true
+  - id: keymap-category
+    selector: '[data-testid^="keymap-category-"]'
+    kind: interactive
+    optional: true
+  - id: keymap-item
+    selector: '[data-testid^="keymap-item-"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="keymap-item-workspace.renameSymbol"]'
+  - id: keymap-cheatsheet-footer-close
+    selector: '[data-testid="keymap-cheatsheet-footer-close"]'
+    kind: interactive
     optional: true
   - id: context-cut
     selector: '[data-testid="editor-context-cut"]'

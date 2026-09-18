@@ -32,8 +32,22 @@ steps:
   - wait_for: '[data-testid="auto-import-on-the-fly-checkbox"]'
   - wait_for: '[data-testid="auto-import-paste-mode-select"]'
   - click: '[data-testid="auto-import-on-the-fly-checkbox"]'
+  - click: '[data-testid="auto-import-optimize-on-the-fly-checkbox"]'
+  - select_option:
+      selector: '[data-testid="auto-import-paste-mode-select"]'
+      value: all
+  - assert_attribute:
+      selector: '[data-testid="auto-import-paste-mode-select"]'
+      name: value
+      equals: all
+  - click: '[data-testid="auto-import-reset-button"]'
+  - eval_readonly:
+      expression: '!document.querySelector("[data-testid" + String.fromCharCode(61) + "\"auto-import-optimize-on-the-fly-checkbox\"]")?.checked && document.querySelector("[data-testid" + String.fromCharCode(61) + "\"auto-import-paste-mode-select\"]")?.value === "ask"'
+      expect_truthy: true
   - click: '[data-testid="auto-import-save-button"]'
-  - wait: 0.2
+  - assert_text:
+      selector: '[data-testid="auto-import-settings-dialog"]'
+      contains: "Settings saved!"
   - click: '[data-testid="auto-import-close-button"]'
   - wait: 0.2
   - screenshot: tc-ide-c8-05-auto-import-settings.png
