@@ -7590,6 +7590,263 @@ describe("CodeWorkspaceTab", () => {
     );
   });
 
+  it("waits for a pending Java didChange before go-to-definition requests", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-definition-sync-barrier",
+      workspaceInstanceId: "instance-definition-sync-barrier",
+      name: "Definition sync barrier",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Main.java" },
+    };
+    const source = "class Main { void target() {} void call() { target(); } }\n";
+    const status = documentStatus({
+      path: "/repo/app/src/Main.java",
+      uri: "file:///repo/app/src/Main.java",
+      presetId: "java",
+      languageId: "java",
+      displayName: "Java",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ definition: true }),
+    });
+    const target = {
+      uri: "file:///repo/app/src/Main.java",
+      path: "/repo/app/src/Main.java",
+      range: { start: { line: 0, character: 19 }, end: { line: 0, character: 25 } },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Main.java", source));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDefinition.mockResolvedValue({ status, locations: [target] });
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/Main.java");
+    const fileKey = "root:app:src/Main.java";
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-definition-sync-barrier")
+        .lspFiles[fileKey]?.syncedText,
+    ).toBe(source));
+    await waitFor(() => expect(registrationRef.current?.items.find(
+      (item) => item.id === "workspace.gotoDefinition",
+    )?.enabled).toBe(true));
+
+    let releaseFirstChange!: () => void;
+    let changeCalls = 0;
+    lspMocks.lspChangeDocument.mockImplementation(() => {
+      changeCalls += 1;
+      if (changeCalls === 1) {
+        return new Promise((resolve) => {
+          releaseFirstChange = () => resolve(status);
+        });
+      }
+      return Promise.resolve(status);
+    });
+
+    const content = document.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+    const editedSource = `${source}// edited after completion\n`;
+    act(() => {
+      view!.dispatch({
+        changes: { from: view!.state.doc.length, insert: "// edited after completion\n" },
+        userEvent: "input.type",
+      });
+    });
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-definition-sync-barrier")
+        .openFiles[fileKey]?.text,
+    ).toBe(editedSource));
+    await waitFor(() => expect(changeCalls).toBe(1), { timeout: 2_000 });
+
+    await act(async () => {
+      await registrationRef.current?.executeAction("workspace.gotoDefinition");
+      await Promise.resolve();
+    });
+    expect(lspMocks.lspDefinition).not.toHaveBeenCalled();
+
+    await act(async () => {
+      releaseFirstChange();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(changeCalls).toBe(2));
+    await waitFor(() => expect(lspMocks.lspDefinition).toHaveBeenCalledWith(
+      expect.objectContaining({ filePath: "src/Main.java" }),
+      expect.anything(),
+      expect.objectContaining({ signal: expect.anything() }),
+    ));
+  });
+
+  it("applies the same sync barrier to Quick Definition and reports a retryable failure", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-quick-definition-sync-barrier",
+      workspaceInstanceId: "instance-quick-definition-sync-barrier",
+      name: "Quick Definition sync barrier",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Main.java" },
+    };
+    const source = "class Main { void target() {} void call() { target(); } }\n";
+    const status = documentStatus({
+      path: "/repo/app/src/Main.java",
+      uri: "file:///repo/app/src/Main.java",
+      presetId: "java",
+      languageId: "java",
+      displayName: "Java",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ definition: true }),
+    });
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Main.java", source));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDefinition.mockResolvedValue({ status, locations: [] });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/Main.java");
+    const fileKey = "root:app:src/Main.java";
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-quick-definition-sync-barrier")
+        .lspFiles[fileKey]?.syncedText,
+    ).toBe(source));
+
+    lspMocks.lspChangeDocument.mockRejectedValue(new Error("didChange transport failed"));
+    const content = document.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+    act(() => {
+      view!.dispatch({
+        changes: { from: view!.state.doc.length, insert: "// unsynchronized\n" },
+        userEvent: "input.type",
+      });
+    });
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-quick-definition-sync-barrier")
+        .openFiles[fileKey]?.text,
+    ).toContain("// unsynchronized"));
+    await waitFor(() => expect(lspMocks.lspChangeDocument).toHaveBeenCalled());
+
+    fireEvent.keyDown(window, { key: "i", code: "KeyI", ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+      "Definition navigation requires the language server to finish synchronizing current editor buffers",
+    ), { timeout: 3_000 });
+    expect(lspMocks.lspDefinition).not.toHaveBeenCalled();
+  });
+
+  it("applies the sync barrier to declaration, type definition, and implementation navigation", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-semantic-navigation-sync-barrier",
+      workspaceInstanceId: "instance-semantic-navigation-sync-barrier",
+      name: "Semantic navigation sync barrier",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Main.java" },
+    };
+    const source = "interface Service { void call(); }\nclass Main implements Service { public void call() {} }\n";
+    const status = documentStatus({
+      path: "/repo/app/src/Main.java",
+      uri: "file:///repo/app/src/Main.java",
+      presetId: "java",
+      languageId: "java",
+      displayName: "Java",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({
+        declaration: true,
+        typeDefinition: true,
+        implementation: true,
+      }),
+    });
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Main.java", source));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDeclaration.mockResolvedValue({ status, locations: [] });
+    lspMocks.lspTypeDefinition.mockResolvedValue({ status, locations: [] });
+    lspMocks.lspImplementation.mockResolvedValue({ status, locations: [] });
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/Main.java");
+    const fileKey = "root:app:src/Main.java";
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-semantic-navigation-sync-barrier")
+        .lspFiles[fileKey]?.syncedText,
+    ).toBe(source));
+    for (const commandId of [
+      "workspace.gotoDeclaration",
+      "workspace.gotoTypeDefinition",
+      "workspace.gotoImplementation",
+    ]) {
+      await waitFor(() => expect(registrationRef.current?.items.find((item) => item.id === commandId)?.enabled).toBe(true));
+    }
+
+    const content = document.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+    let changeCalls = 0;
+    let blockedCall = 0;
+    let releaseBlocked: (() => void) | null = null;
+    lspMocks.lspChangeDocument.mockImplementation(() => {
+      changeCalls += 1;
+      if (changeCalls === blockedCall) {
+        return new Promise((resolve) => {
+          releaseBlocked = () => resolve(status);
+        });
+      }
+      return Promise.resolve(status);
+    });
+
+    const providerByCommand = {
+      "workspace.gotoDeclaration": lspMocks.lspDeclaration,
+      "workspace.gotoTypeDefinition": lspMocks.lspTypeDefinition,
+      "workspace.gotoImplementation": lspMocks.lspImplementation,
+    } as const;
+    for (const [index, commandId] of [
+      "workspace.gotoDeclaration",
+      "workspace.gotoTypeDefinition",
+      "workspace.gotoImplementation",
+    ].entries()) {
+      const provider = providerByCommand[commandId as keyof typeof providerByCommand];
+      provider.mockClear();
+      blockedCall = changeCalls + 1;
+      act(() => {
+        view!.dispatch({
+          changes: { from: view!.state.doc.length, insert: `// semantic edit ${index}\n` },
+          userEvent: "input.type",
+        });
+      });
+      await waitFor(() => expect(changeCalls).toBe(blockedCall), { timeout: 2_000 });
+
+      await act(async () => {
+        registrationRef.current?.executeAction(commandId);
+        await Promise.resolve();
+      });
+      expect(provider).not.toHaveBeenCalled();
+
+      await act(async () => {
+        releaseBlocked?.();
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(changeCalls).toBe(blockedCall + 1));
+      await waitFor(() => expect(provider, commandId).toHaveBeenCalled(), { timeout: 3_000 });
+    }
+  });
+
   it("ingests workspace test coverage report and renders coverage dock panel", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

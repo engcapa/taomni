@@ -144,6 +144,72 @@ describe("§8.22.9 U4 WorkspaceSemanticQueryHost", () => {
   });
 
   describe("§ED-QUERY-001: Semantic Query Envelope, Four-Phase Live Guards & Multi-Tier Cancel", () => {
+    it("keeps a stable definition result when the pinned project generation is unchanged", async () => {
+      const host = new WorkspaceSemanticQueryHost();
+      const location = {
+        uri: "file:///workspace/src/Target.java",
+        path: "/workspace/src/Target.java",
+        range: { start: { line: 4, character: 0 }, end: { line: 4, character: 6 } },
+      };
+      const result = await host.executeEnvelope({
+        kind: "definitions",
+        identity: {
+          workspaceId: "ws-java",
+          fileKey: "src/Main.java",
+          uri: "file:///workspace/src/Main.java",
+          position: { line: 8, character: 11 },
+          documentRevision: 12,
+          lspSessionGeneration: 3,
+          projectGeneration: 9,
+          requestId: "definition-stable",
+        },
+        fetcher: async () => [location],
+        guards: {
+          getLiveDocumentRevision: () => 12,
+          getLiveLspGeneration: () => 3,
+          getLiveProjectGeneration: () => 9,
+          guardDelivery: () => true,
+        },
+      });
+
+      expect(result.status).toBe("success");
+      expect(result.items).toEqual([location]);
+      expect(result.identity).toMatchObject({
+        documentRevision: 12,
+        lspSessionGeneration: 3,
+        projectGeneration: 9,
+      });
+    });
+
+    it("rejects a definition response when project facts change during the request", async () => {
+      const host = new WorkspaceSemanticQueryHost();
+      let projectGeneration = 4;
+      const result = await host.executeEnvelope({
+        kind: "definitions",
+        identity: {
+          workspaceId: "ws-java",
+          fileKey: "src/Main.java",
+          uri: "file:///workspace/src/Main.java",
+          position: { line: 8, character: 11 },
+          documentRevision: 12,
+          lspSessionGeneration: 3,
+          projectGeneration,
+        },
+        fetcher: async () => {
+          projectGeneration = 5;
+          return [{ uri: "file:///workspace/src/Target.java" }];
+        },
+        guards: {
+          getLiveDocumentRevision: () => 12,
+          getLiveLspGeneration: () => 3,
+          getLiveProjectGeneration: () => projectGeneration,
+        },
+      });
+
+      expect(result.status).toBe("stale");
+      expect(result.items).toEqual([]);
+    });
+
     it("passes complete semantic query envelope context to fetcher", async () => {
       const host = new WorkspaceSemanticQueryHost();
       let capturedContext: any = null;

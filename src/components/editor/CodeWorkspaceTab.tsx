@@ -16346,18 +16346,52 @@ export function CodeWorkspaceTab({
     return true;
   }, [openLspLocation, recordNavigationLocation, setStatusMessage]);
 
+  /**
+   * Resolve the live buffer used by semantic location navigation. CodeMirror
+   * edits are published to the language server on a short debounce, so an
+   * explicit definition/declaration/type/implementation request can otherwise
+   * race the pending didChange and ask jdtls to resolve a stale document.
+   * Library buffers are virtual server documents and deliberately bypass this
+   * barrier; their descriptor already points at the originating workspace
+   * document.
+   */
+  const prepareSemanticNavigationRequest = useCallback(async (
+    file: OpenFileState,
+  ): Promise<{ file: OpenFileState; descriptor: LspDocumentDescriptor } | null> => {
+    const live = openFilesRef.current[file.key] ?? file;
+    if (live.library) {
+      const descriptor = lspDescriptorForFile(live);
+      return descriptor ? { file: live, descriptor } : null;
+    }
+
+    const lspState = lspFilesRef.current[live.key];
+    if (lspState?.status?.active) {
+      const synchronized = await ensureLspDocumentSynced(live.key, true);
+      if (!synchronized) {
+        setStatusMessage("Definition navigation requires the language server to finish synchronizing current editor buffers");
+        return null;
+      }
+      const descriptor = lspDescriptorForFile(synchronized);
+      return descriptor ? { file: synchronized, descriptor } : null;
+    }
+
+    const descriptor = lspDescriptorForFile(live);
+    return descriptor ? { file: live, descriptor } : null;
+  }, [ensureLspDocumentSynced, lspDescriptorForFile, setStatusMessage]);
+
   const goToDefinition = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return false;
+      const prepared = await prepareSemanticNavigationRequest(file);
+      if (!prepared) return false;
+      const { file: live, descriptor } = prepared;
       try {
-        const query = beginSemanticQuery("definitions", file, descriptor, position);
+        const query = beginSemanticQuery("definitions", live, descriptor, position);
         const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
           kind: "definitions",
           identity: query.identity,
           fetcher: async ({ signal }) => {
             const result = await lspDefinition(descriptor, position, query.lspOptions(signal));
-            updateLspStatusForFile(file, result.status);
+            updateLspStatusForFile(live, result.status);
             return semanticLocationsFromResult(result);
           },
           guards: query.guards,
@@ -16375,28 +16409,29 @@ export function CodeWorkspaceTab({
           queryRes.items,
           "No definition found",
           query.isCurrent,
-          { file, ref: file.ref, position },
+          { file: live, ref: live.ref, position },
         );
       } catch (err) {
         setStatusMessage(errorMessage(err));
         return false;
       }
     },
-    [beginSemanticQuery, lspDescriptorForFile, navigateLocations, recordNavigationLocation, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
 
   const peekDefinition = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return false;
+      const prepared = await prepareSemanticNavigationRequest(file);
+      if (!prepared) return false;
+      const { file: live, descriptor } = prepared;
       try {
-        const query = beginSemanticQuery("definitions", file, descriptor, position);
+        const query = beginSemanticQuery("definitions", live, descriptor, position);
         const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
           kind: "definitions",
           identity: query.identity,
           fetcher: async ({ signal }) => {
             const result = await lspDefinition(descriptor, position, query.lspOptions(signal));
-            updateLspStatusForFile(file, result.status);
+            updateLspStatusForFile(live, result.status);
             return semanticLocationsFromResult(result);
           },
           guards: query.guards,
@@ -16421,26 +16456,27 @@ export function CodeWorkspaceTab({
         return false;
       }
     },
-    [beginSemanticQuery, lspDescriptorForFile, setLocationPeek, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, prepareSemanticNavigationRequest, setLocationPeek, setStatusMessage, updateLspStatusForFile],
   );
 
   const goToDeclaration = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return false;
-      const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+      const prepared = await prepareSemanticNavigationRequest(file);
+      if (!prepared) return false;
+      const { file: live, descriptor } = prepared;
+      const caps = lspFilesRef.current[live.key]?.status?.capabilities;
       if (caps && caps.declaration === false) {
         setStatusMessage("Go to declaration is not supported by this language server");
         return false;
       }
       try {
-        const query = beginSemanticQuery("declarations", file, descriptor, position);
+        const query = beginSemanticQuery("declarations", live, descriptor, position);
         const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
           kind: "declarations",
           identity: query.identity,
           fetcher: async ({ signal }) => {
             const result = await lspDeclaration(descriptor, position, query.lspOptions(signal));
-            updateLspStatusForFile(file, result.status);
+            updateLspStatusForFile(live, result.status);
             return semanticLocationsFromResult(result);
           },
           guards: query.guards,
@@ -16458,33 +16494,34 @@ export function CodeWorkspaceTab({
           queryRes.items,
           "No declaration found",
           query.isCurrent,
-          { file, ref: file.ref, position },
+          { file: live, ref: live.ref, position },
         );
       } catch (err) {
         setStatusMessage(errorMessage(err));
         return false;
       }
     },
-    [beginSemanticQuery, lspDescriptorForFile, navigateLocations, recordNavigationLocation, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
 
   const goToTypeDefinition = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return false;
-      const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+      const prepared = await prepareSemanticNavigationRequest(file);
+      if (!prepared) return false;
+      const { file: live, descriptor } = prepared;
+      const caps = lspFilesRef.current[live.key]?.status?.capabilities;
       if (caps && !caps.typeDefinition) {
         setStatusMessage("Type definition is not supported by this language server");
         return false;
       }
       try {
-        const query = beginSemanticQuery("typeDefinitions", file, descriptor, position);
+        const query = beginSemanticQuery("typeDefinitions", live, descriptor, position);
         const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
           kind: "typeDefinitions",
           identity: query.identity,
           fetcher: async ({ signal }) => {
             const result = await lspTypeDefinition(descriptor, position, query.lspOptions(signal));
-            updateLspStatusForFile(file, result.status);
+            updateLspStatusForFile(live, result.status);
             return semanticLocationsFromResult(result);
           },
           guards: query.guards,
@@ -16502,33 +16539,34 @@ export function CodeWorkspaceTab({
           queryRes.items,
           "No type definition found",
           query.isCurrent,
-          { file, ref: file.ref, position },
+          { file: live, ref: live.ref, position },
         );
       } catch (err) {
         setStatusMessage(errorMessage(err));
         return false;
       }
     },
-    [beginSemanticQuery, lspDescriptorForFile, navigateLocations, recordNavigationLocation, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
 
   const goToImplementation = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return false;
-      const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+      const prepared = await prepareSemanticNavigationRequest(file);
+      if (!prepared) return false;
+      const { file: live, descriptor } = prepared;
+      const caps = lspFilesRef.current[live.key]?.status?.capabilities;
       if (caps && !caps.implementation) {
         setStatusMessage("Go to implementation is not supported by this language server");
         return false;
       }
       try {
-        const query = beginSemanticQuery("implementations", file, descriptor, position);
+        const query = beginSemanticQuery("implementations", live, descriptor, position);
         const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
           kind: "implementations",
           identity: query.identity,
           fetcher: async ({ signal }) => {
             const result = await lspImplementation(descriptor, position, query.lspOptions(signal));
-            updateLspStatusForFile(file, result.status);
+            updateLspStatusForFile(live, result.status);
             return semanticLocationsFromResult(result);
           },
           guards: query.guards,
@@ -16546,14 +16584,14 @@ export function CodeWorkspaceTab({
           queryRes.items,
           "No implementation found",
           query.isCurrent,
-          { file, ref: file.ref, position },
+          { file: live, ref: live.ref, position },
         );
       } catch (err) {
         setStatusMessage(errorMessage(err));
         return false;
       }
     },
-    [beginSemanticQuery, lspDescriptorForFile, navigateLocations, recordNavigationLocation, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
   goToDefinitionRef.current = goToDefinition;
   peekDefinitionRef.current = peekDefinition;

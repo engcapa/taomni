@@ -1,0 +1,106 @@
+id: TC-IDE-C6-06-java-definition-realproject-native
+title: "Java definition navigation in the real Maven project"
+description: |
+  Reproduces Java definition navigation against the supplied Maven project.
+  The case is read-only: it opens JdbcDebugController.java, checks a same-file
+  field and an imported dependency through F12 and Ctrl+B, and keeps hover and
+  no-definition behavior observable. Set QA_JAVA_PROJECT_ROOT to the absolute
+  project path before running.
+covers: [F25.5]
+tags: [code-workspace, ide-c6, java, definition, regression, p0]
+modes: [native]
+fixtures: [reset_db]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-java-definition-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-real-java-definition","name":"clickhousecrud","roots":[{"id":"clickhousecrud","name":"clickhousecrud","path":"${env.QA_JAVA_PROJECT_ROOT}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"clickhousecrud","path":"src/main/java/com/ipinyou/db/clickhouse/controller/JdbcDebugController.java"},"lastOpenedAt":1789692000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${env.QA_JAVA_PROJECT_ROOT}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "class JdbcDebugController"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  # Exercise Ctrl+B first, before any F12 request can prime the document
+  # revision. This is the declaration path behind the Ctrl+B parity claim.
+  - press: Control+f
+  - fill:
+      selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+      value: clickHouseDataSource.getConnection
+  - press: Enter
+  - press: Escape
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+b"]
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "ClickHouseDataSource clickHouseDataSource"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-nav-back"]'
+  # F12 must agree with the first Ctrl+B result on the same selected symbol.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+f
+  - fill:
+      selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+      value: clickHouseDataSource.getConnection
+  - press: Enter
+  - press: Escape
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["F12"]
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "ClickHouseDataSource clickHouseDataSource"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-nav-back"]'
+  # Recheck the assignment/import reference with F12 after the parity pair.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+f
+  - fill:
+      selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+      value: clickHouseDataSource
+  - press: Enter
+  - press: Enter
+  - press: Enter
+  - press: Escape
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["F12"]
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "ClickHouseDataSource clickHouseDataSource"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-nav-back"]'
+  # JDK dependency reference: java.sql.Connection should resolve to a library
+  # buffer or attached source, never to an empty workspace result.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+f
+  - fill:
+      selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+      value: Connection conn
+  - press: Enter
+  - press: Escape
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["F12"]
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"]'
+      timeout_sec: 60
+  - eval_readonly:
+      expression: 'document.body.innerText.includes("decompiled") || document.body.innerText.includes("java.sql") || document.body.innerText.includes("Connection.java")'
+      expect_truthy: true
+  - screenshot: tc-ide-c6-06-real-java-definition.png

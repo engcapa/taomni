@@ -1,17 +1,16 @@
-id: TC-IDE-C6-02
-title: "Semantic query definition/references/hierarchy under jdtls"
+id: TC-IDE-C6-07-java-definition-unavailable-browser
+title: "Definition navigation fails closed without a browser language server"
 description: |
-  §8.19.10 gate case C6-02 (ED-QUERY-004). Capability ids:
-  query.definition / query.references / query.hierarchy / navigation.history.
-  Asserts real caret parameters, result session, open/reveal, history back,
-  in-flight query cancellation, and hierarchy tree expansion under jdtls.
-  Browser runs verify unavailable contract; native runs verify provider fixture.
-  Highest claim on green: L2 provider-backed (Linux).
+  Browser regression coverage for the Java definition path when the renderer
+  has no native language-server provider. Code Workspace must surface the
+  degraded-provider banner, keep F12 and Ctrl+B harmless, and never create an
+  empty library buffer. Provider-backed Java navigation is covered by the
+  native real-project cases.
 covers: [F25.5]
-tags: [code-workspace, ide-c6, query, definition, hierarchy, provider-fixture, p1]
+tags: [code-workspace, ide-c6, java, definition, browser-gate, p1]
 modes: [browser]
-fixtures: [reset_db, jdtls_required]
-timeout_sec: 300
+fixtures: [reset_db]
+timeout_sec: 180
 steps:
   - open: "${cfg.app.base_url}"
   - wait_for: '[data-testid="welcome-panel"]'
@@ -35,5 +34,4 @@ steps:
       selector: '[data-testid="code-workspace-editor-tab-strip"]'
       contains: "README.txt"
       timeout_sec: 10
-  - screenshot: tc-ide-c6-query-definition-browser-probe.png
-  - screenshot: tc-ide-c6-query-definition.png
+  - screenshot: tc-ide-c6-07-java-definition-unavailable-browser.png
