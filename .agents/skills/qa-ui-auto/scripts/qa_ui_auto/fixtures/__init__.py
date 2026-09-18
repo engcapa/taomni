@@ -38,6 +38,7 @@ from typing import Callable, Protocol
 
 from . import editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, jdtls_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, welcome_recents, workspace_root
 from . import project_tree
+from . import editor_save_race
 
 
 class FixtureContext(Protocol):
@@ -73,6 +74,7 @@ REGISTRY: dict[str, Fixture] = {
     "file_move_recovery_fixtures": Fixture("file_move_recovery_fixtures", file_move_recovery_fixtures.setup),
     "java_rename_deleted_fixtures": Fixture("java_rename_deleted_fixtures", java_rename_deleted_fixtures.setup),
     "view_state_fixtures": Fixture("view_state_fixtures", view_state_fixtures.setup),
+    "editor_save_race": Fixture("editor_save_race", editor_save_race.setup, editor_save_race.teardown),
 }
 
 

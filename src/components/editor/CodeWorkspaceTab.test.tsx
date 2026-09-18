@@ -44,6 +44,7 @@ import { EditorView } from "@codemirror/view";
 import { globalEditorConfigResolver } from "./workspace/editorConfigResolver";
 import { acquireClipboardStore, resetWorkspaceClipboardStores } from "./workspace/workspaceClipboardSession";
 import * as workspaceSearchModule from "../../lib/editor/workspaceSearch";
+import { installSaveRaceProbe, uninstallSaveRaceProbe } from "./workspace/saveRaceProbe";
 
 const workspaceMocks = vi.hoisted(() => ({
   workspaceListDir: vi.fn(),
@@ -403,6 +404,20 @@ function writeAck(
     atomicReplaceUsed: true,
     ...overrides,
   };
+}
+
+/** ED-PARITY-002 QA-only save-race gate installed by installSaveRaceProbe. */
+interface SaveRaceGateForTest {
+  arm(request: Record<string, unknown>): { ok: boolean; reason?: string };
+  status(): { held: null | { stage: string; transactionId: string } };
+  release(request?: { reason?: string }): { ok: boolean; reason?: string };
+  trace(): Array<{ event: string; revision?: number | null; detail?: Record<string, unknown> }>;
+}
+
+function saveRaceGate(): SaveRaceGateForTest {
+  const control = (window as unknown as { __taomniQaSaveGate?: SaveRaceGateForTest }).__taomniQaSaveGate;
+  if (!control) throw new Error("save race gate is not installed");
+  return control;
 }
 
 function entry(
@@ -7575,6 +7590,331 @@ describe("CodeWorkspaceTab", () => {
     );
   });
 
+  it("waits for a pending Java didChange before go-to-definition requests", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-definition-sync-barrier",
+      workspaceInstanceId: "instance-definition-sync-barrier",
+      name: "Definition sync barrier",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Main.java" },
+    };
+    const source = "class Main { void target() {} void call() { target(); } }\n";
+    const status = documentStatus({
+      path: "/repo/app/src/Main.java",
+      uri: "file:///repo/app/src/Main.java",
+      presetId: "java",
+      languageId: "java",
+      displayName: "Java",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ definition: true }),
+    });
+    const target = {
+      uri: "file:///repo/app/src/Main.java",
+      path: "/repo/app/src/Main.java",
+      range: { start: { line: 0, character: 19 }, end: { line: 0, character: 25 } },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Main.java", source));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDefinition.mockResolvedValue({ status, locations: [target] });
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/Main.java");
+    const fileKey = "root:app:src/Main.java";
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-definition-sync-barrier")
+        .lspFiles[fileKey]?.syncedText,
+    ).toBe(source));
+    await waitFor(() => expect(registrationRef.current?.items.find(
+      (item) => item.id === "workspace.gotoDefinition",
+    )?.enabled).toBe(true));
+
+    let releaseFirstChange!: () => void;
+    let changeCalls = 0;
+    lspMocks.lspChangeDocument.mockImplementation(() => {
+      changeCalls += 1;
+      if (changeCalls === 1) {
+        return new Promise((resolve) => {
+          releaseFirstChange = () => resolve(status);
+        });
+      }
+      return Promise.resolve(status);
+    });
+
+    const content = document.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+    const editedSource = `${source}// edited after completion\n`;
+    act(() => {
+      view!.dispatch({
+        changes: { from: view!.state.doc.length, insert: "// edited after completion\n" },
+        userEvent: "input.type",
+      });
+    });
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-definition-sync-barrier")
+        .openFiles[fileKey]?.text,
+    ).toBe(editedSource));
+    await waitFor(() => expect(changeCalls).toBe(1), { timeout: 2_000 });
+
+    await act(async () => {
+      await registrationRef.current?.executeAction("workspace.gotoDefinition");
+      await Promise.resolve();
+    });
+    expect(lspMocks.lspDefinition).not.toHaveBeenCalled();
+
+    await act(async () => {
+      releaseFirstChange();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(changeCalls).toBe(2));
+    await waitFor(() => expect(lspMocks.lspDefinition).toHaveBeenCalledWith(
+      expect.objectContaining({ filePath: "src/Main.java" }),
+      expect.anything(),
+      expect.objectContaining({ signal: expect.anything() }),
+    ));
+  });
+
+  it("applies the same sync barrier to Quick Definition and reports a retryable failure", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-quick-definition-sync-barrier",
+      workspaceInstanceId: "instance-quick-definition-sync-barrier",
+      name: "Quick Definition sync barrier",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Main.java" },
+    };
+    const source = "class Main { void target() {} void call() { target(); } }\n";
+    const status = documentStatus({
+      path: "/repo/app/src/Main.java",
+      uri: "file:///repo/app/src/Main.java",
+      presetId: "java",
+      languageId: "java",
+      displayName: "Java",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ definition: true }),
+    });
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Main.java", source));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDefinition.mockResolvedValue({ status, locations: [] });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/Main.java");
+    const fileKey = "root:app:src/Main.java";
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-quick-definition-sync-barrier")
+        .lspFiles[fileKey]?.syncedText,
+    ).toBe(source));
+
+    lspMocks.lspChangeDocument.mockRejectedValue(new Error("didChange transport failed"));
+    const content = document.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+    act(() => {
+      view!.dispatch({
+        changes: { from: view!.state.doc.length, insert: "// unsynchronized\n" },
+        userEvent: "input.type",
+      });
+    });
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-quick-definition-sync-barrier")
+        .openFiles[fileKey]?.text,
+    ).toContain("// unsynchronized"));
+    await waitFor(() => expect(lspMocks.lspChangeDocument).toHaveBeenCalled());
+
+    fireEvent.keyDown(window, { key: "i", code: "KeyI", ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+      "Definition navigation requires the language server to finish synchronizing current editor buffers",
+    ), { timeout: 3_000 });
+    expect(lspMocks.lspDefinition).not.toHaveBeenCalled();
+  });
+
+  it("applies the sync barrier to declaration, type definition, and implementation navigation", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-semantic-navigation-sync-barrier",
+      workspaceInstanceId: "instance-semantic-navigation-sync-barrier",
+      name: "Semantic navigation sync barrier",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Main.java" },
+    };
+    const source = "interface Service { void call(); }\nclass Main implements Service { public void call() {} }\n";
+    const status = documentStatus({
+      path: "/repo/app/src/Main.java",
+      uri: "file:///repo/app/src/Main.java",
+      presetId: "java",
+      languageId: "java",
+      displayName: "Java",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({
+        definition: true,
+        declaration: true,
+        typeDefinition: true,
+        implementation: true,
+      }),
+    });
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Main.java", source));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDefinition.mockResolvedValue({ status, locations: [] });
+    lspMocks.lspDeclaration.mockResolvedValue({ status, locations: [] });
+    lspMocks.lspTypeDefinition.mockResolvedValue({ status, locations: [] });
+    lspMocks.lspImplementation.mockResolvedValue({ status, locations: [] });
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/Main.java");
+    const fileKey = "root:app:src/Main.java";
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-semantic-navigation-sync-barrier")
+        .lspFiles[fileKey]?.syncedText,
+    ).toBe(source));
+    for (const commandId of [
+      "workspace.gotoDeclaration",
+      "workspace.gotoTypeDefinition",
+      "workspace.gotoImplementation",
+    ]) {
+      await waitFor(() => expect(registrationRef.current?.items.find((item) => item.id === commandId)?.enabled).toBe(true));
+    }
+
+    const content = document.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+    let changeCalls = 0;
+    let blockedCall = 0;
+    let releaseBlocked: (() => void) | null = null;
+    lspMocks.lspChangeDocument.mockImplementation(() => {
+      changeCalls += 1;
+      if (changeCalls === blockedCall) {
+        return new Promise((resolve) => {
+          releaseBlocked = () => resolve(status);
+        });
+      }
+      return Promise.resolve(status);
+    });
+
+    const providerByCommand = {
+      "workspace.gotoDeclaration": lspMocks.lspDefinition,
+      "workspace.gotoTypeDefinition": lspMocks.lspTypeDefinition,
+      "workspace.gotoImplementation": lspMocks.lspImplementation,
+    } as const;
+    for (const [index, commandId] of [
+      "workspace.gotoDeclaration",
+      "workspace.gotoTypeDefinition",
+      "workspace.gotoImplementation",
+    ].entries()) {
+      const provider = providerByCommand[commandId as keyof typeof providerByCommand];
+      provider.mockClear();
+      blockedCall = changeCalls + 1;
+      act(() => {
+        view!.dispatch({
+          changes: { from: view!.state.doc.length, insert: `// semantic edit ${index}\n` },
+          userEvent: "input.type",
+        });
+      });
+      await waitFor(() => expect(changeCalls).toBe(blockedCall), { timeout: 2_000 });
+
+      await act(async () => {
+        registrationRef.current?.executeAction(commandId);
+        await Promise.resolve();
+      });
+      expect(provider).not.toHaveBeenCalled();
+
+      await act(async () => {
+        releaseBlocked?.();
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(changeCalls).toBe(blockedCall + 1));
+      await waitFor(() => expect(provider, commandId).toHaveBeenCalled(), { timeout: 3_000 });
+    }
+  });
+
+  it("routes Ctrl+B (Go to Declaration) directly to definition navigation for Java files", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-java-ctrl-b-definition-reuse",
+      workspaceInstanceId: "instance-java-ctrl-b-definition-reuse",
+      name: "Java Ctrl+B definition reuse",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Main.java" },
+    };
+    const source = "class Main { void target() {} void call() { target(); } }\n";
+    const status = documentStatus({
+      path: "/repo/app/src/Main.java",
+      uri: "file:///repo/app/src/Main.java",
+      presetId: "java",
+      languageId: "java",
+      displayName: "Java",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({
+        definition: true,
+        declaration: false,
+      }),
+    });
+    const target = {
+      uri: "file:///repo/app/src/Main.java",
+      path: "/repo/app/src/Main.java",
+      range: { start: { line: 0, character: 19 }, end: { line: 0, character: 25 } },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Main.java", source));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDefinition.mockResolvedValue({ status, locations: [target] });
+    lspMocks.lspDeclaration.mockResolvedValue({ status, locations: [] });
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/Main.java");
+    const fileKey = "root:app:src/Main.java";
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-java-ctrl-b-definition-reuse")
+        .lspFiles[fileKey]?.syncedText,
+    ).toBe(source));
+
+    // Even though declaration capability is false, definition capability is true so Go to Declaration stays enabled
+    await waitFor(() => expect(registrationRef.current?.items.find(
+      (item) => item.id === "workspace.gotoDeclaration",
+    )?.enabled).toBe(true));
+
+    lspMocks.lspDefinition.mockClear();
+    lspMocks.lspDeclaration.mockClear();
+
+    await act(async () => {
+      await registrationRef.current?.executeAction("workspace.gotoDeclaration");
+      await Promise.resolve();
+    });
+
+    // In Java, Ctrl+B reuses the definition pipeline directly
+    await waitFor(() => expect(lspMocks.lspDefinition).toHaveBeenCalled());
+    expect(lspMocks.lspDeclaration).not.toHaveBeenCalled();
+  });
+
   it("ingests workspace test coverage report and renders coverage dock panel", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
@@ -7846,6 +8186,108 @@ end_of_record
       for (const optionEl of optionEls) {
         expect(optionEl.textContent).not.toContain("StaleServerCandidate");
       }
+    });
+
+    it("never notifies jdtls with didSave and completes on the fast path after saving", async () => {
+      const { EditorView } = await import("@codemirror/view");
+      const { startCompletion } = await import("@codemirror/autocomplete");
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-completion-after-save",
+        workspaceInstanceId: "instance-completion-after-save",
+        name: "Completion After Save",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/App.java" },
+      };
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/App.java", "System."));
+      workspaceMocks.workspaceWriteFileEncoded.mockResolvedValue(writeAck(file(
+        "src/App.java",
+        "System.out.",
+        { hash: "hash-system" },
+      )));
+
+      const javaStatus = documentStatus({
+        path: "src/App.java",
+        uri: "file:///repo/app/src/App.java",
+        presetId: "jdtls",
+        languageId: "java",
+        displayName: "Java",
+        available: true,
+        active: true,
+      });
+      lspMocks.lspOpenDocument.mockResolvedValue(javaStatus);
+      lspMocks.lspChangeDocument.mockResolvedValue(javaStatus);
+
+      lspMocks.lspCompletion.mockResolvedValue({
+        status: javaStatus,
+        isIncomplete: false,
+        items: [{
+          label: "out",
+          kind: 7,
+          detail: "PrintStream",
+          documentation: null,
+          insertText: "out",
+          insertTextFormat: 1,
+          filterText: null,
+          sortText: null,
+          textEdit: null,
+          additionalTextEdits: [],
+          raw: {},
+        }],
+      });
+
+      const rendered = renderWorkspace(workspace);
+      await screen.findByTitle("app / src/App.java");
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+      expect(content).not.toBeNull();
+      const view = EditorView.findFromDOM(content!);
+      expect(view).not.toBeNull();
+
+      // First completion before save
+      act(() => {
+        view!.dispatch({ selection: { anchor: view!.state.doc.length } });
+        startCompletion(view!);
+      });
+      await waitFor(() => {
+        expect(lspMocks.lspCompletion).toHaveBeenCalled();
+      });
+
+      // Make document dirty and save via Ctrl+S
+      act(() => {
+        view!.dispatch({
+          changes: { from: view!.state.doc.length, insert: "out." },
+          selection: { anchor: view!.state.doc.length + 4 },
+          userEvent: "input.type",
+        });
+      });
+      await waitFor(() => expect(screen.getByTestId("code-workspace-save-observation")).toHaveAttribute("data-dirty", "true"));
+
+      const changesAtSave = lspMocks.lspChangeDocument.mock.calls.length;
+      fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+      await waitFor(() =>
+        expect(screen.getByTestId("code-workspace-save-observation")).toHaveAttribute("data-dirty", "false"),
+      );
+      // Eclipse JDT LS degrades completions after didSave and can answer the
+      // first post-save query from the pre-edit document. The save flow's
+      // workspace/didChangeWatchedFiles notification owns the provider rebuild,
+      // so didSave must never be sent and no recovery didChange is needed.
+      expect(lspMocks.lspSaveDocument).not.toHaveBeenCalled();
+      const changesAfterRecovery = lspMocks.lspChangeDocument.mock.calls.length;
+
+      // Trigger completion after saving without typing any new characters:
+      // the buffer is already synced, so completion must reach lspCompletion
+      // directly (fast path) without another didChange round trip.
+      act(() => {
+        startCompletion(view!);
+      });
+
+      await waitFor(() => {
+        expect(lspMocks.lspCompletion.mock.calls.length).toBeGreaterThan(1);
+      });
+      expect(lspMocks.lspChangeDocument.mock.calls.length).toBe(changesAfterRecovery);
+      expect(lspMocks.lspChangeDocument.mock.calls.length).toBeGreaterThanOrEqual(changesAtSave);
     });
   });
 
@@ -8284,6 +8726,346 @@ end_of_record
         (call) => call.includes("initial_text\ninitial_text\n"),
       );
       expect(staleDidSave).toBe(false);
+    });
+
+    it("preserves edits typed while the post-ack watcher notify is awaiting (W2)", async () => {
+      // W2 timing: the writer ack has already been delivered, the watcher
+      // notify is still awaiting, and the writeback merge has not happened.
+      // Edits typed in that window must survive the merge (RISK-01).
+      let releaseWatcher: () => void = () => {};
+      const watcherDeferred = new Promise<number>((resolve) => {
+        releaseWatcher = () => resolve(0);
+      });
+      lspMocks.lspWorkspaceDidChangeWatchedFiles.mockReturnValue(watcherDeferred);
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        writtenPath: string,
+        text: string,
+      ) => writeAck(
+        file(writtenPath, text, { hash: `hash-saved-${writtenPath}` }),
+        { oldHash: `hash-${writtenPath}` },
+      ));
+
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-save-race-watcher",
+        workspaceInstanceId: "instance-save-race-watcher",
+        name: "Save Race Watcher",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+      };
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "initial_text\n"));
+
+      const rendered = renderWorkspace(workspace);
+      await screen.findByTitle("app / src/main.ts");
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+      expect(content).not.toBeNull();
+      const view = EditorView.findFromDOM(content!);
+      expect(view).not.toBeNull();
+
+      // Dirty the buffer (Ctrl+D) so a save transaction can start.
+      fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+      await waitFor(() => {
+        const fileState = selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-race-watcher",
+        ).openFiles["root:app:src/main.ts"];
+        expect(fileState?.text).toBe("initial_text\ninitial_text\n");
+        expect(fileState?.dirty).toBe(true);
+      });
+
+      // Ctrl+S: historySnapshot resolves, the real writer is invoked and its
+      // ack is delivered; the commit then awaits the watcher notify.
+      fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+      await waitFor(() => expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledWith(
+        "/repo/app",
+        "src/main.ts",
+        "initial_text\ninitial_text\n",
+        "hash-src/main.ts",
+        "UTF-8",
+        false,
+      ));
+      await waitFor(() => expect(lspMocks.lspWorkspaceDidChangeWatchedFiles).toHaveBeenCalled());
+
+      // W2 input through the real editor entry: append a single character.
+      act(() => {
+        view!.dispatch({
+          changes: { from: view!.state.doc.length, insert: "X" },
+          selection: { anchor: view!.state.doc.length + 1 },
+          userEvent: "input.type",
+        });
+      });
+      await waitFor(() => {
+        const fileState = selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-race-watcher",
+        ).openFiles["root:app:src/main.ts"];
+        expect(fileState?.text).toBe("initial_text\ninitial_text\nX");
+        expect(fileState?.dirty).toBe(true);
+      });
+
+      // Release the watcher await; the writeback merge now runs.
+      await act(async () => {
+        releaseWatcher();
+      });
+
+      await waitFor(() => {
+        const fileState = selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-race-watcher",
+        ).openFiles["root:app:src/main.ts"];
+        expect(fileState?.savedText).toBe("initial_text\ninitial_text\n");
+        expect(fileState?.text).toBe("initial_text\ninitial_text\nX");
+        expect(fileState?.dirty).toBe(true);
+        expect(fileState?.saving).toBe(false);
+      });
+      // The visible editor document must not roll back to the snapshot.
+      expect(view!.state.doc.toString()).toBe("initial_text\ninitial_text\nX");
+
+      const staleObservation = screen.getByTestId("code-workspace-save-observation");
+      expect(staleObservation).toHaveAttribute("data-state", "stale");
+      expect(staleObservation).toHaveAttribute("data-result-kind", "saved-stale-snapshot");
+      expect(staleObservation).toHaveAttribute("data-dirty", "true");
+
+      // The provider must never see the snapshot as didSave while the live
+      // buffer holds newer text; only the current buffer may be synced.
+      expect(lspMocks.lspSaveDocument).not.toHaveBeenCalledWith(
+        expect.anything(),
+        "initial_text\ninitial_text\n",
+      );
+    });
+
+    it("QA gate W0: cancels with zero writer calls and keeps the edit typed during the prepare hold", async () => {
+      installSaveRaceProbe();
+      try {
+        const workspace: CodeWorkspaceTabInfo = {
+          repoRoot: "/repo/app",
+          workspaceId: "ws-save-gate-w0",
+          workspaceInstanceId: "instance-save-gate-w0",
+          name: "Save Gate W0",
+          roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+          looseFiles: [],
+          initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+        };
+        workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+        workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "gate_text\n"));
+
+        const rendered = renderWorkspace(workspace);
+        await screen.findByTitle("app / src/main.ts");
+        const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+        expect(content).not.toBeNull();
+        const view = EditorView.findFromDOM(content!);
+        expect(view).not.toBeNull();
+
+        fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w0",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\n"));
+
+        const control = saveRaceGate();
+        expect(control.arm({
+          stage: "prepare",
+          filePath: "/repo/app/src/main.ts",
+          timeoutMs: 15_000,
+        })).toMatchObject({ ok: true });
+        fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+        await waitFor(() => expect(control.status().held?.stage).toBe("prepare"));
+        // W0: the writer must not have been invoked yet.
+        expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+
+        act(() => {
+          view!.dispatch({
+            changes: { from: view!.state.doc.length, insert: "X" },
+            selection: { anchor: view!.state.doc.length + 1 },
+            userEvent: "input.type",
+          });
+        });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w0",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\nX"));
+
+        control.release();
+        await waitFor(() => {
+          const fileState = selectCodeWorkspaceUi(
+            useCodeWorkspaceStore.getState(),
+            "instance-save-gate-w0",
+          ).openFiles["root:app:src/main.ts"];
+          expect(fileState?.text).toBe("gate_text\ngate_text\nX");
+          expect(fileState?.dirty).toBe(true);
+          expect(fileState?.saving).toBe(false);
+        });
+        expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+        expect(useAppStore.getState().statusMessage).toContain("Save cancelled");
+        expect(control.trace().map((entryTrace) => entryTrace.event))
+          .toEqual(["arm", "enter", "release", "commit-settled"]);
+      } finally {
+        uninstallSaveRaceProbe();
+      }
+    });
+
+    it("QA gate W1: keeps edits typed after the real writer was invoked and before its ack is delivered", async () => {
+      installSaveRaceProbe();
+      try {
+        workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+          _root: string,
+          writtenPath: string,
+          text: string,
+        ) => writeAck(
+          file(writtenPath, text, { hash: `hash-saved-${writtenPath}` }),
+          { oldHash: `hash-${writtenPath}` },
+        ));
+        const workspace: CodeWorkspaceTabInfo = {
+          repoRoot: "/repo/app",
+          workspaceId: "ws-save-gate-w1",
+          workspaceInstanceId: "instance-save-gate-w1",
+          name: "Save Gate W1",
+          roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+          looseFiles: [],
+          initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+        };
+        workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+        workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "gate_text\n"));
+
+        const rendered = renderWorkspace(workspace);
+        await screen.findByTitle("app / src/main.ts");
+        const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+        expect(content).not.toBeNull();
+        const view = EditorView.findFromDOM(content!);
+        expect(view).not.toBeNull();
+
+        fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w1",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\n"));
+
+        const control = saveRaceGate();
+        expect(control.arm({
+          stage: "ack",
+          filePath: "/repo/app/src/main.ts",
+          timeoutMs: 15_000,
+        })).toMatchObject({ ok: true });
+        fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+        await waitFor(() => expect(control.status().held?.stage).toBe("ack"));
+        // W1: the real writer was invoked; only its ack delivery is held.
+        expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(1);
+
+        act(() => {
+          view!.dispatch({
+            changes: { from: view!.state.doc.length, insert: "X" },
+            selection: { anchor: view!.state.doc.length + 1 },
+            userEvent: "input.type",
+          });
+        });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w1",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\nX"));
+
+        control.release();
+        await waitFor(() => {
+          const fileState = selectCodeWorkspaceUi(
+            useCodeWorkspaceStore.getState(),
+            "instance-save-gate-w1",
+          ).openFiles["root:app:src/main.ts"];
+          expect(fileState?.savedText).toBe("gate_text\ngate_text\n");
+          expect(fileState?.text).toBe("gate_text\ngate_text\nX");
+          expect(fileState?.dirty).toBe(true);
+          expect(fileState?.saving).toBe(false);
+        });
+        expect(screen.getByTestId("code-workspace-save-observation"))
+          .toHaveAttribute("data-result-kind", "saved-stale-snapshot");
+        expect(control.trace().map((entryTrace) => entryTrace.event))
+          .toEqual(["arm", "writer-invoked", "enter", "release", "ack-delivered", "watcher-invoked", "commit-settled"]);
+      } finally {
+        uninstallSaveRaceProbe();
+      }
+    });
+
+    it("QA gate W2: keeps edits typed after the ack and before the watcher completion", async () => {
+      installSaveRaceProbe();
+      try {
+        workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+          _root: string,
+          writtenPath: string,
+          text: string,
+        ) => writeAck(
+          file(writtenPath, text, { hash: `hash-saved-${writtenPath}` }),
+          { oldHash: `hash-${writtenPath}` },
+        ));
+        const workspace: CodeWorkspaceTabInfo = {
+          repoRoot: "/repo/app",
+          workspaceId: "ws-save-gate-w2",
+          workspaceInstanceId: "instance-save-gate-w2",
+          name: "Save Gate W2",
+          roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+          looseFiles: [],
+          initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+        };
+        workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+        workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "gate_text\n"));
+
+        const rendered = renderWorkspace(workspace);
+        await screen.findByTitle("app / src/main.ts");
+        const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+        expect(content).not.toBeNull();
+        const view = EditorView.findFromDOM(content!);
+        expect(view).not.toBeNull();
+
+        fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w2",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\n"));
+
+        const control = saveRaceGate();
+        expect(control.arm({
+          stage: "watcher",
+          filePath: "/repo/app/src/main.ts",
+          timeoutMs: 15_000,
+        })).toMatchObject({ ok: true });
+        fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+        await waitFor(() => expect(control.status().held?.stage).toBe("watcher"));
+        // W2: the real writer acked and the real watcher notify was invoked.
+        expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(1);
+        expect(lspMocks.lspWorkspaceDidChangeWatchedFiles).toHaveBeenCalledTimes(1);
+        expect(control.trace().map((entryTrace) => entryTrace.event))
+          .toEqual(["arm", "writer-invoked", "ack-delivered", "watcher-invoked", "enter"]);
+
+        act(() => {
+          view!.dispatch({
+            changes: { from: view!.state.doc.length, insert: "X" },
+            selection: { anchor: view!.state.doc.length + 1 },
+            userEvent: "input.type",
+          });
+        });
+        await waitFor(() => expect(selectCodeWorkspaceUi(
+          useCodeWorkspaceStore.getState(),
+          "instance-save-gate-w2",
+        ).openFiles["root:app:src/main.ts"]?.text).toBe("gate_text\ngate_text\nX"));
+
+        control.release();
+        await waitFor(() => {
+          const fileState = selectCodeWorkspaceUi(
+            useCodeWorkspaceStore.getState(),
+            "instance-save-gate-w2",
+          ).openFiles["root:app:src/main.ts"];
+          expect(fileState?.savedText).toBe("gate_text\ngate_text\n");
+          expect(fileState?.text).toBe("gate_text\ngate_text\nX");
+          expect(fileState?.dirty).toBe(true);
+          expect(fileState?.saving).toBe(false);
+        });
+        expect(control.trace().map((entryTrace) => entryTrace.event))
+          .toEqual(["arm", "writer-invoked", "ack-delivered", "watcher-invoked", "enter", "release", "commit-settled"]);
+        expect(screen.getByTestId("code-workspace-save-observation"))
+          .toHaveAttribute("data-result-kind", "saved-stale-snapshot");
+      } finally {
+        uninstallSaveRaceProbe();
+      }
     });
 
     it("discards writeback and never recreates a closed buffer when writer resolves after close", async () => {

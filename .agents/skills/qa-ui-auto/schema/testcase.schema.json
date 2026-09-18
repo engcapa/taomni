@@ -77,6 +77,7 @@
      "file_move_recovery_fixtures",
      "java_rename_deleted_fixtures",
      "view_state_fixtures",
+     "editor_save_race",
      "project_tree"
     ]
    },
@@ -441,6 +442,24 @@
      "type": "string",
      "minLength": 1,
      "description": "Complete the empty-vault first-run master-password gate with the given QA password. Locked vault => loud failure; unlocked => no-op."
+    },
+    "save_race_arm": {
+     "$ref": "#/$defs/save_race_arm_arg"
+    },
+    "save_race_wait_entered": {
+     "$ref": "#/$defs/save_race_wait_entered_arg"
+    },
+    "save_race_release": {
+     "$ref": "#/$defs/save_race_release_arg"
+    },
+    "save_race_trace": {
+     "$ref": "#/$defs/save_race_trace_arg"
+    },
+    "save_race_note": {
+     "$ref": "#/$defs/save_race_note_arg"
+    },
+    "host_delete_file": {
+     "$ref": "#/$defs/host_delete_file_arg"
     }
    }
   },
@@ -1236,6 +1255,115 @@
      "type": "boolean"
     }
    }
+  },
+  "save_race_arm_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["stage"],
+   "properties": {
+    "stage": {
+     "enum": ["prepare", "ack", "watcher", "fault"]
+    },
+    "workspaceId": {"type": "string", "minLength": 1},
+    "fileKey": {"type": "string", "minLength": 1},
+    "transactionId": {"type": "string", "minLength": 1},
+    "filePath": {"type": "string", "minLength": 1},
+    "mode": {
+     "enum": ["unknown-response", "unknown-response-delay"],
+     "description": "fault stage only: unknown-response withholds one real successful response immediately; unknown-response-delay holds the real response (success or typed failure) behind the fault hold so the runner can mutate the real disk before the production read-back classification runs"
+    },
+    "timeoutMs": {"type": "integer", "minimum": 100, "maximum": 120000}
+   },
+   "description": "ED-PARITY-002 isolated-QA-build only: arm one save-transaction delivery point (prepare/ack/watcher) or a controlled unknown-response write fault. Fails explicitly when the binary is not the QA build with the save gate."
+  },
+  "save_race_wait_entered_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["stage"],
+   "properties": {
+    "stage": {"enum": ["prepare", "ack", "watcher", "fault"]},
+    "timeout_sec": {"type": "number", "minimum": 0.5, "maximum": 120, "default": 20}
+   },
+   "description": "ED-PARITY-002 isolated-QA-build only: block until the armed delivery point is entered (the production save transaction or the delayed fault is genuinely held there)."
+  },
+  "save_race_release_arg": {
+   "oneOf": [
+    {"type": "null"},
+    {
+     "type": "object",
+     "additionalProperties": false,
+     "properties": {"reason": {"type": "string", "minLength": 1}}
+    }
+   ],
+   "description": "ED-PARITY-002 isolated-QA-build only: release the held delivery point so the production transaction continues."
+  },
+  "save_race_trace_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "artifact": {"type": "string", "minLength": 1},
+    "expect_contains": {
+     "type": "array",
+     "items": {"type": "string", "minLength": 1},
+     "description": "ordered subsequence of timeline events that must be present"
+    },
+    "expect_events": {
+     "type": "array",
+     "items": {"type": "string", "minLength": 1},
+     "description": "exact ordered timeline event sequence"
+    },
+    "require_ack_hashes": {"type": "boolean"},
+    "require_settled_kind": {
+     "type": "string",
+     "minLength": 1,
+     "description": "assert the last recorded production commit-settled result kind"
+    },
+    "require_readback_outcome": {
+     "enum": ["committed", "none", "foreign"],
+     "description": "assert the last recorded unknown-effect read-back classification"
+    },
+    "forbid_between": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": ["anchor", "until", "events"],
+     "properties": {
+      "anchor": {"type": "string", "minLength": 1},
+      "until": {"type": "string", "minLength": 1},
+      "events": {
+       "type": "array",
+       "minItems": 1,
+       "items": {"type": "string", "minLength": 1}
+      }
+     },
+     "description": "assert none of the listed events occurred between the anchor and the until event (e.g. zero writer invocations during a W0 hold)"
+    }
+   },
+   "description": "ED-PARITY-002 isolated-QA-build only: persist the in-page save-race timeline artifact and assert recorded events; ack-delivered entries carry the real native writtenHash."
+  },
+  "save_race_note_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["label", "expression"],
+   "properties": {
+    "label": {"type": "string", "minLength": 1},
+    "artifact": {"type": "string", "minLength": 1},
+    "expression": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 400,
+     "description": "read-only JS expression; mutation-looking expressions are rejected"
+    }
+   },
+   "description": "ED-PARITY-002 isolated-QA-build only: record one read-only DOM/JS observation (focus, selection, undo text, recovery row) into save-race-notes.json. Recording only; never executes app actions."
+  },
+  "host_delete_file_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["path"],
+   "properties": {
+    "path": {"type": "string", "minLength": 1}
+   },
+   "description": "Native-only: delete an existing host file inside the retained report root and record its before hash. Used for the unreadable read-back branch of a controlled response fault."
   }
  }
 }

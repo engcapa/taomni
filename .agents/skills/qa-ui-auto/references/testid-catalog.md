@@ -257,6 +257,9 @@
 - `[data-testid="workspace-recovery-recover-selected"]` — interactive [optional] — F25.5.workspace-recovery-recover-selected
 - `[data-testid="workspace-recovery-recover-all"]` — interactive [optional] — F25.5.workspace-recovery-recover-all
 - `[data-testid="workspace-recovery-discard-all"]` — interactive [optional] — F25.5.workspace-recovery-discard-all
+- `[data-testid="workspace-recovery-disk-results-tab"]` — interactive [optional] — F25.5.workspace-recovery-disk-results-tab
+- `[data-testid="workspace-recovery-disk-results"]` — display [optional] — F25.5.workspace-recovery-disk-results
+- `[data-testid="workspace-recovery-disk-result-row"]` — display [optional] — F25.5.workspace-recovery-disk-result-row
 - `[data-testid="code-workspace-split-down"]` — interactive [optional] — F25.5.split-down
 - `[data-testid="code-workspace-split-close"]` — interactive [optional] — F25.5.split-close
 - `[data-testid="keymap-scheme-select"]` — interactive [optional] — F25.5.keymap-scheme-select

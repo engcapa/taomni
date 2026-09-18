@@ -2761,7 +2761,27 @@ async fn notify_watched_file_sessions(
     sessions.sort_by(|left, right| left.0.cmp(&right.0));
     let mut notified = 0;
     for (_, session) in sessions {
-        let params = match session.watched_file_params(changes).await {
+        // A provider that holds an open document for a path already owns that
+        // document's content through didOpen/didChange. Reporting a watched-file
+        // change for it makes reload-prone servers (Eclipse JDT LS) re-read the
+        // file from disk and discard in-memory edits that arrived after the
+        // write — the user's post-save typing vanished from the provider model.
+        let session_changes: Vec<LspWatchedFileChange> = {
+            let opened = session.opened_documents.read().await;
+            changes
+                .iter()
+                .filter(|change| {
+                    !file_operation_uri(&change.path)
+                        .map(|uri| opened.contains(&uri))
+                        .unwrap_or(false)
+                })
+                .cloned()
+                .collect()
+        };
+        if session_changes.is_empty() {
+            continue;
+        }
+        let params = match session.watched_file_params(&session_changes).await {
             Ok(Some(params)) => params,
             Ok(None) => continue,
             Err(error) => {
@@ -3021,7 +3041,7 @@ impl LspSession {
             tokio::spawn(read_stderr(session.clone(), stderr));
         }
 
-        let initialize_params = json!({
+        let mut initialize_params = json!({
             "processId": Value::Null,
             "rootUri": session.root_uri,
             "initializationOptions": initialization_options,
@@ -3153,6 +3173,15 @@ impl LspSession {
                 "workspace": workspace_client_capabilities()
             }
         });
+        if let Some(text_doc) = initialize_params
+            .get_mut("capabilities")
+            .and_then(|c| c.get_mut("textDocument"))
+        {
+            text_doc["declaration"] = json!({
+                "dynamicRegistration": true,
+                "linkSupport": true
+            });
+        }
         let initialize_timeout = initialize_timeout_secs(&session.command);
         let initialize_result = match tokio::select! {
             result = session.request_with_timeout(
@@ -13302,8 +13331,14 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         let uri = "file:///repo/src/main/java/com/example/single/QuickFixTarget.java";
         let diagnostic = LspDiagnostic {
             range: LspRange {
-                start: LspPosition { line: 12, character: 28 },
-                end: LspPosition { line: 12, character: 39 },
+                start: LspPosition {
+                    line: 12,
+                    character: 28,
+                },
+                end: LspPosition {
+                    line: 12,
+                    character: 39,
+                },
             },
             severity: Some(1),
             code: Some("16777218".into()),
@@ -13317,11 +13352,19 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         let mut stored: HashMap<String, Vec<LspDiagnostic>> = HashMap::new();
 
         // First publish for the document (empty -> report) must signal.
-        assert!(store_diagnostics(&mut stored, uri, vec![diagnostic.clone()]));
+        assert!(store_diagnostics(
+            &mut stored,
+            uri,
+            vec![diagnostic.clone()]
+        ));
 
         // Servers republish the identical report after every reconcile; the
         // frontend must not be re-signalled for those.
-        assert!(!store_diagnostics(&mut stored, uri, vec![diagnostic.clone()]));
+        assert!(!store_diagnostics(
+            &mut stored,
+            uri,
+            vec![diagnostic.clone()]
+        ));
 
         // A changed report (message edit) must signal again.
         let mut edited = diagnostic.clone();

@@ -767,21 +767,55 @@ export function useWorkspaceLspSession({
     if (file.library) return;
     const descriptor = descriptorForFile(file);
     if (!descriptor) return;
+    // Eclipse JDT LS drops into a degraded completion state after
+    // textDocument/didSave (empty list until the next didChange). Its completion
+    // can also answer the first post-save query from the pre-edit document while
+    // the save-triggered work is still settling, so the recovery didChange raced
+    // the user's next keystrokes and the popup showed stale/irrelevant items.
+    // The provider still learns about the save: the save flow notifies
+    // workspace/didChangeWatchedFiles, which triggers the same JDT rebuild and
+    // diagnostics, so we deliberately never send didSave to this provider.
+    const providerSaveIsRedundant = lspPresetIdForPath(file.languagePath) === "java";
     try {
-      // Preserve client message ordering: didSave must follow any queued
-      // didChange for the same text, otherwise semantic queries can observe
-      // the save notification before the provider has the matching buffer.
+      // Preserve client message ordering: any queued didChange for the saved
+      // text must land before the provider rebuilds, otherwise semantic queries
+      // can observe a buffer that does not match what was written to disk.
       if (!isDocumentSynced(file.key, text)) {
         await syncDocument({ ...file, text }, "change");
         await waitForDocumentSyncQueue(file.key);
       }
+      if (providerSaveIsRedundant) {
+        if (!mountedRef.current || !openFilesRef.current[file.key]) return;
+        updateLspFiles((current) => {
+          const existing = current[file.key] ?? emptyLspFileState();
+          return {
+            ...current,
+            [file.key]: {
+              ...existing,
+              syncing: false,
+              syncedText: text,
+              error: null,
+              errorGeneration: nextErrorGeneration(existing, null, null),
+            },
+          };
+        });
+        scheduleDiagnostics(file.key);
+        return;
+      }
       const status = await lspSaveDocument(descriptor, text, versionRef.current[file.key] ?? 0);
       if (!mountedRef.current || !openFilesRef.current[file.key]) return;
+      // Provider behavior: Eclipse JDT LS serves an empty completion list after
+      // textDocument/didSave until the next textDocument/didChange. Clearing
+      // syncedTextRef alone made the NEXT feature query pay a didChange IPC
+      // round trip first; with typing faster than that round trip every query
+      // was dropped as stale before lspCompletion could be sent. Instead, send
+      // the recovery didChange right here in the save path (save is low
+      // frequency) so the buffer is marked synced again and the next
+      // completion/signature request takes the fast already-synced path.
+      delete syncedTextRef.current[file.key];
       if (status.active) {
-        syncedTextRef.current[file.key] = text;
         documentActiveRef.current[file.key] = true;
       } else {
-        delete syncedTextRef.current[file.key];
         documentActiveRef.current[file.key] = false;
       }
       updateLspFiles((current) => {
@@ -800,7 +834,11 @@ export function useWorkspaceLspSession({
       });
       scheduleDiagnostics(file.key);
       const latest = openFilesRef.current[file.key];
-      if (latest && latest.text !== text) {
+      if (latest && status.active) {
+        // Unconditional: restores jdtls out of the didSave empty state. Same
+        // text → no-op full didChange; mid-save edits → syncs the newer buffer.
+        await syncDocument(latest, "change");
+      } else if (latest && latest.text !== text) {
         await syncDocument(latest, "change");
       }
     } catch (error) {

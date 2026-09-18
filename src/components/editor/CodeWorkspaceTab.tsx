@@ -210,6 +210,11 @@ import {
   type SaveObservationState,
 } from "./workspace/saveObservationContract";
 import {
+  applySaveRaceWriteFault,
+  holdSaveRaceStage,
+  recordSaveRaceEvent,
+} from "./workspace/saveRaceProbe";
+import {
   hasBlockingDiskEffectResolution,
   listDiskEffectLedgerEntries,
   recordDiskEffectLedgerEntry,
@@ -939,6 +944,74 @@ const LSP_DOCUMENT_SYMBOLS_IDLE_DELAY_MS = 650;
 const EDITOR_TEXT_COMMIT_IDLE_DELAY_MS = 220;
 // Shared empty result so "no diagnostics" is always the same array identity.
 const EMPTY_DISPLAY_DIAGNOSTICS: LspDiagnostic[] = [];
+
+const DECLARATION_DEFINITION_EQUIVALENT_LANGUAGES = new Set([
+  "java",
+  "kotlin",
+  "scala",
+  "groovy",
+  "python",
+  "rust",
+  "go",
+  "typescript",
+  "javascript",
+  "typescriptreact",
+  "javascriptreact",
+  "php",
+  "ruby",
+  "swift",
+  "dart",
+  "lua",
+]);
+
+const DECLARATION_DEFINITION_EQUIVALENT_EXTENSIONS = new Set([
+  "java",
+  "kt",
+  "kts",
+  "scala",
+  "sc",
+  "groovy",
+  "gvy",
+  "gy",
+  "gsh",
+  "py",
+  "pyw",
+  "rs",
+  "go",
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "php",
+  "rb",
+  "swift",
+  "dart",
+  "lua",
+]);
+
+/**
+ * Languages where declarations and definitions are physically identical
+ * (no separate C-style header/implementation files). For these languages,
+ * IDEA's Ctrl+B ("Go to Declaration or Usages") maps directly to definition
+ * navigation so symbols resolve through standard definition providers.
+ */
+export function isDeclarationDefinitionEquivalentLanguage(
+  languageId?: string | null,
+  filePath?: string | null,
+): boolean {
+  if (languageId && DECLARATION_DEFINITION_EQUIVALENT_LANGUAGES.has(languageId.toLowerCase())) {
+    return true;
+  }
+  if (filePath) {
+    const ext = filePath.split(".").pop()?.toLowerCase();
+    if (ext && DECLARATION_DEFINITION_EQUIVALENT_EXTENSIONS.has(ext)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 export function extractContextSnippet(
   text: string,
@@ -5289,24 +5362,34 @@ export function CodeWorkspaceTab({
       }
     }
 
-    if (rootPath && relPath) {
-      return workspaceWriteFileEncoded(
+    const pendingWrite = rootPath && relPath
+      ? workspaceWriteFileEncoded(
         rootPath,
         relPath,
         normalizedText,
         request.expectedDiskHash,
         targetEncoding,
         targetBom,
+      )
+      : workspaceWriteLooseFileEncoded(
+        request.filePath,
+        normalizedText,
+        request.expectedDiskHash,
+        targetEncoding,
+        targetBom,
       );
+    // ED-PARITY-002 QA build only: the real write attempt above runs first;
+    // the probe may withhold its response (and optionally delay it) so the
+    // production unknown-effect read-back path classifies real disk bytes.
+    // A no-op in normal builds and when the probe is not armed.
+    let writtenAck: WorkspaceWriteAck | null = null;
+    let writeFailure: unknown = null;
+    try {
+      writtenAck = await pendingWrite;
+    } catch (error) {
+      writeFailure = error;
     }
-
-    return workspaceWriteLooseFileEncoded(
-      request.filePath,
-      normalizedText,
-      request.expectedDiskHash,
-      targetEncoding,
-      targetBom,
-    );
+    return applySaveRaceWriteFault(request.filePath, writtenAck, writeFailure);
   }, []);
 
   /**
@@ -5669,6 +5752,20 @@ export function CodeWorkspaceTab({
         if (historyEntry) historyId = `local-history-${historyEntry.id}`;
       }
 
+      // ED-PARITY-002 QA build only: the probe may hold this prepare point
+      // (writer not yet invoked) so the runner can type a real edit and prove
+      // the pre-write boundary cancels with zero writer calls. Immediately
+      // resolved in normal builds and when not armed.
+      await holdSaveRaceStage({
+        stage: "prepare",
+        workspaceId: prepared.workspaceId,
+        fileKey: key,
+        transactionId: prepared.transactionId,
+        filePath: prepared.filePath,
+        revision: () => openFilesRef.current[key]?.documentRevision ?? null,
+        stillValid: () => !!openFilesRef.current[key],
+      });
+
       // 2. Pre-write commit boundary (SYNCHRONOUS, NO AWAIT)
       const currentBeforeWrite = openFilesRef.current[key];
       let cancellation: string | null = validatePreparedSaveBoundary(prepared, currentBeforeWrite
@@ -5695,6 +5792,25 @@ export function CodeWorkspaceTab({
         expectedDiskHash: prepared.expectedDiskHash,
         policy: prepared.policy,
       });
+      recordSaveRaceEvent("writer-invoked", {
+        workspaceId: prepared.workspaceId,
+        fileKey: key,
+        transactionId: prepared.transactionId,
+        filePath: prepared.filePath,
+      }, { byteLength: prepared.text.length });
+
+      // ED-PARITY-002 QA build only: the writer above is the real native
+      // writer; the probe may hold the ack delivery point (W1) so the runner
+      // can type while the UI waits for the real write acknowledgement.
+      await holdSaveRaceStage({
+        stage: "ack",
+        workspaceId: prepared.workspaceId,
+        fileKey: key,
+        transactionId: prepared.transactionId,
+        filePath: prepared.filePath,
+        revision: () => openFilesRef.current[key]?.documentRevision ?? null,
+        stillValid: () => !!openFilesRef.current[key],
+      });
 
       // 3. Writeback phase (merge, never overwrite text; generation-gated)
       try {
@@ -5704,6 +5820,12 @@ export function CodeWorkspaceTab({
         } catch (writeError) {
           // §8.18.1: classify the typed IPC error by its native effect fact.
           const mapped = saveCommitResultFromError(prepared.transactionId, writeError);
+          recordSaveRaceEvent("writer-failed", {
+            workspaceId: prepared.workspaceId,
+            fileKey: key,
+            transactionId: prepared.transactionId,
+            filePath: prepared.filePath,
+          }, { kind: mapped.kind, diskEffect: mapped.diskEffect ?? null });
           mutateOpenBuffer(key, { dirty: true, saving: false, error: mapped.error.message }, "save-metadata");
           if (mapped.diskEffect === "unknown") {
             // The bridge could not prove whether bytes landed: verify against
@@ -5713,6 +5835,17 @@ export function CodeWorkspaceTab({
               writtenHash: mapped.error.intentHash ?? mapped.error.writtenHash,
               expectedOldHash: prepared.expectedDiskHash,
               observedHash: observed?.hash ?? null,
+            });
+            recordSaveRaceEvent("unknown-readback", {
+              workspaceId: prepared.workspaceId,
+              fileKey: key,
+              transactionId: prepared.transactionId,
+              filePath: prepared.filePath,
+            }, {
+              outcome: verification.outcome,
+              observedHash: observed?.hash ?? null,
+              writtenHash: mapped.error.intentHash ?? mapped.error.writtenHash ?? null,
+              expectedOldHash: prepared.expectedDiskHash,
             });
             if (verification.outcome === "committed" && observed) {
               // Intended bytes are provably on disk: continue through the
@@ -5794,6 +5927,18 @@ export function CodeWorkspaceTab({
           }
         }
 
+        recordSaveRaceEvent("ack-delivered", {
+          workspaceId: prepared.workspaceId,
+          fileKey: key,
+          transactionId: prepared.transactionId,
+          filePath: prepared.filePath,
+        }, {
+          writtenHash: ack.writtenHash,
+          writtenByteLength: ack.writtenByteLength,
+          oldHash: ack.oldHash ?? null,
+          documentRevision: openFilesRef.current[key]?.documentRevision ?? null,
+        });
+
         const receipt = buildFinalBytesReceipt(prepared, ack, { historyId });
 
         // Disk acknowledged. From here only committed kinds exist (§8.18.1).
@@ -5818,11 +5963,11 @@ export function CodeWorkspaceTab({
           };
         }
 
-        const liveAfterWrite = openFilesRef.current[key];
-        const writeback = classifySaveWriteback(prepared, liveAfterWrite
-          ? { documentRevision: liveAfterWrite.documentRevision ?? 0 }
+        const liveBeforeWatcher = openFilesRef.current[key];
+        const writebackBeforeWatcher = classifySaveWriteback(prepared, liveBeforeWatcher
+          ? { documentRevision: liveBeforeWatcher.documentRevision ?? 0 }
           : null);
-        if (writeback.kind === "discarded") {
+        if (writebackBeforeWatcher.kind === "discarded") {
           // Buffer closed while the writer was in flight: the disk write is
           // real, but no buffer or provider state may be resurrected.
           recordCommittedDiscardLedgerEntry(prepared, ack.writtenHash);
@@ -5834,7 +5979,7 @@ export function CodeWorkspaceTab({
             memoryEffect: "writeback-discarded",
             providerEffect: "discarded",
             file: ack.file,
-            reason: writeback.reason,
+            reason: writebackBeforeWatcher.reason,
             receipt: { ...receipt, recoveryId },
             historyId: receipt.historyId,
             recoveryId,
@@ -5842,15 +5987,35 @@ export function CodeWorkspaceTab({
         }
 
         const savedPath = absolutePathForOpenFile(fileAtPrepare);
+        let watcherCompletion: Promise<number> | null = null;
         if (savedPath && registry.check(owner).active) {
           if (savedPath.endsWith(".editorconfig")) {
             workspaceStyleControllerRef.current.invalidate(savedPath);
           }
-          await lspWorkspaceDidChangeWatchedFiles(prepared.workspaceId, [{
+          watcherCompletion = lspWorkspaceDidChangeWatchedFiles(prepared.workspaceId, [{
             path: savedPath,
             type: 2,
-          }]).catch(() => 0);
+          }]);
+          recordSaveRaceEvent("watcher-invoked", {
+            workspaceId: prepared.workspaceId,
+            fileKey: key,
+            transactionId: prepared.transactionId,
+            filePath: prepared.filePath,
+          }, { path: savedPath });
         }
+        // ED-PARITY-002 QA build only: the notify above is real; the probe may
+        // hold its completion delivery (W2) so the runner can type after the
+        // real ack but before the writeback merge. No-op otherwise.
+        await holdSaveRaceStage({
+          stage: "watcher",
+          workspaceId: prepared.workspaceId,
+          fileKey: key,
+          transactionId: prepared.transactionId,
+          filePath: prepared.filePath,
+          revision: () => openFilesRef.current[key]?.documentRevision ?? null,
+          stillValid: () => registry.check(owner).active,
+        });
+        if (watcherCompletion) await watcherCompletion.catch(() => 0);
         if (!registry.check(owner).active) {
           recordCommittedDiscardLedgerEntry(prepared, ack.writtenHash);
           const recoveryId = prepared.transactionId;
@@ -5862,6 +6027,32 @@ export function CodeWorkspaceTab({
             providerEffect: "discarded",
             file: ack.file,
             reason: "Owner lost after watcher notify",
+            receipt: { ...receipt, recoveryId },
+            historyId: receipt.historyId,
+            recoveryId,
+          };
+        }
+        // Re-read and re-classify after the watcher await: edits typed while
+        // the notify was pending must merge against the current live buffer,
+        // never the pre-await snapshot (they would otherwise be overwritten
+        // and their revision would falsely report a clean save).
+        const liveAfterWrite = openFilesRef.current[key];
+        const writeback = classifySaveWriteback(prepared, liveAfterWrite
+          ? { documentRevision: liveAfterWrite.documentRevision ?? 0 }
+          : null);
+        if (writeback.kind === "discarded") {
+          // Buffer closed while the watcher notify was in flight: the disk
+          // write is real, but no buffer or provider state may be resurrected.
+          recordCommittedDiscardLedgerEntry(prepared, ack.writtenHash);
+          const recoveryId = prepared.transactionId;
+          return {
+            kind: "committed-writeback-discarded",
+            transactionId: prepared.transactionId,
+            diskEffect: "committed",
+            memoryEffect: "writeback-discarded",
+            providerEffect: "discarded",
+            file: ack.file,
+            reason: writeback.reason,
             receipt: { ...receipt, recoveryId },
             historyId: receipt.historyId,
             recoveryId,
@@ -6358,6 +6549,17 @@ export function CodeWorkspaceTab({
           getLatestBufferVersion: () => openFilesRef.current[key]?.documentRevision ?? file.documentRevision ?? 0,
         },
       );
+      recordSaveRaceEvent("commit-settled", {
+        workspaceId: workspaceInstanceId,
+        fileKey: key,
+        transactionId: outcome.transactionId,
+        filePath: absPath ?? file.path,
+      }, {
+        kind: outcome.kind,
+        diskEffect: outcome.diskEffect,
+        memoryEffect: outcome.memoryEffect,
+        providerEffect: outcome.providerEffect,
+      });
 
       const latestAfterSave = openFilesRef.current[key] ?? null;
       const observation = createSaveObservationRecord({
@@ -14395,11 +14597,15 @@ export function CodeWorkspaceTab({
       keywords: ["declaration", "jump", "navigate"],
       when: (context) => {
         const target = resolveEditorTarget(context);
-        const capabilities = target.file
-          ? lspFilesRef.current[target.file.key]?.status?.capabilities
-          : null;
-        return context.focus !== "tree" && !!target.file && !target.file.loading
-          && (!capabilities || capabilities.declaration !== false);
+        if (context.focus === "tree" || !target.file || target.file.loading) return false;
+        const capabilities = lspFilesRef.current[target.file.key]?.status?.capabilities;
+        const languageId = lspFilesRef.current[target.file.key]?.status?.languageId
+          ?? target.file.languagePath;
+        const isEquivalent = isDeclarationDefinitionEquivalentLanguage(languageId, target.file.path);
+        if (!capabilities) return true;
+        return isEquivalent
+          ? capabilities.definition !== false
+          : (capabilities.declaration !== false || capabilities.definition !== false);
       },
       run: (context) => {
         const target = resolveEditorTarget(context);
@@ -16212,18 +16418,52 @@ export function CodeWorkspaceTab({
     return true;
   }, [openLspLocation, recordNavigationLocation, setStatusMessage]);
 
+  /**
+   * Resolve the live buffer used by semantic location navigation. CodeMirror
+   * edits are published to the language server on a short debounce, so an
+   * explicit definition/declaration/type/implementation request can otherwise
+   * race the pending didChange and ask jdtls to resolve a stale document.
+   * Library buffers are virtual server documents and deliberately bypass this
+   * barrier; their descriptor already points at the originating workspace
+   * document.
+   */
+  const prepareSemanticNavigationRequest = useCallback(async (
+    file: OpenFileState,
+  ): Promise<{ file: OpenFileState; descriptor: LspDocumentDescriptor } | null> => {
+    const live = openFilesRef.current[file.key] ?? file;
+    if (live.library) {
+      const descriptor = lspDescriptorForFile(live);
+      return descriptor ? { file: live, descriptor } : null;
+    }
+
+    const lspState = lspFilesRef.current[live.key];
+    if (lspState?.status?.active) {
+      const synchronized = await ensureLspDocumentSynced(live.key, true);
+      if (!synchronized) {
+        setStatusMessage("Definition navigation requires the language server to finish synchronizing current editor buffers");
+        return null;
+      }
+      const descriptor = lspDescriptorForFile(synchronized);
+      return descriptor ? { file: synchronized, descriptor } : null;
+    }
+
+    const descriptor = lspDescriptorForFile(live);
+    return descriptor ? { file: live, descriptor } : null;
+  }, [ensureLspDocumentSynced, lspDescriptorForFile, setStatusMessage]);
+
   const goToDefinition = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return false;
+      const prepared = await prepareSemanticNavigationRequest(file);
+      if (!prepared) return false;
+      const { file: live, descriptor } = prepared;
       try {
-        const query = beginSemanticQuery("definitions", file, descriptor, position);
+        const query = beginSemanticQuery("definitions", live, descriptor, position);
         const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
           kind: "definitions",
           identity: query.identity,
           fetcher: async ({ signal }) => {
             const result = await lspDefinition(descriptor, position, query.lspOptions(signal));
-            updateLspStatusForFile(file, result.status);
+            updateLspStatusForFile(live, result.status);
             return semanticLocationsFromResult(result);
           },
           guards: query.guards,
@@ -16241,28 +16481,29 @@ export function CodeWorkspaceTab({
           queryRes.items,
           "No definition found",
           query.isCurrent,
-          { file, ref: file.ref, position },
+          { file: live, ref: live.ref, position },
         );
       } catch (err) {
         setStatusMessage(errorMessage(err));
         return false;
       }
     },
-    [beginSemanticQuery, lspDescriptorForFile, navigateLocations, recordNavigationLocation, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
 
   const peekDefinition = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return false;
+      const prepared = await prepareSemanticNavigationRequest(file);
+      if (!prepared) return false;
+      const { file: live, descriptor } = prepared;
       try {
-        const query = beginSemanticQuery("definitions", file, descriptor, position);
+        const query = beginSemanticQuery("definitions", live, descriptor, position);
         const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
           kind: "definitions",
           identity: query.identity,
           fetcher: async ({ signal }) => {
             const result = await lspDefinition(descriptor, position, query.lspOptions(signal));
-            updateLspStatusForFile(file, result.status);
+            updateLspStatusForFile(live, result.status);
             return semanticLocationsFromResult(result);
           },
           guards: query.guards,
@@ -16287,26 +16528,36 @@ export function CodeWorkspaceTab({
         return false;
       }
     },
-    [beginSemanticQuery, lspDescriptorForFile, setLocationPeek, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, prepareSemanticNavigationRequest, setLocationPeek, setStatusMessage, updateLspStatusForFile],
   );
 
   const goToDeclaration = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return false;
-      const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+      const prepared = await prepareSemanticNavigationRequest(file);
+      if (!prepared) return false;
+      const { file: live, descriptor } = prepared;
+      const languageId = lspFilesRef.current[live.key]?.status?.languageId
+        ?? descriptor.languageId
+        ?? live.languagePath;
+      if (isDeclarationDefinitionEquivalentLanguage(languageId, live.path)) {
+        return goToDefinition(live, position);
+      }
+      const caps = lspFilesRef.current[live.key]?.status?.capabilities;
       if (caps && caps.declaration === false) {
+        if (caps.definition !== false) {
+          return goToDefinition(live, position);
+        }
         setStatusMessage("Go to declaration is not supported by this language server");
         return false;
       }
       try {
-        const query = beginSemanticQuery("declarations", file, descriptor, position);
+        const query = beginSemanticQuery("declarations", live, descriptor, position);
         const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
           kind: "declarations",
           identity: query.identity,
           fetcher: async ({ signal }) => {
             const result = await lspDeclaration(descriptor, position, query.lspOptions(signal));
-            updateLspStatusForFile(file, result.status);
+            updateLspStatusForFile(live, result.status);
             return semanticLocationsFromResult(result);
           },
           guards: query.guards,
@@ -16316,41 +16567,51 @@ export function CodeWorkspaceTab({
         }
         if (!query.isCurrent(queryRes.identity)) return false;
         if (queryRes.status === "unavailable" || queryRes.status === "error") {
+          if (caps?.definition !== false) {
+            return goToDefinition(live, position);
+          }
           setStatusMessage(queryRes.error ?? "No declaration found");
           return false;
+        }
+        if (queryRes.items.length === 0 && caps?.definition !== false) {
+          return goToDefinition(live, position);
         }
         return navigateLocations(
           "Declarations",
           queryRes.items,
           "No declaration found",
           query.isCurrent,
-          { file, ref: file.ref, position },
+          { file: live, ref: live.ref, position },
         );
       } catch (err) {
+        if (caps?.definition !== false) {
+          return goToDefinition(live, position);
+        }
         setStatusMessage(errorMessage(err));
         return false;
       }
     },
-    [beginSemanticQuery, lspDescriptorForFile, navigateLocations, recordNavigationLocation, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, goToDefinition, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
 
   const goToTypeDefinition = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return false;
-      const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+      const prepared = await prepareSemanticNavigationRequest(file);
+      if (!prepared) return false;
+      const { file: live, descriptor } = prepared;
+      const caps = lspFilesRef.current[live.key]?.status?.capabilities;
       if (caps && !caps.typeDefinition) {
         setStatusMessage("Type definition is not supported by this language server");
         return false;
       }
       try {
-        const query = beginSemanticQuery("typeDefinitions", file, descriptor, position);
+        const query = beginSemanticQuery("typeDefinitions", live, descriptor, position);
         const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
           kind: "typeDefinitions",
           identity: query.identity,
           fetcher: async ({ signal }) => {
             const result = await lspTypeDefinition(descriptor, position, query.lspOptions(signal));
-            updateLspStatusForFile(file, result.status);
+            updateLspStatusForFile(live, result.status);
             return semanticLocationsFromResult(result);
           },
           guards: query.guards,
@@ -16368,33 +16629,34 @@ export function CodeWorkspaceTab({
           queryRes.items,
           "No type definition found",
           query.isCurrent,
-          { file, ref: file.ref, position },
+          { file: live, ref: live.ref, position },
         );
       } catch (err) {
         setStatusMessage(errorMessage(err));
         return false;
       }
     },
-    [beginSemanticQuery, lspDescriptorForFile, navigateLocations, recordNavigationLocation, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
 
   const goToImplementation = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return false;
-      const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+      const prepared = await prepareSemanticNavigationRequest(file);
+      if (!prepared) return false;
+      const { file: live, descriptor } = prepared;
+      const caps = lspFilesRef.current[live.key]?.status?.capabilities;
       if (caps && !caps.implementation) {
         setStatusMessage("Go to implementation is not supported by this language server");
         return false;
       }
       try {
-        const query = beginSemanticQuery("implementations", file, descriptor, position);
+        const query = beginSemanticQuery("implementations", live, descriptor, position);
         const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
           kind: "implementations",
           identity: query.identity,
           fetcher: async ({ signal }) => {
             const result = await lspImplementation(descriptor, position, query.lspOptions(signal));
-            updateLspStatusForFile(file, result.status);
+            updateLspStatusForFile(live, result.status);
             return semanticLocationsFromResult(result);
           },
           guards: query.guards,
@@ -16412,14 +16674,14 @@ export function CodeWorkspaceTab({
           queryRes.items,
           "No implementation found",
           query.isCurrent,
-          { file, ref: file.ref, position },
+          { file: live, ref: live.ref, position },
         );
       } catch (err) {
         setStatusMessage(errorMessage(err));
         return false;
       }
     },
-    [beginSemanticQuery, lspDescriptorForFile, navigateLocations, recordNavigationLocation, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
   goToDefinitionRef.current = goToDefinition;
   peekDefinitionRef.current = peekDefinition;

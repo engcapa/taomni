@@ -1,5 +1,8 @@
 {
   "identifier": "com.taomni.app.qa",
   "productName": "Taomni QA",
-  "mainBinaryName": "taomni"
+  "mainBinaryName": "taomni",
+  "build": {
+    "beforeBuildCommand": "pnpm build --mode qa && bash scripts/bundle-krb5-macos.sh stage"
+  }
 }

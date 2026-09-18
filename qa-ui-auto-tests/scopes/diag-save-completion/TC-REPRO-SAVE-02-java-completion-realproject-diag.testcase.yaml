@@ -1,0 +1,80 @@
+id: TC-REPRO-SAVE-02-java-completion-realproject-diag
+title: "Diag loop: Java member completion must survive Ctrl+S on a copy of the real Maven project"
+description: |
+  Diagnostic loop case for the saved-completion regression. Uses an isolated
+  copy of the real persis-g2-server Maven project (disposable) and a clean
+  renamed probe class so no real file is touched. Waits for Maven project
+  facts to be ready before typing. Every cycle is ONE atomic native_keys
+  sequence (select line, type, save, reselect, retype) so driver round trips
+  cannot collapse the editor selection. Asserts the LSP method row appears
+  on `s1.` after opening and after each save; screenshots capture every
+  popup; the [CX] decision trace lands in the per-case console JSON.
+covers: [F25.5]
+tags: [code-workspace, completion, native, regression, diagnostic]
+modes: [native]
+fixtures: [reset_db]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-completion-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-save-diag","name":"persis-copy","roots":[{"id":"persis-copy","name":"persis-copy","path":"C:/Users/zhyha/AppData/Local/Temp/opencode/taomni-probe/persis-g2-copy","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"persis-copy","path":"src/main/java/com/deepzero/ads/persis/TaomniProbeSaveTmp.java"},"lastOpenedAt":1788566400000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="C:/Users/zhyha/AppData/Local/Temp/opencode/taomni-probe/persis-g2-copy"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  - wait_for:
+      selector: '[data-testid="project-facts-ready-icon"]'
+      timeout_sec: 60
+  # Baseline: caret to the end of the existing `s1.` line (0-based line 5),
+  # then explicit completion (Ctrl+Space) before any save.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Mod+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      focus_prechecked: true
+      keys: ["Control+Space"]
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 60
+  - screenshot: baseline-s1-members.png
+  # Cycle 1 (atomic): edit + save + query members in one key sequence
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      focus_prechecked: true
+      keys: ["Escape", "Home", "Shift+End", "s", "1", ".", "i", "s", "E", "m", "p", "t", "y", "(", ")", ";", "Mod+s", "Home", "Shift+End", "s", "1", "."]
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 30
+  - screenshot: cycle1-s1-members.png
+  # Cycle 2: pure Ctrl+S on an unchanged buffer, then query members
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      focus_prechecked: true
+      keys: ["Escape", "Mod+s", "Home", "Shift+End", "s", "1", "."]
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 30
+  - screenshot: cycle2-pure-save-s1-members.png
+  # Cycle 3: dirty save + pure save back to back, then query members
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      focus_prechecked: true
+      keys: ["Escape", "Home", "Shift+End", "l", "e", "n", "g", "t", "h", "(", ")", ";", "Mod+s", "Mod+s", "Home", "Shift+End", "s", "1", "."]
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 30
+  - screenshot: cycle3-double-save-s1-members.png
