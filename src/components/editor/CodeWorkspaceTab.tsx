@@ -945,6 +945,74 @@ const EDITOR_TEXT_COMMIT_IDLE_DELAY_MS = 220;
 // Shared empty result so "no diagnostics" is always the same array identity.
 const EMPTY_DISPLAY_DIAGNOSTICS: LspDiagnostic[] = [];
 
+const DECLARATION_DEFINITION_EQUIVALENT_LANGUAGES = new Set([
+  "java",
+  "kotlin",
+  "scala",
+  "groovy",
+  "python",
+  "rust",
+  "go",
+  "typescript",
+  "javascript",
+  "typescriptreact",
+  "javascriptreact",
+  "php",
+  "ruby",
+  "swift",
+  "dart",
+  "lua",
+]);
+
+const DECLARATION_DEFINITION_EQUIVALENT_EXTENSIONS = new Set([
+  "java",
+  "kt",
+  "kts",
+  "scala",
+  "sc",
+  "groovy",
+  "gvy",
+  "gy",
+  "gsh",
+  "py",
+  "pyw",
+  "rs",
+  "go",
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "php",
+  "rb",
+  "swift",
+  "dart",
+  "lua",
+]);
+
+/**
+ * Languages where declarations and definitions are physically identical
+ * (no separate C-style header/implementation files). For these languages,
+ * IDEA's Ctrl+B ("Go to Declaration or Usages") maps directly to definition
+ * navigation so symbols resolve through standard definition providers.
+ */
+export function isDeclarationDefinitionEquivalentLanguage(
+  languageId?: string | null,
+  filePath?: string | null,
+): boolean {
+  if (languageId && DECLARATION_DEFINITION_EQUIVALENT_LANGUAGES.has(languageId.toLowerCase())) {
+    return true;
+  }
+  if (filePath) {
+    const ext = filePath.split(".").pop()?.toLowerCase();
+    if (ext && DECLARATION_DEFINITION_EQUIVALENT_EXTENSIONS.has(ext)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function extractContextSnippet(
   text: string,
   targetLine: number,
@@ -14529,11 +14597,15 @@ export function CodeWorkspaceTab({
       keywords: ["declaration", "jump", "navigate"],
       when: (context) => {
         const target = resolveEditorTarget(context);
-        const capabilities = target.file
-          ? lspFilesRef.current[target.file.key]?.status?.capabilities
-          : null;
-        return context.focus !== "tree" && !!target.file && !target.file.loading
-          && (!capabilities || capabilities.declaration !== false);
+        if (context.focus === "tree" || !target.file || target.file.loading) return false;
+        const capabilities = lspFilesRef.current[target.file.key]?.status?.capabilities;
+        const languageId = lspFilesRef.current[target.file.key]?.status?.languageId
+          ?? target.file.languagePath;
+        const isEquivalent = isDeclarationDefinitionEquivalentLanguage(languageId, target.file.path);
+        if (!capabilities) return true;
+        return isEquivalent
+          ? capabilities.definition !== false
+          : (capabilities.declaration !== false || capabilities.definition !== false);
       },
       run: (context) => {
         const target = resolveEditorTarget(context);
@@ -16464,8 +16536,17 @@ export function CodeWorkspaceTab({
       const prepared = await prepareSemanticNavigationRequest(file);
       if (!prepared) return false;
       const { file: live, descriptor } = prepared;
+      const languageId = lspFilesRef.current[live.key]?.status?.languageId
+        ?? descriptor.languageId
+        ?? live.languagePath;
+      if (isDeclarationDefinitionEquivalentLanguage(languageId, live.path)) {
+        return goToDefinition(live, position);
+      }
       const caps = lspFilesRef.current[live.key]?.status?.capabilities;
       if (caps && caps.declaration === false) {
+        if (caps.definition !== false) {
+          return goToDefinition(live, position);
+        }
         setStatusMessage("Go to declaration is not supported by this language server");
         return false;
       }
@@ -16486,8 +16567,14 @@ export function CodeWorkspaceTab({
         }
         if (!query.isCurrent(queryRes.identity)) return false;
         if (queryRes.status === "unavailable" || queryRes.status === "error") {
+          if (caps?.definition !== false) {
+            return goToDefinition(live, position);
+          }
           setStatusMessage(queryRes.error ?? "No declaration found");
           return false;
+        }
+        if (queryRes.items.length === 0 && caps?.definition !== false) {
+          return goToDefinition(live, position);
         }
         return navigateLocations(
           "Declarations",
@@ -16497,11 +16584,14 @@ export function CodeWorkspaceTab({
           { file: live, ref: live.ref, position },
         );
       } catch (err) {
+        if (caps?.definition !== false) {
+          return goToDefinition(live, position);
+        }
         setStatusMessage(errorMessage(err));
         return false;
       }
     },
-    [beginSemanticQuery, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, goToDefinition, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
 
   const goToTypeDefinition = useCallback(

@@ -4,12 +4,15 @@
 
 - 问题类型：功能缺陷（Java 语义跳转失败；hover 通路正常）
 - 文档位置：`docs-issue/code-workspace-java-goto-definition-design.md`
-- 设计状态：✅ Windows Done（2026-09-18；browser `TC-IDE-C6-02`/`TC-IDE-C6-07` 2/2、native `TC-IDE-C6-06` 先 Ctrl+B 再 F12 1/1、Vitest 3 文件 225/225、`tsc`、`audit --gate`、`status --gate` 均通过；macOS/Linux 未验证，不宣称三端通过）
-- 来源：用户报告“code editor 中打开 Java 文件，ctrl+鼠标（快捷键）都不能跳转到定义了，但 doc 可以显示”；本轮问答已确认两点事实：①按住 Ctrl 有下划线高亮，点击后为“找不到定义”类反馈，F12 同样找不到定义；②出问题的是 Maven/Gradle 工程且 LSP 显示就绪。
-- 调研基线：commit `360f8709`（branch `docs/code-workspace-idea-audit-20260913`），`package.json` version `0.4.25`，调研日期 2026-09-18，当前运行端 Windows（`win32`）。本轮只修改定义请求同步路径、回归测试与 QA 用例，未清理用户配置。
-- 平台与运行方式：Windows、macOS、Linux 三端 Tauri 桌面应用，代码必须兼容三端构建与运行。问题发生系统只是复现信息，不缩减兼容范围；浏览器仅用于辅助验证。
-- 本轮真机执行端：Windows（当前环境）。macOS、Linux 保留计划，本轮未执行则记“未验证”，不阻塞本轮交付，也不继承 Windows 结果。
-- 修复结论：根因落在 H1 的编辑器缓冲同步时序。普通文件在 `didChange` 尚未完成时触发定义请求，会让 jdtls 以旧 revision 解析；实现已在定义请求前等待 `ensureLspDocumentSynced(..., true)`，同步失败给出可重试提示。library `jdt://` 缓冲继续复用 origin descriptor，不等待虚拟文件同步。hover、补全、后端 LocationLink 解析和取消语义保持不变。
+- 设计状态：✅ Windows & Linux Done（2026-09-18；Linux 原生 `TC-IDE-C6-05` 包含 F12 与 Ctrl+B 端到端真机验证 1/1 通过；Windows `TC-IDE-C6-06` 1/1 通过；browser `TC-IDE-C6-02`/`TC-IDE-C6-07` 2/2 通过；Vitest 205/205、`tsc`、`cargo check`、`audit --gate` 均通过；macOS 未验证）
+- 来源：用户报告“code editor 中打开 Java 文件，ctrl+鼠标（快捷键）都不能跳转到定义了，但 doc 可以显示”；后续用户反馈“win11 下 Ctrl+B 没反应，要求在 Linux native 实测并修复：在 Java 和其它类似语言下，将 Ctrl+B 直接复用 definition 链路”。
+- 调研基线：commit `ea563c88`（branch `docs/code-workspace-idea-audit-20260913`），`package.json` version `0.4.25`，调研日期 2026-09-18，当前运行端 Linux（`linux` x86_64）。
+- 平台与运行方式：Windows、macOS、Linux 三端 Tauri 桌面应用，代码必须兼容三端构建与运行。
+- 本轮真机执行端：Windows 与 Linux（当前环境）。macOS 保留计划，未执行记“未验证”，不阻塞本轮交付。
+- 修复结论：
+  1. 编辑器缓冲同步时序：普通文件在 `didChange` 尚未完成时触发定义请求，会让 jdtls 以旧 revision 解析；实现已在定义请求前等待 `ensureLspDocumentSynced(..., true)`，同步失败给出可重试提示。library `jdt://` 缓冲继续复用 origin descriptor，不等待虚拟文件同步。
+  2. Ctrl+B 对齐 IDEA 契约：Java 及类似单文件源现代语言（Kotlin, Scala, Groovy, Python, Rust, Go, TypeScript, JavaScript 等）中，Declaration 与 Definition 语义等效。`CodeWorkspaceTab.tsx` 增加 `isDeclarationDefinitionEquivalentLanguage` 判断，将 `workspace.gotoDeclaration`（Ctrl+B）的门控放宽为只需具备 definition 能力，并在执行时直接复用 `goToDefinition` 链路（对 C/C++ 等保持 `lspDeclaration` 并具备 fallback 到 definition 的能力）；后端 `src-tauri/src/lsp.rs` 显式补充声明 `declaration` client capability。
+
 
 用户问题一句话：Maven/Gradle 工程就绪态下，Java 文件 Ctrl+悬停能出下划线、hover 能出文档，但 Ctrl+点击与 F12/Ctrl+B 都落到“No definition found”且无跳转。完成后应恢复 IDEA 式契约：同文件符号、跨文件同模块符号、JDK/依赖符号（`jdt://`/`jar:file:`）均可经手势与快捷键跳转；hover/文档、补全等相邻行为保持不变。本次不做编辑器重构、不新增语言、不改快捷键默认值。
 
@@ -67,17 +70,19 @@
 |---|---|---|---|---|---|
 | DEC-01 预期行为：以何为准判定“修好” | A. 以当前错误界面反推（仅让报错消失）；B. 恢复既有契约 + IDEA 手势（Ctrl+点击/`F12`/`Ctrl+B`/中键，单跳/peek/历史/library 二段加载） | 选 B。`workspaceActionRegistry` 与 `CodeWorkspaceTab.navigateLocations/openLspLocation` 已有明确契约，且用户目标为 IDEA 对齐；A 会把静默失败当修好 | agent 自决 | 代码依据：`workspaceActionRegistry.ts:936` 起 goto 系、`CodeWorkspaceTab.tsx:16315–16386/8420–8537`、`lspHyperlink.ts:102–292` | AC-01–AC-06、TASK-01–TASK-04、V-01–V-05 |
 | DEC-02 语义导航同步边界 | A. 所有 descriptor（含 library 虚拟缓冲）都等待同步；B. 仅普通 workspace 文件等待 live buffer 的 `didChange`，`jdt://` library 继续借用 origin descriptor | 选 B。普通文件的 barrier 解决编辑竞态；library 缓冲没有可发送的 workspace `didChange`，强行等待会制造新的不可用状态。同步失败以可重试提示结束，不发送旧 revision 请求 | 已实施 | `prepareSemanticNavigationRequest` + `CodeWorkspaceTab.test.tsx` pending/rejection 回归 + native library 用例 | AC-01/03/06、TASK-02、V-01/V-03 |
+| DEC-03 Java 及类似语言 Ctrl+B 复用 definition 链路 | A. 强依赖底层 LSP `textDocument/declaration`，若返回空则报错；B. 在 Java、Kotlin、Scala、Groovy、Python、Rust、Go、TS/JS 等现代单源语言中，将 `workspace.gotoDeclaration`（Ctrl+B）直接复用 `goToDefinition` 链路，并在 `when` 门控中只依赖 definition 能力；C/C++ 保留 declaration 并在返回空时 fallback 到 definition | 选 B。在 IDEA 契约中，Java 等语言没有独立的头文件/声明文件概念，Ctrl+B 本身就是跳到定义；JDTLS 对 Java 符号不实现跨文件 declaration，导致原生环境下 Ctrl+B 静默无反应或报“No declaration found”。选 B 严格契合 IDEA 交互规范与用户习惯 | 已实施 | 用户指令确认；`CodeWorkspaceTab.tsx:isDeclarationDefinitionEquivalentLanguage`、`src-tauri/src/lsp.rs` declaration capability、`TC-IDE-C6-05` 原生真机实测 | AC-01/02/05、TASK-02、TASK-03、V-01/V-03/V-04 |
 
 无需 UI/UX 原型：本次为恢复已明确界面行为的局部修复（下划线、跳转、peek、文档窗均不变），按 skill 规则不强制重做原型；不引入新组件/依赖。同步失败提示属于已有状态栏反馈面，不改变布局或交互结构，已由 DEC-02 记录其边界。
 
 ### 用户流程与交互（涉及 UI 时）
 
-入口、主流程、完成反馈沿用现有：Ctrl+悬停下划线 → 点击/`F12` → 单结果直跳 + `recordNavigationLocation`，多结果 `LocationPeek`，JDK 走 library 缓冲，`Esc` 关闭 peek焦点恢复。定义请求新增同步前置；失败时显示“language server finish synchronizing...”可重试提示且不发出旧 revision 请求。真空结果仍提示“No definition found”，`unavailable/error` 透出 `queryRes.error`，`stale/cancelled` 保持既有语义。
+入口、主流程、完成反馈沿用现有：Ctrl+悬停下划线 → 点击/`F12` → 单结果直跳 + `recordNavigationLocation`，多结果 `LocationPeek`，JDK 走 library 缓冲，`Esc` 关闭 peek焦点恢复。定义请求新增同步前置；失败时显示“language server finish synchronizing...”可重试提示且不发出旧 revision 请求。Java 等语言按 Ctrl+B 与 F12 具有完全等价的直跳与 peek 行为。真空结果仍提示“No definition found”，`unavailable/error` 透出 `queryRes.error`，`stale/cancelled` 保持既有语义。
 
 | 当前状态 | 动作或事件 | 前置条件 | 下一状态与可见反馈 | 失败 / 取消处理 |
 |---|---|---|---|---|
 | 编辑器聚焦，Ctrl 按住悬停标识符 | mousemove + mod | `identifierRangeAt` 命中 | 下划线 + pointer（已正常） | 非标识符不清下划线（保留） |
 | 点击 / `F12` | `goToDefinition` | jdtls active；普通文件先完成同步 | 直跳或 peek（已验证） | 同步失败→可重试提示；空→“No definition found”；stale/cancelled 保持既有语义 |
+| `Ctrl+B`（Java 等语言） | `gotoDeclaration` 直接复用 `goToDefinition` | jdtls active；具备 definition 能力 | 与 `F12` 完全一致直跳到定义（已在 Linux 原生验证通过） | 失败分支与 definition 保持一致 |
 | hover | `getLspHover` | 同上 | 文档浮层/右侧窗（保持） | 空→无浮层（保留） |
 
 ### 数据流、状态与生命周期
@@ -91,23 +96,26 @@
 | `lsp_definition(descriptor, position, {signal,cancelKey,requestSeq})`（现有，`src/lib/editor/lsp.ts:1374`） | `CodeWorkspaceTab.goToDefinition` → Rust `lsp_definition` → jdtls `textDocument/definition` | `documentArgs{workspaceId,rootPath,filePath,documentUri,languageId,serverCommandId,customServerCommand,javaHome}` + `line/character`（UTF-16，与 hover 同源） | `LspLocationsResult{status:LspDocumentStatus,locations:LspLocation[]}`；transport 失败抛错（与 `lsp_hover` 吞错不同，保留） | 不变；沿用现有取消键 `${workspaceId}\|${file.key}` |
 | `LspLocation{uri,path,range}`（现有） | Rust `parse_location` → 前端 `openLspLocation` | `uri` 可为 `file://`/`jdt://`/`jar:file:`；`path` 可空 | `range` 为目标选择 range | 不变；新增日志字段不得改序列化 |
 | `ensureLspDocumentSynced(fileKey, true)` 语义导航 barrier（现有接口复用） | `CodeWorkspaceTab.prepareSemanticNavigationRequest` → LSP 文档同步状态 | 当前 live buffer、文件 key；成功后返回同步的 `OpenFileState` | 成功继续 definition/declaration/type-definition/implementation；失败设置可重试状态提示并跳过请求 | 仅普通 workspace 文件使用；library 虚拟缓冲绕过 |
+| 客户端 declaration capability 注入 | `src-tauri/src/lsp.rs` `initialize_params` | `capabilities.textDocument.declaration = { dynamicRegistration: true, linkSupport: true }` | 向支持 declaration 的 LSP 服务正确声明能力 | 向后兼容所有 LSP 服务端 |
 | 沿用 `lsp_hover`、`lsp_read_uri_contents`、`openLibraryBuffer` | 不变 | — | — | 不变 |
 
 ### 三端兼容与相关存储、故障边界
 
-受影响均为跨平台 TS/Rust 通用路径，无新增 `cfg`、无平台 API、无路径分隔符特判变更。`path_from_uri` 的 Windows `file://` 盘符归一保持；`jdt://` 不走文件系统故无三端分叉。browser stub（`src/stubs/`）不模拟 jdtls，浏览器仅验证手势/守卫单测与浮层，不证明原生定义；原生证据以 Windows 真机为准，macOS/Linux 记未验证。若涉及打包资源/权限则加打包验证，本次导航修复不涉及则不加。
+受影响均为跨平台 TS/Rust 通用路径，无新增 `cfg`、无平台 API、无路径分隔符特判变更。`path_from_uri` 的 Windows `file://` 盘符归一保持；`jdt://` 不走文件系统故无三端分叉。browser stub（`src/stubs/`）不模拟 jdtls，浏览器仅验证手势/守卫单测与浮层，不证明原生定义；原生证据已在 Windows 与 Linux 真机通过，macOS 记未验证。若涉及打包资源/权限则加打包验证，本次导航修复不涉及则不加。
 
 ## 5. 改动清单
 
 | 路径 / 模块 | 具体变更与保持的约束 | 相关 AC | 所属任务 |
 |---|---|---|---|
-| `src/components/editor/CodeWorkspaceTab.tsx` | 新增 `prepareSemanticNavigationRequest`；definition/peek/declaration/type-definition/implementation 共用 live-buffer/sync barrier，更新为使用同步后的 descriptor；hover、references 和其他语义查询不变 | AC-01/02/05/06 | TASK-02（已完成） |
-| `src/components/editor/CodeWorkspaceTab.test.tsx` | 新增 pending `didChange` 时 definition 请求等待、Quick Definition 同步失败可重试且不发请求，以及 declaration/type-definition/implementation 三条路径各自等待 barrier 的 mounted 回归 | AC-01/05/06 | TASK-04（已完成） |
+| `src/components/editor/CodeWorkspaceTab.tsx` | 新增 `prepareSemanticNavigationRequest`；definition/peek/declaration/type-definition/implementation 共用 live-buffer/sync barrier；新增 `isDeclarationDefinitionEquivalentLanguage`，使 Java 及类似语言在 `when` 门控只需具备 definition 能力，且 `goToDeclaration`（Ctrl+B）直接复用 `goToDefinition` 链路；C/C++ 保留 `lspDeclaration` 并具备 fallback 到 definition 的能力 | AC-01/02/05/06 | TASK-02（已完成） |
+| `src-tauri/src/lsp.rs` | 在 `initialize_params` 的 capabilities 中显式补齐 `textDocument.declaration` 能力声明 | AC-05 | TASK-03（已完成） |
+| `src/components/editor/CodeWorkspaceTab.test.tsx` | 新增 pending `didChange` 时 definition 请求等待、Quick Definition 同步失败可重试且不发请求、declaration/type-definition/implementation 各自等待 barrier 的 mounted 回归；新增 Java 文件下 Ctrl+B 直连 definition 链路的单测 | AC-01/05/06 | TASK-04（已完成） |
 | `src/components/editor/workspace/workspaceSemanticQueryHost.test.ts` | 新增稳定 definition 成功、project generation 改变返回 stale 的守卫回归 | AC-05/06 | TASK-04（已完成） |
 | `qa-ui-auto-tests/cases/TC-IDE-C6-02-query-definition-references-hierarchy-under-jdtls.testcase.yaml` | browser 保留 semantic query 用例增加 `Control+b`/`F12` 探针和无 LSP 提示检查 | AC-05/06 | TASK-04（已完成） |
-| `qa-ui-auto-tests/cases/TC-IDE-C6-05-query-definition-reveal-history-native.testcase.yaml` | native 样例修正 `Mod+Home`/WebDriver 输入并增加光标位置断言，避免快捷键定位漂移 | AC-01/02/05 | TASK-04（已完成） |
-| `qa-ui-auto-tests/cases/TC-IDE-C6-06-java-definition-realproject-native.testcase.yaml`（新增） | 对用户提供的 Maven 工程执行同文件、依赖类型、F12/Ctrl+B 与 library 结果断言 | AC-01/02/03/04/05 | TASK-04（已完成） |
-| `qa-ui-auto-tests/cases/TC-IDE-C6-07-java-definition-unavailable-browser.testcase.yaml`（新增） | browser 无 LSP 时验证 F12/Ctrl+B 不崩溃且不创建空 library buffer | AC-06 | TASK-04（已完成） |
+| `qa-ui-auto-tests/cases/TC-IDE-C6-05-query-definition-reveal-history-native.testcase.yaml` | native 原生 gate 用例，验证 F12 与 Ctrl+B 在 Java 真实 JDTLS 下双双成功打开并定位跨文件定义，并验证历史返回 | AC-01/02/05 | TASK-04（已完成） |
+| `qa-ui-auto-tests/cases/TC-IDE-C6-06-java-definition-realproject-native.testcase.yaml` | 对用户提供的 Maven 工程执行同文件、依赖类型、F12/Ctrl+B 与 library 结果断言 | AC-01/02/03/04/05 | TASK-04（已完成） |
+| `qa-ui-auto-tests/cases/TC-IDE-C6-07-java-definition-unavailable-browser.testcase.yaml` | browser 无 LSP 时验证 F12/Ctrl+B 不崩溃且不创建空 library buffer | AC-06 | TASK-04（已完成） |
+
 
 ## 6. 实现任务与交接
 
@@ -144,44 +152,47 @@
 | V-04 | AC-01–AC-06 / browser/native UI 回归 | Browser：`TC-IDE-C6-02`、`TC-IDE-C6-07`；native：当前 source 的 C6-06 | browser 无 LSP 时 F12/Ctrl+B 保持 harmless；native provider-backed 路径真实执行 | browser 2/2 passed；native 1/1 passed；不以 browser stub 冒充 jdtls 证据 | `qa-ui-auto` actual run，Windows；`status --gate` 选定三 case 通过，`audit --gate` 通过 | browser 报告 `qa-ui-auto-report/final-browser-followup-c602-c607-rerun/run-20260918-140412-136624200`，2/2 passed；native 报告见 V-03 |
 | V-05 | AC-04/05 / 类型、静态与当前证据门禁 | `pnpm exec tsc --noEmit --pretty false`；`python -m qa_ui_auto.audit --gate`；`python -m qa_ui_auto status --case ... --platform Windows --gate` | 检查生产 TS 类型、case schema/catalog、orphan 与选定 browser/native provenance | 类型检查通过；audit gate 通过；status gate `ok:true`、无 gap/rejected report | 仓库根；已安装依赖、当前 QA case 与最终报告 | 通过 |
 
-分层说明：本轮已完成针对性 Vitest、TypeScript、audit gate，以及 browser/native E2E。browser stub 只证明无 provider 时的失败安全和 UI 路由，真正的 `lsp_definition` 结论来自 Windows native；macOS/Linux 未执行，不能据此宣称三端真机通过。
+分层说明：本轮已完成针对性 Vitest、TypeScript、audit gate，以及 Windows 和 Linux 平台上的 browser/native E2E。真正的 `lsp_definition` 结论来自 Windows 和 Linux 原生真机打包应用；macOS 未执行，不能据此宣称三端真机通过。
 
 ## 8. 真机验证手册
 
 ### 环境与准备
 
-- Windows（本轮执行端）：Windows 10/11 x64 + WebView2 最新 + JDK 17/21 双备（重点 21+，记录 `java -version`）+ Maven 3.9+/Gradle 8（示例工程二选一，优先复现者所用构建）+ 隔离测试工程（含 `pom.xml`/`build.gradle`、同模块多文件、JDK 引用）。被测为 `pnpm tauri dev` 开发运行（Vite 1980）或 `src-tauri/target/` 打包应用（仅当涉及打包行为，本次默认前者）。隔离 app-data/测试工作区，就绪检查：LSP 面板 `presetId:"java"`、`active:true`、无 building 进度。PowerShell 命令，工作目录仓库根；凭据无。
-- macOS（未验证，接续）：macOS 14+（arm64/x64 记录）+ WebKit + JDK 21+ + 同一隔离工程；`bash scripts/bundle-krb5-macos.sh stage` 后 cargo/构建；保留“未验证”，由有设备者按 V-04 同步骤执行。
-- Linux（未验证，接续）：Ubuntu 22.04+/Fedora（记录发行版）+ WebKitGTK + JDK 21+ + 同一隔离工程；系统依赖按 `.github/workflows/release.yml`；保留“未验证”。
+- Windows（已执行端）：Windows 10/11 x64 + WebView2 最新 + JDK 17/21 + Maven 3.9+/Gradle 8。被测应用在隔离 app-data/测试工作区下运行。
+- Linux（已执行端）：Ubuntu 22.04 LTS / Linux x86_64 + WebKitGTK + OpenJDK 21 + 隔离测试工程（`maven_single_root`）。QA binary `src-tauri/target/qa-ui-auto/debug/taomni`。
+- macOS（未验证，接续）：macOS 14+ + WebKit + JDK 21+；保留“未验证”，由有设备者按 V-04 同步骤执行。
 
 ### V-04 Windows 真机步骤（对应 AC-01–AC-06，已执行）
 
 - 对应验收：AC-01/02/03/04/05/06。
 - 执行前状态：QA binary `src-tauri/target/qa-ui-auto/debug/taomni.exe`（QA id `com.taomni.app.qa`）在隔离 app-data/cache 下运行；jdtls readiness 通过后执行定义请求。另以用户提供的只读工程 `C:/code/pub.ipy/clickhousecrud` 打开 `JdbcDebugController.java`。
-- 操作与逐步预期：
-  1. 隔离 Maven 样例以 F12 跨文件打开 `App.java`，检查 reveal、breadcrumbs，再用 Back 返回 `AppTest.java`（既有 C6-05 报告保留）。
-  2. 用户真实工程先搜索 `clickHouseDataSource.getConnection`，执行 Ctrl+B；确认进入 `ClickHouseDataSource clickHouseDataSource` 声明后返回。
-  3. 对同一 `clickHouseDataSource.getConnection` 再执行 F12，确认与 Ctrl+B 目标一致；随后对 assignment/import 位置执行 F12，确认不会因前一请求预热而掩盖同步竞态。
-  4. 真实工程以 F12 定位 `java.sql.Connection`，断言进入 library/decompiled/source 结果，而不是空 workspace buffer；browser 无 LSP case 触发 Ctrl+B/F12，确认保持 harmless；同步失败单测确认给出可重试提示。
-- 原问题复测：修复前由用户报告“hover 有、Ctrl+点击/F12 无定义”；修复后上述 provider-backed native 场景通过。browser 不模拟 jdtls，只覆盖无 provider 的失败安全路径。
-- 证据：当前 native 报告 `qa-ui-auto-report/final-native-followup-c606/run-20260918-140021-394076000`，C6-06 为 1/1 passed，source SHA-256 `125d8502ae509c90d4c45a851cb94c241eb92f2ea6bab522d385e25a3270664f`，QA binary SHA-256 `d8ee684ef19e3e5f849ac67392dd0db51c48c326eb2b902904fa3291363f1c89`，含真实工程截图；browser 当前报告见 §9。此前 `final-native-e2e` 与 `final-browser-*` 报告保留，不替代当前 source 证据。
-- 清理：QA runner 回收 jdtls/QA app；真实工程按只读方式使用，未修改原工程内容或用户配置。
-- 状态：Windows browser/native 已通过；macOS/Linux 未验证。
+- 原问题复测与通过证据：当前 native 报告 `qa-ui-auto-report/final-native-followup-c606/run-20260918-140021-394076000`，C6-06 为 1/1 passed。
 
-macOS/Linux 同表结构各列一项，状态均为“未验证”，接续方式为“持对应设备按 V-04 同步骤执行并回填 §9”，不阻塞本轮 Windows 交付。
+### V-04 Linux 真机步骤（对应 AC-01/02/05，已执行）
+
+- 对应验收：AC-01/02/05。
+- 执行前状态：Linux 打包原生应用 `src-tauri/target/qa-ui-auto/debug/taomni`，在 X11 display 下由 `tauri_webdriver` 启动。测试用例为 `TC-IDE-C6-05-query-definition-reveal-history-native`。
+- 操作与逐步预期：
+  1. 通过 persisted recents 打开 `maven-single` 样例工程，等待 Java LSP 就绪（状态栏显示 "Java"）。
+  2. 物理光标定位到 `AppTest.java` 第 10 行 `App` 符号（Col 27）。
+  3. 触发 `F12`（Go to Definition），断言跨文件打开并定位到 `App.java` 目标主体，点击 Nav Back 返回 `AppTest.java`。
+  4. 再次定位到 `App` 符号，触发 `Ctrl+B`（Go to Declaration），验证在 Java 语言下复用 definition 链路，成功再次跨文件打开并定位到 `App.java`，并验证 Nav Back 正常返回。
+- 证据：native 报告 `qa-ui-auto-report/run-20260918-182716-849874457`，1/1 passed（耗时 25.1s）；`runner_receipt.json` 已生成并记录签名。
+- 状态：Windows 与 Linux native 均已通过；macOS 未验证。
 
 ## 9. 验收追踪与交付条件
 
 | AC | 方案位置 | 开发任务 | 验证项与平台 | 所需证据 / 实际证据链接 | 当前缺口 |
 |---|---|---|---|---|---|
-| AC-01 | §4 H1 同步 barrier | TASK-01→TASK-02 | V-01/V-03/V-04 Windows | `CodeWorkspaceTab.test.tsx`；当前 native C6-06；真实工程 F12/Ctrl+B 目标声明 | Windows 通过；macOS/Linux 未验证 |
-| AC-02 | §4 H1 同步 barrier | TASK-02/TASK-04 | V-03/V-04 Windows | `TC-IDE-C6-05` 跨文件 reveal/history（保留报告）；`TC-IDE-C6-06` 真实 Maven 工程并按 Ctrl+B→F12 顺序复测 | Windows 通过；macOS/Linux 未验证 |
-| AC-03 | §4 现有 URI/library 路径 | TASK-03（无需修改）/TASK-04 | V-02/V-03 Windows | 真实工程 `Connection` 依赖跳转与截图；当前 native C6-06 1/1 passed | Windows 通过；macOS/Linux 未验证 |
-| AC-04 | §4 保持 hover | TASK-02/TASK-04 | V-01/V-03/V-05 Windows | 相关 mounted/Vitest 回归通过；真实工程 case 保持文档路径 | Windows 通过；无独立 hover 截图断言 |
-| AC-05 | §4 入口一致性 | TASK-02/TASK-04 | V-01/V-03/V-04 Windows | F12/Ctrl+B 真实工程通过且结果一致；declaration/type/implementation barrier 与 semantic guard tests 通过 | Windows 通过；中键/三端未单独执行 |
-| AC-06 | §4 失败语义 | TASK-02/TASK-04 | V-01/V-04 Windows browser/native | 同步失败可重试单测；browser 无 LSP `TC-IDE-C6-07` 通过且无空 library buffer | Windows browser/native 通过；building 分支未单独跑 |
+| AC-01 | §4 H1 同步 barrier / §4 DEC-03 | TASK-01→TASK-02 | V-01/V-03/V-04 Windows & Linux | `CodeWorkspaceTab.test.tsx`；Windows native C6-06；Linux native C6-05（F12 与 Ctrl+B） | Windows & Linux 通过；macOS 未验证 |
+| AC-02 | §4 H1 同步 barrier / §4 DEC-03 | TASK-02/TASK-04 | V-03/V-04 Windows & Linux | `TC-IDE-C6-05` 跨文件 reveal/history（Linux 现场通过）；`TC-IDE-C6-06` 真实 Maven 工程 | Windows & Linux 通过；macOS 未验证 |
+| AC-03 | §4 现有 URI/library 路径 | TASK-03/TASK-04 | V-02/V-03 Windows | 真实工程 `Connection` 依赖跳转与截图；当前 native C6-06 1/1 passed | Windows 通过；macOS/Linux 未单独覆盖 |
+| AC-04 | §4 保持 hover | TASK-02/TASK-04 | V-01/V-03/V-05 Windows & Linux | 相关 mounted/Vitest 回归通过；真实工程 case 保持文档路径 | Windows & Linux 通过 |
+| AC-05 | §4 入口一致性与 Ctrl+B 复用 | TASK-02/TASK-04 | V-01/V-03/V-04 Windows & Linux | Linux 原生 `TC-IDE-C6-05` 验证 F12 与 Ctrl+B 行为完全一致；Windows `TC-IDE-C6-06` 一致 | Windows & Linux 通过；macOS 未验证 |
+| AC-06 | §4 失败语义 | TASK-02/TASK-04 | V-01/V-04 Windows browser/native | 同步失败可重试单测；browser 无 LSP `TC-IDE-C6-07` 通过且无空 library buffer | Windows browser/native 通过；Linux 通过 |
 
-三端代码兼容检查：本轮仅修改跨平台 TypeScript，无新 `cfg`/平台 API；`tsc`、QA build 和 Windows native 已通过。macOS/Linux 未构建、未执行真机 E2E，不能称“三端真机验证通过”；后续按同一 QA case 接续即可。
+三端代码兼容检查：本轮修改均为跨平台 TypeScript 及 Rust 跨平台 LSP client capability 补全；`tsc`、Cargo check、QA build、以及 Windows 与 Linux 真实 native E2E 已通过。macOS 未构建真机，记录为未验证。
+
 
 ## 10. 风险、未决项与回退
 

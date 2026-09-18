@@ -73,4 +73,32 @@ steps:
       selector: '[data-testid="code-workspace-editor"]'
       contains: "appHasMain"
       timeout_sec: 30
+  # Ctrl+B (Go to Declaration) parity: in Java, Ctrl+B routes directly to
+  # definition navigation, opening and revealing App.java.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Mod+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight"]
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: 'Ln 10, Col 27'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+b"]
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-tab-strip"]'
+      contains: "App.java"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public static void main"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-nav-back"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-tab-strip"]'
+      contains: "AppTest.java"
+      timeout_sec: 30
   - screenshot: tc-ide-c6-05-definition-reveal.png
+

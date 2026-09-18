@@ -7762,6 +7762,7 @@ describe("CodeWorkspaceTab", () => {
       available: true,
       active: true,
       capabilities: defaultCapabilities({
+        definition: true,
         declaration: true,
         typeDefinition: true,
         implementation: true,
@@ -7770,6 +7771,7 @@ describe("CodeWorkspaceTab", () => {
     workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Main.java", source));
     lspMocks.lspOpenDocument.mockResolvedValue(status);
     lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDefinition.mockResolvedValue({ status, locations: [] });
     lspMocks.lspDeclaration.mockResolvedValue({ status, locations: [] });
     lspMocks.lspTypeDefinition.mockResolvedValue({ status, locations: [] });
     lspMocks.lspImplementation.mockResolvedValue({ status, locations: [] });
@@ -7812,7 +7814,7 @@ describe("CodeWorkspaceTab", () => {
     });
 
     const providerByCommand = {
-      "workspace.gotoDeclaration": lspMocks.lspDeclaration,
+      "workspace.gotoDeclaration": lspMocks.lspDefinition,
       "workspace.gotoTypeDefinition": lspMocks.lspTypeDefinition,
       "workspace.gotoImplementation": lspMocks.lspImplementation,
     } as const;
@@ -7845,6 +7847,72 @@ describe("CodeWorkspaceTab", () => {
       await waitFor(() => expect(changeCalls).toBe(blockedCall + 1));
       await waitFor(() => expect(provider, commandId).toHaveBeenCalled(), { timeout: 3_000 });
     }
+  });
+
+  it("routes Ctrl+B (Go to Declaration) directly to definition navigation for Java files", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-java-ctrl-b-definition-reuse",
+      workspaceInstanceId: "instance-java-ctrl-b-definition-reuse",
+      name: "Java Ctrl+B definition reuse",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Main.java" },
+    };
+    const source = "class Main { void target() {} void call() { target(); } }\n";
+    const status = documentStatus({
+      path: "/repo/app/src/Main.java",
+      uri: "file:///repo/app/src/Main.java",
+      presetId: "java",
+      languageId: "java",
+      displayName: "Java",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({
+        definition: true,
+        declaration: false,
+      }),
+    });
+    const target = {
+      uri: "file:///repo/app/src/Main.java",
+      path: "/repo/app/src/Main.java",
+      range: { start: { line: 0, character: 19 }, end: { line: 0, character: 25 } },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Main.java", source));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDefinition.mockResolvedValue({ status, locations: [target] });
+    lspMocks.lspDeclaration.mockResolvedValue({ status, locations: [] });
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/Main.java");
+    const fileKey = "root:app:src/Main.java";
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-java-ctrl-b-definition-reuse")
+        .lspFiles[fileKey]?.syncedText,
+    ).toBe(source));
+
+    // Even though declaration capability is false, definition capability is true so Go to Declaration stays enabled
+    await waitFor(() => expect(registrationRef.current?.items.find(
+      (item) => item.id === "workspace.gotoDeclaration",
+    )?.enabled).toBe(true));
+
+    lspMocks.lspDefinition.mockClear();
+    lspMocks.lspDeclaration.mockClear();
+
+    await act(async () => {
+      await registrationRef.current?.executeAction("workspace.gotoDeclaration");
+      await Promise.resolve();
+    });
+
+    // In Java, Ctrl+B reuses the definition pipeline directly
+    await waitFor(() => expect(lspMocks.lspDefinition).toHaveBeenCalled());
+    expect(lspMocks.lspDeclaration).not.toHaveBeenCalled();
   });
 
   it("ingests workspace test coverage report and renders coverage dock panel", async () => {
