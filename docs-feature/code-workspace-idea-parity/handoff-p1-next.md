@@ -36,7 +36,9 @@ P1 选卡不写开发 owner/claimed_at/baseline，不另设一套规划 owner/st
 .agents/skills/code-workspace-idea-parity/SKILL.md
 .agents/skills/code-workspace-idea-task/SKILL.md
 .agents/skills/code-workspace-idea-task/references/backlog-authoring.md
-按需读取 idea-reference、feature-design、issue-design、qa-ui-auto；跨工具 skill 名表示读取相应文件，
+必须读取 .agents/skills/qa-ui-auto/SKILL.md、references/authoring.md 的 Design To Implementation Handoff
+和 references/efficient-verification.md（references 均相对该 skill）；重构既有行为读 regression-protection.md，
+设计 YAML 步骤时核对 verb-catalog.md。按需读取 idea-reference、feature-design、issue-design；跨工具 skill 名表示读取相应文件，
 不是 shell 命令。不要自行委派其他 agent。
 
 先记录当前分支、HEAD 和工作区改动。明确使用下面两个只读命令，不使用脚本默认板或旧板示例：
@@ -78,8 +80,32 @@ planning_required 只是是否仍待 P1 细化的标记，不代表开发可领�
 6. 缺必要目标决定时询问用户；普通实施细节自主收敛。本包太大时收窄到 P0 已指定的首包，
    不静默移除验收或自行新增任务。确需拆新卡/增加范围时交回 P0 增量产卡，保留本卡确定部分。
 
+【测试用例必须写在哪里、写到什么程度】
+在本卡 spec 链接的设计文档内写完整“测试用例设计”，使用 test-cases 锚点；已有完整验证小节可复用。
+默认放 docs-feature/code-workspace-idea-parity/ 的本卡设计；修复设计可在 docs-issue/。任务板及 P2
+交接链接准确文件/锚点。不要仅写 AC/V 标题、测试命令，或把用例留在聊天里。
+用例优先 modes: [browser]；每个 native 检查必须注明 browser 无法证明的具体断言与真实边界。
+应用内 Action、快捷键和焦点默认用 browser，纯 renderer 变化不自动增加 native smoke；保留明确原生 AC。
+按 qa-ui-auto authoring.md 的 Coverage Dimensions And Mode Selection，在同一设计中映射所有受影响
+UI 状态/布局、控件操作、Action 各实际入口、快捷键及焦点/keymap 上下文、异常恢复和共享消费者。
+每项列 AC/V、控件/Action/绑定、操作/预期、test/case、模式及 native 理由、结果或缺口；控件需实际操作，
+Action 需验证可用/禁用、路由和效果，快捷键需实际按键并覆盖相关 modifier、冲突、输入框保护和重复触发。
+不能以 handler 单测代替入口测试、菜单点击代替快捷键、控件存在或 happy path 代替完整覆盖。
+每个受影响入口/绑定/状态转换都有断言，不适用注明理由，未支持/未执行记缺口；可合并重复准备和结果
+检查，不能借“最小充分”缩减覆盖，也不要求无关组合穷举。
+每例包含 V ID/AC、目标或保留行为、前置/隔离 fixture、操作序列、关键步骤及最终预期、相关边界/
+失败/取消/迟到/恢复/消费者回归、清理、层级/browser/native/平台、执行方式及证据位置。
+列出现有或拟新增的精确 test/case 路径、YAML ID/测试名、feature/covers、controls/testid、支持的 verbs，
+新增项查重并标“P2 待实现”；IDEA 比较包含匹配参照状态。缺 fixture/verb/原生支持时明确 P2 实现责任
+或可复现手工步骤；未知预期不能推给 P2 猜测。逐 AC 映射目标和受影响保留行为，复用充分的已有测试。
+P2 将可执行 UI 用例写入 qa-ui-auto-tests/cases/TC-<id>-<slug>.testcase.yaml，维护 feature-list.md
+及 covers/controls；单测放 src/**/*.test.ts(x)、Rust inline 或 src-tauri/tests/integration/。
+原生/手工检查可链接 qa-ui-auto-tests/native/ 的适用 runbook；运行证据放 qa-ui-auto-report/（不入库）。
+P1 只写设计和交接，不改上述可执行测试/目录，不运行产品测试；所有产品验证保持未执行。
+用例设计与 P2 实现责任齐全才算规划就绪，尚待 P2 编写的文件不冒充已有测试，也不等于规划未完成。
+
 【三、更新同一卡并交给 P2】
-完整 spec、参照、AC/V、保留断言、文件责任和依赖就绪后，按 task authoring 流程将本板同一卡
+完整 spec、参照、AC/V、完整用例设计及路径映射、保留断言、文件责任和依赖就绪后，按 task authoring 流程将本板同一卡
 从 deferred 更新为 ready，将 p0.planning_required 改为 false；不写开发 owner 或虚构执行证据。
 required_evidence 与设计一致；不能删除已知失败或必须验证的要求来制造 ready。
 未满足前置则保留 deferred 和 planning_required=true，在卡内 note/spec 写具体待补信息；
@@ -93,6 +119,8 @@ required_evidence 与设计一致；不能删除已知失败或必须验证的�
 加本次任务 ID 的小写形式再加 .md，名称由你自动确定。交接完整填写原 P2 模板，必须写死
 docs-feature/code-workspace-idea-parity/backlog.md 和实际选中的新卡 ID；
 以及本轮设计、DEC/AC/V、参考/fixture、目标环境、owner 范围、依赖、保留断言、最小验证和当前 HEAD/diff。
+必须包含完整用例设计文件/锚点、AC→V→现有/拟新增 test/case 路径与 ID，以及 P2 的测试/设施实现责任；
+保留 P2 模板中的 qa-ui-auto 用例落盘、目录维护、运行及证据回填要求。
 不得让 P2 自行选板、猜 ID 或转去旧 ED-REF-001 等历史卡。
 
 最终交付：本次选定的新卡路径/ID、来源 REQ/CW、规划结果、设计/参考/交接路径、实际文档校验、

@@ -1,0 +1,98 @@
+id: TC-IDE-PARITY-003
+title: "Preview-to-formal, same-file split share, single undo and non-last close retention (browser)"
+description: |
+  ED-PARITY-003 browser gate case (REQ-04 / CW-TAB-001, CW-TAB-002).
+  Covers the S2..S7 browser-reachable slice of the continuous loop on the
+  browser VFS: formal tab -> Split Right (two panes, same buffer) -> typed
+  marker mirrors in real time with dirty marking -> one Ctrl+Z reverts both
+  panes (single shared undo) with redo re-applying both -> closing the
+  non-last view needs no confirm and keeps the survivor's text and dirty
+  state -> closing the last dirty view raises the discard confirm and Cancel
+  is zero effect. S0/S1 preview-italic promotion and S3 caret isolation are
+  covered by the mounted production test (CodeWorkspaceTab.test.tsx
+  ED-PARITY-003) and stay out of this browser slice; the S6 single-pane
+  collapse delta (Taomni keeps the emptied leaf) is recorded in the
+  idea-comparison, not claimed here. Highest green claim: L1 browser-wired
+  split/share/undo/close.
+covers: [F25.5]
+tags: [code-workspace, ide-c4, split, preview, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-tools"]'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+
+  # Add the browser-VFS preview root and open its seeded README as a formal tab.
+  - click: '[data-testid="code-workspace-tree-add-folder"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+
+  # S2: Split Right renders a second pane for the same buffer.
+  - click: '[data-testid="code-workspace-split-right"]'
+  - assert_count: {selector: '[data-testid="code-workspace-editor-pane"]', min: 2}
+  - wait: 0.5
+
+  # S4: type in the primary leaf; the second leaf mirrors it in real time.
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+  - type: PARITY003-SYNC
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"]) .cm-editor'
+      contains: "PARITY003-SYNC"
+      timeout_sec: 30
+  # Both tabs carry the dirty marking.
+  - assert_text:
+      selector: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+      contains: "*"
+  - screenshot: tc-ide-parity-003-split-sync.png
+
+  # S5: one shared undo reverts both panes; redo re-applies both.
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+  - press: Control+z
+  - eval_readonly:
+      expression: "!document.querySelectorAll('.cm-editor')[0].innerText.includes('PARITY003-SYNC')"
+      expect_truthy: true
+  - eval_readonly:
+      expression: "!document.querySelectorAll('.cm-editor')[1].innerText.includes('PARITY003-SYNC')"
+      expect_truthy: true
+  - press: Control+Shift+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
+      contains: "PARITY003-SYNC"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: "document.querySelectorAll('.cm-editor')[1].innerText.includes('PARITY003-SYNC')"
+      expect_truthy: true
+
+  # S6: close the non-last view while dirty: no confirm, survivor keeps text and dirty state.
+  - click: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"]) [title="Close"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
+      contains: "PARITY003-SYNC"
+      timeout_sec: 15
+  - assert_count:
+      selector: '[data-testid="confirm-dialog"]'
+      equal: 0
+  - assert_text:
+      selector: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+      contains: "*"
+  - screenshot: tc-ide-parity-003-after-close.png
+
+  # S7: closing the last dirty view raises the confirm; Cancel is zero effect.
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] [title="Close"]'
+  - wait_for: '[data-testid="confirm-dialog"]'
+  - click: '[data-testid="confirm-dialog-cancel"]'
+  - assert_visible: '[data-testid="code-workspace-editor-tab-strip"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
+      contains: "PARITY003-SYNC"
+      timeout_sec: 15
+  - screenshot: tc-ide-parity-003-dirty-cancel.png

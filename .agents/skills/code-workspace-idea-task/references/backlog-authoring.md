@@ -49,6 +49,19 @@ status, or completion evidence unless the caller requests that change.
 
 ## Handoff Check
 
+For a planning-to-implementation handoff, follow
+[qa-ui-auto's case design contract](../../qa-ui-auto/references/authoring.md#design-to-implementation-handoff).
+The linked spec must contain complete cases at `test-cases` or an existing detailed
+verification anchor, not only AC/V labels or commands. Name existing/proposed YAML
+paths under `qa-ui-auto-tests/cases/`, unit/native checks, fixture/control gaps and
+the P2 implementation responsibility. Link that section from the card and handoff;
+planning readiness requires defined actions and expected results, not executed
+tests. Documentation-only P1 does not edit executable cases or claim test passes.
+Map all affected UI states, controls, Action entries, shortcut bindings and
+recovery/retained behavior using qa-ui-auto's coverage dimensions. Prefer browser;
+each native check names the assertion browser cannot prove. Planning readiness
+requires this coverage mapping, not just a happy path or control-touch inventory.
+
 Run both commands with the exact selected board path. The dated path below is
 only a syntax example; replace it with the caller-selected board:
 

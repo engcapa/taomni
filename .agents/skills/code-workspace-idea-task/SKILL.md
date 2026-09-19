@@ -48,6 +48,10 @@ Use the repository `qa-ui-auto` skill for UI workflows, testcase/catalog changes
 
 Before updating the board, review the final diff and re-check every acceptance ID against the actual production path. Preserve failed checks before successful reruns in chronological evidence.
 
+When consuming a planning handoff, follow [case design to implementation](../qa-ui-auto/references/authoring.md#design-to-implementation-handoff): read the linked design's complete cases, implement/reuse the mapped `qa-ui-auto-tests/cases/TC-*.testcase.yaml` and focused unit/native checks, maintain covers/controls, and return AC/V -> actual test -> result/evidence links. Planned tests in prose are not executable coverage; fill routine case-detail gaps within the authorized contract before verification.
+
+Prefer browser cases and apply [coverage dimensions](../qa-ui-auto/references/authoring.md#coverage-dimensions-and-mode-selection) to all affected UI states, controls, Action entries, shortcuts and retained behavior. Exercise real entries and key combinations; handler tests alone do not prove wiring. Use native only for named assertions browser cannot establish, preserving explicit native acceptance. Minimize duplicate runs, not behavioral coverage.
+
 A single native/provider/UI execution may cover several kinds/ACs with separate assertions; link it once instead of rebuilding or re-running per kind. For visible changes, use [visual/interaction comparison](../qa-ui-auto/references/idea-visual-interaction.md). Ordinary comparison-validator success is not a measured IDEA match. Stop testing when the sufficient required checks pass; expand only for new changes, failures or unresolved requirements.
 
 ## Finish One Task

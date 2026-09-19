@@ -19,6 +19,7 @@ skill; `qa-ui-auto` remains the canonical installed name and CLI.
 | Develop/verify a feature, or tests/builds are slow | [efficient-verification.md](references/efficient-verification.md) |
 | Refactor existing behavior, shared UI/state, or investigate a regression | [regression-protection.md](references/regression-protection.md) |
 | Run known cases | Read their assertions and requirements, run the selected mode directly; no mandatory audit/plan/status cycle |
+| Design test cases for an implementation handoff | [authoring.md](references/authoring.md#design-to-implementation-handoff) for locations, case detail and planning/implementation responsibilities |
 | Author YAML or controls | [authoring.md](references/authoring.md) and relevant [verb-catalog.md](references/verb-catalog.md) entries |
 | Launch native QA | [native-testing.md](references/native-testing.md) |
 | Claim current coverage, combine reports or release | [verification.md](references/verification.md) |
@@ -35,8 +36,12 @@ Do not turn routine feature work into a release checklist or full capability aud
    consumers beyond feature labels. Use [regression protection](references/regression-protection.md)
    for behavior refactors; establish the relevant pre-change baseline and reuse
    meaningful tests, not tests that mirror implementation details.
-2. Iterate with focused unit/mounted tests and browser UI. Native-only defects
-   need an early distinguishing probe, not a native rebuild after every edit.
+2. Prefer browser cases for UI, controls, Actions and app-local shortcuts, with
+   focused unit/mounted tests as support. Cover every affected behavior and entry
+   before minimizing runs; browser-first never means smoke-only. Use native only
+   for named assertions browser cannot establish, documenting the boundary and
+   reason. Native-only defects need an early distinguishing probe, not a native
+   rebuild after every edit.
 3. Stabilize related code/tests, build QA once per required input/configuration,
    then run selected native scenarios. Reuse matching builds and browser workers.
    Keep native sessions isolated and sequential.
@@ -46,8 +51,10 @@ Do not turn routine feature work into a release checklist or full capability aud
    for a relevant change, failure recovery or unresolved assertion. Stop when the
    required checks pass; integration/release gates apply only in that scope.
 
-For desktop delivery, pure renderer changes use browser feedback during iteration
-and a focused current-WebView visual smoke at completion. Explicit browser-only
+For desktop delivery, pure renderer changes default to browser verification.
+Add a focused current-WebView smoke only for a concrete WebView/packaging risk or
+an explicit native acceptance requirement; desktop delivery alone does not make
+every case native. Record untested packaged-WebView behavior as unverified. Explicit browser-only
 or skill/tool verification stays within that scope and records packaged-WebView
 behavior as unverified; it does not inherit an app build requirement.
 IPC, disk, processes, dialogs,
