@@ -1,0 +1,17 @@
+modules = ["nodejs-20", "rust-stable", "python-3.12", "web", "rust-nightly"]
+run = "bash scripts/setup-replit-qa.sh"
+
+[nix]
+channel = "stable-25_05"
+packages = ["gitFull", "libyaml", "playwright-driver", "glib", "nspr", "nss", "atk", "dbus", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libxcb", "mesa", "libxkbcommon", "alsa-lib", "at-spi2-atk", "libgbm", "libdrm", "xorg.libXi", "xorg.libXtst", "pango", "cairo", "cups", "expat", "fontconfig", "freetype", "harfbuzz", "gtk3", "webkitgtk_4_1", "libsoup_3", "glib-networking", "pipewire", "clang", "llvmPackages.libclang", "krb5", "protobuf", "pkg-config", "gcc", "nasm", "meson", "ninja", "patchelf", "v4l-utils", "xorg.xorgserver", "xorg.xprop", "xorg.xwininfo", "wmctrl", "fcitx5", "fcitx5-gtk", "fcitx5-chinese-addons", "jdk21", "maven", "gradle", "libappindicator-gtk3", "librsvg", "perl", "tigervnc", "fluxbox"]
+
+[env]
+PYTHONPATH = ".agents/skills/qa-ui-auto/scripts"
+PLAYWRIGHT_BROWSERS_PATH = ".local/share/taomni-qa-ui-auto/playwright-browsers"
+
+[agent]
+expertMode = true
+
+[[ports]]
+localPort = 5000
+externalPort = 80

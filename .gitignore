@@ -97,7 +97,6 @@ temp/
 # Replit
 .cache/
 .local/
-.replit
 .replit-artifact/
 .config/
 .upm/
