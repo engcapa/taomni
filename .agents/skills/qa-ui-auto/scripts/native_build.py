@@ -22,6 +22,15 @@ BUILD_RECIPE = "python .agents/skills/qa-ui-auto/scripts/native_build.py"
 REPLIT_NATIVE_SETUP = ROOT / "scripts" / "setup-replit-native-qa.sh"
 
 
+def add_target_bindgen_args(env: dict[str, str]) -> dict[str, str]:
+    """Mirror bindgen flags to Cargo's target-specific environment names."""
+    args = env.get("BINDGEN_EXTRA_CLANG_ARGS")
+    if args:
+        env["BINDGEN_EXTRA_CLANG_ARGS_x86_64-unknown-linux-gnu"] = args
+        env["BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu"] = args
+    return env
+
+
 def binary_digest(binary: Path) -> str:
     digest = hashlib.sha256()
     with binary.open("rb") as stream:
@@ -56,9 +65,9 @@ def configured_environment(base: dict[str, str] | None = None) -> dict[str, str]
     """
     env = dict(os.environ if base is None else base)
     if env.get("TAOMNI_REPLIT_NATIVE_QA") != "1" or not REPLIT_NATIVE_SETUP.is_file():
-        return env
+        return add_target_bindgen_args(env)
     if env.get("TAOMNI_NATIVE_QA_TOOLCHAIN_READY") == "1":
-        return env
+        return add_target_bindgen_args(env)
 
     command = [
         "bash",
@@ -76,7 +85,7 @@ def configured_environment(base: dict[str, str] | None = None) -> dict[str, str]
             continue
         key, value = item.split(b"=", 1)
         env[key.decode()] = value.decode()
-    return env
+    return add_target_bindgen_args(env)
 
 
 def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) -> dict:
@@ -93,6 +102,8 @@ def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) ->
             "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET", "RUSTUP_TOOLCHAIN",
             "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG", "CC", "CXX", "CFLAGS",
             "CARGO_PROFILE_DEV_INCREMENTAL", "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS",
+            "BINDGEN_EXTRA_CLANG_ARGS_x86_64-unknown-linux-gnu",
+            "BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu",
             "LIBCLANG_PATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "LIBGSSAPI_IMPL",
             "TAOMNI_REPLIT_NATIVE_QA", "TAOMNI_NATIVE_QA_TOOLCHAIN",
             "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM", "NODE_ENV")},

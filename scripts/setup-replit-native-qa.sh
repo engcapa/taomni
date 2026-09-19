@@ -91,6 +91,9 @@ gcc_header_args="$(
 )"
 if [[ -n "$gcc_header_args" ]]; then
   export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:-}${BINDGEN_EXTRA_CLANG_ARGS:+ }${gcc_header_args}"
+  # Cargo/build scripts may look up bindgen flags through the target-specific
+  # underscore spelling instead of the generic variable.
+  export BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu="$BINDGEN_EXTRA_CLANG_ARGS"
 fi
 
 # pkg-config normally supplies this path, but the final rust-lld invocation
