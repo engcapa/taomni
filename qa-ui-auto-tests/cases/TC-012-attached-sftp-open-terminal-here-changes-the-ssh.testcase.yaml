@@ -41,7 +41,7 @@ steps:
   - press: Enter
   - assert_text:
       selector: '[data-testid="sftp-remote-path"]'
-      contains: "qa-ui-auto"
+      contains: "temp"
       timeout_sec: 15
   - click: "[data-testid=\"sftp-remote-open-terminal-here\"]"
   - wait: 3

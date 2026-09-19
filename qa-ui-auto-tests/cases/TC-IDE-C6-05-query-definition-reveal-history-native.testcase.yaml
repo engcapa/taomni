@@ -7,11 +7,13 @@ description: |
   the `App` symbol in AppTest.java with physical keys, fires F12 (Go to Definition)
   through the production keymap, and proves cross-file open/reveal (App.java
   tab + body) plus navigation-history back to AppTest.java. All keystrokes
-  use native_keys so the exact test window self-activates before XTest
-  injection. Highest claim on green: L2 provider-backed (Linux).
+  use native WebDriver key actions so the packaged WebView receives the same
+  platform-native modifier mapping on Linux, Windows, and macOS. Highest claim
+  on green: L2 provider-backed native desktop behavior.
 covers: [F25.5]
 tags: [code-workspace, ide-c6, query, declaration, native-gate, p1]
 modes: [native]
+native_platforms: [Linux, macOS, Windows]
 fixtures: [reset_db, java_sample_projects]
 timeout_sec: 600
 steps:
@@ -22,6 +24,31 @@ steps:
   - seed_storage:
       key: taomni.recentWorkspaces.v1
       value: '[{"id":"qa-q4","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/test/java/com/example/single/AppTest.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  # The shared sample intentionally contains an incomplete completion token.
+  # This provider navigation case needs a valid test source so JDT LS can
+  # finish indexing before the definition assertions.
+  - host_write_file:
+      path: "${fixture.maven_single_root}/src/test/java/com/example/single/AppTest.java"
+      text: |
+        package com.example.single;
+
+        import org.junit.Test;
+        import org.junit.Assert;
+
+        public class AppTest {
+
+            @Test
+            public void appHasMain() {
+                Assert.assertTrue(App.class.getDeclaredMethods().length > 0);
+            }
+
+            /** Test source-set target: proves junit is on the test classpath for completion. */
+            void testSourceSetTargets() {
+                if (false) {
+                    Assert.assertTrue(true);
+                }
+            }
+        }
   - reload_window: null
   - click: '[data-testid="welcome-history-tab-workspaces"]'
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
@@ -73,7 +100,8 @@ steps:
       selector: '[data-testid="code-workspace-editor"]'
       contains: "appHasMain"
       timeout_sec: 30
-  # Ctrl+B (Go to Declaration) parity: in Java, Ctrl+B routes directly to
+  # Mod+B (Go to Declaration) parity: in Java, the platform-native modifier
+  # routes directly to
   # definition navigation, opening and revealing App.java.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - native_keys:
@@ -86,7 +114,7 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+b"]
+      keys: ["Mod+b"]
   - assert_text:
       selector: '[data-testid="code-workspace-editor-tab-strip"]'
       contains: "App.java"
@@ -101,4 +129,3 @@ steps:
       contains: "AppTest.java"
       timeout_sec: 30
   - screenshot: tc-ide-c6-05-definition-reveal.png
-

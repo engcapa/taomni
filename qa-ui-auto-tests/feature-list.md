@@ -5210,10 +5210,14 @@ controls:
     optional: true       # rendered for each workspace root with execution targets
   - id: run-configuration-edit
     selector: '[data-testid^="run-panel-configuration-edit-run:"]'
+    aliases:
+      - '[data-testid^="run-panel-configuration-edit-java-main:"]'
     kind: interactive
     optional: true       # requires a language fixture with a detected run target
   - id: run-configuration-copy
     selector: '[data-testid^="run-panel-configuration-copy-run:"]'
+    aliases:
+      - '[data-testid^="run-panel-configuration-copy-java-main:"]'
     kind: interactive
     optional: true       # requires a language fixture with a detected run target
   - id: run-configuration-source

@@ -3,7 +3,7 @@ title: Native QA startup opens a local PTY and receives shell output
 covers: [F1.6, F2.1, F2.2]
 tags: [smoke, p0, native-boundary, terminal]
 modes: [native]
-native_platforms: [Linux, Windows]
+native_platforms: [Linux, macOS, Windows]
 fixtures: [reset_db]
 timeout_sec: 60
 steps:
@@ -14,7 +14,7 @@ steps:
   - wait_for: '[data-testid="terminal-pane"]'
   - assert_pattern:
       selector: '[data-testid="terminal-pane"]'
-      regex: '(?m)[$#>]\s*$'
+      regex: '(?m)[$#>%]\s*$'
       timeout_sec: 20
   - click: '[data-testid="terminal-pane"]'
   - type: echo QA_NATIVE_SHELL_READY

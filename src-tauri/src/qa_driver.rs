@@ -488,7 +488,10 @@ async fn actions_script<R: Runtime>(
           '\uE00A':'Alt','\uE00B':'Pause','\uE00C':'Escape','\uE00D':' ',
           '\uE00E':'PageUp','\uE00F':'PageDown','\uE010':'End','\uE011':'Home',
           '\uE012':'ArrowLeft','\uE013':'ArrowUp','\uE014':'ArrowRight','\uE015':'ArrowDown',
-          '\uE016':'Insert','\uE017':'Delete','\uE03D':'Meta'
+          '\uE016':'Insert','\uE017':'Delete',
+          '\uE031':'F1','\uE032':'F2','\uE033':'F3','\uE034':'F4','\uE035':'F5','\uE036':'F6',
+          '\uE037':'F7','\uE038':'F8','\uE039':'F9','\uE03A':'F10','\uE03B':'F11','\uE03C':'F12',
+          '\uE03D':'Meta'
         }}[value] || value);
         // Legacy keyCode/which. Constructed KeyboardEvents always report 0
         // for both, but xterm.js v6 switches on ev.keyCode for every named

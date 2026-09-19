@@ -1,12 +1,12 @@
 id: TC-IDE-JAVA-RENAME-DELETED-RECOVERY-WIN
-title: "Java rename-delete recovery on Windows: abandon both-missing, restore mixed shape"
+title: "Java rename-delete recovery: abandon both-missing, restore mixed shape"
 description: |
-  java-rename-deleted-recovery Windows-native gate case (F25.5). Runs the
-  seeded half of TC-IDE-JAVA-RENAME-DELETED-RECOVERY with Windows-supported
-  verbs only (no pointer/keyboard injection): the live JDT LS class-rename
-  provider segment runs on Linux (pointer caret verbs are Linux/X11-only),
-  while this case proves on real WebView2 + real disk + webview-persistent
-  journals:
+  java-rename-deleted-recovery seeded native gate case (F25.5). Runs the
+  filesystem- and DOM-only half of TC-IDE-JAVA-RENAME-DELETED-RECOVERY on
+  Linux, macOS, and Windows (no pointer/keyboard injection): the live JDT LS
+  class-rename provider segment remains in the Linux case because its pointer
+  caret verbs are Linux/X11-only, while this case proves on the real packaged
+  app, real disk, and webview-persistent journals:
 
   1. AC-02/04 seeded history: a seeded v2 entry in the deleted-after-rename
      shape (old and new paths both missing) reviews as
@@ -25,19 +25,20 @@ description: |
      and lands `rolled-back` with the reversed move recorded
      (assert_file_sha256 == preHash on the moved-home bytes).
 
-  Highest claim on green: L2 native (Windows), packaged QA app over real
-  disk bytes. Explicitly NOT claimed by this run: the live provider class
+  Highest claim on green: L2 native on the executed platform, packaged QA app
+  over real disk bytes. Explicitly NOT claimed by this run: the live provider class
   rename (Linux case), the live user order "rename then delete the renamed
   file via the tree then reopen" (no tree-delete verb exists; recorded
   manual V-05), the 736x375 / 1280x800 viewport matrix (no native viewport
   verb), host proof that a missing path stays missing (no assert-file-missing
   verb; the zero-write ack plus unchanged staged hashes plus the
-  `user-dismissed` marker are the automated evidence), and Linux/macOS runs
-  (other ends stay unverified, never passed-by-proxy).
+  `user-dismissed` marker are the automated evidence). Linux/macOS/Windows
+  evidence remains independently required; a pass on one end never passes the
+  other ends by proxy.
 covers: [F25.5]
 tags: [code-workspace, ide-editor, refactor, recovery, java-rename, native-gate, p1]
 modes: [native]
-native_platforms: [Windows]
+native_platforms: [Linux, macOS, Windows]
 fixtures: [reset_db, java_rename_deleted_fixtures]
 timeout_sec: 600
 steps:

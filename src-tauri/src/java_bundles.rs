@@ -56,6 +56,7 @@ const JAVA_TEST_EXTENSION_PREFIXES: &[&str] = &[
     "org.apiguardian.api_",
     "org.eclipse.jdt.junit4.runtime_",
     "org.eclipse.jdt.junit5.runtime_",
+    "org.eclipse.jdt.junit6.runtime_",
     "org.jacoco.core_",
     "org.opentest4j_",
     "org.objectweb.asm.tree.analysis_",
@@ -599,6 +600,10 @@ mod tests {
             dir.path(),
             "org.eclipse.jdt.junit5.runtime_1.1.300.v20231214-1952.jar",
         );
+        touch(
+            dir.path(),
+            "org.eclipse.jdt.junit6.runtime_1.0.0.v20251112-1701.jar",
+        );
         touch(dir.path(), "junit-platform-launcher_1.11.0.jar");
         touch(dir.path(), "org.jacoco.core_0.8.12.202403310830.jar");
         touch(
@@ -618,6 +623,9 @@ mod tests {
         }));
         assert!(jars.iter().any(|jar| {
             jar.ends_with("org.eclipse.jdt.junit5.runtime_1.1.300.v20231214-1952.jar")
+        }));
+        assert!(jars.iter().any(|jar| {
+            jar.ends_with("org.eclipse.jdt.junit6.runtime_1.0.0.v20251112-1701.jar")
         }));
         assert!(
             jars.iter()

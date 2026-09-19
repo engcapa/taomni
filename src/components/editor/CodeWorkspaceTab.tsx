@@ -4278,17 +4278,20 @@ export function CodeWorkspaceTab({
     const pane = treePaneRef.current;
     const target = event.target;
     if (!pane || !(target instanceof HTMLElement) || event.nativeEvent.isComposing) return;
+    // WKWebView can report function keys as Unidentified while preserving the
+    // physical code. Use that code for tree actions such as F2 and Delete.
+    const key = event.key === "Unidentified" ? event.nativeEvent.code : event.key;
     const tree = pane.querySelector<HTMLElement>("[data-testid='code-workspace-tree']");
     if (!tree || (target !== pane && !tree.contains(target))) return;
     if (target.closest("input, textarea, select, [contenteditable='true']")) return;
     if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey &&
-      navigateProjectTree(tree, event.key, { onSelect: setSelected, onToggleRoot: toggleRoot, onToggleDir: toggleDir })) {
+      navigateProjectTree(tree, key, { onSelect: setSelected, onToggleRoot: toggleRoot, onToggleDir: toggleDir })) {
       event.preventDefault();
       treeInteractionEpochRef.current += 1;
       pendingTreeOpenIntentRef.current = null;
       return;
     }
-    if (event.key === "Enter") {
+    if (key === "Enter") {
       event.preventDefault();
       if (selected?.kind === "file") {
         void requestTreeOpen(selected.ref, { split: event.ctrlKey || event.metaKey });
@@ -4297,15 +4300,15 @@ export function CodeWorkspaceTab({
       return;
     }
     if ((event.nativeEvent as KeyboardEvent).isComposing) return;
-    if (event.key === "Escape") {
+    if (key === "Escape") {
       event.preventDefault();
       handleReturnToEditor();
       return;
     }
-    if (event.key === "F2") {
+    if (key === "F2") {
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.rename", { focus: "tree", payload: { selection: selected ?? undefined } });
-    } else if (event.key === "Delete") {
+    } else if (key === "Delete") {
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.delete", { focus: "tree", payload: { selection: selected ?? undefined } });
     }
@@ -14594,6 +14597,7 @@ export function CodeWorkspaceTab({
       title: "Go to Declaration",
       category: "Navigation",
       keybinding: "Ctrl+B",
+      keybindings: ["Meta+B"],
       keywords: ["declaration", "jump", "navigate"],
       when: (context) => {
         const target = resolveEditorTarget(context);
@@ -15087,6 +15091,7 @@ export function CodeWorkspaceTab({
       title: "Save Active File",
       category: "File",
       keybinding: "Ctrl+S",
+      keybindings: ["Meta+S"],
       when: () => {
         const file = openFilesRef.current[activeKeyRef.current ?? ""];
         return !!file?.dirty && !file.loading && !file.saving;

@@ -381,7 +381,9 @@
 - `[data-testid^="run-panel-configuration-java-main:"]` — interactive [optional] — F25.1.run-configuration-java-main
 - `[data-testid^="run-panel-configurations-"]` — display [optional] — F25.1.run-configurations-root
 - `[data-testid^="run-panel-configuration-edit-run:"]` — interactive [optional] — F25.1.run-configuration-edit
+  ↳ `[data-testid^="run-panel-configuration-edit-java-main:"]` — alias
 - `[data-testid^="run-panel-configuration-copy-run:"]` — interactive [optional] — F25.1.run-configuration-copy
+  ↳ `[data-testid^="run-panel-configuration-copy-java-main:"]` — alias
 - `[data-testid^="run-panel-configuration-source-"]` — display [optional] — F25.1.run-configuration-source
 - `[data-testid="run-panel-execution-diagnostics"]` — display [optional] — F25.1.execution-diagnostics
 - `[data-testid="run-configuration-editor"]` — display [optional] — F25.1.run-configuration-editor
