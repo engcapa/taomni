@@ -6164,6 +6164,160 @@ describe("CodeWorkspaceTab", () => {
     expect(workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
   });
 
+  // ED-PARITY-003 S0..S7: one file preview→formal→split→independent
+  // selection→shared edit→single undo→close non-last keeps the survivor
+  // alive. The S1b typing-promotion assertion is the regression: the baseline
+  // kept the preview italic/dirty-false split (memo-skipped onChange) instead
+  // of promoting to formal like IDEA R1.
+  it("ED-PARITY-003: preview formalize, split, independent selection, shared edit, single undo, close non-last keeps alive", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-parity003",
+      workspaceInstanceId: "instance-parity003",
+      name: "Parity003",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main/example.txt" },
+    };
+    const initialText = "Project tree example\nThe editor buffer should survive tree navigation.\n";
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, _path: string) => (
+      file("src/main/example.txt", initialText)
+    ));
+    lspMocks.lspDetectServers.mockResolvedValue([csharpStatus({ available: true, active: true })]);
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({ available: true, active: true }));
+
+    renderWorkspace(workspace);
+    const fileKey = "root:app:src/main/example.txt";
+    await screen.findByTitle("app / src/main/example.txt");
+    // Plain-text example.txt has no active LSP session, so no open is
+    // expected; the didClose assertions below observe zero additional calls.
+
+    // S0: establish preview through the production group state (same state
+    // openFile preview:true writes) and observe italic + data-preview.
+    const { updateEditorGroup } = useCodeWorkspaceStore.getState();
+    updateEditorGroup("instance-parity003", "primary", (group) => ({
+      ...group,
+      previewKey: fileKey,
+    }));
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-parity003")
+        .editorGroups.primary.previewKey,
+    ).toBe(fileKey));
+    const tabStrip = screen.getByTestId("code-workspace-editor-tab-strip");
+    const previewTabButton = within(tabStrip).getByTitle("app / src/main/example.txt");
+    expect(previewTabButton.closest("[data-editor-tab-key]")).toHaveAttribute("data-preview", "true");
+    expect(within(tabStrip).getByText("example.txt")).toHaveClass("italic");
+
+    // S1a: double-click promotes to a formal tab without editing.
+    fireEvent.doubleClick(previewTabButton);
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-parity003")
+        .editorGroups.primary.previewKey,
+    ).toBeNull());
+    expect(within(screen.getByTestId("code-workspace-editor-tab-strip")).getByText("example.txt")).not.toHaveClass("italic");
+    expect(previewTabButton.closest("[data-editor-tab-key]")).not.toHaveAttribute("data-preview");
+
+    // S1b: re-enter preview, then typing promotes and marks dirty.
+    updateEditorGroup("instance-parity003", "primary", (group) => ({
+      ...group,
+      previewKey: fileKey,
+    }));
+    await waitFor(() => expect(within(screen.getByTestId("code-workspace-editor-tab-strip")).getByText("example.txt")).toHaveClass("italic"));
+    const singlePane = screen.getByTestId("code-workspace-editor-pane");
+    const singleView = EditorView.findFromDOM(singlePane.querySelector<HTMLElement>(".cm-editor")!)!;
+    singleView.dispatch({ changes: { from: 0, to: 0, insert: "X" } });
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-parity003")
+        .editorGroups.primary.previewKey,
+    ).toBeNull());
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-parity003")
+        .openFiles[fileKey]?.dirty,
+    ).toBe(true));
+    expect(within(screen.getByTestId("code-workspace-editor-tab-strip")).getByText("example.txt")).not.toHaveClass("italic");
+    const afterTypingText = `X${initialText}`;
+    await waitFor(() => expect(singleView.state.doc.toString()).toBe(afterTypingText));
+
+    // S2: Open in Split Right from the tab context menu; both panes share the
+    // file and the new (right) leaf becomes active.
+    const tabButton = within(screen.getByTestId("code-workspace-editor-tab-strip")).getByTitle("app / src/main/example.txt");
+    fireEvent.contextMenu(tabButton, { clientX: 10, clientY: 10 });
+    fireEvent.click(await screen.findByRole("button", { name: "Open in Split Right" }));
+    await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
+    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const leftPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
+    const rightPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") !== "primary")!;
+    const afterSplitUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-parity003");
+    expect(afterSplitUi.activeEditorGroupId).not.toBe("primary");
+    expect(afterSplitUi.editorGroups.primary.openOrder).toContain(fileKey);
+    const rightGroupId = rightPane.getAttribute("data-editor-group-id")!;
+    expect(afterSplitUi.editorGroups[rightGroupId]?.openOrder).toContain(fileKey);
+    const leftView = EditorView.findFromDOM(leftPane.querySelector<HTMLElement>(".cm-editor")!)!;
+    const rightView = EditorView.findFromDOM(rightPane.querySelector<HTMLElement>(".cm-editor")!)!;
+    expect(leftView.state.doc.toString()).toBe(afterTypingText);
+    expect(rightView.state.doc.toString()).toBe(afterTypingText);
+
+    // S3: independent cursors/selections across the two views.
+    rightView.dispatch({ selection: EditorSelection.cursor(rightView.state.doc.length) });
+    leftView.dispatch({ selection: EditorSelection.range(0, "Project tree example".length + 1) });
+    expect(leftView.state.selection.main.empty).toBe(false);
+    expect(leftView.state.selection.main.from).toBe(0);
+    expect(rightView.state.selection.main.empty).toBe(true);
+    expect(rightView.state.selection.main.head).toBe(rightView.state.doc.length);
+
+    // S4: shared edit in the left pane syncs to the right in real time.
+    const sharedMarker = "// SHARED-SYNC-OK";
+    leftView.dispatch({
+      changes: { from: leftView.state.doc.length, to: leftView.state.doc.length, insert: sharedMarker },
+    });
+    const afterSharedText = `${afterTypingText}${sharedMarker}`;
+    await waitFor(() => expect(rightView.state.doc.toString()).toBe(afterSharedText));
+    expect(leftView.state.doc.toString()).toBe(afterSharedText);
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-parity003")
+        .openFiles[fileKey]?.dirty,
+    ).toBe(true));
+
+    // S5: one Ctrl+Z reverts the shared marker in both panes.
+    const leftContent = leftPane.querySelector<HTMLElement>(".cm-content")!;
+    fireEvent.keyDown(leftContent, { key: "z", ctrlKey: true });
+    await waitFor(() => expect(leftView.state.doc.toString()).toBe(afterTypingText));
+    expect(rightView.state.doc.toString()).toBe(afterTypingText);
+
+    // S6: close the non-last (right) view; the emptied leaf keeps rendering
+    // (it loses only its tab strip entry) while the survivor keeps the buffer,
+    // history and dirty state with no didClose, no buffer drop and no confirm.
+    // NOTE: IDEA R6 removes the empty pane to a single pane; Taomni keeps the
+    // empty leaf (two panes, one empty). Functional retention matches IDEA;
+    // the pane-count delta is recorded in the idea-comparison, not as an AC
+    // failure (A1 requires only lease/buffer/dirty retention).
+    const closeCallsBefore = vi.mocked(lspMocks.lspCloseDocument).mock.calls.length;
+    const confirmCallsBefore = vi.mocked(confirmAppDialog).mock.calls.length;
+    fireEvent.click(within(rightPane).getByTitle("Close"));
+    await waitFor(() => expect(
+      within(rightPane).queryByTitle("app / src/main/example.txt"),
+    ).not.toBeInTheDocument());
+    expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2);
+    const survivorPane = screen.getAllByTestId("code-workspace-editor-pane").find(
+      (pane) => within(pane).queryByTitle("app / src/main/example.txt") !== null,
+    )!;
+    const survivorView = EditorView.findFromDOM(survivorPane.querySelector<HTMLElement>(".cm-editor")!)!;
+    expect(survivorView.state.doc.toString()).toBe(afterTypingText);
+    expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-parity003").layoutTreeV2.type).toBe("split");
+    expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-parity003").openFiles[fileKey]).toBeDefined();
+    expect(vi.mocked(lspMocks.lspCloseDocument).mock.calls.length).toBe(closeCallsBefore);
+    expect(vi.mocked(confirmAppDialog).mock.calls.length).toBe(confirmCallsBefore);
+    expect(workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
+
+    // S7: closing the last dirty view with Cancel is zero effect.
+    vi.mocked(confirmAppDialog).mockImplementationOnce(async () => false);
+    fireEvent.click(within(survivorPane).getByTitle("Close"));
+    await waitFor(() => expect(vi.mocked(confirmAppDialog)).toHaveBeenCalledTimes(confirmCallsBefore + 1));
+    expect(within(survivorPane).getByTitle("app / src/main/example.txt")).toBeInTheDocument();
+    expect(survivorView.state.doc.toString()).toBe(afterTypingText);
+    expect(workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
+  });
+
   it("keeps the committed layout and buffer recovery state when final-view didClose fails", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

@@ -4642,6 +4642,19 @@ export function CodeWorkspaceTab({
   ) => {
     const file = openFilesRef.current[key];
     if (!file || file.text === text) return;
+    // ED-PARITY-003 S1: typing promotes any preview tab for this file to a
+    // formal tab. EditorGroup's onChange wrapper captures previewKey in a
+    // memo-skipped CodeMirrorHost closure, so a preview set without a doc
+    // change would never promote there; promote here where the edit is
+    // guaranteed to be observed (dirty proves this path runs).
+    const liveUiForPreview = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    for (const [previewGroupId, previewGroup] of Object.entries(liveUiForPreview.editorGroups)) {
+      if (previewGroup.previewKey === key) {
+        updateEditorGroup(previewGroupId as EditorGroupId, (current) => (
+          current.previewKey === key ? { ...current, previewKey: null } : current
+        ));
+      }
+    }
     // Once the user starts a new character-level edit, CodeMirror becomes the
     // active undo owner. Retaining an older cross-file transaction here would
     // make Ctrl/Cmd+Z skip over the fresh typing and surprise the user.
@@ -4672,7 +4685,9 @@ export function CodeWorkspaceTab({
     flushPendingEditorText,
     scheduleLiveLspSync,
     semanticIndex.invalidateSilently,
+    updateEditorGroup,
     workspaceEditHistory,
+    workspaceInstanceId,
   ]);
 
   const absolutePathForOpenFile = useCallback((file: OpenFileState): string | null => {
