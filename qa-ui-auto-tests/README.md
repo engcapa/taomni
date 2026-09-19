@@ -60,6 +60,16 @@ redirected.
 
 Reports land in `qa-ui-auto-report/run-<timestamp>/`.
 
+### Disposable SSH/MySQL services
+
+The runner can start local Docker fixtures automatically. Set
+`fixtures.start_local_sshd: true` and/or `fixtures.start_local_mysql: true` in
+your uncommitted `qa-ui-auto-tests/qa-ui-auto.config.yaml`, using the example
+config for ports, users, and environment-backed passwords. Services are
+started once per run and removed after the run, including setup failures.
+MySQL readiness includes a real `SELECT 1` through the mapped host port; a TCP
+port alone is not accepted as a healthy database fixture.
+
 ## Subcommands provided by the skill
 
 The `qa-ui-auto` skill in Claude Code wraps these tools with playbooks:

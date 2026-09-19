@@ -121,6 +121,56 @@ sweep may use `--workers 6`, while native stays sequential and exclusive for
 performance gates. Windows detaches through the WMI service; POSIX uses a new
 session (`setsid`).
 
+### Local SSH and MySQL services
+
+The runner can own disposable Docker services for cases that declare
+`ssh_required`, `sftp_required`, or `mysql_required`. Enable them independently
+in the local config copied from
+`.agents/skills/qa-ui-auto/assets/qa-ui-auto.config.example.yaml`:
+
+```yaml
+fixtures:
+  start_local_sshd: true
+  sshd_port: 2222
+  sshd_user: testuser
+  sshd_password: ${env.QA_SSH_PASSWORD}
+  start_local_mysql: true
+  mysql_port: 3306
+  mysql_user: test
+  mysql_password: ${env.TAOMNI_TEST_MYSQL_PASSWORD}
+  mysql_root_password: ${env.TAOMNI_TEST_MYSQL_ROOT_PASSWORD}
+  mysql_database: test
+```
+
+When enabled, `qa_ui_auto` starts the services once before the selected browser
+workers or native harness and removes them in a `finally`-equivalent cleanup.
+SSH uses `linuxserver/openssh-server:latest` with host port `2222` mapped to
+container port `2222`. MySQL uses `mysql:8.4` with host port `3306` mapped to
+container port `3306`. Images and ports can be overridden in the same section.
+Passwords are resolved only from environment variables and are never written to
+the report.
+
+The SSH readiness check opens the mapped port and verifies an `SSH-` banner.
+The MySQL readiness check opens the mapped port and then runs a temporary
+MySQL client container against that host port with `SELECT 1`; a raw TCP
+listener is not considered sufficient. The runner fails setup explicitly when
+Docker, credentials, ports, or the protocol check are unavailable; it does not
+silently convert an enabled local service into a skipped/pass case.
+
+`--dry-run` never starts Docker services. For a manual probe using the same
+implementation, use:
+
+```bash
+python .agents/skills/qa-ui-auto/scripts/fixtures.py start-all \
+  --port 2222 --user testuser \
+  --password "$QA_SSH_PASSWORD" \
+  --root-password "$TAOMNI_TEST_MYSQL_ROOT_PASSWORD"
+python .agents/skills/qa-ui-auto/scripts/fixtures.py stop
+```
+
+The manual command's credentials are disposable test values only; prefer
+environment variables or workspace secrets and never commit them.
+
 ## Execution And Evidence
 
 - Native uses the separately built `com.taomni.app.qa`, isolated data/config/cache

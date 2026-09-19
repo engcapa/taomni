@@ -32,9 +32,16 @@ sftp:
 
 fixtures:
   start_local_sshd: false
+  start_local_mysql: false
   sshd_port: 2222
   sshd_user: testuser
   sshd_password: ${env:QA_SSH_PASSWORD}
+  mysql_port: 3306
+  mysql_user: test
+  mysql_password: ${env:TAOMNI_TEST_MYSQL_PASSWORD}
+  mysql_root_password: ${env:TAOMNI_TEST_MYSQL_ROOT_PASSWORD}
+  mysql_database: test
+  startup_timeout_sec: 120
 
 report:
   dir: qa-ui-auto-report
