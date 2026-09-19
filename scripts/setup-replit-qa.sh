@@ -42,4 +42,8 @@ if [[ "${TAOMNI_QA_SETUP_ONLY:-0}" == "1" ]]; then
   exit 0
 fi
 
+if [[ "${TAOMNI_NATIVE_QA_DESKTOP:-0}" == "1" && "$(uname -s)" == "Linux" ]]; then
+  exec bash "$ROOT/scripts/with-linux-native-desktop.sh" pnpm dev
+fi
+
 exec pnpm dev
