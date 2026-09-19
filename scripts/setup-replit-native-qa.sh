@@ -35,12 +35,12 @@ if [[ -z "${TAOMNI_NATIVE_QA_TOOLCHAIN:-}" ]]; then
   nightly_bin=""
   shopt -s nullglob
   nightly_rustc_candidates=(/nix/store/*rust-nightly*/bin/rustc)
-  while IFS= read -r rustc_path; do
-    if "$rustc_path" --version 2>/dev/null | grep -q 'nightly'; then
-      nightly_bin="$(dirname "$rustc_path")"
-      break
-    fi
-  done < <(printf '%s\n' "${nightly_rustc_candidates[@]}" | sort -t- -k3,3Vr)
+  if [[ "${#nightly_rustc_candidates[@]}" -gt 0 ]]; then
+    # The Nix output name is already constrained to rust-nightly. Avoid
+    # executing rustc during shell setup; Replit's shell wrapper can block
+    # subprocess probes while a detached build is starting.
+    nightly_bin="$(dirname "${nightly_rustc_candidates[0]}")"
+  fi
 
   if [[ -n "$nightly_bin" ]]; then
     export PATH="$nightly_bin:$PATH"
