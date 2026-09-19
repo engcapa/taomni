@@ -64,6 +64,10 @@ def configured_environment(base: dict[str, str] | None = None) -> dict[str, str]
     bypassing the Replit toolchain fixes.
     """
     env = dict(os.environ if base is None else base)
+    # Replit's runtime audit loader can be reintroduced between the shell
+    # helper and Python subprocesses; rustc's bundled driver then fails with a
+    # static-TLS allocation error. Native QA does not need that audit hook.
+    env.pop("LD_AUDIT", None)
     if env.get("TAOMNI_REPLIT_NATIVE_QA") != "1" or not REPLIT_NATIVE_SETUP.is_file():
         return add_target_bindgen_args(env)
     if env.get("TAOMNI_NATIVE_QA_TOOLCHAIN_READY") == "1":
@@ -96,6 +100,7 @@ def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) ->
                                              ".agents/skills/qa-ui-auto/scripts/native_build.py"]),
         "platform": platform.platform(),
         "profile": "release" if release else "debug",
+        "cargo": subprocess.check_output(["cargo", "--version"], text=True, env=effective_env).strip(),
         "rustc": subprocess.check_output(["rustc", "--version"], text=True, env=effective_env).strip(),
         "node": subprocess.check_output(["node", "--version"], text=True, env=effective_env).strip(),
         "environment": {key: effective_env.get(key) for key in (
@@ -106,6 +111,7 @@ def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) ->
             "BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu",
             "LIBCLANG_PATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "LIBGSSAPI_IMPL",
             "TAOMNI_REPLIT_NATIVE_QA", "TAOMNI_NATIVE_QA_TOOLCHAIN",
+                                             "RUSTC",
             "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM", "NODE_ENV")},
     }
 
@@ -173,7 +179,6 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     ]
     if not release:
         command.append("--debug")
-    command.extend(["--", "--ignore-rust-version"])
     started = time.monotonic()
     subprocess.run(command, cwd=ROOT, env=env, check=True)
     if inputs != build_inputs(release=release, env=env):

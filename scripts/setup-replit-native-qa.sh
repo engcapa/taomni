@@ -21,35 +21,61 @@ fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Replit's pinned Nix modules can lag behind the Rust version declared by the
+# application. Use rustup's stable channel for the native QA toolchain so the
+# default Cargo stays current instead of silently compiling with an older Nix
+# Cargo and --ignore-rust-version.
+# Replit's runtime audit loader exhausts static TLS while rustc loads its
+# bundled compiler driver. Native QA does not need that audit hook.
+unset LD_AUDIT
+export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+export PATH="$CARGO_HOME/bin:$HOME/.cargo/bin:$PATH"
+if [[ -z "${TAOMNI_NATIVE_QA_TOOLCHAIN:-}" || "${TAOMNI_NATIVE_QA_TOOLCHAIN}" == "stable" ]]; then
+  if ! command -v rustup >/dev/null 2>&1; then
+    echo "[replit-native-qa] installing rustup stable toolchain" >&2
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+      sh -s -- -y --profile minimal --default-toolchain stable --no-modify-path
+  else
+    echo "[replit-native-qa] updating rustup stable toolchain" >&2
+    rustup update stable --no-self-update
+  fi
+  export PATH="$CARGO_HOME/bin:$HOME/.cargo/bin:$PATH"
+  export RUSTUP_TOOLCHAIN="stable"
+  export TAOMNI_NATIVE_QA_TOOLCHAIN="stable"
+
+  # The Replit launcher can re-add LD_AUDIT when Tauri/Cargo spawns rustc.
+  # Route every compiler invocation through a tiny wrapper that removes the
+  # audit hook before loading rustc's bundled compiler driver.
+  rustc_real="$(rustup which rustc)"
+  rustc_wrapper_dir="${TAOMNI_QA_TOOLS_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/taomni-qa-ui-auto}/bin"
+  mkdir -p "$rustc_wrapper_dir"
+  rustc_wrapper="$rustc_wrapper_dir/rustc"
+  cat > "$rustc_wrapper" <<EOF
+#!/bin/sh
+exec env -u LD_AUDIT "$rustc_real" "\$@"
+EOF
+  chmod 755 "$rustc_wrapper"
+  export PATH="$rustc_wrapper_dir:$PATH"
+  export RUSTC="$rustc_wrapper"
+
+  cargo_version="$(cargo --version | awk '{print $2}')"
+  cargo_major="${cargo_version%%.*}"
+  cargo_minor="${cargo_version#*.}"
+  cargo_minor="${cargo_minor%%.*}"
+  if [[ "$cargo_major" != "1" || "$cargo_minor" -lt 94 ]]; then
+    echo "[replit-native-qa] Cargo ${cargo_version} is below the required 1.94" >&2
+    return 2
+  fi
+else
+  echo "[replit-native-qa] using explicitly requested toolchain: ${TAOMNI_NATIVE_QA_TOOLCHAIN}" >&2
+fi
+
 # The app is a large Rust crate. A single Cargo job and no dev debuginfo keep
 # rustc below the memory limit of the Replit QA environment. Users can
 # override either value explicitly.
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 export CARGO_PROFILE_DEV_DEBUG="${CARGO_PROFILE_DEV_DEBUG:-0}"
 export CARGO_PROFILE_DEV_INCREMENTAL="${CARGO_PROFILE_DEV_INCREMENTAL:-false}"
-
-# The stable compiler available in Replit can reject aes' VAES/AVX-512 target
-# features before reaching the application. Prefer the newest installed
-# nightly only when the caller did not explicitly provide a toolchain.
-if [[ -z "${TAOMNI_NATIVE_QA_TOOLCHAIN:-}" ]]; then
-  nightly_bin=""
-  shopt -s nullglob
-  nightly_rustc_candidates=(/nix/store/*rust-nightly*/bin/rustc)
-  if [[ "${#nightly_rustc_candidates[@]}" -gt 0 ]]; then
-    # The Nix output name is already constrained to rust-nightly. Avoid
-    # executing rustc during shell setup; Replit's shell wrapper can block
-    # subprocess probes while a detached build is starting.
-    nightly_bin="$(dirname "${nightly_rustc_candidates[0]}")"
-  fi
-
-  if [[ -n "$nightly_bin" ]]; then
-    export PATH="$nightly_bin:$PATH"
-    export TAOMNI_NATIVE_QA_TOOLCHAIN="nightly"
-  else
-    echo "[replit-native-qa] no installed Rust nightly found; using PATH toolchain" >&2
-    export TAOMNI_NATIVE_QA_TOOLCHAIN="path"
-  fi
-fi
 
 # bindgen can see several Nix libclang outputs, including an incompatible
 # 32-bit library. Select an actual x86-64 ELF library and pass GCC's complete
