@@ -10,13 +10,21 @@ includes both the intended change and affected behavior that must remain.
 For shared behavior/UI refactors, use [regression-protection.md](regression-protection.md)
 to establish relevant baselines and consumer checks before narrowing cases.
 
+Prefer browser for UI, control interactions, Action entry/routing and app-local
+shortcuts. First enumerate all affected behaviors and entry points using the
+[coverage dimensions](authoring.md#coverage-dimensions-and-mode-selection), then
+minimize duplicate setup/runs while preserving their assertions. For every native
+selection, name the assertion browser cannot establish and the real boundary it
+exercises. Lack of a convenient browser verb alone does not make behavior native;
+consider focused browser support. Unit/handler tests supplement entry-point tests.
+
 | Change | Iterate | Complete / escalate |
 |---|---|---|
 | Skill prose / docs | Read/link/frontmatter checks | No app build or UI suite |
 | Planner / evidence utility | Focused Python contracts + CLI smoke | Native sample only if execution behavior needs one |
 | Logic / store / state machine | Exact tests; one discriminating red→green bug regression | Relevant consumer tests; native for OS effects |
-| CSS / layout / labels | Actual browser render and affected states | Focused current-WebView smoke, no unrelated provider suite |
-| Menu / focus / shortcut / lifecycle | Mounted/StrictMode + browser interaction | Actual affected keyboard/focus/IME path and frontend mode |
+| CSS / layout / labels | Actual browser render and affected states | Browser assertions/comparison; current-WebView smoke only for a named WebView/packaging risk or explicit native acceptance |
+| Menu / focus / shortcut / lifecycle | Mounted/StrictMode + browser interaction | Browser covers app-local paths; native only for affected OS input/IME/window or WebView-specific assertions |
 | IPC / filesystem / PTY / provider / recovery | Narrow logic/Rust/integration | Native boundary with result, negative/recovery assertions |
 | Hot path / large data | Distinguishing baseline + focused regression | Matched native measurement of that path |
 | Shared UI / cross-module refactor | Changed primitive and representative consumers | Expand to affected consumers, not automatically every feature |

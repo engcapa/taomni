@@ -4,6 +4,95 @@ Reuse audit results and source context. Inspect the owning feature in
 `qa-ui-auto-tests/feature-list.md` and its source files; run a helper only when
 information is missing. Apply requested changes directly and summarize the diff.
 
+## Design To Implementation Handoff
+
+When planning and implementation are separate (such as IDEA parity P1/P2),
+keep the complete test design in the card's linked spec/design under a stable
+`test-cases` anchor. Reuse an existing detailed verification section instead of
+duplicating it. For IDEA parity this is normally the selected design in
+`docs-feature/code-workspace-idea-parity/`; a bug design may live in `docs-issue/`.
+The backlog and handoff link to the exact file/anchor. Chat, an AC title, a test
+command or a list of V IDs alone is not a complete test case.
+
+| Artifact | Repository location and responsibility |
+|---|---|
+| Case design and AC/V mapping | P1 writes the linked design section; P2 maintains its mapping to actual tests and results |
+| Executable UI workflow | P2 creates/updates `qa-ui-auto-tests/cases/TC-<id>-<slug>.testcase.yaml`, reusing existing IDs/cases when sufficient |
+| Feature ownership and controls | P2 maintains `qa-ui-auto-tests/feature-list.md` and YAML `covers` together; regenerate this skill's `references/testid-catalog.md` only when controls change |
+| Focused unit/component/backend regression | P2 uses colocated `src/**/*.test.ts` / `*.test.tsx`, Rust inline tests, or the unified `src-tauri/tests/integration/` suite as appropriate |
+| Native/manual checks unsupported by the runner | P1 specifies reproducible steps and observations in the design or links an applicable `qa-ui-auto-tests/native/` runbook; P2 records actual execution separately |
+| Runtime evidence | P2 retains reports, receipts, logs, screenshots and recordings under `qa-ui-auto-report/` (uncommitted); the design/handoff records precise paths and evidence identities |
+
+For each selected case, specify:
+
+- Stable V ID, associated ACs, target versus retained behavior, and existing or
+  proposed test path plus exact YAML ID/test name. Check IDs against the current
+  repository; a proposed ID is not registered or executable yet.
+- Preconditions, initial state, fixture data/content and isolated setup/cleanup;
+  real services/provider requirements and readiness checks when relevant.
+- Ordered user actions and observable expected results at decisive steps,
+  including final UI state and relevant disk/provider effects. Cover applicable
+  normal, boundary, failure, cancel/stale, recovery and shared-consumer paths;
+  explain material exclusions rather than adding irrelevant permutations.
+- Layer, browser/native mode, supported OS/WebView, selectors/controls and verbs
+  already available versus additions assigned to P2. Identify stub/mock limits.
+  For IDEA comparison include matched reference states and visual/interaction
+  observations; functional assertions alone do not prove visual parity.
+- A checked command/config or manual procedure, expected evidence, baseline
+  source or pending baseline check, implementation owner and execution status.
+  Mark future files/commands as planned and all unexecuted checks as unrun.
+
+P1 completes this design and the mapping before declaring planning ready; it does
+not edit product tests or run the app when its permission is documentation-only.
+Missing implementation, fixtures or verbs can be assigned explicitly to P2;
+missing expected behavior or an undecided acceptance result cannot be hidden by
+marking the card ready. P1 need not create draft YAML in the runner's case tree.
+
+P2 checks the mapping against current source, implements the selected tests and
+any necessary fixture/control support, and runs the target plus affected retained
+behavior checks. Reuse sufficient tests; do not add artificial unit tests for
+prose or cosmetic changes. Read the schema and relevant verb-catalog entries
+before writing YAML. For unsupported automation, assign fixture/verb support or
+explicit manual checks at the required layer; use native only for native boundaries.
+Never invent verbs or use a skip as proof. Follow the catalog/audit rules
+below when cases or controls change; prose-only handoff edits need no product audit.
+Record AC -> V -> actual test/case -> report/assertion, with pass/fail/skip/unrun
+and platform boundaries. Static validation and dry-run cannot fill runtime results.
+
+## Coverage Dimensions And Mode Selection
+
+Use browser first for every assertion it can establish through the production
+renderer. Default new UI cases to `modes: [browser]`. Add native only for a named
+assertion that requires real Tauri IPC, disk/process effects, native dialogs or
+clipboard, OS shortcut interception, IME, window lifecycle, or a concrete
+WebView/packaging difference. State why browser evidence is insufficient.
+App-local shortcuts, focus and Actions are not inherently native. A missing
+browser verb is an automation gap to assess, not evidence of a native boundary.
+Do not bulk-convert existing modes or relax explicit native acceptance.
+
+P1 records the following applicable dimensions in the linked case design; P2
+checks each against actual tests and results. Use rows such as
+`AC/V | dimension | control/Action/shortcut + context | steps/expected result |
+case/test | mode + native reason if needed | result/evidence or gap`.
+
+| Dimension | Assertions within the changed and affected retained behavior |
+|---|---|
+| UI | Layout/overflow, labels/icons, visible/hidden, enabled/disabled/selected, loading/empty/error states; matched screenshots or geometry where visual fidelity is an AC |
+| Controls and interaction | Operate each affected button/menu/context-menu/list/tab/dialog/input and applicable click/double-click/right-click/drag/scroll/text input; assert opening/closing, selection, focus transfer/return, validation, submit/cancel and resulting state |
+| Actions | Exercise each affected exposed entry (toolbar/menu/context menu/command palette as present), checking availability, context/selection, dispatch target, side effect and disabled/no-op behavior; a direct handler call cannot prove UI wiring |
+| Shortcuts | Press actual key combinations in relevant focus/keymap contexts; verify routing, modifiers, conflicts, editable-field protection, disabled contexts, repeated invocation and no duplicate dispatch where relevant; a menu click cannot prove a shortcut |
+| Lifecycle and regression | Normal/boundary/negative paths, failure/cancel/stale/retry, undo/redo/save/reopen where applicable, consecutive operations and affected shared consumers |
+
+Account for all affected controls, exposed Action entries and shortcut bindings,
+including those outside the owning feature. Avoid an arbitrary Cartesian product;
+combine equivalent setup and repeated result checks, but keep assertions for each
+distinct entry/routing/state transition. Mark a dimension N/A only with a concrete
+reason; unsupported or unexecuted behavior is a gap, not N/A or pass. Controls
+touch coverage, one happy path or a smoke case cannot establish completeness.
+Browser and focused native checks may jointly satisfy the matrix without repeating
+the entire browser suite in native. Never replace a required native effect with
+a stubbed pass, or claim native fidelity from browser results.
+
 ## Cases
 
 - One unique ID per `cases/<id>-<slug>.testcase.yaml`; drafts may use `cases/auto/`.
@@ -17,8 +106,9 @@ information is missing. Apply requested changes directly and summarize the diff.
 - Assert the user's result after acting, including relevant failure/recovery
   paths. Control touches alone do not prove workflows work. Use browser for
   renderer behavior and selected native cases for real OS/IPC boundaries.
-- Set `modes` explicitly. Use `[native]` for real-app boundary workflows;
-  use `[browser, native]` when both implementations/fixtures support the assertions.
+- Set `modes` explicitly, preferring `[browser]`. Use `[native]` for required
+  real-app boundary workflows; use `[browser, native]` only when both modes are
+  needed and their implementations/fixtures support the assertions.
   Browser-specific stubs/verbs stay `[browser]`. Missing modes still default to
   browser for compatibility. Never mass-add native without checking verbs/fixtures.
 - Native is a mode, not an OS guarantee. Some verbs are Linux/X11-only; check
@@ -53,8 +143,9 @@ correction, retaining first-failure evidence and disclosing skips.
 
 The runner validates YAML, so normal edits need a targeted run rather than
 separate lint/dry-run/run stages. Use native dry-run before a new build to check
-new verbs/platform scope cheaply. For feature/control edits, regenerate the
-catalog once after the batch and run `python -m qa_ui_auto audit --gate` to check
+new verbs/platform scope cheaply. For case/feature/control edits, run
+`python -m qa_ui_auto audit --gate` once after the batch; regenerate the control
+catalog beforehand only when controls change. The audit checks
 lint, freshness and the existing coverage ratchet. Ratchet verified improvements
 only; do not overwrite unrelated baseline losses.
 

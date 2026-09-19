@@ -253,9 +253,11 @@ P2 完整提示词，写死本板准确路径和新 ID，人工只需复制。
   <不同限制在此填写；桌面时段沿用已有授权>
 - 交付位置：<默认 docs-feature/code-workspace-idea-parity/ 下复用或更新材料>
 
-先读取适用 AGENTS.md 和相关 skills。使用 $code-workspace-idea-parity audit/plan；按需使用
-$idea-reference 获取真实参照、$feature-design design 形成 UI/交互目标、$qa-ui-auto 判断证据和最小
-验证选择，并使用 $code-workspace-idea-task 的 authoring 流程建立或更新工作包。不要自行委派其他 agent。
+先读取适用 AGENTS.md 和相关 skills。使用 $code-workspace-idea-parity audit/plan 和 $qa-ui-auto，
+必读 .agents/skills/qa-ui-auto/references/authoring.md 的“Design To Implementation Handoff”及
+efficient-verification.md；重构既有行为时读 regression-protection.md，设计 YAML 步骤时核对 verb-catalog.md。
+按需使用 $idea-reference 获取真实参照、$feature-design design 形成 UI/交互目标，并使用
+$code-workspace-idea-task 的 authoring 流程建立或更新工作包。不要自行委派其他 agent。
 
 记录 HEAD、分支和已有工作区改动，保留他人成果。任务板是开发状态唯一来源；索引和设计只保存
 派生结论及链接。先查已有有效任务、规格、参考和证据，不按日期最新、done 数量或文件标题推断状态，
@@ -284,11 +286,35 @@ keymap；输入前确认目标窗口，锁屏时不得自动解锁，输入交�
 标出共享文件冲突与可并行边界；只细化首批真正可推进项，后续不确定项保持待细化。不得领取任务，
 不得改产品，不得把计划检查写成已执行。
 
+【测试用例设计与落盘】
+在本卡 spec 链接的设计文档内写完整“测试用例设计”，使用 test-cases 锚点；已有完整验证小节可复用。
+默认位于 docs-feature/code-workspace-idea-parity/ 的本卡设计，修复设计可在 docs-issue/；任务板和
+P2 交接都必须链接准确文件与锚点，不能只在聊天或交接摘要里写“补测试”。
+用例优先 modes: [browser]；只有具体断言必须触达真实原生边界时才选 native，逐项写出 browser
+无法证明什么。应用内 Action/快捷键/焦点默认在 browser 测；缺少方便的 verb 不自动构成 native 理由。
+按 qa-ui-auto authoring.md 的 Coverage Dimensions And Mode Selection，在同一用例设计中逐项映射
+受影响的 UI 状态/布局、各控件操作、Action 的菜单/工具栏/右键/命令面板等实际入口、快捷键与焦点上下文、
+异常恢复和共享消费者。每项关联 AC/V、操作/预期、test/case、模式及必要 native 理由、结果或缺口。
+Action 验证可用/禁用、路由与实际效果；快捷键必须实际按键，覆盖相关 modifier、冲突、输入框保护及重复触发。
+不能以调用 handler 代替入口测试、菜单点击代替快捷键、控件存在或单条 happy path 代替完整覆盖。
+范围内所有受影响控件/入口/绑定都要有对应断言；不适用写理由，未支持/未执行记缺口。合并重复准备和
+相同结果检查，但保留不同入口、状态转换的断言；“最小充分”不能删减覆盖维度，也不要求无关组合穷举。
+每例写 V ID/关联 AC、目标或保留行为、前置/隔离 fixture、连续操作、关键步骤与最终可观察预期、
+适用的正常/边界/失败/取消/迟到/恢复及消费者回归、清理、层级/browser/native/平台、执行方式和证据位置。
+列出现有或拟新增的精确测试文件、YAML ID/测试名、feature ID/covers、controls/testid、verbs 与设施缺口；
+新增项先查重，标为“P2 待实现”，不能伪称已经存在。IDEA UI/交互用例还要链接匹配参照和观察状态。
+可执行 UI 用例由 P2 写入 qa-ui-auto-tests/cases/TC-<id>-<slug>.testcase.yaml；单测放对应
+src/**/*.test.ts(x)、Rust inline 或 src-tauri/tests/integration/；runner 不支持的真实边界写原生/手工步骤。
+P1 默认只写上述用例设计，不改可执行测试或目录，不运行产品测试。逐 AC 覆盖目标和受影响保留行为，
+允许复用充分的现有用例；纯文案/外观不用机械新增单测。完整用例及实现责任明确才算规划就绪，
+只有 AC/V 标题、命令或“P2 自行补测试”不够；尚未执行保持未执行，不以缺少未来测试文件阻塞合理规划。
+
 最终交付一个可直接给 P2 的接续包：
 - 范围、HEAD 和相关工作区改动；
 - 生产入口与当前差异结论；
 - IDEA 参考包及原始工件路径、适用环境和缺口；
 - 设计/DEC/AC/V 及必须保留行为的准确路径；
+- 完整用例设计文件/锚点、AC→V→已有/拟新增 test/case 路径与 ID、P2 需补的 fixture/controls/verbs；
 - 任务板准确路径、首个可推进 ID、依赖和 owner；
 - 建议 P2 的文件范围、第一步和最小验证集合；用这些已知材料填好本文件 P2 的完整提示词，
   在聊天返回一个可直接复制的代码块，未知外部条件写明缺口，不让人工重组公共前提；
@@ -328,7 +354,7 @@ keymap；输入前确认目标窗口，锁屏时不得自动解锁，输入交�
 - 设计、DEC、AC/V：<准确路径和编号>
 - 必须保留：<行为及其改前依据/测试>
 - 文件/模块 owner 与依赖：<填写；包括共享消费者和已完成前置>
-- 验证材料：<精确 test/case ID、配置、报告路径及 current/stale 状态>
+- 用例设计与验证材料：<完整用例设计文件/锚点，AC→V→精确 test/case 路径与 ID；已有/待实现、配置、报告及 current/stale 状态>
 - 执行环境：<当前 OS、browser/native、QA build/输出目录、桌面时段>
 - 修改权限：允许本卡产品代码、测试、文档、自有任务状态及必要构建/验证；不提交推送。<例外在此填写>
 - 当前工作区或交接：<HEAD、相关 modified/untracked、前一 agent 结论>
@@ -337,6 +363,26 @@ keymap；输入前确认目标窗口，锁屏时不得自动解锁，输入交�
 $idea-reference 及设计 skill 的有效材料。不要自行委派其他 agent。核对任务、依赖、HEAD、生产代码和
 工作区后，按 task lifecycle 领取或接续；不是可领取/可接续状态、依赖未满足或 ID 不准确时不要另造任务，
 返回精确缺口。done 卡不得重领。
+
+【测试用例实现与验证】
+必读 .agents/skills/qa-ui-auto/references/authoring.md（含 Design To Implementation Handoff）和
+efficient-verification.md；改既有行为读 regression-protection.md，写 YAML 前核对 schema 和 verb-catalog.md。
+先读取 P1 交付的完整用例设计，核对每个 AC 的目标及保留行为断言。若旧交接只有 AC/V 或命令，
+在既定目标内直接补齐用例设计和映射；只有实质目标未定才提出具体缺口，不因普通测试细节退回 P1。
+优先 browser 实现完整 UI、控件操作、Action 多入口及快捷键覆盖；逐项核对 P1 的覆盖维度矩阵并补齐
+实际受影响的入口/状态/绑定，包含异常恢复和保留行为。操作真实控件、实际按下快捷键并断言用户结果，
+不能以 handler 单测、控件触达或一次菜单点击替代入口/快捷键验证。每个 native 检查须注明 browser
+无法证明的具体断言和边界；应用内快捷键不默认 native，设施缺失不能直接标不适用或省略验收。
+把选定 UI 工作流落实到 qa-ui-auto-tests/cases/TC-<id>-<slug>.testcase.yaml，复用足够的现有用例；
+相关单测放 src/**/*.test.ts(x)、Rust inline 或 src-tauri/tests/integration/。YAML 使用实际唯一 ID、
+covers、fixtures、modes、必要 native_platforms 和支持的 verbs，断言用户结果及必要真实副作用。
+同步 qa-ui-auto-tests/feature-list.md 的 feature/controls；只在 controls 变化时重生成
+.agents/skills/qa-ui-auto/references/testid-catalog.md，用例/目录变更批次结束按 authoring.md 做一次 audit --gate。
+需要 fixture/verb/selector 支持时在授权范围内补齐对应设施，不能虚构可执行命令；runner 不支持的
+AC 按其真实边界补自动化或手工检查及证据，不自动升级 native。设计段落、控件触达、静态 audit 和 dry-run 都不算行为通过。
+按最小充分集合执行目标与保留行为检查，核对实际选中及 pass/fail/skip 数、summary/receipt 和证据身份。
+运行原件保存 qa-ui-auto-report/（不入库），在同一设计及交接中回填 AC→V→实际 test/case→报告/断言，
+明确已实现/待实现与 pass/fail/skip/未执行及平台范围。不能以文档用例替代必要的可执行测试和运行证据。
 
 你与用户及其他 agent 共用工作区。保留已有改动，只修改本卡 owner 范围；共享接口或其他 owner 文件
 确需调整时，先核对现状并最小化影响，不覆盖或撤销他人成果。未经授权不提交、推送、合并或发布。
@@ -351,9 +397,11 @@ $idea-reference 及设计 skill 的有效材料。不要自行委派其他 agent
 修复并复验；不得删除步骤、放宽断言、扩大超时或改变期望来制造通过。确认 bug 但需要正式修复设计时
 才使用 $issue-design。超出 owner 或权限的部分写清触发、影响、建议和所需输入，继续独立工作。
 
-快速迭代使用定向单测、挂载或 browser。代码和测试输入稳定后，检查 QA binary 是否匹配并可复用，
-只为 IPC、磁盘、进程、IME、clipboard、OS shortcut、重启或 native window 等真实边界集中构建和运行
-必要 native 场景。核对 source/case/runner/config/build 身份；binary 可复用不等于 case 已通过，
+快速迭代使用定向单测、挂载或 browser。只有本轮断言确需验证真实 IPC、磁盘、进程、IME、clipboard、
+OS shortcut、重启、native window 或具体 WebView/打包差异时才补 native；已有明确 native AC 必须履行。
+纯 renderer 可见变化默认用 browser 充分验证，不因“桌面交付”自动要求 native smoke。
+确需 native 时，稳定相关代码/测试后检查 QA binary 身份与复用条件，再集中构建或复用并运行必要场景。
+核对 source/case/runner/config/build 身份；binary 可复用不等于 case 已通过，
 browser 结果不外推 native。验证用户结果以及错误、取消、连续操作、保存/撤销和恢复，不能只看控件
 存在或点击成功。
 
