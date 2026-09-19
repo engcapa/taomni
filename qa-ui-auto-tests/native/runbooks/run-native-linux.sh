@@ -9,6 +9,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
+source scripts/setup-replit-native-qa.sh
+
 echo "== [1/4] build packaged debug app =="
 python .agents/skills/qa-ui-auto/scripts/native_build.py
 

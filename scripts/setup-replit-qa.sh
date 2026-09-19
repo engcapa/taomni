@@ -7,6 +7,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+source "$ROOT/scripts/setup-replit-native-qa.sh"
+
 QA_TOOLS_ROOT="${TAOMNI_QA_TOOLS_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/taomni-qa-ui-auto}"
 export PATH="$QA_TOOLS_ROOT/bin:$HOME/.cargo/bin:$PATH"
 export PYTHONPATH="${PYTHONPATH:-$ROOT/.agents/skills/qa-ui-auto/scripts}"

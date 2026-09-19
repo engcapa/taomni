@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[4]
 QA_APP_ID = "com.taomni.app.qa"
 QA_CONFIG = Path(__file__).resolve().parent.parent / "assets" / "tauri.qa.conf.json"
 BUILD_RECIPE = "python .agents/skills/qa-ui-auto/scripts/native_build.py"
+REPLIT_NATIVE_SETUP = ROOT / "scripts" / "setup-replit-native-qa.sh"
 
 
 def binary_digest(binary: Path) -> str:
@@ -46,19 +47,54 @@ def verify_identity(binary: Path) -> dict:
     return record
 
 
-def build_inputs(*, release: bool = False) -> dict:
+def configured_environment(base: dict[str, str] | None = None) -> dict[str, str]:
+    """Return the environment used for a Replit Linux native build.
+
+    The shell helper is also sourced by the workflow and runbook. Keeping this
+    direct-call path here prevents `python native_build.py` from silently
+    bypassing the Replit toolchain fixes.
+    """
+    env = dict(os.environ if base is None else base)
+    if env.get("TAOMNI_REPLIT_NATIVE_QA") != "1" or not REPLIT_NATIVE_SETUP.is_file():
+        return env
+    if env.get("TAOMNI_NATIVE_QA_TOOLCHAIN_READY") == "1":
+        return env
+
+    command = [
+        "bash",
+        "-c",
+        'set -e; source "$1"; env -0',
+        "replit-native-qa-env",
+        str(REPLIT_NATIVE_SETUP),
+    ]
+    try:
+        output = subprocess.check_output(command, cwd=ROOT, env=env)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ValueError(f"Replit native QA environment setup failed: {exc}") from exc
+    for item in output.split(b"\0"):
+        if not item:
+            continue
+        key, value = item.split(b"=", 1)
+        env[key.decode()] = value.decode()
+    return env
+
+
+def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) -> dict:
+    effective_env = configured_environment(env)
     return {
         "source_sha256": source_identity(ROOT),
         "recipe_sha256": fingerprint(ROOT, [str(QA_CONFIG.relative_to(ROOT)).replace("\\", "/"),
                                              ".agents/skills/qa-ui-auto/scripts/native_build.py"]),
         "platform": platform.platform(),
         "profile": "release" if release else "debug",
-        "rustc": subprocess.check_output(["rustc", "--version"], text=True).strip(),
-        "node": subprocess.check_output(["node", "--version"], text=True).strip(),
-        "environment": {key: os.environ.get(key) for key in (
+        "rustc": subprocess.check_output(["rustc", "--version"], text=True, env=effective_env).strip(),
+        "node": subprocess.check_output(["node", "--version"], text=True, env=effective_env).strip(),
+        "environment": {key: effective_env.get(key) for key in (
             "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET", "RUSTUP_TOOLCHAIN",
             "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG", "CC", "CXX", "CFLAGS",
-            "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS", "LIBCLANG_PATH", "LIBGSSAPI_IMPL",
+            "CARGO_PROFILE_DEV_INCREMENTAL", "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS",
+            "LIBCLANG_PATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "LIBGSSAPI_IMPL",
+            "TAOMNI_REPLIT_NATIVE_QA", "TAOMNI_NATIVE_QA_TOOLCHAIN",
             "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM", "NODE_ENV")},
     }
 
@@ -98,7 +134,8 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     target = ROOT / "src-tauri" / "target" / "qa-ui-auto"
     binary = qa_binary(release=release)
     record_path = identity_path(binary)
-    inputs = build_inputs(release=release)
+    env = configured_environment()
+    inputs = build_inputs(release=release, env=env)
     if not force:
         reuse = check_build(release=release, inputs=inputs)
         if reuse["reusable"]:
@@ -107,7 +144,7 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
         print(f"qa-ui-auto: build needed: {reuse['reason']}; changed inputs: {reuse.get('changed_inputs', [])}")
     # A failed rebuild must not leave an old record authorizing a stale binary.
     record_path.unlink(missing_ok=True)
-    env = dict(os.environ)
+    env = dict(env)
     env["CARGO_TARGET_DIR"] = str(target)
     env.pop("TAURI_CONFIG", None)
     # The workspace dependency lock can declare a newer rust-version than the
@@ -128,7 +165,7 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     command.extend(["--", "--ignore-rust-version"])
     started = time.monotonic()
     subprocess.run(command, cwd=ROOT, env=env, check=True)
-    if inputs != build_inputs(release=release):
+    if inputs != build_inputs(release=release, env=env):
         raise ValueError("Build inputs changed during compilation; rebuild before collecting evidence")
     record = {
         "identifier": QA_APP_ID,

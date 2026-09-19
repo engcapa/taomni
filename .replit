@@ -10,6 +10,7 @@ PYTHONPATH = ".agents/skills/qa-ui-auto/scripts"
 PLAYWRIGHT_BROWSERS_PATH = ".local/share/taomni-qa-ui-auto/playwright-browsers"
 TAOMNI_NATIVE_QA_DESKTOP = "1"
 TAOMNI_NATIVE_QA_DISPLAY = ":99"
+TAOMNI_REPLIT_NATIVE_QA = "1"
 DISPLAY = ":99"
 
 [agent]
