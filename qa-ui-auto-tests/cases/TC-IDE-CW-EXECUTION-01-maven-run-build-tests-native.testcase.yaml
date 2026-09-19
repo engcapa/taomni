@@ -86,10 +86,10 @@ steps:
   - click: '[data-testid="code-workspace-bottom-tab-run"]'
   - wait_for: '[data-testid="code-workspace-run-panel"]'
   - wait_for:
-      selector: '[data-testid^="run-panel-configuration-run:"]'
+      selector: '[data-testid^="run-panel-configuration-java-main:"]'
       timeout_sec: 90
   - assert_visible: '[data-testid^="run-panel-configuration-source-"]'
-  - click: '[data-testid^="run-panel-configuration-edit-run:"]'
+  - click: '[data-testid^="run-panel-configuration-edit-java-main:"]'
   - wait_for: '[data-testid="run-configuration-editor"]'
   - assert_visible: '[data-testid="run-configuration-name"]'
   - assert_visible: '[data-testid="run-configuration-cwd"]'
@@ -118,17 +118,17 @@ steps:
       value: "QA_EXECUTION=enabled"
   - click: '[data-testid="run-configuration-save"]'
   - wait_for:
-      selector: '[data-testid^="run-panel-configuration-run:"]'
+      selector: '[data-testid^="run-panel-configuration-java-main:"]'
       timeout_sec: 30
   - assert_text:
-      selector: '[data-testid^="run-panel-configuration-run:"]'
+      selector: '[data-testid^="run-panel-configuration-java-main:"]'
       contains: "QA Maven Main"
       timeout_sec: 30
   - click: '[data-testid="run-configuration-reset"]'
   - eval_readonly:
       expression: "!String(document.evaluate(\"//*[contains(@data-testid,'run-configuration-name')]\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes('QA Maven Main')"
       expect_truthy: true
-  - click: '[data-testid^="run-panel-configuration-copy-run:"]'
+  - click: '[data-testid^="run-panel-configuration-copy-java-main:"]'
   - wait_for: '[data-testid="run-configuration-editor"]'
   - eval_readonly:
       expression: "String(document.evaluate(\"//*[contains(@data-testid,'run-configuration-name')]\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes('copy')"
@@ -143,7 +143,7 @@ steps:
       timeout_sec: 30
   - click: '[data-testid="run-configuration-delete"]'
   - assert_not_visible: '[data-testid="run-configuration-editor"]'
-  - assert_not_visible: '[data-testid^="run-panel-configuration-run:"][data-configuration-kind="missing"]'
+  - assert_not_visible: '[data-testid^="run-panel-configuration-java-main:"][data-configuration-kind="missing"]'
 
   # Execute the real Maven main class; the terminal output is the boundary
   # assertion rather than a disabled-control check.

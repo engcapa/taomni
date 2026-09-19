@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     // Keep qa-ui-auto startup from crawling the entire dependency graph in
-    // constrained workspaces. Explicitly optimize only the legacy package
+    // constrained workspaces. Explicitly optimize only the top-level packages
     // that need pre-bundling; other imports remain Vite-served modules.
     noDiscovery: true,
     include: [
@@ -37,9 +37,10 @@ export default defineConfig(({ mode }) => ({
       "react-dom",
       "react-dom/client",
       "gifenc",
-      "react-reconciler",
-      "react-reconciler/constants",
-      "scheduler",
+      // react-konva's ESM entry imports named exports from the CommonJS
+      // scheduler package. Optimizing the top-level entry lets Vite bundle
+      // that nested dependency and synthesize the browser-safe exports.
+      "react-konva",
     ],
     // In browser preview the Tauri plugins are aliased to stubs; keep the dep
     // optimizer from pre-bundling the real packages (whose imports reference

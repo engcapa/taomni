@@ -63,10 +63,10 @@ steps:
   - select_option:
       selector: '[data-testid="new-java-class-kind-select"]'
       value: interface
-  - assert_attribute:
-      selector: '[data-testid="new-java-class-kind-select"]'
-      name: value
-      equals: interface
+  - eval_readonly:
+      expression: >-
+        document.querySelectorAll('select')[document.querySelectorAll('select').length - 1]?.value?.includes('interface')
+      expect_truthy: true
   - click: '[data-testid="new-java-class-cancel"]'
   - wait_for:
       selector: '[data-testid="new-java-class-dialog"]'

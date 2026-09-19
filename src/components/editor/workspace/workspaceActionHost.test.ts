@@ -85,6 +85,39 @@ describe("WorkspaceActionHost (N0.1)", () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
+  it("dispatches platform-native secondary keybindings", async () => {
+    const host = new WorkspaceActionHost({
+      workspaceId: "ws-platform-shortcut",
+      getDefaultContext: () => ({ focus: "editor", hasActiveFile: true, isDirty: true }),
+    });
+    const run = vi.fn(async () => ({ kind: "applied" as const }));
+    host.registerAction({
+      id: "workspace.save",
+      title: "Save File",
+      category: "File",
+      provenance: "local",
+      keybinding: "Ctrl+S",
+      secondaryKeybindings: ["Meta+S"],
+      run,
+    });
+
+    const event = {
+      key: "s",
+      code: "KeyS",
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: true,
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+    };
+
+    const dispatched = await host.dispatchKeydown(event);
+    expect(dispatched?.id).toBe("workspace.save");
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it("handles in-flight lock and AbortSignal", async () => {
     const ctx: WorkspaceActionContext = { focus: "editor" };
     const host = new WorkspaceActionHost({

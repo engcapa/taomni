@@ -1,19 +1,19 @@
 id: TC-IDE-SHELLLAYOUT-02-shell-layout-native
 title: "Project, editor, and bottom tool window shell layout parity in native desktop"
 description: |
-  ED-SHELLLAYOUT-001 / WP-SHELL-LAYOUT-01: Linux WebKitGTK native verification against com.taomni.app.qa.
+  ED-SHELLLAYOUT-001 / WP-SHELL-LAYOUT-01: packaged native desktop verification against com.taomni.app.qa.
   1. Default S0 layout (Project tree open, bottom dock closed, right pane closed).
   2. Enter on src/main/example.txt opens in editor (71 bytes LF).
   3. Alt+6 toggles Problems tool window; Alt+4 toggles Run tool window.
   4. Esc from tool window returns focus directly to active editor (.cm-content).
-  5. Direct typing 'z' without mouse click -> undo (Ctrl+z) restores exact original 71 bytes (LF).
+  5. Direct typing 'z' without mouse click -> undo (Mod+z) restores exact original 71 bytes (LF).
   6. Shift+F12 Restore Tool Window Layout restores default S0 layout (bottom dock closed) and returns focus to editor.
-  7. Direct typing 'z' after restore -> undo (Ctrl+z) restores exact original bytes.
+  7. Direct typing 'z' after restore -> undo (Mod+z) restores exact original bytes.
   8. Preserves dirty state and workspace layout persistence.
 covers: [F25.1, F25.5]
 tags: [code-workspace, shell-layout, bottom-dock, idea-parity, native-gate, p1]
 modes: [native]
-native_platforms: [Windows, Linux]
+native_platforms: [Linux, macOS, Windows]
 fixtures: [reset_db, project_tree]
 timeout_sec: 180
 steps:
@@ -87,14 +87,20 @@ steps:
   - screenshot: 04-editor-focus-after-escape.png
 
   # Direct typing 'z' into editor without mouse click
-  - press: Control+End
+  - press: Mod+End
   - type: z
-  - press: Control+s
+  - press: Mod+s
+  - wait_for:
+      selector: '[data-testid="code-workspace-save-observation"][data-state="saved"]'
+      timeout_sec: 30
   - assert_file_contains:
       path: '${fixture.project_tree_root}/src/main/example.txt'
       contains: z
-  - press: Control+z
-  - press: Control+s
+  - press: Mod+z
+  - press: Mod+s
+  - wait_for:
+      selector: '[data-testid="code-workspace-save-observation"][data-state="saved"]'
+      timeout_sec: 30
   - assert_file_sha256:
       path: '${fixture.project_tree_root}/src/main/example.txt'
       equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
@@ -107,14 +113,20 @@ steps:
   - screenshot: 05-shift-f12-restored-layout.png
 
   # Direct typing 'z' again into editor without click
-  - press: Control+End
+  - press: Mod+End
   - type: z
-  - press: Control+s
+  - press: Mod+s
+  - wait_for:
+      selector: '[data-testid="code-workspace-save-observation"][data-state="saved"]'
+      timeout_sec: 30
   - assert_file_contains:
       path: '${fixture.project_tree_root}/src/main/example.txt'
       contains: z
-  - press: Control+z
-  - press: Control+s
+  - press: Mod+z
+  - press: Mod+s
+  - wait_for:
+      selector: '[data-testid="code-workspace-save-observation"][data-state="saved"]'
+      timeout_sec: 30
   - assert_file_sha256:
       path: '${fixture.project_tree_root}/src/main/example.txt'
       equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a

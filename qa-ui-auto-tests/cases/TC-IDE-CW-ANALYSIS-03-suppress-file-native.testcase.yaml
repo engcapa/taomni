@@ -7,7 +7,7 @@ description: |
 covers: [F25.2]
 tags: [code-workspace, analysis, problems, suppression, jdtls, native-gate, p1]
 modes: [native]
-native_platforms: [Windows, Linux]
+native_platforms: [Linux, macOS, Windows]
 fixtures: [reset_db, java_sample_projects, jdtls_required]
 timeout_sec: 360
 steps:

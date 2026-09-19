@@ -3,12 +3,12 @@ title: Project tree navigation preserves tabs and editing
 description: |
   ED-TREE-001: real nested host fixture without a Java/provider setup. Direction
   keys change selection/expansion, Enter opens, context cancellation preserves
-  the buffer, editing/save/undo and Ctrl+Enter split remain usable.
+  the buffer, editing/save/undo and Mod+Enter split remain usable.
   WebDriver keys prove the packaged WebView path, not physical OS input or IME.
 covers: [F25.5]
 tags: [code-workspace, project-tree, p1]
 modes: [native]
-native_platforms: [Windows, Linux]
+native_platforms: [Linux, macOS, Windows]
 fixtures: [reset_db, project_tree]
 timeout_sec: 120
 steps:
@@ -79,14 +79,14 @@ steps:
   - eval_readonly:
       expression: document.activeElement?.classList.contains('cm-content')
   - screenshot: 05-editor-focused.png
-  - press: Control+End
+  - press: Mod+End
   # One edit/undo transaction; multi-character W3C typing need not form one
   # history entry. This scenario protects undo and exact disk restoration.
   - type: X
-  - press: Control+s
+  - press: Mod+s
   - assert_file_contains: { path: '${fixture.project_tree_root}/src/main/example.txt', contains: X }
-  - press: Control+z
-  - press: Control+s
+  - press: Mod+z
+  - press: Mod+s
   - assert_file_sha256:
       path: '${fixture.project_tree_root}/src/main/example.txt'
       equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
@@ -94,7 +94,7 @@ steps:
   # expanded selected file remains navigable after saves (regression found E2E).
   - wait: 1
   - assert_attribute: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', name: aria-selected, equals: 'true' }
-  - press: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', key: Control+Enter }
+  - press: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', key: Mod+Enter }
   - wait_for: '[data-testid="code-workspace-editor-split"]'
   - assert_count: { selector: '[data-testid="code-workspace-editor-pane"] .cm-content', equal: 2 }
   - screenshot: 06-retained-split.png

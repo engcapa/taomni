@@ -98,9 +98,13 @@ describe("workspaceCommands", () => {
   });
 
   it("adapts commands into action definitions with default provenance", () => {
-    const definition = workspaceCommandToActionDefinition(command({ id: "workspace.probe" }));
+    const definition = workspaceCommandToActionDefinition(command({
+      id: "workspace.probe",
+      keybindings: ["Meta+B"],
+    }));
     expect(definition.id).toBe("workspace.probe");
     expect(definition.keybinding).toBe("Ctrl+Shift+F");
+    expect(definition.secondaryKeybindings).toEqual(["Meta+B"]);
     expect(definition.run).toBeTypeOf("function");
   });
 

@@ -122,7 +122,7 @@ steps:
   # Context actions are renderer-wired even without an LSP provider. Reopen
   # the menu for each action so every menu item is exercised independently.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: {selector: '[data-testid="code-workspace-editor"] .cm-content', key: Control+A}
+  - press: {selector: '[data-testid="code-workspace-editor"] .cm-content', key: Mod+A}
   - right_click: '[data-testid="code-workspace-editor"] .cm-content'
   - wait_for: '[data-testid="context-menu"]'
   - assert_enabled: '[data-testid="editor-context-copy"]'
