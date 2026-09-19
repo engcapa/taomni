@@ -23,7 +23,7 @@ import platform
 import sys
 import time
 import traceback
-from contextlib import suppress
+from contextlib import nullcontext, suppress
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +36,7 @@ from . import config as cfg_mod
 from . import reporter
 from . import testcase as tc_mod
 from .fixtures import FixtureSkip, REGISTRY as FIXTURE_REGISTRY, get as get_fixture
+from .service_fixtures import LocalServiceFixtures, ServiceFixtureError
 from .steps import REGISTRY as STEP_REGISTRY, StepContext, StepError
 from .deadline import BudgetedPage, Deadline, using_deadline
 from .provenance import input_digest, execution_identity, conditions_identity
@@ -845,38 +846,48 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     results: list[dict] = []
-    if mode == "native":
-        from tauri_webdriver import WebDriverError
-        try:
-            results = _native_run(selected, cfg, env, report_root, args.dry_run)
-        except (OSError, ValueError, WebDriverError) as exc:
-            print(f"qa-ui-auto: native setup error: {exc}", file=sys.stderr)
-            return 2
-    else:
-        payloads = []
-        for i, c in enumerate(selected):
-            payloads.append({
-                "case": _serialize_case(c),
-                "cfg": cfg,
-                "env": env,
-                "report_root": str(report_root),
-                "worker_id": i % workers,
-                "dry_run": args.dry_run,
-                "headless": not args.headed,
-            })
-        if workers == 1 or args.dry_run:
-            for p in payloads:
-                results.append(_run_browser_case(p))
-                _print_case_line(results[-1])
-            _close_browser()
-        else:
-            ctx = mp.get_context("spawn")
-            with ctx.Pool(workers, initializer=_init_browser_worker) as pool:
-                for r in pool.imap_unordered(_run_browser_case, payloads):
-                    results.append(r)
-                    _print_case_line(r)
-                pool.close()
-                pool.join()
+    service_context = (
+        nullcontext()
+        if args.dry_run
+        else LocalServiceFixtures(cfg, env, report_root=report_root)
+    )
+    try:
+        with service_context:
+            if mode == "native":
+                from tauri_webdriver import WebDriverError
+                try:
+                    results = _native_run(selected, cfg, env, report_root, args.dry_run)
+                except (OSError, ValueError, WebDriverError) as exc:
+                    print(f"qa-ui-auto: native setup error: {exc}", file=sys.stderr)
+                    return 2
+            else:
+                payloads = []
+                for i, c in enumerate(selected):
+                    payloads.append({
+                        "case": _serialize_case(c),
+                        "cfg": cfg,
+                        "env": env,
+                        "report_root": str(report_root),
+                        "worker_id": i % workers,
+                        "dry_run": args.dry_run,
+                        "headless": not args.headed,
+                    })
+                if workers == 1 or args.dry_run:
+                    for p in payloads:
+                        results.append(_run_browser_case(p))
+                        _print_case_line(results[-1])
+                    _close_browser()
+                else:
+                    ctx = mp.get_context("spawn")
+                    with ctx.Pool(workers, initializer=_init_browser_worker) as pool:
+                        for r in pool.imap_unordered(_run_browser_case, payloads):
+                            results.append(r)
+                            _print_case_line(r)
+                        pool.close()
+                        pool.join()
+    except ServiceFixtureError as exc:
+        print(f"qa-ui-auto: local service fixture error: {exc}", file=sys.stderr)
+        return 2
 
     duration = time.time() - started
     results.sort(key=lambda r: r["id"])

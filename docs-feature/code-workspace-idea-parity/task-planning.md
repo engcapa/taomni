@@ -33,16 +33,14 @@
 
 ## ED-PARITY-003 预览标签转正式标签与分屏共享文档
 
-- 来源：REQ-04 / CW-TAB-001、CW-TAB-002；[P0 需求](overall-audit-plan-20260913.md#req-04)、[历史只读材料](../../claudedocs/code-workspace-idea-parity-backlog.md)。
-- 已知依据：P0 只观察双 pane 和 policy Cancel；Tree/Shell 后续交付涉及打开和布局，P1 先复核这些保留证据后确定真正差距。
-- 本包边界：一个文件经 preview→编辑转正式→分屏→关闭非最后 view 的连续场景；其余 MRU/拖动/重启恢复留在总矩阵，不将整域塞入一张卡。
-- 生产 owner 候选（待核）：EditorGroup.tsx、workspaceTabPolicy.ts、recursiveLayoutTree.ts、workspaceDocumentTransactionOwner.ts 及 CodeWorkspaceTab.tsx 入口。
-- IDEA/fixture（待核）：F1 两文件；明确 IDEA preview 设置、dirty 和正式 tab 状态，使用相同文件字节。
-- ED-PARITY-003-A1：预览/正式状态和目标 IDEA 设置一致，分屏共享文本且 view selection 独立，关闭非最后 view 不释放仍使用的文档。
-- ED-PARITY-003-A2：同 fixture 的 IDEA/Taomni 功能、视觉、交互分别有结论和准确证据身份；缺侧或不支持明确标记，不能声称 matched。
-- ED-PARITY-003-A3：dirty 关闭取消零变化、共享 undo、已交付树单击只选/双击正式打开和焦点结果。
-- 验证起点：V1→A1，V2→A2，V3→A3；所需种类为 `code-audit`、`unit`、`typecheck`、`browser`、`native`、`idea-comparison`。具体 case/命令、环境和可复用证据由 P1 核对后写入；本次均未执行。
-- ready 前置：核对当前生产及后续交付是否已覆盖目标；确认参考和运行环境；给每个 AC 可观察的正常/错误/取消/恢复断言及消费者回归；依赖只引用本板实际必要的卡。当前无已确认的跨卡依赖，`depends_on=[]` 不代表外部环境已经就绪。
+2026-09-19 P1 已细化至[本卡完整设计](preview-tab-split-plan.md#ed-parity-003)，来源仍为 [REQ-04](overall-audit-plan-20260913.md#req-04) / CW-TAB-001、CW-TAB-002。
+
+- 范围：一个文件经 preview→编辑转正式→分屏→关闭非最后 view 的连续场景；其余 MRU/拖动/重启恢复留在总矩阵。
+- 架构与决定：独立 ED-PARITY-003-DEC-01..07、A1..A3、V1..V4、S0..S7 与生产文件/符号责任详见设计文档。
+- [Windows IDEA 真实参照与 fixture 工件](references/ed-parity-003-reference.md)；[完整 P2 交接指令](handoff-p2-ed-parity-003.md)。
+- Required evidence 保持 `code-audit`、`unit`、`typecheck`、`browser`、`native`、`idea-comparison`；本轮所有产品代码验证未执行。
+- P1 规划完成，卡片更新为 ready，`p0.planning_required` 置为 false，可交 P2 正式领取。状态以[唯一任务板](backlog.md)为准，无开发 owner。
+
 
 <a id="ed-parity-004"></a>
 

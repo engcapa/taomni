@@ -56,3 +56,21 @@ mysql:
 report:
   dir: qa-ui-auto-report
   keep_runs: 5
+
+# Optional local Docker services. These are started once by qa-ui-auto before
+# browser workers/native cases and removed after the run. Credentials must come
+# from environment variables; no service is started when its flag is false.
+fixtures:
+  start_local_sshd: false
+  sshd_image: linuxserver/openssh-server:latest
+  sshd_port: 2222
+  sshd_user: testuser
+  sshd_password: ${env.QA_SSH_PASSWORD}
+  start_local_mysql: false
+  mysql_image: mysql:8.4
+  mysql_port: 3306
+  mysql_user: test
+  mysql_password: ${env.TAOMNI_TEST_MYSQL_PASSWORD}
+  mysql_root_password: ${env.TAOMNI_TEST_MYSQL_ROOT_PASSWORD}
+  mysql_database: test
+  startup_timeout_sec: 120

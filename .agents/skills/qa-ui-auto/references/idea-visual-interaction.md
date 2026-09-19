@@ -34,9 +34,13 @@ font rasterization differs. Geometry tolerances derive from the target; document
 differences rather than invent a universal similarity percentage. Screenshots
 alone cannot prove interaction.
 
-Use browser feedback while editing, then a compact current-WebView smoke and
-native tests for affected OS behavior. One run can collect UI, provider and result
-evidence. Do not compile per screenshot. Prototype captures are design inputs.
+Prefer browser for renderer visual and interaction assertions throughout delivery.
+Add a compact current-WebView smoke or native tests only for explicit native ACs,
+concrete WebView/packaging differences or affected OS boundaries; name what browser
+cannot prove. Follow the [coverage dimensions](authoring.md#coverage-dimensions-and-mode-selection)
+for affected controls, Action entries and actual shortcut input. One run can collect
+UI, provider and result evidence. Do not compile per screenshot. Prototype captures
+are design inputs; browser results leave native fidelity unverified.
 
 Formal records use the selected
 `claudedocs/code-workspace-idea-specs/idea-comparison.schema.json` and

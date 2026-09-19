@@ -184,6 +184,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 **2026-09-14 REQ-03 P1 增量：** 仅作首包受影响保留消费者，不扩展原场景目标。生产调用链、保留断言和最小改前/改后验证已列入R1..R7；缺当前运行证据不登记成产品bug。 [设计](shell-layout-design.md)、[任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)、[局部参照](references/shell-layout-2026.2.2-linux.md)。任务尚不可领取，状态只读任务板；本场景2026-09-13历史三维结论/分母不变、差距未关闭。
 
+**2026-09-19 REQ-04 P1 增量：** [ED-PARITY-003 设计](preview-tab-split-plan.md#ed-parity-003)、[唯一任务板](backlog.md) / `ED-PARITY-003`、[Windows IDEA 真实参照](references/ed-parity-003-reference.md)、[完整 P2 交接](handoff-p2-ed-parity-003.md)。完成首包连续闭环规划（preview 打开、双击/输入转正、分屏独立选区与光标、共享编辑与撤销、关闭非最后 view 保活），补齐 Windows 11 IDEA 2026.2.2 真实实测截图与工件；唯一板任务卡已 author 为 ready、planning_required=false，可交 P2 正式领取。本结论仅代表 P1 规划就绪，不是功能/UI/交互已对齐；Taomni 产品测试/构建/运行为 0，场景三维结论保持待验证、差距未关闭。
+
+
 <a id="cw-tab-002"></a>
 
 ### CW-TAB-002 — 递归分屏、移动 tab 与独立视图
@@ -208,6 +211,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 
 **2026-09-14 REQ-03 P1 增量：** 仅作首包受影响保留消费者，不扩展原场景目标。生产调用链、保留断言和最小改前/改后验证已列入R1..R7；缺当前运行证据不登记成产品bug。 [设计](shell-layout-design.md)、[任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)、[局部参照](references/shell-layout-2026.2.2-linux.md)。任务尚不可领取，状态只读任务板；本场景2026-09-13历史三维结论/分母不变、差距未关闭。
+
+**2026-09-19 REQ-04 P1 增量：** [ED-PARITY-003 设计](preview-tab-split-plan.md#ed-parity-003)、[唯一任务板](backlog.md) / `ED-PARITY-003`、[Windows IDEA 真实参照](references/ed-parity-003-reference.md)、[完整 P2 交接](handoff-p2-ed-parity-003.md)。完成首包连续闭环规划（preview 打开、双击/输入转正、分屏独立选区与光标、共享编辑与撤销、关闭非最后 view 保活），补齐 Windows 11 IDEA 2026.2.2 真实实测截图与工件；唯一板任务卡已 author 为 ready、planning_required=false，可交 P2 正式领取。本结论仅代表 P1 规划就绪，不是功能/UI/交互已对齐；Taomni 产品测试/构建/运行为 0，场景三维结论保持待验证、差距未关闭。
+
 
 <a id="cw-tab-003"></a>
 
