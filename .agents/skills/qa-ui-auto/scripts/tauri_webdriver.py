@@ -205,7 +205,12 @@ class TauriDriverProcess:
                     f"native driver exited early with code {self.proc.returncode}; "
                     f"see {err}"
                 )
-            if _tcp_ok(self.host, self.port):
+            # tauri-driver can bind its intermediary port before it has
+            # finished spawning WebKitWebDriver/msedgedriver.  Returning on
+            # the first socket creates a startup race: the first /session
+            # request is forwarded while the native driver is still absent
+            # and fails as RemoteDisconnected/connection refused.
+            if _tcp_ok(self.host, self.port) and _tcp_ok(self.host, self.native_port):
                 return
             time.sleep(0.25)
         raise WebDriverError(f"native driver did not listen on {self.url}")
@@ -599,7 +604,7 @@ class NativeSession:
             # Release any input source left depressed by a failed driver action.
             try:
                 self.request("DELETE", self.endpoint("/actions"))
-            except WebDriverError:
+            except (WebDriverError, urllib.error.URLError, OSError):
                 pass
         return {
             "start": {"x": int(start["x"]), "y": int(start["y"])},

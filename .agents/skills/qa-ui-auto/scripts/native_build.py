@@ -57,8 +57,9 @@ def build_inputs(*, release: bool = False) -> dict:
         "node": subprocess.check_output(["node", "--version"], text=True).strip(),
         "environment": {key: os.environ.get(key) for key in (
             "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET", "RUSTUP_TOOLCHAIN",
-            "CC", "CXX", "CFLAGS", "CXXFLAGS", "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM",
-            "NODE_ENV")},
+            "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG", "CC", "CXX", "CFLAGS",
+            "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS", "LIBCLANG_PATH", "LIBGSSAPI_IMPL",
+            "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM", "NODE_ENV")},
     }
 
 
@@ -109,9 +110,22 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     env = dict(os.environ)
     env["CARGO_TARGET_DIR"] = str(target)
     env.pop("TAURI_CONFIG", None)
-    command = [pnpm, "tauri", "build", "--no-bundle", "--config", str(QA_CONFIG), "--ignore-version-mismatches"]
+    # The workspace dependency lock can declare a newer rust-version than the
+    # Rust toolchain available in the verification container. Cargo's
+    # ignore-rust-version flag lets the build reach actual compiler/system
+    # compatibility checks instead of stopping on metadata alone.
+    command = [
+        pnpm,
+        "tauri",
+        "build",
+        "--no-bundle",
+        "--config",
+        str(QA_CONFIG),
+        "--ignore-version-mismatches",
+    ]
     if not release:
         command.append("--debug")
+    command.extend(["--", "--ignore-rust-version"])
     started = time.monotonic()
     subprocess.run(command, cwd=ROOT, env=env, check=True)
     if inputs != build_inputs(release=release):
