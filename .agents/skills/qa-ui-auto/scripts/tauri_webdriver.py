@@ -859,6 +859,10 @@ class NativeSession:
         data = self.request("GET", self.endpoint("/screenshot"))
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(base64.b64decode(str(data)))
+        target.with_suffix(target.suffix + ".metadata.json").write_text(
+            json.dumps({"capture_kind": "webview", "platform": platform.system(),
+                        "actor": "WKWebView.takeSnapshot" if platform.system() == "Darwin" else "WebDriver",
+                        "screen_recording_required": False}), encoding="utf-8")
         return str(target)
 
     def execute(self, script: str) -> Any:

@@ -1,0 +1,13 @@
+schema: qa-ui-auto.ci-toolchains.v1
+jdtls:
+  version: 1.50.0
+  url: https://download.eclipse.org/jdtls/milestones/1.50.0/jdt-language-server-1.50.0-202509041425.tar.gz
+  sha256: 3292c5c33888f95ab0ff718e777ee94ff5496b8635a23a8844b876ee090ebdea
+java-debug:
+  version: 0.59.0
+  url: https://open-vsx.org/api/vscjava/vscode-java-debug/0.59.0/file/vscjava.vscode-java-debug-0.59.0.vsix
+  sha256: 87627e24dbb5b01137decc0265f043cb08adad22af3c195f1ba39898dafb1588
+java-test:
+  version: 0.46.0
+  url: https://open-vsx.org/api/vscjava/vscode-java-test/0.46.0/file/vscjava.vscode-java-test-0.46.0.vsix
+  sha256: 56c1e14dc73a30e9574c47042106fa52893bf8325b580f47c14ace07d5eef255
