@@ -62,13 +62,23 @@ class Desktop:
                         raise RuntimeError("fcitx5 wbpy engine is not installed")
                     env = {**os.environ, "XDG_CONFIG_HOME": str(config.resolve())}
                     self.start(["fcitx5", "--replace"], env=env)
+                    # The current engine is empty until a client owns focus.
+                    # Keep a real GTK input context alive during this preflight.
+                    gtk = self.start(["/usr/bin/python3", "-c",
+                        "import gi; gi.require_version('Gtk','3.0'); from gi.repository import Gtk; "
+                        "w=Gtk.Window(title='QA GTK IME probe'); e=Gtk.Entry(); w.add(e); "
+                        "w.show_all(); w.present(); e.grab_focus(); Gtk.main()"], env=env)
                     for _ in range(60):
+                        subprocess.run(["fcitx5-remote", "-s", "wbpy"], capture_output=True)
                         probe = subprocess.run(["fcitx5-remote", "-n"], capture_output=True, text=True)
                         if probe.returncode == 0 and probe.stdout.strip():
                             break
                         time.sleep(0.5)
                     else:
                         raise RuntimeError("fcitx5 session bus/engine did not become ready")
+                    gtk.terminate()
+                    gtk.wait(timeout=10)
+                    self.processes.remove(gtk)
                     facts["ime"] = {"configured_engine": "wbpy", "observed_engine": probe.stdout.strip(),
                                     "note": "active composition/commit is verified by the selected native case"}
             elif system == "Windows":

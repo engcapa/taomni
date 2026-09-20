@@ -242,9 +242,29 @@ class Services:
         retry(probe)
         self.stack.callback(client.close)
         nonce = secrets.token_hex(12)
-        _, stdout, stderr = client.exec_command(f"echo {nonce}", get_pty=True, timeout=60)
-        if nonce not in stdout.read().decode() or stdout.channel.recv_exit_status() != 0:
-            raise RuntimeError("SSH authentication/PTY/exec probe failed")
+        _, stdout, stderr = client.exec_command(f"echo {nonce}", timeout=60)
+        output = stdout.read().decode(errors="replace")
+        error = stderr.read().decode(errors="replace")
+        code = stdout.channel.recv_exit_status()
+        write_json(self.root / "ssh-exec.json", {"output": output, "stderr": error, "exit": code})
+        if nonce not in output or code != 0:
+            raise RuntimeError("SSH exec probe failed; see ssh-exec.json")
+        channel = client.invoke_shell(width=120, height=32)
+        try:
+            channel.settimeout(30)
+            # Shell output must contain a fresh nonce on its own line, not
+            # merely the command echo. No exit-status assumption for ConPTY.
+            marker = secrets.token_hex(12)
+            channel.send(f"printf '\\n%s\\n' '{marker}'\n")
+            output = ""
+            end = time.monotonic() + 30
+            while "\n" + marker + "\n" not in output.replace("\r", ""):
+                data = channel.recv(4096)
+                if not data or time.monotonic() > end:
+                    raise RuntimeError("SSH PTY shell did not produce the nonce")
+                output += data.decode(errors="replace")
+        finally:
+            channel.close()
         sftp = client.open_sftp()
         try:
             try:
@@ -264,7 +284,9 @@ class Services:
         finally:
             sftp.close()
         cfg = {"host": "127.0.0.1", "port": port, "user": user, "password": "${env.QA_SSH_PASSWORD}"}
-        self.config.update(ssh=cfg.copy(), sftp={**cfg, "remote_test_dir": remote_dir})
+        shell_dir = "/c/" + remote_dir[3:] if platform.system() == "Windows" else remote_dir
+        self.config.update(ssh=cfg.copy(), sftp={**cfg, "remote_test_dir": remote_dir,
+                                             "remote_shell_test_dir": shell_dir})
         return {"authentication": True, "pty_exec": True, "sftp_roundtrip": True, "port": port}
 
     def mysql(self):

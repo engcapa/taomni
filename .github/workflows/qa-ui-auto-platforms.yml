@@ -127,7 +127,7 @@ jobs:
         if: runner.os == 'Linux' && matrix.mode == 'native'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev libudev-dev nasm xvfb xauth openbox wmctrl xdotool x11-utils x11-xserver-utils libxtst6 dbus-x11 xclip python3-tk fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons fonts-noto-cjk
+          sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev libudev-dev nasm xvfb xauth openbox wmctrl xdotool x11-utils x11-xserver-utils libxtst6 dbus-x11 xclip python3-tk python3-gi gir1.2-gtk-3.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons fonts-noto-cjk
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.mode == 'native'
       - uses: arduino/setup-protoc@v3
