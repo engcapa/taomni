@@ -213,8 +213,16 @@ def selection_entry(path: Path, entry_id: str, *, verify: bool = True) -> tuple[
         raise ValueError(f"unknown/duplicate selection entry: {entry_id}")
     entry = matches[0]
     if verify:
-        if commit("HEAD") != manifest["head"] or execution_identity(Path.cwd()) != manifest["identity"]:
-            raise ValueError("CI selection source/runner identity does not match checkout")
+        actual_identity = execution_identity(Path.cwd())
+        actual_head = commit("HEAD")
+        if actual_head != manifest["head"] or actual_identity != manifest["identity"]:
+            details = []
+            if actual_head != manifest["head"]:
+                details.append(f"head {actual_head} != {manifest['head']}")
+            for key in ("source_sha256", "runner_sha256"):
+                if actual_identity.get(key) != manifest["identity"].get(key):
+                    details.append(f"{key} differs ({actual_identity.get(key)} != {manifest['identity'].get(key)})")
+            raise ValueError("CI selection source/runner identity does not match checkout: " + "; ".join(details))
         by_id = {c.id: c for c in discover(Path("qa-ui-auto-tests/cases"))}
         for cid in entry["selected_ids"]:
             if cid not in by_id or input_digest(by_id[cid].source_path) != entry["case_digests"][cid]:
