@@ -10,10 +10,20 @@ from unittest import TestCase, skipUnless
 from unittest.mock import Mock, call, patch
 
 from qa_ui_auto import native_steps
-from tauri_webdriver import NativeSession, WebDriverError
+from tauri_webdriver import NativeHarness, NativeSession, WebDriverError
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_per_case_java_runtime_does_not_leak_into_next_session(self):
+        harness = NativeHarness({"app": {"tooling_java_home": "/jdk21"}}, Path("/qa/run"))
+        harness.driver = Mock()
+        with patch("tauri_webdriver.NativeSession") as factory:
+            harness.create_session(tooling_java_home="/jdk25")
+            self.assertIn('"/jdk25"', factory.return_value.execute.call_args.args[0])
+            harness.create_session()
+            self.assertIn('"/jdk21"', factory.return_value.execute.call_args.args[0])
+        self.assertEqual(harness.cfg["app"]["tooling_java_home"], "/jdk21")
+
     def test_windows_driver_uses_the_apps_isolated_webview_profile(self):
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.request = Mock(return_value={"sessionId": "session-1"})

@@ -64,9 +64,15 @@ def collect(case_dir: Path, run_root: Path, *, failed: bool):
                     shutil.copyfile(log, destination / f"jdtls-{marker.parent.name}.log")
     if failed and platform.system() == "Windows":
         script = r'''
-        Get-Process | Where-Object { $_.Name -match 'taomni|msedge|WerFault' } |
-          Select-Object Id,ProcessName,SessionId,MainWindowTitle,MainWindowHandle |
+        Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'taomni|msedge|WerFault' } |
+          Select-Object ProcessId,Name,SessionId,CommandLine,ExecutablePath |
           ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $env:QA_DIAGNOSTICS 'processes.json')
+        $profile = Join-Path $env:NEWMOB_DATA_DIR 'com.taomni.app.qa\webview'
+        if (Test-Path $profile) {
+          Get-ChildItem -LiteralPath $profile -Recurse -Force -ErrorAction SilentlyContinue |
+            Select-Object FullName,PSIsContainer,Length |
+            ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $env:QA_DIAGNOSTICS 'webview-profile-tree.json')
+        }
         Add-Type -AssemblyName System.Windows.Forms,System.Drawing
         $bounds=[Windows.Forms.SystemInformation]::VirtualScreen
         $image=New-Object Drawing.Bitmap $bounds.Width,$bounds.Height

@@ -78,6 +78,8 @@ def main():
                 # discovery chooses the highest major (currently JDK 26 on
                 # macOS), outside the pinned JDTLS compatibility range.
                 config["app"]["tooling_java_home"] = os.environ["JAVA_HOME"]
+                if "java25" in entry["capabilities"]:
+                    config["app"]["tooling_java25_home"] = os.environ["JAVA25_HOME"]
             if entry["mode"] == "native" and platform.system() == "Windows":
                 driver = shutil.which("msedgedriver.exe")
                 if not driver:

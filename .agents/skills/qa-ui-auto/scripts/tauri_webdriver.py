@@ -1009,13 +1009,15 @@ class NativeHarness:
                     os.environ[key] = previous
             self._previous_env.clear()
 
-    def create_session(self) -> NativeSession:
+    def create_session(self, *, tooling_java_home: str | None = None) -> NativeSession:
         self.driver.ensure_running()
         session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
         session.deadline = getattr(self, "deadline", None)
         try:
             session.start()
-            if java_home := self.cfg.get("app", {}).get("tooling_java_home"):
+            # A Java 25 project must not change the JDK used by unrelated
+            # JDK 21 provider fixtures in the same selected suite.
+            if java_home := tooling_java_home or self.cfg.get("app", {}).get("tooling_java_home"):
                 session.execute(
                     "window.localStorage.setItem('taomni.codeWorkspace.lspJavaHome.v1', "
                     + json.dumps(str(java_home)) + "); return true;"

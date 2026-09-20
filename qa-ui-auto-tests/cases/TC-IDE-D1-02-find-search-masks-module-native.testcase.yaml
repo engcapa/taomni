@@ -53,10 +53,9 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-find-module-select"]'
       keys: ["ArrowDown"]
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-find-module-select"]'
-      name: value
-      equals: com.example.single:maven-single
+  - eval_readonly:
+      expression: 'document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-find-module-select\"]")?.value === "com.example.single:maven-single"'
+      expect_truthy: true
   - native_keys:
       selector: '[aria-label="Search query"]'
       keys: ["Enter"]

@@ -71,7 +71,10 @@ bundles are selected. Java Test 0.43.1 matches the ASM 9.8 family in JDTLS 1.50;
 upgrading these pins requires a new joint probe. The native session seeds the
 application's existing tooling-JDK setting from the prepared `JAVA_HOME`, since
 a hosted image may also contain a newer, incompatible JDK. Java 25 projects
-build online then offline. The
+build online then offline. JDK 21 remains the default for existing provider
+fixtures; jobs selecting Java 25 also install that runtime and select it only
+for cases declaring `java25_projects`. Selecting both kinds must not alter
+the JDK 21 completion/import candidate contract. The
 whole debug/test extension server directories are retained. Product semantics
 and debugging still require the actual native cases; preparation alone is not
 product coverage.
@@ -83,6 +86,13 @@ WKWebView's own snapshot, without asking for Screen Recording. These images are
 WebView captures; they do not establish full desktop capture or OS permission
 handling. macOS bridge DOM events do not prove system keyboard/IME interaction.
 Unsupported platform/verb combinations appear as gaps in selection/report.
+
+`TC-IDE-C6-06-java-definition-realproject-native` additionally requires the
+user's original external `clickhousecrud` checkout (`QA_JAVA_PROJECT_ROOT`).
+That source is not part of this repository. The hosted plan records an explicit
+gap on each platform and rejects explicitly selecting it; run it locally with
+the original project. The in-repository Maven/Gradle definition cases still run
+on hosted VMs. A generated lookalike cannot establish the external-project claim.
 
 ## Evidence and maintenance
 

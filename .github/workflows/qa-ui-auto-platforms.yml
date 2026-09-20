@@ -171,11 +171,20 @@ jobs:
       - name: Native adapter
         if: matrix.mode == 'native' && runner.os != 'macOS'
         run: cargo install tauri-driver --locked
+      - name: Java 25 project runtime
+        uses: actions/setup-java@v4
+        if: contains(matrix.capabilities, 'java25')
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Retain Java 25 runtime
+        if: contains(matrix.capabilities, 'java25')
+        run: echo "JAVA25_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         if: contains(matrix.capabilities, 'java')
         with:
           distribution: temurin
-          java-version: ${{ contains(matrix.capabilities, 'java25') && '25' || '21' }}
+          java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
         if: contains(matrix.capabilities, 'java')
         with:

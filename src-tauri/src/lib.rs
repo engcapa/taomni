@@ -355,6 +355,22 @@ pub fn run() {
                         }
                     }
                 }
+                #[cfg(target_os = "windows")]
+                if cfg!(debug_assertions) && std::env::var_os("NEWMOB_DATA_DIR").is_some() {
+                    // EdgeDriver launches the QA executable with the remote
+                    // debugging arguments in this environment variable. Wry
+                    // also supplies explicit default arguments, which take
+                    // precedence over the WebView2 environment variable. Pass
+                    // the driver value explicitly so DevToolsActivePort is
+                    // created in the isolated data directory watched by it.
+                    if let Ok(arguments) =
+                        std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
+                    {
+                        if !arguments.trim().is_empty() {
+                            builder = builder.additional_browser_args(&arguments);
+                        }
+                    }
+                }
                 // On macOS use the native traffic-light controls with an overlay
                 // title bar so the window feels native (the frontend reserves a
                 // left inset and hides its custom min/max/close there). Windows
