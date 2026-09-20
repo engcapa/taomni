@@ -591,7 +591,7 @@ controls:
     selector: '[data-testid="terminal-pane"]'
     kind: interactive
   - id: terminal-keyboard-target
-    selector: '.xterm-helper-textarea'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     kind: interactive       # xterm's actual type / send_keys focus target
   - id: attached-sftp-toggle
     selector: '[data-testid="attached-sftp-toggle"]'

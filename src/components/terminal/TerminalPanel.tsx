@@ -2626,6 +2626,18 @@ export function TerminalPanel({
       }
     });
     const scrollDisposable = term.onScroll(() => setViewportVersion((v) => v + 1));
+    const syncAutomationState = () => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      panel.setAttribute("data-terminal-text", getBufferText(term));
+      if (terminalAtIdlePrompt(term)) {
+        panel.setAttribute("data-terminal-ready", "true");
+      } else {
+        panel.removeAttribute("data-terminal-ready");
+      }
+    };
+    syncAutomationState();
+    const automationStateTimer = window.setInterval(syncAutomationState, 500);
     const renderDisposable = term.onRender(() => setViewportVersion((v) => v + 1));
     const resizeDisposable = term.onResize(({ cols, rows }) => {
       setViewportVersion((v) => v + 1);
@@ -3237,6 +3249,7 @@ export function TerminalPanel({
       renderDisposable.dispose();
       resizeDisposable.dispose();
       clearTimeout(resizeTimer);
+      window.clearInterval(automationStateTimer);
       if (activityPromptTimer) clearTimeout(activityPromptTimer);
       if (sockscapLaunchTimer) clearTimeout(sockscapLaunchTimer);
       installSshCwdIntegrationRef.current = null;
@@ -3505,20 +3518,6 @@ export function TerminalPanel({
   // doesn't churn on every render (resolvedTheme is a fresh object each time).
   const captureThemeRef = useRef({ resolvedTheme, fontFamily, fontSize });
   captureThemeRef.current = { resolvedTheme, fontFamily, fontSize };
-
-  // Keep data-terminal-text in sync so WebDriver / automation can read
-  // terminal content without depending on xterm's canvas rendering.
-  useEffect(() => {
-    const el = panelRef.current;
-    if (!el) return;
-    const update = () => {
-      const term = termRef.current;
-      el.setAttribute("data-terminal-text", term ? getBufferText(term) : "");
-    };
-    update();
-    const id = window.setInterval(update, 500);
-    return () => window.clearInterval(id);
-  }, []);
 
   // Register this terminal in the global registry so the AI Chat Drawer can
   // pull buffer context (`@terminal:last-N`) and push commands back into it

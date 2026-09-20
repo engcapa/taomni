@@ -1372,7 +1372,7 @@
 ## terminal/local (F2.2)
 
 - `[data-testid="terminal-pane"]` — interactive — F2.2.terminal-pane
-- `.xterm-helper-textarea` — interactive — F2.2.terminal-keyboard-target
+- `[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea` — interactive — F2.2.terminal-keyboard-target
 - `[data-testid="attached-sftp-toggle"]` — interactive [optional] — F2.2.attached-sftp-toggle
 - `[data-testid="tab-chat-toggle"]` — interactive [optional] — F2.2.tab-chat-toggle
 - `[data-testid="context-menu"]` — display [optional] — F2.2.context-menu

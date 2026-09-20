@@ -16,9 +16,11 @@ steps:
   - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
   - click: "[data-testid=\"auth-submit\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 2
+  - wait_for:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+      timeout_sec: 20
   - type:
-      selector: '.xterm-helper-textarea'
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
       text: "sleep 60 && echo qa-should-not-appear"
   - press: Enter
   - wait: 1
@@ -27,9 +29,11 @@ steps:
   - hover: '[data-testid="context-menu"] >> text=Special Command'
   - wait_for: "[data-testid=\"context-menu\"] >> text=\"SIGINT (Interrupt)\""
   - click: "[data-testid=\"context-menu\"] >> text=\"SIGINT (Interrupt)\""
-  - wait: 2
+  - wait_for:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+      timeout_sec: 20
   - type:
-      selector: '.xterm-helper-textarea'
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
       text: echo qa-after-sigint
   - press: Enter
   - wait: 1

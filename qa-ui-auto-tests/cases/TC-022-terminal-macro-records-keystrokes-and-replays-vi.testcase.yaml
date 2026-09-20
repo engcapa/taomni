@@ -16,7 +16,9 @@ steps:
   - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
   - click: "[data-testid=\"auth-submit\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 2
+  - wait_for:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+      timeout_sec: 20
   - click: "[data-testid=\"terminal-pane\"]"
   - wait: 1
   - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }
@@ -24,7 +26,7 @@ steps:
   - click: "text=\"Record new macro\""
   - wait: 1
   - type:
-      selector: '.xterm-helper-textarea'
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
       text: echo qa-macro-payload
   - press: Enter
   - wait: 1
@@ -34,6 +36,9 @@ steps:
   - click: "text=\"Stop macro recording\""
   - wait: 1
   - click: "[data-testid=\"terminal-pane\"]"
+  - wait_for:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+      timeout_sec: 20
   - press: Control+Space
   - wait: 1
   - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-macro-payload}

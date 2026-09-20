@@ -352,6 +352,35 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it("mirrors rendered terminal text and idle-prompt readiness for automation", async () => {
+    vi.useFakeTimers();
+    render(<TerminalPanel visible />);
+
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    const lines = ["qa-output", "runner$ "].map((text) => ({
+      isWrapped: false,
+      translateToString: vi.fn(() => text),
+    }));
+    term.buffer.active = {
+      type: "normal",
+      length: 2,
+      baseY: 0,
+      cursorY: 1,
+      cursorX: 8,
+      viewportY: 0,
+      getLine: vi.fn((index: number) => lines[index]),
+    };
+
+    await act(async () => vi.advanceTimersByTime(500));
+
+    expect(screen.getByTestId("terminal-pane")).toHaveAttribute(
+      "data-terminal-text",
+      "qa-output\nrunner$ ",
+    );
+    expect(screen.getByTestId("terminal-pane")).toHaveAttribute("data-terminal-ready", "true");
+    vi.useRealTimers();
+  });
+
   it("launches a SocksCap TUI only once when StrictMode replays mount effects", async () => {
     render(
       <StrictMode>

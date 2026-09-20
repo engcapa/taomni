@@ -7,6 +7,8 @@ permissions:
   contents: read
   issues: write
 jobs:
+  # Focused rerun for terminal prompt readiness, buffer mirroring, and
+  # between-case WebView2 profile cleanup.
   windows_browser:
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
@@ -21,10 +23,3 @@ jobs:
       platforms: windows
       modes: native
       case_ids: TC-006,TC-012
-  linux_module:
-    uses: ./.github/workflows/qa-ui-auto-platforms.yml
-    with:
-      scope: selected
-      platforms: linux
-      modes: native
-      case_ids: TC-IDE-D1-02-find-search-masks-module-native

@@ -21,7 +21,9 @@ steps:
   - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
   - click: "[data-testid=\"auth-submit\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 4
+  - wait_for:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+      timeout_sec: 20
   - click: "[data-testid=\"attached-sftp-toggle\"]"
   - wait_for: "[data-testid=\"sftp-browser\"]"
   # The attached pane navigates to the SSH home on mount. Setting the path
@@ -50,7 +52,7 @@ steps:
   - click: "[data-testid=\"sftp-remote-open-terminal-here\"]"
   - wait: 3
   - type:
-      selector: '.xterm-helper-textarea'
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
       text: pwd
   - press: Enter
   - wait: 2

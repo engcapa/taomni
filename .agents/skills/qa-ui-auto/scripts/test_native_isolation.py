@@ -5,6 +5,7 @@ import contextlib
 import io
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
@@ -201,6 +202,33 @@ class NativeIsolationTest(unittest.TestCase):
                 os.environ.pop("NEWMOB_DATA_DIR", None)
                 with self.assertRaises(RuntimeError):
                     reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
+
+    def test_reset_retries_a_transient_windows_webview_profile_lock(self):
+        with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Windows"):
+            root = Path(directory)
+            env = native.native_isolation_env(root / "run")
+            profile = Path(env["NEWMOB_DATA_DIR"]) / native_build.QA_APP_ID
+            profile.mkdir(parents=True)
+            (profile / "chrome_debug.log").write_text("locked", encoding="utf-8")
+            real_rmtree = shutil.rmtree
+            attempts = 0
+
+            def transient_lock(path):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise PermissionError("WebView2 is still closing")
+                return real_rmtree(path)
+
+            with (
+                patch.dict(os.environ, env),
+                patch.object(reset_db.shutil, "rmtree", side_effect=transient_lock),
+                patch.object(reset_db.time, "sleep"),
+            ):
+                reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
+
+            self.assertEqual(attempts, 2)
+            self.assertFalse(profile.exists())
 
     def test_reset_refuses_missing_or_wrong_run_environment(self):
         with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Linux"):
