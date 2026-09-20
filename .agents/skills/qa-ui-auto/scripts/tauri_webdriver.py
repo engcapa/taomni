@@ -169,7 +169,9 @@ class TauriDriverProcess:
             raise WebDriverError("Native isolation requires a local driver started by this run")
         if _tcp_ok(self.host, self.port):
             raise WebDriverError(f"Driver port {self.port} is occupied; choose a free port so the driver inherits QA isolation")
-        if self.native_port == self.port or _tcp_ok(self.host, self.native_port):
+        if platform.system() != "Darwin" and (
+            self.native_port == self.port or _tcp_ok(self.host, self.native_port)
+        ):
             raise WebDriverError(f"Native driver port {self.native_port} must be free and distinct from the driver port")
         out = self.report_root / "tauri-driver.out.log"
         err = self.report_root / "tauri-driver.err.log"
@@ -210,7 +212,10 @@ class TauriDriverProcess:
             # the first socket creates a startup race: the first /session
             # request is forwarded while the native driver is still absent
             # and fails as RemoteDisconnected/connection refused.
-            if _tcp_ok(self.host, self.port) and _tcp_ok(self.host, self.native_port):
+            ready = _tcp_ok(self.host, self.port)
+            if platform.system() != "Darwin":
+                ready = ready and _tcp_ok(self.host, self.native_port)
+            if ready:
                 return
             time.sleep(0.25)
         raise WebDriverError(f"native driver did not listen on {self.url}")
