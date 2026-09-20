@@ -48,7 +48,7 @@ steps:
   - assert_visible: '[data-testid="code-workspace-find-module-select"]'
   - select_option:
       selector: '[data-testid="code-workspace-find-module-select"]'
-      label: "maven-single"
+      label: "com.example.single:maven-single"
   - click: '[data-testid="code-workspace-find-module-select"]'
   - native_keys:
       selector: '[data-testid="code-workspace-find-module-select"]'
@@ -56,7 +56,7 @@ steps:
   - assert_attribute:
       selector: '[data-testid="code-workspace-find-module-select"]'
       name: value
-      equals: maven-single
+      equals: com.example.single:maven-single
   - native_keys:
       selector: '[aria-label="Search query"]'
       keys: ["Enter"]

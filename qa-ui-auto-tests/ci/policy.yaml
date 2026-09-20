@@ -3,7 +3,14 @@ schema: qa-ui-auto.ci-policy.v1
 smoke:
 - TC-001
 - TC-NATIVE-CORE-001
-unavailable: {}
+unavailable:
+  # This read-only regression targets the user's external clickhousecrud
+  # checkout, not an in-repository sample. Hosted VMs have neither that source
+  # nor QA_JAVA_PROJECT_ROOT; a synthetic replacement would change its claim.
+  TC-IDE-C6-06-java-definition-realproject-native:
+    linux/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
+    windows/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
+    macos/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
 cases:
 - TC-001
 - TC-003

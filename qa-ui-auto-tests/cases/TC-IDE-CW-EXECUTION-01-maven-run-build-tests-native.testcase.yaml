@@ -83,7 +83,11 @@ steps:
       timeout_sec: 60
 
   # Provider run configuration: edit, save, reset, copy, select, and delete.
-  - click: '[data-testid="code-workspace-bottom-tab-run"]'
+  # Run can live in the overflow menu on smaller hosted desktops. Its normal
+  # workspace action opens the same panel regardless of the dock's width.
+  - press:
+      key: Alt+4
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
   - wait_for: '[data-testid="code-workspace-run-panel"]'
   - wait_for:
       selector: '[data-testid^="run-panel-configuration-java-main:"]'

@@ -29,6 +29,16 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(entry['selected_ids'], [cid.removesuffix('-restore'), cid])
             self.assertIn('mysql', entry['capabilities'])
 
+    def test_external_project_is_reported_as_gap_and_explicit_selection_fails(self):
+        cid = 'TC-IDE-C6-06-java-definition-realproject-native'
+        plan = make_plan(args(scope='all', modes='native'))
+        gaps = [gap for gap in plan['gaps'] if gap['case'] == cid]
+        self.assertEqual({gap['platform'] for gap in gaps}, {'linux', 'windows', 'macos'})
+        self.assertTrue(all('QA_JAVA_PROJECT_ROOT' in gap['reason'] for gap in gaps))
+        self.assertTrue(all(cid not in entry['selected_ids'] for entry in plan['entries']))
+        with self.assertRaisesRegex(ValueError, 'explicit cases unavailable'):
+            make_plan(args(scope='selected', case_ids=cid, modes='native'))
+
     def test_unknown_empty_and_wrong_platform_requests_fail(self):
         for override in ({'scope':'selected'}, {'scope':'selected','case_ids':'TC-NOT-REAL'},
                          {'scope':'impacted'}, {'platforms':'self-hosted'},
