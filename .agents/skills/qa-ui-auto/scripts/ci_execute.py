@@ -23,8 +23,7 @@ def main():
     parser.add_argument("--report", type=Path, required=True)
     args = parser.parse_args()
     args.report.mkdir(parents=True, exist_ok=True)
-    manifest, entry = selection_entry(args.selection, args.entry)
-    outcome = {"head": manifest["head"], "entry": entry["id"], "exit_code": 2, "stage": "prepare"}
+    outcome = {"head": None, "entry": args.entry, "exit_code": 2, "stage": "selection"}
     write_json(args.report / "ci-outcome.json", outcome)
     scripts = Path(__file__).resolve().parent
     children = []
@@ -35,6 +34,8 @@ def main():
     signal.signal(signal.SIGTERM, cancelled)
     signal.signal(signal.SIGINT, cancelled)
     try:
+        manifest, entry = selection_entry(args.selection, args.entry)
+        outcome.update(head=manifest["head"], stage="prepare")
         with ExitStack() as stack:
             config = {"app": {"base_url": "http://127.0.0.1:5000", "mode": entry["mode"]},
                       "worker": {"parallel": 1 if "ssh" in entry["capabilities"] else 2},
@@ -83,7 +84,8 @@ def main():
                        "--selection-entry", args.entry, "--config", str(cfg_path), "--report-dir", str(args.report),
                        "--keep-runs", "0", "--require-pass", "--mode", entry["mode"]]
             # Keep the interpreter/process owning the runner receipt unchanged.
-            case_process = subprocess.Popen(command)
+            runner_log = stack.enter_context((args.report / "runner.log").open("w", encoding="utf-8"))
+            case_process = subprocess.Popen(command, stdout=runner_log, stderr=subprocess.STDOUT)
             children.append(case_process)
             outcome["exit_code"] = case_process.wait()
             if outcome["exit_code"]:

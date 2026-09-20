@@ -19,10 +19,8 @@ def digest_file(path: Path) -> str:
 
 def repository_files(root: Path) -> list[str]:
     raw = subprocess.check_output(
-        ["git", "ls-files", "-z"], cwd=root,
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=root,
     )
-    # Identity is a checkout contract. Generated/untracked files differ by
-    # runner OS and by the order in which plan/install steps create them.
     return sorted(set(raw.decode("utf-8").split("\0")) - {""})
 
 
@@ -33,12 +31,18 @@ def input_digest(path: Path) -> str:
     granularity is not strong enough to safely cache same-size rewrites, and a
     false fresh identity would invalidate the execution gate.
     """
-    path = path.resolve()
-    if path.suffix.lower() in {".ts", ".tsx", ".rs", ".json", ".py", ".toml", ".yaml", ".yml",
-                               ".md", ".sh", ".ps1", ".html", ".css", ".js", ".mjs", ".cjs",
-                               ".lock", ".txt", ".svg"}:
-        return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
-    return digest_file(path)
+    data = path.resolve().read_bytes()
+    # Git converts all text formats on Windows, including extensionless
+    # licenses, .proto, .java and .plist. A suffix allowlist misses these.
+    # Preserve binary identities (including UTF-16) byte for byte.
+    if b"\0" not in data:
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError:
+            pass
+        else:
+            data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def source_input(name: str) -> bool:
