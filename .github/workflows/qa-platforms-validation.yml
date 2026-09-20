@@ -12,7 +12,7 @@ jobs:
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
       scope: selected
-      case_ids: TC-001,TC-NATIVE-CORE-001,TC-012,TC-027,TC-auto-F-DB-1-query-tab-rename-native-restore,TC-IDE-C2-05-java-completion-refine-accept-native,TC-IDE-CW-EXECUTION-01-maven-run-build-tests-native,TC-IDE-IMPROVE-008-ime-lifecycle-native,TC-IDE-C8-02-native-virtual-space-transaction,TC-IDE-C3-02-native-clipboard-permission-and-multicaret
+      case_ids: TC-001,TC-NATIVE-CORE-001,TC-012,TC-027,TC-auto-F-DB-1-query-tab-rename-native-restore,TC-IDE-C2-05-java-completion-refine-accept-native,TC-IDE-CW-EXECUTION-01-maven-run-build-tests-native,TC-IDE-IMPROVE-008-ime-lifecycle-native,TC-IDE-C8-02,TC-IDE-C3-02
   services:
     permissions:
       contents: read

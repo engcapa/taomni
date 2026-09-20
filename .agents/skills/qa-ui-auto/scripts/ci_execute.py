@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from contextlib import ExitStack
 import os
+import platform
 from pathlib import Path
 import signal
 import subprocess
@@ -56,6 +57,11 @@ def main():
     try:
         manifest, entry = selection_entry(args.selection, args.entry)
         outcome.update(head=manifest["head"], stage="prepare")
+        architecture = {"amd64": "X64", "x86_64": "X64", "arm64": "ARM64", "aarch64": "ARM64"}.get(platform.machine().lower())
+        if architecture != entry["arch"]:
+            raise RuntimeError(f"runner architecture {platform.machine()} differs from selected {entry['arch']}")
+        write_json(args.report / "environment.json", {"platform": platform.system(), "architecture": architecture,
+                   "python": platform.python_version(), "head": manifest["head"], "capabilities": entry["capabilities"]})
         with ExitStack() as stack:
             config = {"app": {"base_url": "http://127.0.0.1:5000", "mode": entry["mode"]},
                       "worker": {"parallel": 1 if "ssh" in entry["capabilities"] else 2},

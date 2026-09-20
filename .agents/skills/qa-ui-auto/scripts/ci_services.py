@@ -181,12 +181,18 @@ class Services:
             cfg.write_text("\n".join(lines) + "\n", encoding="utf-8")
             # sshd must run as LocalSystem for password logon/PTY impersonation.
             executable = Path(os.environ["WINDIR"]) / "System32/OpenSSH/sshd.exe"
-            for protected in (host_key, cfg):
+            # The service runs as SYSTEM; use the standard machine host-key
+            # location instead of a runner user's temporary directory.
+            command([ssh_keygen, "-A"])
+            lines = [line for line in lines if not line.startswith("HostKey ")]
+            cfg.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            for protected in (cfg,):
                 command(["icacls", str(protected), "/inheritance:r", "/grant:r", "*S-1-5-18:F", "*S-1-5-32-544:F"])
                 command(["icacls", str(protected), "/setowner", "*S-1-5-32-544"])
             command([executable, "-t", "-f", cfg])
             standard = Path(os.environ["PROGRAMDATA"]) / "ssh/sshd_config"
             standard.parent.mkdir(parents=True, exist_ok=True)
+            (standard.parent / "logs").mkdir(exist_ok=True)
             previous = standard.read_bytes() if standard.exists() else None
             self.stack.callback(lambda: standard.write_bytes(previous) if previous is not None else standard.unlink(missing_ok=True))
             standard.write_text("\n".join(lines + ["SyslogFacility LOCAL0"]) + "\n", encoding="utf-8")
@@ -207,7 +213,7 @@ class Services:
                 powershell("Start-Service sshd")
             except Exception:
                 diagnostics = powershell("Get-CimInstance Win32_Service -Filter \"Name='sshd'\" | Select-Object Name,PathName,StartName,ExitCode | ConvertTo-Json; "
-                                         "Get-WinEvent -LogName OpenSSH/Operational -MaxEvents 10 -ErrorAction SilentlyContinue | Select-Object Message | ConvertTo-Json")
+                                         "Get-WinEvent -LogName OpenSSH/Admin,OpenSSH/Operational -MaxEvents 20 -ErrorAction SilentlyContinue | Select-Object TimeCreated,Message | ConvertTo-Json")
                 (self.root / "service-diagnostics.json").write_text(diagnostics, encoding="utf-8")
                 raise
         self.resources.append(f"sshd:{user}:{port}")
