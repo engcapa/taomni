@@ -21,7 +21,11 @@ def repository_files(root: Path) -> list[str]:
     raw = subprocess.check_output(
         ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=root,
     )
-    return sorted(set(raw.decode("utf-8").split("\0")) - {""})
+    generated = ("qa-ui-auto-report/", "dist/", "src-tauri/target/", "node_modules/")
+    return sorted(
+        name for name in set(raw.decode("utf-8").split("\0")) - {""}
+        if not name.startswith(generated)
+    )
 
 
 def input_digest(path: Path) -> str:
