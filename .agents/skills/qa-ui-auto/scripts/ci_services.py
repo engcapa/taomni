@@ -29,7 +29,7 @@ def command(argv, **kwargs):
 
 
 def powershell(script):
-    return command(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+    return command(["pwsh.exe", "-NoProfile", "-NonInteractive", "-Command",
                     "$ErrorActionPreference='Stop'; " + script])
 
 

@@ -122,9 +122,12 @@ def warm_projects(root, capabilities):
             receipts.append(projects._run_build(command, directory))
     source = Path("src/components/editor/workspace/__fixtures__/jdtls/projects/maven-single")
     project = root / "warm-maven-single"
-    shutil.copytree(source, project, dirs_exist_ok=True)
-    checked([mvn, "-q", "test", "package"], cwd=project)
-    write_json(root / "warmup.json", {"java25": receipts, "maven_single": "package/test passed"})
+    project.mkdir(parents=True, exist_ok=True)
+    # The editor fixture intentionally contains incomplete completion targets.
+    # Resolve its POM dependencies/plugins without compiling those broken inputs.
+    shutil.copy2(source / "pom.xml", project / "pom.xml")
+    checked([mvn, "-q", "dependency:go-offline", "package"], cwd=project)
+    write_json(root / "warmup.json", {"java25": receipts, "maven_single": "POM dependencies/plugins cached; editor sources intentionally incomplete"})
 
 
 def prepare_java(root, capabilities):
@@ -166,8 +169,8 @@ def prepare_java(root, capabilities):
     facts = {"java": checked([shutil.which("java"), "-version"]), "architecture": platform.machine(),
              "versions": {k: v["version"] for k, v in specs.items() if isinstance(v, dict)},
              "lsp_capabilities": lsp_probe(home, root)}
-    warm_projects(root, capabilities)
     write_json(root / "readiness.json", facts)
+    warm_projects(root, capabilities)
     return facts
 
 

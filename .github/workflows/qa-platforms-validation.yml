@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   smoke:
-    # Temporary branch-only trigger for hosted validation (CRLF text identity fix).
+    # Temporary branch-only trigger for hosted validation (Perl, services and Java probe fixes).
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
       scope: smoke

@@ -145,6 +145,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
           'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
           $runtimeRoot = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
           $runtime = Get-ChildItem -LiteralPath $runtimeRoot -Directory | Where-Object Name -Match '^\d+\.\d+\.\d+\.\d+$' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
