@@ -10,7 +10,7 @@ app:
   # native_binary: ./src-tauri/target/qa-ui-auto/debug/taomni.exe  # Windows; omit .exe on Linux
 
 worker:
-  parallel: 4                       # max browser worker processes (browser mode only)
+  parallel: 2                       # max browser worker processes (browser mode only)
 
 webdriver:
   host: 127.0.0.1

@@ -771,7 +771,7 @@ def main(argv: list[str] | None = None) -> int:
 
     mode = args.mode or cfg["app"].get("mode", "browser")
     cfg["app"]["mode"] = mode  # propagate into fixtures
-    workers = max(1, int(args.workers or (cfg.get("worker") or {}).get("parallel", 4)))
+    workers = max(1, int(args.workers or (cfg.get("worker") or {}).get("parallel", 2)))
     if mode == "native":
         workers = 1
 
