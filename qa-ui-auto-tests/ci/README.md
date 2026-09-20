@@ -57,7 +57,7 @@ input or repository variable `QA_UI_AUTO_PUBLISH_ISSUES=true` for nightly runs.
 ## Runner-local dependencies
 
 Only selected capabilities are provisioned. Linux owns uniquely named local
-Docker SSH/MySQL containers; macOS uses Homebrew OpenSSH and an isolated MySQL
+Docker SSH/MySQL containers pinned by image digest in `services.yaml`; macOS uses Homebrew OpenSSH and an isolated MySQL
 data directory; Windows uses OpenSSH and an isolated MySQL ZIP installation.
 Accounts, passwords, keys, ports and databases are disposable within the job VM.
 The supervisor runs actual SSH login/PTY/exec, SFTP byte roundtrip and SQL DML
@@ -81,8 +81,10 @@ Unsupported platform/verb combinations appear as gaps in selection/report.
 
 ## Evidence and maintenance
 
-Read the run's **qa-ui-auto-platforms-result** summary and download `qa-summary`
-and per-entry artifacts. `selection.json` binds the selected commit, source,
+Read the run's **qa-ui-auto-platforms-result** summary and download
+`qa-summary-<invocation UUID>` and `qa-<platform>-<mode>-<invocation UUID>` artifacts.
+The UUID keeps multiple reusable calls within one caller isolated. The plan
+summary lists exact selected IDs, reasons and changed paths before execution. `selection.json` binds the selected commit, source,
 runner and case hashes. Raw runner summaries and receipts are not rewritten.
 Missing reports, native build/source mismatch, failed setup and selected skips
 all make the aggregate fail. `build.log`, `runner.log`, `ci-outcome.json`,

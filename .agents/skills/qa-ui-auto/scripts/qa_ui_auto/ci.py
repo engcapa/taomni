@@ -348,6 +348,20 @@ def main(argv=None):
             github_output("matrix", json.dumps(matrix, separators=(",", ":")))
             github_output("has_cases", str(bool(result["entries"])).lower())
             github_output("head", result["head"])
+            if summary_path := os.environ.get("GITHUB_STEP_SUMMARY"):
+                lines = ["# QA selection", "", f"Scope: `{result['scope']}`; commit: `{result['head']}`.", ""]
+                if result["base"]:
+                    lines += [f"Base: `{result['base']}`; merge base: `{result['merge_base']}`.", "",
+                              "Changed paths: " + ", ".join(f"`{p}`" for p in result["changed_paths"]), ""]
+                for entry in result["entries"]:
+                    lines += [f"<details><summary>{entry['id']}: {len(entry['selected_ids'])} cases</summary>", ""]
+                    lines += [f"- `{cid}`: {', '.join(result['reasons'][cid])}" for cid in entry["selected_ids"]]
+                    lines += ["", "</details>", ""]
+                if not result["entries"]:
+                    lines.append("No relevant executable cases; no platform execution claimed.")
+                lines += ["", f"Not applicable: {len(result['not_applicable'])}; capability gaps: {len(result['gaps'])}."]
+                with open(summary_path, "a", encoding="utf-8") as stream:
+                    stream.write("\n".join(lines) + "\n")
             print(json.dumps(matrix, indent=2))
             return 0
         manifest = json.loads(args.selection.read_text(encoding="utf-8"))

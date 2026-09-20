@@ -674,6 +674,12 @@ class NativeSession:
                 if line:
                     self.type_text(line)
             return f"filled contenteditable {selector}"
+        if platform.system() == "Darwin":
+            # The WKWebView bridge's value endpoint replaces the value using
+            # the native DOM setter and React input events without blurring.
+            # Its synthetic keyboard adapter cannot perform OS select-all.
+            self.request("POST", self.element_path(element, "/value"), {"text": text})
+            return f"filled {selector}"
         # WebDriver /clear unfocuses form controls. Blur-committing inputs
         # (path breadcrumbs, rename fields) disappear before /value arrives.
         # Select and replace through keyboard input while retaining focus.
@@ -999,6 +1005,11 @@ class NativeHarness:
         session.deadline = getattr(self, "deadline", None)
         try:
             session.start()
+            if java_home := self.cfg.get("app", {}).get("tooling_java_home"):
+                session.execute(
+                    "window.localStorage.setItem('taomni.codeWorkspace.lspJavaHome.v1', "
+                    + json.dumps(str(java_home)) + "); return true;"
+                )
         except BaseException:
             # If readiness fails after the bridge has started, there is no
             # session object for the runner's normal finally block to close.

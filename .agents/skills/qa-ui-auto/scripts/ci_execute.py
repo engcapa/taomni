@@ -74,13 +74,17 @@ def main():
             if "java" in entry["capabilities"]:
                 from ci_toolchains import prepare_java
                 prepare_java(args.report / "java", entry["capabilities"])
+                # Hosted images also contain newer JDKs. The app's automatic
+                # discovery chooses the highest major (currently JDK 26 on
+                # macOS), outside the pinned JDTLS compatibility range.
+                config["app"]["tooling_java_home"] = os.environ["JAVA_HOME"]
             if entry["mode"] == "native" and platform.system() == "Windows":
                 driver = shutil.which("msedgedriver.exe")
                 if not driver:
                     raise RuntimeError("WebView2 driver not found")
                 wrapper = args.report.resolve() / "webview-driver.cmd"
                 log_path = args.report.resolve() / "webview-driver.log"
-                wrapper.write_text(f'@echo off\r\n"{driver}" --verbose "--log-path={log_path}" %*\r\n', encoding="utf-8")
+                wrapper.write_text(f'@echo off\n"{driver}" --verbose "--log-path={log_path}" %*\n', encoding="utf-8")
                 config["webdriver"] = {"native_driver": str(wrapper)}
             cfg_path = args.report / "config.yaml"
             cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")

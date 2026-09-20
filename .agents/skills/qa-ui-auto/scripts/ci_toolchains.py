@@ -37,7 +37,7 @@ def checked(command, cwd=None):
     return (result.stdout + result.stderr).strip()
 
 
-def lsp_probe(home, root):
+def lsp_probe(home, root, bundles=()):
     """Validate the actual POSIX launcher; Windows uses the app's Java expansion."""
     suffix = {"Linux": "linux", "Darwin": "mac", "Windows": "win"}[platform.system()]
     if platform.machine().lower() in {"arm64", "aarch64"}:
@@ -79,7 +79,8 @@ def lsp_probe(home, root):
             process.stdin.flush()
         try:
             send({"id": 1, "method": "initialize", "params": {"processId": os.getpid(),
-                  "rootUri": root.as_uri(), "capabilities": {}, "workspaceFolders": []}})
+                  "rootUri": root.as_uri(), "capabilities": {}, "workspaceFolders": [],
+                  "initializationOptions": {"bundles": list(bundles)}}})
             end = time.monotonic() + 180
             while True:
                 value = messages.get(timeout=max(1, end-time.monotonic()))
@@ -88,7 +89,15 @@ def lsp_probe(home, root):
                 if value.get("id") == 1:
                     if "error" in value or not value.get("result", {}).get("capabilities"):
                         raise RuntimeError(f"JDTLS initialize rejected: {value}")
-                    return sorted(value["result"]["capabilities"])
+                    capabilities = value["result"]["capabilities"]
+                    if bundles:
+                        commands = capabilities.get("executeCommandProvider", {}).get("commands", [])
+                        required = {"vscode.java.test.findTestTypesAndMethods", "vscode.java.startDebugSession"}
+                        missing = required - set(commands)
+                        if missing:
+                            raise RuntimeError(f"JDTLS extension commands unavailable: {sorted(missing)}; "
+                                               "check the pinned JDTLS/debug/test bundle compatibility")
+                    return sorted(capabilities)
                 if time.monotonic() > end:
                     raise RuntimeError("JDTLS initialize timeout")
         finally:
@@ -160,6 +169,7 @@ def prepare_java(root, capabilities):
         (home / "bin/jdtls.cmd").write_text('@echo off\r\npython "%~dp0jdtls.py" %*\r\n')
     else:
         (home / "bin/jdtls").chmod(0o755)
+    probe_bundles = []
     if "java-bundles" in capabilities:
         for name, env in (("java-debug", "QA_JAVA_DEBUG_BUNDLE"), ("java-test", "QA_JAVA_TEST_BUNDLE")):
             spec = specs[name]
@@ -172,6 +182,17 @@ def prepare_java(root, capabilities):
             if not list(server.glob("*.jar")):
                 raise RuntimeError(f"{name} archive lacks complete server bundle")
             os.environ[env] = str(server)
+            extension = extracted / "extension"
+            package = json.loads((extension / "package.json").read_text(encoding="utf-8"))
+            for relative in package["contributes"]["javaExtensions"]:
+                jar = (extension / relative).resolve()
+                if not jar.is_file():
+                    raise RuntimeError(f"{name} extension bundle missing: {relative}")
+                # Match the app's single ASM provider rule: use JDTLS' own
+                # family when present, and prove the extension resolves with it.
+                if jar.name.startswith("org.objectweb.asm") and list((home / "plugins").glob("org.objectweb.asm_*.jar")):
+                    continue
+                probe_bundles.append(str(jar))
             # Automatic bundle-discovery cases need the normal editor install layout.
             # Only the disposable hosted HOME is allowed for this integration path.
             if os.environ.get("GITHUB_ACTIONS") == "true":
@@ -179,7 +200,8 @@ def prepare_java(root, capabilities):
                 shutil.copytree(extracted / "extension", target, dirs_exist_ok=True)
     facts = {"java": checked([shutil.which("java"), "-version"]), "architecture": platform.machine(),
              "versions": {k: v["version"] for k, v in specs.items() if isinstance(v, dict)},
-             "lsp_capabilities": lsp_probe(home, root)}
+             "lsp_capabilities": lsp_probe(home, root, probe_bundles),
+             "bundles": probe_bundles}
     write_json(root / "readiness.json", facts)
     warm_projects(root, capabilities)
     return facts

@@ -27,7 +27,7 @@
 | 依据 | 当前事实 | 设计处理 |
 |---|---|---|
 | `.github/workflows/e2e.yml` | PR Linux smoke；push main 跑 Linux/Windows browser；手动可增加 macOS；未强制 selected 全部 pass | 原文件不修改；新 workflow 独立实现六组合 |
-| `.github/workflows/qa-native.yml` | 定时/手动只跑 Linux、Windows 的 `TC-NATIVE-CORE-001` | 原文件不修改；新 workflow 使用独立名称、concurrency group 和错开的夜间时间；未来停用旧入口另行决定 |
+| `.github/workflows/qa-native.yml` | 定时/手动只跑 Linux、Windows 的 `TC-NATIVE-CORE-001` | 原文件不修改；新 workflow 使用独立名称与错开的夜间时间；未来停用旧入口另行决定 |
 | 2026-09-19 [native Actions](https://github.com/engcapa/taomni/actions/runs/35468773305) | Linux 1 pass；Windows 构建成功但 setup 超时；status 输出有 charmap 编码错误 | 保留 Linux 基线；分别修复 Windows setup 和 UTF-8，不通过加大 case timeout 掩盖原因 |
 | 2026-09-18 [browser Actions](https://github.com/engcapa/taomni/actions/runs/35353829438) | Linux 124 pass / 2 fail / 42 skip；Windows audit 输出编码失败 | 全集执行不能按历史绿色 smoke 认定通过；缺依赖与产品失败分开处理 |
 | `scripts/tauri_webdriver.py: TauriDriverProcess.start`（本节脚本相对 `.agents/skills/qa-ui-auto/`） | macOS 启动内置 bridge，但 readiness 同时等待 host port 与 native port；Rust `src-tauri/src/qa_driver.rs::start` 只绑定前者 | Darwin 检查单一 bridge `/status`；Linux/Windows 等待中间层和底层驱动；补回归 |
@@ -62,9 +62,9 @@
 
 ## 4. Workflow 划分与调用契约
 
-### 4.1 文件职责（均为目标设计）
+### 4.1 文件职责
 
-重测试矩阵的 label 固定为 `ubuntu-24.04`、`windows-2025`、`macos-15`，分别展开 browser/native。`plan` 在编译前上传选例结果；`execute` 使用 `fail-fast: false`；`summarize` 总运行；`publish-issues` 按输入独立运行。concurrency key 包含新 workflow 名、事件/调用标识与 ref；不复用原有 E2E/native group，不让两条手动不同范围的诊断互相取消。
+重测试矩阵的 label 固定为 `ubuntu-24.04`、`windows-2025`、`macos-15`，分别展开 browser/native。`plan` 在编译前上传选例结果；`execute` 使用 `fail-fast: false`；`summarize` 总运行；`publish-issues` 按输入独立运行。测试 invocation 不设置 workflow 级串行锁，避免同一个 caller 的多次复用调用互相等待；每次 plan 生成 UUID，隔离选择、组合和汇总 artifacts。只有 issue 发布使用独立串行 concurrency group，避免重复建 issue。
 
 | 文件 | 职责 |
 |---|---|
@@ -73,7 +73,7 @@
 | `.github/workflows/qa-native.yml`、`release.yml`（只读参考） | 不删除、不改触发或依赖；新 workflow 不作为 release 的 needs |
 | `.github/actions/qa-runtime/action.yml`（新增） | Node/pnpm/Python 和按平台配置的 native toolchain；不在这里决定范围、不掩盖失败 |
 | `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/ci.py`（新增） | 验证输入、生成 manifest、环境预检、消费本机 matrix entry、编排后台任务、汇总已有 runner 证据 |
-| `qa-ui-auto-tests/ci/{policy,dependencies,toolchains}.yaml`（新增） | CI 可执行性、case 依赖链、工具版本和 hash；不得复制 feature/covers 真源 |
+| `qa-ui-auto-tests/ci/{policy,dependencies,toolchains,services}.yaml`（新增） | CI 可执行性、case 依赖链、工具版本和 hash；不得复制 feature/covers 真源 |
 
 `workflow_call` 由调用方通过 job `uses: ./.github/workflows/qa-ui-auto-platforms.yml` 调用，或用仓库路径加固定 ref。调用方设置 `needs` 决定它在原流程中的位置。被调用流程验证 `head`，执行 jobs 全部 checkout 同一个解析后的 SHA。默认不使用 `workflow_run`，也不自动触发发布。
 
@@ -99,11 +99,14 @@
 - 一个 case 在不适用的组合列入 `not_applicable`；显式请求的 case 若在所有所选组合都不可运行则报错，而不是成功执行零项。
 - `all` 若存在尚未声明归属的 case，则 planning 失败；不能只靠旧 allowlist 永久漏掉新 case。
 
-未来调用示例（目标 workflow 实现后才可使用）：
+复用调用示例（手动入口需先在默认分支注册）：
 
 ```yaml
 jobs:
   qa:
+    permissions:
+      contents: read
+      issues: write
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
       scope: impacted
@@ -112,10 +115,10 @@ jobs:
       platforms: linux,windows,macos
       modes: browser,native
       publish_issues: false
-    # 不需要外部测试机 secrets；默认 GITHUB_TOKEN 只读。
+    # 不需要外部测试机 secrets；被调用 workflow 按 job 收紧权限。
 ```
 
-上例展示 caller 接口，不建议直接加进默认 PR 重流程。原有 PR 保持现状。新 workflow 使用只读 GITHUB_TOKEN 执行被测代码；issue 写权限只授予独立的结果发布 job，不暴露给测试进程。issues 仅在受信任的仓库调用中启用；不使用 `pull_request_target` checkout PR 代码后注入写凭据。调用已有 release 流程的示例仅说明可复用接口，本次不把它加进 release。
+GitHub 会校验 reusable workflow 的最大权限，即使 issue job 不运行，caller 也必须允许 `issues: write`；plan/test/report 的 token 由被调用 workflow 收紧为 `contents: read`。上例展示 caller 接口，不建议直接加进默认 PR 重流程。原有 PR 保持现状。新 workflow 使用只读 GITHUB_TOKEN 执行被测代码；issue 写权限只授予独立的结果发布 job，不暴露给测试进程。issues 仅在受信任的仓库调用中启用；不使用 `pull_request_target` checkout PR 代码后注入写凭据。调用已有 release 流程的示例仅说明可复用接口，本次不把它加进 release。
 
 ## 5. 差异选例、能力和执行计划
 
@@ -345,11 +348,11 @@ cleanup 总在上传前后有明确次序：先收集必要进程日志，再停
 
 ### 8.1 报告优先与可选 issue 追踪
 
-默认每次生成 Actions Job Summary 表格：平台/架构/mode、选择数、pass/fail/skip、构建/环境失败、remote capability gaps、display/IME/permission 状态、hosted-unavailable 缺口、未评审覆盖、主要错误和 artifact 链接。另输出 `ci-summary.json` 和 `failures.md`，方便后续 agent 下载原始证据定位。Summary 不直接塞入未经截断/脱敏的测试 stdout。
+默认每次生成 Actions Job Summary 表格：平台/架构/mode、选择数、pass/fail/skip、构建/环境失败、remote capability gaps、display/IME/permission 状态、hosted-unavailable 缺口、未评审覆盖、主要错误和 artifact 链接。另输出 `ci-summary.json` 和 `summary.md`，方便后续 agent 下载原始证据定位。Summary 不直接塞入未经截断/脱敏的测试 stdout。
 
-`publish_issues=false` 时不申请 issues 写权限、不创建 issue。打开时，在独立 job 中使用受信任的发布脚本和只包含预期字段的摘要，job 级 `issues: write`；测试 job 仍为只读 token。发布 job 不执行被测 head 的任意脚本，不把测试日志当 shell 或模板代码。
+`publish_issues=false` 时跳过 issue job，不创建 issue；caller 的权限校验规则见第 4 节。打开时，在独立 job 中使用受信任的发布脚本和只包含预期字段的摘要，job 级 `issues: write`；测试 job 仍为只读 token。发布 job 不执行被测 head 的任意脚本，不把测试日志当 shell 或模板代码。
 
-issue 按 `qa-ui-auto:<platform>:<mode>:<case-id或infra-stage>:<error-class>` 指纹去重，标题例如 `[QA][Windows/native] TC-NATIVE-CORE-001 setup timeout`；正文包括首次/最近出现、head SHA、run/attempt URL、实际失败步骤、脱敏错误摘要、artifact 链接。使用隐藏 marker 保存稳定 key；查找 open issue 后更新其“最近失败”区块，避免同一个失败每晚建新 issue或刷多条评论。发布并发使用独立串行 concurrency group 防止同时创建重复项。
+issue 按平台/mode/case（基础设施错误使用对应占位 case）的 SHA256 指纹去重，标题例如 `[QA UI Auto] windows-native/TC-NATIVE-CORE-001`；正文保存最近失败的 head SHA、run URL、脱敏错误摘要和 artifacts 获取说明。使用隐藏 marker 保存稳定 key；查找 open issue 后更新正文，每次最多处理 50 个失败分组，避免同一个失败每晚建新 issue 或刷评论。发布并发使用独立串行 concurrency group 防止同时创建重复项。
 
 本轮默认不自动关闭 issue。一次 selected 运行通过不能证明该平台/依赖的所有历史失败已消失；可在**同一平台、模式、case 实际执行通过**时记录恢复证据，保留人工关闭。被排除、未选中、skip、缺报告都不能记为修复。issues API 权限不足时报告 issue sync 失败并保留 artifacts，不覆盖原测试结果；不因此改变 PR/release 状态。
 
@@ -383,7 +386,7 @@ GitHub 运行已复现并保留代表性失败：Linux native Maven run configur
 | V-05 汇总故障注入 | 缺一个 artifact、selected skip、过期 receipt、head 错、构建失败、取消、路径迁移；最终 check 必须失败且指出组合；平台不适用不能算 pass；成功集合与真实 case IDs 一致 | AC-07/08/09 |
 | V-06 六组合实际运行 | 先核心，再 SSH/SFTP/MySQL/Java 能力代表，再 all；每个 native job 构建一次后批量跑；保存每个平台实际 head/build/runtime/receipt；不凭模拟平台单测宣布 macOS/Windows 已通过 | hosted 无人值守范围 AC；不可用能力必须列缺口 |
 | V-07 三端 display 与启动 | 拟新增 `scripts/test_ci_desktop.py` 检查 supervisor 生命周期、环境继承、分阶段失败分类；真实 runner 验证 Linux EWMH/焦点、Windows runner/driver/app 同交互 session、macOS Aqua/WindowServer/app；断开 display/错误 session 时早失败；截图确含 app 内容 | AC-06/10，目标变化及既有 native 启动回归 |
-| V-08 Linux IME/clipboard | 同一 Xvfb/WM/DBus 下执行 `TC-IDE-IMPROVE-008-ime-lifecycle-native`、`TC-IDE-C8-02-native-virtual-space-transaction`、`TC-IDE-C3-02-native-clipboard-permission-and-multicaret`；检查 CJK、取消不落字、undo 次数与剪贴板拒绝/恢复。再分别缺 engine、停止 fcitx、断开 session bus，必须报环境失败而非绿色 skip | AC-11，使用现有真实用例，不能仅测安装脚本 |
+| V-08 Linux IME/clipboard | 同一 Xvfb/WM/DBus 下执行 `TC-IDE-IMPROVE-008-ime-lifecycle-native`、`TC-IDE-C8-02`、`TC-IDE-C3-02`；检查 CJK、取消不落字、undo 次数与剪贴板拒绝/恢复。再分别缺 engine、停止 fcitx、断开 session bus，必须报环境失败而非绿色 skip | AC-11，使用现有真实用例，不能仅测安装脚本 |
 | V-09 macOS 截图与权限 | 对未授予 Screen Recording 的新测试身份，基础 WKWebView snapshot 仍有正确内容/尺寸；桌面捕获缺许可时明确 blocked，不能换截图范围后 pass。验证 actor 身份记录与 prompt timeout；全流程无人确认。显式选择 unavailable case 时 planning 失败；必跑权限回归时执行失败且不改写计划；只能被人工授予的能力保持覆盖缺口 | AC-12，snapshot 拟新增 QA bridge 定向测试及真机检查 |
 
 可复用的现有检查（仓库根，Bash；Windows 用 PowerShell 设置同名环境变量）：
@@ -430,8 +433,8 @@ python -m qa_ui_auto run --mode native --filter TC-NATIVE-CORE-001 --dry-run \
 
 | AC | 方案章节 | TASK | V | 当前状态 |
 |---|---|---|---|---|
-| AC-01 | 4、7 | 04 | 04、06 | 已设计，待实现 |
-| AC-02/03 | 4、5 | 01 | 01、04 | 已设计，待实现 |
+| AC-01 | 4、7 | 04 | 04、06 | 三入口已实现，workflow_call 已实跑；dispatch/nightly 待默认分支注册 |
+| AC-02/03 | 4、5 | 01 | 01、04 | selector、diff、依赖闭包已实现及单测；selected/all/零变化 impacted 已在 hosted 调用 |
 | AC-04 | 6.1～6.3 | 02 | 02、06 | 本机 provider 已实现；Linux/macOS/Windows 协议探针有 hosted 证据 |
 | AC-05 | 6.4 | 03 | 03、06 | 三端 JDTLS/Java25/构建探针通过；产品 Java case 仍有 macOS provider 失败 |
 | AC-06 | 2、7 | 03 | 03、06 | Linux/macOS native 核心通过；Windows build/display 通过但 WebView2 session 超时 |
@@ -441,8 +444,8 @@ python -m qa_ui_auto run --mode native --filter TC-NATIVE-CORE-001 --dry-run \
 | AC-11 | 7.2 | 06 | 08 | Linux fcitx5/wbpy/GTK/XTest native 用例已通过 |
 | AC-12 | 7.4～7.5、8 | 06、05 | 09 | macOS WKWebView snapshot 已实现；OS 输入/权限仍明确为 hosted 缺口 |
 
-独立上线时先以手动入口验证新 workflow，再验证自身 nightly 与 caller。原有 `e2e.yml`、`qa-native.yml`、`release.yml` 保持不变，因此旧夜间任务可能仍运行；本次用独立 concurrency group 避免相互取消。以后是否合并/停用旧 workflow 是另一项调整，本次不做。
+独立上线时先以手动入口验证新 workflow，再验证自身 nightly 与 caller。原有 `e2e.yml`、`qa-native.yml`、`release.yml` 保持不变，因此旧夜间任务可能仍运行；本次不复用旧 workflow 的并发锁，避免相互取消。以后是否合并/停用旧 workflow 是另一项调整，本次不做。
 
 新 workflow 不监听 `pull_request`/`push`/`release`，不修改 branch protection，不写入 release 的 needs。它的失败应该真实显示为红色，以便发现问题，但不作为合并/发布门禁。如果调用方未来选择把它串入某业务 flow，该调用方自己决定失败处理；不能一边声称阻断调用链、一边又声称不影响 release。
 
-回退只撤销新增 workflow/工具及本轮创建资源；报告保留。当前无待用户确认的实质决策，TASK-01 和 TASK-03 可开始，TASK-02/06 先完成三端本机服务与图形会话探针再深化脚本。三端 CI 功能已实现并执行过；本设计不将失败 case、系统权限缺口或未执行的 all 范围记为已验证；仅 hosted 自动化通过不等于三端所有系统权限/IME 已通过。
+回退只撤销新增 workflow/工具及本轮创建资源；报告保留。当前无待用户确认的实质决策；剩余工作是修复 hosted 失败并回填实际报告。三端 CI 功能已实现并执行过；本设计不将失败 case、系统权限缺口或未执行的 all 范围记为已验证；仅 hosted 自动化通过不等于三端所有系统权限/IME 已通过。

@@ -161,6 +161,15 @@ class NativeSessionFillTest(TestCase):
         session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
         session.type_text.assert_called_once_with("Taomni")
 
+    def test_macos_fill_replaces_value_without_synthetic_backspace(self) -> None:
+        session = self.session(False)
+        with patch("tauri_webdriver.platform.system", return_value="Darwin"):
+            session.fill("input[name=title]", "Taomni")
+        session.request.assert_called_once_with(
+            "POST", "/session/session-1/element/element-1/value", {"text": "Taomni"})
+        session.press_combo.assert_not_called()
+        session.type_text.assert_not_called()
+
     def test_type_text_paces_contenteditable_key_transactions(self) -> None:
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.session_id = "session-1"

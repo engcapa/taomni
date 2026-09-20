@@ -7,7 +7,9 @@ java-debug:
   version: 0.59.0
   url: https://open-vsx.org/api/vscjava/vscode-java-debug/0.59.0/file/vscjava.vscode-java-debug-0.59.0.vsix
   sha256: 87627e24dbb5b01137decc0265f043cb08adad22af3c195f1ba39898dafb1588
+# 0.43.1 requires ASM [9.8,9.9), matching JDTLS 1.50.0.
+# Newer 0.46 requires ASM 9.10.1 and leaves test commands unregistered.
 java-test:
-  version: 0.46.0
-  url: https://open-vsx.org/api/vscjava/vscode-java-test/0.46.0/file/vscjava.vscode-java-test-0.46.0.vsix
-  sha256: 56c1e14dc73a30e9574c47042106fa52893bf8325b580f47c14ace07d5eef255
+  version: 0.43.1
+  url: https://open-vsx.org/api/vscjava/vscode-java-test/0.43.1/file/vscjava.vscode-java-test-0.43.1.vsix
+  sha256: 16f091b1683cd07845671727b4b1332092660887f08b6af5c76225bfdc071f07

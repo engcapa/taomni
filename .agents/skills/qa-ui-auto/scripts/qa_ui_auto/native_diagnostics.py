@@ -15,13 +15,14 @@ def collect(case_dir: Path, run_root: Path, *, failed: bool):
     for root in roots:
         for path in root.rglob("*.log"):
             if path.stat().st_size <= 10_000_000:
-                target = destination / root.name / path.relative_to(root)
+                target = destination / ("logs-" + root.name) / path.relative_to(root)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(path, target)
     # macOS dirs::cache_dir ignores the QA app override. Only copy JDTLS
     # workspaces whose ownership marker points inside this exact run.
-    if platform.system() == "Darwin":
-        base = Path.home() / "Library/Caches/jdtls-ws"
+    if platform.system() != "Windows":
+        base = (Path.home() / "Library/Caches/jdtls-ws" if platform.system() == "Darwin"
+                else run_root / "native-appcache/jdtls-ws")
         for marker in base.glob("*/.taomni-workspace"):
             workspace = Path(marker.read_text().strip()).resolve()
             if workspace.is_relative_to(run_root.resolve()):

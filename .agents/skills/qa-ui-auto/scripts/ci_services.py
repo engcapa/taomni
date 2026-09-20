@@ -15,6 +15,7 @@ import tempfile
 import time
 import urllib.request
 import zipfile
+import yaml
 
 from qa_ui_auto.ci import write_json
 
@@ -92,6 +93,7 @@ class Services:
         self.stack = ExitStack()
         self.namespace = "qa" + secrets.token_hex(5)
         self.resources = []
+        self.images = yaml.safe_load(Path("qa-ui-auto-tests/ci/services.yaml").read_text(encoding="utf-8"))
 
     def cleanup_command(self, argv):
         def cleanup():
@@ -228,7 +230,7 @@ class Services:
         password = secret("QA_SSH_PASSWORD")
         if platform.system() == "Linux":
             user, remote_dir = "testuser", "/tmp/qa-ui-auto-temp"
-            port = self.docker("sshd", "linuxserver/openssh-server:latest", 2222,
+            port = self.docker("sshd", self.images["ssh_image"], 2222,
                                {"USER_NAME": user, "USER_PASSWORD": password, "PASSWORD_ACCESS": "true"})
         else:
             user, port, remote_dir = self.local_ssh(password)
@@ -312,7 +314,7 @@ class Services:
         password = secret("TAOMNI_TEST_MYSQL_PASSWORD")
         root_password = secret("QA_MYSQL_ROOT_PASSWORD")
         if platform.system() == "Linux":
-            port = self.docker("mysql", "mysql:8.4", 3306,
+            port = self.docker("mysql", self.images["mysql_image"], 3306,
                                {"MYSQL_ROOT_PASSWORD": root_password, "MYSQL_DATABASE": "test",
                                 "MYSQL_USER": "test", "MYSQL_PASSWORD": password})
         else:
@@ -360,7 +362,8 @@ class Services:
         self.root.mkdir(parents=True, exist_ok=True)
         self.private = Path(self.stack.enter_context(tempfile.TemporaryDirectory(prefix=self.namespace)))
         try:
-            facts = {"namespace": self.namespace, "platform": platform.system(), "resources": self.resources}
+            facts = {"namespace": self.namespace, "platform": platform.system(), "resources": self.resources,
+                     "images": self.images if platform.system() == "Linux" else None}
             if "ssh" in self.capabilities:
                 facts["ssh"] = self.ssh()
             if "mysql" in self.capabilities:

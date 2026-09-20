@@ -139,7 +139,9 @@ jobs:
         with:
           workspaces: src-tauri -> target/qa-ui-auto
           shared-key: qa-platforms-${{ matrix.platform_key }}
+          key: hosted-services-v2
           cache-on-failure: true
+          cache-workspace-crates: true
       - name: Windows build tools and WebView2 driver
         if: runner.os == 'Windows' && matrix.mode == 'native'
         shell: pwsh
@@ -252,6 +254,9 @@ jobs:
       github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
     needs: [plan, summarize]
     runs-on: ubuntu-24.04
+    concurrency:
+      group: qa-ui-auto-issue-publisher
+      cancel-in-progress: false
     permissions:
       contents: read
       issues: write
