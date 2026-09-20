@@ -4,6 +4,37 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
+import json
+
+
+def windows_startup_probe(binary: Path, report: Path):
+    """Distinguish executable startup failures from WebView2 driver handshakes."""
+    from native_build import verify_identity
+    from tauri_webdriver import native_isolation_env
+
+    verify_identity(binary)
+    root = report / "startup-probe"
+    root.mkdir(parents=True, exist_ok=True)
+    environment = native_isolation_env(root)
+    for directory in environment.values():
+        Path(directory).mkdir(parents=True, exist_ok=True)
+    with (root / "app.log").open("w", encoding="utf-8") as log:
+        process = subprocess.Popen([str(binary)], stdout=log, stderr=subprocess.STDOUT,
+                                   env={**os.environ, **environment, "RUST_BACKTRACE": "1"})
+        try:
+            try:
+                exit_code = process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                exit_code = None
+            collect(root, root, failed=True)
+            (root / "startup.json").write_text(json.dumps({"pid": process.pid, "exit_code": exit_code,
+                "alive_after_10s": exit_code is None}), encoding="utf-8")
+            if exit_code is not None:
+                raise RuntimeError(f"QA executable exited before driver startup ({exit_code}); see startup-probe/app.log")
+        finally:
+            if process.poll() is None:
+                subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True, timeout=20)
+                process.wait(timeout=10)
 
 
 def collect(case_dir: Path, run_root: Path, *, failed: bool):
@@ -25,9 +56,9 @@ def collect(case_dir: Path, run_root: Path, *, failed: bool):
                 else run_root / "native-appcache/jdtls-ws")
         for marker in base.glob("*/.taomni-workspace"):
             workspace = Path(marker.read_text().strip()).resolve()
-            if workspace.is_relative_to(run_root.resolve()):
+            if workspace.is_relative_to(case_dir.resolve()):
                 log = marker.parent / ".metadata/.log"
-                if log.is_file():
+                if log.is_file() and log.stat().st_size <= 10_000_000:
                     shutil.copyfile(log, destination / f"jdtls-{marker.parent.name}.log")
     if failed and platform.system() == "Windows":
         script = r'''

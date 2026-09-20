@@ -100,6 +100,10 @@ def main():
                     raise RuntimeError("native build failed; see build.log")
                 from native_build import identity_path, qa_binary
                 (args.report / "build-identity.json").write_bytes(identity_path(qa_binary()).read_bytes())
+                if platform.system() == "Windows":
+                    outcome["stage"] = "native-startup"
+                    from qa_ui_auto.native_diagnostics import windows_startup_probe
+                    windows_startup_probe(qa_binary(), args.report)
             else:
                 log = stack.enter_context((args.report / "vite.log").open("w", encoding="utf-8"))
                 pnpm = shutil.which("pnpm")

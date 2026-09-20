@@ -420,10 +420,10 @@ python -m qa_ui_auto run --mode native --filter TC-NATIVE-CORE-001 --dry-run \
 
 真实 Actions 证据（分支验证调用方）：
 
-- Java/JDTLS/Java25/Maven/Gradle 探针：Linux、Windows、macOS ARM64 均通过。
+- Java/JDTLS/Java25/Maven/Gradle 基础探针：Linux、Windows、macOS ARM64 均通过。增强后的插件命令注册探针正在 [35502381103](https://github.com/engcapa/taomni/actions/runs/35502381103) 复验；Linux/macOS 已通过。
 - SSH/SFTP/MySQL 协议探针：Linux、macOS ARM64、Windows 最新探针通过；Windows ConPTY 采用终端画面解析，避免 ANSI 光标输出误判。
 - browser：Linux 和 macOS ARM64 代表用例通过；Windows browser 曾通过。
-- native：Linux 核心、IME/clipboard、SFTP、MySQL、数据库恢复代表用例通过；macOS ARM64 核心、SFTP、MySQL/恢复通过，Java provider 仍有 JDTLS 退出失败；Windows 构建和桌面预检通过，但 WebView2 session 初始化在 hosted runner 超时。
+- native：在 [35501449155](https://github.com/engcapa/taomni/actions/runs/35501449155) 中，Linux 代表范围 9/10 通过，Maven 已跑通运行/构建，在测试发现处失败；已定位 Java Test 0.46 与 JDTLS 1.50 的 ASM 依赖不兼容，改为匹配的 Java Test 0.43.1 并实测插件注册。macOS JDTLS 日志确认应用选到 runner 的 JDK 26（不支持 class major 70），已通过应用现有设置固定 tooling JDK；表单 bridge 的 Backspace 写入回归也已修复。Linux/macOS 全量 native 在 35502381103 验证。Windows 构建和桌面预检通过，WebView2 session 超时仍在定位。
 
 当前失败会在 `qa-summary` 和对应组合 artifact 中保留，不影响 PR 合并或 release。失败根因分为应用用例断言（例如 Maven run configuration 文本）和平台适配（macOS ARM JDTLS、Windows WebView2 启动），不能通过缩小选择范围宣称完整覆盖。
 

@@ -66,7 +66,12 @@ in config artifacts. No external server, repository secret or private network
 is required. Account/package mutations are limited to CI.
 
 Java downloads are pinned by version and SHA256 in `toolchains.yaml`. JDTLS
-performs real LSP initialize; Java 25 projects build online then offline. The
+performs real LSP initialize and checks debug/test command registration when
+bundles are selected. Java Test 0.43.1 matches the ASM 9.8 family in JDTLS 1.50;
+upgrading these pins requires a new joint probe. The native session seeds the
+application's existing tooling-JDK setting from the prepared `JAVA_HOME`, since
+a hosted image may also contain a newer, incompatible JDK. Java 25 projects
+build online then offline. The
 whole debug/test extension server directories are retained. Product semantics
 and debugging still require the actual native cases; preparation alone is not
 product coverage.

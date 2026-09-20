@@ -7,48 +7,10 @@ permissions:
   contents: read
   issues: write
 jobs:
-  native_all:
-    # Temporary validation: pinned tooling JDK and compatible test bundles.
+  windows_core:
+    # Temporary validation: capture app startup independently of EdgeDriver.
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
-      scope: all
-      platforms: linux,macos
+      scope: smoke
+      platforms: windows
       modes: native
-  java:
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
-    env:
-      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
-      PYTHONUTF8: '1'
-      PYTHONIOENCODING: utf-8
-      PYTHONUNBUFFERED: '1'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: python -m pip install pyyaml jsonschema
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '25'
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.1.0'
-      - run: python .agents/skills/qa-ui-auto/scripts/ci_toolchains.py
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: java-probe-${{ matrix.os }}
-          path: |
-            qa-ui-auto-report/java-probe/readiness.json
-            qa-ui-auto-report/java-probe/warmup.json
-            qa-ui-auto-report/java-probe/jdtls-stderr.log
