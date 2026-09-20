@@ -25,9 +25,8 @@ steps:
   - wait_for: "[data-testid=\"context-menu\"]"
   - click: "text=\"Record new macro\""
   - wait: 1
-  - type:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-      text: echo qa-macro-payload
+  - click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - type: echo qa-macro-payload
   - press: Enter
   - wait: 1
   - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }

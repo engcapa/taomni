@@ -7,8 +7,8 @@ permissions:
   contents: read
   issues: write
 jobs:
-  # Focused rerun for terminal prompt readiness, buffer mirroring, and
-  # between-case WebView2 profile cleanup.
+  # Focused rerun for xterm-owned focus after prompt readiness, buffer
+  # mirroring, and between-case WebView2 profile cleanup.
   windows_browser:
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:

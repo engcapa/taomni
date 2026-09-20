@@ -19,9 +19,8 @@ steps:
   - wait_for:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
       timeout_sec: 20
-  - type:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-      text: "printf \"qa-ui-auto-search\\n\""
+  - click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - type: "printf \"qa-ui-auto-search\\n\""
   - press: Enter
   - wait: 1
   - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }
