@@ -140,7 +140,7 @@ class Services:
         command([ssh_keygen, "-t", "ed25519", "-N", "", "-f", str(host_key)])
         lines = [f"Port {port}", "ListenAddress 127.0.0.1", f'HostKey "{host_key.as_posix()}"',
                  "PasswordAuthentication yes", "PubkeyAuthentication no", "PermitEmptyPasswords no",
-                 f"AllowUsers {user}", "StrictModes no", "LogLevel VERBOSE", "Subsystem sftp internal-sftp"]
+                 f"AllowUsers {user}", "StrictModes no", "LogLevel DEBUG3", "Subsystem sftp internal-sftp"]
         if system == "Darwin":
             uid = str(5500 + secrets.randbelow(2000))
             remote_dir = f"/private/tmp/{self.namespace}-temp"
@@ -167,7 +167,10 @@ class Services:
             os.environ["QA_SERVICE_USER"] = user
             # Password supplied through the child environment, never a log or artifact.
             powershell("$pw=ConvertTo-SecureString $env:QA_SSH_PASSWORD -AsPlainText -Force; "
-                       "New-LocalUser -Name $env:QA_SERVICE_USER -Password $pw -PasswordNeverExpires | Out-Null")
+                       "New-LocalUser -Name $env:QA_SERVICE_USER -Password $pw -PasswordNeverExpires | Out-Null; "
+                       "$cred=[PSCredential]::new($env:QA_SERVICE_USER,$pw); "
+                       "Start-Process $env:WINDIR\\System32\\cmd.exe -Credential $cred -LoadUserProfile "
+                       "-ArgumentList '/c exit 0' -Wait")
             self.stack.callback(lambda: powershell("Remove-LocalUser -Name $env:QA_SERVICE_USER"))
             remote_dir = f"C:/qa-temp-{user}"
             powershell(f"New-Item -ItemType Directory -Force '{remote_dir}' | Out-Null; "
@@ -176,7 +179,9 @@ class Services:
             # Git Bash supports the POSIX shell commands in the portable SSH cases.
             powershell("New-Item -Path HKLM:\\SOFTWARE\\OpenSSH -Force | Out-Null; "
                        "New-ItemProperty -Path HKLM:\\SOFTWARE\\OpenSSH -Name DefaultShell "
-                       "-Value 'C:\\Program Files\\Git\\bin\\bash.exe' -PropertyType String -Force | Out-Null")
+                       "-Value 'C:\\Program Files\\Git\\bin\\bash.exe' -PropertyType String -Force | Out-Null; "
+                       "New-ItemProperty -Path HKLM:\\SOFTWARE\\OpenSSH -Name DefaultShellCommandOption "
+                       "-Value '-c' -PropertyType String -Force | Out-Null")
             cfg = private / "sshd_config"
             cfg.write_text("\n".join(lines) + "\n", encoding="utf-8")
             # sshd must run as LocalSystem for password logon/PTY impersonation.
@@ -237,7 +242,7 @@ class Services:
         retry(probe)
         self.stack.callback(client.close)
         nonce = secrets.token_hex(12)
-        _, stdout, stderr = client.exec_command(f"echo {nonce}", get_pty=True, timeout=15)
+        _, stdout, stderr = client.exec_command(f"echo {nonce}", get_pty=True, timeout=60)
         if nonce not in stdout.read().decode() or stdout.channel.recv_exit_status() != 0:
             raise RuntimeError("SSH authentication/PTY/exec probe failed")
         sftp = client.open_sftp()

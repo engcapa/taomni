@@ -8,7 +8,7 @@ permissions:
   issues: write
 jobs:
   smoke:
-    # Temporary branch-only trigger for hosted validation (service authentication fixes).
+    # Temporary branch-only trigger for hosted validation (first Windows SSH user profile).
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
       scope: selected
