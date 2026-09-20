@@ -381,7 +381,9 @@ describe("TerminalPanel focus behavior", () => {
       "data-terminal-text",
       "qa-output\nrunner$ ",
     );
-    expect(screen.getByTestId("terminal-pane")).toHaveAttribute("data-terminal-ready", "true");
+    await waitFor(() => {
+      expect(screen.getByTestId("terminal-pane")).toHaveAttribute("data-terminal-ready", "true");
+    });
   });
 
   it("launches a SocksCap TUI only once when StrictMode replays mount effects", async () => {
@@ -484,6 +486,10 @@ describe("TerminalPanel focus behavior", () => {
     };
     term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());
     ipcMocks.writeTerminal.mockClear();
+    const panel = screen.getByTestId("terminal-pane");
+
+    act(() => terminalMocks.state.onRenderHandler?.());
+    expect(panel).not.toHaveAttribute("data-terminal-ready");
 
     await act(async () => {
       onOutput?.(new TextEncoder().encode(prompt));
@@ -497,6 +503,17 @@ describe("TerminalPanel focus behavior", () => {
           atob(encoded).includes("__taomni_osc7"),
       );
       expect(integrationWrite).toBeTruthy();
+    });
+    expect(panel).not.toHaveAttribute("data-terminal-ready");
+
+    await act(async () => {
+      onOutput?.(
+        new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${prompt}`),
+      );
+    });
+
+    await waitFor(() => {
+      expect(panel).toHaveAttribute("data-terminal-ready", "true");
     });
   });
 

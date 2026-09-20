@@ -598,6 +598,7 @@ export function TerminalPanel({
   // polling window. Keep a deferred installer so the first later idle prompt
   // can still enable continuous OSC 7 cwd reporting.
   const installSshCwdIntegrationRef = useRef<(() => boolean) | null>(null);
+  const automationInputSettlingRef = useRef(false);
   const webglAddonRef = useRef<{
     addon: WebglAddon;
     contextLossDisposable: { dispose: () => void } | null;
@@ -2336,6 +2337,8 @@ export function TerminalPanel({
     let sockscapLaunchTimer: ReturnType<typeof setTimeout> | undefined;
     let launchedSockscapPid: number | null = null;
 
+    automationInputSettlingRef.current = Boolean(ssh && !adoptedTerminalRef.current);
+
     const submitLocalDirectoryUse = (path: string) => {
       const backendSessionId = sessionIdRef.current;
       if (!backendSessionId) {
@@ -2630,7 +2633,11 @@ export function TerminalPanel({
       const panel = panelRef.current;
       if (!panel) return;
       panel.setAttribute("data-terminal-text", getBufferText(term));
-      if (terminalAtIdlePrompt(term)) {
+      if (
+        connectionStateRef.current === "connected" &&
+        !automationInputSettlingRef.current &&
+        terminalAtIdlePrompt(term)
+      ) {
         panel.setAttribute("data-terminal-ready", "true");
       } else {
         panel.removeAttribute("data-terminal-ready");
@@ -2726,7 +2733,15 @@ export function TerminalPanel({
                       activitySource: "input-heuristic",
                     });
                   }
-                  installSshCwdIntegrationRef.current?.();
+                  if (installSshCwdIntegrationRef.current) {
+                    installSshCwdIntegrationRef.current();
+                  } else if (
+                    automationInputSettlingRef.current &&
+                    !injectedInputEchoSuppressorRef.current
+                  ) {
+                    automationInputSettlingRef.current = false;
+                    syncAutomationState();
+                  }
                 }
               }, 120);
             });
@@ -2854,6 +2869,9 @@ export function TerminalPanel({
 
       clearConnectionListeners();
       connectionStateRef.current = "disconnected";
+      automationInputSettlingRef.current = false;
+      installSshCwdIntegrationRef.current = null;
+      injectedInputEchoSuppressorRef.current = null;
       sessionIdRef.current = null;
       setRegisteredSessionId(null);
       zmodemRef.current = null;
@@ -2940,6 +2958,7 @@ export function TerminalPanel({
       // an idle prompt. The terminal is usable immediately; this only defers the
       // background hook. Shared by the SSH remote shell and the local macOS zsh.
       const scheduleCwdIntegrationInstall = (targetSid: string, integrationCommand: string) => {
+        if (ssh && !adopted) automationInputSettlingRef.current = true;
         let integrationAttempts = 0;
         let integrationInstalling = false;
         const MAX_INTEGRATION_ATTEMPTS = 12; // ~6s of polling for a slow login
@@ -3053,6 +3072,9 @@ export function TerminalPanel({
       onSessionLaunchFailedRef.current?.(err);
       cancelPendingMfa();
       connectionStateRef.current = ssh ? "disconnected" : "idle";
+      automationInputSettlingRef.current = false;
+      installSshCwdIntegrationRef.current = null;
+      injectedInputEchoSuppressorRef.current = null;
       sessionIdRef.current = null;
       pendingLocalDirectoryReportsRef.current = [];
       setRegisteredSessionId(null);
@@ -3082,6 +3104,9 @@ export function TerminalPanel({
       clearConnectionListeners();
       cancelPendingMfa();
       connectionStateRef.current = mode === "reconnect" ? "reconnecting" : "connecting";
+      automationInputSettlingRef.current = true;
+      installSshCwdIntegrationRef.current = null;
+      injectedInputEchoSuppressorRef.current = null;
       if (tabId) setTerminalRuntime(tabId, { state: "connecting", program: undefined });
       sessionIdRef.current = null;
       setRegisteredSessionId(null);
@@ -3257,6 +3282,7 @@ export function TerminalPanel({
       if (activityPromptTimer) clearTimeout(activityPromptTimer);
       if (sockscapLaunchTimer) clearTimeout(sockscapLaunchTimer);
       installSshCwdIntegrationRef.current = null;
+      automationInputSettlingRef.current = false;
       unlistenExit?.();
       unlistenForwardError?.();
       unlistenAuthPrompt?.();
