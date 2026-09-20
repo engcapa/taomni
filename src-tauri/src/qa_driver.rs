@@ -326,7 +326,9 @@ async fn element_click<R: Runtime>(
         "if (!el) throw new Error('stale element'); el.focus?.(); ",
         "el.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0})); ",
         "el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true,button:0})); ",
-        "el.click(); return true;",
+        "if (typeof el.click === 'function') el.click(); ",
+        "else el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,button:0})); ",
+        "return true;",
     ));
     match eval_js(&state, script).await {
         Ok(value) => ok(value),

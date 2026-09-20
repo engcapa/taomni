@@ -6,8 +6,8 @@
 
 - 来源：2026-09-20 用户要求重新设计 workflow 和 SSH/MySQL/JDTLS 基础设施；随后明确“三端仅手动或夜间运行，PR 保持轻量”，并要求 flow 触发、按代码修改指定范围；最终要求新增独立 workflow，原有流程仅参考，暂不影响 PR 合并与 release，以报告或 issues 追踪问题。
 - 基线：`6e292fd3cfb638deffc3805a447fea11275fc01f`；调研时工作区干净；当前工作机 Linux x86_64。
-- 本轮产物是详细设计，文中拟新增文件、参数、workflow 和测试尚未实现，不代表已经通过三端 CI。
-- 设计状态：可进入实现；采用各端 runner 本地服务，不要求专用主机。三端图形会话、Linux fcitx5 及 Windows/macOS SSH 最小环境探针是先行任务。所有 hosted jobs 必须完全无人值守，包括服务安装、图形准备、权限预检、测试与清理；第 7 节定义自动化必跑范围与 hosted 覆盖缺口，不以人工授权作为执行或验收环节。
+- 本轮已完成实现并发布到分支 `feat/qa-ui-auto-platforms`；实现文件、运行手册、证据契约和回归测试已经落地。三端 hosted 验证以 Actions 原始 artifacts 为准，失败仍保留在报告中，不自动改绿。
+- 设计状态：已实现，持续用 hosted run 验证；采用各端 runner 本地服务，不要求专用主机。三端图形会话、Linux fcitx5 及 Windows/macOS SSH 最小环境探针是先行任务。所有 hosted jobs 必须完全无人值守，包括服务安装、图形准备、权限预检、测试与清理；第 7 节定义自动化必跑范围与 hosted 覆盖缺口，不以人工授权作为执行或验收环节。
 - 三端指上述三个 OS/架构组合，不包含 Linux ARM64、Windows ARM64、macOS Intel 的额外矩阵。
 - native 使用 `com.taomni.app.qa` debug 构建及内嵌生产前端；不等同于发行安装包签名/升级测试。
 
@@ -357,7 +357,7 @@ V-05 增加测试：同一失败两次只产生一个 issue 更新；不同平�
 
 ## 9. 实现任务与文件责任
 
-所有下列路径为拟新增或拟修改；未表示已经执行。表中 `scripts/` 指 `.agents/skills/qa-ui-auto/scripts/`，`ci/` 指 `qa-ui-auto-tests/ci/`。任务拆分不授权启动子 agent。
+下表记录实现责任与当前落地位置；已完成项以仓库文件和 Actions artifacts 为证。表中 `scripts/` 指 `.agents/skills/qa-ui-auto/scripts/`，`ci/` 指 `qa-ui-auto-tests/ci/`。任务拆分不授权启动子 agent。
 
 | TASK | 职责与主要文件 | 依赖 / 完成条件 |
 |---|---|---|
@@ -368,11 +368,11 @@ V-05 增加测试：同一失败两次只产生一个 issue 更新；不同平�
 | TASK-05 汇总与集成交付 | CI summarize、最小治理/迁移说明、skill CI 引用；检查 receipt 与 expected entries；调度六组合、定位既有失败，不删失败 case 换绿 | 依赖 TASK-01～04、06；AC-08/09 及整体 AC；V-05/06/07/08/09；回填实际 Actions 链接、counts、遗漏能力 |
 | TASK-06 图形会话、IME 与权限 | 新增 `scripts/ci_desktop.py`、Linux session supervisor/fcitx profile；增强 `fixtures/linux_x11_required.py` 活性检查；Windows 交互 session 探针及必要的 CI launcher 分支；`src-tauri/src/qa_driver.rs` 增加自身 WKWebView snapshot，保留明确命名的桌面捕获；截图范围 metadata、无人值守权限预检、prompt 超时处理和 hosted-unavailable 策略 | 先执行三端轻量 session 探针；与 TASK-03 协调 driver 文件，不重复构建；AC-10/11/12；V-07/08/09；禁止以权限/输入模拟冒充系统验证 |
 
-现有 Linux browser 两个已知失败应在三端集成前先定向复现：`TC-IDE-C0-02` 保存状态、`TC-auto-F-Servers-1-servers-dialog`。Windows native setup timeout 同样是验收阻断，不能仅标“平台未验证”。对独立既有产品缺陷记录修复任务；本次改动新增的回归由对应 TASK 负责。
+GitHub 运行已复现并保留代表性失败：Linux native Maven run configuration 文本断言、macOS ARM JDTLS provider 退出、Windows WebView2 session 初始化超时。它们分别记录为产品断言/平台适配问题，不能通过 policy 排除。
 
 ## 10. 验证计划与交接命令
 
-以下全部是实现后的待执行计划；本轮只读源码、目录和上轮 Actions 日志属于调查证据。
+以下全部是实现后的待执行计划；本轮同时执行了本地回归、静态 gate 和 GitHub hosted workflow；以下状态区分设施通过、产品 case 失败和平台尚未完成。
 
 | V | 输入 / 操作与断言 | 覆盖 |
 |---|---|---|
@@ -404,7 +404,27 @@ python -m qa_ui_auto run --mode native --filter TC-NATIVE-CORE-001 --dry-run \
 2. Windows：先 V-07，再同样的跨平台集合；特别证明 WebView2 session 成功、UTF-8 artifact 可读、Java launcher/Gradle batch 调用、OpenSSH/SFTP 路径和进程清理。Linux-only verb 在 manifest 标注不适用，但 Windows 系统 IME 的对应行为记录为未覆盖能力，不能标产品不适用。
 3. macOS ARM64：先 V-07/V-09 hosted 部分；校验 arch、WKWebView `/status`、真实 QA app UI、WebView 内 Cmd/Meta、MySQL/SSH 与 Java provider；不从 release ARM 构建成功推导 native case 通过。系统输入/权限按第 7.5 节无人值守准入或列 hosted 覆盖缺口，不把 bridge 的事件当真实 OS 输入。
 
-本设计交付无需重新构建产品；实现交付至少完成当前 Linux 所需验证并明确其他端状态。由于本项目的目标正是三端 CI，只有最终六组合在实际 GitHub runner 留下有效执行证据，才能报告“三端 workflow 已验收”；其他平台未跑仍是该整体目标的未完成项。
+实现交付已完成 runner/服务/Java/桌面设施，并已在 hosted runner 留下真实执行证据；仍需修复失败 case 后再宣称六组合全绿。由于本项目的目标正是三端 CI，只有最终六组合在实际 GitHub runner 留下有效执行证据，才能报告“三端 workflow 已验收”；其他平台未跑仍是该整体目标的未完成项。
+
+## 10.1 已实现与真实验证记录（2026-09-20）
+
+已落地：
+
+- `.github/workflows/qa-ui-auto-platforms.yml`：`workflow_dispatch`、`schedule`、`workflow_call`，六组合矩阵，精确选择/依赖闭包、artifact、汇总和可选 issue 发布；不监听 PR/push/release。
+- `.github/actions/qa-runtime/action.yml`、`ci.py`、`ci_execute.py`、`ci_services.py`、`ci_toolchains.py`、`ci_desktop.py`：三端 runner 本机服务、JDTLS/Java25/bundles、Linux Xvfb/DBus/fcitx5、Windows 交互桌面、macOS WKWebView snapshot。
+- 选择 manifest、source/runner/case/build identity、receipt 绑定、凭据脱敏、artifact 隔离和 invocation 独立 artifact key 已加入汇总校验。
+- `qa-ui-auto-tests/ci/README.md` 已提供触发、调用权限、基础设施、证据和限制说明；原 `e2e.yml`、`qa-native.yml`、`release.yml` 未修改。
+
+真实 Actions 证据（分支验证调用方）：
+
+- Java/JDTLS/Java25/Maven/Gradle 探针：Linux、Windows、macOS ARM64 均通过。
+- SSH/SFTP/MySQL 协议探针：Linux、macOS ARM64、Windows 最新探针通过；Windows ConPTY 采用终端画面解析，避免 ANSI 光标输出误判。
+- browser：Linux 和 macOS ARM64 代表用例通过；Windows browser 曾通过。
+- native：Linux 核心、IME/clipboard、SFTP、MySQL、数据库恢复代表用例通过；macOS ARM64 核心、SFTP、MySQL/恢复通过，Java provider 仍有 JDTLS 退出失败；Windows 构建和桌面预检通过，但 WebView2 session 初始化在 hosted runner 超时。
+
+当前失败会在 `qa-summary` 和对应组合 artifact 中保留，不影响 PR 合并或 release。失败根因分为应用用例断言（例如 Maven run configuration 文本）和平台适配（macOS ARM JDTLS、Windows WebView2 启动），不能通过缩小选择范围宣称完整覆盖。
+
+临时 `.github/workflows/qa-platforms-validation.yml` 只用于该 feature branch 的真实 `workflow_call` 验证；完成本轮证据收集后删除，避免成为长期 push 入口。默认分支注册 `workflow_dispatch` 仍需将独立 workflow 合入默认分支后才能在 Actions UI 中选择。
 
 ## 11. 追踪、迁移与未决项
 
@@ -412,17 +432,17 @@ python -m qa_ui_auto run --mode native --filter TC-NATIVE-CORE-001 --dry-run \
 |---|---|---|---|---|
 | AC-01 | 4、7 | 04 | 04、06 | 已设计，待实现 |
 | AC-02/03 | 4、5 | 01 | 01、04 | 已设计，待实现 |
-| AC-04 | 6.1～6.3 | 02 | 02、06 | 采用本机 provider，三端服务探针待执行 |
-| AC-05 | 6.4 | 03 | 03、06 | 已设计，具体工具锁需安装验证 |
-| AC-06 | 2、7 | 03 | 03、06 | 已定位 macOS readiness 缺口；Windows setup 原因待探针 |
-| AC-07/08 | 8 | 04、05 | 04、05、06 | 已设计，待实现 |
+| AC-04 | 6.1～6.3 | 02 | 02、06 | 本机 provider 已实现；Linux/macOS/Windows 协议探针有 hosted 证据 |
+| AC-05 | 6.4 | 03 | 03、06 | 三端 JDTLS/Java25/构建探针通过；产品 Java case 仍有 macOS provider 失败 |
+| AC-06 | 2、7 | 03 | 03、06 | Linux/macOS native 核心通过；Windows build/display 通过但 WebView2 session 超时 |
+| AC-07/08 | 8 | 04、05 | 04、05、06 | receipt、identity、脱敏、汇总失败闭环已实现并有单测 |
 | AC-09 | 5～8 | 01～05 | 01～06 | 需保留既有测试并回填回归证据 |
-| AC-10 | 7.1～7.4 | 06、04 | 07、06 | 明确三端 GUI 前提，真实 hosted session 探针待执行 |
-| AC-11 | 7.2 | 06 | 08 | 完整 fcitx5/GTK/XTest 方案已补，真实 CI 待执行 |
-| AC-12 | 7.4～7.5、8 | 06、05 | 09 | snapshot 待实现；权限 preflight/超时待验证，必须人工 grant 的能力不纳入无人值守准入 |
+| AC-10 | 7.1～7.4 | 06、04 | 07、06 | 三端 display/session 预检已执行；Windows app session 仍待修复 |
+| AC-11 | 7.2 | 06 | 08 | Linux fcitx5/wbpy/GTK/XTest native 用例已通过 |
+| AC-12 | 7.4～7.5、8 | 06、05 | 09 | macOS WKWebView snapshot 已实现；OS 输入/权限仍明确为 hosted 缺口 |
 
 独立上线时先以手动入口验证新 workflow，再验证自身 nightly 与 caller。原有 `e2e.yml`、`qa-native.yml`、`release.yml` 保持不变，因此旧夜间任务可能仍运行；本次用独立 concurrency group 避免相互取消。以后是否合并/停用旧 workflow 是另一项调整，本次不做。
 
 新 workflow 不监听 `pull_request`/`push`/`release`，不修改 branch protection，不写入 release 的 needs。它的失败应该真实显示为红色，以便发现问题，但不作为合并/发布门禁。如果调用方未来选择把它串入某业务 flow，该调用方自己决定失败处理；不能一边声称阻断调用链、一边又声称不影响 release。
 
-回退只撤销新增 workflow/工具及本轮创建资源；报告保留。当前无待用户确认的实质决策，TASK-01 和 TASK-03 可开始，TASK-02/06 先完成三端本机服务与图形会话探针再深化脚本。整个三端 CI 功能仍待实现与执行，本设计不将安装、授权或 display 假设记为已验证；仅 hosted 自动化通过不等于三端所有系统权限/IME 已通过。
+回退只撤销新增 workflow/工具及本轮创建资源；报告保留。当前无待用户确认的实质决策，TASK-01 和 TASK-03 可开始，TASK-02/06 先完成三端本机服务与图形会话探针再深化脚本。三端 CI 功能已实现并执行过；本设计不将失败 case、系统权限缺口或未执行的 all 范围记为已验证；仅 hosted 自动化通过不等于三端所有系统权限/IME 已通过。

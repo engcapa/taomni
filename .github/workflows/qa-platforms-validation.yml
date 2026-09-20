@@ -8,7 +8,7 @@ permissions:
   issues: write
 jobs:
   smoke:
-    # Temporary validation: isolated calls, ConPTY rendering, WebKit transport and SFTP edit mode.
+    # Temporary validation: native process diagnostics and paced form input.
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
       scope: selected
@@ -20,6 +20,11 @@ jobs:
       scope: smoke
       platforms: windows
       modes: native
+  browser_all:
+    uses: ./.github/workflows/qa-ui-auto-platforms.yml
+    with:
+      scope: all
+      modes: browser
   no_change:
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:

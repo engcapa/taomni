@@ -157,16 +157,9 @@ class NativeSessionFillTest(TestCase):
             call("POST", "/session/session-1/element/element-1/clear", {}),
             session.request.call_args_list,
         )
-        self.assertIn(
-            call(
-                "POST",
-                "/session/session-1/element/element-1/value",
-                {"text": "Taomni", "value": list("Taomni")},
-            ),
-            session.request.call_args_list,
-        )
+        self.assertFalse(any(c.args[1].endswith('/value') for c in session.request.call_args_list))
         session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
-        session.type_text.assert_not_called()
+        session.type_text.assert_called_once_with("Taomni")
 
     def test_type_text_paces_contenteditable_key_transactions(self) -> None:
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))

@@ -543,6 +543,9 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                 }
             if r["status"] == "failed":
                 r["failure"]["artifacts"] = failure_artifacts
+            with suppress(Exception):
+                from .native_diagnostics import collect
+                collect(case_dir, report_root, failed=r["status"] == "failed")
             r["duration_sec"] = time.time() - started
             results.append(r)
     return results

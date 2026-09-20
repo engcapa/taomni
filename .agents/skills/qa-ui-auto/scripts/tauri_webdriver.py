@@ -186,7 +186,7 @@ class TauriDriverProcess:
             env = dict(os.environ)
             env["TAOMNI_QA_WEBDRIVER_HOST"] = self.host
             env["TAOMNI_QA_WEBDRIVER_PORT"] = str(self.port)
-            with out.open("w", encoding="utf-8") as stdout, err.open("w", encoding="utf-8") as stderr:
+            with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
                 self.proc = subprocess.Popen(
                     [str(self.application.resolve())],
                     cwd=ROOT,
@@ -680,11 +680,7 @@ class NativeSession:
         self.request("POST", self.element_path(element, "/click"), {})
         self.press_combo("Mod+a")
         self.press_combo("Backspace")
-        self.request(
-            "POST",
-            self.element_path(element, "/value"),
-            {"text": text, "value": list(text)},
-        )
+        self.type_text(text)
         return f"filled {selector}"
 
     def send_keys(self, text: str) -> str:
