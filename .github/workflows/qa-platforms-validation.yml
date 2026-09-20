@@ -7,8 +7,8 @@ permissions:
   contents: read
   issues: write
 jobs:
-  # Focused rerun after SSH PTY interrupt handling and readiness settling,
-  # covering renderer input delivery and the WebView2 native adapter.
+  # Focused rerun after SSH PTY interrupt handling and bounded readiness settling,
+  # covering renderer input delivery and a real WebView2 native smoke.
   windows_browser:
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
@@ -22,4 +22,4 @@ jobs:
       scope: selected
       platforms: windows
       modes: native
-      case_ids: TC-006,TC-012
+      case_ids: TC-NATIVE-CORE-001

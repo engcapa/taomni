@@ -3009,6 +3009,14 @@ export function TerminalPanel({
           if (integrationAttempts < MAX_INTEGRATION_ATTEMPTS) {
             integrationAttempts += 1;
             window.setTimeout(pollForCwdIntegration, 500);
+          } else if (installSshCwdIntegrationRef.current === installCwdIntegration) {
+            // A shell that never exposes a prompt (or a non-POSIX prompt that
+            // cannot accept the integration command) must not block normal
+            // input forever. Stop retrying and expose the stable output we do
+            // have; cwd reporting remains unavailable for this session.
+            installSshCwdIntegrationRef.current = null;
+            automationInputSettlingRef.current = false;
+            syncAutomationState();
           }
         };
         window.setTimeout(pollForCwdIntegration, 500);
