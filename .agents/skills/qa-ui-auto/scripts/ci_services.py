@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import platform
-import re
 import secrets
 import shutil
 import socket
@@ -234,6 +233,7 @@ class Services:
         else:
             user, port, remote_dir = self.local_ssh(password)
         import paramiko
+        import pyte
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         def probe():
@@ -252,7 +252,8 @@ class Services:
             raise RuntimeError("SSH exec probe failed; see ssh-exec.json")
         channel = client.invoke_shell(width=120, height=32)
         output = ""
-        plain = ""
+        screen = pyte.Screen(120, 32)
+        terminal = pyte.Stream(screen)
         try:
             channel.settimeout(2)
             # Shell output must contain a fresh nonce on its own line, not
@@ -268,19 +269,19 @@ class Services:
                 if not data:
                     break
                 output += data.decode(errors="replace")
+                terminal.feed(data.decode(errors="replace"))
                 # Windows ConPTY paints using ANSI escapes, and asks the
                 # terminal to report its cursor before starting the shell.
                 if b"\x1b[6n" in data:
                     channel.send("\x1b[1;1R")
-                plain = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", output).replace("\r", "")
-                if "\n" + marker + "\n" in plain:
+                if marker in [line.strip() for line in screen.display]:
                     break
             else:
                 raise RuntimeError("SSH PTY shell did not produce the nonce; see ssh-pty.json")
-            if "\n" + marker + "\n" not in plain:
+            if marker not in [line.strip() for line in screen.display]:
                 raise RuntimeError("SSH PTY closed without command output; see ssh-pty.json")
         finally:
-            write_json(self.root / "ssh-pty.json", {"output": output})
+            write_json(self.root / "ssh-pty.json", {"output": output, "screen": screen.display})
             channel.close()
         sftp = client.open_sftp()
         try:

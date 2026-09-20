@@ -60,8 +60,11 @@ class NativeSessionTransportTest(TestCase):
 
     def test_loopback_driver_bypasses_system_proxy(self):
         class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
             def do_GET(self):
+                self.server.observed.append((self.client_address, self.headers.get('Connection')))
                 self.send_response(200)
+                self.send_header('Content-Length', '26')
                 self.end_headers()
                 self.wfile.write(b'{"value": {"ready": true}}')
 
@@ -69,12 +72,17 @@ class NativeSessionTransportTest(TestCase):
                 pass
 
         server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        server.observed = []
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
             with patch("urllib.request.getproxies", return_value={"http": "http://127.0.0.1:1"}):
                 session = NativeSession(f"http://127.0.0.1:{server.server_port}", Path("unused"))
                 self.assertEqual(session.request("GET", "/status"), {"ready": True})
+                self.assertEqual(session.request("GET", "/status"), {"ready": True})
+                self.assertEqual(server.observed[0][0], server.observed[1][0])
+                self.assertNotIn('close', [connection for _, connection in server.observed])
+                session._connection.close()
         finally:
             server.shutdown()
             server.server_close()
@@ -139,13 +147,13 @@ class NativeSessionFillTest(TestCase):
         click_call = call("POST", "/session/session-1/element/element-1/click", {})
         self.assertEqual(session.request.call_args_list.count(click_call), 2)
 
-    def test_input_fill_preserves_clear_and_value_contract(self) -> None:
+    def test_input_fill_keeps_blur_committing_control_focused(self) -> None:
         session = self.session(False)
 
         result = session.fill("input[name=title]", "Taomni")
 
         self.assertEqual(result, "filled input[name=title]")
-        self.assertIn(
+        self.assertNotIn(
             call("POST", "/session/session-1/element/element-1/clear", {}),
             session.request.call_args_list,
         )
@@ -157,7 +165,7 @@ class NativeSessionFillTest(TestCase):
             ),
             session.request.call_args_list,
         )
-        session.press_combo.assert_not_called()
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
         session.type_text.assert_not_called()
 
     def test_type_text_paces_contenteditable_key_transactions(self) -> None:

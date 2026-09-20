@@ -8,7 +8,7 @@ permissions:
   issues: write
 jobs:
   smoke:
-    # Temporary branch-only trigger: actual JDTLS launcher and ConPTY handshake.
+    # Temporary validation: isolated calls, ConPTY rendering and WebKit transport.
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
       scope: selected
@@ -20,6 +20,11 @@ jobs:
       scope: smoke
       platforms: windows
       modes: native
+  no_change:
+    uses: ./.github/workflows/qa-ui-auto-platforms.yml
+    with:
+      scope: impacted
+      base: ${{ github.sha }}
   services:
     permissions:
       contents: read

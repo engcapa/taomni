@@ -7,6 +7,7 @@ It speaks the small W3C WebDriver subset needed by the qa-ui-auto DSL.
 from __future__ import annotations
 
 import base64
+import http.client
 from contextlib import suppress
 import json
 import os
@@ -284,6 +285,9 @@ class NativeSession:
         self.transport = "macOS WKWebView bridge" if platform.system() == "Darwin" else "tauri-driver"
         # A local driver must remain reachable when the desktop uses a proxy.
         host = urllib.parse.urlsplit(self.driver_url).hostname
+        self._local_endpoint = (urllib.parse.urlsplit(self.driver_url)
+                                if host in {"localhost", "127.0.0.1", "::1"} else None)
+        self._connection: http.client.HTTPConnection | None = None
         self._open = (urllib.request.build_opener(urllib.request.ProxyHandler({})).open
                       if host in {"localhost", "127.0.0.1", "::1"} else urllib.request.urlopen)
 
@@ -297,8 +301,30 @@ class NativeSession:
         )
         try:
             timeout = min(120, self.deadline.remaining()) if self.deadline else 120
-            with self._open(req, timeout=timeout) as r:
-                data = r.read().decode("utf-8")
+            if self._local_endpoint and self._local_endpoint.scheme == "http":
+                # urllib unconditionally adds Connection: close. Forwarded
+                # by tauri-driver, this causes WebKitGTK to reset responses
+                # mid-flight. Keep the sequential W3C session on HTTP/1.1.
+                if self._connection is None:
+                    self._connection = http.client.HTTPConnection(
+                        self._local_endpoint.hostname, self._local_endpoint.port, timeout=timeout)
+                if self._connection.sock:
+                    self._connection.sock.settimeout(timeout)
+                self._connection.timeout = timeout
+                try:
+                    self._connection.request(method, path, body=body, headers=headers)
+                    response = self._connection.getresponse()
+                    data = response.read().decode("utf-8")
+                    if response.status >= 400:
+                        raise WebDriverError(f"HTTP {response.status}: {data}")
+                except Exception:
+                    self._connection.close()
+                    self._connection = None
+                    # Never retry an action whose delivery is uncertain.
+                    raise
+            else:
+                with self._open(req, timeout=timeout) as r:
+                    data = r.read().decode("utf-8")
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")
             raise WebDriverError(f"HTTP {e.code}: {detail}") from e
@@ -368,6 +394,9 @@ class NativeSession:
                 self.request("DELETE", f"/session/{self.session_id}")
             finally:
                 self.session_id = None
+                if self._connection:
+                    self._connection.close()
+                    self._connection = None
                 if self._on_close is not None:
                     self._on_close()
 
@@ -645,10 +674,12 @@ class NativeSession:
                 if line:
                     self.type_text(line)
             return f"filled contenteditable {selector}"
-        try:
-            self.request("POST", self.element_path(element, "/clear"), {})
-        except WebDriverError:
-            pass
+        # WebDriver /clear unfocuses form controls. Blur-committing inputs
+        # (path breadcrumbs, rename fields) disappear before /value arrives.
+        # Select and replace through keyboard input while retaining focus.
+        self.request("POST", self.element_path(element, "/click"), {})
+        self.press_combo("Mod+a")
+        self.press_combo("Backspace")
         self.request(
             "POST",
             self.element_path(element, "/value"),

@@ -15,7 +15,7 @@ import urllib.request
 
 import yaml
 
-from qa_ui_auto.ci import selection_entry, write_json
+from qa_ui_auto.ci import selection_digest, selection_entry, write_json
 
 
 def main():
@@ -57,7 +57,8 @@ def main():
     signal.signal(signal.SIGINT, cancelled)
     try:
         manifest, entry = selection_entry(args.selection, args.entry)
-        outcome.update(head=manifest["head"], stage="prepare")
+        outcome.update(head=manifest["head"], stage="prepare", selection_sha256=selection_digest(manifest),
+                       run_id=os.environ.get("GITHUB_RUN_ID"), attempt=os.environ.get("GITHUB_RUN_ATTEMPT"))
         architecture = {"amd64": "X64", "x86_64": "X64", "arm64": "ARM64", "aarch64": "ARM64"}.get(platform.machine().lower())
         if architecture != entry["arch"]:
             raise RuntimeError(f"runner architecture {platform.machine()} differs from selected {entry['arch']}")

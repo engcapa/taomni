@@ -4,3 +4,4 @@ playwright==1.55.0
 paramiko==3.5.1
 PyMySQL==1.1.2
 cryptography==46.0.1
+pyte==0.8.2

@@ -42,6 +42,10 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def selection_digest(manifest: dict) -> str:
+    return hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 def diff_paths(base: str, head: str) -> tuple[str, list[str]]:
     ancestor = git("merge-base", base, head)
     raw = subprocess.check_output(["git", "diff", "--name-status", "-z", "-M", ancestor, head])
@@ -163,7 +167,7 @@ def make_plan(args) -> dict:
     ordered = dependency_order(selected | explicit, dependencies, known)
     for cid in ordered:
         reasons.setdefault(cid, ["prerequisite"])
-    entries, gaps, reachable = [], [], set()
+    entries, gaps, not_applicable, reachable = [], [], [], set()
     for platform_key in platforms:
         target, runner, arch = PLATFORMS[platform_key]
         for mode in modes:
@@ -171,8 +175,13 @@ def make_plan(args) -> dict:
             for cid in ordered:
                 case = by_id[cid]
                 if mode not in case.modes:
+                    not_applicable.append({"case": cid, "platform": platform_key, "mode": mode,
+                                           "reason": "case does not declare this mode"})
                     continue
                 reason = native_support(case, target) if mode == "native" else browser_support(case, target)
+                if reason:
+                    not_applicable.append({"case": cid, "platform": platform_key, "mode": mode, "reason": reason})
+                    continue
                 if case.skip:
                     reason = f"case declares skip: {case.skip}"
                 unavailable = policy.get("unavailable", {}).get(cid, {})
@@ -200,6 +209,7 @@ def make_plan(args) -> dict:
             "merge_base": ancestor, "scope": args.scope, "changed_paths": changed,
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
             "entries": entries, "gaps": gaps, "no_relevant_changes": not entries,
+            "not_applicable": not_applicable,
             "run_id": os.environ.get("GITHUB_RUN_ID"), "attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
             "unreviewed": [cid for cid in ordered if set(by_id[cid].tags) & {"needs-review", "legacy-imported"}]}
 
@@ -270,6 +280,10 @@ def aggregate(manifest: dict, root: Path) -> dict:
                             or identity.get("source_sha256") != manifest["identity"]["source_sha256"]):
                         raise ValueError("native binary identity differs from build/source")
                 ids = [c["id"] for c in summary["cases"]]
+                counts = Counter(c["status"] for c in summary["cases"])
+                expected_totals = {"total": len(ids), **{k: counts[k] for k in ("passed", "failed", "skipped")}}
+                if summary.get("totals") != expected_totals or set(counts) - {"passed", "failed", "skipped"}:
+                    raise ValueError("summary totals/statuses disagree with case results")
                 if len(ids) != len(set(ids)):
                     raise ValueError("duplicate case IDs inside summary")
                 if seen.intersection(ids) or set(ids) != set(summary["selection"]["selected"]):
@@ -294,6 +308,10 @@ def aggregate(manifest: dict, root: Path) -> dict:
             actual = json.loads(outcome.read_text(encoding="utf-8"))
             if actual.get("head") != manifest["head"] or actual.get("entry") != entry["id"]:
                 errors.append("execution head/entry differs")
+            if (actual.get("selection_sha256") != selection_digest(manifest)
+                    or actual.get("run_id") != manifest.get("run_id")
+                    or actual.get("attempt") != manifest.get("attempt")):
+                errors.append("execution selection/run identity differs")
             if actual.get("exit_code") != 0:
                 errors.append(actual.get("error", "execution failed"))
         except (OSError, ValueError):
@@ -303,6 +321,7 @@ def aggregate(manifest: dict, root: Path) -> dict:
                         "counts": dict(totals), "errors": errors})
     return {"head": manifest["head"], "run_id": manifest.get("run_id"), "attempt": manifest.get("attempt"),
             "entries": entries, "failures": failures, "gaps": manifest["gaps"],
+            "not_applicable": manifest.get("not_applicable", []),
             "unreviewed": manifest["unreviewed"], "passed": not failures}
 
 
@@ -342,6 +361,9 @@ def main(argv=None):
             lines.append(f"| {entry['id']} | {entry['selected']} | {c.get('passed',0)} | {c.get('failed',0)} | {c.get('skipped',0)} | {len(entry['errors'])} |")
         lines.extend(["", f"Declared capability gaps: {len(result['gaps'])}; unreviewed cases: {len(result['unreviewed'])}.",
                       "", "See selection.json and ci-summary.json for exact IDs, exclusions and failures."])
+        for failure in result["failures"]:
+            message = failure["message"].replace("\n", " ").replace("`", "'")[:500]
+            lines.append(f"\n- `{failure['entry']}/{failure['case']}`: {message}")
         if not result["entries"]:
             lines.append("No relevant executable cases; no platform execution claimed.")
         text = "\n".join(lines) + "\n"
