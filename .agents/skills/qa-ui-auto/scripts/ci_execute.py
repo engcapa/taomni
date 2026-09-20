@@ -81,7 +81,7 @@ def main():
             write_json(args.report / "ci-outcome.json", outcome)
             command = [sys.executable, "-m", "qa_ui_auto", "run", "--selection", str(args.selection),
                        "--selection-entry", args.entry, "--config", str(cfg_path), "--report-dir", str(args.report),
-                       "--keep-runs", "0", "--require-pass"]
+                       "--keep-runs", "0", "--require-pass", "--mode", entry["mode"]]
             # Keep the interpreter/process owning the runner receipt unchanged.
             case_process = subprocess.Popen(command)
             children.append(case_process)
