@@ -185,15 +185,31 @@ class Services:
                 command(["icacls", str(protected), "/inheritance:r", "/grant:r", "*S-1-5-18:F", "*S-1-5-32-544:F"])
                 command(["icacls", str(protected), "/setowner", "*S-1-5-32-544"])
             command([executable, "-t", "-f", cfg])
-            os.environ["QA_SSH_SERVICE_COMMAND"] = f'"{executable}" -f "{cfg}" -E "{self.root / "sshd.log"}"'
-            # Win32 OpenSSH registers ServiceMain under its fixed sshd name.
-            # Hosted VMs are exclusive; restore the existing stopped service on exit.
+            standard = Path(os.environ["PROGRAMDATA"]) / "ssh/sshd_config"
+            standard.parent.mkdir(parents=True, exist_ok=True)
+            previous = standard.read_bytes() if standard.exists() else None
+            self.stack.callback(lambda: standard.write_bytes(previous) if previous is not None else standard.unlink(missing_ok=True))
+            standard.write_text("\n".join(lines + ["SyslogFacility LOCAL0"]) + "\n", encoding="utf-8")
+            command(["icacls", str(standard), "/inheritance:r", "/grant:r", "*S-1-5-18:F", "*S-1-5-32-544:F"])
+            command(["icacls", str(standard), "/setowner", "*S-1-5-32-544"])
+            os.environ["QA_SSH_SERVICE_COMMAND"] = f'"{executable}"'
             powershell("Stop-Service sshd -ErrorAction SilentlyContinue; "
                        "if (Get-Service sshd -ErrorAction SilentlyContinue) { "
                        "sc.exe config sshd binPath= $env:QA_SSH_SERVICE_COMMAND | Out-Null } else { "
                        "New-Service -Name sshd -BinaryPathName $env:QA_SSH_SERVICE_COMMAND -StartupType Manual | Out-Null }")
+            def collect_windows_logs():
+                log = standard.parent / "logs/sshd.log"
+                if log.is_file():
+                    shutil.copy2(log, self.root / "sshd.log")
+            self.stack.callback(collect_windows_logs)
             self.stack.callback(lambda: powershell("Stop-Service sshd -ErrorAction SilentlyContinue"))
-            powershell("Start-Service sshd")
+            try:
+                powershell("Start-Service sshd")
+            except Exception:
+                diagnostics = powershell("Get-CimInstance Win32_Service -Filter \"Name='sshd'\" | Select-Object Name,PathName,StartName,ExitCode | ConvertTo-Json; "
+                                         "Get-WinEvent -LogName OpenSSH/Operational -MaxEvents 10 -ErrorAction SilentlyContinue | Select-Object Message | ConvertTo-Json")
+                (self.root / "service-diagnostics.json").write_text(diagnostics, encoding="utf-8")
+                raise
         self.resources.append(f"sshd:{user}:{port}")
         return user, port, remote_dir
 
