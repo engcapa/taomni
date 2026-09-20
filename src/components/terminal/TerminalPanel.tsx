@@ -1662,6 +1662,17 @@ export function TerminalPanel({
   const sendSpecialSignal = useCallback((signal: string, fallback?: string) => {
     const sid = sessionIdRef.current;
     if (!sid) return;
+    // PTY-backed SSH sessions receive terminal control bytes more reliably
+    // than SSH channel requests on Windows OpenSSH/ConPTY. Some servers
+    // acknowledge channel.signal(SIGINT) by closing the channel, which leaves
+    // the interactive session unusable even though Ctrl-C is supported.
+    if (ssh && fallback) {
+      writeInput(fallback);
+      appendEvent("signal", `Sent ${signal} control character`);
+      setStatusMessage(`Sent ${signal}`);
+      focusTerminal();
+      return;
+    }
     sendTerminalSignal(sid, signal)
       .then(() => {
         appendEvent("signal", `Sent ${signal}`);
