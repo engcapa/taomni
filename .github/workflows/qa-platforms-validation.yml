@@ -8,9 +8,15 @@ permissions:
   issues: write
 jobs:
   windows_core:
-    # Temporary validation: capture app startup independently of EdgeDriver.
+    # Temporary validation: align EdgeDriver and app WebView profile.
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
       scope: smoke
       platforms: windows
       modes: native
+  browser_fixes:
+    uses: ./.github/workflows/qa-ui-auto-platforms.yml
+    with:
+      scope: selected
+      modes: browser
+      case_ids: TC-010,TC-012,TC-IDE-CW-SHELL-01-editor-shell-actions-browser,TC-auto-F-DB-1-query-tab-rename,TC-auto-F-DB-1-sql-session-scaffold

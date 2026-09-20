@@ -14,6 +14,17 @@ from tauri_webdriver import NativeSession, WebDriverError
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_windows_driver_uses_the_apps_isolated_webview_profile(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.request = Mock(return_value={"sessionId": "session-1"})
+        session.install_console_hook = Mock()
+        with patch("tauri_webdriver.platform.system", return_value="Windows"), \
+             patch.dict(os.environ, {"NEWMOB_DATA_DIR": "/qa/run/native-appdata"}):
+            session.start()
+        options = session.request.call_args.args[2]["capabilities"]["alwaysMatch"]["tauri:options"]
+        self.assertEqual(options["webviewOptions"]["userDataFolder"],
+                         str(Path("/qa/run/native-appdata/com.taomni.app.qa/webview")))
+
     def test_right_click_uses_right_button_and_releases_on_failure(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"

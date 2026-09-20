@@ -45,6 +45,8 @@ def collect(case_dir: Path, run_root: Path, *, failed: bool):
     roots = [run_root / "native-appdata", run_root / "native-appcache", run_root / "native-appconfig"]
     for root in roots:
         for path in root.rglob("*.log"):
+            if any(part.lower() in {"webview", "ebwebview"} for part in path.relative_to(root).parts):
+                continue  # WebView LevelDB .log files are profile data, not diagnostic text.
             if path.stat().st_size <= 10_000_000:
                 target = destination / ("logs-" + root.name) / path.relative_to(root)
                 target.parent.mkdir(parents=True, exist_ok=True)

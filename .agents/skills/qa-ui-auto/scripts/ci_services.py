@@ -298,6 +298,9 @@ class Services:
                 if stream.read() != nonce.encode():
                     raise RuntimeError("SFTP byte roundtrip differs")
             sftp.remove(probe_path)
+            # TC-010 mutates files in its own initially empty directory.
+            # Without it navigation fails and the case stays in the SSH home.
+            sftp.mkdir(remote_dir + "/tc010")
             for name, payload in (("alpha.txt", b"one"), ("beta.txt", b"two-two"), ("gamma.txt", b"three-three")):
                 with sftp.open(remote_dir + "/" + name, "wb") as stream:
                     stream.write(payload)
