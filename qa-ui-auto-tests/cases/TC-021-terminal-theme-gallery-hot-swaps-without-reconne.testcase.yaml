@@ -19,9 +19,10 @@ steps:
   - wait_for:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
       timeout_sec: 20
-  - click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-  - type: echo qa-theme-marker
-  - press: Enter
+  - terminal_input:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+      text: echo qa-theme-marker
+      submit: true
   - wait: 1
   - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }
   - wait_for: "[data-testid=\"context-menu\"]"
@@ -40,9 +41,10 @@ steps:
   - wait_for:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
       timeout_sec: 20
-  - click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-  - type: echo qa-theme-still-alive
-  - press: Enter
+  - terminal_input:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+      text: echo qa-theme-still-alive
+      submit: true
   - wait: 1
   - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-theme-still-alive}
   - screenshot: 021-terminal-theme-hot-swap.png

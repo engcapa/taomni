@@ -169,6 +169,9 @@
     "send_keys": {
      "$ref": "#/$defs/type_arg"
     },
+    "terminal_input": {
+     "$ref": "#/$defs/terminal_input_arg"
+    },
     "compose_text": {
      "$ref": "#/$defs/compose_text_arg"
     },
@@ -692,6 +695,26 @@
     "during_key": {
      "type": "string",
      "minLength": 1
+    }
+   }
+  },
+  "terminal_input_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "selector",
+    "text"
+   ],
+   "properties": {
+    "selector": {
+     "$ref": "#/$defs/selector"
+    },
+    "text": {
+     "type": "string"
+    },
+    "submit": {
+     "type": "boolean",
+     "default": false
     }
    }
   },

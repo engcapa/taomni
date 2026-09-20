@@ -51,9 +51,10 @@ steps:
       timeout_sec: 15
   - click: "[data-testid=\"sftp-remote-open-terminal-here\"]"
   - wait: 3
-  - click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-  - type: pwd
-  - press: Enter
+  - terminal_input:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+      text: pwd
+      submit: true
   - wait: 2
   - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: "${fixture.sftp_shell_test_dir}"}
   - screenshot: 012-sftp-open-terminal-here.png

@@ -33,11 +33,12 @@ steps:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
       timeout_sec: 20
   # Git Bash clears the terminal after connecting on Windows, so the
-  # pre-session info banner is not stable evidence. Click the pane so xterm
-  # owns focus before sending a command through its keyboard input path.
-  - click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-  - send_keys: "printf 'qa-saved-ssh-live\\n'"
-  - press: Enter
+  # pre-session info banner is not stable evidence. Send text through xterm's
+  # input event path and check output from the real SSH PTY.
+  - terminal_input:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+      text: "printf 'qa-saved-ssh-live\\n'"
+      submit: true
   - wait: 1
   - assert_text:
       selector: '[data-testid="terminal-pane"]'

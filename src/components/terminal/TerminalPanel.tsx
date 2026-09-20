@@ -2638,7 +2638,10 @@ export function TerminalPanel({
     };
     syncAutomationState();
     const automationStateTimer = window.setInterval(syncAutomationState, 500);
-    const renderDisposable = term.onRender(() => setViewportVersion((v) => v + 1));
+    const renderDisposable = term.onRender(() => {
+      setViewportVersion((v) => v + 1);
+      syncAutomationState();
+    });
     const resizeDisposable = term.onResize(({ cols, rows }) => {
       setViewportVersion((v) => v + 1);
       appendEvent("resize", `${cols}x${rows}`);
@@ -2708,6 +2711,7 @@ export function TerminalPanel({
             compositionBufferRef.current.push(filtered);
           } else {
             term.write(filtered, () => {
+              syncAutomationState();
               if (activityPromptTimer) clearTimeout(activityPromptTimer);
               activityPromptTimer = setTimeout(() => {
                 if (

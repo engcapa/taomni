@@ -27,9 +27,10 @@ steps:
   # The Windows SSH fixture launches Git Bash, which clears the pre-session
   # info banner after connecting. The command/output pair below is the live
   # session assertion and is stable across all browser hosts.
-  - click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-  - type: "printf 'qa-quick-ssh-live\\n'"
-  - press: Enter
+  - terminal_input:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+      text: "printf 'qa-quick-ssh-live\\n'"
+      submit: true
   - wait: 1
   - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-quick-ssh-live}
   - screenshot: 006-quick-ssh-terminal.png

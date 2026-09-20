@@ -591,8 +591,8 @@ controls:
     selector: '[data-testid="terminal-pane"]'
     kind: interactive
   - id: terminal-keyboard-target
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-    kind: interactive       # clicking the active pane lets xterm own keyboard focus
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    kind: interactive       # xterm input target driven through terminal_input
   - id: attached-sftp-toggle
     selector: '[data-testid="attached-sftp-toggle"]'
     kind: interactive

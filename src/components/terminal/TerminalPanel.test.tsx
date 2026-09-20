@@ -12,6 +12,7 @@ const terminalMocks = vi.hoisted(() => {
   const oscHandlers = new Map<number, (data: string) => boolean | Promise<boolean>>();
   const state = {
     onDataHandler: null as ((data: string) => void) | null,
+    onRenderHandler: null as (() => void) | null,
     onResizeHandler: null as ((size: { cols: number; rows: number }) => void) | null,
     customKeyEventHandler: null as ((event: KeyboardEvent) => boolean) | null,
   };
@@ -45,7 +46,10 @@ const terminalMocks = vi.hoisted(() => {
       }),
       onBinary: vi.fn(() => ({ dispose: vi.fn() })),
       onScroll: vi.fn(() => ({ dispose: vi.fn() })),
-      onRender: vi.fn(() => ({ dispose: vi.fn() })),
+      onRender: vi.fn((handler: () => void) => {
+        state.onRenderHandler = handler;
+        return { dispose: vi.fn() };
+      }),
       onResize: vi.fn((handler: (size: { cols: number; rows: number }) => void) => {
         state.onResizeHandler = handler;
         return { dispose: vi.fn() };
@@ -306,6 +310,7 @@ describe("TerminalPanel focus behavior", () => {
     window.localStorage.clear();
     terminalMocks.oscHandlers.clear();
     terminalMocks.state.onDataHandler = null;
+    terminalMocks.state.onRenderHandler = null;
     terminalMocks.state.onResizeHandler = null;
     terminalMocks.state.customKeyEventHandler = null;
     ipcMocks.terminalExitHandlers.clear();
@@ -353,7 +358,6 @@ describe("TerminalPanel focus behavior", () => {
   });
 
   it("mirrors rendered terminal text and idle-prompt readiness for automation", async () => {
-    vi.useFakeTimers();
     render(<TerminalPanel visible />);
 
     const term = terminalMocks.terminalCtor.mock.results[0].value;
@@ -371,14 +375,13 @@ describe("TerminalPanel focus behavior", () => {
       getLine: vi.fn((index: number) => lines[index]),
     };
 
-    await act(async () => vi.advanceTimersByTime(500));
+    act(() => terminalMocks.state.onRenderHandler?.());
 
     expect(screen.getByTestId("terminal-pane")).toHaveAttribute(
       "data-terminal-text",
       "qa-output\nrunner$ ",
     );
     expect(screen.getByTestId("terminal-pane")).toHaveAttribute("data-terminal-ready", "true");
-    vi.useRealTimers();
   });
 
   it("launches a SocksCap TUI only once when StrictMode replays mount effects", async () => {
