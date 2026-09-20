@@ -19,13 +19,11 @@ def digest_file(path: Path) -> str:
 
 def repository_files(root: Path) -> list[str]:
     raw = subprocess.check_output(
-        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=root,
+        ["git", "ls-files", "-z"], cwd=root,
     )
-    generated = ("qa-ui-auto-report/", "dist/", "src-tauri/target/", "node_modules/")
-    return sorted(
-        name for name in set(raw.decode("utf-8").split("\0")) - {""}
-        if not name.startswith(generated)
-    )
+    # Identity is a checkout contract. Generated/untracked files differ by
+    # runner OS and by the order in which plan/install steps create them.
+    return sorted(set(raw.decode("utf-8").split("\0")) - {""})
 
 
 def input_digest(path: Path) -> str:
