@@ -86,7 +86,7 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("mysql")
         if mode == "native":
             result.add("display")
-            if fixtures & {"jdtls_required", "java25_projects", "java_test_bundle"}:
+            if fixtures & {"jdtls_required", "java25_projects", "java_test_bundle", "java_sample_projects", "sortable_java_fixtures"}:
                 result.add("java")
             if "java25_projects" in fixtures:
                 result.add("java25")

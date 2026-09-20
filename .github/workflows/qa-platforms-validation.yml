@@ -5,6 +5,7 @@ on:
     paths: [.github/workflows/qa-platforms-validation.yml]
 permissions:
   contents: read
+  issues: write
 jobs:
   smoke:
     # Temporary branch-only trigger for hosted validation (service authentication fixes).
