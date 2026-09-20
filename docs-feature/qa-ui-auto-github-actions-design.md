@@ -371,7 +371,7 @@ V-05 增加测试：同一失败两次只产生一个 issue 更新；不同平�
 | TASK-05 汇总与集成交付 | CI summarize、最小治理/迁移说明、skill CI 引用；检查 receipt 与 expected entries；调度六组合、定位既有失败，不删失败 case 换绿 | 依赖 TASK-01～04、06；AC-08/09 及整体 AC；V-05/06/07/08/09；回填实际 Actions 链接、counts、遗漏能力 |
 | TASK-06 图形会话、IME 与权限 | 新增 `scripts/ci_desktop.py`、Linux session supervisor/fcitx profile；增强 `fixtures/linux_x11_required.py` 活性检查；Windows 交互 session 探针及必要的 CI launcher 分支；`src-tauri/src/qa_driver.rs` 增加自身 WKWebView snapshot，保留明确命名的桌面捕获；截图范围 metadata、无人值守权限预检、prompt 超时处理和 hosted-unavailable 策略 | 先执行三端轻量 session 探针；与 TASK-03 协调 driver 文件，不重复构建；AC-10/11/12；V-07/08/09；禁止以权限/输入模拟冒充系统验证 |
 
-GitHub 运行已复现并保留代表性失败：Linux native Maven run configuration 文本断言、macOS ARM JDTLS provider 退出、Windows WebView2 session 初始化超时。它们分别记录为产品断言/平台适配问题，不能通过 policy 排除。
+GitHub 运行已复现并保留代表性失败：Linux native Maven run configuration 文本断言、macOS ARM JDTLS/provider 与 UI case 失败，以及 Windows SSH-native 执行阶段未产生 case receipt 的 hosted runner 卡住。它们分别记录为产品断言、平台适配或 runner 执行问题，不能通过 policy 排除。
 
 ## 10. 验证计划与交接命令
 
@@ -418,14 +418,16 @@ python -m qa_ui_auto run --mode native --filter TC-NATIVE-CORE-001 --dry-run \
 - 选择 manifest、source/runner/case/build identity、receipt 绑定、凭据脱敏、artifact 隔离和 invocation 独立 artifact key 已加入汇总校验。
 - `qa-ui-auto-tests/ci/README.md` 已提供触发、调用权限、基础设施、证据和限制说明；原 `e2e.yml`、`qa-native.yml`、`release.yml` 未修改。
 
-真实 Actions 证据（分支验证调用方）：
+真实 Actions 证据（分支验证调用方；失败和取消仍保留在 artifact 中）：
 
-- Java/JDTLS/Java25/Maven/Gradle 基础探针：Linux、Windows、macOS ARM64 均通过。增强后的插件命令注册探针正在 [35502381103](https://github.com/engcapa/taomni/actions/runs/35502381103) 复验；Linux/macOS 已通过。
+- Java/JDTLS/Java25/Maven/Gradle 基础探针：Linux、Windows、macOS ARM64 均通过；增强后的插件命令注册探针结果已包含在 [35502381103](https://github.com/engcapa/taomni/actions/runs/35502381103) 的 artifacts 中，Linux/macOS 已通过。
 - SSH/SFTP/MySQL 协议探针：Linux、macOS ARM64、Windows 最新探针通过；Windows ConPTY 采用终端画面解析，避免 ANSI 光标输出误判。
-- browser：Linux 和 macOS ARM64 代表用例通过；Windows browser 曾通过。
-- native：在 [35501449155](https://github.com/engcapa/taomni/actions/runs/35501449155) 中，Linux 代表范围 9/10 通过，Maven 已跑通运行/构建，在测试发现处失败；已定位 Java Test 0.46 与 JDTLS 1.50 的 ASM 依赖不兼容，改为匹配的 Java Test 0.43.1 并实测插件注册。macOS JDTLS 日志确认应用选到 runner 的 JDK 26（不支持 class major 70），已通过应用现有设置固定 tooling JDK；表单 bridge 的 Backspace 写入回归也已修复。Linux/macOS 全量 native 在 35502381103 验证。Windows 构建和桌面预检通过，WebView2 session 超时仍在定位。
+- 全量 browser 运行 [35505593314](https://github.com/engcapa/taomni/actions/runs/35505593314) 留下了 Linux 174/174、Windows 165/174（9 个 case 失败、1 个 infrastructure failure）、macOS ARM64 173/173；这些数字是该 commit 的完整选择结果，不把失败 case 排除后记为通过。
+- Windows focused browser 运行 [35518300768](https://github.com/engcapa/taomni/actions/runs/35518300768) 在修复 SSH readiness、PTY Ctrl-C 和 bounded settling 后为 8/8：`TC-004`、`TC-006`、`TC-007`、`TC-012`、`TC-021`、`TC-022`、`TC-024`、`TC-auto-F-Servers-1-servers-dialog` 全部通过。这里的 `terminal_input` 是 WebView/xterm renderer 的 `InputEvent`，用于验证产品输入链路；它不等同于 OS 全局物理键盘证据。
+- 全量 native 运行 [35502381103](https://github.com/engcapa/taomni/actions/runs/35502381103) 留下 Linux 56/61、macOS ARM64 42/45；失败 case 和 macOS 系统能力缺口仍在报告中。Windows 的真实 WebView2/local-PTY 核心 smoke 在 [35508060837](https://github.com/engcapa/taomni/actions/runs/35508060837) 为 1/1；同一修复 commit 的最新 Windows native 复验在 [35518300768](https://github.com/engcapa/taomni/actions/runs/35518300768) 也为 `TC-NATIVE-CORE-001` 1/1。此前 Windows SSH-native focused execution 曾在执行阶段无 case receipt，已按 infrastructure failure 保留，不能记为 pass。
+- Java/JDTLS/Java25/Maven/Gradle 基础探针和 SSH/SFTP/MySQL 协议探针在 Linux、Windows、macOS ARM64 均有 hosted 通过证据。macOS 的 OS-global input、系统 dialog、Accessibility、Screen Recording/TCC 等仍是无人值守 hosted 限制；WKWebView 内操作和 snapshot 不能扩大为这些系统能力的证明。
 
-当前失败会在 `qa-summary` 和对应组合 artifact 中保留，不影响 PR 合并或 release。失败根因分为应用用例断言（例如 Maven run configuration 文本）和平台适配（macOS ARM JDTLS、Windows WebView2 启动），不能通过缩小选择范围宣称完整覆盖。
+当前失败会在 `qa-summary` 和对应组合 artifact 中保留，不影响 PR 合并或 release。已知失败包括 Linux/macOS native 产品断言与 provider/UI 问题，以及曾出现的 Windows SSH-native execution 无 receipt；Windows WebView2/local-PTY 核心和 focused browser 已有独立通过证据，不能用这些通过结果替代未通过的全量 native 覆盖。
 
 临时 `.github/workflows/qa-platforms-validation.yml` 只用于该 feature branch 的真实 `workflow_call` 验证；完成本轮证据收集后删除，避免成为长期 push 入口。默认分支注册 `workflow_dispatch` 仍需将独立 workflow 合入默认分支后才能在 Actions UI 中选择。
 
@@ -437,10 +439,10 @@ python -m qa_ui_auto run --mode native --filter TC-NATIVE-CORE-001 --dry-run \
 | AC-02/03 | 4、5 | 01 | 01、04 | selector、diff、依赖闭包已实现及单测；selected/all/零变化 impacted 已在 hosted 调用 |
 | AC-04 | 6.1～6.3 | 02 | 02、06 | 本机 provider 已实现；Linux/macOS/Windows 协议探针有 hosted 证据 |
 | AC-05 | 6.4 | 03 | 03、06 | 三端 JDTLS/Java25/构建探针通过；产品 Java case 仍有 macOS provider 失败 |
-| AC-06 | 2、7 | 03 | 03、06 | Linux/macOS native 核心通过；Windows build/display 通过但 WebView2 session 超时 |
+| AC-06 | 2、7 | 03 | 03、06 | Linux/macOS native 全量有部分通过；Windows WebView2/local-PTY 核心 1/1 通过，SSH-native focused execution 仍有 hosted receipt 缺口 |
 | AC-07/08 | 8 | 04、05 | 04、05、06 | receipt、identity、脱敏、汇总失败闭环已实现并有单测 |
 | AC-09 | 5～8 | 01～05 | 01～06 | 需保留既有测试并回填回归证据 |
-| AC-10 | 7.1～7.4 | 06、04 | 07、06 | 三端 display/session 预检已执行；Windows app session 仍待修复 |
+| AC-10 | 7.1～7.4 | 06、04 | 07、06 | 三端 display/session 预检已执行；Windows core WebView2 session 通过，SSH-native execution 卡住已显式记录 |
 | AC-11 | 7.2 | 06 | 08 | Linux fcitx5/wbpy/GTK/XTest native 用例已通过 |
 | AC-12 | 7.4～7.5、8 | 06、05 | 09 | macOS WKWebView snapshot 已实现；OS 输入/权限仍明确为 hosted 缺口 |
 
