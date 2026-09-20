@@ -56,6 +56,7 @@ steps:
   - eval_readonly:
       expression: 'document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-find-module-select\"]")?.value === "com.example.single:maven-single"'
       expect_truthy: true
+  - click: '[aria-label="Search query"]'
   - native_keys:
       selector: '[aria-label="Search query"]'
       keys: ["Enter"]

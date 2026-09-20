@@ -17,8 +17,9 @@ steps:
   - click: "[data-testid=\"auth-submit\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
   - wait: 2
-  - click: "[data-testid=\"terminal-pane\"]"
-  - type: "printf \"qa-ui-auto-search\\n\""
+  - type:
+      selector: '.xterm-helper-textarea'
+      text: "printf \"qa-ui-auto-search\\n\""
   - press: Enter
   - wait: 1
   - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }

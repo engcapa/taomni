@@ -1296,7 +1296,20 @@ def _do_fill(ctx: NativeStepContext, args: Any) -> str:
 @_verb("type")
 @_verb("send_keys")
 def _do_type(ctx: NativeStepContext, args: Any) -> str:
-    return ctx.session.type_text(str(args))
+    if isinstance(args, str):
+        selector, text = None, args
+    elif (
+        isinstance(args, dict)
+        and set(args) == {"selector", "text"}
+        and isinstance(args["selector"], str)
+        and isinstance(args["text"], str)
+    ):
+        selector, text = args["selector"], args["text"]
+    else:
+        raise StepError("type/send_keys: expected string or {selector, text}")
+    if selector:
+        ctx.session.focus(selector)
+    return ctx.session.type_text(text)
 
 
 @_verb("press")

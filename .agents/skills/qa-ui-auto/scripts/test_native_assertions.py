@@ -34,3 +34,22 @@ class NativeAssertionsTest(TestCase):
         ctx.session.right_click.assert_not_called()
         run_native_step(ctx, "right_click", "#row")
         ctx.session.right_click.assert_called_once_with("#row")
+
+    def test_type_can_focus_an_explicit_target_before_input(self):
+        ctx = Mock()
+        ctx.session.type_text.return_value = "typed"
+        result = run_native_step(
+            ctx,
+            "type",
+            {"selector": ".xterm-helper-textarea", "text": "whoami"},
+        )
+        self.assertEqual(result, "typed")
+        ctx.session.focus.assert_called_once_with(".xterm-helper-textarea")
+        ctx.session.type_text.assert_called_once_with("whoami")
+
+    def test_type_rejects_malformed_rich_arguments(self):
+        ctx = Mock()
+        with self.assertRaisesRegex(StepError, "expected string"):
+            run_native_step(ctx, "send_keys", {"selector": "#terminal"})
+        ctx.session.focus.assert_not_called()
+        ctx.session.type_text.assert_not_called()

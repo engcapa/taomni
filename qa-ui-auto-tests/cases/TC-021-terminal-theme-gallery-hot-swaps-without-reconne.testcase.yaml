@@ -17,8 +17,9 @@ steps:
   - click: "[data-testid=\"auth-submit\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
   - wait: 2
-  - click: "[data-testid=\"terminal-pane\"]"
-  - type: echo qa-theme-marker
+  - type:
+      selector: '.xterm-helper-textarea'
+      text: echo qa-theme-marker
   - press: Enter
   - wait: 1
   - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }
@@ -35,8 +36,9 @@ steps:
   - click: "[data-testid=\"context-menu-item-find\"]"
   - wait_for: "input[placeholder=\"Find\"]"
   - click: '[data-testid="terminal-pane"] button:has-text("Close")'
-  - click: "[data-testid=\"terminal-pane\"]"
-  - type: echo qa-theme-still-alive
+  - type:
+      selector: '.xterm-helper-textarea'
+      text: echo qa-theme-still-alive
   - press: Enter
   - wait: 1
   - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-theme-still-alive}

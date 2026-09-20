@@ -30,12 +30,12 @@ steps:
       selector: '[data-testid="terminal-pane"]'
       timeout_sec: 30
   - wait: 2
-  - assert_text:
-      selector: '[data-testid="terminal-pane"]'
-      contains: Taomni SSH terminal
-      timeout_sec: 30
-  - click: '[data-testid="terminal-pane"]'
-  - send_keys: 'whoami'
+  # Git Bash clears the terminal after connecting on Windows, so the
+  # pre-session info banner is not stable evidence. Prove the live session by
+  # directing input to xterm's actual keyboard target and checking its output.
+  - send_keys:
+      selector: '.xterm-helper-textarea'
+      text: whoami
   - press: Enter
   - wait: 1
   - assert_text:

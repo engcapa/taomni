@@ -17,8 +17,9 @@ steps:
   - click: "[data-testid=\"auth-submit\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
   - wait: 2
-  - click: "[data-testid=\"terminal-pane\"]"
-  - type: "sleep 60 && echo qa-should-not-appear"
+  - type:
+      selector: '.xterm-helper-textarea'
+      text: "sleep 60 && echo qa-should-not-appear"
   - press: Enter
   - wait: 1
   - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }
@@ -27,8 +28,9 @@ steps:
   - wait_for: "[data-testid=\"context-menu\"] >> text=\"SIGINT (Interrupt)\""
   - click: "[data-testid=\"context-menu\"] >> text=\"SIGINT (Interrupt)\""
   - wait: 2
-  - click: "[data-testid=\"terminal-pane\"]"
-  - type: echo qa-after-sigint
+  - type:
+      selector: '.xterm-helper-textarea'
+      text: echo qa-after-sigint
   - press: Enter
   - wait: 1
   - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-after-sigint}

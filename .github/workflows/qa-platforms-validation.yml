@@ -7,16 +7,24 @@ permissions:
   contents: read
   issues: write
 jobs:
-  windows_core:
-    uses: ./.github/workflows/qa-ui-auto-platforms.yml
-    with:
-      scope: smoke
-      platforms: windows
-      modes: native
-  java_runtimes:
+  windows_browser:
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
       scope: selected
-      platforms: linux,macos
+      platforms: windows
+      modes: browser
+      case_ids: TC-004,TC-006,TC-007,TC-012,TC-021,TC-022,TC-024,TC-auto-F-Servers-1-servers-dialog
+  windows_native:
+    uses: ./.github/workflows/qa-ui-auto-platforms.yml
+    with:
+      scope: selected
+      platforms: windows
       modes: native
-      case_ids: TC-IDE-C2-01,TC-IDE-AUDIT-008-intention-quickfix-apply-undo-native,TC-IDE-C2-04-java25-completion-lsp-reuse-performance-native,TC-IDE-DEBUG-01-java25-breakpoint-native,TC-IDE-D1-02-find-search-masks-module-native
+      case_ids: TC-006,TC-012
+  linux_module:
+    uses: ./.github/workflows/qa-ui-auto-platforms.yml
+    with:
+      scope: selected
+      platforms: linux
+      modes: native
+      case_ids: TC-IDE-D1-02-find-search-masks-module-native

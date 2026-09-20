@@ -274,7 +274,7 @@ class NativeIsolationTest(unittest.TestCase):
             driver = native.TauriDriverProcess({"webdriver": {"port": 4450, "native_port": 4451}}, Path(directory))
             proc = Mock()
             proc.poll.return_value = None
-            with patch.object(native.platform, "system", return_value="Linux"), patch.object(native, "_tcp_ok", side_effect=[False, False, True]), patch.object(native.subprocess, "Popen", return_value=proc) as spawn:
+            with patch.object(native.platform, "system", return_value="Linux"), patch.object(native, "_tcp_ok", side_effect=[False, False, True, True]), patch.object(native.subprocess, "Popen", return_value=proc) as spawn:
                 driver.start()
                 self.assertEqual(spawn.call_args.args[0], ["tauri-driver", "--port", "4450", "--native-port", "4451"])
                 driver.stop()

@@ -589,7 +589,10 @@ files:
 controls:
   - id: terminal-pane
     selector: '[data-testid="terminal-pane"]'
-    kind: interactive       # type / send_keys go here
+    kind: interactive
+  - id: terminal-keyboard-target
+    selector: '.xterm-helper-textarea'
+    kind: interactive       # xterm's actual type / send_keys focus target
   - id: attached-sftp-toggle
     selector: '[data-testid="attached-sftp-toggle"]'
     kind: interactive

@@ -167,7 +167,7 @@
      "$ref": "#/$defs/type_arg"
     },
     "send_keys": {
-     "$ref": "#/$defs/text_arg"
+     "$ref": "#/$defs/type_arg"
     },
     "compose_text": {
      "$ref": "#/$defs/compose_text_arg"
@@ -652,7 +652,27 @@
    }
   },
   "type_arg": {
-   "type": "string"
+   "oneOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "selector",
+      "text"
+     ],
+     "properties": {
+      "selector": {
+       "$ref": "#/$defs/selector"
+      },
+      "text": {
+       "type": "string"
+      }
+     }
+    }
+   ]
   },
   "compose_text_arg": {
    "type": "object",

@@ -45,8 +45,8 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | Verb | Args | Notes |
 |------|------|-------|
 | `fill` | `{selector, value}` | Replaces field content. |
-| `type` | string | Types into the focused element. Prefer `fill` for inputs. |
-| `send_keys` | string | Same as `type`; semantic for terminal-pane interaction. |
+| `type` | string or `{selector, text}` | Types into the current focus, or focuses `selector` immediately before typing. Prefer `fill` for ordinary inputs. Use the rich form for xterm's `.xterm-helper-textarea`, whose parent click does not reliably transfer focus on Windows Chromium. |
+| `send_keys` | string or `{selector, text}` | Same as `type`; semantic for terminal interaction. |
 | `compose_text` | `{selector, text, during_key?}` | Browser-only composition lifecycle; optionally dispatches one composing key before committing text. Never substitutes for native IME evidence. |
 | `native_keys` | `{selector, keys, transport?, focus_prechecked?}` | Requires the selector to own focus. Default `transport: x11` injects XTest keys through Linux/X11 and identifies the Taomni window. `transport: webdriver` uses W3C actions in the platform WebView (Windows/Linux), not OS-level input. Records transport and observed events. `focus_prechecked: true` is limited to a testcase that asserted focus immediately before a driver fault; it omits WebDriver probes/event collection and records that limitation. Testcase assertions own the postcondition. |
 | `native_ime_keys` | `{selector, expected_engine, keys}` | Native Linux/X11 only. Injects physical XTest keys through the named configured fcitx5 engine and records an observation artifact; testcase assertions must verify the committed result. |

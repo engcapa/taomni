@@ -23,18 +23,35 @@ def step_fill(ctx: StepContext, args: Any) -> None:
 
 @verb("type")
 def step_type(ctx: StepContext, args: Any) -> None:
-    text = str(args)
+    selector, text = _typing_args("type", args)
     if ctx.dry_run:
         return
+    if selector:
+        ctx.page.locator(selector).first.focus()  # type: ignore[attr-defined]
     ctx.page.keyboard.type(text)  # type: ignore[attr-defined]
 
 
 @verb("send_keys")
 def step_send_keys(ctx: StepContext, args: Any) -> None:
-    text = str(args)
+    selector, text = _typing_args("send_keys", args)
     if ctx.dry_run:
         return
+    if selector:
+        ctx.page.locator(selector).first.focus()  # type: ignore[attr-defined]
     ctx.page.keyboard.type(text)  # type: ignore[attr-defined]
+
+
+def _typing_args(verb_name: str, args: Any) -> tuple[str | None, str]:
+    if isinstance(args, str):
+        return None, args
+    if (
+        isinstance(args, dict)
+        and set(args) == {"selector", "text"}
+        and isinstance(args["selector"], str)
+        and isinstance(args["text"], str)
+    ):
+        return args["selector"], args["text"]
+    raise StepError(f"{verb_name}: expected string or {{selector, text}}")
 
 
 @verb("compose_text")
