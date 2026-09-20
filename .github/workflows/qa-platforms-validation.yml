@@ -8,7 +8,7 @@ permissions:
   issues: write
 jobs:
   smoke:
-    # Temporary validation: isolated calls, ConPTY rendering and WebKit transport.
+    # Temporary validation: isolated calls, ConPTY rendering, WebKit transport and SFTP edit mode.
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
       scope: selected
