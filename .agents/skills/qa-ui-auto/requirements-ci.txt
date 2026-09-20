@@ -1,0 +1,6 @@
+PyYAML==6.0.2
+jsonschema==4.25.1
+playwright==1.55.0
+paramiko==3.5.1
+PyMySQL==1.1.2
+cryptography==46.0.1

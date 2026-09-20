@@ -761,7 +761,26 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--report-dir", help="isolated output directory")
     ap.add_argument("--keep-runs", type=int, help="retained runs in output directory; 0 disables rotation")
     ap.add_argument("--require-pass", action="store_true", help="fail if any selected case skips")
+    ap.add_argument("--selection", type=Path, help="input-verified CI selection manifest")
+    ap.add_argument("--selection-entry", help="entry ID inside --selection")
     args = ap.parse_args(argv)
+    ci_entry = None
+    if args.selection or args.selection_entry:
+        if not (args.selection and args.selection_entry) or args.filter or args.tag:
+            ap.error("--selection and --selection-entry are required together; do not combine with filters")
+        from .ci import selection_entry
+        from .verification import host_platform
+        try:
+            _, ci_entry = selection_entry(args.selection, args.selection_entry)
+            if ci_entry["platform"] != host_platform():
+                raise ValueError("CI selection platform differs from host")
+            if args.mode and args.mode != ci_entry["mode"]:
+                raise ValueError("CI selection mode differs")
+            args.mode = ci_entry["mode"]
+            args.filter = ",".join(ci_entry["selected_ids"])
+        except (OSError, ValueError) as exc:
+            print(f"qa-ui-auto: CI selection error: {exc}", file=sys.stderr)
+            return 2
 
     try:
         cfg = cfg_mod.load_config(args.config)
@@ -790,6 +809,9 @@ def main(argv: list[str] | None = None) -> int:
         tags=[t.strip() for t in args.tag.split(",")] if args.tag else None,
         ids=[t.strip() for t in args.filter.split(",")] if args.filter else None,
     )
+    if ci_entry:
+        order = {cid: i for i, cid in enumerate(ci_entry["selected_ids"])}
+        selected.sort(key=lambda case: order[case.id])
     if not selected:
         print(
             f"qa-ui-auto: 0 cases matched filters "
