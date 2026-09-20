@@ -1294,6 +1294,7 @@
 
 - `[data-testid="sftp-local-path"]` — interactive — F7.5.local-path
 - `[data-testid="sftp-remote-path"]` — interactive — F7.5.remote-path
+  ↳ `input[data-testid="sftp-remote-path"]` — alias
 - `[data-testid="sftp-local-back"]` — interactive — F7.5.local-back
 - `[data-testid="sftp-local-forward"]` — interactive — F7.5.local-forward
 - `[data-testid="sftp-local-up"]` — interactive — F7.5.local-up

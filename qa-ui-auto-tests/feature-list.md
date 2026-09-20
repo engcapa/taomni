@@ -1910,6 +1910,8 @@ controls:
   - id: remote-path
     selector: '[data-testid="sftp-remote-path"]'
     kind: interactive
+    aliases:
+      - 'input[data-testid="sftp-remote-path"]'  # transient edit-mode input
   # toolbar — local side
   - id: local-back
     selector: '[data-testid="sftp-local-back"]'

@@ -33,13 +33,13 @@ steps:
       selector: '[data-testid="sftp-remote-list"] tbody tr'
       timeout_sec: 30
   # Click the separator, which enters edit mode without navigating a segment.
-  - click: '[data-testid="sftp-remote-path"] > span:last-child > svg'
+  - click: '[data-testid="sftp-remote-path"]'
   - wait_for: 'input[data-testid="sftp-remote-path"]' 
   - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
   - press: Enter
   - wait: 1
   # Click the separator, which enters edit mode without navigating a segment.
-  - click: '[data-testid="sftp-remote-path"] > span:last-child > svg'
+  - click: '[data-testid="sftp-remote-path"]'
   - wait_for: 'input[data-testid="sftp-remote-path"]' 
   - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
   - press: Enter
