@@ -7,7 +7,7 @@ permissions:
   contents: read
   issues: write
 jobs:
-  # Focused rerun after SSH readiness waits for cwd integration to settle,
+  # Focused rerun after SSH PTY interrupt handling and readiness settling,
   # covering renderer input delivery and the WebView2 native adapter.
   windows_browser:
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
