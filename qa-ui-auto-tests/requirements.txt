@@ -1,0 +1,4 @@
+PyYAML>=6.0,<7
+jsonschema>=4.0,<5
+playwright>=1.48,<2.0
+websockify>=0.12,<1

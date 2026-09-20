@@ -25,6 +25,26 @@ export function normalizeLocalStartCwd(cwd: string, platform: AppPlatform): stri
   if (!cwd) return null;
   if (platform !== "windows") return cwd;
 
+  // Windows extended-length paths are valid to the OS but are not accepted by
+  // every shell that runs inside the PTY. Strip the prefix before handing the
+  // cwd to CreateProcess so cmd-based tools (for example Maven) inherit the
+  // intended directory instead of falling back to C:\\Windows.
+  const extendedPath = cwd.startsWith("\\\\?\\")
+    ? cwd.slice(4)
+    : cwd.startsWith("//?/")
+      ? cwd.slice(4)
+      : null;
+  if (extendedPath !== null) {
+    const normalized = extendedPath.replace(/\//g, "\\");
+    if (/^UNC\\/i.test(normalized)) {
+      return `\\\\${normalized.slice(4)}`;
+    }
+    if (/^[A-Za-z]:(?:\\|$)/.test(normalized)) {
+      return normalized;
+    }
+    return null;
+  }
+
   // Native Windows paths are already valid for CreateProcess cwd. This path
   // shape comes from local directory shortcuts rather than OSC 7 reports.
   if (/^[A-Za-z]:[\\/]/.test(cwd) || cwd.startsWith("\\\\")) return cwd;

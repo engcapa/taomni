@@ -12,6 +12,7 @@ const terminalMocks = vi.hoisted(() => {
   const oscHandlers = new Map<number, (data: string) => boolean | Promise<boolean>>();
   const state = {
     onDataHandler: null as ((data: string) => void) | null,
+    onRenderHandler: null as (() => void) | null,
     onResizeHandler: null as ((size: { cols: number; rows: number }) => void) | null,
     customKeyEventHandler: null as ((event: KeyboardEvent) => boolean) | null,
   };
@@ -45,7 +46,10 @@ const terminalMocks = vi.hoisted(() => {
       }),
       onBinary: vi.fn(() => ({ dispose: vi.fn() })),
       onScroll: vi.fn(() => ({ dispose: vi.fn() })),
-      onRender: vi.fn(() => ({ dispose: vi.fn() })),
+      onRender: vi.fn((handler: () => void) => {
+        state.onRenderHandler = handler;
+        return { dispose: vi.fn() };
+      }),
       onResize: vi.fn((handler: (size: { cols: number; rows: number }) => void) => {
         state.onResizeHandler = handler;
         return { dispose: vi.fn() };
@@ -306,6 +310,7 @@ describe("TerminalPanel focus behavior", () => {
     window.localStorage.clear();
     terminalMocks.oscHandlers.clear();
     terminalMocks.state.onDataHandler = null;
+    terminalMocks.state.onRenderHandler = null;
     terminalMocks.state.onResizeHandler = null;
     terminalMocks.state.customKeyEventHandler = null;
     ipcMocks.terminalExitHandlers.clear();
@@ -349,6 +354,35 @@ describe("TerminalPanel focus behavior", () => {
 
     await waitFor(() => {
       expect(terminalMocks.focus).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("mirrors rendered terminal text and idle-prompt readiness for automation", async () => {
+    render(<TerminalPanel visible />);
+
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    const lines = ["qa-output", "runner$ "].map((text) => ({
+      isWrapped: false,
+      translateToString: vi.fn(() => text),
+    }));
+    term.buffer.active = {
+      type: "normal",
+      length: 2,
+      baseY: 0,
+      cursorY: 1,
+      cursorX: 8,
+      viewportY: 0,
+      getLine: vi.fn((index: number) => lines[index]),
+    };
+
+    act(() => terminalMocks.state.onRenderHandler?.());
+
+    expect(screen.getByTestId("terminal-pane")).toHaveAttribute(
+      "data-terminal-text",
+      "qa-output\nrunner$ ",
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("terminal-pane")).toHaveAttribute("data-terminal-ready", "true");
     });
   });
 
@@ -452,6 +486,10 @@ describe("TerminalPanel focus behavior", () => {
     };
     term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());
     ipcMocks.writeTerminal.mockClear();
+    const panel = screen.getByTestId("terminal-pane");
+
+    act(() => terminalMocks.state.onRenderHandler?.());
+    expect(panel).not.toHaveAttribute("data-terminal-ready");
 
     await act(async () => {
       onOutput?.(new TextEncoder().encode(prompt));
@@ -465,6 +503,17 @@ describe("TerminalPanel focus behavior", () => {
           atob(encoded).includes("__taomni_osc7"),
       );
       expect(integrationWrite).toBeTruthy();
+    });
+    expect(panel).not.toHaveAttribute("data-terminal-ready");
+
+    await act(async () => {
+      onOutput?.(
+        new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${prompt}`),
+      );
+    });
+
+    await waitFor(() => {
+      expect(panel).toHaveAttribute("data-terminal-ready", "true");
     });
   });
 

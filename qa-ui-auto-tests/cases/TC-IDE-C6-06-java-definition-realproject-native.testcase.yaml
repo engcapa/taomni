@@ -9,6 +9,7 @@ description: |
 covers: [F25.5]
 tags: [code-workspace, ide-c6, java, definition, regression, p0]
 modes: [native]
+native_platforms: [Linux, macOS, Windows]
 fixtures: [reset_db]
 timeout_sec: 600
 steps:
@@ -31,9 +32,10 @@ steps:
       contains: "Java"
       timeout_sec: 60
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  # Exercise Ctrl+B first, before any F12 request can prime the document
-  # revision. This is the declaration path behind the Ctrl+B parity claim.
-  - press: Control+f
+  # Exercise Mod+B first, before any F12 request can prime the document
+  # revision. This is the declaration path behind the platform-native
+  # modifier parity claim.
+  - press: Mod+f
   - fill:
       selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
       value: clickHouseDataSource.getConnection
@@ -42,15 +44,15 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+b"]
+      keys: ["Mod+b"]
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
       contains: "ClickHouseDataSource clickHouseDataSource"
       timeout_sec: 60
   - click: '[data-testid="code-workspace-nav-back"]'
-  # F12 must agree with the first Ctrl+B result on the same selected symbol.
+  # F12 must agree with the first Mod+B result on the same selected symbol.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+f
+  - press: Mod+f
   - fill:
       selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
       value: clickHouseDataSource.getConnection
@@ -67,7 +69,7 @@ steps:
   - click: '[data-testid="code-workspace-nav-back"]'
   # Recheck the assignment/import reference with F12 after the parity pair.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+f
+  - press: Mod+f
   - fill:
       selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
       value: clickHouseDataSource
@@ -87,7 +89,7 @@ steps:
   # JDK dependency reference: java.sql.Connection should resolve to a library
   # buffer or attached source, never to an empty workspace result.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+f
+  - press: Mod+f
   - fill:
       selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
       value: Connection conn

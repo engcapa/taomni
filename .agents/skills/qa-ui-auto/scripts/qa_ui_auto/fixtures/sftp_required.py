@@ -9,6 +9,7 @@ from typing import Any
 def setup(ctx: Any) -> None:
     cfg = getattr(ctx, "cfg", {}) or {}
     section = cfg.get("sftp") or {}
+    ctx.values["sftp_shell_test_dir"] = section.get("remote_shell_test_dir", section.get("remote_test_dir", ""))
     host = section.get("host")
     port = section.get("port")
     if not host or not port:

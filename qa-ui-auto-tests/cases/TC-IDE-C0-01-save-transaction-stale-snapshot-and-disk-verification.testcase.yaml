@@ -402,4 +402,37 @@ steps:
       selector: '[data-testid="code-workspace-save-observation"]'
       name: data-state
       equals: saved
+  # The real save snapshots are now available through the editor tab action.
+  # Exercise the native dialog, compare a selected snapshot, then restore it
+  # into the buffer and prove the restored text is dirty against disk.
+  - right_click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key][data-active="true"] button[title]'
+  - assert_menu_items:
+      - Local History
+  - click_menu: Local History
+  - wait_for: '[data-testid="code-workspace-local-history-dialog"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-local-history-dialog"] button[data-selected="true"]'
+      timeout_sec: 30
+  # A native click on each enabled action is the postcondition; the native
+  # runner intentionally has no DOM enabled-state helper.
+  - assert_visible: '[data-testid="code-workspace-local-history-compare"]'
+  - assert_visible: '[data-testid="code-workspace-local-history-restore"]'
+  - click: '[data-testid="code-workspace-local-history-compare"]'
+  - wait_for: '[data-testid="code-workspace-compare-dialog"]'
+  - assert_text:
+      selector: '[data-testid="compare-session-metadata"]'
+      contains: local-history
+  - click: '[data-testid="compare-dialog-close"]'
+  - right_click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key][data-active="true"] button[title]'
+  - click_menu: Local History
+  - wait_for: '[data-testid="code-workspace-local-history-dialog"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-local-history-dialog"] button[data-selected="true"]'
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-local-history-restore"]'
+  - assert_not_visible: '[data-testid="code-workspace-local-history-dialog"]'
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      equals: dirty
   - screenshot: tc-ide-c0-native-save-conflict-undo.png

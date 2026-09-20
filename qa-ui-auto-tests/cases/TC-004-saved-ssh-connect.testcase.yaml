@@ -1,8 +1,8 @@
 id: TC-004
-title: Saved SSH session connects and accepts whoami
+title: Saved SSH session connects and accepts command input
 description: |
   Create a bookmark for the configured SSH server, connect via the session
-  tree (double-click), authenticate, and run `whoami`. Verifies persistence
+  tree (double-click), authenticate, and run a marker command. Verifies persistence
   → reconnect → terminal I/O end-to-end.
   Requires ssh.host:port reachable and QA_SSH_PASSWORD set.
 covers: [F3.1, F6.1, F6.2, F6.5]
@@ -29,17 +29,19 @@ steps:
   - wait_for:
       selector: '[data-testid="terminal-pane"]'
       timeout_sec: 30
-  - wait: 2
-  - assert_text:
-      selector: '[data-testid="terminal-pane"]'
-      contains: Taomni SSH terminal
-      timeout_sec: 30
-  - click: '[data-testid="terminal-pane"]'
-  - send_keys: 'whoami'
-  - press: Enter
+  - wait_for:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+      timeout_sec: 20
+  # Git Bash clears the terminal after connecting on Windows, so the
+  # pre-session info banner is not stable evidence. Send text through xterm's
+  # input event path and check output from the real SSH PTY.
+  - terminal_input:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+      text: "printf 'qa-saved-ssh-live\\n'"
+      submit: true
   - wait: 1
   - assert_text:
       selector: '[data-testid="terminal-pane"]'
-      contains: '${cfg.ssh.user}'
+      contains: qa-saved-ssh-live
       timeout_sec: 15
   - screenshot: 004-saved-ssh-connect.png

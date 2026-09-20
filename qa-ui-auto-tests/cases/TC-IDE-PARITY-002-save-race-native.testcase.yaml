@@ -1,7 +1,7 @@
 id: TC-IDE-PARITY-002
-title: "ED-PARITY-002 save-while-typing W0/W1/W2 byte + dirty retention baseline (Windows WebView2)"
+title: "ED-PARITY-002 save-while-typing W0/W1/W2 byte + dirty retention baseline (native desktop)"
 description: |
-  ED-PARITY-002 / REQ-11 / CW-EDIT-003 packaged Windows/WebView2 slice. It
+  ED-PARITY-002 / REQ-11 / CW-EDIT-003 packaged native desktop slice. It
   proves with real native writes, real acknowledgements and real watched-file
   notifications that a save freezes B1 on disk while newer typing keeps its
   own live buffer:
@@ -40,8 +40,9 @@ description: |
   remaining unverified layers are recorded in the ED-PARITY-002 report, not
   claimed here.
 covers: [F25.5, F1.7]
-tags: [code-workspace, ide-parity, save, save-race, w0-w1-w2, recovery, native, windows-qa, p0]
+tags: [code-workspace, ide-parity, save, save-race, w0-w1-w2, recovery, native, cross-platform, p0]
 modes: [native]
+native_platforms: [Linux, macOS, Windows]
 fixtures: [reset_db, editor_save_race]
 timeout_sec: 600
 steps:
@@ -80,11 +81,11 @@ steps:
   - screenshot: s0-open-b0-clean.png
 
   # ---------------------------------------------------------------------
-  # S1: type S at the end and Ctrl+S. Disk becomes B1 with a fresh receipt;
+  # S1: type S at the end and Mod+S. Disk becomes B1 with a fresh receipt;
   # the live buffer is clean again (no append, no EOL/BOM change).
   # ---------------------------------------------------------------------
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - save_race_note:
       label: s1-focus-before-save
       expression: 'document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName'
@@ -99,7 +100,7 @@ steps:
       selector: '[data-testid="code-workspace-save-observation"]'
       name: data-state
       equals: dirty
-  - press: Control+s
+  - press: Mod+s
   - assert_file_receipt:
       path: "${fixture.workspace_root}/edit.txt"
       selector: '[data-testid="code-workspace-save-observation"]'
@@ -125,7 +126,7 @@ steps:
 
   # ---------------------------------------------------------------------
   # S2-W0 (edit-w0.txt, independent B0 copy): type S => B1 dirty with disk
-  # still B0. Ctrl+S is held BEFORE the byte writer; typing X lands in the
+  # still B0. Mod+S is held BEFORE the byte writer; typing X lands in the
   # live buffer only, and releasing cancels the save with zero writer calls.
   # ---------------------------------------------------------------------
   # Let the tree finish any async re-render (project facts / watcher refresh)
@@ -134,7 +135,7 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-w0.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "S"
   - eval_readonly:
       expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
@@ -143,7 +144,7 @@ steps:
       stage: prepare
       filePath: "${fixture.workspace_root}/edit-w0.txt"
       timeoutMs: 60000
-  - press: Control+s
+  - press: Mod+s
   - save_race_wait_entered:
       stage: prepare
       timeout_sec: 20
@@ -179,7 +180,7 @@ steps:
   - screenshot: s2-w0-cancelled.png
 
   # ---------------------------------------------------------------------
-  # S2-W1 (edit-w1.txt): type S => B1 dirty. Ctrl+S invokes the REAL writer;
+  # S2-W1 (edit-w1.txt): type S => B1 dirty. Mod+S invokes the REAL writer;
   # the ack delivery is held. Typing X then releasing must keep the live
   # B2 buffer and dirty flag while disk stays at the frozen B1 bytes.
   # ---------------------------------------------------------------------
@@ -187,13 +188,13 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-w1.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "S"
   - save_race_arm:
       stage: ack
       filePath: "${fixture.workspace_root}/edit-w1.txt"
       timeoutMs: 60000
-  - press: Control+s
+  - press: Mod+s
   - save_race_wait_entered:
       stage: ack
       timeout_sec: 20
@@ -229,7 +230,7 @@ steps:
   - screenshot: s2-w1-ack-held.png
   # Record the actual undo grouping after the race (DEC-04: never forced to
   # match IDEA). The disk must not roll back with the buffer.
-  - press: Control+z
+  - press: Mod+z
   - wait: 0.5
   - save_race_note:
       label: s2-w1-undo-text
@@ -248,13 +249,13 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-w2.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "S"
   - save_race_arm:
       stage: watcher
       filePath: "${fixture.workspace_root}/edit-w2.txt"
       timeoutMs: 60000
-  - press: Control+s
+  - press: Mod+s
   - save_race_wait_entered:
       stage: watcher
       timeout_sec: 20
@@ -285,7 +286,7 @@ steps:
       require_settled_kind: saved-stale-snapshot
   - screenshot: s2-w2-watcher-held.png
   # Record the actual W2 undo grouping too; the disk stays frozen.
-  - press: Control+z
+  - press: Mod+z
   - wait: 0.5
   - save_race_note:
       label: s2-w2-undo-text
@@ -303,7 +304,7 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - press: ArrowLeft
   - press: ArrowRight
   - type: "X"
@@ -315,7 +316,7 @@ steps:
       selector: '[data-testid="code-workspace-save-observation"]'
       name: data-state
       equals: dirty
-  - press: Control+z
+  - press: Mod+z
   - wait: 0.5
   - eval_readonly:
       expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
@@ -331,7 +332,7 @@ steps:
       path: "${fixture.workspace_root}/edit.txt"
       equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
   - type: "X"
-  - press: Control+s
+  - press: Mod+s
   - assert_file_receipt:
       path: "${fixture.workspace_root}/edit.txt"
       selector: '[data-testid="code-workspace-save-observation"]'
@@ -358,7 +359,7 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-conflict.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "S"
   - host_write_file:
       path: "${fixture.workspace_root}/edit-conflict.txt"
@@ -379,7 +380,7 @@ steps:
       expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
       contains: 'line threeS'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+s
+  - press: Mod+s
   - wait: 1
   - assert_attribute:
       selector: '[data-testid="code-workspace-save-observation"]'
@@ -412,7 +413,7 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-conflict2.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "S"
   - host_write_file:
       path: "${fixture.workspace_root}/edit-conflict2.txt"
@@ -429,9 +430,9 @@ steps:
       path: "${fixture.workspace_root}/edit-conflict2.txt"
       equals: c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "Z"
-  - press: Control+s
+  - press: Mod+s
   - assert_file_receipt:
       path: "${fixture.workspace_root}/edit-conflict2.txt"
       selector: '[data-testid="code-workspace-save-observation"]'
@@ -453,9 +454,12 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-encoding.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "S"
-  - press: Control+s
+  - press: Mod+s
+  - wait_for:
+      selector: '[data-testid="code-workspace-save-observation"][data-state="saved"]'
+      timeout_sec: 30
   - assert_file_sha256:
       path: "${fixture.workspace_root}/edit-encoding.txt"
       equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
@@ -466,9 +470,9 @@ steps:
   - click: '[data-testid="file-encoding-convert"]'
   - wait: 0.3
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "你"
-  - press: Control+s
+  - press: Mod+s
   - wait: 1
   - assert_attribute:
       selector: '[data-testid="code-workspace-save-observation"]'
@@ -491,7 +495,7 @@ steps:
       equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
   - screenshot: s6-encoding-failed.png
   # Undo the unrepresentable character and switch the policy back to UTF-8.
-  - press: Control+z
+  - press: Mod+z
   - wait: 0.5
   - click: '[data-testid="status-bar-workspace-encoding"]'
   - wait_for: '[data-testid="file-encoding-dialog"]'
@@ -500,7 +504,7 @@ steps:
   - click: '[data-testid="file-encoding-convert"]'
   - wait: 0.3
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+s
+  - press: Mod+s
   - assert_file_sha256:
       path: "${fixture.workspace_root}/edit-encoding.txt"
       equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
@@ -520,7 +524,7 @@ steps:
   - click: '[data-testid="status-bar-workspace-eol"]'
   - wait: 0.3
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+s
+  - press: Mod+s
   - assert_file_receipt:
       path: "${fixture.workspace_root}/edit-encoding.txt"
       selector: '[data-testid="code-workspace-save-observation"]'
@@ -536,14 +540,14 @@ steps:
       label: s6-bom-crlf-focus-before-hold
       expression: 'document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "X"
   - wait: 0.6
   - save_race_arm:
       stage: watcher
       filePath: "${fixture.workspace_root}/edit-encoding.txt"
       timeoutMs: 60000
-  - press: Control+s
+  - press: Mod+s
   - save_race_wait_entered:
       stage: watcher
       timeout_sec: 20
@@ -575,7 +579,7 @@ steps:
       require_settled_kind: saved-stale-snapshot
   - screenshot: s6-bom-crlf-watcher-held.png
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+s
+  - press: Mod+s
   - assert_file_receipt:
       path: "${fixture.workspace_root}/edit-encoding.txt"
       selector: '[data-testid="code-workspace-save-observation"]'
@@ -598,14 +602,14 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-unknown.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "S"
   - save_race_arm:
       stage: fault
       mode: unknown-response
       filePath: "${fixture.workspace_root}/edit-unknown.txt"
       timeoutMs: 60000
-  - press: Control+s
+  - press: Mod+s
   - wait: 1.5
   - assert_attribute:
       selector: '[data-testid="code-workspace-save-observation"]'
@@ -634,14 +638,14 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-unknown-old.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "S"
   - save_race_arm:
       stage: fault
       mode: unknown-response-delay
       filePath: "${fixture.workspace_root}/edit-unknown-old.txt"
       timeoutMs: 60000
-  - press: Control+s
+  - press: Mod+s
   - save_race_wait_entered:
       stage: fault
       timeout_sec: 20
@@ -679,7 +683,7 @@ steps:
   # pre-failure attempt already snapshotted the identical B0 preimage, so the
   # deduplicated history id is legitimately absent here.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+s
+  - press: Mod+s
   - assert_file_receipt:
       path: "${fixture.workspace_root}/edit-unknown-old.txt"
       selector: '[data-testid="code-workspace-save-observation"]'
@@ -702,14 +706,14 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-unknown-foreign.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "S"
   - save_race_arm:
       stage: fault
       mode: unknown-response-delay
       filePath: "${fixture.workspace_root}/edit-unknown-foreign.txt"
       timeoutMs: 60000
-  - press: Control+s
+  - press: Mod+s
   - save_race_wait_entered:
       stage: fault
       timeout_sec: 20
@@ -769,7 +773,7 @@ steps:
       equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
   # Blind retry is blocked before any writer call.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+s
+  - press: Mod+s
   - wait: 0.6
   - eval_readonly:
       expression: 'document.querySelector("[data-testid\x3d\"status-bar-message\"]")?.textContent'
@@ -841,10 +845,10 @@ steps:
   # Post-resolution retry: a fresh edit saves over the clean FOREIGN buffer.
   - click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key="root:r1:edit-unknown-foreign.txt"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "Z"
   - wait: 0.6
-  - press: Control+s
+  - press: Mod+s
   - assert_file_receipt:
       path: "${fixture.workspace_root}/edit-unknown-foreign.txt"
       selector: '[data-testid="code-workspace-save-observation"]'
@@ -865,13 +869,13 @@ steps:
   - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-close.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
+  - press: Mod+End
   - type: "S"
   - save_race_arm:
       stage: ack
       filePath: "${fixture.workspace_root}/edit-close.txt"
       timeoutMs: 60000
-  - press: Control+s
+  - press: Mod+s
   - save_race_wait_entered:
       stage: ack
       timeout_sec: 20

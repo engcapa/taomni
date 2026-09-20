@@ -6,6 +6,7 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
 * ssh_required    - probe the configured ssh.host:port over TCP; skip case otherwise
 * sftp_required   - probe the configured sftp.host:port over TCP; skip case otherwise
 * jdtls_required  - JDK-on-PATH probe; skip case otherwise (never auto-fallback)
+* java_test_bundle - resolve an installed java-test extension for native tests
 * linux_x11_required - require the Linux X11/fcitx5 tools used by X11 gates
 * workspace_root  - native-only: temp host dir seeded with files, exposed as
                     ${fixture.workspace_root}
@@ -36,7 +37,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
-from . import editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, jdtls_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, welcome_recents, workspace_root
+from . import editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, welcome_recents, workspace_root
 from . import project_tree
 from . import editor_save_race
 
@@ -62,6 +63,7 @@ REGISTRY: dict[str, Fixture] = {
     "sftp_required": Fixture("sftp_required", sftp_required.setup),
     "mysql_required": Fixture("mysql_required", mysql_required.setup),
     "jdtls_required": Fixture("jdtls_required", jdtls_required.setup),
+    "java_test_bundle": Fixture("java_test_bundle", java_test_bundle.setup),
     "linux_x11_required": Fixture("linux_x11_required", linux_x11_required.setup),
     "workspace_root": Fixture("workspace_root", workspace_root.setup, workspace_root.teardown),
     "java_sample_projects": Fixture("java_sample_projects", java_sample_projects.setup),

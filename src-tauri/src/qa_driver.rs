@@ -326,7 +326,9 @@ async fn element_click<R: Runtime>(
         "if (!el) throw new Error('stale element'); el.focus?.(); ",
         "el.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0})); ",
         "el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true,button:0})); ",
-        "el.click(); return true;",
+        "if (typeof el.click === 'function') el.click(); ",
+        "else el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,button:0})); ",
+        "return true;",
     ));
     match eval_js(&state, script).await {
         Ok(value) => ok(value),
@@ -488,7 +490,10 @@ async fn actions_script<R: Runtime>(
           '\uE00A':'Alt','\uE00B':'Pause','\uE00C':'Escape','\uE00D':' ',
           '\uE00E':'PageUp','\uE00F':'PageDown','\uE010':'End','\uE011':'Home',
           '\uE012':'ArrowLeft','\uE013':'ArrowUp','\uE014':'ArrowRight','\uE015':'ArrowDown',
-          '\uE016':'Insert','\uE017':'Delete','\uE03D':'Meta'
+          '\uE016':'Insert','\uE017':'Delete',
+          '\uE031':'F1','\uE032':'F2','\uE033':'F3','\uE034':'F4','\uE035':'F5','\uE036':'F6',
+          '\uE037':'F7','\uE038':'F8','\uE039':'F9','\uE03A':'F10','\uE03B':'F11','\uE03C':'F12',
+          '\uE03D':'Meta'
         }}[value] || value);
         // Legacy keyCode/which. Constructed KeyboardEvents always report 0
         // for both, but xterm.js v6 switches on ev.keyCode for every named
@@ -717,11 +722,76 @@ fn screen_capture() -> Result<String, String> {
 }
 
 async fn screenshot<R: Runtime>(
-    State(_state): State<DriverState<R>>,
-    Path(_session_id): Path<String>,
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
 ) -> Response {
+    if !session_is_valid(&session_id) {
+        return error("unknown WebDriver session");
+    }
+    // Capture only this app's WKWebView. Unlike screencapture, this does not
+    // require Screen Recording consent on an unattended hosted runner.
+    #[cfg(target_os = "macos")]
+    {
+        use block2::RcBlock;
+        use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
+        use objc2_foundation::NSData;
+
+        let (tx, rx) = oneshot::channel::<Result<String, String>>();
+        let sender = Arc::new(StdMutex::new(Some(tx)));
+        let started = state.window.with_webview(move |webview| unsafe {
+            let completion = RcBlock::new(move |image: *mut AnyObject, err: *mut AnyObject| {
+                let result = (|| {
+                    if image.is_null() || !err.is_null() {
+                        return Err("WKWebView snapshot did not return an image".to_string());
+                    }
+                    let tiff: Option<Retained<NSData>> = msg_send![&*image, TIFFRepresentation];
+                    let tiff = tiff.ok_or("snapshot TIFF conversion failed")?;
+                    let bitmap: Option<Retained<AnyObject>> =
+                        msg_send![class!(NSBitmapImageRep), imageRepWithData: &*tiff];
+                    let bitmap = bitmap.ok_or("snapshot bitmap conversion failed")?;
+                    let properties: Retained<AnyObject> =
+                        msg_send![class!(NSDictionary), dictionary];
+                    let png: Option<Retained<NSData>> = msg_send![&*bitmap,
+                        representationUsingType: 4usize, properties: &*properties];
+                    let png = png.ok_or("snapshot PNG conversion failed")?;
+                    let bytes = png.as_bytes_unchecked();
+                    if bytes.len() < 8 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" {
+                        return Err("snapshot is not a PNG".to_string());
+                    }
+                    Ok(BASE64.encode(bytes))
+                })();
+                if let Some(tx) = sender.lock().expect("snapshot sender lock").take() {
+                    let _ = tx.send(result);
+                }
+            });
+            let view = &*(webview.inner() as *mut AnyObject);
+            let _: () = msg_send![view,
+                takeSnapshotWithConfiguration: std::ptr::null::<AnyObject>(),
+                completionHandler: &*completion];
+        });
+        if let Err(err) = started {
+            return error(format!("WKWebView snapshot could not start: {err}"));
+        }
+        return match tokio::time::timeout(Duration::from_secs(20), rx).await {
+            Ok(Ok(Ok(encoded))) => ok(Value::String(encoded)),
+            Ok(Ok(Err(message))) => error(message),
+            _ => error("WKWebView snapshot timed out or callback was dropped"),
+        };
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = state;
+        error("WKWebView snapshot is only available on macOS")
+    }
+}
+
+/// Explicit opt-in desktop evidence; never a fallback for a WebView snapshot.
+async fn desktop_screenshot(Path(session_id): Path<String>) -> Response {
+    if !session_is_valid(&session_id) {
+        return error("unknown WebDriver session");
+    }
     match screen_capture() {
-        Ok(encoded) => ok(Value::String(encoded)),
+        Ok(encoded) => ok(json!({"captureKind": "desktop", "png": encoded})),
         Err(message) => error(message),
     }
 }
@@ -783,6 +853,10 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
             .route("/session/{session_id}/refresh", post(refresh::<R>))
             .route("/session/{session_id}/url", get(current_url::<R>))
             .route("/session/{session_id}/screenshot", get(screenshot::<R>))
+            .route(
+                "/session/{session_id}/qa/desktop-screenshot",
+                get(desktop_screenshot),
+            )
             .with_state(state);
         log::info!("qa webdriver bridge listening on {address}");
         if let Err(error) = axum::serve(listener, router).await {

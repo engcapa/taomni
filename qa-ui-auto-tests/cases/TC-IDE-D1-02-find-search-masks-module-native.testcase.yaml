@@ -46,6 +46,17 @@ steps:
       selector: '[data-testid="code-workspace-find-scope-select"]'
       label: "Module"
   - assert_visible: '[data-testid="code-workspace-find-module-select"]'
+  - select_option:
+      selector: '[data-testid="code-workspace-find-module-select"]'
+      label: "com.example.single:maven-single"
+  - click: '[data-testid="code-workspace-find-module-select"]'
+  - native_keys:
+      selector: '[data-testid="code-workspace-find-module-select"]'
+      keys: ["ArrowDown"]
+  - eval_readonly:
+      expression: 'document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-find-module-select\"]")?.value === "com.example.single:maven-single"'
+      expect_truthy: true
+  - click: '[aria-label="Search query"]'
   - native_keys:
       selector: '[aria-label="Search query"]'
       keys: ["Enter"]

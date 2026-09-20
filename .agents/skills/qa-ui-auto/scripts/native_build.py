@@ -19,6 +19,16 @@ ROOT = Path(__file__).resolve().parents[4]
 QA_APP_ID = "com.taomni.app.qa"
 QA_CONFIG = Path(__file__).resolve().parent.parent / "assets" / "tauri.qa.conf.json"
 BUILD_RECIPE = "python .agents/skills/qa-ui-auto/scripts/native_build.py"
+REPLIT_NATIVE_SETUP = ROOT / "scripts" / "setup-replit-native-qa.sh"
+
+
+def add_target_bindgen_args(env: dict[str, str]) -> dict[str, str]:
+    """Mirror bindgen flags to Cargo's target-specific environment names."""
+    args = env.get("BINDGEN_EXTRA_CLANG_ARGS")
+    if args:
+        env["BINDGEN_EXTRA_CLANG_ARGS_x86_64-unknown-linux-gnu"] = args
+        env["BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu"] = args
+    return env
 
 
 def binary_digest(binary: Path) -> str:
@@ -46,19 +56,63 @@ def verify_identity(binary: Path) -> dict:
     return record
 
 
-def build_inputs(*, release: bool = False) -> dict:
+def configured_environment(base: dict[str, str] | None = None) -> dict[str, str]:
+    """Return the environment used for a Replit Linux native build.
+
+    The shell helper is also sourced by the workflow and runbook. Keeping this
+    direct-call path here prevents `python native_build.py` from silently
+    bypassing the Replit toolchain fixes.
+    """
+    env = dict(os.environ if base is None else base)
+    # Replit's runtime audit loader can be reintroduced between the shell
+    # helper and Python subprocesses; rustc's bundled driver then fails with a
+    # static-TLS allocation error. Native QA does not need that audit hook.
+    env.pop("LD_AUDIT", None)
+    if env.get("TAOMNI_REPLIT_NATIVE_QA") != "1" or not REPLIT_NATIVE_SETUP.is_file():
+        return add_target_bindgen_args(env)
+    if env.get("TAOMNI_NATIVE_QA_TOOLCHAIN_READY") == "1":
+        return add_target_bindgen_args(env)
+
+    command = [
+        "bash",
+        "-c",
+        'set -e; source "$1"; env -0',
+        "replit-native-qa-env",
+        str(REPLIT_NATIVE_SETUP),
+    ]
+    try:
+        output = subprocess.check_output(command, cwd=ROOT, env=env)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ValueError(f"Replit native QA environment setup failed: {exc}") from exc
+    for item in output.split(b"\0"):
+        if not item:
+            continue
+        key, value = item.split(b"=", 1)
+        env[key.decode()] = value.decode()
+    return add_target_bindgen_args(env)
+
+
+def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) -> dict:
+    effective_env = configured_environment(env)
     return {
         "source_sha256": source_identity(ROOT),
         "recipe_sha256": fingerprint(ROOT, [str(QA_CONFIG.relative_to(ROOT)).replace("\\", "/"),
                                              ".agents/skills/qa-ui-auto/scripts/native_build.py"]),
         "platform": platform.platform(),
         "profile": "release" if release else "debug",
-        "rustc": subprocess.check_output(["rustc", "--version"], text=True).strip(),
-        "node": subprocess.check_output(["node", "--version"], text=True).strip(),
-        "environment": {key: os.environ.get(key) for key in (
+        "cargo": subprocess.check_output(["cargo", "--version"], text=True, env=effective_env).strip(),
+        "rustc": subprocess.check_output(["rustc", "--version"], text=True, env=effective_env).strip(),
+        "node": subprocess.check_output(["node", "--version"], text=True, env=effective_env).strip(),
+        "environment": {key: effective_env.get(key) for key in (
             "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET", "RUSTUP_TOOLCHAIN",
-            "CC", "CXX", "CFLAGS", "CXXFLAGS", "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM",
-            "NODE_ENV")},
+            "CARGO_BUILD_JOBS", "CARGO_PROFILE_DEV_DEBUG", "CC", "CXX", "CFLAGS",
+            "CARGO_PROFILE_DEV_INCREMENTAL", "CXXFLAGS", "BINDGEN_EXTRA_CLANG_ARGS",
+            "BINDGEN_EXTRA_CLANG_ARGS_x86_64-unknown-linux-gnu",
+            "BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu",
+            "LIBCLANG_PATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "LIBGSSAPI_IMPL",
+            "TAOMNI_REPLIT_NATIVE_QA", "TAOMNI_NATIVE_QA_TOOLCHAIN",
+                                             "RUSTC", "OPENSSL_SRC_PERL", "PERL",
+            "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM", "NODE_ENV")},
     }
 
 
@@ -97,7 +151,8 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     target = ROOT / "src-tauri" / "target" / "qa-ui-auto"
     binary = qa_binary(release=release)
     record_path = identity_path(binary)
-    inputs = build_inputs(release=release)
+    env = configured_environment()
+    inputs = build_inputs(release=release, env=env)
     if not force:
         reuse = check_build(release=release, inputs=inputs)
         if reuse["reusable"]:
@@ -106,15 +161,27 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
         print(f"qa-ui-auto: build needed: {reuse['reason']}; changed inputs: {reuse.get('changed_inputs', [])}")
     # A failed rebuild must not leave an old record authorizing a stale binary.
     record_path.unlink(missing_ok=True)
-    env = dict(os.environ)
+    env = dict(env)
     env["CARGO_TARGET_DIR"] = str(target)
     env.pop("TAURI_CONFIG", None)
-    command = [pnpm, "tauri", "build", "--no-bundle", "--config", str(QA_CONFIG), "--ignore-version-mismatches"]
+    # The workspace dependency lock can declare a newer rust-version than the
+    # Rust toolchain available in the verification container. Cargo's
+    # ignore-rust-version flag lets the build reach actual compiler/system
+    # compatibility checks instead of stopping on metadata alone.
+    command = [
+        pnpm,
+        "tauri",
+        "build",
+        "--no-bundle",
+        "--config",
+        str(QA_CONFIG),
+        "--ignore-version-mismatches",
+    ]
     if not release:
         command.append("--debug")
     started = time.monotonic()
     subprocess.run(command, cwd=ROOT, env=env, check=True)
-    if inputs != build_inputs(release=release):
+    if inputs != build_inputs(release=release, env=env):
         raise ValueError("Build inputs changed during compilation; rebuild before collecting evidence")
     record = {
         "identifier": QA_APP_ID,

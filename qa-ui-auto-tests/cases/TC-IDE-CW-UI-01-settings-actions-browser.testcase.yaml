@@ -1,0 +1,141 @@
+id: TC-IDE-CW-UI-01-settings-actions-browser
+title: "Code Workspace editor settings, keymap reference, and context actions"
+description: |
+  Browser regression gate for the renderer-owned Code Workspace surfaces. It
+  exercises every editor appearance and intelligence control, applies and
+  reopens the persisted profiles, opens the shortcut reference, and dispatches
+  the core editor context actions. Browser evidence covers the UI/store and
+  action routing only; clipboard, LSP and disk effects remain native concerns.
+covers: [F25.3, F25.5]
+tags: [code-workspace, editor-settings, keymap, context-menu, browser-gate, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 240
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-tools"]'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - click: '[data-testid="code-workspace-tree-add-folder"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+
+  # Appearance: exercise the complete profile, reset path, apply path, and
+  # re-open path so a future change cannot silently drop a setting.
+  - click: '[data-testid="code-workspace-tab"]'
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Editor Appearance Settings
+  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance Settings'
+  - wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+  - fill: {selector: '[data-testid="workspace-editor-appearance-font-family"]', value: "Consolas"}
+  - fill: {selector: '[data-testid="workspace-editor-appearance-font-size-px"]', value: "15"}
+  - fill: {selector: '[data-testid="workspace-editor-appearance-line-height"]', value: "1.45"}
+  - click: '[data-testid="workspace-editor-appearance-ligatures"]'
+  - fill: {selector: '[data-testid="workspace-editor-appearance-color-scheme-id"]', value: "qa-code-scheme"}
+  - click: '[data-testid="workspace-editor-appearance-high-contrast"]'
+  - select_option: {selector: '[data-testid="workspace-editor-appearance-zoom-scope"]', value: active-editor}
+  - fill: {selector: '[data-testid="workspace-editor-appearance-soft-wrap-patterns"]', value: "**/*.md\n**/*.txt"}
+  - click: '[data-testid="workspace-editor-appearance-soft-wrap-use-original-indent"]'
+  - fill: {selector: '[data-testid="workspace-editor-appearance-soft-wrap-additional-indent"]', value: "2"}
+  - click: '[data-testid="workspace-editor-appearance-soft-wrap-show-markers"]'
+  - click: '[data-testid="workspace-editor-appearance-virtual-space-after-line-end"]'
+  - click: '[data-testid="workspace-editor-appearance-virtual-space-at-file-bottom"]'
+  - click: '[data-testid="workspace-editor-appearance-breadcrumbs-visible"]'
+  - select_option: {selector: '[data-testid="workspace-editor-appearance-breadcrumbs-placement"]', value: bottom}
+  - fill: {selector: '[data-testid="workspace-editor-appearance-breadcrumbs-languages"]', value: "text\nmarkdown"}
+  - click: '[data-testid="workspace-editor-appearance-clipboard-history-enabled"]'
+  - fill: {selector: '[data-testid="workspace-editor-appearance-clipboard-max-items"]', value: "12"}
+  - fill: {selector: '[data-testid="workspace-editor-appearance-clipboard-max-bytes"]', value: "32768"}
+  - click: '[data-testid="workspace-editor-appearance-clipboard-clear"]'
+  - click: '[data-testid="workspace-editor-appearance-reset"]'
+  - fill: {selector: '[data-testid="workspace-editor-appearance-font-size-px"]', value: "15"}
+  - click: '[data-testid="workspace-editor-appearance-apply"]'
+  - wait_for:
+      selector: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+      state: detached
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Editor Appearance Settings
+  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance Settings'
+  - wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+  - assert_attribute: {selector: '[data-testid="workspace-editor-appearance-font-size-px"]', name: value, equals: "15"}
+  - click: '[data-testid="workspace-editor-appearance-close"]'
+  - wait_for:
+      selector: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+      state: detached
+
+  # Intelligence: cover the quick-documentation and parameter-info settings,
+  # including reset, apply, and cancel closure paths.
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Editor Intelligence Settings
+  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Intelligence Settings'
+  - wait_for: '[data-testid="workspace-intelligence-settings-dialog"]'
+  - click: '[data-testid="workspace-quick-doc-hover-enabled"]'
+  - fill: {selector: '[data-testid="workspace-quick-doc-hover-delay"]', value: "250"}
+  - select_option: {selector: '[data-testid="workspace-quick-doc-default-target"]', value: tool-window}
+  - click: '[data-testid="workspace-parameter-info-auto-popup"]'
+  - fill: {selector: '[data-testid="workspace-parameter-info-delay"]', value: "400"}
+  - click: '[data-testid="workspace-parameter-info-full-signatures"]'
+  - click: '[data-testid="workspace-intelligence-settings-reset"]'
+  - click: '[data-testid="workspace-quick-doc-hover-enabled"]'
+  - click: '[data-testid="workspace-intelligence-settings-apply"]'
+  - wait_for:
+      selector: '[data-testid="workspace-intelligence-settings-dialog"]'
+      state: detached
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Editor Intelligence Settings
+  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Intelligence Settings'
+  - wait_for: '[data-testid="workspace-intelligence-settings-dialog"]'
+  - click: '[data-testid="workspace-intelligence-settings-cancel"]'
+  - wait_for:
+      selector: '[data-testid="workspace-intelligence-settings-dialog"]'
+      state: detached
+
+  # Read-only shortcut reference: search and category filtering must preserve
+  # the rendered action rows before either close affordance is used.
+  - press: Control+Alt+/
+  - wait_for: '[data-testid="keymap-cheatsheet-dialog"]'
+  - fill: {selector: '[data-testid="keymap-search-input"]', value: "Rename Symbol"}
+  - wait_for: '[data-testid="keymap-item-workspace.renameSymbol"]'
+  - click: '[data-testid^="keymap-category-"]'
+  - click: '[data-testid="keymap-cheatsheet-footer-close"]'
+  - wait_for:
+      selector: '[data-testid="keymap-cheatsheet-dialog"]'
+      state: detached
+
+  # Context actions are renderer-wired even without an LSP provider. Reopen
+  # the menu for each action so every menu item is exercised independently.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: {selector: '[data-testid="code-workspace-editor"] .cm-content', key: Mod+A}
+  - right_click: '[data-testid="code-workspace-editor"] .cm-content'
+  - wait_for: '[data-testid="context-menu"]'
+  - assert_enabled: '[data-testid="editor-context-copy"]'
+  - assert_enabled: '[data-testid="editor-context-cut"]'
+  - click: '[data-testid="editor-context-copy"]'
+  - right_click: '[data-testid="code-workspace-editor"] .cm-content'
+  - click: '[data-testid="editor-context-cut"]'
+  - right_click: '[data-testid="code-workspace-editor"] .cm-content'
+  - click: '[data-testid="editor-context-paste"]'
+  - right_click: '[data-testid="code-workspace-editor"] .cm-content'
+  - click: '[data-testid="editor-context-goto-definition"]'
+  - right_click: '[data-testid="code-workspace-editor"] .cm-content'
+  - click: '[data-testid="editor-context-goto-declaration"]'
+  - right_click: '[data-testid="code-workspace-editor"] .cm-content'
+  - click: '[data-testid="editor-context-format"]'
+  - screenshot: tc-ide-cw-ui-01-settings-actions.png

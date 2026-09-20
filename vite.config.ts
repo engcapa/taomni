@@ -27,7 +27,24 @@ export default defineConfig(({ mode }) => ({
     __TAOMNI_QA_SAVE_GATE__: JSON.stringify(mode === "qa"),
   },
   optimizeDeps: {
-    include: ["zmodem.js"],
+    // Keep qa-ui-auto startup from crawling the entire dependency graph in
+    // constrained workspaces. Explicitly optimize only the top-level packages
+    // that need pre-bundling; other imports remain Vite-served modules.
+    noDiscovery: true,
+    include: [
+      "zmodem.js",
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "gifenc",
+      // react-konva's ESM entry imports named exports from the CommonJS
+      // scheduler package. Optimizing the top-level entry lets Vite bundle
+      // that nested dependency and synthesize the browser-safe exports.
+      "react-konva",
+      // The database workspace is lazy-loaded; its formatter imports the
+      // CommonJS nearley parser, which needs ESM interop in browser preview.
+      "sql-formatter",
+    ],
     // In browser preview the Tauri plugins are aliased to stubs; keep the dep
     // optimizer from pre-bundling the real packages (whose imports reference
     // core exports the stub intentionally omits).
@@ -59,6 +76,7 @@ export default defineConfig(({ mode }) => ({
           "@tauri-apps/plugin-shell": resolve(__dirname, "src/stubs/tauri-shell.ts"),
           "@tauri-apps/plugin-notification": resolve(__dirname, "src/stubs/tauri-notification.ts"),
           "@tauri-apps/plugin-dialog": resolve(__dirname, "src/stubs/tauri-dialog.ts"),
+          "react-reconciler/constants.js": resolve(__dirname, "src/stubs/react-reconciler-constants.ts"),
         },
   },
   server: {
@@ -71,7 +89,15 @@ export default defineConfig(({ mode }) => ({
     // during runs; without this ignore every artifact triggers a full reload
     // and tears down the page mid-case.
     watch: {
-      ignored: ["**/qa-ui-auto-report/**", "**/qa-ui-auto-tests/cases/**"],
+      ignored: [
+        "**/qa-ui-auto-report/**",
+        "**/qa-ui-auto-tests/cases/**",
+        // Replit keeps a large Cargo registry under the workspace's .local
+        // tree. It is not frontend source and can exhaust Linux inotify
+        // watchers during Vite startup.
+        "**/.local/**",
+        "**/src-tauri/target/**",
+      ],
     },
   },
 }));

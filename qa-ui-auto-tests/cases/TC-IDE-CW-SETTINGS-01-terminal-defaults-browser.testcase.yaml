@@ -1,0 +1,102 @@
+id: TC-IDE-CW-SETTINGS-01-terminal-defaults-browser
+title: "Terminal default appearance settings persist and reset"
+description: |
+  Browser regression case for the shared TerminalAppearanceSettings surface.
+  Exercises the theme picker, custom font picker, size stepper, ligatures,
+  scrollback, cursor, right-click behavior, custom colors, and inline history
+  limit through the real Settings route. The saved terminal profile is checked
+  in localStorage after changes and reset before cleanup.
+  Highest claim on green: renderer settings behavior and browser-local profile
+  persistence. Native terminal rendering and OS font enumeration remain native
+  evidence gaps.
+covers: [F5.2]
+tags: [code-workspace, settings, terminal, appearance, persistence, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="ribbon-settings"]'
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="settings-panel"]'
+  - click: '[data-testid="settings-group-toggle-terminal"]'
+  - wait_for: '[data-testid="terminal-appearance-settings"]'
+  - assert_visible: '[data-testid="terminal-theme-select"]'
+  - assert_visible: '[data-testid="terminal-preview"]'
+  - assert_visible: '[data-testid="terminal-preview-cursor"]'
+
+  # ThemePreviewSelect is a real button/listbox interaction, not a native select.
+  - click: '[data-testid="terminal-theme-select"]'
+  - wait_for: '[data-testid="terminal-theme-option-kanagawa-wave"]'
+  - click: '[data-testid="terminal-theme-option-kanagawa-wave"]'
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"theme":"kanagawa-wave"'
+
+  # The font picker requests the system catalog on open and commits a selected option.
+  - click: '[role="combobox"][aria-label="Terminal font"]'
+  - wait_for: '[role="listbox"] button[role="option"]'
+  - assert_count: {selector: '[role="listbox"] button[role="option"]', min: 1}
+  - click: '[role="listbox"] button[role="option"] >> nth=0'
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"fontFamily"'
+
+  - fill: {selector: 'input[aria-label="Terminal font size"]', value: "16"}
+  - press: {selector: 'input[aria-label="Terminal font size"]', key: Tab}
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"fontSize":16'
+  - click: 'button[aria-label="Decrease text size"]'
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"fontSize":15'
+  - click: 'button[aria-label="Increase text size"]'
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"fontSize":16'
+
+  - set_check: {selector: 'input[aria-label="Enable font ligatures"]', checked: true}
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"fontLigatures":true'
+  - fill: {selector: 'input[aria-label="Scrollback lines"]', value: "12000"}
+  - press: {selector: 'input[aria-label="Scrollback lines"]', key: Tab}
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"scrollback":12000'
+  - select_option:
+      selector: 'select[aria-label="Terminal cursor"]'
+      label: "Vertical bar (steady)"
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"cursorStyle":"bar"'
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"cursorBlink":false'
+  - select_option:
+      selector: 'select[aria-label="Right click behavior"]'
+      label: "Paste clipboard"
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"rightClickBehavior":"paste"'
+
+  - fill: {selector: 'input[aria-label="Terminal background hex"]', value: "#112233"}
+  - fill: {selector: 'input[aria-label="Terminal foreground hex"]', value: "#ddeeff"}
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"theme":"custom:#112233:#ddeeff"'
+  - fill: {selector: 'input[aria-label="Maximum command history entries per host"]', value: "2500"}
+  - press: {selector: 'input[aria-label="Maximum command history entries per host"]', key: Tab}
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"inlineSuggestionsMax":2500'
+
+  - click: '[data-testid="settings-reset-terminal-default-profile"]'
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"theme":"classic"'
+  - assert_localstorage:
+      key: taomni.terminalDefaultProfile.v1
+      contains: '"fontSize":14'
+  - screenshot: tc-ide-cw-settings-01-terminal-defaults.png

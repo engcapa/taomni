@@ -1,0 +1,26 @@
+name: QA runtime
+description: Common tooling for the independent hosted QA workflow
+inputs:
+  mode:
+    required: true
+    description: browser or native
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 10
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: pnpm
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - shell: bash
+      run: |
+        pnpm install --frozen-lockfile
+        python -m pip install -r .agents/skills/qa-ui-auto/requirements-ci.txt
+    - if: inputs.mode == 'browser'
+      shell: bash
+      run: python -m playwright install --with-deps chromium

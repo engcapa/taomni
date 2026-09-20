@@ -1296,7 +1296,50 @@ def _do_fill(ctx: NativeStepContext, args: Any) -> str:
 @_verb("type")
 @_verb("send_keys")
 def _do_type(ctx: NativeStepContext, args: Any) -> str:
-    return ctx.session.type_text(str(args))
+    if isinstance(args, str):
+        selector, text = None, args
+    elif (
+        isinstance(args, dict)
+        and set(args) == {"selector", "text"}
+        and isinstance(args["selector"], str)
+        and isinstance(args["text"], str)
+    ):
+        selector, text = args["selector"], args["text"]
+    else:
+        raise StepError("type/send_keys: expected string or {selector, text}")
+    if selector:
+        ctx.session.focus(selector)
+    return ctx.session.type_text(text)
+
+
+@_verb("terminal_input")
+def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
+    if not isinstance(args, dict) or set(args) - {"selector", "text", "submit"}:
+        raise StepError("terminal_input: expected {selector, text, submit?}")
+    selector = args.get("selector")
+    text = args.get("text")
+    submit = args.get("submit", False)
+    if not isinstance(selector, str) or not selector:
+        raise StepError("terminal_input: selector must be a non-empty string")
+    if not isinstance(text, str):
+        raise StepError("terminal_input: text must be a string")
+    if not isinstance(submit, bool):
+        raise StepError("terminal_input: submit must be a boolean")
+    data = text + ("\r" if submit else "")
+    result = ctx.session.execute(
+        f"const element = document.querySelector({json.dumps(selector)});"
+        "if (!element) return {found:false,focused:false};"
+        "element.focus();"
+        f"const data = {json.dumps(data)};"
+        "element.dispatchEvent(new InputEvent('input',{"
+        "data,inputType:'insertText',bubbles:true,composed:false}));"
+        "return {found:true,focused:document.activeElement===element};"
+    )
+    if not isinstance(result, dict) or result.get("found") is not True:
+        raise StepError(f"terminal_input: target not found: {selector}")
+    if result.get("focused") is not True:
+        raise StepError(f"terminal_input: target could not receive focus: {selector}")
+    return f"sent {len(text)} chars to xterm input" + (" and submitted" if submit else "")
 
 
 @_verb("press")

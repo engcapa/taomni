@@ -1,7 +1,7 @@
 id: TC-IDE-C2-06-live-template-popup-input-native
 title: "Java Live Template popup input interaction on native"
 description: |
-  Native verification for RT-01..06 on Windows/Desktop. Opens real Java workspace,
+  Native verification for RT-01..06 on desktop targets. Opens real Java workspace,
   types `sout`, waits for provider proposals and confirms autocomplete popup
   is stable and operable (not disabled). Navigates with ArrowDown to `soutm`,
   accepts with Enter without spurious newlines, asserts provider method name

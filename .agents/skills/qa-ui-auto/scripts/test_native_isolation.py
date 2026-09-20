@@ -5,6 +5,7 @@ import contextlib
 import io
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
@@ -202,6 +203,33 @@ class NativeIsolationTest(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
 
+    def test_reset_retries_a_transient_windows_webview_profile_lock(self):
+        with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Windows"):
+            root = Path(directory)
+            env = native.native_isolation_env(root / "run")
+            profile = Path(env["NEWMOB_DATA_DIR"]) / native_build.QA_APP_ID
+            profile.mkdir(parents=True)
+            (profile / "chrome_debug.log").write_text("locked", encoding="utf-8")
+            real_rmtree = shutil.rmtree
+            attempts = 0
+
+            def transient_lock(path):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise PermissionError("WebView2 is still closing")
+                return real_rmtree(path)
+
+            with (
+                patch.dict(os.environ, env),
+                patch.object(reset_db.shutil, "rmtree", side_effect=transient_lock),
+                patch.object(reset_db.time, "sleep"),
+            ):
+                reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
+
+            self.assertEqual(attempts, 2)
+            self.assertFalse(profile.exists())
+
     def test_reset_refuses_missing_or_wrong_run_environment(self):
         with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Linux"):
             with self.assertRaises(RuntimeError):
@@ -274,7 +302,7 @@ class NativeIsolationTest(unittest.TestCase):
             driver = native.TauriDriverProcess({"webdriver": {"port": 4450, "native_port": 4451}}, Path(directory))
             proc = Mock()
             proc.poll.return_value = None
-            with patch.object(native.platform, "system", return_value="Linux"), patch.object(native, "_tcp_ok", side_effect=[False, False, True]), patch.object(native.subprocess, "Popen", return_value=proc) as spawn:
+            with patch.object(native.platform, "system", return_value="Linux"), patch.object(native, "_tcp_ok", side_effect=[False, False, True, True]), patch.object(native.subprocess, "Popen", return_value=proc) as spawn:
                 driver.start()
                 self.assertEqual(spawn.call_args.args[0], ["tauri-driver", "--port", "4450", "--native-port", "4451"])
                 driver.stop()

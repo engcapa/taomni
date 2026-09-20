@@ -40,19 +40,37 @@ steps:
       selector: '[data-testid="code-workspace-todos-panel"]'
       contains: Bookmarks
 
-  # A3: group rename commits on Enter and Escape returns focus without a
-  # mutation; both paths are keyboard-only after the initial rename click.
+  # A3: exercise both explicit group buttons, then keep the keyboard commit
+  # and Escape recovery paths covered as well.
   - click: '[data-testid="code-workspace-bookmark-group-rename"]'
   - fill:
       selector: '[data-testid="code-workspace-bookmark-group-input"]'
       value: Review
+  - click: '[data-testid="code-workspace-bookmark-group-save"]'
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-bookmark-group"]'
+      name: data-group-name
+      equals: Review
+  - click: '[data-testid="code-workspace-bookmark-group-rename"]'
+  - fill:
+      selector: '[data-testid="code-workspace-bookmark-group-input"]'
+      value: Canceled
+  - click: '[data-testid="code-workspace-bookmark-group-cancel"]'
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-bookmark-group"]'
+      name: data-group-name
+      equals: Review
+  - click: '[data-testid="code-workspace-bookmark-group-rename"]'
+  - fill:
+      selector: '[data-testid="code-workspace-bookmark-group-input"]'
+      value: Entered
   - press:
       key: Enter
       selector: '[data-testid="code-workspace-bookmark-group-input"]'
   - assert_attribute:
       selector: '[data-testid="code-workspace-bookmark-group"]'
       name: data-group-name
-      equals: Review
+      equals: Entered
   - click: '[data-testid="code-workspace-bookmark-group-rename"]'
   - fill:
       selector: '[data-testid="code-workspace-bookmark-group-input"]'
@@ -63,7 +81,7 @@ steps:
   - assert_attribute:
       selector: '[data-testid="code-workspace-bookmark-group"]'
       name: data-group-name
-      equals: Review
+      equals: Entered
   - eval_readonly:
       expression: "document.activeElement?.getAttribute('data-testid') === 'code-workspace-bookmark-group-rename'"
       expect_truthy: true
@@ -114,6 +132,8 @@ steps:
   - assert_count:
       selector: '[data-testid="code-workspace-bookmark-mnemonic"]'
       equal: 1
+  - click: '[data-testid="code-workspace-bookmark-open"]'
+  - assert_visible: '[data-testid="code-workspace-editor"] .cm-content'
 
   # A2: Ctrl+J jumps from line one to the current J bookmark and records the
   # origin so the mounted Back control can restore it.

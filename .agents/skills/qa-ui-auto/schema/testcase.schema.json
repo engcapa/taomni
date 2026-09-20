@@ -64,7 +64,8 @@
      "ssh_required",
      "sftp_required",
      "mysql_required",
-     "jdtls_required",
+      "jdtls_required",
+      "java_test_bundle",
      "linux_x11_required",
      "workspace_root",
      "java_sample_projects",
@@ -166,7 +167,10 @@
      "$ref": "#/$defs/type_arg"
     },
     "send_keys": {
-     "$ref": "#/$defs/text_arg"
+     "$ref": "#/$defs/type_arg"
+    },
+    "terminal_input": {
+     "$ref": "#/$defs/terminal_input_arg"
     },
     "compose_text": {
      "$ref": "#/$defs/compose_text_arg"
@@ -651,7 +655,27 @@
    }
   },
   "type_arg": {
-   "type": "string"
+   "oneOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "selector",
+      "text"
+     ],
+     "properties": {
+      "selector": {
+       "$ref": "#/$defs/selector"
+      },
+      "text": {
+       "type": "string"
+      }
+     }
+    }
+   ]
   },
   "compose_text_arg": {
    "type": "object",
@@ -671,6 +695,26 @@
     "during_key": {
      "type": "string",
      "minLength": 1
+    }
+   }
+  },
+  "terminal_input_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "selector",
+    "text"
+   ],
+   "properties": {
+    "selector": {
+     "$ref": "#/$defs/selector"
+    },
+    "text": {
+     "type": "string"
+    },
+    "submit": {
+     "type": "boolean",
+     "default": false
     }
    }
   },

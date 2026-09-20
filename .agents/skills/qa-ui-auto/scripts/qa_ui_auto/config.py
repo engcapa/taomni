@@ -49,7 +49,7 @@ def load_config(path: Path | str = "qa-ui-auto-tests/qa-ui-auto.config.yaml") ->
     cfg["app"].setdefault("mode", "browser")
     cfg.setdefault("report", {}).setdefault("dir", "qa-ui-auto-report")
     cfg["report"].setdefault("keep_runs", 5)
-    cfg.setdefault("worker", {}).setdefault("parallel", 4)
+    cfg.setdefault("worker", {}).setdefault("parallel", 2)
     return cfg
 
 

@@ -8,9 +8,32 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
+qa_python="${TAOMNI_QA_PYTHON:-}"
+if [ -z "$qa_python" ]; then
+  qa_data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  persistent_qa_python="$qa_data_home/taomni/qa-ui-auto-venv/bin/python"
+  if [ -x "$persistent_qa_python" ]; then
+    qa_python="$persistent_qa_python"
+  else
+    qa_python="$(command -v python3 || true)"
+  fi
+fi
+if [ -z "$qa_python" ] || [ ! -x "$qa_python" ]; then
+  echo "Python 3.10+ with qa-ui-auto dependencies is required; set TAOMNI_QA_PYTHON" >&2
+  exit 2
+fi
+"$qa_python" -c 'import sys, yaml, jsonschema; raise SystemExit(0 if sys.version_info >= (3, 10) else "Python 3.10+ is required")'
+
 native_java_home="${TAOMNI_NATIVE_JAVA_HOME:-}"
 if [ -z "$native_java_home" ]; then
   native_java_home="$(/usr/libexec/java_home -v 21 2>/dev/null || true)"
+fi
+if [ -z "$native_java_home" ]; then
+  openjdk_prefix="$(brew --prefix openjdk@21 2>/dev/null || true)"
+  homebrew_java_home="$openjdk_prefix/libexec/openjdk.jdk/Contents/Home"
+  if [ -x "$homebrew_java_home/bin/java" ]; then
+    native_java_home="$homebrew_java_home"
+  fi
 fi
 if [ -n "$native_java_home" ]; then
   export JAVA_HOME="$native_java_home"
@@ -72,12 +95,12 @@ echo "maven=$(mvn -version 2>&1 | head -1)"
 echo "gradle=$(gradle --version 2>&1 | sed -n '/^Gradle /{p;q;}')"
 
 echo "== [2/3] build packaged debug app =="
-python .agents/skills/qa-ui-auto/scripts/native_build.py
+"$qa_python" .agents/skills/qa-ui-auto/scripts/native_build.py
 
 echo "== [3/3] run isolated macOS native cases =="
 export PYTHONPATH=".agents/skills/qa-ui-auto/scripts${PYTHONPATH:+:$PYTHONPATH}"
 REPORT_DIR="${QA_UI_AUTO_REPORT_DIR:-qa-ui-auto-report/native-macos}"
-python -m qa_ui_auto run \
+"$qa_python" -m qa_ui_auto run \
   --mode native \
   --config qa-ui-auto-tests/qa-ui-auto.config.yaml \
   --report-dir "$REPORT_DIR" \

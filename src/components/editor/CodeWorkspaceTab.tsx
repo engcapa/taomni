@@ -4278,17 +4278,20 @@ export function CodeWorkspaceTab({
     const pane = treePaneRef.current;
     const target = event.target;
     if (!pane || !(target instanceof HTMLElement) || event.nativeEvent.isComposing) return;
+    // WKWebView can report function keys as Unidentified while preserving the
+    // physical code. Use that code for tree actions such as F2 and Delete.
+    const key = event.key === "Unidentified" ? event.nativeEvent.code : event.key;
     const tree = pane.querySelector<HTMLElement>("[data-testid='code-workspace-tree']");
     if (!tree || (target !== pane && !tree.contains(target))) return;
     if (target.closest("input, textarea, select, [contenteditable='true']")) return;
     if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey &&
-      navigateProjectTree(tree, event.key, { onSelect: setSelected, onToggleRoot: toggleRoot, onToggleDir: toggleDir })) {
+      navigateProjectTree(tree, key, { onSelect: setSelected, onToggleRoot: toggleRoot, onToggleDir: toggleDir })) {
       event.preventDefault();
       treeInteractionEpochRef.current += 1;
       pendingTreeOpenIntentRef.current = null;
       return;
     }
-    if (event.key === "Enter") {
+    if (key === "Enter") {
       event.preventDefault();
       if (selected?.kind === "file") {
         void requestTreeOpen(selected.ref, { split: event.ctrlKey || event.metaKey });
@@ -4297,15 +4300,15 @@ export function CodeWorkspaceTab({
       return;
     }
     if ((event.nativeEvent as KeyboardEvent).isComposing) return;
-    if (event.key === "Escape") {
+    if (key === "Escape") {
       event.preventDefault();
       handleReturnToEditor();
       return;
     }
-    if (event.key === "F2") {
+    if (key === "F2") {
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.rename", { focus: "tree", payload: { selection: selected ?? undefined } });
-    } else if (event.key === "Delete") {
+    } else if (key === "Delete") {
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.delete", { focus: "tree", payload: { selection: selected ?? undefined } });
     }
@@ -4642,6 +4645,19 @@ export function CodeWorkspaceTab({
   ) => {
     const file = openFilesRef.current[key];
     if (!file || file.text === text) return;
+    // ED-PARITY-003 S1: typing promotes any preview tab for this file to a
+    // formal tab. EditorGroup's onChange wrapper captures previewKey in a
+    // memo-skipped CodeMirrorHost closure, so a preview set without a doc
+    // change would never promote there; promote here where the edit is
+    // guaranteed to be observed (dirty proves this path runs).
+    const liveUiForPreview = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    for (const [previewGroupId, previewGroup] of Object.entries(liveUiForPreview.editorGroups)) {
+      if (previewGroup.previewKey === key) {
+        updateEditorGroup(previewGroupId as EditorGroupId, (current) => (
+          current.previewKey === key ? { ...current, previewKey: null } : current
+        ));
+      }
+    }
     // Once the user starts a new character-level edit, CodeMirror becomes the
     // active undo owner. Retaining an older cross-file transaction here would
     // make Ctrl/Cmd+Z skip over the fresh typing and surprise the user.
@@ -4672,7 +4688,9 @@ export function CodeWorkspaceTab({
     flushPendingEditorText,
     scheduleLiveLspSync,
     semanticIndex.invalidateSilently,
+    updateEditorGroup,
     workspaceEditHistory,
+    workspaceInstanceId,
   ]);
 
   const absolutePathForOpenFile = useCallback((file: OpenFileState): string | null => {
@@ -14594,6 +14612,7 @@ export function CodeWorkspaceTab({
       title: "Go to Declaration",
       category: "Navigation",
       keybinding: "Ctrl+B",
+      keybindings: ["Meta+B"],
       keywords: ["declaration", "jump", "navigate"],
       when: (context) => {
         const target = resolveEditorTarget(context);
@@ -15087,6 +15106,7 @@ export function CodeWorkspaceTab({
       title: "Save Active File",
       category: "File",
       keybinding: "Ctrl+S",
+      keybindings: ["Meta+S"],
       when: () => {
         const file = openFilesRef.current[activeKeyRef.current ?? ""];
         return !!file?.dirty && !file.loading && !file.saving;

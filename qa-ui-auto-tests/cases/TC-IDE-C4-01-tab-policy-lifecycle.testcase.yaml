@@ -67,6 +67,14 @@ steps:
   # A1 + accessibility: change the numeric limit and observe the exact plan.
   - click: '[data-testid="code-workspace-tab-policy-settings"]'
   - wait_for: '[data-testid="workspace-tab-policy-settings-dialog"]'
+  # Closing without applying must remove the dialog and allow a clean reopen;
+  # the lifecycle assertions below then exercise the actual apply flow.
+  - click: '[data-testid="workspace-tab-policy-close"]'
+  - assert_count:
+      selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
+      equal: 0
+  - click: '[data-testid="code-workspace-tab-policy-settings"]'
+  - wait_for: '[data-testid="workspace-tab-policy-settings-dialog"]'
   - assert_attribute:
       selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
       name: role

@@ -7,6 +7,7 @@ It speaks the small W3C WebDriver subset needed by the qa-ui-auto DSL.
 from __future__ import annotations
 
 import base64
+import http.client
 from contextlib import suppress
 import json
 import os
@@ -169,7 +170,9 @@ class TauriDriverProcess:
             raise WebDriverError("Native isolation requires a local driver started by this run")
         if _tcp_ok(self.host, self.port):
             raise WebDriverError(f"Driver port {self.port} is occupied; choose a free port so the driver inherits QA isolation")
-        if self.native_port == self.port or _tcp_ok(self.host, self.native_port):
+        if platform.system() != "Darwin" and (
+            self.native_port == self.port or _tcp_ok(self.host, self.native_port)
+        ):
             raise WebDriverError(f"Native driver port {self.native_port} must be free and distinct from the driver port")
         out = self.report_root / "tauri-driver.out.log"
         err = self.report_root / "tauri-driver.err.log"
@@ -183,7 +186,7 @@ class TauriDriverProcess:
             env = dict(os.environ)
             env["TAOMNI_QA_WEBDRIVER_HOST"] = self.host
             env["TAOMNI_QA_WEBDRIVER_PORT"] = str(self.port)
-            with out.open("w", encoding="utf-8") as stdout, err.open("w", encoding="utf-8") as stderr:
+            with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
                 self.proc = subprocess.Popen(
                     [str(self.application.resolve())],
                     cwd=ROOT,
@@ -205,7 +208,15 @@ class TauriDriverProcess:
                     f"native driver exited early with code {self.proc.returncode}; "
                     f"see {err}"
                 )
-            if _tcp_ok(self.host, self.port):
+            # tauri-driver can bind its intermediary port before it has
+            # finished spawning WebKitWebDriver/msedgedriver.  Returning on
+            # the first socket creates a startup race: the first /session
+            # request is forwarded while the native driver is still absent
+            # and fails as RemoteDisconnected/connection refused.
+            ready = _tcp_ok(self.host, self.port)
+            if platform.system() != "Darwin":
+                ready = ready and _tcp_ok(self.host, self.native_port)
+            if ready:
                 return
             time.sleep(0.25)
         raise WebDriverError(f"native driver did not listen on {self.url}")
@@ -274,6 +285,9 @@ class NativeSession:
         self.transport = "macOS WKWebView bridge" if platform.system() == "Darwin" else "tauri-driver"
         # A local driver must remain reachable when the desktop uses a proxy.
         host = urllib.parse.urlsplit(self.driver_url).hostname
+        self._local_endpoint = (urllib.parse.urlsplit(self.driver_url)
+                                if host in {"localhost", "127.0.0.1", "::1"} else None)
+        self._connection: http.client.HTTPConnection | None = None
         self._open = (urllib.request.build_opener(urllib.request.ProxyHandler({})).open
                       if host in {"localhost", "127.0.0.1", "::1"} else urllib.request.urlopen)
 
@@ -287,8 +301,30 @@ class NativeSession:
         )
         try:
             timeout = min(120, self.deadline.remaining()) if self.deadline else 120
-            with self._open(req, timeout=timeout) as r:
-                data = r.read().decode("utf-8")
+            if self._local_endpoint and self._local_endpoint.scheme == "http":
+                # urllib unconditionally adds Connection: close. Forwarded
+                # by tauri-driver, this causes WebKitGTK to reset responses
+                # mid-flight. Keep the sequential W3C session on HTTP/1.1.
+                if self._connection is None:
+                    self._connection = http.client.HTTPConnection(
+                        self._local_endpoint.hostname, self._local_endpoint.port, timeout=timeout)
+                if self._connection.sock:
+                    self._connection.sock.settimeout(timeout)
+                self._connection.timeout = timeout
+                try:
+                    self._connection.request(method, path, body=body, headers=headers)
+                    response = self._connection.getresponse()
+                    data = response.read().decode("utf-8")
+                    if response.status >= 400:
+                        raise WebDriverError(f"HTTP {response.status}: {data}")
+                except Exception:
+                    self._connection.close()
+                    self._connection = None
+                    # Never retry an action whose delivery is uncertain.
+                    raise
+            else:
+                with self._open(req, timeout=timeout) as r:
+                    data = r.read().decode("utf-8")
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")
             raise WebDriverError(f"HTTP {e.code}: {detail}") from e
@@ -310,6 +346,16 @@ class NativeSession:
                 }
             }
         }
+        if platform.system() == "Windows":
+            # The QA app chooses an explicit WebView profile. EdgeDriver must
+            # watch that same directory for DevToolsActivePort instead of a
+            # separate temporary profile (which causes session init to hang).
+            data_root = os.environ.get("NEWMOB_DATA_DIR")
+            if not data_root:
+                raise WebDriverError("Windows WebView2 session requires the QA data directory")
+            payload["capabilities"]["alwaysMatch"]["tauri:options"]["webviewOptions"] = {
+                "userDataFolder": str(Path(data_root) / QA_APP_ID / "webview")
+            }
         value = self.request("POST", "/session", payload)
         sid = value.get("sessionId") if isinstance(value, dict) else None
         if not sid:
@@ -358,6 +404,9 @@ class NativeSession:
                 self.request("DELETE", f"/session/{self.session_id}")
             finally:
                 self.session_id = None
+                if self._connection:
+                    self._connection.close()
+                    self._connection = None
                 if self._on_close is not None:
                     self._on_close()
 
@@ -599,7 +648,7 @@ class NativeSession:
             # Release any input source left depressed by a failed driver action.
             try:
                 self.request("DELETE", self.endpoint("/actions"))
-            except WebDriverError:
+            except (WebDriverError, urllib.error.URLError, OSError):
                 pass
         return {
             "start": {"x": int(start["x"]), "y": int(start["y"])},
@@ -635,15 +684,19 @@ class NativeSession:
                 if line:
                     self.type_text(line)
             return f"filled contenteditable {selector}"
-        try:
-            self.request("POST", self.element_path(element, "/clear"), {})
-        except WebDriverError:
-            pass
-        self.request(
-            "POST",
-            self.element_path(element, "/value"),
-            {"text": text, "value": list(text)},
-        )
+        if platform.system() == "Darwin":
+            # The WKWebView bridge's value endpoint replaces the value using
+            # the native DOM setter and React input events without blurring.
+            # Its synthetic keyboard adapter cannot perform OS select-all.
+            self.request("POST", self.element_path(element, "/value"), {"text": text})
+            return f"filled {selector}"
+        # WebDriver /clear unfocuses form controls. Blur-committing inputs
+        # (path breadcrumbs, rename fields) disappear before /value arrives.
+        # Select and replace through keyboard input while retaining focus.
+        self.request("POST", self.element_path(element, "/click"), {})
+        self.press_combo("Mod+a")
+        self.press_combo("Backspace")
+        self.type_text(text)
         return f"filled {selector}"
 
     def send_keys(self, text: str) -> str:
@@ -849,6 +902,10 @@ class NativeSession:
         data = self.request("GET", self.endpoint("/screenshot"))
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(base64.b64decode(str(data)))
+        target.with_suffix(target.suffix + ".metadata.json").write_text(
+            json.dumps({"capture_kind": "webview", "platform": platform.system(),
+                        "actor": "WKWebView.takeSnapshot" if platform.system() == "Darwin" else "WebDriver",
+                        "screen_recording_required": False}), encoding="utf-8")
         return str(target)
 
     def execute(self, script: str) -> Any:
@@ -952,12 +1009,19 @@ class NativeHarness:
                     os.environ[key] = previous
             self._previous_env.clear()
 
-    def create_session(self) -> NativeSession:
+    def create_session(self, *, tooling_java_home: str | None = None) -> NativeSession:
         self.driver.ensure_running()
         session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
         session.deadline = getattr(self, "deadline", None)
         try:
             session.start()
+            # A Java 25 project must not change the JDK used by unrelated
+            # JDK 21 provider fixtures in the same selected suite.
+            if java_home := tooling_java_home or self.cfg.get("app", {}).get("tooling_java_home"):
+                session.execute(
+                    "window.localStorage.setItem('taomni.codeWorkspace.lspJavaHome.v1', "
+                    + json.dumps(str(java_home)) + "); return true;"
+                )
         except BaseException:
             # If readiness fails after the bridge has started, there is no
             # session object for the runner's normal finally block to close.

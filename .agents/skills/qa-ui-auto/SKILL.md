@@ -19,6 +19,7 @@ skill; `qa-ui-auto` remains the canonical installed name and CLI.
 | Develop/verify a feature, or tests/builds are slow | [efficient-verification.md](references/efficient-verification.md) |
 | Refactor existing behavior, shared UI/state, or investigate a regression | [regression-protection.md](references/regression-protection.md) |
 | Run known cases | Read their assertions and requirements, run the selected mode directly; no mandatory audit/plan/status cycle |
+| Design test cases for an implementation handoff | [authoring.md](references/authoring.md#design-to-implementation-handoff) for locations, case detail and planning/implementation responsibilities |
 | Author YAML or controls | [authoring.md](references/authoring.md) and relevant [verb-catalog.md](references/verb-catalog.md) entries |
 | Launch native QA | [native-testing.md](references/native-testing.md) |
 | Claim current coverage, combine reports or release | [verification.md](references/verification.md) |
@@ -35,8 +36,12 @@ Do not turn routine feature work into a release checklist or full capability aud
    consumers beyond feature labels. Use [regression protection](references/regression-protection.md)
    for behavior refactors; establish the relevant pre-change baseline and reuse
    meaningful tests, not tests that mirror implementation details.
-2. Iterate with focused unit/mounted tests and browser UI. Native-only defects
-   need an early distinguishing probe, not a native rebuild after every edit.
+2. Prefer browser cases for UI, controls, Actions and app-local shortcuts, with
+   focused unit/mounted tests as support. Cover every affected behavior and entry
+   before minimizing runs; browser-first never means smoke-only. Use native only
+   for named assertions browser cannot establish, documenting the boundary and
+   reason. Native-only defects need an early distinguishing probe, not a native
+   rebuild after every edit.
 3. Stabilize related code/tests, build QA once per required input/configuration,
    then run selected native scenarios. Reuse matching builds and browser workers.
    Keep native sessions isolated and sequential.
@@ -46,8 +51,10 @@ Do not turn routine feature work into a release checklist or full capability aud
    for a relevant change, failure recovery or unresolved assertion. Stop when the
    required checks pass; integration/release gates apply only in that scope.
 
-For desktop delivery, pure renderer changes use browser feedback during iteration
-and a focused current-WebView visual smoke at completion. Explicit browser-only
+For desktop delivery, pure renderer changes default to browser verification.
+Add a focused current-WebView smoke only for a concrete WebView/packaging risk or
+an explicit native acceptance requirement; desktop delivery alone does not make
+every case native. Record untested packaged-WebView behavior as unverified. Explicit browser-only
 or skill/tool verification stays within that scope and records packaged-WebView
 behavior as unverified; it does not inherit an app build requirement.
 IPC, disk, processes, dialogs,
@@ -120,6 +127,64 @@ Vite server resident across runs; on machines with eight or more cores a browser
 sweep may use `--workers 6`, while native stays sequential and exclusive for
 performance gates. Windows detaches through the WMI service; POSIX uses a new
 session (`setsid`).
+
+### Local SSH and MySQL services
+
+The runner can own disposable Docker services for cases that declare
+`ssh_required`, `sftp_required`, or `mysql_required`. Enable them independently
+in the local config copied from
+`.agents/skills/qa-ui-auto/assets/qa-ui-auto.config.example.yaml`:
+
+```yaml
+fixtures:
+  start_local_sshd: true
+  sshd_port: 2222
+  sshd_user: testuser
+  sshd_password: ${env.QA_SSH_PASSWORD}
+  start_local_mysql: true
+  mysql_port: 3306
+  mysql_user: test
+  mysql_password: ${env.TAOMNI_TEST_MYSQL_PASSWORD}
+  mysql_root_password: ${env.TAOMNI_TEST_MYSQL_ROOT_PASSWORD}
+  mysql_database: test
+```
+
+When enabled, `qa_ui_auto` starts the services once before the selected browser
+workers or native harness and removes them in a `finally`-equivalent cleanup.
+SSH uses `linuxserver/openssh-server:latest` with host port `2222` mapped to
+container port `2222`. MySQL uses `mysql:8.4` with host port `3306` mapped to
+container port `3306`. Images and ports can be overridden in the same section.
+Passwords are resolved only from environment variables and are never written to
+the report.
+
+The SSH readiness check opens the mapped port and verifies an `SSH-` banner.
+The MySQL readiness check opens the mapped port and then runs a temporary
+MySQL client container against that host port with `SELECT 1`; a raw TCP
+listener is not considered sufficient. The runner fails setup explicitly when
+Docker, credentials, ports, or the protocol check are unavailable; it does not
+silently convert an enabled local service into a skipped/pass case.
+
+`--dry-run` never starts Docker services. For a manual probe using the same
+implementation, use:
+
+```bash
+python .agents/skills/qa-ui-auto/scripts/fixtures.py start-all \
+  --port 2222 --user testuser \
+  --password "$QA_SSH_PASSWORD" \
+  --root-password "$TAOMNI_TEST_MYSQL_ROOT_PASSWORD"
+python .agents/skills/qa-ui-auto/scripts/fixtures.py stop
+```
+
+The manual command's credentials are disposable test values only; prefer
+environment variables or workspace secrets and never commit them.
+
+## GitHub Hosted Execution
+
+For manual/nightly/reusable three-platform browser/native jobs, use the independent
+[CI runbook](../../../../qa-ui-auto-tests/ci/README.md). The workflow plans exact
+case IDs and dependencies before provisioning runner-local services. Inspect its
+selection manifest, raw receipts and aggregate summary; hosted capability gaps
+are not passes. The original E2E/native/release workflows remain separate.
 
 ## Execution And Evidence
 

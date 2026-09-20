@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -101,5 +102,22 @@ def _reset_native(ctx: Any) -> None:
     if any(target.resolve() != target for target in targets):
         raise RuntimeError("reset_db refuses symlinked QA profile paths")
     for target in targets:
-        if target.exists():
+        _remove_native_profile(target)
+
+
+def _remove_native_profile(target: Path, timeout_sec: float = 10.0) -> None:
+    """Remove one run-owned profile after the previous WebView exits.
+
+    EdgeDriver can acknowledge DELETE /session shortly before WebView2 releases
+    chrome_debug.log. Retrying the same already-validated profile keeps case
+    isolation deterministic without broadening the cleanup boundary.
+    """
+    deadline = time.monotonic() + timeout_sec
+    while target.exists():
+        try:
             shutil.rmtree(target)
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.2)

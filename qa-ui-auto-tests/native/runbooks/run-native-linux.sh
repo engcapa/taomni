@@ -9,6 +9,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
+source scripts/setup-replit-native-qa.sh
+
 echo "== [1/4] build packaged debug app =="
 python .agents/skills/qa-ui-auto/scripts/native_build.py
 
@@ -18,11 +20,15 @@ command -v WebKitWebDriver >/dev/null || { echo "WebKitWebDriver missing (libweb
 
 echo "== [3/4] run native cases (app-data isolated by the runner) =="
 # The runner redirects XDG_DATA_HOME/XDG_CONFIG_HOME into the run report dir,
-# so the launched binary never touches the developer profile.
+# so the launched binary never touches the developer profile. The desktop
+# wrapper is a no-op on developer machines with their own DISPLAY; Replit
+# enables it explicitly through TAOMNI_NATIVE_QA_DESKTOP=1.
 CASES="${CASES:-TC-NATIVE-CORE-001}"
-PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto.runner \
-  --mode native --require-pass --filter "$CASES" \
-  --config "${QA_CONFIG:-.agents/skills/qa-ui-auto/assets/qa-ui-auto.config.example.yaml}"
+bash scripts/with-linux-native-desktop.sh \
+  env PYTHONPATH=.agents/skills/qa-ui-auto/scripts \
+  python -m qa_ui_auto.runner \
+    --mode native --require-pass --filter "$CASES" \
+    --config "${QA_CONFIG:-.agents/skills/qa-ui-auto/assets/qa-ui-auto.config.example.yaml}"
 
 echo "== [4/4] evidence entries =="
 RUN_DIR=$(ls -td qa-ui-auto-report/run-* | head -1)

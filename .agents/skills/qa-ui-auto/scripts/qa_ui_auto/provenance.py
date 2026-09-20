@@ -31,12 +31,18 @@ def input_digest(path: Path) -> str:
     granularity is not strong enough to safely cache same-size rewrites, and a
     false fresh identity would invalidate the execution gate.
     """
-    path = path.resolve()
-    if path.suffix.lower() in {".ts", ".tsx", ".rs", ".json", ".py", ".toml", ".yaml", ".yml",
-                               ".md", ".sh", ".ps1", ".html", ".css", ".js", ".mjs", ".cjs",
-                               ".lock", ".txt", ".svg"}:
-        return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
-    return digest_file(path)
+    data = path.resolve().read_bytes()
+    # Git converts all text formats on Windows, including extensionless
+    # licenses, .proto, .java and .plist. A suffix allowlist misses these.
+    # Preserve binary identities (including UTF-16) byte for byte.
+    if b"\0" not in data:
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError:
+            pass
+        else:
+            data = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def source_input(name: str) -> bool:

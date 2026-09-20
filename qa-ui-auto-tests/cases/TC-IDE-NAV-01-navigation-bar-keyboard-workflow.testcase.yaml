@@ -22,8 +22,23 @@ steps:
   - click: '[data-testid="code-workspace-tree-add-folder"]'
   - wait_for: '[data-testid="text-input-dialog"]'
   - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"]'
+  - wait_for: '[data-testid="code-workspace-tree-root"]'
+  # Put the active file below a directory so the root breadcrumb popup has
+  # both directory and file entries to navigate.
+  - click: '[data-testid="code-workspace-tree-root"]'
+  - click: '[data-testid="code-workspace-tree-new-directory"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - fill:
+      selector: '[data-testid="text-input-dialog-input"]'
+      value: src
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
+  # The browser VFS exposes the existing README at the root. Keeping the
+  # directory creation gives the root popup both directory and file entries;
+  # opening the stable fixture avoids coupling this navigation case to the
+  # tree command's selected-directory write semantics.
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - wait_for: '[data-testid="code-workspace-breadcrumbs"]'
@@ -71,10 +86,26 @@ steps:
       selector: '[data-testid="code-workspace-breadcrumb-popup-filter"]'
       name: role
       equals: combobox
+  - assert_count:
+      selector: '[data-testid="code-workspace-breadcrumb-entry-directory"]'
+      min: 1
+  - click: '[data-testid="code-workspace-breadcrumb-entry-directory"]'
+  - assert_not_visible: '[data-testid="code-workspace-breadcrumb-popup"]'
+
+  # Open the same root popup again and choose a file entry. This exercises
+  # both path-child navigation branches instead of only the keyboard cancel.
+  - press:
+      key: Home
+      selector: '[data-testid="code-workspace-breadcrumbs"]'
   - press:
       key: Enter
-      selector: '[data-testid="code-workspace-breadcrumb-popup-filter"]'
+      selector: '[data-testid="code-workspace-breadcrumbs"]'
+  - wait_for: '[data-testid="code-workspace-breadcrumb-entry-file"]'
+  - click: '[data-testid="code-workspace-breadcrumb-entry-file"]'
   - assert_not_visible: '[data-testid="code-workspace-breadcrumb-popup"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-breadcrumbs"]'
+      contains: README.txt
 
   # Reopen the popup and cancel it; focus remains on the navigation bar.
   - press:

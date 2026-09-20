@@ -28,6 +28,18 @@ describe("normalizeLocalStartCwd", () => {
     );
   });
 
+  it("unwraps Windows extended-length drive and UNC paths", () => {
+    expect(normalizeLocalStartCwd("\\\\?\\C:\\work\\maven-single", "windows")).toBe(
+      "C:\\work\\maven-single",
+    );
+    expect(normalizeLocalStartCwd("//?/D:/work/maven-single", "windows")).toBe(
+      "D:\\work\\maven-single",
+    );
+    expect(normalizeLocalStartCwd("\\\\?\\UNC\\server\\share\\repo", "windows")).toBe(
+      "\\\\server\\share\\repo",
+    );
+  });
+
   it("returns null for MSYS/WSL paths with no Windows drive", () => {
     expect(normalizeLocalStartCwd("/home/user", "windows")).toBeNull();
     expect(normalizeLocalStartCwd("/usr/local/bin", "windows")).toBeNull();

@@ -1,0 +1,88 @@
+id: TC-IDE-CW-ANALYSIS-01-baseline-native
+title: "Provider diagnostics create, export, and clear an inspection baseline"
+description: |
+  Native provider gate for the Analysis and Problems panels. A real jdtls
+  diagnostic from QuickFixTarget is added to the client inspection baseline,
+  exported through the mounted action, and then cleared. This proves the
+  baseline controls are live against provider data rather than only present in
+  the empty browser shell.
+covers: [F25.2]
+tags: [code-workspace, analysis, problems, baseline, jdtls, native-gate, p1]
+modes: [native]
+native_platforms: [Linux, macOS, Windows]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 360
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: qa-analysis-baseline-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-analysis-baseline","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1789259400000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      timeout_sec: 90
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: Java
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: StringUtils.isBlank
+      timeout_sec: 30
+
+  - click: '[data-testid="code-workspace-bottom-tab-analysis"]'
+  - wait_for: '[data-testid="code-workspace-analysis-panel"]'
+  - assert_visible: '[data-testid="analysis-semantic-index"]'
+  - assert_visible: '[data-testid="analysis-lsp-status"]'
+  - assert_visible: '[data-testid="analysis-inspection-profile"]'
+  - assert_visible: '[data-testid="analysis-inspection-baseline"]'
+  - assert_visible: '[data-testid="analysis-inspection-suppressions"]'
+  - assert_visible: '[data-testid="analysis-data-flow"]'
+
+  - click: '[data-testid="code-workspace-bottom-tab-problems"]'
+  - wait_for: '[data-testid="code-workspace-problems-panel"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-problems-panel"]'
+      contains: "StringUtils cannot be resolved"
+      timeout_sec: 30
+  # The same provider diagnostic enables the editor chrome's previous/next
+  # error actions; click both directions so the controls are regression-tested
+  # as behavior, not only as a rendered widget.
+  - wait_for: '[data-testid="code-workspace-highlighting-widget"]'
+  - assert_visible: '[data-testid="highlighting-widget-prev-error"]'
+  - click: '[data-testid="highlighting-widget-prev-error"]'
+  - assert_visible: '[data-testid="highlighting-widget-next-error"]'
+  - click: '[data-testid="highlighting-widget-next-error"]'
+  - right_click: '[data-testid="problems-diagnostic-row"]'
+  - wait_for: '[data-testid="context-menu-item-add-to-inspection-baseline"]'
+  - click: '[data-testid="context-menu-item-add-to-inspection-baseline"]'
+  # Reopen the Analysis tool window through its registered action. The context
+  # menu closes the bottom dock after the action, so a tab click alone can
+  # toggle the already-selected tab closed instead of reopening it.
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Show Code Analysis
+  - click: '[data-testid="code-workspace-search-everywhere"] button[data-index="0"]'
+  - wait_for: '[data-testid="analysis-baseline-export"]'
+  - eval_readonly:
+      expression: "!Boolean(document.querySelector('[data-testid' + String.fromCharCode(61) + '\"analysis-baseline-export\"]')?.disabled)"
+      expect_truthy: true
+  - eval_readonly:
+      expression: "!Boolean(document.querySelector('[data-testid' + String.fromCharCode(61) + '\"analysis-baseline-clear\"]')?.disabled)"
+      expect_truthy: true
+  - click: '[data-testid="analysis-baseline-export"]'
+  - click: '[data-testid="analysis-baseline-clear"]'
+  - eval_readonly:
+      expression: "Boolean(document.querySelector('[data-testid' + String.fromCharCode(61) + '\"analysis-baseline-export\"]')?.disabled)"
+      expect_truthy: true
+  - eval_readonly:
+      expression: "Boolean(document.querySelector('[data-testid' + String.fromCharCode(61) + '\"analysis-baseline-clear\"]')?.disabled)"
+      expect_truthy: true
+  - screenshot: tc-ide-cw-analysis-01-baseline.png

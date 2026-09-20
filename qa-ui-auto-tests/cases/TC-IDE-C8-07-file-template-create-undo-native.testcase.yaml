@@ -60,6 +60,24 @@ steps:
   - assert_text:
       selector: '[data-testid="new-java-class-package"]'
       contains: "com.example.single"
+  - select_option:
+      selector: '[data-testid="new-java-class-kind-select"]'
+      value: interface
+  - eval_readonly:
+      expression: >-
+        document.querySelectorAll('select')[document.querySelectorAll('select').length - 1]?.value?.includes('interface')
+      expect_truthy: true
+  - click: '[data-testid="new-java-class-cancel"]'
+  - wait_for:
+      selector: '[data-testid="new-java-class-dialog"]'
+      state: detached
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: New Java Class...
+  - press: Enter
+  - wait_for: '[data-testid="new-java-class-dialog"]'
   - fill:
       selector: '[data-testid="new-java-class-name-input"]'
       value: "QaTemplateSmoke"

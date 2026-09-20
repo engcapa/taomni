@@ -49,7 +49,17 @@ steps:
   - assert_visible: '[data-testid="keymap-scheme-select"]'
   # The built-in scheme is readOnly; copy it first so rows become mutable
   # (keymap-add-*/keymap-replace-* only render for a mutable scheme).
+  - select_option:
+      selector: '[data-testid="keymap-scheme-select"]'
+      label: "IDEA defaults (default)"
+  - assert_attribute:
+      selector: '[data-testid="keymap-scheme-select"]'
+      name: value
+      equals: ""
   - click: '[data-testid="workspace-keymap-settings-dialog"] >> text=Copy'
+  - eval_readonly:
+      expression: 'document.querySelector("[data-testid" + String.fromCharCode(61) + "\"keymap-scheme-select\"] option:checked")?.textContent?.includes("copy")'
+      expect_truthy: true
   - fill:
       selector: '[data-testid="keymap-action-filter"]'
       value: Replace in File

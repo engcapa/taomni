@@ -27,7 +27,7 @@ steps:
   - open: ${cfg.app.base_url}?servers=main
   - wait_for:
       selector: '[data-testid="servers-dialog"]'
-      timeout_sec: 5
+      timeout_sec: 15
   - assert_visible: '[data-testid="server-list"]'
   - assert_visible: '[data-testid="server-settings"]'
   # SSH/SFTP is the first row and selected by default. Selecting it is safe

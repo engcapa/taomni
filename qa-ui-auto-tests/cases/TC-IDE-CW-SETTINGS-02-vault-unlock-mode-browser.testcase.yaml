@@ -1,0 +1,57 @@
+id: TC-IDE-CW-SETTINGS-02-vault-unlock-mode-browser
+title: "Vault unlock mode toggles, updates its hint, and persists"
+description: |
+  Browser regression case for the VaultSettings unlock-prompt segmented control.
+  Verifies the startup default, switches to on-demand and checks the changed
+  hint plus localStorage value, reloads the application to prove persistence,
+  then restores the startup default. Vault encryption and native keychain
+  boundaries are covered separately by native lifecycle cases.
+covers: [F12.1]
+tags: [code-workspace, settings, vault, persistence, security, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="ribbon-settings"]'
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="settings-panel"]'
+  - click: '[data-testid="settings-group-toggle-security"]'
+  - wait_for: '[data-testid="vault-settings"]'
+  - assert_visible: '[data-testid="vault-unlock-mode-setting"]'
+  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-startup"]', name: aria-pressed, equals: "true"}
+  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-on-demand"]', name: aria-pressed, equals: "false"}
+  - assert_text:
+      selector: '[data-testid="vault-unlock-mode-hint"]'
+      contains: "Default."
+
+  - click: '[data-testid="vault-unlock-mode-on-demand"]'
+  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-on-demand"]', name: aria-pressed, equals: "true"}
+  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-startup"]', name: aria-pressed, equals: "false"}
+  - assert_text:
+      selector: '[data-testid="vault-unlock-mode-hint"]'
+      contains: "waits until"
+  - assert_localstorage:
+      key: taomni.vaultUnlockMode
+      equals: on-demand
+
+  - reload_window: null
+  - wait_for: '[data-testid="ribbon-settings"]'
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="settings-panel"]'
+  - click: '[data-testid="settings-group-toggle-security"]'
+  - wait_for: '[data-testid="vault-settings"]'
+  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-on-demand"]', name: aria-pressed, equals: "true"}
+  - assert_text:
+      selector: '[data-testid="vault-unlock-mode-hint"]'
+      contains: "waits until"
+
+  - click: '[data-testid="vault-unlock-mode-startup"]'
+  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-startup"]', name: aria-pressed, equals: "true"}
+  - assert_text:
+      selector: '[data-testid="vault-unlock-mode-hint"]'
+      contains: "Default."
+  - assert_localstorage:
+      key: taomni.vaultUnlockMode
+      equals: startup
+  - screenshot: tc-ide-cw-settings-02-vault-unlock-mode.png
