@@ -253,6 +253,8 @@ def aggregate(manifest: dict, root: Path) -> dict:
                 digest = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
                 if not any(a.get("path") == "summary.json" and a.get("sha256") == digest for a in receipt["artifacts"]):
                     raise ValueError("receipt does not bind summary")
+                if receipt.get("purpose") != entry["mode"] + "-runner":
+                    raise ValueError("receipt mode differs")
                 if receipt.get("exitCode") != summary["exit_code"]:
                     raise ValueError("receipt exit code differs")
                 if (summary.get("dry_run") is not False or not summary.get("identity_stable")
@@ -260,7 +262,16 @@ def aggregate(manifest: dict, root: Path) -> dict:
                     raise ValueError("stale, unstable or dry-run evidence")
                 if summary["mode"] != entry["mode"] or summary["platform"] not in {entry["platform"], "Darwin" if entry["platform"] == "macOS" else entry["platform"]}:
                     raise ValueError("wrong platform/mode")
+                if entry["mode"] == "native":
+                    identity = summary.get("native_identity", {})
+                    build = json.loads((entry_root / "build-identity.json").read_text(encoding="utf-8"))
+                    if (identity.get("identifier") != "com.taomni.app.qa"
+                            or identity.get("binary_sha256") != build.get("binary_sha256")
+                            or identity.get("source_sha256") != manifest["identity"]["source_sha256"]):
+                        raise ValueError("native binary identity differs from build/source")
                 ids = [c["id"] for c in summary["cases"]]
+                if len(ids) != len(set(ids)):
+                    raise ValueError("duplicate case IDs inside summary")
                 if seen.intersection(ids) or set(ids) != set(summary["selection"]["selected"]):
                     raise ValueError("duplicate/mismatched case results")
                 if not set(ids).issubset(entry["selected_ids"]):

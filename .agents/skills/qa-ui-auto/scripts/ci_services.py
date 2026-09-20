@@ -64,8 +64,10 @@ def install(capabilities):
     system = platform.system()
     if system == "Linux":
         command(["docker", "info", "--format", "{{.ServerVersion}}"])
-    elif system == "Darwin" and "mysql" in capabilities:
-        command(["brew", "install", "mysql@8.4"])
+    elif system == "Darwin":
+        packages = (["mysql@8.4"] if "mysql" in capabilities else []) + (["openssh"] if "ssh" in capabilities else [])
+        if packages:
+            command(["brew", "install", *packages])
     elif system == "Windows":
         if "ssh" in capabilities:
             powershell("if (-not (Test-Path $env:WINDIR\\System32\\OpenSSH\\sshd.exe)) { "
@@ -138,7 +140,7 @@ class Services:
         command([ssh_keygen, "-t", "ed25519", "-N", "", "-f", str(host_key)])
         lines = [f"Port {port}", "ListenAddress 127.0.0.1", f'HostKey "{host_key.as_posix()}"',
                  "PasswordAuthentication yes", "PubkeyAuthentication no", "PermitEmptyPasswords no",
-                 f"AllowUsers {user}", "StrictModes no", "LogLevel ERROR", "Subsystem sftp internal-sftp"]
+                 f"AllowUsers {user}", "StrictModes no", "LogLevel VERBOSE", "Subsystem sftp internal-sftp"]
         if system == "Darwin":
             uid = str(5500 + secrets.randbelow(2000))
             remote_dir = f"/private/tmp/{self.namespace}-temp"
@@ -152,10 +154,15 @@ class Services:
             command(["sudo", "-n", "chown", "-R", f"{user}:staff", home, remote_dir])
             # The temporary account is owned by this VM/job, not a shared user.
             self.cleanup_command(["sudo", "-n", "rm", "-r", home, remote_dir])
-            lines += ["UsePAM no", f"PidFile {private / 'sshd.pid'}"]
+            lines += ["UsePAM yes", f"PidFile {private / 'sshd.pid'}"]
+            # Add only the disposable account when macOS restricts SSH login.
+            group = subprocess.run(["dscl", ".", "-read", "/Groups/com.apple.access_ssh"], capture_output=True)
+            if group.returncode == 0:
+                command(["sudo", "-n", "dseditgroup", "-o", "edit", "-a", user, "-t", "user", "com.apple.access_ssh"])
             cfg = private / "sshd_config"
             cfg.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            self.start_process(["sudo", "-n", "/usr/sbin/sshd", "-D", "-e", "-f", cfg], "sshd")
+            sshd = Path(command(["brew", "--prefix", "openssh"])) / "sbin/sshd"
+            self.start_process(["sudo", "-n", sshd, "-D", "-e", "-f", cfg], "sshd")
         else:
             os.environ["QA_SERVICE_USER"] = user
             # Password supplied through the child environment, never a log or artifact.
@@ -174,11 +181,19 @@ class Services:
             cfg.write_text("\n".join(lines) + "\n", encoding="utf-8")
             # sshd must run as LocalSystem for password logon/PTY impersonation.
             executable = Path(os.environ["WINDIR"]) / "System32/OpenSSH/sshd.exe"
-            os.environ["QA_SSH_SERVICE_COMMAND"] = f'"{executable}" -f "{cfg}"'
-            powershell("New-Service -Name $env:QA_SERVICE_USER -BinaryPathName $env:QA_SSH_SERVICE_COMMAND "
-                       "-StartupType Manual | Out-Null; Start-Service $env:QA_SERVICE_USER")
-            self.stack.callback(lambda: powershell("Stop-Service $env:QA_SERVICE_USER -ErrorAction SilentlyContinue; "
-                                                  "sc.exe delete $env:QA_SERVICE_USER | Out-Null"))
+            for protected in (host_key, cfg):
+                command(["icacls", str(protected), "/inheritance:r", "/grant:r", "*S-1-5-18:F", "*S-1-5-32-544:F"])
+                command(["icacls", str(protected), "/setowner", "*S-1-5-32-544"])
+            command([executable, "-t", "-f", cfg])
+            os.environ["QA_SSH_SERVICE_COMMAND"] = f'"{executable}" -f "{cfg}" -E "{self.root / "sshd.log"}"'
+            # Win32 OpenSSH registers ServiceMain under its fixed sshd name.
+            # Hosted VMs are exclusive; restore the existing stopped service on exit.
+            powershell("Stop-Service sshd -ErrorAction SilentlyContinue; "
+                       "if (Get-Service sshd -ErrorAction SilentlyContinue) { "
+                       "sc.exe config sshd binPath= $env:QA_SSH_SERVICE_COMMAND | Out-Null } else { "
+                       "New-Service -Name sshd -BinaryPathName $env:QA_SSH_SERVICE_COMMAND -StartupType Manual | Out-Null }")
+            self.stack.callback(lambda: powershell("Stop-Service sshd -ErrorAction SilentlyContinue"))
+            powershell("Start-Service sshd")
         self.resources.append(f"sshd:{user}:{port}")
         return user, port, remote_dir
 
@@ -194,6 +209,7 @@ class Services:
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         def probe():
+            client.close()
             client.connect("127.0.0.1", port, user, password, timeout=5,
                            banner_timeout=5, auth_timeout=5, allow_agent=False, look_for_keys=False)
         retry(probe)

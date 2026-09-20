@@ -239,3 +239,48 @@ jobs:
             qa-ui-auto-report/summary.md
             qa-ui-auto-report/selection.json
           if-no-files-found: warn
+
+  publish-issues:
+    if: >-
+      always() && (inputs.publish_issues ||
+      (github.event_name == 'schedule' && vars.QA_UI_AUTO_PUBLISH_ISSUES == 'true')) &&
+      github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
+    needs: summarize
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # No checkout or execution of the tested source in this privileged job.
+      - uses: actions/download-artifact@v4
+        with:
+          name: qa-summary-${{ github.run_attempt }}
+          path: qa-summary
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const summary = JSON.parse(fs.readFileSync('qa-summary/ci-summary.json', 'utf8'));
+            if (String(summary.run_id) !== String(context.runId)) throw new Error('Wrong run artifact');
+            const { owner, repo } = context.repo;
+            const issues = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
+            const groups = new Map();
+            for (const failure of summary.failures || []) {
+              const key = `${failure.entry}/${failure.case}`;
+              if (!groups.has(key)) groups.set(key, []);
+              groups.get(key).push(String(failure.message).slice(0, 2500));
+            }
+            for (const [key, messages] of [...groups].slice(0, 50)) {
+              const fingerprint = crypto.createHash('sha256').update(key).digest('hex').slice(0, 24);
+              const marker = `<!-- qa-ui-auto:${fingerprint} -->`;
+              const title = `[QA UI Auto] ${key}`.slice(0, 200);
+              const safeMessages = messages.map(m => m.replace(/@/g, '@\u200b').replace(/`/g, "'")).join('\n\n');
+              const body = `${marker}\n\n${key.replace(/@/g, '@\u200b')} failed.\n\n` +
+                `Run: https://github.com/${owner}/${repo}/actions/runs/${context.runId}\n\n` +
+                `Tested commit: ${summary.head}\n\n\`\`\`text\n${safeMessages}\n\`\`\`\n\n` +
+                'See the run summary and artifacts for original receipts, screenshots and setup logs. This QA workflow is independent of PR/release gates.';
+              const existing = issues.find(i => !i.pull_request && (i.body || '').includes(marker));
+              if (existing) await github.rest.issues.update({owner, repo, issue_number: existing.number, body});
+              else await github.rest.issues.create({owner, repo, title, body});
+            }

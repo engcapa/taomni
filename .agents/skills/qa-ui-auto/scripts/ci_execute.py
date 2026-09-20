@@ -26,7 +26,27 @@ def main():
     outcome = {"head": None, "entry": args.entry, "exit_code": 2, "stage": "selection"}
     write_json(args.report / "ci-outcome.json", outcome)
     scripts = Path(__file__).resolve().parent
-    children = []
+
+    def stop(process):
+        if process.poll() is not None:
+            return
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
+        else:
+            os.killpg(process.pid, signal.SIGTERM)
+        try:
+            process.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            if sys.platform != "win32":
+                os.killpg(process.pid, signal.SIGKILL)
+            else:
+                process.kill()
+            process.wait()
+
+    def launch(stack, command, **kwargs):
+        process = subprocess.Popen(command, start_new_session=sys.platform != "win32", **kwargs)
+        stack.callback(stop, process)
+        return process
 
     def cancelled(signum, frame):
         raise RuntimeError(f"job cancelled (signal {signum})")
@@ -53,7 +73,11 @@ def main():
                 stack.enter_context(Desktop(args.report / "desktop", entry["capabilities"]))
                 outcome["stage"] = "build"
                 write_json(args.report / "ci-outcome.json", outcome)
-                subprocess.run([sys.executable, str(scripts / "native_build.py")], check=True)
+                build_log = stack.enter_context((args.report / "build.log").open("w", encoding="utf-8"))
+                build = launch(stack, [sys.executable, str(scripts / "native_build.py")],
+                               stdout=build_log, stderr=subprocess.STDOUT)
+                if build.wait():
+                    raise RuntimeError("native build failed; see build.log")
                 from native_build import identity_path, qa_binary
                 (args.report / "build-identity.json").write_bytes(identity_path(qa_binary()).read_bytes())
             else:
@@ -62,10 +86,9 @@ def main():
                 pnpm = shutil.which("pnpm")
                 if not pnpm:
                     raise RuntimeError("pnpm not found")
-                process = subprocess.Popen([pnpm, "dev", "--host", "127.0.0.1", "--strictPort"],
+                process = launch(stack, [pnpm, "dev", "--host", "127.0.0.1", "--strictPort"],
                                            stdout=log, stderr=subprocess.STDOUT,
                                            env={**os.environ, "DEV_PROXY_ALLOW_PRIVATE": "1"})
-                children.append(process)
                 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
                 for _ in range(90):
                     if process.poll() is not None:
@@ -85,8 +108,7 @@ def main():
                        "--keep-runs", "0", "--require-pass", "--mode", entry["mode"]]
             # Keep the interpreter/process owning the runner receipt unchanged.
             runner_log = stack.enter_context((args.report / "runner.log").open("w", encoding="utf-8"))
-            case_process = subprocess.Popen(command, stdout=runner_log, stderr=subprocess.STDOUT)
-            children.append(case_process)
+            case_process = launch(stack, command, stdout=runner_log, stderr=subprocess.STDOUT)
             outcome["exit_code"] = case_process.wait()
             if outcome["exit_code"]:
                 outcome["error"] = "selected cases did not all pass; see original runner reports"
@@ -95,17 +117,6 @@ def main():
         outcome.update(exit_code=2, error=f"{type(exc).__name__}: {exc}")
         print(outcome["error"], file=sys.stderr)
     finally:
-        for process in reversed(children):
-            if process.poll() is None:
-                if sys.platform == "win32":
-                    subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
-                else:
-                    process.terminate()
-                try:
-                    process.wait(timeout=15)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
         write_json(args.report / "ci-outcome.json", outcome)
     return outcome["exit_code"]
 

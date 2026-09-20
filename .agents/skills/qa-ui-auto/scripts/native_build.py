@@ -111,7 +111,7 @@ def build_inputs(*, release: bool = False, env: dict[str, str] | None = None) ->
             "BINDGEN_EXTRA_CLANG_ARGS_x86_64_unknown_linux_gnu",
             "LIBCLANG_PATH", "LIBRARY_PATH", "PKG_CONFIG_PATH", "LIBGSSAPI_IMPL",
             "TAOMNI_REPLIT_NATIVE_QA", "TAOMNI_NATIVE_QA_TOOLCHAIN",
-                                             "RUSTC",
+                                             "RUSTC", "OPENSSL_SRC_PERL", "PERL",
             "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM", "NODE_ENV")},
     }
 
