@@ -42,6 +42,7 @@ class StepContext:
     case_state: dict[str, Any] = field(default_factory=dict)
     step_index: int = 0
     dry_run: bool = False
+    values: dict[str, str] = field(default_factory=dict)
 
 
 class StepError(RuntimeError):

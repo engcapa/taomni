@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import secrets
 import shutil
 import socket
@@ -250,20 +251,36 @@ class Services:
         if nonce not in output or code != 0:
             raise RuntimeError("SSH exec probe failed; see ssh-exec.json")
         channel = client.invoke_shell(width=120, height=32)
+        output = ""
+        plain = ""
         try:
-            channel.settimeout(30)
+            channel.settimeout(2)
             # Shell output must contain a fresh nonce on its own line, not
             # merely the command echo. No exit-status assumption for ConPTY.
             marker = secrets.token_hex(12)
-            channel.send(f"printf '\\n%s\\n' '{marker}'\n")
-            output = ""
+            channel.send(f"printf '\\n%s\\n' '{marker}'\r")
             end = time.monotonic() + 30
-            while "\n" + marker + "\n" not in output.replace("\r", ""):
-                data = channel.recv(4096)
-                if not data or time.monotonic() > end:
-                    raise RuntimeError("SSH PTY shell did not produce the nonce")
+            while time.monotonic() < end:
+                try:
+                    data = channel.recv(4096)
+                except socket.timeout:
+                    continue
+                if not data:
+                    break
                 output += data.decode(errors="replace")
+                # Windows ConPTY paints using ANSI escapes, and asks the
+                # terminal to report its cursor before starting the shell.
+                if b"\x1b[6n" in data:
+                    channel.send("\x1b[1;1R")
+                plain = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", output).replace("\r", "")
+                if "\n" + marker + "\n" in plain:
+                    break
+            else:
+                raise RuntimeError("SSH PTY shell did not produce the nonce; see ssh-pty.json")
+            if "\n" + marker + "\n" not in plain:
+                raise RuntimeError("SSH PTY closed without command output; see ssh-pty.json")
         finally:
+            write_json(self.root / "ssh-pty.json", {"output": output})
             channel.close()
         sftp = client.open_sftp()
         try:

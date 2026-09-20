@@ -233,7 +233,7 @@ def _run_browser_case_inner(payload: dict) -> dict:
                 verb, raw_args = tc_mod.step_verb_and_args(step)
                 last_step_index = i
                 last_verb = verb
-                args = cfg_mod.resolve(raw_args, cfg=cfg, env=env)
+                args = cfg_mod.resolve(raw_args, cfg=cfg, env=env, fixture=ctx.values)
                 last_args = args
                 if verb not in STEP_REGISTRY:
                     raise StepError(f"unknown verb: {verb}")
@@ -952,6 +952,8 @@ def main(argv: list[str] | None = None) -> int:
     reporter.write_summary(report_root, summary)
     md = reporter.write_markdown(report_root, summary)
     reporter.write_junit(report_root, summary)
+    from .report_secrets import redact_report
+    redact_report(report_root)
     print("\n" + md.read_text(encoding="utf-8"))
 
     # ED-REL-001: emit runner-owned execution receipt

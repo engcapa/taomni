@@ -8,18 +8,25 @@ permissions:
   issues: write
 jobs:
   smoke:
-    # Temporary branch-only trigger for hosted validation (PTY and focused GTK input probes).
+    # Temporary branch-only trigger: actual JDTLS launcher and ConPTY handshake.
     uses: ./.github/workflows/qa-ui-auto-platforms.yml
     with:
       scope: selected
+      platforms: linux,macos
       case_ids: TC-001,TC-NATIVE-CORE-001,TC-012,TC-027,TC-auto-F-DB-1-query-tab-rename-native-restore,TC-IDE-C2-05-java-completion-refine-accept-native,TC-IDE-CW-EXECUTION-01-maven-run-build-tests-native,TC-IDE-IMPROVE-008-ime-lifecycle-native,TC-IDE-C8-02,TC-IDE-C3-02
+  windows_core:
+    uses: ./.github/workflows/qa-ui-auto-platforms.yml
+    with:
+      scope: smoke
+      platforms: windows
+      modes: native
   services:
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: [windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     env:
@@ -48,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     env:

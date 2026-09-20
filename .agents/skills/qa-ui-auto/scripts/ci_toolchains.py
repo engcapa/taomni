@@ -38,7 +38,7 @@ def checked(command, cwd=None):
 
 
 def lsp_probe(home, root):
-    """Use the same architecture-specific Eclipse config as the app launcher."""
+    """Validate the actual POSIX launcher; Windows uses the app's Java expansion."""
     suffix = {"Linux": "linux", "Darwin": "mac", "Windows": "win"}[platform.system()]
     if platform.machine().lower() in {"arm64", "aarch64"}:
         suffix += "_arm"
@@ -51,6 +51,8 @@ def lsp_probe(home, root):
             "-Xmx1G", "--add-modules=ALL-SYSTEM", "--add-opens", "java.base/java.util=ALL-UNNAMED",
             "--add-opens", "java.base/java.lang=ALL-UNNAMED", "-jar", str(launcher),
             "-configuration", str(config), "-data", str(root / "probe-workspace")]
+    if platform.system() != "Windows":
+        argv = [str(home / "bin/jdtls"), "-data", str(root / "probe-workspace")]
     messages = queue.Queue()
     with (root / "jdtls-stderr.log").open("wb") as log:
         process = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log)
@@ -142,6 +144,15 @@ def prepare_java(root, capabilities):
     download(specs["jdtls"], archive)
     with tarfile.open(archive) as bundle:
         bundle.extractall(home, filter="data")
+    # The pinned upstream launcher predates ARM config selection. Its default
+    # config_mac points at x86_64 bundles and exits 13 on hosted Apple Silicon.
+    launcher_script = home / "bin/jdtls.py"
+    script = launcher_script.read_text(encoding="utf-8")
+    anchor = "\treturn str(jdtls_base_path / config_dir)"
+    if script.count(anchor) != 1:
+        raise RuntimeError("pinned JDTLS launcher contract changed; review ARM configuration")
+    launcher_script.write_text(script.replace(anchor,
+        '\tif platform.machine().lower() in ("arm64", "aarch64"):\n\t\tconfig_dir += "_arm"\n' + anchor), encoding="utf-8")
     os.environ["JDTLS_HOME"] = str(home)
     os.environ["PATH"] = str(home / "bin") + os.pathsep + os.environ["PATH"]
     if platform.system() == "Windows":
