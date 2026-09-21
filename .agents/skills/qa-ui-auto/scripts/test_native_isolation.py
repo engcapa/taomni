@@ -230,6 +230,40 @@ class NativeIsolationTest(unittest.TestCase):
             self.assertEqual(attempts, 2)
             self.assertFalse(profile.exists())
 
+    def test_reset_retries_windows_profile_mutation_errors(self):
+        with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Windows"):
+            root = Path(directory)
+            env = native.native_isolation_env(root / "run")
+            profile = Path(env["NEWMOB_DATA_DIR"]) / native_build.QA_APP_ID
+            profile.mkdir(parents=True)
+            (profile / "DIPS-wal").write_text("closing", encoding="utf-8")
+            real_rmtree = shutil.rmtree
+            attempts = 0
+
+            class WinError(OSError):
+                def __init__(self, code):
+                    super().__init__(f"[WinError {code}] transient profile mutation")
+                    self.winerror = code
+
+            def transient_mutation(path):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise FileNotFoundError("DIPS-wal disappeared during cleanup")
+                if attempts == 2:
+                    raise WinError(145)
+                return real_rmtree(path)
+
+            with (
+                patch.dict(os.environ, env),
+                patch.object(reset_db.shutil, "rmtree", side_effect=transient_mutation),
+                patch.object(reset_db.time, "sleep"),
+            ):
+                reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
+
+            self.assertEqual(attempts, 3)
+            self.assertFalse(profile.exists())
+
     def test_reset_refuses_missing_or_wrong_run_environment(self):
         with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Linux"):
             with self.assertRaises(RuntimeError):

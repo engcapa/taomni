@@ -1843,6 +1843,7 @@ export function CodeWorkspaceTab({
   );
   const [fileEncodingDialogOpen, setFileEncodingDialogOpen] = useState(false);
   const [saveObservations, setSaveObservations] = useState<Record<string, SaveObservationRecord>>({});
+  const pendingEncodingDialogFileKeyRef = useRef<string | null>(null);
   const pendingWorkspaceRecoveryKeysRef = useRef(new Set<string>());
   useEffect(() => {
     setSaveObservations({});
@@ -7979,9 +7980,29 @@ export function CodeWorkspaceTab({
 
   const openFileEncodingDialog = useCallback(() => {
     const file = activeKey ? openFilesRef.current[activeKey] : null;
-    if (!file || file.library || file.loading || file.saving) return;
+    if (!file || file.library || file.loading) return;
+    if (file.saving) {
+      // Saving is an asynchronous transaction. Queue the user's intent so a
+      // status-bar click that lands in the save/writeback window is honored
+      // after the same active file reaches a settled state.
+      pendingEncodingDialogFileKeyRef.current = activeKey;
+      return;
+    }
     setFileEncodingDialogOpen(true);
   }, [activeKey]);
+
+  useEffect(() => {
+    const pendingKey = pendingEncodingDialogFileKeyRef.current;
+    if (!pendingKey) return;
+    if (pendingKey !== activeKey) {
+      pendingEncodingDialogFileKeyRef.current = null;
+      return;
+    }
+    const file = openFilesRef.current[pendingKey];
+    if (!file || file.library || file.loading || file.saving) return;
+    pendingEncodingDialogFileKeyRef.current = null;
+    setFileEncodingDialogOpen(true);
+  }, [activeFile, activeKey]);
 
   const cycleActiveFileEol = useCallback(() => {
     const key = activeKey;

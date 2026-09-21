@@ -7,8 +7,12 @@ trace。任何 capability 在没有对应 trace 证据前,只能声明
 
 ## 工具链(固定版本,trace 内记录)
 
-- JDK 21+: macOS/Linux 可通过 `TAOMNI_FIXTURE_JAVA` 覆盖；本机 native QA 使用已安装的 Zulu 25。
-- jdtls 1.61.0(`JDTLS_HOME` 覆盖,默认 `~/.local/share/jdtls`;当前 macOS trace build 为 `1.61.0.202609031315`)。
+- JDK 21+: macOS/Linux 可通过 `TAOMNI_FIXTURE_JAVA` 覆盖。
+- hosted/native provider gate 使用 `qa-ui-auto-tests/ci/toolchains.yaml` 固定的
+  jdtls 1.50.0 + JDK 21；`maven-single` 与 `import-maven-single` trace 以该组合为准。
+  其余专项 trace 仍记录各自真实工具链（部分历史 trace 为 jdtls 1.61.0）。
+  即使版本相同，独立 runner 与生产等价 client 的初始化/项目状态也可能
+  产生不同候选集合，必须以对应 trace 为准。`JDTLS_HOME` 可覆盖 provider 位置。
 - Maven 3.9.x(jdtls 内嵌 m2e 解析 pom;`mvnCliDetected` 仅记录探测结果)。
 - Gradle:`~/.gradle/wrapper/dists` 缓存中的最高发行版(9.7.1;
   `TAOMNI_FIXTURE_GRADLE` 覆盖),经 `java.import.gradle.home` 注入。

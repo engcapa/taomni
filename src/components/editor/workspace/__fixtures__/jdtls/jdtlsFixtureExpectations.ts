@@ -96,10 +96,9 @@ export const JDTLS_FIXTURE_EXPECTATIONS: readonly JdtlsTraceExpectation[] = [
     caseId: "dependency-source-import",
     fixture: "maven-single",
     assert: { type: "resolve", minAdditionalEdits: 1, includesText: "import org.apache.commons.lang3.StringUtils;" },
-    // Real observed difference (trace, 2026-08-24): raw jdtls also offers
-    // com.sun.tools.javac.util.StringUtils as a same-name twin; IDEA ranks the
-    // project dependency far above JDK-internal symbols. The runner pins the
-    // expected twin via detailContains so the resolve import is unambiguous.
+    // JDTLS 1.50 emits only the project dependency here. Newer 1.61 traces
+    // also exposed a com.sun.tools.javac.util twin, so detailContains keeps
+    // the accepted dependency explicit across provider versions.
     ideaExpected: "Accepting a non-imported dependency type inserts the FQN import together with the call; javac-internal twins are ranked last / flagged.",
   },
   {

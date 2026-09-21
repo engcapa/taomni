@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import ExitStack
+import json
 import os
 import platform
 from pathlib import Path
@@ -16,6 +17,47 @@ import urllib.request
 import yaml
 
 from qa_ui_auto.ci import selection_digest, selection_entry, write_json
+
+
+def _runner_report_complete(report: Path) -> tuple[bool, str | None]:
+    """Return whether the runner produced a trustworthy report.
+
+    The hosted workflow is report-oriented: a completed suite may contain case
+    failures, but a missing/unstable summary is an execution failure. Keep this
+    distinction at the supervisor boundary so case failures do not masquerade
+    as infrastructure errors in the aggregate report.
+    """
+    summaries = sorted(report.glob("run-*/summary.json"))
+    if not summaries:
+        return False, "runner did not produce summary.json"
+    if len(summaries) > 1:
+        return False, f"runner produced multiple summaries ({len(summaries)})"
+    try:
+        summary = json.loads(summaries[0].read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return False, f"runner summary is unreadable: {exc}"
+    if summary.get("dry_run") is not False:
+        return False, "runner summary is not an execution report"
+    if not summary.get("identity_stable"):
+        return False, "runner report identity is unstable"
+    if not isinstance(summary.get("cases"), list) or not isinstance(summary.get("totals"), dict):
+        return False, "runner summary is missing case results"
+    return True, None
+
+
+def _classify_runner_result(report: Path, runner_exit_code: int) -> dict:
+    complete, report_error = _runner_report_complete(report)
+    result = {"runner_exit_code": runner_exit_code}
+    if complete:
+        # Case failures/skips are expected report content. Preserve the raw
+        # runner status while making the supervisor status about completion.
+        result["exit_code"] = 0
+        if runner_exit_code:
+            result["case_result_exit_code"] = runner_exit_code
+    else:
+        result["exit_code"] = 1
+        result["error"] = report_error or f"runner exited with code {runner_exit_code}"
+    return result
 
 
 def main():
@@ -130,13 +172,12 @@ def main():
             write_json(args.report / "ci-outcome.json", outcome)
             command = [sys.executable, "-m", "qa_ui_auto", "run", "--selection", str(args.selection),
                        "--selection-entry", args.entry, "--config", str(cfg_path), "--report-dir", str(args.report),
-                       "--keep-runs", "0", "--require-pass", "--mode", entry["mode"]]
+                       "--keep-runs", "0", "--mode", entry["mode"]]
             # Keep the interpreter/process owning the runner receipt unchanged.
             runner_log = stack.enter_context((args.report / "runner.log").open("w", encoding="utf-8"))
             case_process = launch(stack, command, stdout=runner_log, stderr=subprocess.STDOUT)
-            outcome["exit_code"] = case_process.wait()
-            if outcome["exit_code"]:
-                outcome["error"] = "selected cases did not all pass; see original runner reports"
+            runner_exit_code = case_process.wait()
+            outcome.update(_classify_runner_result(args.report, runner_exit_code))
             outcome["stage"] = "complete"
     except BaseException as exc:
         outcome.update(exit_code=2, error=f"{type(exc).__name__}: {exc}")

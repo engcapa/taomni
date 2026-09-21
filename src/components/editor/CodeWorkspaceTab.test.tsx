@@ -7303,6 +7303,46 @@ describe("CodeWorkspaceTab", () => {
     ).toBe("ISO-8859-1");
   });
 
+  it("opens a queued encoding chooser after an in-flight save settles", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-encoding-save-race",
+      workspaceInstanceId: "instance-encoding-save-race",
+      name: "Encoding Save Race",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.txt" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.txt", "before\n"));
+    let resolveWrite!: (ack: WorkspaceWriteAck) => void;
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(() => new Promise((resolve) => {
+      resolveWrite = resolve;
+    }));
+
+    const rendered = renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.txt");
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-encoding-save-race",
+    ).openFiles["root:app:src/main.txt"]?.dirty).toBe(true));
+
+    fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-encoding-save-race",
+    ).openFiles["root:app:src/main.txt"]?.saving).toBe(true));
+    act(() => useCodeWorkspaceStatusStore.getState().actions?.chooseEncoding?.());
+    expect(screen.queryByTestId("file-encoding-dialog")).toBeNull();
+
+    await act(async () => {
+      resolveWrite(writeAck(file("src/main.txt", "before\nbefore\n", { hash: "hash-saved" })));
+    });
+    expect(await screen.findByTestId("file-encoding-dialog")).toBeInTheDocument();
+  });
+
   it("reloads the active file with an explicit encoding from the status action", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

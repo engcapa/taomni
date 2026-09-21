@@ -36,7 +36,7 @@ steps:
   - wait_for: '.git-log-view [data-testid="git-diff-viewer"][data-path="long-lines.txt"]'
   - click: '.git-log-view [data-testid="git-diff-render-anyway"]'
   - click: '.git-log-view [data-testid="git-diff-mode-split"]'
-  - wait_for: '.git-log-view [data-testid="git-diff-splitter"]'
+  - wait_for: '.git-log-view [data-testid="git-diff-splitter"][data-layout-ready="true"]'
   - wait_for: '.git-log-view [data-testid="git-diff-left-scroll"]'
   - wait_for: '.git-log-view [data-testid="git-diff-right-scroll"]'
   - eval_readonly:

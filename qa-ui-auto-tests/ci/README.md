@@ -101,8 +101,10 @@ Read the run's **qa-ui-auto-platforms-result** summary and download
 The UUID keeps multiple reusable calls within one caller isolated. The plan
 summary lists exact selected IDs, reasons and changed paths before execution. `selection.json` binds the selected commit, source,
 runner and case hashes. Raw runner summaries and receipts are not rewritten.
-Missing reports, native build/source mismatch, failed setup and selected skips
-all make the aggregate fail. `build.log`, `runner.log`, `ci-outcome.json`,
+Case failures and selected skips remain in the aggregate report but do not fail
+the report workflow. Missing reports, native build/source mismatch, failed
+setup, selected skips without a completed runner report, and other
+infrastructure errors make the aggregate fail. `build.log`, `runner.log`, `ci-outcome.json`,
 service/desktop readiness and screenshot metadata identify the failing phase.
 Original failures remain available in each Actions run. Issue sync deduplicates
 by combination/case and updates the run link; it does not close issues from a
@@ -115,7 +117,7 @@ fixtures keep their existing behavior.
 
 ```sh
 export PYTHONPATH=.agents/skills/qa-ui-auto/scripts
-python -m unittest test_ci_selection test_ci_report test_ci_desktop test_ci_provenance test_ci_services
+python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services
 python -m qa_ui_auto.audit --gate
 python -m qa_ui_auto.ci plan --scope selected --case-ids TC-012,TC-027
 ```

@@ -134,6 +134,14 @@ pub fn build_workspace_environment(
     let launcher_java_home = launcher_java.as_ref().map(sdk_home);
     if let Some(java_home) = launcher_java_home.as_ref().or(project_java_home.as_ref()) {
         environment.insert("JAVA_HOME".to_string(), java_home.clone());
+    } else if let Some(java_home) = std::env::var("JAVA_HOME")
+        .ok()
+        .and_then(|value| normalize_inherited_home(&value))
+    {
+        // A hosted/GUI launch may have no registered project SDK yet. Keep
+        // the process-level Java selection explicit so Maven/Gradle batch
+        // launchers on Windows do not fall back to an older PATH JDK.
+        environment.insert("JAVA_HOME".to_string(), java_home);
     }
 
     let python_home = python.as_ref().map(sdk_home);
@@ -527,6 +535,11 @@ fn sdk_home(installation: &SdkInstallation) -> String {
     super::strip_verbatim_prefix(&installation.location)
 }
 
+fn normalize_inherited_home(value: &str) -> Option<String> {
+    let value = value.trim();
+    (!value.is_empty()).then(|| super::strip_verbatim_prefix(value))
+}
+
 fn fingerprint(parts: &[&str]) -> String {
     let mut digest = Sha256::new();
     for part in parts {
@@ -736,6 +749,15 @@ mod tests {
             environment.path_entries.first().map(String::as_str),
             Some(r"C:\Program Files\Java\jdk-21\bin")
         );
+    }
+
+    #[test]
+    fn normalizes_inherited_java_home_values() {
+        assert_eq!(
+            normalize_inherited_home(r"  \\?\C:\Program Files\Java\jdk-21  ").as_deref(),
+            Some(r"C:\Program Files\Java\jdk-21")
+        );
+        assert_eq!(normalize_inherited_home(" \t\n"), None);
     }
 
     #[test]
