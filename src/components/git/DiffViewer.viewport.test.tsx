@@ -61,11 +61,13 @@ function prepareDimensions(container: HTMLElement, width = 1000) {
   setWidth(editorDom!, width);
   const editors = Array.from(container.querySelectorAll<HTMLElement>(".cm-mergeViewEditor > .cm-editor"));
   editors.forEach((editor) => setWidth(editor, Math.max(1, (width - 36) / 2)));
+  const splitter = screen.getByTestId("git-diff-splitter");
+  setWidth(splitter, 36);
   fireEvent(window, new Event("resize"));
   return {
     editorDom: editorDom!,
     editors,
-    splitter: screen.getByTestId("git-diff-splitter"),
+    splitter,
     leftScroll: screen.getByTestId("git-diff-left-scroll"),
     rightScroll: screen.getByTestId("git-diff-right-scroll"),
   };
@@ -97,6 +99,7 @@ describe("DiffViewer split viewport behavior", () => {
   it("resizes panes continuously and resets with double click without rebuilding editors", async () => {
     const { container } = await renderReady(pair("before\n", "after\n"));
     const { editorDom, splitter } = prepareDimensions(container);
+    await waitFor(() => expect(splitter).toHaveAttribute("data-layout-ready", "true"));
     const beforeViews = Array.from(container.querySelectorAll<HTMLElement>(".cm-editor")).map((dom) => EditorView.findFromDOM(dom));
     const initial = wrapperWidths(editorDom);
 

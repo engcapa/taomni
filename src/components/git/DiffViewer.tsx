@@ -31,7 +31,6 @@ interface DiffViewerProps {
   worktreeEditable?: boolean;
   onSaveWorktree?: (text: string) => Promise<void> | void;
 }
-
 const VIEW_KEY = "taomni.git.diff.view";
 const WS_KEY = "taomni.git.diff.ws";
 const SYNC_SCROLL_KEY = "taomni.git.diff.syncScroll";
@@ -598,6 +597,7 @@ function setupSplitDiffInteractions(mv: MergeView, options: SplitInteractionOpti
   svg.appendChild(pathLayer);
   connector.appendChild(svg);
   editorDom.insertBefore(connector, rightWrap);
+  connector.dataset.layoutReady = "false";
 
   const aScroll = mv.a.scrollDOM;
   const bScroll = mv.b.scrollDOM;
@@ -617,6 +617,16 @@ function setupSplitDiffInteractions(mv: MergeView, options: SplitInteractionOpti
   const renderConnectors = () => {
     renderFrame = 0;
     if (!connector.isConnected) return;
+    const connectorRect = connector.getBoundingClientRect();
+    const editorRect = editorDom.getBoundingClientRect();
+    const layoutReady = connectorRect.width > 0
+      && connectorRect.height > 0
+      && editorRect.width > CONNECTOR_WIDTH
+      && editorRect.height > 0;
+    if (layoutReady && connector.dataset.layoutReady !== "true") {
+      connector.dataset.layoutReady = "true";
+      options.onLayoutReady();
+    }
     const width = connector.clientWidth || CONNECTOR_WIDTH;
     const height =
       connector.clientHeight ||
@@ -918,6 +928,17 @@ function setupSplitDiffInteractions(mv: MergeView, options: SplitInteractionOpti
       applyLayout(options.readPreferredRatio());
       if (becameUsable) options.onLayoutReady();
     }
+    // renderConnectors also runs on the next frame, but update the observable
+    // readiness immediately for WebKit implementations that report ResizeObserver
+    // before the connector's final flex rect is committed.
+    const connectorRect = connector.getBoundingClientRect();
+    const editorRect = editorDom.getBoundingClientRect();
+    if (connectorRect.width > 0 && connectorRect.height > 0
+      && editorRect.width > CONNECTOR_WIDTH && editorRect.height > 0
+      && connector.dataset.layoutReady !== "true") {
+      connector.dataset.layoutReady = "true";
+      options.onLayoutReady();
+    }
     queueRender();
   };
   const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(handleResize) : null;
@@ -942,7 +963,7 @@ function setupSplitDiffInteractions(mv: MergeView, options: SplitInteractionOpti
 
   queueRender();
   deferredRender = window.setTimeout(queueRender, 80);
-  if (layout.width > CONNECTOR_WIDTH) options.onLayoutReady();
+  if (layout.width > CONNECTOR_WIDTH) queueRender();
 
   return () => {
     options.cancelPendingScrollCorrection();
@@ -1550,6 +1571,3 @@ function ImageSide({ label, url, missing }: { label: string; url: string | null;
     </div>
   );
 }
-
-
-
