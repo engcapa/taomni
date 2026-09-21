@@ -350,6 +350,30 @@ class NativeKeysVerbTest(TestCase):
             self.assertEqual(artifact["keys"], ["Tab", "Control+v"])
             self.assertNotIn("text", artifact)
 
+    def test_native_keys_can_focus_target_before_verifying_ownership(self) -> None:
+        session = Mock()
+        session.execute.side_effect = [True, None, []]
+
+        with TemporaryDirectory() as directory, patch.object(native_steps.time, "sleep"):
+            case_dir = Path(directory)
+            ctx = native_steps.NativeStepContext(session, case_dir, {})
+            native_steps.VERBS["native_keys"](ctx, {
+                "selector": ".cm-content",
+                "keys": ["Control+z"],
+                "transport": "webdriver",
+                "focus_target": True,
+            })
+
+            session.focus.assert_called_once_with(".cm-content")
+            session.press_combos.assert_called_once_with(["Control+z"])
+            artifact = json.loads(
+                (case_dir / "native-key-observation.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                artifact["focus_verification"],
+                "WebDriver focus then immediate DOM probe",
+            )
+
     def test_native_keys_accepts_explicit_focus_precondition_during_driver_fault(self) -> None:
         session = Mock()
         session.application = Path("/tmp/taomni")

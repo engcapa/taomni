@@ -12,7 +12,7 @@ use crate::state::AppState;
 use base64::{Engine, engine::general_purpose::STANDARD as B64};
 use russh::Sig;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::io::{Read, Write};
 use std::pin::Pin;
@@ -59,7 +59,10 @@ pub async fn list_common_local_directories(
     // "defaults only" list, which silently lost history). Filesystem
     // probing happens inside `list_directory_shortcuts` without the DB
     // lock held.
-    let db = state.db.lock().map_err(|e| format!("session database is unavailable: {e}"))?;
+    let db = state
+        .db
+        .lock()
+        .map_err(|e| format!("session database is unavailable: {e}"))?;
     let mut db = db;
     local_directories::init_tables(&db).map_err(|e| e.to_string())?;
     local_directories::migrate_legacy_history(&mut db).map_err(|e| e.to_string())?;
@@ -85,7 +88,7 @@ pub async fn record_local_directory_use(
             _ => {
                 return Err(format!(
                     "terminal {backend_session_id} is not a live local terminal"
-                ))
+                ));
             }
         }
     }
@@ -107,7 +110,12 @@ pub(crate) fn record_local_directory_use_inner(
     let Some(new_key) = local_directories::normalize_path_key(&path_buf) else {
         return Err(format!("invalid local directory path: {path}"));
     };
-    if let Some(last) = state.local_directory_runtime.lock().ok().and_then(|r| r.get(backend_session_id).cloned()) {
+    if let Some(last) = state
+        .local_directory_runtime
+        .lock()
+        .ok()
+        .and_then(|r| r.get(backend_session_id).cloned())
+    {
         if last == new_key {
             return Ok(local_directories::RecordDirectoryUseResponse {
                 changed: false,
@@ -118,13 +126,20 @@ pub(crate) fn record_local_directory_use_inner(
     let now_ms = local_directories::system_now_ms();
     let mut db = state.db.lock().map_err(|e| e.to_string())?;
     local_directories::init_tables(&db).map_err(|e| e.to_string())?;
-    let (changed, revision) =
-        local_directories::record_directory_use(&mut db, &path_buf, local_directories::SOURCE_LOCAL_CWD, now_ms)?;
+    let (changed, revision) = local_directories::record_directory_use(
+        &mut db,
+        &path_buf,
+        local_directories::SOURCE_LOCAL_CWD,
+        now_ms,
+    )?;
     if let Ok(mut runtime) = state.local_directory_runtime.lock() {
         runtime.insert(backend_session_id.to_string(), new_key);
     }
     if changed {
-        let _ = app_handle.emit("welcome-directories-changed", serde_json::json!({ "revision": revision }));
+        let _ = app_handle.emit(
+            "welcome-directories-changed",
+            serde_json::json!({ "revision": revision }),
+        );
     }
     Ok(local_directories::RecordDirectoryUseResponse {
         changed,
@@ -167,7 +182,10 @@ pub(crate) fn record_successful_local_start(
     }
     match result {
         Ok((true, revision)) => {
-            let _ = app_handle.emit("welcome-directories-changed", serde_json::json!({ "revision": revision }));
+            let _ = app_handle.emit(
+                "welcome-directories-changed",
+                serde_json::json!({ "revision": revision }),
+            );
             None
         }
         Ok((false, _)) => None,
@@ -201,6 +219,24 @@ pub struct LocalTerminalCreated {
     /// usage record could not be saved. Launch success is never downgraded to
     /// an IPC error for a history write failure (design §4.1.5).
     pub directory_use_warning: Option<String>,
+    /// SDK variables resolved for this workspace. Interactive shell profiles
+    /// may overwrite the PTY launch environment, so task wrappers re-apply
+    /// these values immediately around each command.
+    pub task_environment: BTreeMap<String, String>,
+}
+
+fn terminal_task_environment(
+    sdk_environment: Option<&crate::sdk::WorkspaceSdkEnvironment>,
+    inherited_path: Option<&std::ffi::OsStr>,
+) -> BTreeMap<String, String> {
+    let Some(sdk_environment) = sdk_environment else {
+        return BTreeMap::new();
+    };
+    let mut environment = sdk_environment.environment.clone();
+    if let Some(path) = sdk_environment.prepend_path(inherited_path) {
+        environment.insert("PATH".to_string(), path.to_string_lossy().into_owned());
+    }
+    environment
 }
 
 /// Register an already-spawned local PTY in the shared terminal runtime and
@@ -374,6 +410,10 @@ pub async fn create_local_terminal(
     } else {
         None
     };
+    let task_environment = terminal_task_environment(
+        sdk_environment.as_ref(),
+        std::env::var_os("PATH").as_deref(),
+    );
     let (handle, reader, shell_id) = pty::create_pty_with_environment(
         cols,
         rows,
@@ -412,7 +452,49 @@ pub async fn create_local_terminal(
         session_id,
         shell_id,
         directory_use_warning,
+        task_environment,
     })
+}
+
+#[cfg(test)]
+mod sdk_task_environment_tests {
+    use super::*;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn exposes_sdk_values_with_sdk_bins_preceding_the_inherited_path() {
+        let mut sdk_environment = crate::sdk::WorkspaceSdkEnvironment::passthrough(
+            Path::new("/repo"),
+            Path::new("/repo"),
+        );
+        sdk_environment
+            .environment
+            .insert("JAVA_HOME".to_string(), "/sdk/jdk-21".to_string());
+        sdk_environment.path_entries = vec!["/sdk/jdk-21/bin".to_string()];
+
+        let inherited_entry = PathBuf::from("/inherited/bin");
+        let inherited_path =
+            std::env::join_paths([inherited_entry.as_path()]).expect("join inherited task PATH");
+        let environment =
+            terminal_task_environment(Some(&sdk_environment), Some(inherited_path.as_os_str()));
+
+        assert_eq!(
+            environment.get("JAVA_HOME").map(String::as_str),
+            Some("/sdk/jdk-21")
+        );
+        let path = environment.get("PATH").expect("task PATH");
+        let entries = std::env::split_paths(std::ffi::OsStr::new(path)).collect::<Vec<_>>();
+        assert_eq!(
+            entries.first().and_then(|entry| entry.to_str()),
+            Some("/sdk/jdk-21/bin")
+        );
+        assert!(entries.iter().any(|entry| entry == &inherited_entry));
+    }
+
+    #[test]
+    fn returns_no_task_overrides_without_a_workspace_sdk_environment() {
+        assert!(terminal_task_environment(None, Some(std::ffi::OsStr::new("/usr/bin"))).is_empty());
+    }
 }
 
 #[tauri::command]

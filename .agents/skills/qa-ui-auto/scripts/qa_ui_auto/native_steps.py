@@ -1485,7 +1485,7 @@ def _host_delete_file(ctx: NativeStepContext, args: Any) -> str:
 
 @_verb("native_keys")
 def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
-    """Inject native keys into an already-focused native control."""
+    """Inject native keys into a focused native control."""
     if not isinstance(args, dict):
         raise StepError("native_keys: expected {selector, keys}")
     selector = args.get("selector")
@@ -1508,11 +1508,18 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(require_keydown_prevented, bool):
         raise StepError("native_keys: require_keydown_prevented must be a boolean")
 
+    focus_target = args.get("focus_target", False)
+    if not isinstance(focus_target, bool):
+        raise StepError("native_keys: focus_target must be a boolean")
     focus_prechecked = args.get("focus_prechecked") is True
+    if focus_target and focus_prechecked:
+        raise StepError("native_keys: focus_target and focus_prechecked are mutually exclusive")
     if focus_prechecked and require_keydown_prevented:
         raise StepError(
             "native_keys: require_keydown_prevented needs WebDriver event observation"
         )
+    if focus_target:
+        ctx.session.focus(selector)
     if not focus_prechecked:
         focused = ctx.session.execute(
             f"const el = document.querySelector({json.dumps(selector)});"
@@ -1594,7 +1601,13 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
         "active_window": window_id,
         "window_identity": window_identity,
         "focused_selector": selector,
-        "focus_verification": "testcase precondition" if focus_prechecked else "immediate DOM probe",
+        "focus_verification": (
+            "testcase precondition"
+            if focus_prechecked
+            else "WebDriver focus then immediate DOM probe"
+            if focus_target
+            else "immediate DOM probe"
+        ),
         "keys": keys,
         "observed_events": observed_events,
         "ready_selector": ready_selector,

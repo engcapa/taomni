@@ -767,6 +767,10 @@
      "type": "boolean",
      "description": "Skip the immediate WebDriver focus probe only when the testcase asserted DOM focus immediately before an external fault that makes WebDriver commands unavailable."
     },
+    "focus_target": {
+     "type": "boolean",
+     "description": "Focus the selector through WebDriver immediately before verifying ownership and injecting keys. Mutually exclusive with focus_prechecked."
+    },
     "ready_selector": {
      "$ref": "#/$defs/selector",
      "description": "Optional visible selector polled after native input setup and immediately before key delivery."
