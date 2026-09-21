@@ -10612,14 +10612,15 @@ end_of_record
     });
 
     it("restores pending recovery entries through the real UI after reopen", async () => {
-      const { disk, workspace } = setupWorkspace("recovery-restore", "src/reader.ts");
+      runtimeState.tauri = true;
+      const { disk, workspace } = setupWorkspace("recovery-restore", "src/main.ts");
       // The interrupted transaction already applied its post-state on disk.
       disk["src/main.ts"] = POST["src/main.ts"];
       disk["src/other.ts"] = POST["src/other.ts"];
       seedPendingJournal();
 
       renderWorkspace(workspace, {});
-      await screen.findByTitle("app / src/reader.ts");
+      await screen.findByTitle("app / src/main.ts");
       // RC-02: auto-discover opens the review dialog (figure A) instead of a
       // global confirm. Restore via the dialog; the second confirm reuses the
       // mocked app dialog (default true).
@@ -10633,6 +10634,22 @@ end_of_record
       await waitFor(() => expect(disk["src/other.ts"]).toBe(PRE["src/other.ts"]));
       expect(getRefactorRecoveryJournalV2("rec-reopen-1")?.status).toBe("rolled-back");
       expect(useAppStore.getState().statusMessage).toContain("Refactor recovery complete: restored 2");
+
+      // Windows can deliver the restore-owned delete half of a rename after
+      // the buffer has already been remapped/opened at the restored path.
+      await act(async () => {
+        await emit("lsp://external-file-change", {
+          workspaceId: "instance-recovery-restore",
+          path: "/repo/app/src/main.ts",
+          type: 3,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 240));
+      });
+      expect(useAppStore.getState().statusMessage).toContain("Refactor recovery complete: restored 2");
+      expect(selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        "instance-recovery-restore",
+      ).openFiles["root:app:src/main.ts"]?.error).toBeNull();
     });
 
     it("closes an already-restored pending entry idempotently without rewriting files", async () => {

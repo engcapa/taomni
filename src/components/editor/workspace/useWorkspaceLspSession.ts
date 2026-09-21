@@ -101,6 +101,7 @@ function sameDocumentStatus(left: LspDocumentStatus, right: LspDocumentStatus): 
     && left.displayName === right.displayName
     && left.available === right.available
     && left.active === right.active
+    && (left.semanticReady ?? true) === (right.semanticReady ?? true)
     && left.selectedCommandId === right.selectedCommandId
     && left.selectedCommand === right.selectedCommand
     && left.installHint === right.installHint

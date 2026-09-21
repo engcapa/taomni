@@ -5,6 +5,7 @@ import { closeCompletion, completionStatus, currentCompletions, selectedCompleti
 import { EditorView } from "@codemirror/view";
 import type { LspCompletionItem } from "../../../lib/editor/lsp";
 import { CodeMirrorHost } from "./CodeMirrorHost";
+import { LspCompletionController } from "./lspCompletion";
 import { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactionOwner";
 
 describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / AC-01..05)", () => {
@@ -119,6 +120,7 @@ describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / A
   it("AC-02 / RT-02 & RT-03: ArrowDown navigates candidates and Enter accepts without newline", async () => {
     let revision = 0;
     const item = createProviderSoutItem();
+    const completionController = new LspCompletionController({ documentationDelayMs: 5_000 });
     const complete = vi.fn(async () => ({
       status: {
         path: "App.java",
@@ -152,6 +154,7 @@ describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / A
         onComplete={complete}
         onCompleteResolve={async () => item}
         completionTriggers={["."]}
+        completionController={completionController}
         hoverDocumentationDelayMs={0}
         onCompletionDiagnostic={vi.fn()}
         getCompletionIdentity={() => ({
@@ -179,7 +182,7 @@ describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / A
     await waitFor(() => expect(document.querySelector(".cm-tooltip-autocomplete li")).not.toBeNull());
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      await new Promise((resolve) => setTimeout(resolve, 150));
     });
 
     const initialHead = view.state.selection.main.head;
@@ -681,6 +684,10 @@ describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / A
     });
 
     await waitFor(() => expect(document.querySelector(".cm-tooltip-autocomplete li")).not.toBeNull());
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
 
     // Enter accepts local sout template
     fireEvent.keyDown(content, { key: "Enter" });
@@ -1475,4 +1482,3 @@ describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / A
     expect(props.onChange).not.toHaveBeenCalled();
   });
 });
-

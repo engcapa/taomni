@@ -41,10 +41,14 @@ export function LspStatusPill({
   const warnings = diagnostics.filter((item) => item.severity === 2).length;
   const runtimeError = status.error ?? state.error;
   const name = status.displayName ?? "LSP";
+  // Older/browser status producers omit the field and remain ready-compatible.
+  const semanticReady = status.semanticReady !== false;
   // "starting…" only while a sync/open is in flight. A silent available+!active
   // after the process exits used to look stuck forever on "Java starting…".
   const label = status.active
-    ? `${name}${errors || warnings ? ` · ${errors}E ${warnings}W` : ""}`
+    ? semanticReady
+      ? `${name}${errors || warnings ? ` · ${errors}E ${warnings}W` : ""}`
+      : `${name} indexing…`
     : runtimeError
       ? runtimeError
       : !status.available && status.installHint
@@ -64,6 +68,7 @@ export function LspStatusPill({
       title={title}
       data-testid="code-workspace-lsp-status-pill"
       data-active={status.active || undefined}
+      data-semantic-ready={String(status.active && semanticReady)}
       data-error={!!state.error || (!status.active && !!status.error) || undefined}
       className="max-w-[50%] shrink-0 inline-flex min-w-0 items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[11px] font-medium bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)] data-[active=true]:border-[var(--taomni-selected-border)] data-[active=true]:bg-[var(--taomni-selected)] data-[active=true]:font-semibold data-[active=true]:text-[var(--taomni-accent)] data-[error=true]:border-amber-500/50 data-[error=true]:text-amber-700 dark:data-[error=true]:text-amber-400"
     >
@@ -118,5 +123,4 @@ export function IconButton({
     </button>
   );
 }
-
 

@@ -1070,6 +1070,7 @@ function stubLspDocumentStatus(args?: InvokeArgs) {
     displayName: preset?.displayName ?? null,
     available: false,
     active: false,
+    semanticReady: false,
     selectedCommandId: null,
     selectedCommand: null,
     installHint: preset?.commands[0]?.installHint ?? null,

@@ -221,6 +221,10 @@ import {
 } from "./workspaceVirtualSpace";
 import type { WorkspaceActionHost } from "./workspaceActionHost";
 
+// CodeMirror uses this only to ignore the key event that opened a popup. It is
+// unrelated to how long completion documentation waits before being shown.
+const COMPLETION_INTERACTION_DELAY_MS = 75;
+
 // ED-MAIN-009: hashing a multi-megabyte document costs ~100ms, so capture
 // ED-REPAIR-009: exact document content hash cached by immutable Text instance.
 // Never reused across document mutations by wall-clock heuristics.
@@ -2442,7 +2446,6 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       const autoPopup = policy?.autoPopup ?? true;
       const delayMs = policy?.delayMs ?? 100;
       const maxVisibleItems = policy?.maxVisibleItems ?? 100;
-      const docDelayMs = policy?.documentation?.delayMs ?? hoverDocumentationDelayMs ?? 75;
 
       return autocompletion({
         activateOnTyping: autoPopup,
@@ -2450,7 +2453,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         defaultKeymap: true,
         icons: true,
         maxRenderedOptions: maxVisibleItems,
-        interactionDelay: docDelayMs,
+        interactionDelay: COMPLETION_INTERACTION_DELAY_MS,
         positionInfo: positionCompletionInfo,
         optionClass: (completion) => (
           completion.type ? `cm-completion-type-${completion.type}` : ""

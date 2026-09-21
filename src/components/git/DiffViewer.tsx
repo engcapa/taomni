@@ -272,7 +272,6 @@ if (typeof document !== "undefined" && !document.getElementById(STYLE_ID)) {
   flex: 0 0 ${CONNECTOR_WIDTH}px;
   width: ${CONNECTOR_WIDTH}px;
   min-width: ${CONNECTOR_WIDTH}px;
-  height: 100%;
   min-height: 0;
   overflow: hidden;
   background:
