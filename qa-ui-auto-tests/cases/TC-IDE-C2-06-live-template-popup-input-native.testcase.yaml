@@ -40,18 +40,18 @@ steps:
   # collision refresh cannot restart CodeMirror's interaction guard underneath
   # the delivered ArrowDown.
   - wait_for:
-      selector: '.cm-tooltip-autocomplete li:nth-of-type(2)'
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)'
       timeout_sec: 30
   - assert_text:
-      selector: '.cm-tooltip-autocomplete li:nth-of-type(2)'
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)'
       contains: "soutm"
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
       keys: ["ArrowDown"]
-      ready_selector: '.cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)'
+      ready_selector: '.cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)'
       ready_timeout_sec: 30
-      ready_stable_sec: 0.2
+      ready_stable_sec: 1.0
       require_keydown_prevented: true
   - assert_text:
       selector: '.cm-tooltip-autocomplete [aria-selected="true"]'
@@ -60,9 +60,9 @@ steps:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
       keys: ["Enter"]
-      ready_selector: '.cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)'
+      ready_selector: '.cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)[aria-selected="true"]'
       ready_timeout_sec: 30
-      ready_stable_sec: 0.2
+      ready_stable_sec: 1.0
       require_keydown_prevented: true
   - wait_for:
       selector: '[data-testid="code-workspace-editor"]'

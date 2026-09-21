@@ -112,7 +112,11 @@ import { extractTerminalCommand } from "../../lib/terminalCommand";
 import { normalizeLocalStartCwd } from "../../lib/terminalCwd";
 import { inferTerminalProgram } from "../../lib/terminalActivity";
 import { buildSshCwdIntegration, buildLocalZshCwdIntegration } from "../../lib/terminalShellIntegration";
-import { buildInteractiveCommandInput, renderTerminalTask } from "../../lib/terminal/commandInput";
+import {
+  buildInteractiveCommandInput,
+  renderTerminalTask,
+  type TerminalTaskVariables,
+} from "../../lib/terminal/commandInput";
 import { registerTerminal, consumeTerminalDetachPending } from "../../lib/terminal/terminalRegistry";
 import {
   ZmodemSession,
@@ -396,6 +400,7 @@ export function TerminalPanel({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const sdkTaskEnvironmentRef = useRef<Record<string, string>>({});
   const connectionStateRef = useRef<TerminalConnectionState>("idle");
   const reconnectSshRef = useRef<(() => void) | null>(null);
   // Mirrors `sessionIdRef.current` as state so the registry-effect below
@@ -2826,6 +2831,7 @@ export function TerminalPanel({
       sessionId: string;
       shellId: string | null;
       directoryUseWarning?: string | null;
+      taskEnvironment?: Record<string, string>;
     };
 
     const cancelPendingMfa = () => {
@@ -2915,7 +2921,7 @@ export function TerminalPanel({
     };
 
     const handleConnected = async (
-      { sessionId: connectedSid, shellId, directoryUseWarning }: ConnectResult,
+      { sessionId: connectedSid, shellId, directoryUseWarning, taskEnvironment }: ConnectResult,
       mode: ConnectMode,
     ) => {
       if (destroyed) {
@@ -2933,6 +2939,7 @@ export function TerminalPanel({
 
       connectionStateRef.current = "connected";
       sessionIdRef.current = connectedSid;
+      sdkTaskEnvironmentRef.current = taskEnvironment ?? {};
       if (isLocalRef.current) flushPendingLocalDirectoryReports(connectedSid);
       lastTerminalSizeSyncRef.current = null;
       setRegisteredSessionId(connectedSid);
@@ -3282,8 +3289,8 @@ export function TerminalPanel({
         handleRawOutput,
         workspaceRootRef.current,
       )
-        .then(({ sessionId, shellId, directoryUseWarning }) =>
-          handleConnected({ sessionId, shellId, directoryUseWarning }, "initial"),
+        .then(({ sessionId, shellId, directoryUseWarning, taskEnvironment }) =>
+          handleConnected({ sessionId, shellId, directoryUseWarning, taskEnvironment }, "initial"),
         )
         .catch((err) => handleConnectFailure(err, "initial"));
     }
@@ -3333,6 +3340,7 @@ export function TerminalPanel({
       fitAddonRef.current = null;
       searchAddonRef.current = null;
       sessionIdRef.current = null;
+      sdkTaskEnvironmentRef.current = {};
       pendingLocalDirectoryReportsRef.current = [];
       connectionStateRef.current = "idle";
       reconnectSshRef.current = null;
@@ -3611,11 +3619,17 @@ export function TerminalPanel({
       },
       runTask: (command: string, taskVariables) => {
         if (readOnlyRef.current) return;
+        const sdkTaskVariables = Object.fromEntries(
+          Object.entries(sdkTaskEnvironmentRef.current).map(([name, value]) => [
+            name,
+            { value, mode: "replace" as const },
+          ]),
+        ) satisfies TerminalTaskVariables;
         const task = renderTerminalTask(command, {
           platform: getAppPlatform(),
           shellId: resolvedLocalShellId ?? localShell?.id ?? null,
           shellName: localShell?.name ?? null,
-        }, taskVariables);
+        }, { ...sdkTaskVariables, ...taskVariables });
         const suppressor = createTaskStartOutputSuppressor(
           task.startMarker,
           task.displayCommand,

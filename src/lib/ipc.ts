@@ -170,6 +170,8 @@ export interface LocalTerminalCreated {
   sessionId: string;
   /** `LocalShellOption.id` of the shell the backend actually launched. */
   shellId: string;
+  /** SDK variables that task wrappers must restore after shell profile setup. */
+  taskEnvironment: Record<string, string>;
   /**
    * Present when the terminal started but the local-directory usage record
    * could not be saved. Never turns a successful launch into a failure.

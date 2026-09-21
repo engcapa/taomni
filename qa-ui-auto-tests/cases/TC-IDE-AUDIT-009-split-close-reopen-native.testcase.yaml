@@ -141,6 +141,7 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
       transport: webdriver
+      focus_target: true
       keys: ["Mod+Home", "Mod+z"]
   - eval_readonly:
       expression: "!document.querySelector('.cm-editor').innerText.includes('XSPLIT1')"
@@ -148,6 +149,7 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
       transport: webdriver
+      focus_target: true
       keys: ["Control+Shift+z"]
   - assert_text:
       selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'

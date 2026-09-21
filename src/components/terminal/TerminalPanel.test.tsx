@@ -5,6 +5,7 @@ import { TerminalPanel, collectTerminalBlockSelectionText } from "./TerminalPane
 import { DEFAULT_TERMINAL_PROFILE, SYSTEM_TERMINAL_THEME } from "../../lib/terminalProfile";
 import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 import { useAppStore } from "../../stores/appStore";
+import { getTerminal } from "../../lib/terminal/terminalRegistry";
 
 const terminalMocks = vi.hoisted(() => {
   const focus = vi.fn();
@@ -355,6 +356,68 @@ describe("TerminalPanel focus behavior", () => {
     await waitFor(() => {
       expect(terminalMocks.focus).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("re-applies the workspace SDK environment for tasks after shell startup", async () => {
+    ipcMocks.createLocalTerminal.mockImplementation(async (sessionId: string) => ({
+      sessionId,
+      shellId: "powershell",
+      taskEnvironment: {
+        JAVA_HOME: "C:\\Program Files\\Java\\jdk-21",
+        PATH: "C:\\Program Files\\Java\\jdk-21\\bin;C:\\Windows\\System32",
+      },
+    }));
+    render(
+      <TerminalPanel
+        tabId="sdk-task"
+        visible
+        workspaceRoot="C:\\repo"
+        localShell={{ id: "powershell", name: "PowerShell" }}
+      />,
+    );
+
+    await waitFor(() => expect(getTerminal("sdk-task")?.runTask).toBeTypeOf("function"));
+    ipcMocks.writeTerminal.mockClear();
+    act(() => {
+      getTerminal("sdk-task")?.runTask?.("mvn.cmd test", {
+        MAVEN_OPTS: { value: "--add-opens=java.base/java.lang=ALL-UNNAMED", mode: "append" },
+      });
+    });
+
+    const encoded = (ipcMocks.writeTerminal.mock.calls as unknown[][])[0]?.[1] as string;
+    const command = atob(encoded);
+    expect(command).toContain("$env:JAVA_HOME='C:\\Program Files\\Java\\jdk-21'");
+    expect(command).toContain("$env:PATH='C:\\Program Files\\Java\\jdk-21\\bin;C:\\Windows\\System32'");
+    expect(command).toContain("$env:MAVEN_OPTS=if ([string]::IsNullOrWhiteSpace");
+  });
+
+  it("lets explicit task variables override workspace SDK defaults", async () => {
+    ipcMocks.createLocalTerminal.mockImplementation(async (sessionId: string) => ({
+      sessionId,
+      shellId: "powershell",
+      taskEnvironment: { JAVA_HOME: "C:\\sdk\\jdk-21" },
+    }));
+    render(
+      <TerminalPanel
+        tabId="sdk-task-override"
+        visible
+        workspaceRoot="C:\\repo"
+        localShell={{ id: "powershell", name: "PowerShell" }}
+      />,
+    );
+
+    await waitFor(() => expect(getTerminal("sdk-task-override")?.runTask).toBeTypeOf("function"));
+    ipcMocks.writeTerminal.mockClear();
+    act(() => {
+      getTerminal("sdk-task-override")?.runTask?.("java -version", {
+        JAVA_HOME: { value: "C:\\task\\jdk-17", mode: "replace" },
+      });
+    });
+
+    const encoded = (ipcMocks.writeTerminal.mock.calls as unknown[][])[0]?.[1] as string;
+    const command = atob(encoded);
+    expect(command).toContain("$env:JAVA_HOME='C:\\task\\jdk-17'");
+    expect(command).not.toContain("C:\\sdk\\jdk-21");
   });
 
   it("mirrors rendered terminal text and idle-prompt readiness for automation", async () => {
