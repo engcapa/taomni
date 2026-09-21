@@ -142,7 +142,10 @@ steps:
       selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
       transport: webdriver
       focus_target: true
-      keys: ["Mod+Home", "Mod+z"]
+      ready_selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      ready_timeout_sec: 15
+      ready_stable_sec: 1
+      keys: ["Mod+z"]
   - eval_readonly:
       expression: "!document.querySelector('.cm-editor').innerText.includes('XSPLIT1')"
       expect_truthy: true
