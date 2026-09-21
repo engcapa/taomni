@@ -767,6 +767,23 @@
      "type": "boolean",
      "description": "Skip the immediate WebDriver focus probe only when the testcase asserted DOM focus immediately before an external fault that makes WebDriver commands unavailable."
     },
+    "ready_selector": {
+     "$ref": "#/$defs/selector",
+     "description": "Optional visible selector polled after native input setup and immediately before key delivery."
+    },
+    "ready_timeout_sec": {
+     "type": "number",
+     "minimum": 0
+    },
+    "ready_stable_sec": {
+     "type": "number",
+     "minimum": 0,
+     "description": "Require the ready element identity and markup to remain unchanged for this duration before delivering keys. Requires ready_selector."
+    },
+    "require_keydown_prevented": {
+     "type": "boolean",
+     "description": "Require each delivered keydown to be consumed with preventDefault; available only with WebDriver event observation."
+    },
     "transport": {
      "enum": ["x11", "webdriver"],
      "default": "x11",

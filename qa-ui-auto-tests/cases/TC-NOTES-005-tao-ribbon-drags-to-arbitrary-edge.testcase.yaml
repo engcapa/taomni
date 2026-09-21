@@ -22,6 +22,9 @@ steps:
   - wait: 0.5
   - assert_attribute: { selector: '[data-testid="ai-chat-drawer-ribbon"]', name: 'data-position', equals: 'bottom' }
   - assert_localstorage: { key: "taomni.chatDrawer.layout.v1", contains: "bottom" }
+  # The drag ends over the bottom edge. Move the physical pointer away before
+  # reload so the restored bottom ribbon does not immediately hover-open.
+  - hover: '[data-testid="welcome-panel"]'
   - reload: null
   - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
   - assert_attribute: { selector: '[data-testid="ai-chat-drawer-ribbon"]', name: 'data-position', equals: 'bottom' }

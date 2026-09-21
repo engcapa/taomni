@@ -173,6 +173,57 @@ class NativeIsolationTest(unittest.TestCase):
                 "PATH_prepend": str(root / "jdk-21" / "bin"),
             })
 
+    def test_harness_seeds_prepared_jdk_into_run_owned_sdk_registry(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = recorded_binary(root)
+            java_home = root / "jdk-21"
+            java = java_home / "bin" / "java.exe"
+            java.parent.mkdir(parents=True)
+            java.write_bytes(b"test executable")
+            harness = native.NativeHarness({
+                "app": {
+                    "native_binary": str(binary),
+                    "tooling_java_home": str(java_home),
+                },
+            }, root / "run")
+            harness.driver = Mock()
+            probe = subprocess.CompletedProcess(
+                [str(java), "-version"],
+                0,
+                stdout="",
+                stderr='openjdk version "21.0.12.1" 2026-08-18 LTS',
+            )
+            with (
+                patch.object(native.platform, "system", return_value="Windows"),
+                patch.dict(os.environ, {"JAVA_HOME": "old-jdk", "PATH": "system-path"}),
+                patch.object(native.subprocess, "run", return_value=probe),
+                patch.object(native, "NativeSession") as session_factory,
+            ):
+                with harness:
+                    harness.create_session()
+
+            registry_path = (
+                root / "run" / "native-appconfig" / native_build.QA_APP_ID
+                / "taomni" / "sdk.json"
+            )
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+            self.assertEqual(registry["defaults"], [{
+                "kind": "java",
+                "sdkId": "qa-prepared-java",
+            }])
+            self.assertEqual(registry["installations"][0]["location"], str(java_home))
+            self.assertEqual(registry["installations"][0]["version"], "21.0.12.1")
+            session_factory.return_value.start.assert_called_once_with()
+
+            evidence = json.loads(
+                (root / "run" / "native-isolation.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                evidence["tooling_sdk_registry"]["registry_path"],
+                str(registry_path),
+            )
+
     def test_unrecorded_binary_never_starts_driver(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

@@ -35,23 +35,24 @@ steps:
   - wait_for:
       selector: '.cm-tooltip-autocomplete'
       timeout_sec: 30
-  # The local source opens first. Wait until the provider result has been merged
-  # and its collision refresh has rebuilt the popup before starting CodeMirror's
-  # interaction-delay clock; otherwise ArrowDown can land during that guard.
+  # The local source opens first. Wait until the provider result has been merged;
+  # native_keys then polls the rebuilt popup after its own input setup so a late
+  # collision refresh cannot restart CodeMirror's interaction guard underneath
+  # the delivered ArrowDown.
   - wait_for:
       selector: '.cm-tooltip-autocomplete li:nth-of-type(2)'
       timeout_sec: 30
   - assert_text:
       selector: '.cm-tooltip-autocomplete li:nth-of-type(2)'
       contains: "soutm"
-  - wait: 0.5
-  - eval_readonly:
-      expression: 'document.querySelector(".cm-tooltip-autocomplete")?.classList.contains("cm-tooltip-autocomplete-disabled") === false'
-      expect_truthy: true
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
       keys: ["ArrowDown"]
+      ready_selector: '.cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)'
+      ready_timeout_sec: 30
+      ready_stable_sec: 0.2
+      require_keydown_prevented: true
   - assert_text:
       selector: '.cm-tooltip-autocomplete [aria-selected="true"]'
       contains: "soutm"
@@ -59,6 +60,10 @@ steps:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
       keys: ["Enter"]
+      ready_selector: '.cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)'
+      ready_timeout_sec: 30
+      ready_stable_sec: 0.2
+      require_keydown_prevented: true
   - wait_for:
       selector: '[data-testid="code-workspace-editor"]'
       timeout_sec: 10

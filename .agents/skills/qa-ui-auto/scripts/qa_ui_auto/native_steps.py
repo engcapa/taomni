@@ -1495,8 +1495,24 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
         raise StepError("native_keys: selector must be a non-empty string")
     if not isinstance(keys, list) or not keys or not all(isinstance(key, str) for key in keys):
         raise StepError("native_keys: keys must be a non-empty string array")
+    ready_selector = args.get("ready_selector")
+    if ready_selector is not None and (not isinstance(ready_selector, str) or not ready_selector):
+        raise StepError("native_keys: ready_selector must be a non-empty string")
+    ready_timeout_sec = float(args.get("ready_timeout_sec", 10))
+    ready_stable_sec = float(args.get("ready_stable_sec", 0))
+    if ready_stable_sec < 0:
+        raise StepError("native_keys: ready_stable_sec must be non-negative")
+    if ready_stable_sec and ready_selector is None:
+        raise StepError("native_keys: ready_stable_sec requires ready_selector")
+    require_keydown_prevented = args.get("require_keydown_prevented", False)
+    if not isinstance(require_keydown_prevented, bool):
+        raise StepError("native_keys: require_keydown_prevented must be a boolean")
 
     focus_prechecked = args.get("focus_prechecked") is True
+    if focus_prechecked and require_keydown_prevented:
+        raise StepError(
+            "native_keys: require_keydown_prevented needs WebDriver event observation"
+        )
     if not focus_prechecked:
         focused = ctx.session.execute(
             f"const el = document.querySelector({json.dumps(selector)});"
@@ -1509,14 +1525,51 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
     if not focus_prechecked:
         ctx.session.execute(
             "window.__QA_NATIVE_KEY_EVENTS__=[];"
-            "window.__QA_NATIVE_KEY_LISTENER__=(event)=>window.__QA_NATIVE_KEY_EVENTS__.push({"
-            "type:event.type,key:event.key,code:event.code,ctrlKey:event.ctrlKey,"
-            "altKey:event.altKey,shiftKey:event.shiftKey,metaKey:event.metaKey,"
-            "defaultPrevented:event.defaultPrevented});"
+            "window.__QA_NATIVE_KEY_LISTENER__=(event)=>{"
+            "const snapshot={type:event.type,key:event.key,code:event.code,"
+            "ctrlKey:event.ctrlKey,altKey:event.altKey,shiftKey:event.shiftKey,"
+            "metaKey:event.metaKey};"
+            "setTimeout(()=>window.__QA_NATIVE_KEY_EVENTS__.push({"
+            "...snapshot,defaultPrevented:event.defaultPrevented}));};"
             "window.addEventListener('keydown',window.__QA_NATIVE_KEY_LISTENER__,true);"
             "window.addEventListener('keyup',window.__QA_NATIVE_KEY_LISTENER__,true);"
         )
     time.sleep(0.25)
+    if ready_selector is not None:
+        _wait_for(ctx, {
+            "selector": ready_selector,
+            "timeout_sec": ready_timeout_sec,
+            "state": "visible",
+        })
+        if ready_stable_sec:
+            ctx.session.execute("delete window.__QA_NATIVE_READY_STATE__; return true;")
+            expires = time.monotonic() + ready_timeout_sec
+            last_stable_ms = 0.0
+            while time.monotonic() < expires:
+                readiness = ctx.session.execute(
+                    f"const el=document.querySelector({json.dumps(ready_selector)});"
+                    "const now=performance.now();"
+                    "const rect=el?.getBoundingClientRect();"
+                    "const visible=!!el && !!rect && rect.width>0 && rect.height>0;"
+                    "const signature=visible ? el.outerHTML : null;"
+                    "const previous=window.__QA_NATIVE_READY_STATE__;"
+                    "if(!visible || !previous || previous.el!==el || previous.signature!==signature){"
+                    "window.__QA_NATIVE_READY_STATE__={el,signature,since:now};"
+                    "return {stable:false,stableMs:0};}"
+                    "const stableMs=now-previous.since;"
+                    f"return {{stable:stableMs>={ready_stable_sec * 1000},stableMs}};"
+                )
+                if isinstance(readiness, dict):
+                    last_stable_ms = float(readiness.get("stableMs", 0))
+                    if readiness.get("stable") is True:
+                        break
+                time.sleep(0.05)
+            else:
+                raise StepError(
+                    "native_keys: ready selector did not remain stable for "
+                    f"{ready_stable_sec}s within {ready_timeout_sec}s "
+                    f"(last stable {last_stable_ms / 1000:.3f}s)"
+                )
     window_id = None
     window_identity = None
     if transport == "webdriver":
@@ -1544,6 +1597,9 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
         "focus_verification": "testcase precondition" if focus_prechecked else "immediate DOM probe",
         "keys": keys,
         "observed_events": observed_events,
+        "ready_selector": ready_selector,
+        "ready_stable_sec": ready_stable_sec,
+        "require_keydown_prevented": require_keydown_prevented,
         "transport": (
             "W3C WebDriver key actions -> platform WebView"
             if transport == "webdriver"
@@ -1555,6 +1611,19 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
         json.dumps(artifact, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+    if require_keydown_prevented:
+        expected = [chord.rsplit("+", 1)[-1].casefold() for chord in keys]
+        prevented = [
+            str(event.get("key", "")).casefold()
+            for event in observed_events or []
+            if event.get("type") == "keydown" and event.get("defaultPrevented") is True
+        ]
+        missing = [key for key in expected if key not in prevented]
+        if missing:
+            raise StepError(
+                "native_keys: keydown was not consumed by the target: "
+                + ", ".join(missing)
+            )
     return f"injected {len(keys)} {transport} keys into focused native control"
 
 

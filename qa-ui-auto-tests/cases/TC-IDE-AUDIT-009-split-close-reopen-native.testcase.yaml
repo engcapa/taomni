@@ -138,9 +138,6 @@ steps:
       timeout_sec: 15
   # ...and its history: undo/redo still reach the shared document ledger.
   - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
-  - eval_readonly:
-      expression: 'document.activeElement === document.querySelectorAll(".cm-content")[0]'
-      expect_truthy: true
   - native_keys:
       selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
       transport: webdriver
