@@ -6792,10 +6792,11 @@ export function CodeWorkspaceTab({
       return absolute !== null && fsPathEquals(absolute, normalizedPath);
     });
     refreshTree();
+    // Restore can remap a renamed file back into the open-file registry before
+    // Windows delivers the old delete notification. Consume that owned echo
+    // before either the open- or closed-file status path handles it.
+    if (restoreEchoSuppressorRef.current.shouldSuppress(fsPathComparisonKey(normalizedPath))) return;
     if (!file) {
-      // ED-AUDIT-014: a closed file we just restore-wrote echoes back
-      // through the watcher; skip only the misleading status note.
-      if (restoreEchoSuppressorRef.current.shouldSuppress(fsPathComparisonKey(normalizedPath))) return;
       setStatusMessage(`File changed on disk: ${change.path}`);
       return;
     }

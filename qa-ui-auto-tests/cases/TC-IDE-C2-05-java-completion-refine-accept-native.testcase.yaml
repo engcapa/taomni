@@ -21,10 +21,9 @@ steps:
   - click: '[data-testid="welcome-history-tab-workspaces"]'
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
   - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
-  - assert_text:
-      selector: '[data-testid="code-workspace-lsp-status-pill"]'
-      contains: "Java"
-      timeout_sec: 60
+  - wait_for:
+      selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+      timeout_sec: 120
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   # Replace the existing println line in main, leaving the disk fixture intact.
   - native_keys:

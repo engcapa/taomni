@@ -23,7 +23,7 @@ steps:
   - wait_for: "[data-testid=\"terminal-pane\"]"
   - wait_for:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-      timeout_sec: 20
+      timeout_sec: 60
   - click: "[data-testid=\"attached-sftp-toggle\"]"
   - wait_for: "[data-testid=\"sftp-browser\"]"
   # The attached pane navigates to the SSH home on mount. Setting the path

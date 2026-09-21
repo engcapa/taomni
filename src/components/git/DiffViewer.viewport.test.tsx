@@ -40,14 +40,18 @@ class TestResizeObserver {
   }
 }
 
-function setWidth(element: HTMLElement, width: number) {
+const elementDimensions = new WeakMap<HTMLElement, { width: number; height: number }>();
+
+function setDimensions(element: HTMLElement, width: number, height: number) {
+  elementDimensions.set(element, { width, height });
   Object.defineProperty(element, "clientWidth", { configurable: true, value: width });
+  Object.defineProperty(element, "clientHeight", { configurable: true, value: height });
   element.getBoundingClientRect = () => ({
     width,
-    height: 400,
+    height,
     top: 0,
     right: width,
-    bottom: 400,
+    bottom: height,
     left: 0,
     x: 0,
     y: 0,
@@ -55,14 +59,22 @@ function setWidth(element: HTMLElement, width: number) {
   }) as DOMRect;
 }
 
+function setWidth(element: HTMLElement, width: number) {
+  setDimensions(element, width, elementDimensions.get(element)?.height ?? 0);
+}
+
+function setHeight(element: HTMLElement, height: number) {
+  setDimensions(element, elementDimensions.get(element)?.width ?? 0, height);
+}
+
 function prepareDimensions(container: HTMLElement, width = 1000) {
   const editorDom = container.querySelector<HTMLElement>(".cm-mergeViewEditors");
   expect(editorDom).toBeTruthy();
-  setWidth(editorDom!, width);
+  setDimensions(editorDom!, width, 400);
   const editors = Array.from(container.querySelectorAll<HTMLElement>(".cm-mergeViewEditor > .cm-editor"));
-  editors.forEach((editor) => setWidth(editor, Math.max(1, (width - 36) / 2)));
+  editors.forEach((editor) => setDimensions(editor, Math.max(1, (width - 36) / 2), 400));
   const splitter = screen.getByTestId("git-diff-splitter");
-  setWidth(splitter, 36);
+  setDimensions(splitter, 36, 400);
   fireEvent(window, new Event("resize"));
   return {
     editorDom: editorDom!,
@@ -94,6 +106,34 @@ describe("DiffViewer split viewport behavior", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+  });
+
+  it("lets flex stretch establish the connector height on WebKitGTK", async () => {
+    const connectorRule = Array.from(
+      (document.getElementById("taomni-diff-style") as HTMLStyleElement).sheet!.cssRules,
+    ).find((rule): rule is CSSStyleRule => (
+      rule instanceof CSSStyleRule
+      && rule.selectorText === ".taomni-diff-host .taomni-diff-connector"
+    ));
+    expect(connectorRule).toBeTruthy();
+    expect(connectorRule!.style.alignSelf).toBe("stretch");
+    expect(connectorRule!.style.height).toBe("");
+
+    const { container } = await renderReady(pair("before\n", "after\n"));
+    const editorDom = container.querySelector<HTMLElement>(".cm-mergeViewEditors")!;
+    const splitter = screen.getByTestId("git-diff-splitter");
+    setDimensions(editorDom, 1000, 400);
+    setDimensions(splitter, 36, 0);
+    fireEvent(window, new Event("resize"));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(splitter).toHaveAttribute("data-layout-ready", "false");
+
+    // jsdom has no flex layout engine; this models WebKitGTK applying the
+    // cross-axis stretch after the parent has a definite rendered height.
+    setHeight(splitter, 400);
+    fireEvent(window, new Event("resize"));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(splitter).toHaveAttribute("data-layout-ready", "true");
   });
 
   it("resizes panes continuously and resets with double click without rebuilding editors", async () => {

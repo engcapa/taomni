@@ -138,12 +138,20 @@ steps:
       timeout_sec: 15
   # ...and its history: undo/redo still reach the shared document ledger.
   - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
-  - press: Mod+Home
-  - press: Mod+z
+  - eval_readonly:
+      expression: 'document.activeElement === document.querySelectorAll(".cm-content")[0]'
+      expect_truthy: true
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      transport: webdriver
+      keys: ["Mod+Home", "Mod+z"]
   - eval_readonly:
       expression: "!document.querySelector('.cm-editor').innerText.includes('XSPLIT1')"
       expect_truthy: true
-  - press: Control+Shift+z
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      transport: webdriver
+      keys: ["Control+Shift+z"]
   - assert_text:
       selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
       contains: "XSPLIT1"

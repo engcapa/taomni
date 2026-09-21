@@ -74,6 +74,27 @@ def native_isolation_env(report_root: Path) -> dict[str, str]:
     raise WebDriverError("native isolation is unsupported on this OS")
 
 
+def native_tooling_env(cfg: dict) -> tuple[dict[str, str], dict[str, str]]:
+    """Pin the configured tooling JDK in the WebDriver-launched application.
+
+    On Windows the application is a grandchild of tauri-driver and
+    msedgedriver. Seeding the renderer's LSP setting does not affect Maven or
+    workspace terminals, so the process environment must carry the same JDK.
+    """
+    configured = cfg.get("app", {}).get("tooling_java_home")
+    if not configured:
+        return {}, {}
+    home = str(Path(str(configured)).expanduser())
+    java_bin = str(Path(home) / "bin")
+    inherited_path = os.environ.get("PATH", "")
+    process_env = {
+        "JAVA_HOME": home,
+        "PATH": java_bin if not inherited_path else os.pathsep.join((java_bin, inherited_path)),
+    }
+    evidence = {"JAVA_HOME": home, "PATH_prepend": java_bin}
+    return process_env, evidence
+
+
 def _tcp_ok(host: str, port: int, timeout: float = 1.0) -> bool:
     try:
         with socket.create_connection((host, int(port)), timeout=timeout):
@@ -974,20 +995,23 @@ class NativeHarness:
             identity = verify_identity(self.application)
         except ValueError as exc:
             raise WebDriverError(str(exc)) from exc
-        overrides = native_isolation_env(self.report_root)
+        isolation_overrides = native_isolation_env(self.report_root)
+        tooling_overrides, tooling_evidence = native_tooling_env(self.cfg)
+        overrides = {**isolation_overrides, **tooling_overrides}
         if identity.get("source_sha256"):
             from qa_ui_auto.provenance import source_identity
             if identity["source_sha256"] != source_identity(ROOT):
                 raise WebDriverError("QA binary source is stale; run native_build.py")
         self._previous_env = {key: os.environ.get(key) for key in overrides}
         try:
-            for value in overrides.values():
+            for value in isolation_overrides.values():
                 Path(value).mkdir(parents=True, exist_ok=True)
             os.environ.update(overrides)
             self.report_root.mkdir(parents=True, exist_ok=True)
             (self.report_root / "native-isolation.json").write_text(
                 json.dumps({"identifier": QA_APP_ID, "binary": str(self.application.resolve()),
-                            "binary_sha256": identity["binary_sha256"], "environment": overrides,
+                            "binary_sha256": identity["binary_sha256"], "environment": isolation_overrides,
+                            "tooling_environment": tooling_evidence,
                             "source_sha256": identity.get("source_sha256"),
                             "profile": identity.get("profile")}, indent=2) + "\n",
                 encoding="utf-8",

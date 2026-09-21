@@ -96,6 +96,8 @@ export interface LspDocumentStatus {
   displayName: string | null;
   available: boolean;
   active: boolean;
+  /** False while a provider such as JDT LS is still importing/indexing its workspace. */
+  semanticReady?: boolean;
   selectedCommandId: string | null;
   selectedCommand: string | null;
   installHint: string | null;

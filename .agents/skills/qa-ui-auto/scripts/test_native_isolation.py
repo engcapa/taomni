@@ -143,6 +143,36 @@ class NativeIsolationTest(unittest.TestCase):
                 evidence = json.loads((root / "run" / "native-isolation.json").read_text())
                 self.assertEqual(evidence["identifier"], native_build.QA_APP_ID)
 
+    def test_harness_pins_configured_jdk_for_the_webdriver_application(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = recorded_binary(root)
+            harness = native.NativeHarness({
+                "app": {
+                    "native_binary": str(binary),
+                    "tooling_java_home": str(root / "jdk-21"),
+                },
+            }, root / "run")
+            harness.driver = Mock()
+            with (
+                patch.object(native.platform, "system", return_value="Linux"),
+                patch.dict(os.environ, {"JAVA_HOME": "old-jdk", "PATH": "system-path"}),
+            ):
+                with harness:
+                    self.assertEqual(os.environ["JAVA_HOME"], str(root / "jdk-21"))
+                    self.assertEqual(
+                        os.environ["PATH"],
+                        os.pathsep.join((str(root / "jdk-21" / "bin"), "system-path")),
+                    )
+                self.assertEqual(os.environ["JAVA_HOME"], "old-jdk")
+                self.assertEqual(os.environ["PATH"], "system-path")
+
+            evidence = json.loads((root / "run" / "native-isolation.json").read_text())
+            self.assertEqual(evidence["tooling_environment"], {
+                "JAVA_HOME": str(root / "jdk-21"),
+                "PATH_prepend": str(root / "jdk-21" / "bin"),
+            })
+
     def test_unrecorded_binary_never_starts_driver(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

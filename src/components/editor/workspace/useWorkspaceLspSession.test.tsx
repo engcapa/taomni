@@ -294,6 +294,34 @@ describe("useWorkspaceLspSession", () => {
     unmount();
   });
 
+  it("publishes semantic readiness when the provider refreshes after indexing", async () => {
+    const initializing = { ...status, presetId: "jdtls", semanticReady: false };
+    const ready = { ...initializing, semanticReady: true };
+    lspMocks.lspOpenDocument.mockResolvedValue(initializing);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status: ready, diagnostics: [] });
+    const openFilesRef = { current: { [file.key]: file } };
+    let lspFiles: Record<string, LspFileState> = {};
+    const updateLspFiles = vi.fn((updater: Record<string, LspFileState> | ((current: Record<string, LspFileState>) => Record<string, LspFileState>)) => {
+      lspFiles = typeof updater === "function" ? updater(lspFiles) : updater;
+    });
+    const { result, unmount } = renderHook(() => useWorkspaceLspSession({
+      workspaceInstanceId: "workspace-semantic-ready",
+      roots,
+      openFilesRef,
+      updateLspFiles,
+      onError: vi.fn(),
+    }));
+
+    await act(async () => result.current.syncDocument(file, "open"));
+    expect(lspFiles[file.key]?.status?.semanticReady).toBe(false);
+    await act(async () => {
+      await emit(LSP_DIAGNOSTICS_REFRESH_EVENT, { workspaceId: "workspace-semantic-ready" });
+    });
+
+    await waitFor(() => expect(lspFiles[file.key]?.status?.semanticReady).toBe(true));
+    unmount();
+  });
+
   it("ED-PERF-002-A1: skips server detection while hidden and refreshes when shown", async () => {
     const onError = vi.fn();
     const { result, rerender } = renderHook(
