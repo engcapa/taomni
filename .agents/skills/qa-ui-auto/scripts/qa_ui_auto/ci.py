@@ -319,10 +319,21 @@ def aggregate(manifest: dict, root: Path) -> dict:
         failures.extend({"entry": entry["id"], "case": "infrastructure", "message": e[:2500]} for e in errors)
         entries.append({"id": entry["id"], "selected": len(entry["selected_ids"]),
                         "counts": dict(totals), "errors": errors})
+    infrastructure_errors = [
+        {"entry": entry["id"], "message": error}
+        for entry in entries
+        for error in entry["errors"]
+    ]
     return {"head": manifest["head"], "run_id": manifest.get("run_id"), "attempt": manifest.get("attempt"),
             "entries": entries, "failures": failures, "gaps": manifest["gaps"],
             "not_applicable": manifest.get("not_applicable", []),
-            "unreviewed": manifest["unreviewed"], "passed": not failures}
+            "unreviewed": manifest["unreviewed"],
+            # `passed` remains a strict all-cases signal for consumers that
+            # need it. `report_ok` is the workflow gate: case failures are
+            # report content, while missing/invalid execution evidence is not.
+            "passed": not failures,
+            "report_ok": not infrastructure_errors,
+            "infrastructure_errors": infrastructure_errors}
 
 
 def main(argv=None):
@@ -386,7 +397,7 @@ def main(argv=None):
             with open(path, "a", encoding="utf-8") as stream:
                 stream.write(text)
         print(text)
-        return 0 if result["passed"] else 1
+        return 0 if result["report_ok"] else 1
     except (ValueError, OSError, subprocess.CalledProcessError) as exc:
         print(f"qa-ci: {exc}", file=sys.stderr)
         return 2

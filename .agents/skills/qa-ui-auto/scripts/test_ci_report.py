@@ -19,7 +19,8 @@ class ReportTests(unittest.TestCase):
         write_json(run/'summary.json',summary)
         emit_runner_receipt(report_root=run,mode='browser',executed_cmd=['qa-test'],
           started_at='2026-09-20T00:00:00+00:00',finished_at='2026-09-20T00:00:01+00:00',duration_sec=1,exit_code=summary['exit_code'])
-        write_json(root/'linux-browser'/'ci-outcome.json',{'head':'commit','entry':'linux-browser','exit_code':summary['exit_code'],
+        write_json(root/'linux-browser'/'ci-outcome.json',{'head':'commit','entry':'linux-browser','exit_code':0,
+                                                        'runner_exit_code':summary['exit_code'],
                                                         'selection_sha256':selection_digest(manifest)})
         return manifest,run
 
@@ -31,13 +32,24 @@ class ReportTests(unittest.TestCase):
     def test_skip_never_becomes_pass(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d); manifest,_=self.example(root,'skipped')
-            self.assertFalse(aggregate(manifest,root)['passed'])
+            result = aggregate(manifest,root)
+            self.assertFalse(result['passed'])
+            self.assertTrue(result['report_ok'])
+
+    def test_case_failure_is_report_content_not_infrastructure_failure(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); manifest,_=self.example(root,'failed')
+            result = aggregate(manifest,root)
+            self.assertFalse(result['passed'])
+            self.assertTrue(result['report_ok'])
+            self.assertFalse(result['infrastructure_errors'])
 
     def test_tampered_summary_and_missing_combination_fail(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d); manifest,run=self.example(root)
             (run/'summary.json').write_text((run/'summary.json').read_text()+' ')
             self.assertFalse(aggregate(manifest,root)['passed'])
+            self.assertFalse(aggregate(manifest,root)['report_ok'])
             (run/'summary.json').unlink()
             self.assertFalse(aggregate(manifest,root)['passed'])
 

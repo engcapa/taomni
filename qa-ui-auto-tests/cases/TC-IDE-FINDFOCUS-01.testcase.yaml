@@ -76,7 +76,9 @@ steps:
     value: fixture/README.md
 - click: '[data-testid="text-input-dialog-confirm"]'
 - assert_not_visible: '[data-testid="text-input-dialog"]'
-- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="code-workspace-tab"][data-observation-status="ready"][data-active-editor-key$="fixture/README.md"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[contenteditable="true"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
 - fill:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     value: '# project-tree-e2e
@@ -102,7 +104,9 @@ steps:
     value: fixture/src/main/example.txt
 - click: '[data-testid="text-input-dialog-confirm"]'
 - assert_not_visible: '[data-testid="text-input-dialog"]'
-- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="code-workspace-tab"][data-observation-status="ready"][data-active-editor-key$="fixture/src/main/example.txt"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[contenteditable="true"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
 - fill:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     value: 'Project tree example
@@ -124,7 +128,9 @@ steps:
     value: fixture/docs/notes.txt
 - click: '[data-testid="text-input-dialog-confirm"]'
 - assert_not_visible: '[data-testid="text-input-dialog"]'
-- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="code-workspace-tab"][data-observation-status="ready"][data-active-editor-key$="fixture/docs/notes.txt"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[contenteditable="true"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
 - fill:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     value: 'Reference notes
@@ -146,7 +152,9 @@ steps:
     value: fixture/tests/sample.txt
 - click: '[data-testid="text-input-dialog-confirm"]'
 - assert_not_visible: '[data-testid="text-input-dialog"]'
-- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="code-workspace-tab"][data-observation-status="ready"][data-active-editor-key$="fixture/tests/sample.txt"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[contenteditable="true"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
 - fill:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     value: 'Example test data

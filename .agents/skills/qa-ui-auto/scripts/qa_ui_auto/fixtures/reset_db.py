@@ -40,6 +40,12 @@ LOCAL_STORAGE_PREFIXES = [
     "taomni.recent.",
 ]
 
+# WebView2 can mutate its LevelDB/profile directory while EdgeDriver is
+# acknowledging session deletion. These Windows errors are transient only for
+# this already-validated run-owned profile; unrelated filesystem errors must
+# still fail setup instead of being hidden.
+_WINDOWS_PROFILE_TRANSIENT_ERRORS = {2, 3, 5, 32, 33, 145}
+
 
 def setup(ctx: Any) -> None:
     cfg = getattr(ctx, "cfg", {}) or {}
@@ -117,7 +123,19 @@ def _remove_native_profile(target: Path, timeout_sec: float = 10.0) -> None:
         try:
             shutil.rmtree(target)
             return
-        except PermissionError:
+        except OSError as error:
+            # A concurrent WebView2 cleanup can remove the file between
+            # rmtree's scan and unlink, or briefly leave the directory nonempty
+            # while releasing a handle. Treat only those known transient cases
+            # as retryable and re-check the validated target boundary.
+            winerror = getattr(error, "winerror", None)
+            transient = isinstance(error, (FileNotFoundError, PermissionError)) or (
+                winerror in _WINDOWS_PROFILE_TRANSIENT_ERRORS
+            )
+            if not transient:
+                raise
+            if not target.exists():
+                return
             if time.monotonic() >= deadline:
                 raise
-            time.sleep(0.2)
+            time.sleep(min(0.2, max(0.0, deadline - time.monotonic())))
