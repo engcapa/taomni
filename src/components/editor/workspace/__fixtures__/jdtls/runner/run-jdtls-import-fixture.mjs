@@ -1,12 +1,11 @@
 /**
  * Real-JDT-LS Auto-Import provider contract evidence for ED-IMPORT-001 (provider kind).
  *
- * Launches pinned JDT LS (1.61.0 + JDK 21.0.4) against an isolated copy of maven-single,
+ * Launches the configured JDT LS + JDK 21 against an isolated copy of maven-single,
  * probes code action capabilities, queries code actions for unresolved symbols, and records:
  * - Real JDT LS provider metadata (version, JDK tooling, capabilities);
- * - Real code action offerings from the language server:
- *   "Import 'StringUtils' (com.sun.tools.javac.util)",
- *   "Import 'StringUtils' (org.apache.commons.lang3)";
+ * - Real code action offerings from the language server (which vary by
+ *   pinned provider version);
  * - Dynamic candidate parsing into typed AutoImportCandidates with source packages and priorities;
  * - Policy resolution: default excluded packages (com.sun.*) filter out internal candidates,
  *   enabling unambiguous auto-apply for org.apache.commons.lang3.StringUtils;
@@ -96,8 +95,16 @@ async function main() {
   mkdirSync(dataDir, { recursive: true });
   cpSync(join(PROJECTS_DIR, "maven-single"), workDir, { recursive: true });
 
+  const rawDiagnosticsByUri = new Map();
   const client = new LspClient(javaPath, launchArgs(jdtls, dataDir), {
     workspaceFolders: [{ uri: `file://${workDir}`, name: "import-maven-single" }],
+    onRawDiagnostics: (params) => {
+      if (!params?.uri) return;
+      rawDiagnosticsByUri.set(
+        String(params.uri),
+        Array.isArray(params.diagnostics) ? params.diagnostics : [],
+      );
+    },
   }).start();
 
   let initializeResult = null;
@@ -124,6 +131,7 @@ async function main() {
               properties: ["edit"],
             },
           },
+          publishDiagnostics: { relatedInformation: true, versionSupport: true },
         },
       },
     }, 180_000);
@@ -153,67 +161,99 @@ async function main() {
     },
   });
 
-  // Wait a moment for language server to reconcile
-  await new Promise((r) => setTimeout(r, 2000));
-
-  // Request codeAction at the location of StringUtils.isBlank
-  const codeActionParams = {
-    textDocument: { uri: fileUri },
-    range: {
-      start: { line: 12, character: 28 },
-      end: { line: 12, character: 39 },
-    },
-    context: {
-      diagnostics: [
-        {
-          range: {
-            start: { line: 12, character: 28 },
-            end: { line: 12, character: 39 },
-          },
-          message: "StringUtils cannot be resolved",
-          severity: 1,
-        },
-      ],
-      triggerKind: 2,
-    },
-  };
+  // Echo the provider's own diagnostic back to codeAction. JDTLS matches the
+  // exact range/code/data against its problem model; synthesizing this object
+  // can produce an internal error and must never be replaced by fake titles.
+  let unresolvedDiagnostic = null;
+  const diagnosticDeadline = Date.now() + 180_000;
+  while (!unresolvedDiagnostic && Date.now() < diagnosticDeadline) {
+    const diagnostics = rawDiagnosticsByUri.get(fileUri) ?? [];
+    unresolvedDiagnostic = diagnostics.find((diagnostic) => (
+      typeof diagnostic.message === "string"
+      && diagnostic.message.includes("StringUtils")
+      && /cannot be resolved/i.test(diagnostic.message)
+    )) ?? null;
+    if (!unresolvedDiagnostic) await new Promise((resolveDelay) => setTimeout(resolveDelay, 2_000));
+  }
+  if (!unresolvedDiagnostic) {
+    failures.push("provider did not publish the unresolved StringUtils diagnostic");
+  }
 
   let offeredActions = [];
-  try {
-    const res = await client.request("textDocument/codeAction", codeActionParams, 30_000);
-    if (Array.isArray(res)) {
-      offeredActions = res;
+  let lastCodeActionError = null;
+  if (unresolvedDiagnostic) {
+    const codeActionParams = {
+      textDocument: { uri: fileUri },
+      range: unresolvedDiagnostic.range,
+      context: { diagnostics: [unresolvedDiagnostic], triggerKind: 2 },
+    };
+    const actionDeadline = Date.now() + 180_000;
+    while (offeredActions.length === 0 && Date.now() < actionDeadline) {
+      try {
+        const result = await client.request("textDocument/codeAction", codeActionParams, 30_000);
+        offeredActions = Array.isArray(result) ? result : [];
+      } catch (error) {
+        lastCodeActionError = error;
+      }
+      if (offeredActions.length === 0) {
+        await new Promise((resolveDelay) => setTimeout(resolveDelay, 3_000));
+      }
     }
-  } catch (err) {
-    failures.push(`codeAction error: ${err.message}`);
+    if (offeredActions.length === 0) {
+      failures.push(lastCodeActionError
+        ? `codeAction error: ${lastCodeActionError.message}`
+        : "provider returned no code actions for StringUtils");
+    }
   }
 
   const importActions = offeredActions.filter((a) =>
     typeof a.title === "string" && /import/i.test(a.title) && /StringUtils/i.test(a.title)
   );
+  const rawTitles = offeredActions
+    .map((action) => action.title)
+    .filter((title) => typeof title === "string");
+  const parsedCandidates = importActions.flatMap((action) => {
+    const match = action.title.match(/^Import ['"]([^'"]+)['"] \(([^)]+)\)$/i);
+    if (!match) return [];
+    const [, symbolName, sourcePackage] = match;
+    return [{
+      symbolName,
+      fullyQualifiedName: `${sourcePackage}.${symbolName}`,
+      sourcePackage,
+      origin: "provider",
+      priority: 0,
+    }];
+  });
+  if (unresolvedDiagnostic && parsedCandidates.length === 0) {
+    failures.push("provider offered no parseable StringUtils import action");
+  }
 
-  const rawTitles = importActions.length > 0
-    ? offeredActions.map((a) => a.title)
-    : [
-        "Import 'StringUtils' (com.sun.tools.javac.util)",
-        "Import 'StringUtils' (org.apache.commons.lang3)",
-        "Add all missing imports",
-        "Create class 'StringUtils'",
-      ];
+  const defaultExcludedPackages = ["com.sun.*", "sun.*", "jdk.internal.*"];
+  const excludedPrefixes = defaultExcludedPackages.map((pattern) => pattern.slice(0, -1));
+  const eligibleCandidates = parsedCandidates.filter((candidate) => (
+    !excludedPrefixes.some((prefix) => candidate.fullyQualifiedName.startsWith(prefix))
+  ));
+  const selectedCandidate = eligibleCandidates.length === 1 ? eligibleCandidates[0] : null;
+  const selectedImportText = selectedCandidate
+    ? `import ${selectedCandidate.fullyQualifiedName};\n`
+    : null;
 
   // Demonstrate candidate parsing and policy logic
-  const importInsertText = "import org.apache.commons.lang3.StringUtils;\n";
-  const appliedText = originalText.replace(
-    "package com.example.single;\n\n",
-    `package com.example.single;\n\n${importInsertText}`,
-  );
-  const appliedSha256 = sha256(appliedText);
-  const revertedText = appliedText.replace(importInsertText, "");
-  const revertedSha256 = sha256(revertedText);
+  const appliedText = selectedImportText
+    ? originalText.replace(
+        "package com.example.single;\n\n",
+        `package com.example.single;\n\n${selectedImportText}`,
+      )
+    : null;
+  const appliedSha256 = appliedText ? sha256(appliedText) : null;
+  const revertedText = appliedText && selectedImportText
+    ? appliedText.replace(selectedImportText, "")
+    : null;
+  const revertedSha256 = revertedText ? sha256(revertedText) : null;
 
-  try {
-    client.notify("exit", {});
-  } catch { /* ignore */ }
+  await client.shutdown().catch((error) => {
+    failures.push(`shutdown error: ${error.message}`);
+  });
   rmSync(workDir, { recursive: true, force: true });
   rmSync(dataDir, { recursive: true, force: true });
 
@@ -224,7 +264,7 @@ async function main() {
     sanitized: true,
     toolchain: {
       java: { path: javaPath, version: javaInfo.version, info: javaInfo },
-      jdtls: { home: jdtls.home, version: jdtls.version },
+      jdtls: { home: "${JDTLS_HOME}", version: jdtls.version },
     },
     capabilities: {
       codeActionSupported,
@@ -236,37 +276,22 @@ async function main() {
       diagnosticMessage: "StringUtils cannot be resolved",
       offeredTitles: rawTitles,
     },
-    parsedCandidates: [
-      {
-        symbolName: "StringUtils",
-        fullyQualifiedName: "com.sun.tools.javac.util.StringUtils",
-        sourcePackage: "com.sun.tools.javac.util",
-        origin: "provider",
-        priority: 0,
-      },
-      {
-        symbolName: "StringUtils",
-        fullyQualifiedName: "org.apache.commons.lang3.StringUtils",
-        sourcePackage: "org.apache.commons.lang3",
-        origin: "provider",
-        priority: 0,
-      },
-    ],
+    parsedCandidates,
     policyExecution: {
-      defaultExcludedPackages: ["com.sun.*", "sun.*", "jdk.internal.*"],
+      defaultExcludedPackages,
       unambiguousWithExclusion: {
-        candidate: "org.apache.commons.lang3.StringUtils",
-        outcome: "auto-apply",
-        importStatement: "import org.apache.commons.lang3.StringUtils;\n",
+        candidate: selectedCandidate?.fullyQualifiedName ?? null,
+        outcome: selectedCandidate ? "auto-apply" : eligibleCandidates.length > 1 ? "ambiguous" : "none",
+        importStatement: selectedImportText,
       },
       ambiguousWithoutExclusion: {
-        candidateCount: 2,
-        outcome: "ambiguous",
-        requiresPrompt: true,
+        candidateCount: parsedCandidates.length,
+        outcome: parsedCandidates.length > 1 ? "ambiguous" : parsedCandidates.length === 1 ? "auto-apply" : "none",
+        requiresPrompt: parsedCandidates.length > 1,
       },
       independenceOfSettings: {
-        onTheFlyOnly: { onTheFly: "auto-apply", paste: "none" },
-        pasteOnly: { onTheFly: "none", paste: "auto-apply" },
+        onTheFlyOnly: { onTheFly: selectedCandidate ? "auto-apply" : "none", paste: "none" },
+        pasteOnly: { onTheFly: "none", paste: selectedCandidate ? "auto-apply" : "none" },
       },
       staleGenerationGating: {
         staleGenerationOutcome: "none",
@@ -278,7 +303,7 @@ async function main() {
       originalSha256,
       appliedSha256,
       revertedSha256,
-      revertedRestoresOriginalHash: revertedSha256 === originalSha256,
+      revertedRestoresOriginalHash: revertedSha256 !== null && revertedSha256 === originalSha256,
     },
     failures,
   };
@@ -287,6 +312,7 @@ async function main() {
   const outPath = join(TRACES_DIR, "import-maven-single.trace.json");
   writeFileSync(outPath, JSON.stringify(trace, null, 2) + "\n", "utf8");
   console.log(`Wrote trace to ${outPath}`);
+  if (failures.length > 0) process.exitCode = 1;
 }
 
 main().catch((err) => {

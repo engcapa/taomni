@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "fixtureId": "import-maven-single",
-  "generatedAt": "2026-09-05T05:25:51.571Z",
+  "generatedAt": "2026-09-21T00:56:04.461Z",
   "sanitized": true,
   "toolchain": {
     "java": {
@@ -14,8 +14,8 @@
       }
     },
     "jdtls": {
-      "home": "/home/zhyhang/.local/share/jdtls",
-      "version": "1.61.0.202607102111.jar"
+      "home": "${JDTLS_HOME}",
+      "version": "1.50.0.202509041425.jar"
     }
   },
   "capabilities": {
@@ -37,8 +37,23 @@
     "offeredTitles": [
       "Import 'StringUtils' (com.sun.tools.javac.util)",
       "Import 'StringUtils' (org.apache.commons.lang3)",
-      "Add all missing imports",
-      "Create class 'StringUtils'"
+      "Create class 'StringUtils'",
+      "Create enum 'StringUtils'",
+      "Create interface 'StringUtils'",
+      "Create record 'StringUtils'",
+      "Create constant 'StringUtils'",
+      "Create local variable 'StringUtils'",
+      "Change to 'String' (com.sun.org.apache.xpath.internal.operations)",
+      "Change to 'String' (java.lang)",
+      "Change to 'StringDV' (com.sun.org.apache.xerces.internal.impl.dv.xs)",
+      "Change to 'StringEscapeUtils' (org.apache.commons.lang3)",
+      "Change to 'Strings' (jdk.internal.joptsimple.internal)",
+      "Create field 'StringUtils'",
+      "Create parameter 'StringUtils'",
+      "Add Javadoc comment",
+      "Generate toString()",
+      "Change modifiers to final where possible",
+      "Add final modifier for 'blank'"
     ]
   },
   "parsedCandidates": [

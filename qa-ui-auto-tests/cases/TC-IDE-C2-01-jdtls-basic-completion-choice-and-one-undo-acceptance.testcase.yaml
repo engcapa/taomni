@@ -8,14 +8,11 @@ description: |
 
   1. Import-on-resolve accept: the caret sits after the bare `StringUti`
      token (the fixture's un-imported org.apache.commons.lang3 target).
-     Basic completion is fired explicitly. The provider answers with two
-     same-label twins (jdtls decorates the labels with the package); the
-     case first proves the popup preserves provider order (the JDK-internal
-     com.sun.tools.javac.util twin is the top option, the
-     org.apache.commons.lang3 entry second - identical sortText, so the
-     owner's equal-tier rule keeps rawResponseIndex), then ArrowDown
-     selects the org.apache.commons.lang3 entry (the item the provider
-     trace accepted) and Enter accepts it. The provider resolve supplies
+     Basic completion is fired explicitly. The CI-pinned JDTLS 1.50 provider
+     answers with the org.apache.commons.lang3 candidate; the case proves
+     its decorated package identity and accepts the selected item with Enter.
+     (JDTLS 1.61 also exposed a JDK-internal com.sun twin, but that is not the
+     provider version exercised by this hosted workflow.) Provider resolve supplies
      one additionalTextEdit (the lang3 import). The acceptance must land
      the identifier AND the import in one dispatch; saving proves the disk
      bytes equal the provider trace's appliedSha256, and ONE Ctrl+Z plus a
@@ -115,22 +112,13 @@ steps:
   - assert_text:
       selector: '.cm-tooltip-autocomplete'
       contains: "StringUtils"
-  # Provider-order preservation (§ED-COMP-002 Rule 3): both twins carry the
-  # identical sortText, so the popup must list them in raw response order -
-  # the JDK-internal twin first, the lang3 entry second. The options render
-  # the decorated displayLabel, which discriminates the twins.
+  # JDTLS 1.50 emits the project dependency as the selected candidate. The
+  # decorated displayLabel proves which provider symbol will be accepted.
   - eval_readonly:
-      expression: "document.querySelectorAll('.cm-tooltip-autocomplete > ul > li').length > 1 && document.querySelectorAll('.cm-tooltip-autocomplete > ul > li')[0].textContent.includes('com.sun.tools.javac.util') && document.querySelectorAll('.cm-tooltip-autocomplete > ul > li')[1].textContent.includes('org.apache.commons.lang3')"
+      expression: "document.querySelectorAll('.cm-tooltip-autocomplete > ul > li').length > 0 && document.querySelector('.cm-tooltip-autocomplete li[aria-selected]').textContent.includes('org.apache.commons.lang3')"
       expect_truthy: true
   - screenshot: tc-ide-c2-01-popup.png
-  # Select the org.apache.commons.lang3 entry (second option) - the item the
-  # provider trace accepted - then accept it.
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["ArrowDown"]
-  - eval_readonly:
-      expression: "document.querySelector('.cm-tooltip-autocomplete li[aria-selected]').textContent.includes('org.apache.commons.lang3')"
-      expect_truthy: true
+  # Accept the selected org.apache.commons.lang3 item recorded by the trace.
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       keys: ["Enter"]

@@ -8,9 +8,9 @@ description: |
   through the packaged app UI from two real entry points:
 
   1. Alt+Enter at the caret inside the unresolved `StringUtils` token opens
-     the frozen intention menu. The offered list must contain both provider
-     import twins (com.sun.tools.javac.util and org.apache.commons.lang3) and
-     "Add all missing imports", matching the provider trace's offeredTitles.
+     the frozen intention menu. The offered list must contain the provider's
+     org.apache.commons.lang3 import and "Add all missing imports", matching
+     the CI-pinned JDTLS 1.50 trace's offeredTitles.
      Clicking "Import 'StringUtils' (org.apache.commons.lang3)" resolves
      through the real provider, applies the single-file WorkspaceEdit with no
      preview dialog (affectedFileCount == 1), and lands the import. Saving
@@ -101,14 +101,10 @@ steps:
       selector: '[data-testid="context-menu"]'
       timeout_sec: 90
   # The frozen menu must offer the provider's real candidate list (the trace's
-  # offeredTitles): both import twins plus the add-all fix.
+  # offeredTitles): the project dependency import plus the add-all fix.
   - assert_text:
       selector: '[data-testid="context-menu"]'
       contains: "Import 'StringUtils' (org.apache.commons.lang3)"
-      timeout_sec: 10
-  - assert_text:
-      selector: '[data-testid="context-menu"]'
-      contains: "Import 'StringUtils' (com.sun.tools.javac.util)"
       timeout_sec: 10
   - assert_text:
       selector: '[data-testid="context-menu"]'

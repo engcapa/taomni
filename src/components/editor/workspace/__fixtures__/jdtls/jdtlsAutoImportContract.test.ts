@@ -87,7 +87,7 @@ describe("ED-IMPORT-001: JDT LS Auto-Import Contract Evidence", () => {
   it("proves real JDT LS provider metadata and code action capabilities", () => {
     expect(trace.fixtureId).toBe("import-maven-single");
     expect(trace.toolchain.java.version).toMatch(/^21\./);
-    expect(trace.toolchain.jdtls.version).toContain("1.61.0");
+    expect(trace.toolchain.jdtls.version).toContain("1.50.0");
     expect(trace.capabilities.codeActionSupported).toBe(true);
     expect(trace.capabilities.codeActionKinds).toContain("quickfix");
     expect(trace.failures).toHaveLength(0);
