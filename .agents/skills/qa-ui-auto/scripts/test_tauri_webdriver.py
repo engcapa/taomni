@@ -383,6 +383,77 @@ class NativeKeysVerbTest(TestCase):
             )
             self.assertEqual(artifact["focus_verification"], "testcase precondition")
 
+    def test_native_keys_waits_for_readiness_and_requires_consumed_keydown(self) -> None:
+        session = Mock()
+        session.application = Path("/tmp/taomni")
+        session.find.return_value = "popup"
+        session.execute.side_effect = [
+            True,
+            None,
+            True,
+            True,
+            {"stable": True, "stableMs": 200},
+            [{"type": "keydown", "key": "ArrowDown", "defaultPrevented": True}],
+        ]
+
+        def press(keys: list[str]) -> None:
+            self.assertEqual(session.execute.call_count, 5)
+            self.assertEqual(keys, ["ArrowDown"])
+
+        session.press_combos.side_effect = press
+        with TemporaryDirectory() as directory, patch.object(native_steps.time, "sleep"):
+            case_dir = Path(directory)
+            ctx = native_steps.NativeStepContext(session, case_dir, {})
+            result = native_steps.VERBS["native_keys"](ctx, {
+                "selector": ".cm-content",
+                "keys": ["ArrowDown"],
+                "transport": "webdriver",
+                "ready_selector": ".cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)",
+                "ready_timeout_sec": 3,
+                "ready_stable_sec": 0.2,
+                "require_keydown_prevented": True,
+            })
+
+            self.assertIn("injected 1", result)
+            listener_script = session.execute.call_args_list[1].args[0]
+            self.assertIn("setTimeout", listener_script)
+            session.find.assert_called_with(
+                ".cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)",
+                timeout=0.5,
+            )
+            artifact = json.loads(
+                (case_dir / "native-key-observation.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(artifact["require_keydown_prevented"])
+            self.assertEqual(
+                artifact["ready_selector"],
+                ".cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)",
+            )
+            self.assertEqual(artifact["ready_stable_sec"], 0.2)
+
+    def test_native_keys_rejects_unconsumed_keydown_after_recording_evidence(self) -> None:
+        session = Mock()
+        session.application = Path("/tmp/taomni")
+        session.execute.side_effect = [
+            True,
+            None,
+            [{"type": "keydown", "key": "ArrowDown", "defaultPrevented": False}],
+        ]
+        with TemporaryDirectory() as directory, patch.object(native_steps.time, "sleep"):
+            case_dir = Path(directory)
+            ctx = native_steps.NativeStepContext(session, case_dir, {})
+            with self.assertRaisesRegex(
+                native_steps.StepError,
+                "keydown was not consumed.*arrowdown",
+            ):
+                native_steps.VERBS["native_keys"](ctx, {
+                    "selector": ".cm-content",
+                    "keys": ["ArrowDown"],
+                    "transport": "webdriver",
+                    "require_keydown_prevented": True,
+                })
+            self.assertTrue((case_dir / "native-key-observation.json").is_file())
+
 
 class NativeClickVerbTest(TestCase):
     def test_native_click_targets_exact_window_and_records_pointer_transport(self) -> None:

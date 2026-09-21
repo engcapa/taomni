@@ -12,6 +12,7 @@ from contextlib import suppress
 import json
 import os
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -93,6 +94,70 @@ def native_tooling_env(cfg: dict) -> tuple[dict[str, str], dict[str, str]]:
     }
     evidence = {"JAVA_HOME": home, "PATH_prepend": java_bin}
     return process_env, evidence
+
+
+def seed_native_tooling_sdk(report_root: Path, java_home: str) -> dict[str, str]:
+    """Register the prepared JDK before the isolated QA application starts.
+
+    Process inheritance remains the fallback, but it is not an observable SDK
+    selection contract across the Windows tauri-driver/msedgedriver launch
+    chain. A run-owned registry gives workspace terminals and build tools the
+    same explicit JDK that the native session supplies to JDTLS.
+    """
+    home = Path(java_home).expanduser()
+    executable_name = "java.exe" if platform.system() == "Windows" else "java"
+    java = home / "bin" / executable_name
+    if not java.is_file():
+        raise WebDriverError(f"Configured tooling JDK has no executable: {java}")
+    probe = subprocess.run(
+        [str(java), "-version"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    output = f"{probe.stderr}\n{probe.stdout}"
+    match = re.search(r'version\s+"([^"]+)"', output)
+    if probe.returncode != 0 or not match:
+        raise WebDriverError(f"Configured tooling JDK version probe failed: {java}")
+    version = match.group(1)
+
+    isolation = native_isolation_env(report_root)
+    if raw_config := isolation.get("NEWMOB_CONFIG_DIR"):
+        config_dir = Path(raw_config) / QA_APP_ID
+    else:
+        config_dir = Path(isolation["XDG_CONFIG_HOME"])
+    registry_path = config_dir / "taomni" / "sdk.json"
+    run_root = report_root.resolve()
+    if not registry_path.resolve().is_relative_to(run_root):
+        raise WebDriverError("Tooling SDK registry must stay inside the native run directory")
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    sdk_id = "qa-prepared-java"
+    registry = {
+        "schemaVersion": 1,
+        "installations": [{
+            "id": sdk_id,
+            "kind": "java",
+            "name": f"QA prepared JDK {version}",
+            "location": str(home),
+            "executables": {"java": str(java)},
+            "version": version,
+            "vendor": None,
+            "architecture": None,
+            "origin": "manual",
+            "status": "ready",
+            "lastError": None,
+            "lastProbedAt": None,
+        }],
+        "defaults": [{"kind": "java", "sdkId": sdk_id}],
+        "bindings": [],
+    }
+    registry_path.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+    return {
+        "id": sdk_id,
+        "java_home": str(home),
+        "java_version": version,
+        "registry_path": str(registry_path),
+    }
 
 
 def _tcp_ok(host: str, port: int, timeout: float = 1.0) -> bool:
@@ -1035,13 +1100,23 @@ class NativeHarness:
 
     def create_session(self, *, tooling_java_home: str | None = None) -> NativeSession:
         self.driver.ensure_running()
+        java_home = tooling_java_home or self.cfg.get("app", {}).get("tooling_java_home")
+        if java_home and self._previous_env:
+            sdk_evidence = seed_native_tooling_sdk(self.report_root, str(java_home))
+            isolation_path = self.report_root / "native-isolation.json"
+            isolation_evidence = json.loads(isolation_path.read_text(encoding="utf-8"))
+            isolation_evidence["tooling_sdk_registry"] = sdk_evidence
+            isolation_path.write_text(
+                json.dumps(isolation_evidence, indent=2) + "\n",
+                encoding="utf-8",
+            )
         session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
         session.deadline = getattr(self, "deadline", None)
         try:
             session.start()
             # A Java 25 project must not change the JDK used by unrelated
             # JDK 21 provider fixtures in the same selected suite.
-            if java_home := tooling_java_home or self.cfg.get("app", {}).get("tooling_java_home"):
+            if java_home:
                 session.execute(
                     "window.localStorage.setItem('taomni.codeWorkspace.lspJavaHome.v1', "
                     + json.dumps(str(java_home)) + "); return true;"

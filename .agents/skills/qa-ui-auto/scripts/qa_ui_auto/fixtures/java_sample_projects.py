@@ -48,4 +48,8 @@ def setup(ctx: Any) -> None:
         if any(path.is_symlink() for path in root.rglob("*")):
             raise FixtureSkip(f"sample contains symlinks; cannot isolate workspace: {root}")
         shutil.copytree(root, destination, ignore=shutil.ignore_patterns("target", "build", ".gradle", ".git"))
+        if key == "maven_single_root":
+            maven_config = destination / ".mvn" / "maven.config"
+            maven_config.parent.mkdir(parents=True, exist_ok=True)
+            maven_config.write_text("--show-version\n", encoding="utf-8")
         values[key] = destination.resolve().as_posix()

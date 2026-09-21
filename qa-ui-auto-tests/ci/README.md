@@ -68,9 +68,10 @@ is required. Account/package mutations are limited to CI.
 Java downloads are pinned by version and SHA256 in `toolchains.yaml`. JDTLS
 performs real LSP initialize and checks debug/test command registration when
 bundles are selected. Java Test 0.43.1 matches the ASM 9.8 family in JDTLS 1.50;
-upgrading these pins requires a new joint probe. The native session seeds the
-application's existing tooling-JDK setting from the prepared `JAVA_HOME`, since
-a hosted image may also contain a newer, incompatible JDK. Java 25 projects
+upgrading these pins requires a new joint probe. The native session seeds both
+the application's run-owned SDK registry and its tooling-JDK setting from the
+prepared `JAVA_HOME`, since a hosted image may contain an older build JDK or a
+newer, incompatible JDTLS JDK. Java 25 projects
 build online then offline. JDK 21 remains the default for existing provider
 fixtures; jobs selecting Java 25 also install that runtime and select it only
 for cases declaring `java25_projects`. Selecting both kinds must not alter
