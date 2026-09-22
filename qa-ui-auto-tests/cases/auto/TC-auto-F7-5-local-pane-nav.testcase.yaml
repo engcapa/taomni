@@ -50,6 +50,8 @@ steps:
 - assert_visible: '[data-testid="sftp-local-pane"]'
 - assert_visible: '[data-testid="sftp-local-list"]'
 - assert_visible: '[data-testid="sftp-local-refresh"]'
+- click: '[data-testid="sftp-local-path"]'
+- press: Escape
 - click: '[data-testid="sftp-local-path-edit"]'
 - press: Escape
 - wait: 0.3
@@ -99,10 +101,10 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"sftp-local-list\"]"}'
     - step: 17
       expectation: '{"assert_visible": "[data-testid=\"sftp-local-refresh\"]"}'
-    - step: 29
+    - step: 31
       expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
     results:
-    - 29
+    - 31
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
