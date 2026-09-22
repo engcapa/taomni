@@ -1,21 +1,59 @@
 id: TC-106
 title: VNC RFB engine module is present in the build
-description: |
-  Coverage smoke for F9.1. Confirms that the VNC client modules
-  (src/lib/vnc, vncStore) are in the bundle by querying the page's
+description: 'Coverage smoke for F9.1. Confirms that the VNC client modules
+
+  (src/lib/vnc, vncStore) are in the bundle by querying the page''s
+
   scripts; if the modules were tree-shaken away, this assertion fails.
 
+
   Real RFB protocol testing requires a configured VNC server (no fixture
+
   exists in our config), so this case is passive scaffolding only.
-covers: [F9.1]
-tags: [smoke, p1, vnc, scaffolding-only]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F9.1
+tags:
+- smoke
+- p1
+- vnc
+- scaffolding-only
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 20
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="sidebar"]'
-  - click: 'text="New session…"'
-  - wait_for: '[data-testid="session-editor"]'
-  - assert_visible: '[data-testid="session-proto-vnc"]'
-  - screenshot: 106-vnc-engine-scaffold.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: text="New session…"
+- wait_for: '[data-testid="session-editor"]'
+- assert_visible: '[data-testid="session-proto-vnc"]'
+- screenshot: 106-vnc-engine-scaffold.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: VNC RFB engine module is present in the build：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"session-proto-vnc\"]"}'
+    results:
+    - 4
+    - 5
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

@@ -1,45 +1,91 @@
 id: TC-WELCOME-RS-N-04-restore-local-shell
-title: "Native: saved LocalShell run snapshot restores and locates the live tab"
-covers: [F1.6]
-tags: [welcome, native-gate, p1, needs-review]
-modes: [native]
-fixtures: [reset_db]
+title: 'Native: saved LocalShell run snapshot restores and locates the live tab'
+covers:
+- F1.6
+tags:
+- welcome
+- native-gate
+- p1
+- needs-review
+modes:
+- native
+fixtures:
+- reset_db
 timeout_sec: 300
 steps:
-  - open: "${cfg.app.base_url}"
-  - vault_first_run: "qa-native-gate-password"
-  - wait_for: '[data-testid="welcome-panel"]'
-
-  # Create and save a LocalShell session through the real editor. Use the
-  # stable testid (not text=): the welcome cards shift while async WSL
-  # detection resolves, and text= clicks land on card boundaries.
-  - click: '[data-testid="welcome-new-session"]'
-  - wait_for: '[data-testid="session-editor"]'
-  - click: '[data-testid="session-proto-shell"]'
-  - wait_for: '[data-testid="session-proto-shell"][data-active="true"]'
-  - click: '[data-testid="session-section-bookmark"]'
-  - wait_for: '[data-testid="bookmark-settings"]'
-  - fill: {selector: '[data-testid="session-name"]', value: qa-native-shell}
-  - click: '[data-testid="session-save"]'
-  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-native-shell"]'
-
-  # Fresh profiles start with the sidebar expanded (readSidebarCollapsed
-  # defaults to false), so the tree row is directly double-clickable.
-  # Open it once: the run-snapshot collector commits the saved-session entry.
-  - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-native-shell"]'
-  - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 30
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - wait_for: '[data-testid="welcome-panel"]'
-  - wait_for:
-      selector: '[data-testid="welcome-restore-status"][data-state="available"]'
-      timeout_sec: 20
-
-  # Restore locates the live tab (ready) without duplicating it.
-  - click: '[data-testid="welcome-restore-last-session"]'
-  - wait: 2
-  - eval_readonly:
-      expression: "document.querySelectorAll('[data-tab-type]').length === 2"
-      expect_truthy: true
-  - screenshot: F1.6-native-restore-localshell.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-new-session"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- wait_for: '[data-testid="session-proto-shell"][data-active="true"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-native-shell
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-native-shell"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-native-shell"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 30
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- wait_for:
+    selector: '[data-testid="welcome-restore-status"][data-state="available"]'
+    timeout_sec: 20
+- click: '[data-testid="welcome-restore-last-session"]'
+- wait: 2
+- eval_readonly:
+    expression: document.querySelectorAll('[data-tab-type]').length === 2
+    expect_truthy: true
+- screenshot: F1.6-native-restore-localshell.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 'Native: saved LocalShell run snapshot restores and locates the live tab：按步骤执行后，所有声明的可观察结果均满足。'
+    actions:
+    - 1
+    - 2
+    - 4
+    - 6
+    - 8
+    - 10
+    - 11
+    - 13
+    - 15
+    - 18
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-proto-shell\"][data-active=\"true\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-native-shell\"]"}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"available\"]",
+        "timeout_sec": 20}}'
+    - step: 20
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type]'').length ===
+        2", "expect_truthy": true}}'
+    results:
+    - 20
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

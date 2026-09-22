@@ -1,100 +1,311 @@
 id: TC-IDE-TREE-01-project-tree-keyboard-native
 title: Project tree navigation preserves tabs and editing
-description: |
-  ED-TREE-001: real nested host fixture without a Java/provider setup. Direction
+description: 'ED-TREE-001: real nested host fixture without a Java/provider setup. Direction
+
   keys change selection/expansion, Enter opens, context cancellation preserves
+
   the buffer, editing/save/undo and Mod+Enter split remain usable.
+
   WebDriver keys prove the packaged WebView path, not physical OS input or IME.
-covers: [F25.5]
-tags: [code-workspace, project-tree, p1]
-modes: [native]
-native_platforms: [Linux, macOS, Windows]
-fixtures: [reset_db, project_tree]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- project-tree
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- project_tree
 timeout_sec: 120
 steps:
-  - open: "${cfg.app.base_url}"
-  - vault_first_run: qa-tree-password
-  - wait_for: '[data-testid="welcome-panel"]'
-  - seed_storage:
-      key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-tree","name":"fixture","roots":[{"id":"fixture","name":"fixture","path":"${fixture.project_tree_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1789259400000,"isGitRepo":false}]'
-  - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.project_tree_root}"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor-pane"] .cm-content'
-      contains: Disposable project tree reference
-  - press: { selector: '[data-testid="code-workspace-tree-file"][data-path="README.md"]', key: Home }
-  - press: ArrowRight
-  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]', name: aria-selected, equals: 'true' }
-  - press: { selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]', key: ArrowRight }
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="docs/notes.txt"]'
-  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]', name: aria-selected, equals: 'true' }
-  - press: ArrowRight
-  - assert_attribute: { selector: '[data-testid="code-workspace-tree-file"][data-path="docs/notes.txt"]', name: aria-selected, equals: 'true' }
-  - assert_count: { selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]', equal: 1 }
-  - screenshot: 01-child-selected.png
-  - press: ArrowLeft
-  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]', name: aria-selected, equals: 'true' }
-  - press: ArrowLeft
-  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]', name: aria-expanded, equals: 'false' }
-  - press: ArrowDown
-  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="src"]', name: aria-expanded, equals: 'false' }
-  - press: ArrowRight
-  - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
-  - press: ArrowRight
-  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]', name: aria-selected, equals: 'true' }
-  - press: ArrowRight
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
-  - press: ArrowDown
-  - assert_attribute: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', name: aria-selected, equals: 'true' }
-  - assert_count: { selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]', equal: 1 }
-  - assert_text: { selector: '[data-testid="code-workspace-editor-pane"] .cm-content', contains: Disposable project tree reference }
-  - screenshot: 02-example-selected.png
-  - press: Enter
-  - assert_text: { selector: '[data-testid="code-workspace-editor-pane"] .cm-content', contains: The editor buffer should survive tree navigation. }
-  - assert_count: { selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]', equal: 2 }
-  - screenshot: 03-example-open.png
-  - right_click: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
-  - assert_menu_items: [Open, 'Rename...', Delete]
-  - screenshot: 04-context-menu.png
-  - press: Escape
-  - assert_not_visible: '[data-testid="context-menu"]'
-  - assert_attribute: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', name: aria-selected, equals: 'true' }
-  - press: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', key: F2 }
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - assert_attribute: { selector: '[data-testid="text-input-dialog-input"]', name: value, equals: example.txt }
-  - press: Escape
-  - assert_not_visible: '[data-testid="text-input-dialog"]'
-  - press: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', key: Delete }
-  - assert_text: { selector: '[data-testid="confirm-dialog-message"]', contains: src/main/example.txt }
-  - press: Escape
-  - assert_not_visible: '[data-testid="confirm-dialog"]'
-  - assert_file_sha256:
-      path: '${fixture.project_tree_root}/src/main/example.txt'
-      equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
-  - click: '[data-testid="code-workspace-editor-pane"] .cm-content'
-  - eval_readonly:
-      expression: document.activeElement?.classList.contains('cm-content')
-  - screenshot: 05-editor-focused.png
-  - press: Mod+End
-  # One edit/undo transaction; multi-character W3C typing need not form one
-  # history entry. This scenario protects undo and exact disk restoration.
-  - type: X
-  - press: Mod+s
-  - assert_file_contains: { path: '${fixture.project_tree_root}/src/main/example.txt', contains: X }
-  - press: Mod+z
-  - press: Mod+s
-  - assert_file_sha256:
-      path: '${fixture.project_tree_root}/src/main/example.txt'
-      equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
-  # Give the debounced real watcher refresh time to land, then prove that the
-  # expanded selected file remains navigable after saves (regression found E2E).
-  - wait: 1
-  - assert_attribute: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', name: aria-selected, equals: 'true' }
-  - press: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', key: Mod+Enter }
-  - wait_for: '[data-testid="code-workspace-editor-split"]'
-  - assert_count: { selector: '[data-testid="code-workspace-editor-pane"] .cm-content', equal: 2 }
-  - screenshot: 06-retained-split.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tree-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-tree","name":"fixture","roots":[{"id":"fixture","name":"fixture","path":"${fixture.project_tree_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1789259400000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.project_tree_root}"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-pane"] .cm-content'
+    contains: Disposable project tree reference
+- press:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+    key: Home
+- press: ArrowRight
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]'
+    name: aria-selected
+    equals: 'true'
+- press:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]'
+    key: ArrowRight
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="docs/notes.txt"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]'
+    name: aria-selected
+    equals: 'true'
+- press: ArrowRight
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="docs/notes.txt"]'
+    name: aria-selected
+    equals: 'true'
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]'
+    equal: 1
+- screenshot: 01-child-selected.png
+- press: ArrowLeft
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]'
+    name: aria-selected
+    equals: 'true'
+- press: ArrowLeft
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]'
+    name: aria-expanded
+    equals: 'false'
+- press: ArrowDown
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
+    name: aria-expanded
+    equals: 'false'
+- press: ArrowRight
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
+- press: ArrowRight
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
+    name: aria-selected
+    equals: 'true'
+- press: ArrowRight
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+- press: ArrowDown
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+    name: aria-selected
+    equals: 'true'
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-pane"] .cm-content'
+    contains: Disposable project tree reference
+- screenshot: 02-example-selected.png
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-pane"] .cm-content'
+    contains: The editor buffer should survive tree navigation.
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]'
+    equal: 2
+- screenshot: 03-example-open.png
+- right_click: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+- assert_menu_items:
+  - Open
+  - Rename...
+  - Delete
+- screenshot: 04-context-menu.png
+- press: Escape
+- assert_not_visible: '[data-testid="context-menu"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+    name: aria-selected
+    equals: 'true'
+- press:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+    key: F2
+- wait_for: '[data-testid="text-input-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="text-input-dialog-input"]'
+    name: value
+    equals: example.txt
+- press: Escape
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- press:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+    key: Delete
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: src/main/example.txt
+- press: Escape
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_file_sha256:
+    path: ${fixture.project_tree_root}/src/main/example.txt
+    equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
+- click: '[data-testid="code-workspace-editor-pane"] .cm-content'
+- eval_readonly:
+    expression: document.activeElement?.classList.contains('cm-content')
+- screenshot: 05-editor-focused.png
+- press: Mod+End
+- type: X
+- press: Mod+s
+- assert_file_contains:
+    path: ${fixture.project_tree_root}/src/main/example.txt
+    contains: X
+- press: Mod+z
+- press: Mod+s
+- assert_file_sha256:
+    path: ${fixture.project_tree_root}/src/main/example.txt
+    equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
+- wait: 1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+    name: aria-selected
+    equals: 'true'
+- press:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+    key: Mod+Enter
+- wait_for: '[data-testid="code-workspace-editor-split"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"] .cm-content'
+    equal: 2
+- screenshot: 06-retained-split.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Project tree navigation preserves tabs and editing：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 11
+    - 12
+    - 14
+    - 17
+    - 21
+    - 23
+    - 25
+    - 27
+    - 29
+    - 31
+    - 33
+    - 38
+    - 42
+    - 45
+    - 48
+    - 51
+    - 53
+    - 55
+    - 58
+    - 61
+    - 62
+    - 63
+    - 65
+    - 66
+    - 70
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"] .cm-content", "contains":
+        "Disposable project tree reference"}}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"docs\"]",
+        "name": "aria-selected", "equals": "true"}}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"docs/notes.txt\"]"}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"docs\"]",
+        "name": "aria-selected", "equals": "true"}}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"docs/notes.txt\"]",
+        "name": "aria-selected", "equals": "true"}}'
+    - step: 19
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]",
+        "equal": 1}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"docs\"]",
+        "name": "aria-selected", "equals": "true"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"docs\"]",
+        "name": "aria-expanded", "equals": "false"}}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src\"]",
+        "name": "aria-expanded", "equals": "false"}}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main\"]"}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main\"]",
+        "name": "aria-selected", "equals": "true"}}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/example.txt\"]"}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/example.txt\"]",
+        "name": "aria-selected", "equals": "true"}}'
+    - step: 35
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]",
+        "equal": 1}}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"] .cm-content", "contains":
+        "Disposable project tree reference"}}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"] .cm-content", "contains":
+        "The editor buffer should survive tree navigation."}}'
+    - step: 40
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]",
+        "equal": 2}}'
+    - step: 43
+      expectation: '{"assert_menu_items": ["Open", "Rename...", "Delete"]}'
+    - step: 46
+      expectation: '{"assert_not_visible": "[data-testid=\"context-menu\"]"}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/example.txt\"]",
+        "name": "aria-selected", "equals": "true"}}'
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 50
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"text-input-dialog-input\"]", "name": "value",
+        "equals": "example.txt"}}'
+    - step: 52
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "src/main/example.txt"}}'
+    - step: 56
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 57
+      expectation: '{"assert_file_sha256": {"path": "${fixture.project_tree_root}/src/main/example.txt", "equals":
+        "bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a"}}'
+    - step: 59
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')"}}'
+    - step: 64
+      expectation: '{"assert_file_contains": {"path": "${fixture.project_tree_root}/src/main/example.txt", "contains":
+        "X"}}'
+    - step: 67
+      expectation: '{"assert_file_sha256": {"path": "${fixture.project_tree_root}/src/main/example.txt", "equals":
+        "bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a"}}'
+    - step: 69
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/example.txt\"]",
+        "name": "aria-selected", "equals": "true"}}'
+    - step: 71
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
+    - step: 72
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] .cm-content", "equal":
+        2}}'
+    results:
+    - 71
+    - 72
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

@@ -1,189 +1,333 @@
 id: TC-IDE-AUDIT-003-replace-conflict-ledger-native
-title: "Replace conflict guard and real applier ledger in packaged app"
-description: |
-  §ED-AUDIT-003 A2 native gate case. Proves the replace-in-files commit
-  against a real disposable workspace_root with deterministic fault
-  injections on both applier paths:
-
-  1. Closed-file path, external change between preview and commit
-     (host_write_file rewrites the matched file while no editor tab is
-     open): the pre-commit freshness recheck blocks with "changed since
-     search", the preview stays open, and the disk bytes are provably
-     untouched (exact SHA-256); restoring the bytes makes the same frozen
-     plan commit, and one workspace undo reverts the disk.
-  2. Open-buffer path, unwritable workspace directory (native_set_writable
-     removes owner-write from the root, so the writer's temp file cannot be
-     created): the applier's open-clean save genuinely fails, the resume
-     dialog appears, declining it leaves the real ledger — "Replace
-     blocked, nothing applied" — the preview stays open, and the disk bytes
-     are provably untouched. No workspace-edit history is registered by the
-     failed run.
-  3. Recovery: restoring directory write permission and saving the dirty
-     buffer (Ctrl+S) lands the intended bytes; a following Ctrl+Z is a
-     no-op, proving the failed run registered zero workspace-edit history
-     while the successful paths above each undid with exactly one step.
-
-  Highest claim on green: L2 provider-backed (Linux). Preview exclusion and
-  cancel are covered by unit tests and the browser gate (TC-IDE-D2-01).
-covers: [F25.5]
-tags: [code-workspace, ide-find, replace, native-gate, p1]
-modes: [native]
-fixtures: [reset_db, workspace_root]
+title: Replace conflict guard and real applier ledger in packaged app
+description: "§ED-AUDIT-003 A2 native gate case. Proves the replace-in-files commit\nagainst a real disposable workspace_root\
+  \ with deterministic fault\ninjections on both applier paths:\n\n1. Closed-file path, external change between\
+  \ preview and commit\n   (host_write_file rewrites the matched file while no editor tab is\n   open): the pre-commit\
+  \ freshness recheck blocks with \"changed since\n   search\", the preview stays open, and the disk bytes are provably\n\
+  \   untouched (exact SHA-256); restoring the bytes makes the same frozen\n   plan commit, and one workspace undo\
+  \ reverts the disk.\n2. Open-buffer path, unwritable workspace directory (native_set_writable\n   removes owner-write\
+  \ from the root, so the writer's temp file cannot be\n   created): the applier's open-clean save genuinely fails,\
+  \ the resume\n   dialog appears, declining it leaves the real ledger — \"Replace\n   blocked, nothing applied\"\
+  \ — the preview stays open, and the disk bytes\n   are provably untouched. No workspace-edit history is registered\
+  \ by the\n   failed run.\n3. Recovery: restoring directory write permission and saving the dirty\n   buffer (Ctrl+S)\
+  \ lands the intended bytes; a following Ctrl+Z is a\n   no-op, proving the failed run registered zero workspace-edit\
+  \ history\n   while the successful paths above each undid with exactly one step.\n\nHighest claim on green: L2\
+  \ provider-backed (Linux). Preview exclusion and\ncancel are covered by unit tests and the browser gate (TC-IDE-D2-01).\n"
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-find
+- replace
+- native-gate
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- workspace_root
 timeout_sec: 600
 steps:
-  - open: "${cfg.app.base_url}"
-  - vault_first_run: "qa-native-gate-password"
-  - wait_for: '[data-testid="welcome-panel"]'
-  # Enter the disposable fixture root through persisted recents (no picker).
-  - seed_storage:
-      key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-audit003","name":"qa-root","roots":[{"id":"qa-root","name":"qa-root","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-root","path":"notes.txt"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
-  - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - wait_for:
-      selector: '[data-testid="code-workspace-editor-pane"]'
-      timeout_sec: 60
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "scratch notes"
-      timeout_sec: 60
-  - click: '[data-testid="code-workspace-bottom-tab-search"]'
-  - wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
-  # Close the only editor tab: segment 1 must exercise the closed-file
-  # commit path, which re-reads disk at commit time (no open-buffer state
-  # that an external writer could race against).
-  - click: '[data-testid="code-workspace-editor-tab-strip"] [data-active="true"] button[title="Close"]'
-  - assert_not_visible: '[data-testid="code-workspace-editor-tab-strip"]'
-  # Segment 1: external change between preview and commit (closed file).
-  - native_click:
-      selector: '[aria-label="Search query"]'
-  - native_keys:
-      selector: '[aria-label="Search query"]'
-      keys: ["Control+a", "s", "c", "r", "a", "t", "c", "h", "Enter"]
-  - click: '[data-testid="code-workspace-find-run-search"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-find-in-files-panel"]'
-      contains: "notes.txt"
-      timeout_sec: 60
-  - native_click:
-      selector: '[aria-label="Replace text"]'
-  - native_keys:
-      selector: '[aria-label="Replace text"]'
-      keys: ["Control+a", "s", "n", "a", "t", "c", "h"]
-  - click: '[data-testid="code-workspace-find-replace-all"]'
-  - wait_for: '[data-testid="code-workspace-replace-preview"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-replace-counts"]'
-      contains: "1 of 1"
-      timeout_sec: 10
-  # A real external process rewrites the matched file after the preview
-  # froze its match set.
-  - host_write_file:
-      path: "${fixture.workspace_root}/notes.txt"
-      text: "externally rewritten\n"
-  - click: '[data-testid="code-workspace-replace-commit"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-replace-commit-error"]'
-      contains: "changed since search"
-      timeout_sec: 15
-  - wait_for: '[data-testid="code-workspace-replace-preview"]'
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/notes.txt"
-      equals: "5185a66ab96d05620dff4ba24fcb4fec28df21dae051c073396380b99270497b"
-      timeout_sec: 10
-  # Restore the matched bytes: the same frozen plan now commits.
-  - host_write_file:
-      path: "${fixture.workspace_root}/notes.txt"
-      text: "scratch notes\n"
-  - click: '[data-testid="code-workspace-replace-commit"]'
-  - assert_file_contains:
-      path: "${fixture.workspace_root}/notes.txt"
-      contains: "snatch notes"
-      timeout_sec: 30
-  - assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
-  - native_click:
-      selector: '[aria-label="Search query"]'
-  - native_keys:
-      selector: '[aria-label="Search query"]'
-      keys: ["Control+z"]
-  - assert_file_contains:
-      path: "${fixture.workspace_root}/notes.txt"
-      contains: "scratch notes"
-      timeout_sec: 30
-  # Segment 2: reopen the file — the open-buffer applier path with an
-  # unwritable workspace directory.
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-tab-strip"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "scratch notes"
-      timeout_sec: 30
-  - native_click:
-      selector: '[aria-label="Search query"]'
-  - native_keys:
-      selector: '[aria-label="Search query"]'
-      keys: ["Control+a", "s", "c", "r", "a", "t", "c", "h", "Enter"]
-  - click: '[data-testid="code-workspace-find-run-search"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-find-in-files-panel"]'
-      contains: "notes.txt"
-      timeout_sec: 60
-  - native_click:
-      selector: '[aria-label="Replace text"]'
-  - native_keys:
-      selector: '[aria-label="Replace text"]'
-      keys: ["Control+a", "s", "n", "a", "t", "c", "h"]
-  - click: '[data-testid="code-workspace-find-replace-all"]'
-  - wait_for: '[data-testid="code-workspace-replace-preview"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-replace-counts"]'
-      contains: "1 of 1"
-      timeout_sec: 10
-  - native_set_writable:
-      path: "${fixture.workspace_root}"
-      writable: false
-  - click: '[data-testid="code-workspace-replace-commit"]'
-  - wait_for: '[data-testid="confirm-dialog"]'
-  - assert_text:
-      selector: '[data-testid="confirm-dialog-message"]'
-      contains: "Retry"
-      timeout_sec: 15
-  - click: '[data-testid="confirm-dialog-cancel"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-replace-commit-error"]'
-      contains: "nothing applied"
-      timeout_sec: 15
-  - wait_for: '[data-testid="code-workspace-replace-preview"]'
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/notes.txt"
-      equals: "d10eea22971a9850a14277b8e4b2f5922c5f27530a9d216774c8029d6340a538"
-      timeout_sec: 10
-  # Cancel closes the preview without committing anything further.
-  - click: '[data-testid="code-workspace-replace-cancel"]'
-  - assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
-  # Recovery: writable again, then the dirty buffer's intended bytes land
-  # through a real Ctrl+S save.
-  - native_set_writable:
-      path: "${fixture.workspace_root}"
-      writable: true
-  - native_click:
-      selector: '[data-testid="code-workspace-editor"]'
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"]'
-      keys: ["Control+s"]
-  - assert_file_contains:
-      path: "${fixture.workspace_root}/notes.txt"
-      contains: "snatch notes"
-      timeout_sec: 30
-  # The failed run registered zero workspace-edit history: undo is a no-op
-  # and the recovered bytes stay.
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"]'
-      keys: ["Control+z"]
-  - assert_file_contains:
-      path: "${fixture.workspace_root}/notes.txt"
-      contains: "snatch notes"
-      timeout_sec: 30
-  - screenshot: tc-ide-audit-003-replace-ledger.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-audit003","name":"qa-root","roots":[{"id":"qa-root","name":"qa-root","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-root","path":"notes.txt"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: scratch notes
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-bottom-tab-search"]'
+- wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
+- click: '[data-testid="code-workspace-editor-tab-strip"] [data-active="true"] button[title="Close"]'
+- assert_not_visible: '[data-testid="code-workspace-editor-tab-strip"]'
+- native_click:
+    selector: '[aria-label="Search query"]'
+- native_keys:
+    selector: '[aria-label="Search query"]'
+    keys:
+    - Control+a
+    - s
+    - c
+    - r
+    - a
+    - t
+    - c
+    - h
+    - Enter
+- click: '[data-testid="code-workspace-find-run-search"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-find-in-files-panel"]'
+    contains: notes.txt
+    timeout_sec: 60
+- native_click:
+    selector: '[aria-label="Replace text"]'
+- native_keys:
+    selector: '[aria-label="Replace text"]'
+    keys:
+    - Control+a
+    - s
+    - n
+    - a
+    - t
+    - c
+    - h
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-counts"]'
+    contains: 1 of 1
+    timeout_sec: 10
+- host_write_file:
+    path: ${fixture.workspace_root}/notes.txt
+    text: 'externally rewritten
+
+      '
+- click: '[data-testid="code-workspace-replace-commit"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-commit-error"]'
+    contains: changed since search
+    timeout_sec: 15
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/notes.txt
+    equals: 5185a66ab96d05620dff4ba24fcb4fec28df21dae051c073396380b99270497b
+    timeout_sec: 10
+- host_write_file:
+    path: ${fixture.workspace_root}/notes.txt
+    text: 'scratch notes
+
+      '
+- click: '[data-testid="code-workspace-replace-commit"]'
+- assert_file_contains:
+    path: ${fixture.workspace_root}/notes.txt
+    contains: snatch notes
+    timeout_sec: 30
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
+- native_click:
+    selector: '[aria-label="Search query"]'
+- native_keys:
+    selector: '[aria-label="Search query"]'
+    keys:
+    - Control+z
+- assert_file_contains:
+    path: ${fixture.workspace_root}/notes.txt
+    contains: scratch notes
+    timeout_sec: 30
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-tab-strip"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: scratch notes
+    timeout_sec: 30
+- native_click:
+    selector: '[aria-label="Search query"]'
+- native_keys:
+    selector: '[aria-label="Search query"]'
+    keys:
+    - Control+a
+    - s
+    - c
+    - r
+    - a
+    - t
+    - c
+    - h
+    - Enter
+- click: '[data-testid="code-workspace-find-run-search"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-find-in-files-panel"]'
+    contains: notes.txt
+    timeout_sec: 60
+- native_click:
+    selector: '[aria-label="Replace text"]'
+- native_keys:
+    selector: '[aria-label="Replace text"]'
+    keys:
+    - Control+a
+    - s
+    - n
+    - a
+    - t
+    - c
+    - h
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-counts"]'
+    contains: 1 of 1
+    timeout_sec: 10
+- native_set_writable:
+    path: ${fixture.workspace_root}
+    writable: false
+- click: '[data-testid="code-workspace-replace-commit"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Retry
+    timeout_sec: 15
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-commit-error"]'
+    contains: nothing applied
+    timeout_sec: 15
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/notes.txt
+    equals: d10eea22971a9850a14277b8e4b2f5922c5f27530a9d216774c8029d6340a538
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-replace-cancel"]'
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
+- native_set_writable:
+    path: ${fixture.workspace_root}
+    writable: true
+- native_click:
+    selector: '[data-testid="code-workspace-editor"]'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"]'
+    keys:
+    - Control+s
+- assert_file_contains:
+    path: ${fixture.workspace_root}/notes.txt
+    contains: snatch notes
+    timeout_sec: 30
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"]'
+    keys:
+    - Control+z
+- assert_file_contains:
+    path: ${fixture.workspace_root}/notes.txt
+    contains: snatch notes
+    timeout_sec: 30
+- screenshot: tc-ide-audit-003-replace-ledger.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Replace conflict guard and real applier ledger in packaged app：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 11
+    - 13
+    - 15
+    - 16
+    - 17
+    - 19
+    - 20
+    - 21
+    - 24
+    - 25
+    - 29
+    - 30
+    - 33
+    - 34
+    - 36
+    - 39
+    - 40
+    - 41
+    - 43
+    - 44
+    - 45
+    - 48
+    - 49
+    - 52
+    - 56
+    - 58
+    - 59
+    - 60
+    - 62
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "scratch
+        notes", "timeout_sec": 60}}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-find-in-files-panel\"]"}'
+    - step: 14
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
+        "notes.txt", "timeout_sec": 60}}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
+        "1 of 1", "timeout_sec": 10}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains":
+        "changed since search", "timeout_sec": 15}}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 28
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "5185a66ab96d05620dff4ba24fcb4fec28df21dae051c073396380b99270497b",
+        "timeout_sec": 10}}'
+    - step: 31
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch
+        notes", "timeout_sec": 30}}'
+    - step: 32
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 35
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "scratch
+        notes", "timeout_sec": 30}}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
+    - step: 38
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "scratch
+        notes", "timeout_sec": 30}}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
+        "notes.txt", "timeout_sec": 60}}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 47
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
+        "1 of 1", "timeout_sec": 10}}'
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 51
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Retry",
+        "timeout_sec": 15}}'
+    - step: 53
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains":
+        "nothing applied", "timeout_sec": 15}}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 55
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "d10eea22971a9850a14277b8e4b2f5922c5f27530a9d216774c8029d6340a538",
+        "timeout_sec": 10}}'
+    - step: 57
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 61
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch
+        notes", "timeout_sec": 30}}'
+    - step: 63
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch
+        notes", "timeout_sec": 30}}'
+    results:
+    - 63
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

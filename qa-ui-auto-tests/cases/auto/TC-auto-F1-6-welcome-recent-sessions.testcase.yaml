@@ -1,98 +1,225 @@
 id: TC-auto-F1-6-welcome-recent-sessions
 title: Welcome recent sessions restore and filter controls
-description: |
-  Creates a saved LocalShell session, opens it once so last_connected_at is set,
+description: 'Creates a saved LocalShell session, opens it once so last_connected_at is set,
+
   then verifies the Welcome recent-session history supports filtering, type
+
   filtering, sorting, selecting filtered rows, opening selected/filtered rows,
+
   session-tree reveal, session-tree-equivalent row context actions, and the
+
   history settings shortcut.
-covers: [F1.6, F11.1]
-tags: [auto-generated, smoke, p1, welcome, needs-review]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F1.6
+- F11.1
+tags:
+- auto-generated
+- smoke
+- p1
+- welcome
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 60
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - assert_visible: '[data-testid="welcome-recent-sessions"]'
-  - assert_visible: '[data-testid="welcome-recent-empty"]'
-
-  # Create a saved local shell session without external network credentials.
-  - click: text="New session…"
-  - wait_for: '[data-testid="session-editor"]'
-  - click: '[data-testid="session-proto-shell"]'
-  - click: '[data-testid="session-section-bookmark"]'
-  - wait_for: '[data-testid="bookmark-settings"]'
-  - fill: {selector: '[data-testid="session-name"]', value: qa-ui-auto-welcome-recent}
-  - click: '[data-testid="session-save"]'
-  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
-
-  # Opening the saved session marks it connected and promotes it into history.
-  - open_session: {name: qa-ui-auto-welcome-recent, double_click: true}
-  - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 10
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - wait_for: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
-
-  - fill: {selector: '[data-testid="welcome-recent-filter"]', value: welcome-recent}
-  - select_option: {selector: '[data-testid="welcome-recent-type-filter"]', value: LocalShell}
-  - select_option: {selector: '[data-testid="welcome-recent-sort"]', value: name-asc}
-  - assert_visible: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
-  - click: '[data-testid="welcome-recent-select-filtered"]'
-  - assert_visible: '[data-testid="welcome-recent-clear-selection"]'
-  - click: '[data-testid="welcome-recent-clear-selection"]'
-  - click: '[data-testid="welcome-recent-select"]'
-  - click: '[data-testid="welcome-recent-open-selected"]'
-  - wait_for:
-      selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
-      timeout_sec: 10
-
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - wait_for: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
-  - click: '[data-testid="welcome-recent-reveal"]'
-  - assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
-  - assert_attribute: {selector: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]', name: data-selected, equals: 'true'}
-  # F6.2 side-tab-sessions is toggle-semantic: bare click on fresh profiles
-  # collapses the panel. Switch away first so the sessions click is a real
-  # select + session-tree proof, not a collapse.
-  - click: '[data-testid="side-tab-tools"]'
-  - click: '[data-testid="side-tab-sessions"]'
-  - wait_for: '[data-testid="session-tree"]'
-  - assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
-  - right_click: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
-  - assert_menu_items: [Connect, Edit..., Duplicate, Move to folder, Delete]
-  - click_menu: Connect
-  - wait_for:
-      selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
-      timeout_sec: 10
-
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - click: '[data-testid="welcome-recent-open-filtered"]'
-  - wait_for:
-      selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
-      timeout_sec: 10
-
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - click: '[data-testid="welcome-recent-clear-filter"]'
-  - fill: {selector: '[data-testid="welcome-recent-filter"]', value: no-such-session}
-  - assert_visible: '[data-testid="welcome-recent-no-matches"]'
-  - click: '[data-testid="welcome-recent-clear-filter"]'
-  - click: '[data-testid="welcome-recent-open-all"]'
-  - wait_for:
-      selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
-      timeout_sec: 10
-
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - click: '[data-testid="welcome-recent-open"]'
-  - wait_for:
-      selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
-      timeout_sec: 10
-
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - click: '[data-testid="welcome-recent-settings"]'
-  - wait_for: '[data-testid="settings-panel"]'
-  - click: '[data-testid="settings-group-toggle-general"]'
-  - wait_for: '[data-testid="settings-welcome-recent-session-limit"]'
-  - fill: {selector: '[data-testid="settings-welcome-recent-session-limit"]', value: '20'}
-  - screenshot: F1.6-welcome-recent-sessions.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="welcome-recent-sessions"]'
+- assert_visible: '[data-testid="welcome-recent-empty"]'
+- click: text="New session…"
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-welcome-recent
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
+- open_session:
+    name: qa-ui-auto-welcome-recent
+    double_click: true
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 10
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- wait_for: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
+- fill:
+    selector: '[data-testid="welcome-recent-filter"]'
+    value: welcome-recent
+- select_option:
+    selector: '[data-testid="welcome-recent-type-filter"]'
+    value: LocalShell
+- select_option:
+    selector: '[data-testid="welcome-recent-sort"]'
+    value: name-asc
+- assert_visible: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
+- click: '[data-testid="welcome-recent-select-filtered"]'
+- assert_visible: '[data-testid="welcome-recent-clear-selection"]'
+- click: '[data-testid="welcome-recent-clear-selection"]'
+- click: '[data-testid="welcome-recent-select"]'
+- click: '[data-testid="welcome-recent-open-selected"]'
+- wait_for:
+    selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
+    timeout_sec: 10
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- wait_for: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
+- click: '[data-testid="welcome-recent-reveal"]'
+- assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
+- assert_attribute:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
+    name: data-selected
+    equals: 'true'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
+- right_click: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
+- assert_menu_items:
+  - Connect
+  - Edit...
+  - Duplicate
+  - Move to folder
+  - Delete
+- click_menu: Connect
+- wait_for:
+    selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
+    timeout_sec: 10
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="welcome-recent-open-filtered"]'
+- wait_for:
+    selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
+    timeout_sec: 10
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="welcome-recent-clear-filter"]'
+- fill:
+    selector: '[data-testid="welcome-recent-filter"]'
+    value: no-such-session
+- assert_visible: '[data-testid="welcome-recent-no-matches"]'
+- click: '[data-testid="welcome-recent-clear-filter"]'
+- click: '[data-testid="welcome-recent-open-all"]'
+- wait_for:
+    selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
+    timeout_sec: 10
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="welcome-recent-open"]'
+- wait_for:
+    selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
+    timeout_sec: 10
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="welcome-recent-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- wait_for: '[data-testid="settings-welcome-recent-session-limit"]'
+- fill:
+    selector: '[data-testid="settings-welcome-recent-session-limit"]'
+    value: '20'
+- screenshot: F1.6-welcome-recent-sessions.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Welcome recent sessions restore and filter controls：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 5
+    - 7
+    - 8
+    - 10
+    - 11
+    - 13
+    - 15
+    - 17
+    - 18
+    - 19
+    - 21
+    - 23
+    - 24
+    - 25
+    - 27
+    - 29
+    - 32
+    - 33
+    - 36
+    - 38
+    - 40
+    - 41
+    - 43
+    - 44
+    - 45
+    - 47
+    - 48
+    - 50
+    - 51
+    - 53
+    - 54
+    - 56
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 3
+      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-sessions\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-empty\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 10}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"welcome-recent-session-row\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-session-row\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-clear-selection\"]"}'
+    - step: 26
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-pane\"][data-active=\"true\"] [data-testid=\"terminal-pane\"]",
+        "timeout_sec": 10}}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"welcome-recent-session-row\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-welcome-recent\"]",
+        "name": "data-selected", "equals": "true"}}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 35
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-welcome-recent\"]"}'
+    - step: 37
+      expectation: '{"assert_menu_items": ["Connect", "Edit...", "Duplicate", "Move to folder", "Delete"]}'
+    - step: 39
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-pane\"][data-active=\"true\"] [data-testid=\"terminal-pane\"]",
+        "timeout_sec": 10}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-pane\"][data-active=\"true\"] [data-testid=\"terminal-pane\"]",
+        "timeout_sec": 10}}'
+    - step: 46
+      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-no-matches\"]"}'
+    - step: 49
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-pane\"][data-active=\"true\"] [data-testid=\"terminal-pane\"]",
+        "timeout_sec": 10}}'
+    - step: 52
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-pane\"][data-active=\"true\"] [data-testid=\"terminal-pane\"]",
+        "timeout_sec": 10}}'
+    - step: 55
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 57
+      expectation: '{"wait_for": "[data-testid=\"settings-welcome-recent-session-limit\"]"}'
+    results:
+    - 57
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

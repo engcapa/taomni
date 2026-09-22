@@ -1,49 +1,112 @@
 id: TC-auto-F-DB-2-redis-session-scaffold
 title: Redis session keeps its command library available offline
-description: |
-  Coverage smoke for F-DB-2 (Redis client). Opens SessionEditor, switches to
+description: 'Coverage smoke for F-DB-2 (Redis client). Opens SessionEditor, switches to
+
   the Redis protocol, saves the session, then opens its offline client. Browser
+
   mode intentionally rejects db_connect; the test verifies that the Redis CLI
+
   and DB-index-scoped Query Library remain mounted and usable for saved commands.
-covers: [F-DB-2, F-DB-4, F6.3]
-tags: [auto-generated, smoke, needs-review, database, redis, query-library, no-connect]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-DB-2
+- F-DB-4
+- F6.3
+tags:
+- auto-generated
+- smoke
+- needs-review
+- database
+- redis
+- query-library
+- no-connect
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="sidebar"]'
-  - click: '[data-testid="session-new"]'
-  - wait_for: '[data-testid="session-editor"]'
-  # Selecting the Redis proto auto-switches to the database section.
-  - click: '[data-testid="session-proto-redis"]'
-  - wait_for:
-      selector: '[data-testid="session-database-section"]'
-      timeout_sec: 5
-  - assert_visible: '[data-testid="database-settings"]'
-  - fill:
-      selector: '[data-testid="session-host"]'
-      value: redis-host.example.test
-  - fill:
-      selector: '[data-testid="session-port"]'
-      value: "6379"
-  # Redis-specific form fields: DB index (0–15) + optional key prefix.
-  - fill:
-      selector: 'input[aria-label="Redis DB index"]'
-      value: "2"
-  - fill:
-      selector: 'input[aria-label="Redis key prefix"]'
-      value: "qa:"
-  - click: '[data-testid="session-section-bookmark"]'
-  - wait_for: '[data-testid="bookmark-settings"]'
-  - fill:
-      selector: '[data-testid="session-name"]'
-      value: qa-ui-auto-redis
-  - click: '[data-testid="session-save"]'
-  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-redis"]'
-  - open_session: { name: qa-ui-auto-redis, double_click: true }
-  - wait_for: '[data-testid="redis-connection-error-banner"]'
-  - assert_visible: '[data-testid="redis-cli"]'
-  - click: '[data-testid="redis-query-library-tab"]'
-  - wait_for: '[data-testid="query-library-panel"]'
-  - screenshot: db-2-redis-query-library.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-redis"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 5
+- assert_visible: '[data-testid="database-settings"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: redis-host.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '6379'
+- fill:
+    selector: input[aria-label="Redis DB index"]
+    value: '2'
+- fill:
+    selector: input[aria-label="Redis key prefix"]
+    value: 'qa:'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-redis
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-redis"]'
+- open_session:
+    name: qa-ui-auto-redis
+    double_click: true
+- wait_for: '[data-testid="redis-connection-error-banner"]'
+- assert_visible: '[data-testid="redis-cli"]'
+- click: '[data-testid="redis-query-library-tab"]'
+- wait_for: '[data-testid="query-library-panel"]'
+- screenshot: db-2-redis-query-library.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Redis session keeps its command library available offline：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 20
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 6
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]", "timeout_sec": 5}}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"database-settings\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-redis\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"redis-connection-error-banner\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"redis-cli\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"query-library-panel\"]"}'
+    results:
+    - 21
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

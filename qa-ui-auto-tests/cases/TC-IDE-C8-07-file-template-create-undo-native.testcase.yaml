@@ -1,114 +1,229 @@
 id: TC-IDE-C8-07-file-template-create-undo-native
-title: "Java file template creates a real source file and undoes it"
-description: |
-  Native gate case for ED-TEMPLATE-001 A1/A3. Opens the real Maven sample,
+title: Java file template creates a real source file and undoes it
+description: 'Native gate case for ED-TEMPLATE-001 A1/A3. Opens the real Maven sample,
+
   waits for trusted project facts, creates a Java class from the source package
+
   through the production tree command, verifies the host file and generated
+
   package/content, then uses the workspace undo command and verifies the UI no
+
   longer exposes the resource. The host-side absence check runs after the
+
   runner because the native harness exposes creation/content assertions only.
+
   Highest claim on green: L1 packaged native disk boundary.
-covers: [F25.5]
-tags: [code-workspace, ide-c8, file-templates, native-gate, p1]
-modes: [native]
-fixtures: [reset_db, java_sample_projects]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c8
+- file-templates
+- native-gate
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- java_sample_projects
 timeout_sec: 300
 steps:
-  - open: "${cfg.app.base_url}"
-  - vault_first_run: "qa-template-password"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - seed_storage:
-      key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-template","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1788566400000,"isGitRepo":false}]'
-  - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - wait_for:
-      selector: '[data-testid="project-facts-status-badge"]'
-      timeout_sec: 90
-  - assert_text:
-      selector: '[data-testid="project-facts-status-badge"]'
-      contains: "Ready"
-      timeout_sec: 30
-  - wait_for:
-      selector: '[data-testid="code-workspace-tree-dir"]'
-      timeout_sec: 30
-  - click: '[data-testid="code-workspace-view-tree"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
-  - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main"] [data-testid="code-workspace-tree-dir-arrow"]'
-  - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"] [data-testid="code-workspace-tree-dir-arrow"]'
-  - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com"] [data-testid="code-workspace-tree-dir-arrow"]'
-  - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example"] [data-testid="code-workspace-tree-dir-arrow"]'
-  - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example/single"]'
-  - click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example/single"] [data-testid="code-workspace-tree-dir-arrow"]'
-  - wait_for:
-      selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/App.java"]'
-      timeout_sec: 60
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/App.java"]'
-  - press: Control+Shift+N
-  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
-  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
-  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
-  - type: New Java Class...
-  - press: Enter
-  - wait_for: '[data-testid="new-java-class-dialog"]'
-  - assert_text:
-      selector: '[data-testid="new-java-class-package"]'
-      contains: "com.example.single"
-  - select_option:
-      selector: '[data-testid="new-java-class-kind-select"]'
-      value: interface
-  - eval_readonly:
-      expression: >-
-        document.querySelectorAll('select')[document.querySelectorAll('select').length - 1]?.value?.includes('interface')
-      expect_truthy: true
-  - click: '[data-testid="new-java-class-cancel"]'
-  - wait_for:
-      selector: '[data-testid="new-java-class-dialog"]'
-      state: detached
-  - press: Control+Shift+N
-  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
-  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
-  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
-  - type: New Java Class...
-  - press: Enter
-  - wait_for: '[data-testid="new-java-class-dialog"]'
-  - fill:
-      selector: '[data-testid="new-java-class-name-input"]'
-      value: "QaTemplateSmoke"
-  - click: '[data-testid="new-java-class-submit"]'
-  - assert_file_exists:
-      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java"
-      timeout_sec: 30
-  - assert_file_contains:
-      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java"
-      contains: "package com.example.single;"
-      timeout_sec: 30
-  - assert_file_contains:
-      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java"
-      contains: "public class QaTemplateSmoke"
-      timeout_sec: 30
-  # Disk writes precede tree refresh/openFile and the dialog's async onCreate
-  # completion. The App.java pane already exists, so its presence cannot prove
-  # creation has finished or that Ctrl+Z will reach the workspace history.
-  - wait_for:
-      selector: '[data-testid="new-java-class-dialog"]'
-      state: detached
-      timeout_sec: 30
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      contains: "public class QaTemplateSmoke"
-      timeout_sec: 30
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
-      focus_target: true
-      require_keydown_prevented: true
-      keys: ["Mod+z"]
-  - assert_not_visible: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/QaTemplateSmoke.java"]'
-  - screenshot: tc-ide-c8-07-file-template-create-undo.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-template-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-template","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1788566400000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="project-facts-status-badge"]'
+    timeout_sec: 90
+- assert_text:
+    selector: '[data-testid="project-facts-status-badge"]'
+    contains: Ready
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-dir"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-view-tree"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example/single"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example/single"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/App.java"]'
+    timeout_sec: 60
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/App.java"]'
+- press: Control+Shift+N
+- wait_for: '[data-testid="code-workspace-search-everywhere"]'
+- click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: New Java Class...
+- press: Enter
+- wait_for: '[data-testid="new-java-class-dialog"]'
+- assert_text:
+    selector: '[data-testid="new-java-class-package"]'
+    contains: com.example.single
+- select_option:
+    selector: '[data-testid="new-java-class-kind-select"]'
+    value: interface
+- eval_readonly:
+    expression: document.querySelectorAll('select')[document.querySelectorAll('select').length - 1]?.value?.includes('interface')
+    expect_truthy: true
+- click: '[data-testid="new-java-class-cancel"]'
+- wait_for:
+    selector: '[data-testid="new-java-class-dialog"]'
+    state: detached
+- press: Control+Shift+N
+- wait_for: '[data-testid="code-workspace-search-everywhere"]'
+- click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: New Java Class...
+- press: Enter
+- wait_for: '[data-testid="new-java-class-dialog"]'
+- fill:
+    selector: '[data-testid="new-java-class-name-input"]'
+    value: QaTemplateSmoke
+- click: '[data-testid="new-java-class-submit"]'
+- assert_file_exists:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java
+    timeout_sec: 30
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java
+    contains: package com.example.single;
+    timeout_sec: 30
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java
+    contains: public class QaTemplateSmoke
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="new-java-class-dialog"]'
+    state: detached
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: public class QaTemplateSmoke
+    timeout_sec: 30
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    focus_target: true
+    require_keydown_prevented: true
+    keys:
+    - Mod+z
+- assert_not_visible: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/QaTemplateSmoke.java"]'
+- screenshot: tc-ide-c8-07-file-template-create-undo.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Java file template creates a real source file and undoes it：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 12
+    - 13
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
+    - 25
+    - 26
+    - 28
+    - 29
+    - 30
+    - 31
+    - 34
+    - 36
+    - 38
+    - 40
+    - 41
+    - 42
+    - 43
+    - 45
+    - 46
+    - 52
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"project-facts-status-badge\"]", "timeout_sec": 90}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"project-facts-status-badge\"]", "contains": "Ready",
+        "timeout_sec": 30}}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-dir\"]", "timeout_sec": 30}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java/com\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java/com/example\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java/com/example/single\"]"}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/java/com/example/single/App.java\"]",
+        "timeout_sec": 60}}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"new-java-class-dialog\"]"}'
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"new-java-class-package\"]", "contains": "com.example.single"}}'
+    - step: 35
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''select'')[document.querySelectorAll(''select'').length
+        - 1]?.value?.includes(''interface'')", "expect_truthy": true}}'
+    - step: 37
+      expectation: '{"wait_for": {"selector": "[data-testid=\"new-java-class-dialog\"]", "state": "detached"}}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"new-java-class-dialog\"]"}'
+    - step: 47
+      expectation: '{"assert_file_exists": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java",
+        "timeout_sec": 30}}'
+    - step: 48
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java",
+        "contains": "package com.example.single;", "timeout_sec": 30}}'
+    - step: 49
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java",
+        "contains": "public class QaTemplateSmoke", "timeout_sec": 30}}'
+    - step: 50
+      expectation: '{"wait_for": {"selector": "[data-testid=\"new-java-class-dialog\"]", "state": "detached", "timeout_sec":
+        30}}'
+    - step: 51
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains":
+        "public class QaTemplateSmoke", "timeout_sec": 30}}'
+    - step: 53
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/java/com/example/single/QaTemplateSmoke.java\"]"}'
+    results:
+    - 53
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

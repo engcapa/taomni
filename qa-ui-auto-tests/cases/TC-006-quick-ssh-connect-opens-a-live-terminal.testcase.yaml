@@ -1,36 +1,84 @@
 id: TC-006
 title: Quick SSH connect opens a live terminal
-covers: [F6.4, F3.1]
-tags: [legacy-imported, p0, quickconnect, ssh, terminal]
-modes: [browser, native]
-fixtures: [reset_db, ssh_required]
+covers:
+- F6.4
+- F3.1
+tags:
+- legacy-imported
+- p0
+- quickconnect
+- ssh
+- terminal
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
 steps:
-  - open: "${cfg.app.base_url}"
-  # Reveal the QuickConnect bar without the in-bar app menu: that menu is
-  # hidden on native macOS by design (native global menu). Seeding the
-  # persisted visibility flag and reloading selects the same UI on all three
-  # platforms; Menu-path coverage stays in the browser-only cases.
-  - seed_storage:
-      key: taomni.quickConnectVisible
-      value: 'true'
-  - reload_window: null
-  - wait_for: '[data-testid="qc-input"]'
-  - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
-  - click: "[data-testid=\"qc-submit\"]"
-  - wait_for: "[data-testid=\"auth-prompt\"]"
-  - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
-  - click: "[data-testid=\"auth-submit\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait_for:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-      timeout_sec: 20
-  # The Windows SSH fixture launches Git Bash, which clears the pre-session
-  # info banner after connecting. The command/output pair below is the live
-  # session assertion and is stable across all browser hosts.
-  - terminal_input:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-      text: "printf 'qa-quick-ssh-live\\n'"
-      submit: true
-  - wait: 1
-  - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-quick-ssh-live}
-  - screenshot: 006-quick-ssh-terminal.png
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 20
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf 'qa-quick-ssh-live\n'
+    submit: true
+- wait: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-quick\-ssh\-live\r?$
+    timeout_sec: 15
+- screenshot: 006-quick-ssh-terminal.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 快捷 SSH URL 打开认证框，认证完成终端就绪；命令产生独立的精确输出行。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 9
+    - 12
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
+        "timeout_sec": 20}}'
+    - step: 14
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-quick\\-ssh\\-live\\r?$",
+        "timeout_sec": 15}}'
+    results:
+    - 14
+  visual:
+  - check: 快捷连接与认证框布局、终端光标和输出可读。
+    method: manual
+    reason: 截图必须单独评审，不能由功能步骤通过推导视觉通过。
+  native:
+  - check: 浏览器通过真实 SSH 桥接服务；桌面认证与输入通道须看 native 执行结果。
+    method: automated
+    reason: 按实际执行模式解释；其他平台不继承 Linux 证据。

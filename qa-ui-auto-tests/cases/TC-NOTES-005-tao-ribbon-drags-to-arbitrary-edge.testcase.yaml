@@ -1,31 +1,84 @@
 id: TC-NOTES-005
 title: Tao Ribbon drags to an arbitrary edge and persists
-description: |
-  Verifies the unified Tao Ribbon placement (F-TAO-1, plan §7.1): dragging the
+description: 'Verifies the unified Tao Ribbon placement (F-TAO-1, plan §7.1): dragging the
+
   edge-docked ribbon toward the bottom of the window re-docks it to the bottom
+
   edge and persists the placement (edge + offsetRatio) to localStorage so it
+
   survives reload. The offset math + clamping are unit-tested in
+
   src/lib/tao/ribbonPlacement.test.ts; this case exercises the live drag.
-covers: [F-TAO-1]
-tags: [notes, tao, ribbon, p2]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-TAO-1
+tags:
+- notes
+- tao
+- ribbon
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="status-bar"]'
-  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-  # Drag the ribbon down onto the status bar → nearest edge is the bottom.
-  - drag_to:
-      from: '[data-testid="ai-chat-drawer-ribbon"]'
-      to: '[data-testid="status-bar"]'
-  - wait: 0.5
-  - assert_attribute: { selector: '[data-testid="ai-chat-drawer-ribbon"]', name: 'data-position', equals: 'bottom' }
-  - assert_localstorage: { key: "taomni.chatDrawer.layout.v1", contains: "bottom" }
-  # The drag ends over the bottom edge. Move the physical pointer away before
-  # reload so the restored bottom ribbon does not immediately hover-open.
-  - hover: '[data-testid="welcome-panel"]'
-  - reload: null
-  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-  - assert_attribute: { selector: '[data-testid="ai-chat-drawer-ribbon"]', name: 'data-position', equals: 'bottom' }
-  - screenshot: notes-005-ribbon-drag.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+- drag_to:
+    from: '[data-testid="ai-chat-drawer-ribbon"]'
+    to: '[data-testid="status-bar"]'
+- wait: 0.5
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer-ribbon"]'
+    name: data-position
+    equals: bottom
+- assert_localstorage:
+    key: taomni.chatDrawer.layout.v1
+    contains: bottom
+- hover: '[data-testid="welcome-panel"]'
+- reload: null
+- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer-ribbon"]'
+    name: data-position
+    equals: bottom
+- screenshot: notes-005-ribbon-drag.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tao Ribbon drags to an arbitrary edge and persists：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 8
+    - 9
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+    - step: 6
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "name": "data-position",
+        "equals": "bottom"}}'
+    - step: 7
+      expectation: '{"assert_localstorage": {"key": "taomni.chatDrawer.layout.v1", "contains": "bottom"}}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+    - step: 11
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "name": "data-position",
+        "equals": "bottom"}}'
+    results:
+    - 10
+    - 11
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

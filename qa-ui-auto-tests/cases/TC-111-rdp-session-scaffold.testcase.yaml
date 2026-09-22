@@ -1,65 +1,134 @@
 id: TC-111
 title: Saved RDP session opens the RDP panel and toolbar
-description: |
-  Coverage smoke for the desktop-only RDP client shell. Creates an RDP
+description: 'Coverage smoke for the desktop-only RDP client shell. Creates an RDP
+
   session bookmark and double-clicks to open it. Browser mode cannot
+
   authenticate to a real RDP target, so this case verifies the saved
+
   session route, panel mount, canvas mount, and toolbar controls; live
+
   protocol/display coverage is handled by ignored Rust live tests against
+
   a configured Windows/xrdp target.
 
+
   Because the configured cfg.ssh.host is not necessarily an RDP server,
+
   the test does NOT authenticate — it only confirms the protocol
+
   selector + tab-mount path is wired up. Real connection testing
+
   requires a configured RDP fixture (xrdp / Windows host).
-covers: [F9.7]
-tags: [smoke, p1, rdp, desktop-only]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F9.7
+tags:
+- smoke
+- p1
+- rdp
+- desktop-only
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="sidebar"]'
-  - click: '[data-testid="session-new"]'
-  - wait_for: '[data-testid="session-editor"]'
-  - click: '[data-testid="session-proto-rdp"]'
-  - fill:
-      selector: '[data-testid="session-host"]'
-      value: rdp-host.example.test
-  - fill:
-      selector: '[data-testid="session-port"]'
-      value: "3389"
-  - click: '[data-testid="session-section-bookmark"]'
-  - wait_for: '[data-testid="bookmark-settings"]'
-  - fill:
-      selector: '[data-testid="session-name"]'
-      value: qa-ui-auto-rdp
-  - click: '[data-testid="session-save"]'
-  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rdp"]'
-  # Open the RDP tab — the panel mounts immediately, regardless of dial state.
-  - open_session: { name: qa-ui-auto-rdp, double_click: true }
-  - wait_for: '[data-testid="auth-prompt"]'
-  - fill: {selector: '[data-testid="auth-password"]', value: "rdp-test"}
-  - click: '[data-testid="auth-submit"]'
-  - wait_for:
-      selector: '[data-testid="rdp-panel"]'
-      timeout_sec: 10
-  - assert_visible: '[data-testid="rdp-panel"]'
-  # The canvas element is rendered — assert it's attached even before connect.
-  - wait_for:
-      selector: '[data-testid="rdp-canvas"]'
-      state: attached
-      timeout_sec: 5
-  # The status chip should be present and show "connecting" or "error" (no real server).
-  - assert_visible: '[data-testid="rdp-status"]'
-  - click: '[data-testid="rdp-scale-toggle"]'
-  - assert_visible: '[data-testid="rdp-view-cycle"]'
-  - click: '[data-testid="rdp-view-cycle"]'
-  - click: '[data-testid="rdp-reconnect"]'
-  # Detach is wired by MainLayout for every RDP tab. In browser mode this
-  # falls back to window.open + drops the source tab, so it is the LAST
-  # action — same destructive-detach pattern TC-043 uses for SFTP.
-  - assert_visible: '[data-testid="rdp-detach"]'
-  - click: '[data-testid="rdp-detach"]'
-  - wait: 1
-  - screenshot: 111-rdp-saved.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-rdp"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: rdp-host.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '3389'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-rdp
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rdp"]'
+- open_session:
+    name: qa-ui-auto-rdp
+    double_click: true
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: rdp-test
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="rdp-panel"]'
+    timeout_sec: 10
+- assert_visible: '[data-testid="rdp-panel"]'
+- wait_for:
+    selector: '[data-testid="rdp-canvas"]'
+    state: attached
+    timeout_sec: 5
+- assert_visible: '[data-testid="rdp-status"]'
+- click: '[data-testid="rdp-scale-toggle"]'
+- assert_visible: '[data-testid="rdp-view-cycle"]'
+- click: '[data-testid="rdp-view-cycle"]'
+- click: '[data-testid="rdp-reconnect"]'
+- assert_visible: '[data-testid="rdp-detach"]'
+- click: '[data-testid="rdp-detach"]'
+- wait: 1
+- screenshot: 111-rdp-saved.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Saved RDP session opens the RDP panel and toolbar：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 10
+    - 11
+    - 13
+    - 15
+    - 16
+    - 21
+    - 23
+    - 24
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-rdp\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-panel\"]", "timeout_sec": 10}}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"rdp-panel\"]"}'
+    - step: 19
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-canvas\"]", "state": "attached", "timeout_sec":
+        5}}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"rdp-status\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"rdp-view-cycle\"]"}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"rdp-detach\"]"}'
+    results:
+    - 25
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

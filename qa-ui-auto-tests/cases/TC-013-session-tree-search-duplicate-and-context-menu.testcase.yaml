@@ -1,61 +1,175 @@
 id: TC-013
 title: Session tree search, duplicate, edit, delete, and context menu
-covers: [F6.2]
-tags: [legacy-imported, p1, right-menu, session]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+covers:
+- F6.2
+tags:
+- legacy-imported
+- p1
+- right-menu
+- session
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"session-new\"]"
-  - wait_for: "[data-testid=\"session-editor\"]"
-  - fill: {selector: "[data-testid=\"session-host\"]", value: "${cfg.ssh.host}"}
-  - fill: {selector: "[data-testid=\"session-port\"]", value: "${cfg.ssh.port}"}
-  - send_text_via_label: {label_contains: Specify username, checked: true}
-  - fill: {selector: "[data-testid=\"session-user\"]", value: "${cfg.ssh.user}"}
-  - click: "[data-testid=\"session-section-bookmark\"]"
-  - wait_for: "[data-testid=\"bookmark-settings\"]"
-  - fill: {selector: "[data-testid=\"session-name\"]", value: qa-ui-auto-menu}
-  - click: "[data-testid=\"session-save\"]"
-  - wait_for: "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-menu\""
-  - fill: {selector: "[data-testid=\"session-search\"]", value: qa-ui-auto-menu}
-  - assert_visible: "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu\"]"
-  - click: "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu\"]"
-  - click: "[data-testid=\"session-duplicate\"]"
-  - wait_for: "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-menu (copy)\""
-  - right_click: "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu\"]"
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - assert_visible: "[data-testid=\"context-menu\"] >> text=\"Connect\""
-  - assert_visible: "[data-testid=\"context-menu-item-copy-connection-command\"]"
-  - hover: "[data-testid=\"context-menu-item-copy-connection-command\"]"
-  - assert_visible: "[data-testid=\"context-menu-item-copy-command-posix\"]"
-  - assert_visible: "[data-testid=\"context-menu-item-copy-command-powershell\"]"
-  - hover: "[data-testid=\"context-menu-item-copy-command-posix\"]"
-  - assert_visible: "[data-testid=\"context-menu-item-copy-command-posix-basic\"]"
-  - assert_visible: "[data-testid=\"context-menu-item-copy-command-posix-jump\"]"
-  - assert_visible: "[data-testid=\"context-menu-item-copy-command-posix-forwards\"]"
-  - assert_visible: "[data-testid=\"context-menu-item-copy-command-posix-full\"]"
-  - assert_visible: "[data-testid=\"context-menu\"] >> text=\"Edit...\""
-  - assert_visible: "[data-testid=\"context-menu\"] >> text=\"Duplicate\""
-  - assert_visible: "[data-testid=\"context-menu\"] >> text=\"Move to folder\""
-  - assert_visible: "[data-testid=\"context-menu\"] >> text=\"Delete\""
-  - press: Escape
-  - press: Escape
-  - press: Escape
-  - wait_for:
-      selector: "[data-testid=\"context-menu\"]"
-      state: detached
-  # session-edit toolbar button opens the editor for the selected session
-  - click: "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu (copy)\"]"
-  - click: '[data-testid="session-edit"]'
-  - wait_for: "[data-testid=\"session-editor\"]"
-  - press: Escape
-  - wait_for:
-      selector: "[data-testid=\"session-editor\"]"
-      state: detached
-      timeout_sec: 5
-  # session-delete removes the (copy) leaving the original behind
-  - seed_dialog: {confirm: true}
-  - click: '[data-testid="session-delete"]'
-  - wait: 1
-  - assert_visible: "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu\"]"
-  - screenshot: 013-session-tree-right-menu.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- send_text_via_label:
+    label_contains: Specify username
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-menu
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree"] >> text="qa-ui-auto-menu"'
+- fill:
+    selector: '[data-testid="session-search"]'
+    value: qa-ui-auto-menu
+- assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-menu"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-menu"]'
+- click: '[data-testid="session-duplicate"]'
+- wait_for: '[data-testid="session-tree"] >> text="qa-ui-auto-menu (copy)"'
+- right_click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="context-menu"] >> text="Connect"'
+- assert_visible: '[data-testid="context-menu-item-copy-connection-command"]'
+- hover: '[data-testid="context-menu-item-copy-connection-command"]'
+- assert_visible: '[data-testid="context-menu-item-copy-command-posix"]'
+- assert_visible: '[data-testid="context-menu-item-copy-command-powershell"]'
+- hover: '[data-testid="context-menu-item-copy-command-posix"]'
+- assert_visible: '[data-testid="context-menu-item-copy-command-posix-basic"]'
+- assert_visible: '[data-testid="context-menu-item-copy-command-posix-jump"]'
+- assert_visible: '[data-testid="context-menu-item-copy-command-posix-forwards"]'
+- assert_visible: '[data-testid="context-menu-item-copy-command-posix-full"]'
+- assert_visible: '[data-testid="context-menu"] >> text="Edit..."'
+- assert_visible: '[data-testid="context-menu"] >> text="Duplicate"'
+- assert_visible: '[data-testid="context-menu"] >> text="Move to folder"'
+- assert_visible: '[data-testid="context-menu"] >> text="Delete"'
+- press: Escape
+- press: Escape
+- press: Escape
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-menu (copy)"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 5
+- seed_dialog:
+    confirm: true
+- click: '[data-testid="session-delete"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-menu (copy)"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait: 1
+- assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-menu"]'
+- assert_not_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-menu (copy)"]'
+- screenshot: 013-session-tree-right-menu.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 创建、筛选、复制会话，复制项可编辑并取消；删除确认前仍存在，确认后仅复制项消失
+    actions:
+    - 2
+    - 11
+    - 13
+    - 15
+    - 16
+    - 38
+    - 39
+    - 41
+    - 44
+    - 47
+    checkpoints:
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-menu\""}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-menu (copy)\""}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 46
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu
+        (copy)\"]"}'
+    - step: 49
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu\"]"}'
+    - step: 50
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu
+        (copy)\"]"}'
+    results:
+    - 49
+    - 50
+  - id: R2
+    requirement: 会话右键菜单及命令复制子菜单具有指定入口
+    actions:
+    - 18
+    - 22
+    - 25
+    checkpoints:
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Connect\""}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-connection-command\"]"}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix\"]"}'
+    - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-powershell\"]"}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-basic\"]"}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-jump\"]"}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-forwards\"]"}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-copy-command-posix-full\"]"}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Edit...\""}'
+    - step: 31
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Duplicate\""}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Move to folder\""}'
+    - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Delete\""}'
+    results:
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+  visual:
+  - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图记录评审。
+  native:
+  - check: 本用例只验证浏览器渲染交互；系统级输入、桌面窗口与真实持久化需独立 native 验证。
+    method: external
+    reason: 按实际执行模式与指定边界解释证据。

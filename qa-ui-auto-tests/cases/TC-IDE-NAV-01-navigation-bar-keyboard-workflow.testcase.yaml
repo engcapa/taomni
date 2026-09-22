@@ -1,124 +1,220 @@
 id: TC-IDE-NAV-01
-title: "Navigation bar keyboard traversal, popup selection, and cancel"
-description: |
-  ED-NAV-001 browser slice. Opens a browser-VFS workspace and exercises the
+title: Navigation bar keyboard traversal, popup selection, and cancel
+description: 'ED-NAV-001 browser slice. Opens a browser-VFS workspace and exercises the
+
   production Navigation Bar entry with Alt+Home, Home/End and arrow traversal,
+
   keyboard popup selection, and Escape cancellation. Browser evidence proves
+
   mounted UI routing and observable ARIA state only; it does not claim native
+
   filesystem or provider-backed symbol resolution.
+
   Highest claim on green: L1 browser-wired navigation bar contract.
-covers: [F25.5]
-tags: [code-workspace, ide-nav, navigation, breadcrumbs, p1, smoke]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-nav
+- navigation
+- breadcrumbs
+- p1
+- smoke
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 120
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-root"]'
-  # Put the active file below a directory so the root breadcrumb popup has
-  # both directory and file entries to navigate.
-  - click: '[data-testid="code-workspace-tree-root"]'
-  - click: '[data-testid="code-workspace-tree-new-directory"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - fill:
-      selector: '[data-testid="text-input-dialog-input"]'
-      value: src
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
-  # The browser VFS exposes the existing README at the root. Keeping the
-  # directory creation gives the root popup both directory and file entries;
-  # opening the stable fixture avoids coupling this navigation case to the
-  # tree command's selected-directory write semantics.
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - wait_for: '[data-testid="code-workspace-breadcrumbs"]'
-
-  # Alt+Home activates the production Navigation Bar owner and transfers focus.
-  - press:
-      key: Alt+Home
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-      name: tabindex
-      equals: "0"
-  - press:
-      key: Home
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-  - press:
-      key: ArrowRight
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-  - press:
-      key: End
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-  - press:
-      key: ArrowLeft
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-      name: aria-label
-      equals: Editor breadcrumbs
-
-  # Enter opens the selected path popup; the active file is selected after the
-  # production directory listing is sorted into IDEA-style order.
-  - press:
-      key: Home
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-  - press:
-      key: Enter
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-  - wait_for: '[data-testid="code-workspace-breadcrumb-popup"]'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-breadcrumb-popup"]'
-      name: role
-      equals: listbox
-  - wait_for: '[data-testid="code-workspace-breadcrumb-entry-file"]'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-breadcrumb-popup-filter"]'
-      name: role
-      equals: combobox
-  - assert_count:
-      selector: '[data-testid="code-workspace-breadcrumb-entry-directory"]'
-      min: 1
-  - click: '[data-testid="code-workspace-breadcrumb-entry-directory"]'
-  - assert_not_visible: '[data-testid="code-workspace-breadcrumb-popup"]'
-
-  # Open the same root popup again and choose a file entry. This exercises
-  # both path-child navigation branches instead of only the keyboard cancel.
-  - press:
-      key: Home
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-  - press:
-      key: Enter
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-  - wait_for: '[data-testid="code-workspace-breadcrumb-entry-file"]'
-  - click: '[data-testid="code-workspace-breadcrumb-entry-file"]'
-  - assert_not_visible: '[data-testid="code-workspace-breadcrumb-popup"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-      contains: README.txt
-
-  # Reopen the popup and cancel it; focus remains on the navigation bar.
-  - press:
-      key: Home
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-  - press:
-      key: Enter
-      selector: '[data-testid="code-workspace-breadcrumbs"]'
-  - wait_for: '[data-testid="code-workspace-breadcrumb-popup-filter"]'
-  - press:
-      key: Escape
-      selector: '[data-testid="code-workspace-breadcrumb-popup-filter"]'
-  - assert_not_visible: '[data-testid="code-workspace-breadcrumb-popup"]'
-  - eval_readonly:
-      expression: "document.activeElement?.getAttribute('data-testid') === 'code-workspace-breadcrumbs'"
-      expect_truthy: true
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-new-directory"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: src
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="code-workspace-breadcrumbs"]'
+- press:
+    key: Alt+Home
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+    name: tabindex
+    equals: '0'
+- press:
+    key: Home
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+- press:
+    key: ArrowRight
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+- press:
+    key: End
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+    name: aria-label
+    equals: Editor breadcrumbs
+- press:
+    key: Home
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+- press:
+    key: Enter
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+- wait_for: '[data-testid="code-workspace-breadcrumb-popup"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-breadcrumb-popup"]'
+    name: role
+    equals: listbox
+- wait_for: '[data-testid="code-workspace-breadcrumb-entry-file"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-breadcrumb-popup-filter"]'
+    name: role
+    equals: combobox
+- assert_count:
+    selector: '[data-testid="code-workspace-breadcrumb-entry-directory"]'
+    min: 1
+- click: '[data-testid="code-workspace-breadcrumb-entry-directory"]'
+- assert_not_visible: '[data-testid="code-workspace-breadcrumb-popup"]'
+- press:
+    key: Home
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+- press:
+    key: Enter
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+- wait_for: '[data-testid="code-workspace-breadcrumb-entry-file"]'
+- click: '[data-testid="code-workspace-breadcrumb-entry-file"]'
+- assert_not_visible: '[data-testid="code-workspace-breadcrumb-popup"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+    contains: README.txt
+- press:
+    key: Home
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+- press:
+    key: Enter
+    selector: '[data-testid="code-workspace-breadcrumbs"]'
+- wait_for: '[data-testid="code-workspace-breadcrumb-popup-filter"]'
+- press:
+    key: Escape
+    selector: '[data-testid="code-workspace-breadcrumb-popup-filter"]'
+- assert_not_visible: '[data-testid="code-workspace-breadcrumb-popup"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-breadcrumbs'
+    expect_truthy: true
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Navigation bar keyboard traversal, popup selection, and cancel：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+    - 18
+    - 20
+    - 22
+    - 24
+    - 25
+    - 26
+    - 27
+    - 29
+    - 30
+    - 36
+    - 38
+    - 39
+    - 41
+    - 44
+    - 45
+    - 47
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-root\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.txt\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-breadcrumbs\"]"}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]", "name": "tabindex",
+        "equals": "0"}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]", "name": "aria-label",
+        "equals": "Editor breadcrumbs"}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-breadcrumb-popup\"]"}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumb-popup\"]", "name":
+        "role", "equals": "listbox"}}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-breadcrumb-entry-file\"]"}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-breadcrumb-popup-filter\"]",
+        "name": "role", "equals": "combobox"}}'
+    - step: 35
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-breadcrumb-entry-directory\"]",
+        "min": 1}}'
+    - step: 37
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-breadcrumb-popup\"]"}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-breadcrumb-entry-file\"]"}'
+    - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-breadcrumb-popup\"]"}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-breadcrumbs\"]", "contains": "README.txt"}}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-breadcrumb-popup-filter\"]"}'
+    - step: 48
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-breadcrumb-popup\"]"}'
+    - step: 49
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'') ===
+        ''code-workspace-breadcrumbs''", "expect_truthy": true}}'
+    results:
+    - 48
+    - 49
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

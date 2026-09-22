@@ -1,49 +1,161 @@
 id: TC-026
 title: SFTP reports hidden and filtered file visibility
-description: |
-  Verifies that local hidden files and active local/remote filters are
+description: 'Verifies that local hidden files and active local/remote filters are
+
   explained in the listing status instead of being presented as empty
+
   directories. The hidden file is zero-byte data in the browser-only VFS;
+
   the remote side is only browsed and filtered.
-covers: [F7.2, F7.5]
-tags: [legacy-imported, p1, sftp, toolbar]
-modes: [browser]
-fixtures: [reset_db, ssh_required, sftp_required]
+
+  '
+covers:
+- F7.2
+- F7.5
+tags:
+- legacy-imported
+- p1
+- sftp
+- toolbar
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
+- sftp_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - wait_for: '[data-testid="quick-connect"]'
-  - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
-  - click: "[data-testid=\"qc-submit\"]"
-  - wait_for: "[data-testid=\"auth-prompt\"]"
-  - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
-  - click: "[data-testid=\"auth-submit\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 2
-  - click: "[data-testid=\"attached-sftp-toggle\"]"
-  - wait_for: "[data-testid=\"sftp-browser\"]"
-  - set_remote_path: '${cfg.sftp.remote_test_dir}'
-  - wait: 1
-  - fill: {selector: '[data-testid="sftp-remote-filter"]', value: __taomni_no_match_539__}
-  - wait_for: '[data-testid="sftp-remote-listing-status"]'
-  - assert_text: {selector: '[data-testid="sftp-remote-listing-status"]', contains: match}
-  - click: '[data-testid="sftp-remote-clear-filter"]'
-  - click: '[data-testid="sftp-local-new-file"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - fill: {selector: '[data-testid="text-input-dialog-input"]', value: .taomni-qa-539-hidden}
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="sftp-local-listing-status"]'
-  - assert_text: {selector: '[data-testid="sftp-local-listing-status"]', contains: 'Hidden: 1'}
-  - click: '[data-testid="sftp-local-show-hidden-filtered"]'
-  - wait_for: '[data-testid="sftp-local-pane"] >> text=".taomni-qa-539-hidden"'
-  - fill: {selector: '[data-testid="sftp-local-filter"]', value: __taomni_no_match_539__}
-  - assert_text: {selector: '[data-testid="sftp-local-listing-status"]', contains: match}
-  - click: '[data-testid="sftp-local-clear-filter"]'
-  - wait_for: '[data-testid="sftp-local-pane"] >> text=".taomni-qa-539-hidden"'
-  - click: "[data-testid=\"sftp-remote-toggle-hidden\"]"
-  - wait: 1
-  - click: "[data-testid=\"sftp-local-toggle-hidden\"]"
-  - wait: 1
-  - screenshot: 026-sftp-hidden-toggle.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="quick-connect"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 2
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- set_remote_path: ${cfg.sftp.remote_test_dir}
+- wait: 1
+- fill:
+    selector: '[data-testid="sftp-remote-filter"]'
+    value: __taomni_no_match_539__
+- assert_count:
+    selector: '[data-testid="sftp-remote-list"] tr[data-row]'
+    equal: 0
+- wait_for: '[data-testid="sftp-remote-listing-status"]'
+- assert_text:
+    selector: '[data-testid="sftp-remote-listing-status"]'
+    contains: match
+- click: '[data-testid="sftp-remote-clear-filter"]'
+- click: '[data-testid="sftp-local-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: .taomni-qa-539-hidden
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="sftp-local-listing-status"]'
+- assert_text:
+    selector: '[data-testid="sftp-local-listing-status"]'
+    contains: 'Hidden: 1'
+- click: '[data-testid="sftp-local-show-hidden-filtered"]'
+- wait_for: '[data-testid="sftp-local-pane"] >> text=".taomni-qa-539-hidden"'
+- fill:
+    selector: '[data-testid="sftp-local-filter"]'
+    value: __taomni_no_match_539__
+- assert_count:
+    selector: '[data-testid="sftp-local-list"] tr[data-row]'
+    equal: 0
+- assert_text:
+    selector: '[data-testid="sftp-local-listing-status"]'
+    contains: match
+- click: '[data-testid="sftp-local-clear-filter"]'
+- wait_for: '[data-testid="sftp-local-pane"] >> text=".taomni-qa-539-hidden"'
+- click: '[data-testid="sftp-remote-toggle-hidden"]'
+- assert_attribute:
+    selector: '[data-testid="sftp-remote-toggle-hidden"]'
+    name: title
+    equals: Hide hidden files
+- wait: 1
+- click: '[data-testid="sftp-local-toggle-hidden"]'
+- assert_not_visible: '[data-testid="sftp-local-pane"] tr[title$="/.taomni-qa-539-hidden"]'
+- wait: 1
+- screenshot: 026-sftp-hidden-toggle.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SFTP reports hidden and filtered file visibility：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 9
+    - 10
+    - 13
+    - 15
+    - 17
+    - 21
+    - 22
+    - 24
+    - 25
+    - 28
+    - 30
+    - 33
+    - 35
+    - 38
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"quick-connect\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 18
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-remote-list\"] tr[data-row]", "equal": 0}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-listing-status\"]"}'
+    - step: 20
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-listing-status\"]", "contains": "match"}}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"sftp-local-listing-status\"]"}'
+    - step: 27
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-listing-status\"]", "contains": "Hidden:
+        1"}}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"sftp-local-pane\"] >> text=\".taomni-qa-539-hidden\""}'
+    - step: 31
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sftp-local-list\"] tr[data-row]", "equal": 0}}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-listing-status\"]", "contains": "match"}}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"sftp-local-pane\"] >> text=\".taomni-qa-539-hidden\""}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sftp-remote-toggle-hidden\"]", "name": "title",
+        "equals": "Hide hidden files"}}'
+    - step: 39
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-local-pane\"] tr[title$=\"/.taomni-qa-539-hidden\"]"}'
+    results:
+    - 39
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

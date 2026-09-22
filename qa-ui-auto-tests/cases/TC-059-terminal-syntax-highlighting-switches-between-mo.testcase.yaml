@@ -1,27 +1,80 @@
 id: TC-059
 title: Terminal syntax highlighting switches between modes
-covers: [F4.3]
-tags: [highlighting, legacy-imported, p1, syntax, terminal]
-modes: [browser]
-fixtures: [reset_db]
+covers:
+- F4.3
+tags:
+- highlighting
+- legacy-imported
+- p1
+- syntax
+- terminal
+modes:
+- browser
+fixtures:
+- reset_db
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"welcome-open-local-terminal\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - click: "[data-testid=\"terminal-pane\"]"
-  - type: echo error warning success
-  - press: Enter
-  - wait: 1
-  - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - hover: "text=\"Syntax highlighting\""
-  - wait: 1
-  - click: "text=\"Error/Warning/Success keywords\""
-  - wait: 1
-  - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - hover: "text=\"Syntax highlighting\""
-  - wait: 1
-  - click: "text=\"Default\""
-  - wait: 1
-  - screenshot: 059-terminal-syntax-highlight.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="terminal-pane"]'
+- type: echo error warning success
+- press: Enter
+- wait: 1
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- hover: text="Syntax highlighting"
+- wait: 1
+- click: text="Error/Warning/Success keywords"
+- wait_for: .terminal-keyword-error
+- assert_count:
+    selector: .terminal-keyword-warning
+    min: 1
+- assert_count:
+    selector: .terminal-keyword-success
+    min: 1
+- wait: 1
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- hover: text="Syntax highlighting"
+- wait: 1
+- click: text="Default"
+- assert_not_visible: .terminal-keyword-hit
+- wait: 1
+- screenshot: 059-terminal-syntax-highlight.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 启用关键词高亮后错误/警告/成功均有渲染覆盖层，切回默认后全部消失
+    actions:
+    - 5
+    - 6
+    - 12
+    - 21
+    checkpoints:
+    - step: 13
+      expectation: '{"wait_for": ".terminal-keyword-error"}'
+    - step: 14
+      expectation: '{"assert_count": {"selector": ".terminal-keyword-warning", "min": 1}}'
+    - step: 15
+      expectation: '{"assert_count": {"selector": ".terminal-keyword-success", "min": 1}}'
+    - step: 22
+      expectation: '{"assert_not_visible": ".terminal-keyword-hit"}'
+    results:
+    - 22
+  visual:
+  - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图记录评审。
+  native:
+  - check: 本用例只验证浏览器渲染交互；系统级输入、桌面窗口与真实持久化需独立 native 验证。
+    method: external
+    reason: 按实际执行模式与指定边界解释证据。

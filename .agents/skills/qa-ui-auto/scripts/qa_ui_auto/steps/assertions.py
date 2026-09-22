@@ -131,6 +131,20 @@ def step_assert_pattern(ctx: StepContext, args: Any) -> None:
     _wait_for_match(ctx, _check, timeout, fail=f"{selector} text does not match {args['regex']!r}")
 
 
+@verb("assert_text_equals")
+def step_assert_text_equals(ctx: StepContext, args: Any) -> None:
+    from ..exact_assertions import assert_exact
+    if not ctx.dry_run:
+        assert_exact(lambda expr: ctx.page.evaluate(f"() => ({expr})"), args, items=False)
+
+
+@verb("assert_items")
+def step_assert_items(ctx: StepContext, args: Any) -> None:
+    from ..exact_assertions import assert_exact
+    if not ctx.dry_run:
+        assert_exact(lambda expr: ctx.page.evaluate(f"() => ({expr})"), args, items=True)
+
+
 @verb("assert_count")
 def step_assert_count(ctx: StepContext, args: Any) -> None:
     if not isinstance(args, dict):

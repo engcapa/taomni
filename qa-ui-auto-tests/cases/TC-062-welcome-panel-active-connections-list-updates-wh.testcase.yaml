@@ -1,22 +1,63 @@
 id: TC-062
 title: Welcome panel stays intact after opening a local terminal
-covers: [F1.6]
-tags: [connections, legacy-imported, p1, welcome]
-modes: [browser]
-fixtures: [reset_db]
-description: |
-  The former "Active connections" welcome column was removed from the
+covers:
+- F1.6
+tags:
+- connections
+- legacy-imported
+- p1
+- welcome
+modes:
+- browser
+fixtures:
+- reset_db
+description: 'The former "Active connections" welcome column was removed from the
+
   product. The case now verifies the surviving contract: the welcome panel
+
   renders its core actions, a local terminal opens from it, and returning
+
   to the welcome tab still shows the panel content.
+
+  '
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: "[data-testid=\"welcome-panel\"]"
-  - assert_visible: "[data-testid=\"welcome-open-local-terminal\"]"
-  - click: "[data-testid=\"welcome-open-local-terminal\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 1
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - wait: 1
-  - assert_text: {selector: '[data-testid="welcome-panel"]', contains: "Start local terminal"}
-  - screenshot: 062-welcome-active-connections.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 1
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- wait: 1
+- assert_text:
+    selector: '[data-testid="welcome-panel"]'
+    contains: Start local terminal
+- screenshot: 062-welcome-active-connections.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Welcome panel stays intact after opening a local terminal：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 7
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 3
+      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Start local terminal"}}'
+    results:
+    - 9
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

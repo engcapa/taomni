@@ -64,8 +64,8 @@
      "ssh_required",
      "sftp_required",
      "mysql_required",
-      "jdtls_required",
-      "java_test_bundle",
+     "jdtls_required",
+     "java_test_bundle",
      "linux_x11_required",
      "workspace_root",
      "java_sample_projects",
@@ -86,14 +86,26 @@
   },
   "native_platforms": {
    "type": "array",
-   "items": {"enum": ["Linux", "Windows", "macOS"]},
+   "items": {
+    "enum": [
+     "Linux",
+     "Windows",
+     "macOS"
+    ]
+   },
    "uniqueItems": true,
    "minItems": 1,
    "description": "Optional native platform restriction. Does not certify that a platform was tested."
   },
   "browser_platforms": {
    "type": "array",
-   "items": {"enum": ["Linux", "Windows", "macOS"]},
+   "items": {
+    "enum": [
+     "Linux",
+     "Windows",
+     "macOS"
+    ]
+   },
    "uniqueItems": true,
    "minItems": 1,
    "description": "Optional browser platform restriction for OS-dependent renderer chrome (e.g. macOS title-bar). Coverage stays global; the skip is explicit per host."
@@ -114,6 +126,151 @@
    "minItems": 1,
    "items": {
     "$ref": "#/$defs/step"
+   }
+  },
+  "verification": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "review",
+    "requirements",
+    "visual",
+    "native"
+   ],
+   "properties": {
+    "review": {
+     "enum": [
+      "pending",
+      "reviewed"
+     ]
+    },
+    "requirements": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "id",
+       "requirement",
+       "actions",
+       "checkpoints",
+       "results"
+      ],
+      "properties": {
+       "id": {
+        "type": "string",
+        "minLength": 1
+       },
+       "requirement": {
+        "type": "string",
+        "minLength": 1
+       },
+       "actions": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {
+         "type": "integer",
+         "minimum": 1
+        }
+       },
+       "checkpoints": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+         "type": "object",
+         "additionalProperties": false,
+         "required": [
+          "step",
+          "expectation"
+         ],
+         "properties": {
+          "step": {
+           "type": "integer",
+           "minimum": 1
+          },
+          "expectation": {
+           "type": "string",
+           "minLength": 1
+          }
+         }
+        }
+       },
+       "results": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {
+         "type": "integer",
+         "minimum": 1
+        }
+       }
+      }
+     }
+    },
+    "visual": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "check",
+       "method",
+       "reason"
+      ],
+      "properties": {
+       "check": {
+        "type": "string",
+        "minLength": 1
+       },
+       "method": {
+        "enum": [
+         "automated",
+         "manual",
+         "external",
+         "not-applicable"
+        ]
+       },
+       "reason": {
+        "type": "string",
+        "minLength": 1
+       }
+      }
+     }
+    },
+    "native": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "check",
+       "method",
+       "reason"
+      ],
+      "properties": {
+       "check": {
+        "type": "string",
+        "minLength": 1
+       },
+       "method": {
+        "enum": [
+         "automated",
+         "manual",
+         "external",
+         "not-applicable"
+        ]
+       },
+       "reason": {
+        "type": "string",
+        "minLength": 1
+       }
+      }
+     }
+    }
    }
   }
  },
@@ -361,13 +518,22 @@
        "minLength": 1
       },
       "encoding": {
-       "enum": ["UTF-8", "UTF-16LE", "UTF-16BE", "ISO-8859-1"]
+       "enum": [
+        "UTF-8",
+        "UTF-16LE",
+        "UTF-16BE",
+        "ISO-8859-1"
+       ]
       },
       "bom": {
        "type": "boolean"
       },
       "eol": {
-       "enum": ["lf", "crlf", "cr"]
+       "enum": [
+        "lf",
+        "crlf",
+        "cr"
+       ]
       },
       "expected_text": {
        "type": "string"
@@ -464,6 +630,15 @@
     },
     "host_delete_file": {
      "$ref": "#/$defs/host_delete_file_arg"
+    },
+    "assert_text_equals": {
+     "$ref": "#/$defs/assert_text_equals_arg"
+    },
+    "assert_items": {
+     "$ref": "#/$defs/assert_items_arg"
+    },
+    "middle_click": {
+     "$ref": "#/$defs/selector"
     }
    }
   },
@@ -789,7 +964,10 @@
      "description": "Require each delivered keydown to be consumed with preventDefault; available only with WebDriver event observation."
     },
     "transport": {
-     "enum": ["x11", "webdriver"],
+     "enum": [
+      "x11",
+      "webdriver"
+     ],
      "default": "x11",
      "description": "Native key transport. WebDriver uses packaged-webview W3C key actions; x11 uses XTest."
     }
@@ -798,26 +976,54 @@
   "assert_native_process_delta_arg": {
    "type": "object",
    "additionalProperties": false,
-   "required": ["pattern", "baseline", "max_delta"],
+   "required": [
+    "pattern",
+    "baseline",
+    "max_delta"
+   ],
    "properties": {
-    "pattern": {"type": "string", "minLength": 1},
-    "baseline": {"type": ["integer", "string"]},
-    "max_delta": {"type": "integer", "minimum": 0},
-    "timeout_sec": {"type": "number", "minimum": 0}
+    "pattern": {
+     "type": "string",
+     "minLength": 1
+    },
+    "baseline": {
+     "type": [
+      "integer",
+      "string"
+     ]
+    },
+    "max_delta": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "timeout_sec": {
+     "type": "number",
+     "minimum": 0
+    }
    }
   },
   "native_editor_performance_arg": {
    "type": "object",
    "additionalProperties": false,
-   "required": ["selector", "keys", "max_p95_ms"],
+   "required": [
+    "selector",
+    "keys",
+    "max_p95_ms"
+   ],
    "properties": {
-    "selector": {"$ref": "#/$defs/selector"},
+    "selector": {
+     "$ref": "#/$defs/selector"
+    },
     "keys": {
      "anyOf": [
       {
        "type": "array",
        "minItems": 5,
-       "items": {"type": "string", "minLength": 1, "maxLength": 1}
+       "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1
+       }
       },
       {
        "type": "string",
@@ -826,7 +1032,10 @@
       }
      ]
     },
-    "max_p95_ms": {"type": "number", "exclusiveMinimum": 0},
+    "max_p95_ms": {
+     "type": "number",
+     "exclusiveMinimum": 0
+    },
     "capture_text": {
      "type": "boolean",
      "description": "default true; false skips per-mutation textContent reads so multi-megabyte documents are not dominated by probe overhead"
@@ -852,7 +1061,11 @@
   "native_pointer_drag_arg": {
    "type": "object",
    "additionalProperties": false,
-   "required": ["selector", "from", "to"],
+   "required": [
+    "selector",
+    "from",
+    "to"
+   ],
    "properties": {
     "selector": {
      "$ref": "#/$defs/selector"
@@ -867,7 +1080,13 @@
      "type": "array",
      "uniqueItems": true,
      "items": {
-      "enum": ["Alt", "Control", "Meta", "Shift", "Mod"]
+      "enum": [
+       "Alt",
+       "Control",
+       "Meta",
+       "Shift",
+       "Mod"
+      ]
      }
     }
    }
@@ -875,10 +1094,19 @@
   "native_line_column": {
    "type": "object",
    "additionalProperties": false,
-   "required": ["line", "column"],
+   "required": [
+    "line",
+    "column"
+   ],
    "properties": {
-    "line": {"type": "integer", "minimum": 1},
-    "column": {"type": "integer", "minimum": 0}
+    "line": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "column": {
+     "type": "integer",
+     "minimum": 0
+    }
    }
   },
   "native_clipboard_owner_arg": {
@@ -890,7 +1118,13 @@
    "description": "Native-only: external X11 CLIPBOARD selection owner. grant takes the real selection; deny advertises standard text targets but rejects their conversion; suspend stops the owner so every client's read genuinely fails; resume restores the last granted text; release terminates it and records that the host selection was replaced.",
    "properties": {
     "action": {
-     "enum": ["grant", "deny", "suspend", "resume", "release"]
+     "enum": [
+      "grant",
+      "deny",
+      "suspend",
+      "resume",
+      "release"
+     ]
     },
     "text": {
      "type": "string",
@@ -902,9 +1136,21 @@
    "type": "object",
    "additionalProperties": false,
    "oneOf": [
-    {"required": ["equals"]},
-    {"required": ["contains"]},
-    {"required": ["readable"]}
+    {
+     "required": [
+      "equals"
+     ]
+    },
+    {
+     "required": [
+      "contains"
+     ]
+    },
+    {
+     "required": [
+      "readable"
+     ]
+    }
    ],
    "description": "Native-only: out-of-process read of the real X11 CLIPBOARD selection. Exactly one of equals/contains/readable.",
    "properties": {
@@ -1324,40 +1570,87 @@
   "save_race_arm_arg": {
    "type": "object",
    "additionalProperties": false,
-   "required": ["stage"],
+   "required": [
+    "stage"
+   ],
    "properties": {
     "stage": {
-     "enum": ["prepare", "ack", "watcher", "fault"]
+     "enum": [
+      "prepare",
+      "ack",
+      "watcher",
+      "fault"
+     ]
     },
-    "workspaceId": {"type": "string", "minLength": 1},
-    "fileKey": {"type": "string", "minLength": 1},
-    "transactionId": {"type": "string", "minLength": 1},
-    "filePath": {"type": "string", "minLength": 1},
+    "workspaceId": {
+     "type": "string",
+     "minLength": 1
+    },
+    "fileKey": {
+     "type": "string",
+     "minLength": 1
+    },
+    "transactionId": {
+     "type": "string",
+     "minLength": 1
+    },
+    "filePath": {
+     "type": "string",
+     "minLength": 1
+    },
     "mode": {
-     "enum": ["unknown-response", "unknown-response-delay"],
+     "enum": [
+      "unknown-response",
+      "unknown-response-delay"
+     ],
      "description": "fault stage only: unknown-response withholds one real successful response immediately; unknown-response-delay holds the real response (success or typed failure) behind the fault hold so the runner can mutate the real disk before the production read-back classification runs"
     },
-    "timeoutMs": {"type": "integer", "minimum": 100, "maximum": 120000}
+    "timeoutMs": {
+     "type": "integer",
+     "minimum": 100,
+     "maximum": 120000
+    }
    },
    "description": "ED-PARITY-002 isolated-QA-build only: arm one save-transaction delivery point (prepare/ack/watcher) or a controlled unknown-response write fault. Fails explicitly when the binary is not the QA build with the save gate."
   },
   "save_race_wait_entered_arg": {
    "type": "object",
    "additionalProperties": false,
-   "required": ["stage"],
+   "required": [
+    "stage"
+   ],
    "properties": {
-    "stage": {"enum": ["prepare", "ack", "watcher", "fault"]},
-    "timeout_sec": {"type": "number", "minimum": 0.5, "maximum": 120, "default": 20}
+    "stage": {
+     "enum": [
+      "prepare",
+      "ack",
+      "watcher",
+      "fault"
+     ]
+    },
+    "timeout_sec": {
+     "type": "number",
+     "minimum": 0.5,
+     "maximum": 120,
+     "default": 20
+    }
    },
    "description": "ED-PARITY-002 isolated-QA-build only: block until the armed delivery point is entered (the production save transaction or the delayed fault is genuinely held there)."
   },
   "save_race_release_arg": {
    "oneOf": [
-    {"type": "null"},
+    {
+     "type": "null"
+    },
     {
      "type": "object",
      "additionalProperties": false,
-     "properties": {"reason": {"type": "string", "minLength": 1}}
+     "properties": {
+      "reason": {
+       "type": "string",
+       "minLength": 1
+      }
+     }
     }
    ],
    "description": "ED-PARITY-002 isolated-QA-build only: release the held delivery point so the production transaction continues."
@@ -1366,38 +1659,66 @@
    "type": "object",
    "additionalProperties": false,
    "properties": {
-    "artifact": {"type": "string", "minLength": 1},
+    "artifact": {
+     "type": "string",
+     "minLength": 1
+    },
     "expect_contains": {
      "type": "array",
-     "items": {"type": "string", "minLength": 1},
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
      "description": "ordered subsequence of timeline events that must be present"
     },
     "expect_events": {
      "type": "array",
-     "items": {"type": "string", "minLength": 1},
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
      "description": "exact ordered timeline event sequence"
     },
-    "require_ack_hashes": {"type": "boolean"},
+    "require_ack_hashes": {
+     "type": "boolean"
+    },
     "require_settled_kind": {
      "type": "string",
      "minLength": 1,
      "description": "assert the last recorded production commit-settled result kind"
     },
     "require_readback_outcome": {
-     "enum": ["committed", "none", "foreign"],
+     "enum": [
+      "committed",
+      "none",
+      "foreign"
+     ],
      "description": "assert the last recorded unknown-effect read-back classification"
     },
     "forbid_between": {
      "type": "object",
      "additionalProperties": false,
-     "required": ["anchor", "until", "events"],
+     "required": [
+      "anchor",
+      "until",
+      "events"
+     ],
      "properties": {
-      "anchor": {"type": "string", "minLength": 1},
-      "until": {"type": "string", "minLength": 1},
+      "anchor": {
+       "type": "string",
+       "minLength": 1
+      },
+      "until": {
+       "type": "string",
+       "minLength": 1
+      },
       "events": {
        "type": "array",
        "minItems": 1,
-       "items": {"type": "string", "minLength": 1}
+       "items": {
+        "type": "string",
+        "minLength": 1
+       }
       }
      },
      "description": "assert none of the listed events occurred between the anchor and the until event (e.g. zero writer invocations during a W0 hold)"
@@ -1408,10 +1729,19 @@
   "save_race_note_arg": {
    "type": "object",
    "additionalProperties": false,
-   "required": ["label", "expression"],
+   "required": [
+    "label",
+    "expression"
+   ],
    "properties": {
-    "label": {"type": "string", "minLength": 1},
-    "artifact": {"type": "string", "minLength": 1},
+    "label": {
+     "type": "string",
+     "minLength": 1
+    },
+    "artifact": {
+     "type": "string",
+     "minLength": 1
+    },
     "expression": {
      "type": "string",
      "minLength": 1,
@@ -1424,11 +1754,65 @@
   "host_delete_file_arg": {
    "type": "object",
    "additionalProperties": false,
-   "required": ["path"],
+   "required": [
+    "path"
+   ],
    "properties": {
-    "path": {"type": "string", "minLength": 1}
+    "path": {
+     "type": "string",
+     "minLength": 1
+    }
    },
    "description": "Native-only: delete an existing host file inside the retained report root and record its before hash. Used for the unreadable read-back branch of a controlled response fault."
+  },
+  "assert_text_equals_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "selector",
+    "equals"
+   ],
+   "properties": {
+    "selector": {
+     "$ref": "#/$defs/selector"
+    },
+    "equals": {
+     "type": "string"
+    },
+    "timeout_sec": {
+     "type": "number",
+     "minimum": 0.5,
+     "maximum": 60
+    }
+   }
+  },
+  "assert_items_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "selector",
+    "equals"
+   ],
+   "properties": {
+    "selector": {
+     "$ref": "#/$defs/selector"
+    },
+    "equals": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "timeout_sec": {
+     "type": "number",
+     "minimum": 0.5,
+     "maximum": 60
+    },
+    "attribute": {
+     "type": "string",
+     "minLength": 1
+    }
+   }
   }
  }
 }

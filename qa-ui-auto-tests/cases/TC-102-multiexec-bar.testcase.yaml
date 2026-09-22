@@ -1,24 +1,63 @@
 id: TC-102
 title: MultiExec broadcast bar mounts when activated from ribbon
-description: |
-  Smoke test for F4.11. Open at least one terminal, toggle MultiExec via
+description: 'Smoke test for F4.11. Open at least one terminal, toggle MultiExec via
+
   the ribbon (or its keyboard shortcut), and assert the multiexec-bar with
+
   its input renders.
-covers: [F4.11]
-tags: [smoke, p1, terminal, multiexec]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F4.11
+tags:
+- smoke
+- p1
+- terminal
+- multiexec
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-open-local-terminal"]'
-  - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 20
-  - click: '[data-testid="tab-multiexec-toggle"]'
-  - wait_for:
-      selector: '[data-testid="multiexec-bar"]'
-      timeout_sec: 5
-  - assert_visible: '[data-testid="multiexec-input"]'
-  - screenshot: 102-multiexec-bar.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 20
+- click: '[data-testid="tab-multiexec-toggle"]'
+- wait_for:
+    selector: '[data-testid="multiexec-bar"]'
+    timeout_sec: 5
+- assert_visible: '[data-testid="multiexec-input"]'
+- screenshot: 102-multiexec-bar.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: MultiExec broadcast bar mounts when activated from ribbon：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 20}}'
+    - step: 6
+      expectation: '{"wait_for": {"selector": "[data-testid=\"multiexec-bar\"]", "timeout_sec": 5}}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"multiexec-input\"]"}'
+    results:
+    - 6
+    - 7
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

@@ -1,45 +1,96 @@
 id: TC-WELCOME-RS-02-restore-single
 title: Welcome restores the seeded snapshot entry and locates the existing tab on repeat
-description: |
-  Fixture seeds a saved embedded-File session over the readable VFS home plus
+description: 'Fixture seeds a saved embedded-File session over the readable VFS home plus
+
   a confirmed run snapshot containing it. Restore opens the file browser tab
+
   with real directory entries; a second restore locates the existing tab
+
   instead of duplicating it; switching history tabs keeps the restore entry
+
   and does not reset the sessions filter.
-covers: [F1.6]
-tags: [auto-generated, p1, welcome, needs-review]
-modes: [browser]
-fixtures: [reset_db, welcome_recents]
+
+  '
+covers:
+- F1.6
+tags:
+- auto-generated
+- p1
+- welcome
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
+- welcome_recents
 timeout_sec: 90
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - wait_for:
-      selector: '[data-testid="welcome-restore-status"][data-state="available"]'
-      timeout_sec: 15
-
-  # Restore the seeded snapshot entry.
-  - click: '[data-testid="welcome-restore-last-session"]'
-  # The restore navigates to the restored tab; switch back to Welcome.
-  - wait_for:
-      selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
-      timeout_sec: 15
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - wait_for:
-      selector: '[data-testid="welcome-restore-status"][data-state="succeeded"], [data-testid="welcome-restore-status"][data-state="partial"]'
-      timeout_sec: 30
-
-  # Repeat restore must locate the existing tab, not duplicate it.
-  - click: '[data-testid="welcome-restore-last-session"]'
-  - wait: 2
-  - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 1}
-
-  # Locate switched to the restored tab; back to Welcome, then check that
-  # switching history tabs keeps the restore row and the sessions filter.
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - wait_for: '[data-testid="welcome-restore-row"]'
-  - click: '[data-testid="welcome-history-tab-directories"]'
-  - wait_for: '[data-testid="welcome-local-directories"]'
-  - click: '[data-testid="welcome-history-tab-sessions"]'
-  - wait_for: '[data-testid="welcome-restore-row"]'
-  - screenshot: F1.6-welcome-restore-single.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- wait_for:
+    selector: '[data-testid="welcome-restore-status"][data-state="available"]'
+    timeout_sec: 15
+- click: '[data-testid="welcome-restore-last-session"]'
+- wait_for:
+    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    timeout_sec: 15
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- wait_for:
+    selector: '[data-testid="welcome-restore-status"][data-state="succeeded"], [data-testid="welcome-restore-status"][data-state="partial"]'
+    timeout_sec: 30
+- click: '[data-testid="welcome-restore-last-session"]'
+- wait: 2
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    equal: 1
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- wait_for: '[data-testid="welcome-restore-row"]'
+- click: '[data-testid="welcome-history-tab-directories"]'
+- wait_for: '[data-testid="welcome-local-directories"]'
+- click: '[data-testid="welcome-history-tab-sessions"]'
+- wait_for: '[data-testid="welcome-restore-row"]'
+- screenshot: F1.6-welcome-restore-single.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Welcome restores the seeded snapshot entry and locates the existing tab on repeat：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 6
+    - 8
+    - 11
+    - 13
+    - 15
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"available\"]",
+        "timeout_sec": 15}}'
+    - step: 5
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"file-browser\"]", "timeout_sec":
+        15}}'
+    - step: 7
+      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"succeeded\"],
+        [data-testid=\"welcome-restore-status\"][data-state=\"partial\"]", "timeout_sec": 30}}'
+    - step: 10
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"file-browser\"]",
+        "equal": 1}}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"welcome-restore-row\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"welcome-local-directories\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"welcome-restore-row\"]"}'
+    results:
+    - 16
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

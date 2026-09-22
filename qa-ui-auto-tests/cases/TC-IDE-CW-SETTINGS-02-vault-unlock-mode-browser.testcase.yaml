@@ -1,57 +1,159 @@
 id: TC-IDE-CW-SETTINGS-02-vault-unlock-mode-browser
-title: "Vault unlock mode toggles, updates its hint, and persists"
-description: |
-  Browser regression case for the VaultSettings unlock-prompt segmented control.
+title: Vault unlock mode toggles, updates its hint, and persists
+description: 'Browser regression case for the VaultSettings unlock-prompt segmented control.
+
   Verifies the startup default, switches to on-demand and checks the changed
+
   hint plus localStorage value, reloads the application to prove persistence,
+
   then restores the startup default. Vault encryption and native keychain
+
   boundaries are covered separately by native lifecycle cases.
-covers: [F12.1]
-tags: [code-workspace, settings, vault, persistence, security, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F12.1
+tags:
+- code-workspace
+- settings
+- vault
+- persistence
+- security
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="ribbon-settings"]'
-  - click: '[data-testid="ribbon-settings"]'
-  - wait_for: '[data-testid="settings-panel"]'
-  - click: '[data-testid="settings-group-toggle-security"]'
-  - wait_for: '[data-testid="vault-settings"]'
-  - assert_visible: '[data-testid="vault-unlock-mode-setting"]'
-  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-startup"]', name: aria-pressed, equals: "true"}
-  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-on-demand"]', name: aria-pressed, equals: "false"}
-  - assert_text:
-      selector: '[data-testid="vault-unlock-mode-hint"]'
-      contains: "Default."
-
-  - click: '[data-testid="vault-unlock-mode-on-demand"]'
-  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-on-demand"]', name: aria-pressed, equals: "true"}
-  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-startup"]', name: aria-pressed, equals: "false"}
-  - assert_text:
-      selector: '[data-testid="vault-unlock-mode-hint"]'
-      contains: "waits until"
-  - assert_localstorage:
-      key: taomni.vaultUnlockMode
-      equals: on-demand
-
-  - reload_window: null
-  - wait_for: '[data-testid="ribbon-settings"]'
-  - click: '[data-testid="ribbon-settings"]'
-  - wait_for: '[data-testid="settings-panel"]'
-  - click: '[data-testid="settings-group-toggle-security"]'
-  - wait_for: '[data-testid="vault-settings"]'
-  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-on-demand"]', name: aria-pressed, equals: "true"}
-  - assert_text:
-      selector: '[data-testid="vault-unlock-mode-hint"]'
-      contains: "waits until"
-
-  - click: '[data-testid="vault-unlock-mode-startup"]'
-  - assert_attribute: {selector: '[data-testid="vault-unlock-mode-startup"]', name: aria-pressed, equals: "true"}
-  - assert_text:
-      selector: '[data-testid="vault-unlock-mode-hint"]'
-      contains: "Default."
-  - assert_localstorage:
-      key: taomni.vaultUnlockMode
-      equals: startup
-  - screenshot: tc-ide-cw-settings-02-vault-unlock-mode.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-security"]'
+- wait_for: '[data-testid="vault-settings"]'
+- assert_visible: '[data-testid="vault-unlock-mode-setting"]'
+- assert_attribute:
+    selector: '[data-testid="vault-unlock-mode-startup"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="vault-unlock-mode-on-demand"]'
+    name: aria-pressed
+    equals: 'false'
+- assert_text:
+    selector: '[data-testid="vault-unlock-mode-hint"]'
+    contains: Default.
+- click: '[data-testid="vault-unlock-mode-on-demand"]'
+- assert_attribute:
+    selector: '[data-testid="vault-unlock-mode-on-demand"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="vault-unlock-mode-startup"]'
+    name: aria-pressed
+    equals: 'false'
+- assert_text:
+    selector: '[data-testid="vault-unlock-mode-hint"]'
+    contains: waits until
+- assert_localstorage:
+    key: taomni.vaultUnlockMode
+    equals: on-demand
+- reload_window: null
+- wait_for: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-security"]'
+- wait_for: '[data-testid="vault-settings"]'
+- assert_attribute:
+    selector: '[data-testid="vault-unlock-mode-on-demand"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="vault-unlock-mode-hint"]'
+    contains: waits until
+- click: '[data-testid="vault-unlock-mode-startup"]'
+- assert_attribute:
+    selector: '[data-testid="vault-unlock-mode-startup"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="vault-unlock-mode-hint"]'
+    contains: Default.
+- assert_localstorage:
+    key: taomni.vaultUnlockMode
+    equals: startup
+- screenshot: tc-ide-cw-settings-02-vault-unlock-mode.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Vault unlock mode toggles, updates its hint, and persists：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 11
+    - 16
+    - 18
+    - 20
+    - 24
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"vault-settings\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"vault-unlock-mode-setting\"]"}'
+    - step: 8
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-startup\"]", "name": "aria-pressed",
+        "equals": "true"}}'
+    - step: 9
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-on-demand\"]", "name": "aria-pressed",
+        "equals": "false"}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]", "contains": "Default."}}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-on-demand\"]", "name": "aria-pressed",
+        "equals": "true"}}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-startup\"]", "name": "aria-pressed",
+        "equals": "false"}}'
+    - step: 14
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]", "contains": "waits
+        until"}}'
+    - step: 15
+      expectation: '{"assert_localstorage": {"key": "taomni.vaultUnlockMode", "equals": "on-demand"}}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"vault-settings\"]"}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-on-demand\"]", "name": "aria-pressed",
+        "equals": "true"}}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]", "contains": "waits
+        until"}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"vault-unlock-mode-startup\"]", "name": "aria-pressed",
+        "equals": "true"}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-unlock-mode-hint\"]", "contains": "Default."}}'
+    - step: 27
+      expectation: '{"assert_localstorage": {"key": "taomni.vaultUnlockMode", "equals": "startup"}}'
+    results:
+    - 25
+    - 26
+    - 27
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

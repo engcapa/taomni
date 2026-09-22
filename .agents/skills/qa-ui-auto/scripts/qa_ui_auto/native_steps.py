@@ -333,7 +333,7 @@ def _assert_attribute(ctx: NativeStepContext, args: Any) -> str:
     expected = str(args["equals"])
     actual = ctx.session.execute(
         f"const el = document.querySelector({json.dumps(selector)});"
-        f"return el ? el.getAttribute({json.dumps(name)}) : null;"
+        f"return el ? ({json.dumps(name)} === 'value' && 'value' in el ? el.value : el.getAttribute({json.dumps(name)})) : null;"
     )
     if str(actual) != expected:
         raise StepError(f"assert_attribute: {selector}[{name}]={actual!r} != {expected!r}")
@@ -1293,6 +1293,12 @@ def _do_fill(ctx: NativeStepContext, args: Any) -> str:
     return ctx.session.fill(str(args["selector"]), str(args["value"]))
 
 
+@_verb("middle_click")
+def _do_middle_click(ctx: NativeStepContext, args: Any) -> str:
+    selector, _ = _selector_args(args)
+    return ctx.session.pointer_button_click(selector, 1)
+
+
 @_verb("type")
 @_verb("send_keys")
 def _do_type(ctx: NativeStepContext, args: Any) -> str:
@@ -1389,6 +1395,18 @@ def _do_assert_pattern(ctx: NativeStepContext, args: Any) -> str:
     raise StepError(f"assert_pattern failed: {args['selector']} did not match {args['regex']!r}")
 
 
+@_verb("assert_text_equals")
+def _do_assert_text_equals(ctx: NativeStepContext, args: Any) -> str:
+    from .exact_assertions import assert_exact
+    return assert_exact(lambda expr: ctx.session.execute(f"return ({expr});"), args, items=False)
+
+
+@_verb("assert_items")
+def _do_assert_items(ctx: NativeStepContext, args: Any) -> str:
+    from .exact_assertions import assert_exact
+    return assert_exact(lambda expr: ctx.session.execute(f"return ({expr});"), args, items=True)
+
+
 @_verb("eval_readonly")
 def _do_eval_readonly(ctx: NativeStepContext, args: Any) -> str:
     return _eval_readonly(ctx, args)
@@ -1407,6 +1425,78 @@ def _do_select_option(ctx: NativeStepContext, args: Any) -> str:
 @_verb("assert_attribute")
 def _do_assert_attribute(ctx: NativeStepContext, args: Any) -> str:
     return _assert_attribute(ctx, args)
+
+
+@_verb("assert_localstorage")
+def _do_assert_localstorage(ctx: NativeStepContext, args: Any) -> str:
+    if not isinstance(args, dict) or "key" not in args:
+        raise StepError("assert_localstorage: expected {key, exists?/contains?/equals?}")
+    key = json.dumps(str(args["key"]))
+    value = ctx.session.execute(f"return window.localStorage.getItem({key});")
+    if "exists" in args and (value is not None) != bool(args["exists"]):
+        raise StepError(f"assert_localstorage: {args['key']} exists={value is not None}")
+    if "contains" in args and (value is None or str(args["contains"]) not in str(value)):
+        raise StepError(f"assert_localstorage: {args['key']} does not contain {args['contains']!r}")
+    if "equals" in args and str(value) != str(args["equals"]):
+        raise StepError(f"assert_localstorage: {args['key']}={value!r} != {args['equals']!r}")
+    return f"localStorage ok: {args['key']}"
+
+
+@_verb("assert_disabled")
+def _do_assert_disabled(ctx: NativeStepContext, args: Any) -> str:
+    selector, _ = _selector_args(args)
+    value = ctx.session.execute(f"const e=document.querySelector({json.dumps(selector)}); return !!e && (e.matches(':disabled') || !!e.closest('[aria-disabled=\"true\"]'));")
+    if not value:
+        raise StepError(f"assert_disabled: {selector} is enabled")
+    return f"disabled ok: {selector}"
+
+
+@_verb("assert_enabled")
+def _do_assert_enabled(ctx: NativeStepContext, args: Any) -> str:
+    selector, _ = _selector_args(args)
+    value = ctx.session.execute(f"const e=document.querySelector({json.dumps(selector)}); return !!e && !e.matches(':disabled') && !e.closest('[aria-disabled=\"true\"]');")
+    if not value:
+        raise StepError(f"assert_enabled: {selector} is disabled or missing")
+    return f"enabled ok: {selector}"
+
+
+@_verb("set_check")
+def _do_set_check(ctx: NativeStepContext, args: Any) -> str:
+    if not isinstance(args, dict) or "selector" not in args or "checked" not in args:
+        raise StepError("set_check: expected {selector, checked}")
+    selector = json.dumps(str(args["selector"]))
+    desired = bool(args["checked"])
+    probe = (f"const e=document.querySelector({selector}); "
+             "return e instanceof HTMLInputElement && ['checkbox','radio'].includes(e.type) ? e.checked : null;")
+    actual = ctx.session.execute(probe)
+    if actual is None:
+        raise StepError(f"set_check: missing checkbox/radio {args['selector']}")
+    if actual != desired:
+        ctx.session.click(str(args["selector"]))
+    if ctx.session.execute(probe) != desired:
+        raise StepError(f"set_check: {args['selector']} did not become checked={desired}")
+    return f"checkbox ok: {args['selector']}"
+
+
+@_verb("click_menu")
+def _do_click_menu(ctx: NativeStepContext, args: Any) -> str:
+    label = args if isinstance(args, str) else args.get("label") if isinstance(args, dict) else None
+    if not isinstance(label, str) or not label:
+        raise StepError("click_menu: expected string label or {label}")
+    # Return a WebDriver element reference from a read-only DOM query. The
+    # interaction itself must travel through WebDriver, never HTMLElement.click.
+    found = ctx.session.execute(
+        f"const label = {json.dumps(label)};"
+        "const nodes = [...document.querySelectorAll('[data-testid=\"context-menu\"] *')]"
+        ".filter(e => e.textContent.trim() === label && e.getClientRects().length)"
+        ".filter(e => ![...e.children].some(c => c.textContent.trim() === label));"
+        "return nodes.length === 1 ? nodes[0] : null;"
+    )
+    element = (found.get("element-6066-11e4-a52e-4f735466cecf") or found.get("ELEMENT")) if isinstance(found, dict) else None
+    if not element:
+        raise StepError(f"click_menu: expected one visible exact menu label {label!r}")
+    ctx.session.request("POST", ctx.session.element_path(element, "/click"), {})
+    return f"clicked menu {label!r}"
 
 
 @_verb("assert_file_contains")
@@ -2126,6 +2216,7 @@ def _do_seed_storage(ctx: NativeStepContext, args: Any) -> str:
     return f"seeded {key}"
 
 
+@_verb("reload")
 @_verb("reload_window")
 def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
     """Reload the webview document; wait for the app shell to return."""

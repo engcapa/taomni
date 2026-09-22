@@ -1,30 +1,73 @@
 id: TC-113
 title: SSH keyboard-interactive MFA prompt scaffold
-description: |
-  Coverage smoke for F-Mfa-1 (keyboard-interactive MFA). The MfaPrompt
+description: 'Coverage smoke for F-Mfa-1 (keyboard-interactive MFA). The MfaPrompt
+
   dialog only mounts when an SSH server issues a keyboard-interactive
+
   challenge (MFA/OTP). Our local smoke sshd authenticates with a password
+
   and never issues such a challenge, so this case is passive
+
   scaffolding-only — same approach as TC-105 (zmodem) / TC-106 (VNC engine).
 
+
   It opens a local terminal (proving TerminalPanel — which hosts MfaPrompt —
+
   is in the module graph) and asserts the prompt is NOT currently shown.
+
   When a real MFA-enabled SSH server is configured as a fixture, the live
+
   challenge will exercise mfa-prompt / mfa-answer-0 / mfa-submit / mfa-cancel
+
   via the same testids declared on F-Mfa-1.
-covers: [F-Mfa-1]
-tags: [smoke, p1, ssh, mfa, scaffolding-only, needs-review]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-Mfa-1
+tags:
+- smoke
+- p1
+- ssh
+- mfa
+- scaffolding-only
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 25
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-open-local-terminal"]'
-  - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 15
-  # No keyboard-interactive challenge on a local terminal — the prompt stays
-  # unmounted. This flags only if MfaPrompt regresses to always-on.
-  - assert_not_visible: '[data-testid="mfa-prompt"]'
-  - screenshot: 113-mfa-prompt-scaffold.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 15
+- assert_not_visible: '[data-testid="mfa-prompt"]'
+- screenshot: 113-mfa-prompt-scaffold.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SSH keyboard-interactive MFA prompt scaffold：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 15}}'
+    - step: 5
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-prompt\"]"}'
+    results:
+    - 4
+    - 5
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

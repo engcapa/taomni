@@ -1,64 +1,206 @@
 id: TC-001
 title: Main interface shell renders all primary surfaces
-description: |
-  Smoke test for the chrome of the app in standard (non-compact) mode. Loads
+description: 'Smoke test for the chrome of the app in standard (non-compact) mode. Loads
+
   the welcome screen and verifies every top-level layout surface is mounted:
+
   menu bar, sidebar sidetab strip, session tree, tab bar, status bar,
+
   welcome panel, and the optional ribbon / quick-connect toolbars once enabled
+
   from View. Asserts the remaining welcome actions (Start local terminal,
+
   New session) and the Tips section. Status bar segments are spot-checked.
+
   (The former right-hand activity column and compact mode were removed from
+
   the product.)
-covers: [F1.2, F1.6, F1.7]
-tags: [smoke, p0, main]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F1.2
+- F1.6
+- F1.7
+tags:
+- smoke
+- p0
+- main
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 60
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for:
-      selector: '[data-testid="control-bar"]'
-      timeout_sec: 55
-  - assert_not_visible: '[data-testid="quick-connect"]'
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - wait_for: '[data-testid="quick-connect"]'
-  - assert_visible: '[data-testid="quick-connect"]'
-  - assert_visible: '[data-testid="qc-input"]'
-  - assert_visible: '[data-testid="qc-submit"]'
-  - assert_visible: '[data-testid="sidebar"]'
-  - assert_visible: '[data-testid="main-sidebar-resize-handle"]'
-  - assert_visible: '[data-testid="session-tree"]'
-  - assert_visible: '[data-testid="session-search"]'
-  - assert_visible: '[data-testid="session-new"]'
-  - assert_visible: '[data-testid="tab-bar"]'
-  - assert_visible: '[data-testid="new-local-terminal"]'
-  - assert_visible: '[data-testid="status-bar"]'
-  - assert_visible: '[data-testid="app-titlebar"]'
-  - assert_visible: '[data-testid="titlebar-tray"]'
-  - assert_visible: '[data-testid="theme-cycle"]'
-  - assert_visible: '[data-testid="welcome-panel"]'
-  - assert_text:
-      selector: '[data-testid="welcome-panel"]'
-      contains: Welcome to Taomni
-  - assert_text:
-      selector: '[data-testid="welcome-panel"]'
-      contains: Start local terminal
-  - assert_visible: '[data-testid="welcome-open-local-terminal"]'
-  - assert_enabled: '[data-testid="welcome-open-local-terminal"]'
-  - assert_visible: '[data-testid="welcome-version"]'
-  - assert_visible: '[data-testid="welcome-version-footer"]'
-  # Welcome screen content — remaining actions + tips + quick connect hint
-  - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'New session'}
-  - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'Tips'}
-  - assert_text: {selector: '[data-testid="welcome-panel"]', contains: 'Quick connect'}
-  # The right-hand welcome activity column (Active connections / Last events)
-  # was removed from the product; the status bar carries connection state now.
-  # Status-bar segments (Image 2 reference).
-  - assert_text: {selector: '[data-testid="status-bar"]', contains: 'sessions'}
-  - assert_text: {selector: '[data-testid="status-bar"]', contains: 'Network'}
-  - assert_text: {selector: '[data-testid="status-bar"]', contains: 'Theme'}
-  - assert_text: {selector: '[data-testid="status-bar"]', contains: 'terminals'}
-  - assert_text: {selector: '[data-testid="status-bar"]', contains: '0.2.0 MVP'}
-  - screenshot: 001-main-interface.png
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="control-bar"]'
+    timeout_sec: 55
+- assert_not_visible: '[data-testid="quick-connect"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="quick-connect"]'
+- assert_visible: '[data-testid="quick-connect"]'
+- assert_visible: '[data-testid="qc-input"]'
+- assert_visible: '[data-testid="qc-submit"]'
+- assert_visible: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="main-sidebar-resize-handle"]'
+- assert_visible: '[data-testid="session-tree"]'
+- assert_visible: '[data-testid="session-search"]'
+- assert_visible: '[data-testid="session-new"]'
+- assert_visible: '[data-testid="tab-bar"]'
+- assert_visible: '[data-testid="new-local-terminal"]'
+- assert_visible: '[data-testid="status-bar"]'
+- assert_visible: '[data-testid="app-titlebar"]'
+- assert_visible: '[data-testid="titlebar-tray"]'
+- assert_visible: '[data-testid="theme-cycle"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_text:
+    selector: '[data-testid="welcome-panel"]'
+    contains: Welcome to Taomni
+- assert_text:
+    selector: '[data-testid="welcome-panel"]'
+    contains: Start local terminal
+- assert_visible: '[data-testid="welcome-open-local-terminal"]'
+- assert_enabled: '[data-testid="welcome-open-local-terminal"]'
+- assert_visible: '[data-testid="welcome-version"]'
+- assert_visible: '[data-testid="welcome-version-footer"]'
+- assert_text:
+    selector: '[data-testid="welcome-panel"]'
+    contains: New session
+- assert_text:
+    selector: '[data-testid="welcome-panel"]'
+    contains: Tips
+- assert_text:
+    selector: '[data-testid="welcome-panel"]'
+    contains: Quick connect
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: sessions
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: Network
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: Theme
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: terminals
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: 0.2.0 MVP
+- screenshot: 001-main-interface.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 初始主界面各主要表面可见；快捷连接从隐藏切换为输入框和提交按钮可用。
+    actions:
+    - 1
+    - 4
+    - 5
+    - 6
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": {"selector": "[data-testid=\"control-bar\"]", "timeout_sec": 55}}'
+    - step: 3
+      expectation: '{"assert_not_visible": "[data-testid=\"quick-connect\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"quick-connect\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"quick-connect\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"qc-input\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"qc-submit\"]"}'
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"sidebar\"]"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"main-sidebar-resize-handle\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"session-search\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"tab-bar\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"new-local-terminal\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"status-bar\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"app-titlebar\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"titlebar-tray\"]"}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"theme-cycle\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Welcome to Taomni"}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Start local terminal"}}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
+    - step: 26
+      expectation: '{"assert_enabled": "[data-testid=\"welcome-open-local-terminal\"]"}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"welcome-version\"]"}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"welcome-version-footer\"]"}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "New session"}}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Tips"}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Quick connect"}}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "sessions"}}'
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Network"}}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Theme"}}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "terminals"}}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "0.2.0 MVP"}}'
+    results:
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+  visual:
+  - check: 主界面标题栏、侧栏和欢迎页无重叠、裁切；窄窗口另需布局检查。
+    method: manual
+    reason: 截图必须单独评审，不能由功能步骤通过推导视觉通过。
+  native:
+  - check: 浏览器只证明主界面渲染，窗口拖动、最小化与系统托盘需要桌面用例。
+    method: external
+    reason: 按实际执行模式解释；其他平台不继承 Linux 证据。

@@ -1,20 +1,64 @@
 id: TC-042
 title: Tab management including middle-click close
-covers: [F1.5]
-tags: [legacy-imported, mouse, p1, tabs]
-modes: [browser]
-fixtures: [reset_db]
+covers:
+- F1.5
+tags:
+- legacy-imported
+- mouse
+- p1
+- tabs
+modes:
+- browser
+fixtures:
+- reset_db
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"welcome-open-local-terminal\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - click: "[data-testid=\"new-local-terminal\"]"
-  - wait_for: '[data-testid="tab-item"] >> nth=2'
-  - assert_count: {selector: '[data-testid="tab-item"]', min: 2}
-  # Middle-click can't be issued via verbs; click the per-tab close icon (SVG) to
-  # verify tab close. Welcome tab has no close icon (non-closable), so we target
-  # a closable terminal tab.
-  - click: '[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-close"] >> nth=0'
-  - wait: 1
-  - assert_text: {selector: "[data-testid=\"status-bar\"]", contains: 1 terminals}
-  - screenshot: 042-tab-middle-click-close.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="tab-item"] >> nth=2'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    min: 2
+- middle_click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- wait: 1
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: 1 terminals
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
+    equal: 1
+- screenshot: 042-tab-middle-click-close.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tab management including middle-click close：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 7
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"] >> nth=2"}'
+    - step: 6
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 2}}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "1 terminals"}}'
+    - step: 10
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"]", "equal":
+        1}}'
+    results:
+    - 9
+    - 10
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

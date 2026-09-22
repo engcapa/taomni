@@ -1,60 +1,120 @@
 id: TC-012
 title: Attached SFTP open-terminal-here changes the SSH working directory
-covers: [F3.3, F7.4]
-tags: [integration, legacy-imported, p1, sftp, ssh, terminal]
-modes: [browser, native]
-fixtures: [reset_db, ssh_required, sftp_required]
+covers:
+- F3.3
+- F7.4
+tags:
+- integration
+- legacy-imported
+- p1
+- sftp
+- ssh
+- terminal
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+- sftp_required
 steps:
-  - open: "${cfg.app.base_url}"
-  # Reveal the QuickConnect bar without the in-bar app menu: that menu is
-  # hidden on native macOS by design (native global menu). Seeding the
-  # persisted visibility flag and reloading selects the same UI on all three
-  # platforms; Menu-path coverage stays in the browser-only cases.
-  - seed_storage:
-      key: taomni.quickConnectVisible
-      value: 'true'
-  - reload_window: null
-  - wait_for: '[data-testid="qc-input"]'
-  - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
-  - click: "[data-testid=\"qc-submit\"]"
-  - wait_for: "[data-testid=\"auth-prompt\"]"
-  - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
-  - click: "[data-testid=\"auth-submit\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait_for:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-      timeout_sec: 60
-  - click: "[data-testid=\"attached-sftp-toggle\"]"
-  - wait_for: "[data-testid=\"sftp-browser\"]"
-  # The attached pane navigates to the SSH home on mount. Setting the path
-  # while that first listing is still in flight lets the older response
-  # overwrite the typed target (observed: breadcrumb reverts to home and
-  # open-terminal-here cds to the wrong dir). Let the first listing settle,
-  # then set + prove the target path; the assertion owns the postcondition.
-  - wait_for:
-      selector: '[data-testid="sftp-remote-list"] tbody tr'
-      timeout_sec: 30
-  # Click the segment container, whose separator area enters path edit mode.
-  - click: '[data-testid="sftp-remote-path"] > span:last-child > svg'
-  - wait_for: 'input[data-testid="sftp-remote-path"]'
-  - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
-  - press: Enter
-  - wait: 1
-  # Click the segment container, whose separator area enters path edit mode.
-  - click: '[data-testid="sftp-remote-path"] > span:last-child > svg'
-  - wait_for: 'input[data-testid="sftp-remote-path"]'
-  - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
-  - press: Enter
-  - assert_text:
-      selector: '[data-testid="sftp-remote-path"]'
-      contains: "temp"
-      timeout_sec: 15
-  - click: "[data-testid=\"sftp-remote-open-terminal-here\"]"
-  - wait: 3
-  - terminal_input:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-      text: pwd
-      submit: true
-  - wait: 2
-  - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: "${fixture.sftp_shell_test_dir}"}
-  - screenshot: 012-sftp-open-terminal-here.png
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- wait_for:
+    selector: '[data-testid="sftp-remote-list"] tbody tr'
+    timeout_sec: 30
+- click: '[data-testid="sftp-remote-path"] > span:last-child > svg'
+- wait_for: input[data-testid="sftp-remote-path"]
+- fill:
+    selector: '[data-testid="sftp-remote-path"]'
+    value: ${cfg.sftp.remote_test_dir}
+- press: Enter
+- wait: 1
+- click: '[data-testid="sftp-remote-path"] > span:last-child > svg'
+- wait_for: input[data-testid="sftp-remote-path"]
+- fill:
+    selector: '[data-testid="sftp-remote-path"]'
+    value: ${cfg.sftp.remote_test_dir}
+- press: Enter
+- click: '[data-testid="sftp-remote-open-terminal-here"]'
+- wait: 3
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf '\nQA_CWD=%s\n' "$PWD"
+    submit: true
+- wait: 2
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_CWD=${cfg.sftp.remote_test_dir}\r?$
+- screenshot: 012-sftp-open-terminal-here.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SFTP 导航后点击在此打开终端，实际 shell 输出的工作目录精确等于 SFTP 目标。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 9
+    - 12
+    - 15
+    - 17
+    - 18
+    - 20
+    - 22
+    - 23
+    - 24
+    - 26
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
+        "timeout_sec": 60}}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
+    - step: 16
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 28
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD=${cfg.sftp.remote_test_dir}\\r?$"}}'
+    results:
+    - 28
+  visual:
+  - check: SFTP 路径与关联终端输出可同时辨认。
+    method: manual
+    reason: 截图必须单独评审，不能由功能步骤通过推导视觉通过。
+  native:
+  - check: browser 通过 SSH 桥接读取真实远端 PWD；本机原生通道需 native 同例验证。
+    method: automated
+    reason: 按实际执行模式解释；其他平台不继承 Linux 证据。

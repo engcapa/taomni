@@ -1,34 +1,97 @@
 id: TC-AI-004
 title: Native web search caps + ClaudeCode integration both surface
-description: |
-  Companion to TC-AI-003: focuses on the provider-native search side
+description: 'Companion to TC-AI-003: focuses on the provider-native search side
+
   (provider_caps command + ClaudeCodePanel) plus the Models advanced panel
+
   (mirror selector + CUDA pack toggle). Verifies the §11.4 mirror radios and
+
   §11.6 CUDA-pack section render so users can pick their download source
+
   before launching real downloads.
-covers: [F-AI-2.5, F-AI-2.6, F-AI-11, F-AI-2.1]
-tags: [ai, native-search, claude-code, p2]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-AI-2.5
+- F-AI-2.6
+- F-AI-11
+- F-AI-2.1
+tags:
+- ai
+- native-search
+- claude-code
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="ribbon-settings"]'
-  - click: '[data-testid="ribbon-settings"]'
-  - wait_for: '[data-testid="settings-group-toggle-ai"]'
-  - click: '[data-testid="settings-group-toggle-ai"]'
-  - wait_for: 'text=AI Settings'
-  - assert_visible: 'text="AI Settings"'
-  # Models advanced panel: mirror radios
-  - assert_visible: 'text="Model distribution & GPU acceleration"'
-  - assert_visible: 'text="ModelScope first"'
-  - assert_visible: 'text="GitHub direct"'
-  - assert_visible: 'text="gh-proxy"'
-  - assert_visible: 'text="Custom base URL"'
-  # Chat history retention
-  - assert_visible: 'text="Chat history management"'
-  - assert_visible: 'text="Retention (days)"'
-  - fill:
-      selector: 'input[aria-label="Chat history retention days"]'
-      value: '30'
-  - screenshot: ai-004-native-and-cc.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- wait_for: text=AI Settings
+- assert_visible: text="AI Settings"
+- assert_visible: text="Model distribution & GPU acceleration"
+- assert_visible: text="ModelScope first"
+- assert_visible: text="GitHub direct"
+- assert_visible: text="gh-proxy"
+- assert_visible: text="Custom base URL"
+- assert_visible: text="Chat history management"
+- assert_visible: text="Retention (days)"
+- fill:
+    selector: input[aria-label="Chat history retention days"]
+    value: '30'
+- screenshot: ai-004-native-and-cc.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native web search caps + ClaudeCode integration both surface：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-group-toggle-ai\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "text=AI Settings"}'
+    - step: 7
+      expectation: '{"assert_visible": "text=\"AI Settings\""}'
+    - step: 8
+      expectation: '{"assert_visible": "text=\"Model distribution & GPU acceleration\""}'
+    - step: 9
+      expectation: '{"assert_visible": "text=\"ModelScope first\""}'
+    - step: 10
+      expectation: '{"assert_visible": "text=\"GitHub direct\""}'
+    - step: 11
+      expectation: '{"assert_visible": "text=\"gh-proxy\""}'
+    - step: 12
+      expectation: '{"assert_visible": "text=\"Custom base URL\""}'
+    - step: 13
+      expectation: '{"assert_visible": "text=\"Chat history management\""}'
+    - step: 14
+      expectation: '{"assert_visible": "text=\"Retention (days)\""}'
+    results:
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

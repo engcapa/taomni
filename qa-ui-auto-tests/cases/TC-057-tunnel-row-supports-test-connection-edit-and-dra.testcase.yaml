@@ -1,43 +1,170 @@
 id: TC-057
 title: Tunnel row supports test connection, edit, and drag reorder
-covers: [F8.2]
-tags: [edit, legacy-imported, p1, reorder, test, tunnel]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+covers:
+- F8.2
+tags:
+- edit
+- legacy-imported
+- p1
+- reorder
+- test
+- tunnel
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="app-main-menu"]'
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-tools"]'
-  - click: '[data-testid="context-menu-item-tunneling"]'
-  - wait_for: "[data-testid=\"tunnel-manager\"]"
-  - click: "[data-testid=\"tunnel-new\"]"
-  - wait_for: "[data-testid=\"tunnel-editor\"]"
-  - fill: {selector: "input[placeholder=\"e.g. postgres-replica\"]", value: qa-ui-auto-reorder-a}
-  - fill: {selector: "input[placeholder=\"ssh.example.com\"]", value: "${cfg.ssh.host}"}
-  - fill: {selector: "input[placeholder=\"user\"]", value: "${cfg.ssh.user}"}
-  - fill: {selector: "input[placeholder=\"22\"]", value: "${cfg.ssh.port}"}
-  - fill: {selector: 'input[placeholder="0"]', value: "19333"}
-  - fill: {selector: 'input[placeholder="db.internal"]', value: "127.0.0.1"}
-  - fill: {selector: 'input[placeholder="5432"]', value: "5432"}
-  - click: '[data-testid="tunnel-editor-save"]'
-  - wait: 1
-  - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-ui-auto-reorder-a\""
-  - click: "[data-testid=\"tunnel-new\"]"
-  - wait_for: "[data-testid=\"tunnel-editor\"]"
-  - fill: {selector: "input[placeholder=\"e.g. postgres-replica\"]", value: qa-ui-auto-reorder-b}
-  - fill: {selector: "input[placeholder=\"ssh.example.com\"]", value: "${cfg.ssh.host}"}
-  - fill: {selector: "input[placeholder=\"user\"]", value: "${cfg.ssh.user}"}
-  - fill: {selector: "input[placeholder=\"22\"]", value: "${cfg.ssh.port}"}
-  - fill: {selector: 'input[placeholder="0"]', value: "19334"}
-  - fill: {selector: 'input[placeholder="db.internal"]', value: "127.0.0.1"}
-  - fill: {selector: 'input[placeholder="5432"]', value: "5432"}
-  - click: '[data-testid="tunnel-editor-save"]'
-  - wait: 1
-  - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-ui-auto-reorder-b\""
-  - click: '[data-testid="tunnel-manager"] tr:has-text("qa-ui-auto-reorder-a") button[title="Move down"]'
-  - wait: 1
-  - seed_dialog: {confirm: true}
-  - click: '[data-testid="tunnel-manager"] tr:has-text("qa-ui-auto-reorder-a") button[title="Test SSH connection"]'
-  - wait: 2
-  - screenshot: 057-tunnel-reorder-test.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="app-main-menu"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-tunneling"]'
+- wait_for: '[data-testid="tunnel-manager"]'
+- click: '[data-testid="tunnel-new"]'
+- wait_for: '[data-testid="tunnel-editor"]'
+- fill:
+    selector: input[placeholder="e.g. postgres-replica"]
+    value: qa-ui-auto-reorder-a
+- fill:
+    selector: input[placeholder="ssh.example.com"]
+    value: ${cfg.ssh.host}
+- fill:
+    selector: input[placeholder="user"]
+    value: ${cfg.ssh.user}
+- fill:
+    selector: input[placeholder="22"]
+    value: ${cfg.ssh.port}
+- fill:
+    selector: input[placeholder="0"]
+    value: '19333'
+- fill:
+    selector: input[placeholder="db.internal"]
+    value: 127.0.0.1
+- fill:
+    selector: input[placeholder="5432"]
+    value: '5432'
+- click: '[data-testid="tunnel-editor-save"]'
+- wait: 1
+- wait_for: '[data-testid="tunnel-manager"] >> text="qa-ui-auto-reorder-a"'
+- click: '[data-testid="tunnel-new"]'
+- wait_for: '[data-testid="tunnel-editor"]'
+- fill:
+    selector: input[placeholder="e.g. postgres-replica"]
+    value: qa-ui-auto-reorder-b
+- fill:
+    selector: input[placeholder="ssh.example.com"]
+    value: ${cfg.ssh.host}
+- fill:
+    selector: input[placeholder="user"]
+    value: ${cfg.ssh.user}
+- fill:
+    selector: input[placeholder="22"]
+    value: ${cfg.ssh.port}
+- fill:
+    selector: input[placeholder="0"]
+    value: '19334'
+- fill:
+    selector: input[placeholder="db.internal"]
+    value: 127.0.0.1
+- fill:
+    selector: input[placeholder="5432"]
+    value: '5432'
+- click: '[data-testid="tunnel-editor-save"]'
+- wait: 1
+- wait_for: '[data-testid="tunnel-manager"] >> text="qa-ui-auto-reorder-b"'
+- assert_items:
+    selector: '[data-testid="tunnel-row"] td:nth-child(2) > div:first-child'
+    equals:
+    - qa-ui-auto-reorder-a
+    - qa-ui-auto-reorder-b
+- click: '[data-testid="tunnel-manager"] tr:has-text("qa-ui-auto-reorder-a") button[title="Move down"]'
+- assert_items:
+    selector: '[data-testid="tunnel-row"] td:nth-child(2) > div:first-child'
+    equals:
+    - qa-ui-auto-reorder-b
+    - qa-ui-auto-reorder-a
+- assert_disabled: '[data-testid="tunnel-row"]:last-child [data-testid="tunnel-row-move-down"]'
+- assert_disabled: '[data-testid="tunnel-row"]:first-child [data-testid="tunnel-row-move-up"]'
+- wait: 1
+- seed_dialog:
+    confirm: true
+- click: '[data-testid="tunnel-manager"] tr:has-text("qa-ui-auto-reorder-a") button[title="Test SSH connection"]'
+- wait: 2
+- assert_text:
+    selector: '[data-testid="tunnel-activity-log"]'
+    contains: Testing tunnels is only available in the desktop build.
+- click: '[data-testid="tunnel-row"]:last-child [data-testid="tunnel-row-edit"]'
+- wait_for: '[data-testid="tunnel-editor"]'
+- fill:
+    selector: input[placeholder="e.g. postgres-replica"]
+    value: qa-ui-auto-reorder-renamed
+- click: '[data-testid="tunnel-editor-save"]'
+- assert_items:
+    selector: '[data-testid="tunnel-row"] td:nth-child(2) > div:first-child'
+    equals:
+    - qa-ui-auto-reorder-b
+    - qa-ui-auto-reorder-renamed
+- screenshot: 057-tunnel-reorder-test.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 移动隧道后两行顺序与边界按钮一致
+    actions:
+    - 7
+    - 16
+    - 19
+    - 28
+    - 32
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"tunnel-manager\"] >> text=\"qa-ui-auto-reorder-a\""}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"tunnel-manager\"] >> text=\"qa-ui-auto-reorder-b\""}'
+    - step: 31
+      expectation: '{"assert_items": {"selector": "[data-testid=\"tunnel-row\"] td:nth-child(2) > div:first-child",
+        "equals": ["qa-ui-auto-reorder-a", "qa-ui-auto-reorder-b"]}}'
+    - step: 33
+      expectation: '{"assert_items": {"selector": "[data-testid=\"tunnel-row\"] td:nth-child(2) > div:first-child",
+        "equals": ["qa-ui-auto-reorder-b", "qa-ui-auto-reorder-a"]}}'
+    - step: 34
+      expectation: '{"assert_disabled": "[data-testid=\"tunnel-row\"]:last-child [data-testid=\"tunnel-row-move-down\"]"}'
+    - step: 35
+      expectation: '{"assert_disabled": "[data-testid=\"tunnel-row\"]:first-child [data-testid=\"tunnel-row-move-up\"]"}'
+    results:
+    - 33
+    - 34
+    - 35
+  - id: R2
+    requirement: 浏览器测试 SSH 连接明确提示需要桌面版
+    actions:
+    - 38
+    checkpoints:
+    - step: 40
+      expectation: '{"assert_text": {"selector": "[data-testid=\"tunnel-activity-log\"]", "contains": "Testing tunnels
+        is only available in the desktop build."}}'
+    results:
+    - 40
+  - id: R3
+    requirement: 编辑第二行名称后保存，只修改该行
+    actions:
+    - 41
+    - 43
+    - 44
+    checkpoints:
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"tunnel-editor\"]"}'
+    - step: 45
+      expectation: '{"assert_items": {"selector": "[data-testid=\"tunnel-row\"] td:nth-child(2) > div:first-child",
+        "equals": ["qa-ui-auto-reorder-b", "qa-ui-auto-reorder-renamed"]}}'
+    results:
+    - 45
+  visual:
+  - check: 检查截图中表格列、行名、按钮不重叠/截断，排序或操作反馈可见。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图记录评审。
+  native:
+  - check: 本用例只验证浏览器渲染交互；系统级输入、桌面窗口与真实持久化需独立 native 验证。
+    method: external
+    reason: 按实际执行模式与指定边界解释证据。

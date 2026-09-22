@@ -1,44 +1,112 @@
 id: TC-auto-F-DB-3-hbase-query-library
 title: HBase Shell keeps its query library available offline
-description: |
-  Creates and opens an HBase Shell session in browser mode. The browser stub
+description: 'Creates and opens an HBase Shell session in browser mode. The browser stub
+
   rejects the native connection, so this verifies the failure banner does not
+
   replace the shell workspace and that the shared Query Library can persist the
+
   default HBase command under the stable session and namespace scope.
-covers: [F-DB-3, F-DB-4, F6.3]
-tags: [auto-generated, smoke, needs-review, database, hbase, query-library, no-connect]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-DB-3
+- F-DB-4
+- F6.3
+tags:
+- auto-generated
+- smoke
+- needs-review
+- database
+- hbase
+- query-library
+- no-connect
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="sidebar"]'
-  - click: '[data-testid="session-new"]'
-  - wait_for: '[data-testid="session-editor"]'
-  - click: '[data-testid="session-proto-hbaseshell"]'
-  - wait_for: '[data-testid="session-hbase-section"]'
-  - select_option: {selector: '[data-testid="hbase-connection-mode"]', value: "rest"}
-  - fill:
-      selector: 'input[aria-label="Remote host"]'
-      value: hbase-host.example.test
-  - fill:
-      selector: 'input[aria-label="HBase namespace"]'
-      value: qa
-  - click: '[data-testid="session-section-bookmark"]'
-  - wait_for: '[data-testid="bookmark-settings"]'
-  - fill:
-      selector: '[data-testid="session-name"]'
-      value: qa-ui-auto-hbase
-  - click: '[data-testid="session-save"]'
-  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-hbase"]'
-  - open_session: { name: qa-ui-auto-hbase, double_click: true }
-  - wait_for: '[data-testid="hbase-connection-error-banner"]'
-  - assert_visible: '[data-testid="hbase-schema-tree"]'
-  - click: '[data-testid="hbase-save-query"]'
-  - wait_for: '[data-testid="query-library-dialog"]'
-  - fill:
-      selector: '[data-testid="query-library-name"]'
-      value: qa-ui-auto-hbase-list
-  - click: '[data-testid="query-library-save"]'
-  - wait_for: '[data-testid^="saved-query-"]'
-  - screenshot: db-3-hbase-query-library.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-hbaseshell"]'
+- wait_for: '[data-testid="session-hbase-section"]'
+- select_option:
+    selector: '[data-testid="hbase-connection-mode"]'
+    value: rest
+- fill:
+    selector: input[aria-label="Remote host"]
+    value: hbase-host.example.test
+- fill:
+    selector: input[aria-label="HBase namespace"]
+    value: qa
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-hbase
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-hbase"]'
+- open_session:
+    name: qa-ui-auto-hbase
+    double_click: true
+- wait_for: '[data-testid="hbase-connection-error-banner"]'
+- assert_visible: '[data-testid="hbase-schema-tree"]'
+- click: '[data-testid="hbase-save-query"]'
+- wait_for: '[data-testid="query-library-dialog"]'
+- fill:
+    selector: '[data-testid="query-library-name"]'
+    value: qa-ui-auto-hbase-list
+- click: '[data-testid="query-library-save"]'
+- wait_for: '[data-testid^="saved-query-"]'
+- screenshot: db-3-hbase-query-library.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: HBase Shell keeps its query library available offline：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 15
+    - 18
+    - 20
+    - 21
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-hbase-section\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-hbase\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"hbase-connection-error-banner\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"hbase-schema-tree\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"query-library-dialog\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid^=\"saved-query-\"]"}'
+    results:
+    - 22
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

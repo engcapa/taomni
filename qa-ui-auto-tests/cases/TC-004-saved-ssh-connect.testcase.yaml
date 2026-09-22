@@ -1,47 +1,116 @@
 id: TC-004
 title: Saved SSH session connects and accepts command input
-description: |
-  Create a bookmark for the configured SSH server, connect via the session
+description: 'Create a bookmark for the configured SSH server, connect via the session
+
   tree (double-click), authenticate, and run a marker command. Verifies persistence
+
   → reconnect → terminal I/O end-to-end.
+
   Requires ssh.host:port reachable and QA_SSH_PASSWORD set.
-covers: [F3.1, F6.1, F6.2, F6.5]
-tags: [ssh, terminal, persistence, p0]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+
+  '
+covers:
+- F3.1
+- F6.1
+- F6.2
+- F6.5
+tags:
+- ssh
+- terminal
+- persistence
+- p0
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 timeout_sec: 90
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="sidebar"]'
-  - click: '[data-testid="session-new"]'
-  - wait_for: '[data-testid="session-editor"]'
-  - fill: { selector: '[data-testid="session-host"]', value: '${cfg.ssh.host}' }
-  - fill: { selector: '[data-testid="session-port"]', value: '${cfg.ssh.port}' }
-  - send_text_via_label: { label_contains: Specify username, checked: true }
-  - fill: { selector: '[data-testid="session-user"]', value: '${cfg.ssh.user}' }
-  - click: '[data-testid="session-section-bookmark"]'
-  - wait_for: '[data-testid="bookmark-settings"]'
-  - fill: { selector: '[data-testid="session-name"]', value: 'qa-ui-auto-saved-ssh' }
-  - click: '[data-testid="session-save"]'
-  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-saved-ssh"]'
-  - open_session: { name: 'qa-ui-auto-saved-ssh', double_click: true }
-  - auth: ${env.QA_SSH_PASSWORD}
-  - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 30
-  - wait_for:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-      timeout_sec: 20
-  # Git Bash clears the terminal after connecting on Windows, so the
-  # pre-session info banner is not stable evidence. Send text through xterm's
-  # input event path and check output from the real SSH PTY.
-  - terminal_input:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-      text: "printf 'qa-saved-ssh-live\\n'"
-      submit: true
-  - wait: 1
-  - assert_text:
-      selector: '[data-testid="terminal-pane"]'
-      contains: qa-saved-ssh-live
-      timeout_sec: 15
-  - screenshot: 004-saved-ssh-connect.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- send_text_via_label:
+    label_contains: Specify username
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-saved-ssh
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-saved-ssh"]'
+- open_session:
+    name: qa-ui-auto-saved-ssh
+    double_click: true
+- auth: ${env.QA_SSH_PASSWORD}
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 20
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf 'qa-saved-ssh-live\n'
+    submit: true
+- wait: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-saved\-ssh\-live\r?$
+    timeout_sec: 15
+- screenshot: 004-saved-ssh-connect.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 保存的 SSH 会话可从树中打开，认证后执行命令并出现独立的精确输出行。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+    - 18
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-saved-ssh\"]"}'
+    - step: 16
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
+        "timeout_sec": 20}}'
+    - step: 20
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-saved\\-ssh\\-live\\r?$",
+        "timeout_sec": 15}}'
+    results:
+    - 20
+  visual:
+  - check: 认证框和终端输出可读、焦点反馈清晰。
+    method: manual
+    reason: 截图必须单独评审，不能由功能步骤通过推导视觉通过。
+  native:
+  - check: 浏览器连接真实 SSH 服务，但原生 PTY/桌面密钥库不由此证明。
+    method: external
+    reason: 按实际执行模式解释；其他平台不继承 Linux 证据。

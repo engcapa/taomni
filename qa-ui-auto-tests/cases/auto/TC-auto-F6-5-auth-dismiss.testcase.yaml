@@ -1,46 +1,107 @@
 id: TC-auto-F6-5
 title: Auth prompt close and cancel buttons dismiss without submitting
-description: |
-  Auto-generated focused coverage for F6.5 (AuthPrompt). The prompt
+description: 'Auto-generated focused coverage for F6.5 (AuthPrompt). The prompt
+
   exposes two dismissal affordances besides Esc — the title-bar close
+
   button (auth-close) and the footer Cancel button (auth-cancel). Both
+
   must dismiss without firing onSubmit. This case opens the prompt
+
   twice (via QuickConnect), once per affordance, and asserts the prompt
+
   detaches and the welcome panel is restored. No SSH dial is required —
+
   the prompt mounts as soon as the address resolves.
-covers: [F6.5]
-tags: [auto-generated, smoke, p1, sessions, auth, needs-review]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F6.5
+tags:
+- auto-generated
+- smoke
+- p1
+- sessions
+- auth
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - wait_for: '[data-testid="qc-input"]'
-
-  # First trip: dismiss via header X (auth-close)
-  - fill: {selector: '[data-testid="qc-input"]', value: 'ssh://qa-user@127.0.0.1:22'}
-  - click: '[data-testid="qc-submit"]'
-  - wait_for: '[data-testid="auth-prompt"]'
-  - assert_visible: '[data-testid="auth-close"]'
-  - click: '[data-testid="auth-close"]'
-  - wait_for:
-      selector: '[data-testid="auth-prompt"]'
-      state: detached
-      timeout_sec: 5
-
-  # Second trip: dismiss via footer Cancel (auth-cancel)
-  - fill: {selector: '[data-testid="qc-input"]', value: 'ssh://qa-user@127.0.0.1:22'}
-  - click: '[data-testid="qc-submit"]'
-  - wait_for: '[data-testid="auth-prompt"]'
-  - assert_visible: '[data-testid="auth-cancel"]'
-  - click: '[data-testid="auth-cancel"]'
-  - wait_for:
-      selector: '[data-testid="auth-prompt"]'
-      state: detached
-      timeout_sec: 5
-
-  - assert_visible: '[data-testid="welcome-panel"]'
-  - screenshot: F6.5-auth-dismiss.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://qa-user@127.0.0.1:22
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- assert_visible: '[data-testid="auth-close"]'
+- click: '[data-testid="auth-close"]'
+- wait_for:
+    selector: '[data-testid="auth-prompt"]'
+    state: detached
+    timeout_sec: 5
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://qa-user@127.0.0.1:22
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- assert_visible: '[data-testid="auth-cancel"]'
+- click: '[data-testid="auth-cancel"]'
+- wait_for:
+    selector: '[data-testid="auth-prompt"]'
+    state: detached
+    timeout_sec: 5
+- assert_visible: '[data-testid="welcome-panel"]'
+- screenshot: F6.5-auth-dismiss.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Auth prompt close and cancel buttons dismiss without submitting：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 10
+    - 12
+    - 13
+    - 16
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"auth-close\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"auth-cancel\"]"}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    results:
+    - 17
+    - 18
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。
