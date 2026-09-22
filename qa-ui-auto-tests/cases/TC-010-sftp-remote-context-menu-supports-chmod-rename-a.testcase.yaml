@@ -97,7 +97,8 @@ steps:
 - wait: 1
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
-    text: printf '\nQA_MODE=%s\n' "$(stat -c %a '${cfg.sftp.remote_test_dir}/tc010/qa-ui-auto-menu.txt')"
+    text: printf '\nQA_MODE=%s\n' "$(stat -c %a '${cfg.sftp.remote_test_dir}/tc010/qa-ui-auto-menu.txt' 2>/dev/null
+      || stat -f %Lp '${cfg.sftp.remote_test_dir}/tc010/qa-ui-auto-menu.txt')"
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
@@ -166,14 +167,14 @@ verification:
     - step: 11
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 13
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        60}}'
     - step: 15
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_TC010_READY\\r?$"}}'
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
     - step: 18
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-path-edit\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-path-edit\"]", "timeout_sec": 30}}'
     - step: 20
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 23

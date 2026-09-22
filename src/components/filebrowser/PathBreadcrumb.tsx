@@ -141,6 +141,7 @@ export function PathBreadcrumb({
             {i > 0 && <ChevronRight className="w-3 h-3 opacity-50" />}
             <button
               type="button"
+              data-path={seg.path}
               className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
               onClick={(e) => {
                 e.stopPropagation();

@@ -13,6 +13,7 @@ modes:
 fixtures:
 - reset_db
 - ssh_required
+- sftp_required
 steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="app-main-menu"]'
@@ -29,14 +30,16 @@ steps:
     value: ${env.QA_SSH_PASSWORD}
 - click: '[data-testid="auth-submit"]'
 - wait_for: '[data-testid="terminal-pane"]'
-- wait: 2
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 60
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
 - click: '[data-testid="terminal-pane"]'
 - wait: 1
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
-    text: cd /tmp && printf '\nQA_CWD_READY\n'
+    text: cd '${fixture.sftp_shell_test_dir}' && printf '\nQA_CWD_READY\n'
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
@@ -48,7 +51,7 @@ steps:
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
-    equals: /tmp
+    equals: ${fixture.sftp_shell_test_dir}
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - screenshot: 044-sftp-manual-sync.png
@@ -82,11 +85,10 @@ verification:
     - step: 14
       expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
     - step: 18
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]",
-        "regex": "(?m)^QA_CWD_READY\\r?$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD_READY\\r?$"}}'
     - step: 23
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]",
-        "name": "value", "equals": "/tmp"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
+        "equals": "${fixture.sftp_shell_test_dir}"}}'
     - step: 25
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
     results:

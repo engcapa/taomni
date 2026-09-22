@@ -10,10 +10,14 @@ from unittest import TestCase, skipUnless
 from unittest.mock import Mock, call, patch
 
 from qa_ui_auto import native_steps
-from tauri_webdriver import NativeHarness, NativeSession, WebDriverError
+from tauri_webdriver import NativeHarness, NativeSession, WebDriverError, selector_strategy
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_explicit_xpath_preserves_exact_candidate_text_matching(self):
+        xpath = "//span[normalize-space(.)='String']"
+        self.assertEqual(selector_strategy("xpath=" + xpath, interactive=True), ("xpath", xpath))
+
     def test_per_case_java_runtime_does_not_leak_into_next_session(self):
         harness = NativeHarness({"app": {"tooling_java_home": "/jdk21"}}, Path("/qa/run"))
         harness.driver = Mock()

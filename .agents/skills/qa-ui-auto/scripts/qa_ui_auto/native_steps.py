@@ -1344,7 +1344,9 @@ def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
         raise StepError("terminal_input: text must be a string")
     if not isinstance(submit, bool):
         raise StepError("terminal_input: submit must be a boolean")
-    data = text + ("\r" if submit else "")
+    ctx.session.focus(selector)
+    ctx.session.press_combo("Shift")
+    data = text
     result = ctx.session.execute(
         f"const element = document.querySelector({json.dumps(selector)});"
         "if (!element) return {found:false,focused:false};"
@@ -1358,6 +1360,8 @@ def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
         raise StepError(f"terminal_input: target not found: {selector}")
     if result.get("focused") is not True:
         raise StepError(f"terminal_input: target could not receive focus: {selector}")
+    if submit:
+        ctx.session.press_combo("Enter")
     return f"sent {len(text)} chars to xterm input" + (" and submitted" if submit else "")
 
 

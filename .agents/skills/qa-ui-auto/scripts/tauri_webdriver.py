@@ -180,6 +180,8 @@ def _quote_xpath_text(value: str) -> str:
 def selector_strategy(selector: str, *, interactive: bool = False) -> tuple[str, str]:
     """Map common Playwright-ish selectors to WebDriver selector strategies."""
     selector = selector.strip()
+    if selector.startswith("xpath="):
+        return "xpath", selector[6:]
     if " >> text=" in selector:
         parent_sel, text_part = selector.split(" >> text=", 1)
         text = text_part.strip()

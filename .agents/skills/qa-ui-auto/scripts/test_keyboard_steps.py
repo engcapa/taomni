@@ -40,7 +40,7 @@ class KeyboardStepsTest(TestCase):
             "text": "echo ready",
             "submit": True,
         })
-        page.locator.assert_called_once_with(".xterm-helper-textarea")
+        self.assertEqual([c.args[0] for c in locator.press.call_args_list], ["Shift", "Enter"])
         script, payload = locator.evaluate.call_args.args
         self.assertIn("new InputEvent", script)
         self.assertEqual(payload, {"text": "echo ready", "submit": True})
@@ -54,6 +54,11 @@ class KeyboardStepsTest(TestCase):
                 "submit": "yes",
             })
         locator.evaluate.assert_not_called()
+
+    def test_terminal_input_without_submit_preserves_draft(self):
+        ctx, _, locator = self.context()
+        step_terminal_input(ctx, {"selector": ".xterm-helper-textarea", "text": "draft"})
+        locator.press.assert_called_once_with("Shift")
 
 
 if __name__ == "__main__":

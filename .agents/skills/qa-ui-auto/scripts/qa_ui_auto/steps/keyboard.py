@@ -46,10 +46,13 @@ def step_terminal_input(ctx: StepContext, args: Any) -> None:
     selector, text, submit = _terminal_input_args(args)
     if ctx.dry_run:
         return
+    # A real modifier key cycle clears xterm's prior keypress suppression
+    # state without inserting text. Send Enter separately from the text chunk.
+    ctx.page.locator(selector).first.press("Shift")
     focused = ctx.page.locator(selector).first.evaluate(  # type: ignore[attr-defined]
         """(element, payload) => {
           element.focus();
-          const data = payload.text + (payload.submit ? "\\r" : "");
+          const data = payload.text;
           element.dispatchEvent(new InputEvent("input", {
             data,
             inputType: "insertText",
@@ -62,6 +65,8 @@ def step_terminal_input(ctx: StepContext, args: Any) -> None:
     )
     if focused is not True:
         raise StepError(f"terminal_input: target could not receive focus: {selector}")
+    if submit:
+        ctx.page.locator(selector).first.press("Enter")
 
 
 def _typing_args(verb_name: str, args: Any) -> tuple[str | None, str]:
