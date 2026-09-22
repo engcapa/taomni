@@ -59,7 +59,7 @@ steps:
 - wait: 3
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: printf '\nQA_CWD=%s\n' "$PWD"
+    text: printf '\nQA_CWD=%s\n' "$(pwd -W 2>/dev/null || pwd)"
     submit: true
 - wait: 2
 - assert_pattern:

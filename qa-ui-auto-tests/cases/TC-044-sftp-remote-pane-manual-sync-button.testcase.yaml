@@ -33,6 +33,7 @@ steps:
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
 - click: '[data-testid="terminal-pane"]'
+- wait: 1
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
     text: cd /tmp && printf '\nQA_CWD_READY\n'
@@ -43,7 +44,7 @@ steps:
 - wait: 1
 - click: '[data-testid="sftp-browser"] >> button[title*="sync the remote pane"]'
 - wait: 1
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
@@ -67,10 +68,10 @@ verification:
     - 10
     - 13
     - 15
-    - 16
-    - 19
-    - 21
-    - 23
+    - 17
+    - 20
+    - 22
+    - 24
     checkpoints:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
@@ -80,15 +81,16 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 14
       expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
-    - step: 17
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD_READY\\r?$"}}'
-    - step: 22
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "/tmp"}}'
-    - step: 24
+    - step: 18
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]",
+        "regex": "(?m)^QA_CWD_READY\\r?$"}}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]",
+        "name": "value", "equals": "/tmp"}}'
+    - step: 25
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
     results:
-    - 24
+    - 25
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

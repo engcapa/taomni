@@ -538,6 +538,9 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
       set((state) => {
         const cur = state.sessions[sessionId];
         if (!cur) return state;
+        const nextEntries = listing.entries;
+        const alive = new Set(nextEntries.map((e) => e.path));
+        const prunedSelection = cur[side].selection.filter((p) => alive.has(p));
         return {
           sessions: {
             ...state.sessions,
@@ -546,6 +549,7 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
               [side]: {
                 ...cur[side],
                 ...listingState(listing),
+                selection: prunedSelection,
                 loading: false,
                 error: null,
               },

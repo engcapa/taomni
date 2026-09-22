@@ -12,10 +12,25 @@ modes:
 - browser
 fixtures:
 - reset_db
+- ssh_required
 steps:
 - open: ${cfg.app.base_url}
-- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
 - wait_for: '[data-testid="terminal-pane"]'
+- wait: 2
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
 - click: '[data-testid="terminal-pane"]'
 - type: echo error warning success
 - press: Enter
@@ -55,21 +70,23 @@ verification:
   - id: R1
     requirement: 启用关键词高亮后错误/警告/成功均有渲染覆盖层，切回默认后全部消失
     actions:
-    - 5
-    - 6
-    - 12
-    - 21
+    - 15
+    - 16
+    - 22
+    - 31
     checkpoints:
-    - step: 13
+    - step: 23
       expectation: '{"wait_for": ".terminal-keyword-error"}'
-    - step: 14
-      expectation: '{"assert_count": {"selector": ".terminal-keyword-warning", "min": 1}}'
-    - step: 15
-      expectation: '{"assert_count": {"selector": ".terminal-keyword-success", "min": 1}}'
-    - step: 22
+    - step: 24
+      expectation: '{"assert_count": {"selector": ".terminal-keyword-warning", "min":
+        1}}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": ".terminal-keyword-success", "min":
+        1}}'
+    - step: 32
       expectation: '{"assert_not_visible": ".terminal-keyword-hit"}'
     results:
-    - 22
+    - 32
   visual:
   - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
     method: manual

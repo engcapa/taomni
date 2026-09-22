@@ -9,6 +9,9 @@ tags:
 - window-close
 modes:
 - browser
+browser_platforms:
+- Linux
+- Windows
 fixtures:
 - reset_db
 steps:

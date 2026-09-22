@@ -432,7 +432,7 @@ steps:
 - right_click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key][data-active="true"] button[title]'
 - assert_menu_items:
   - Local History
-- click_menu: Local History
+- click_menu: Local History…
 - wait_for: '[data-testid="code-workspace-local-history-dialog"]'
 - wait_for:
     selector: '[data-testid="code-workspace-local-history-dialog"] button[data-selected="true"]'
@@ -446,7 +446,7 @@ steps:
     contains: local-history
 - click: '[data-testid="compare-dialog-close"]'
 - right_click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key][data-active="true"] button[title]'
-- click_menu: Local History
+- click_menu: Local History…
 - wait_for: '[data-testid="code-workspace-local-history-dialog"]'
 - wait_for:
     selector: '[data-testid="code-workspace-local-history-dialog"] button[data-selected="true"]'

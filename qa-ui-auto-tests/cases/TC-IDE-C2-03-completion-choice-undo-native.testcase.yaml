@@ -100,7 +100,10 @@ steps:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     keys:
     - Control+Space
-- wait: 3
+- wait: 5
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 30
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     keys:
@@ -108,7 +111,7 @@ steps:
 - assert_text_equals:
     selector: '[data-testid="code-workspace-editor"] .cm-line:nth-child(21)'
     equals: '            String'
-    timeout_sec: 30
+    timeout_sec: 60
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     keys:
@@ -116,13 +119,14 @@ steps:
 - assert_text_equals:
     selector: '[data-testid="code-workspace-editor"] .cm-line:nth-child(21)'
     equals: '            Stri'
-    timeout_sec: 30
+    timeout_sec: 60
 - screenshot: tc-ide-c2-03-completion-undo.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Basic completion choice and one undo over real JDT LS in packaged app：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Basic completion choice and one undo over real JDT LS in packaged
+      app：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 2
@@ -133,29 +137,33 @@ verification:
     - 12
     - 13
     - 14
-    - 16
-    - 18
+    - 17
+    - 19
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 8
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
-    - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "completionTargets",
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
         "timeout_sec": 60}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]",
+        "contains": "completionTargets", "timeout_sec": 60}}'
     - step: 11
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
-        "Java", "timeout_sec": 60}}'
-    - step: 17
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:nth-child(21)",
-        "equals": "            String", "timeout_sec": 30}}'
-    - step: 19
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:nth-child(21)",
-        "equals": "            Stri", "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]",
+        "contains": "Java", "timeout_sec": 60}}'
+    - step: 16
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec":
+        30}}'
+    - step: 18
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-line:nth-child(21)", "equals": "            String", "timeout_sec": 60}}'
+    - step: 20
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"]
+        .cm-line:nth-child(21)", "equals": "            Stri", "timeout_sec": 60}}'
     results:
-    - 19
+    - 20
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

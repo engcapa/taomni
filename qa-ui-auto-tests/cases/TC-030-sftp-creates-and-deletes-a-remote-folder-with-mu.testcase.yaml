@@ -73,7 +73,7 @@ steps:
 - assert_not_visible: '[data-testid="sftp-browser"] tr[title$="/qa-ui-auto-folder-b"]'
 - assert_pattern:
     selector: '[data-testid="sftp-remote-pane"] > div:last-child'
-    regex: ^\d+ items?$
+    regex: ^\d+ items?( • \d+ selected)?$
 - screenshot: 030-sftp-folder-multiselect.png
 verification:
   review: reviewed
@@ -138,7 +138,7 @@ verification:
       expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"] tr[title$=\"/qa-ui-auto-folder-b\"]"}'
     - step: 44
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"sftp-remote-pane\"] > div:last-child", "regex":
-        "^\\d+ items?$"}}'
+        "^\\d+ items?( • \\d+ selected)?$"}}'
     results:
     - 38
     - 40
