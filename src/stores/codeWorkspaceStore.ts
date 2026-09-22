@@ -759,6 +759,7 @@ export const useCodeWorkspaceStore = create<CodeWorkspaceStoreState>((set, get) 
             layoutRevision: current.layoutRevision + 1,
             layoutTreeV2: result.tree,
             editorGroups: result.groups,
+            activeEditorGroupId: result.activeGroupId,
             openOrder: activeGroup?.openOrder ?? current.openOrder,
             activeKey: activeGroup?.activeKey ?? current.activeKey,
           },
