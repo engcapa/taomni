@@ -26,7 +26,14 @@ def windows_startup_probe(binary: Path, report: Path):
                 exit_code = process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 exit_code = None
-            collect(root, root, failed=True)
+            try:
+                collect(root, root, failed=True)
+            except Exception as exc:
+                # Startup diagnostics are optional evidence. Never turn a
+                # profile permission/IO problem into a suite infrastructure failure.
+                _record_windows_diagnostic_error(
+                    root / "native-diagnostics", "collect", f"{type(exc).__name__}: {exc}"
+                )
             (root / "startup.json").write_text(json.dumps({"pid": process.pid, "exit_code": exit_code,
                 "alive_after_10s": exit_code is None}), encoding="utf-8")
             if exit_code is not None:
@@ -63,16 +70,22 @@ def collect(case_dir: Path, run_root: Path, *, failed: bool):
                 if log.is_file() and log.stat().st_size <= 10_000_000:
                     shutil.copyfile(log, destination / f"jdtls-{marker.parent.name}.log")
     if failed and platform.system() == "Windows":
-        script = r'''
+        process_script = r'''
         Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'taomni|msedge|WerFault' } |
           Select-Object ProcessId,Name,SessionId,CommandLine,ExecutablePath |
           ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $env:QA_DIAGNOSTICS 'processes.json')
+        '''
+        profile_script = r'''
         $profile = Join-Path $env:NEWMOB_DATA_DIR 'com.taomni.app.qa\webview'
         if (Test-Path $profile) {
-          Get-ChildItem -LiteralPath $profile -Recurse -Force -ErrorAction SilentlyContinue |
+          # A recursive WebView2 profile walk can block on locked LevelDB files
+          # and must never prevent the native suite from starting.
+          Get-ChildItem -LiteralPath $profile -Force -ErrorAction SilentlyContinue |
             Select-Object FullName,PSIsContainer,Length |
             ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $env:QA_DIAGNOSTICS 'webview-profile-tree.json')
         }
+        '''
+        desktop_script = r'''
         Add-Type -AssemblyName System.Windows.Forms,System.Drawing
         $bounds=[Windows.Forms.SystemInformation]::VirtualScreen
         $image=New-Object Drawing.Bitmap $bounds.Width,$bounds.Height
@@ -81,6 +94,43 @@ def collect(case_dir: Path, run_root: Path, *, failed: bool):
         $image.Save((Join-Path $env:QA_DIAGNOSTICS 'desktop.png'))
         $graphics.Dispose(); $image.Dispose()
         '''
-        subprocess.run(["pwsh.exe", "-NoProfile", "-Command", script],
-                       env={**os.environ, "QA_DIAGNOSTICS": str(destination.resolve())},
-                       capture_output=True, timeout=20)
+        for name, script in (("processes", process_script),
+                             ("webview-profile", profile_script),
+                             ("desktop", desktop_script)):
+            _run_windows_diagnostic(destination, name, script)
+
+
+def _run_windows_diagnostic(destination: Path, name: str, script: str) -> None:
+    """Run one optional Windows diagnostic without affecting test execution."""
+    try:
+        result = subprocess.run(
+            ["pwsh.exe", "-NoProfile", "-Command", script],
+            env={**os.environ, "QA_DIAGNOSTICS": str(destination.resolve())},
+            capture_output=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _record_windows_diagnostic_error(destination, name, f"{type(exc).__name__}: {exc}")
+        return
+    if result.returncode:
+        detail = (
+            result.stderr.decode(errors="replace").strip()
+            if isinstance(result.stderr, bytes)
+            else str(result.stderr or "").strip()
+        )
+        _record_windows_diagnostic_error(destination, name, f"pwsh exited {result.returncode}: {detail}")
+
+
+def _record_windows_diagnostic_error(destination: Path, name: str, message: str) -> None:
+    path = destination / "windows-diagnostics-errors.json"
+    try:
+        errors = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else []
+        if not isinstance(errors, list):
+            errors = []
+        errors.append({"diagnostic": name, "error": message})
+        path.write_text(json.dumps(errors, indent=2) + "\n", encoding="utf-8")
+    except (OSError, ValueError):
+        # Diagnostics are strictly best-effort; a read-only report directory
+        # must not turn an otherwise valid native run into an infrastructure error.
+        return
