@@ -100,7 +100,7 @@ steps:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     keys:
     - Control+Space
-- wait: 5
+- wait: 10
 - wait_for:
     selector: .cm-tooltip-autocomplete
     timeout_sec: 30

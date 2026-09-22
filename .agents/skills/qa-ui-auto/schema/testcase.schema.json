@@ -1518,8 +1518,19 @@
    "additionalProperties": false,
    "required": [
     "selector",
-    "name",
-    "equals"
+    "name"
+   ],
+   "anyOf": [
+    {
+     "required": [
+      "equals"
+     ]
+    },
+    {
+     "required": [
+      "matches"
+     ]
+    }
    ],
    "properties": {
     "selector": {
@@ -1530,6 +1541,9 @@
      "minLength": 1
     },
     "equals": {
+     "type": "string"
+    },
+    "matches": {
      "type": "string"
     }
    }

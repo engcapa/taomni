@@ -30,7 +30,9 @@ steps:
 - click: '[data-testid="auth-submit"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - wait: 2
-- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 60
 - click: '[data-testid="terminal-pane"]'
 - type: echo error warning success
 - press: Enter

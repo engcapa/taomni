@@ -326,16 +326,22 @@ def _select_option(ctx: NativeStepContext, args: Any) -> str:
 
 
 def _assert_attribute(ctx: NativeStepContext, args: Any) -> str:
-    if not isinstance(args, dict) or not {"selector", "name", "equals"} <= set(args):
-        raise StepError("assert_attribute: expected {selector, name, equals}")
+    if not isinstance(args, dict) or not {"selector", "name"} <= set(args):
+        raise StepError("assert_attribute: expected {selector, name, equals|matches}")
     selector = str(args["selector"])
     name = str(args["name"])
-    expected = str(args["equals"])
+    expected = str(args["equals"]) if "equals" in args else None
+    pattern = str(args["matches"]) if "matches" in args else None
+    if expected is None and pattern is None:
+        raise StepError("assert_attribute: expected equals or matches")
     actual = ctx.session.execute(
         f"const el = document.querySelector({json.dumps(selector)});"
         f"return el ? ({json.dumps(name)} === 'value' && 'value' in el ? el.value : el.getAttribute({json.dumps(name)})) : null;"
     )
-    if str(actual) != expected:
+    if pattern is not None:
+        if re.fullmatch(pattern, str(actual)) is None:
+            raise StepError(f"assert_attribute: {selector}[{name}]={actual!r} does not match {pattern!r}")
+    elif str(actual) != expected:
         raise StepError(f"assert_attribute: {selector}[{name}]={actual!r} != {expected!r}")
     return f"attribute ok: {selector}[{name}]"
 

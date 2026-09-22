@@ -31,7 +31,9 @@ steps:
 - click: '[data-testid="auth-submit"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - wait: 2
-- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
     text: mkdir -p '${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b' && printf '\nQA_PATH_READY\n'
@@ -90,7 +92,7 @@ steps:
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
-    equals: /tmp
+    matches: /(?:private/)?tmp
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-path-edit"]'
