@@ -5985,6 +5985,51 @@ describe("CodeWorkspaceTab", () => {
     expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-split").openFiles[fileKey]).toBeUndefined();
   });
 
+  it("keeps keyboard history routed to the survivor when the active split leaf closes", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-active-split-close",
+      workspaceInstanceId: "instance-active-split-close",
+      name: "Active split close",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "alpha\nbeta\n"));
+    lspMocks.lspDetectServers.mockResolvedValue([csharpStatus({ available: false, active: false })]);
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+    await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
+
+    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
+    const activeSplitPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") !== "primary")!;
+    const primaryView = EditorView.findFromDOM(primaryPane.querySelector<HTMLElement>(".cm-editor")!)!;
+    primaryView.dispatch({ changes: { from: 0, to: 0, insert: "HEAD;" } });
+    await waitFor(() => expect(
+      EditorView.findFromDOM(activeSplitPane.querySelector<HTMLElement>(".cm-editor")!)!.state.doc.toString(),
+    ).toBe("HEAD;alpha\nbeta\n"));
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-active-split-close",
+    ).activeEditorGroupId).not.toBe("primary");
+
+    // The split created above is the active group. Closing its only tab must
+    // transfer action ownership to the surviving primary leaf even when the
+    // next key is delivered directly to that leaf without a pane mousedown.
+    fireEvent.click(within(activeSplitPane).getByTitle("Close"));
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-active-split-close").activeEditorGroupId,
+    ).toBe("primary"));
+    await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
+
+    const primaryContent = primaryPane.querySelector<HTMLElement>(".cm-content")!;
+    fireEvent.keyDown(primaryContent, { key: "z", code: "KeyZ", ctrlKey: true });
+    await waitFor(() => expect(primaryView.state.doc.toString()).toBe("alpha\nbeta\n"));
+  });
+
   // ED-AUDIT-009 A1: two real leaves of one file share ONE logical history —
   // an edit in either leaf reaches the other in real time without clobbering
   // its caret/scroll, and one undo/redo stroke issued from one leaf reverts
