@@ -88,7 +88,14 @@ class NativeAssertionsTest(TestCase):
         script = ctx.session.execute.call_args.args[0]
         self.assertIn("new InputEvent", script)
         self.assertIn("echo ready", script)
+        self.assertEqual([c.args[0] for c in ctx.session.press_combo.call_args_list], ["Shift", "Enter"])
         self.assertEqual(result, "sent 10 chars to xterm input and submitted")
+
+    def test_terminal_input_without_submit_does_not_press_enter(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = {"found": True, "focused": True}
+        run_native_step(ctx, "terminal_input", {"selector": ".xterm-helper-textarea", "text": "draft"})
+        ctx.session.press_combo.assert_called_once_with("Shift")
 
     def test_terminal_input_requires_a_real_target(self):
         ctx = Mock()
@@ -98,3 +105,4 @@ class NativeAssertionsTest(TestCase):
                 "selector": ".xterm-helper-textarea",
                 "text": "echo ready",
             })
+        self.assertNotIn("Enter", [c.args[0] for c in ctx.session.press_combo.call_args_list])

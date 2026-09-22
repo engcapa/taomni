@@ -67,6 +67,25 @@ function session(): SftpSessionState {
 }
 
 describe("sftpStore", () => {
+  it("waits for an in-flight attach before navigating the remote pane", async () => {
+    const sid = "attach-navigation-race";
+    let connected!: (value: { homeDir: string }) => void;
+    vi.mocked(sftpAttach).mockImplementationOnce(() => new Promise((resolve) => { connected = resolve; }));
+    vi.mocked(sftpListRemote).mockResolvedValue([hostEntry]);
+    const attaching = useSftpStore.getState().attach({
+      sessionId: sid, host: "localhost", port: 22, username: "qa",
+      authMethod: "password", authData: "test",
+    });
+    const navigating = useSftpStore.getState().navigate(sid, "remote", "/target");
+    expect(sftpListRemote).not.toHaveBeenCalled();
+    connected({ homeDir: "/home/qa" });
+    await Promise.all([attaching, navigating]);
+    expect(vi.mocked(sftpListRemote).mock.calls.map((call) => call[1])).toEqual(["/home/qa", "/target"]);
+    expect(useSftpStore.getState().sessions[sid].remote.path).toBe("/target");
+    expect(useSftpStore.getState().sessions[sid].remote.error).toBeNull();
+    await useSftpStore.getState().detach(sid);
+  });
+
   beforeEach(() => {
     vi.mocked(sftpListRemote).mockReset();
     vi.mocked(sftpListLocalDetailed).mockReset();

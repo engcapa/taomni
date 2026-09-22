@@ -6,9 +6,8 @@ description: '§8.19.10 native gate case (ED-COMP-004 A1). Enters the in-repo
 
   waits for the real JDT LS provider, places the caret after the bare `Stri`
 
-  token with physical keys, fires explicit completion, accepts the top
-
-  choice, and proves one undo restores the prefix. The request carries the
+  token with physical keys, fires explicit completion with Alt+/ (Ctrl+Space is reserved by the CI IME),
+  explicitly clicks the java.lang.String candidate (provider order varies), and proves one undo restores the prefix. The request carries the
 
   effective project scope recorded from the ready same-workspace snapshot
 
@@ -99,15 +98,14 @@ steps:
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     keys:
-    - Control+Space
-- wait: 10
+    - Alt+/
+    require_keydown_prevented: true
+- wait: 0.3
 - wait_for:
     selector: .cm-tooltip-autocomplete
     timeout_sec: 30
-- native_keys:
-    selector: '[data-testid="code-workspace-editor"] .cm-content'
-    keys:
-    - Enter
+- click: xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel')
+    and normalize-space(.)='String - java.lang']
 - assert_text_equals:
     selector: '[data-testid="code-workspace-editor"] .cm-line:nth-child(21)'
     equals: '            String'
@@ -125,8 +123,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Basic completion choice and one undo over real JDT LS in packaged
-      app：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Basic completion choice and one undo over real JDT LS in packaged app：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 2
@@ -145,23 +142,22 @@ verification:
     - step: 8
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]",
-        "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec":
+        60}}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]",
-        "contains": "completionTargets", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains":
+        "completionTargets", "timeout_sec": 60}}'
     - step: 11
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]",
-        "contains": "Java", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
+        "Java", "timeout_sec": 60}}'
     - step: 16
-      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 30}}'
     - step: 18
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"]
-        .cm-line:nth-child(21)", "equals": "            String", "timeout_sec": 60}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:nth-child(21)",
+        "equals": "            String", "timeout_sec": 60}}'
     - step: 20
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"]
-        .cm-line:nth-child(21)", "equals": "            Stri", "timeout_sec": 60}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:nth-child(21)",
+        "equals": "            Stri", "timeout_sec": 60}}'
     results:
     - 20
   visual:
