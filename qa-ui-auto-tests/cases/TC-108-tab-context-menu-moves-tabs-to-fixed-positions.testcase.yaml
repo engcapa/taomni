@@ -1,58 +1,138 @@
 id: TC-108
 title: Tab context menu moves tabs to fixed positions
-description: |
-  Covers the v0.1.24 tab context-menu move actions added after the feature
+description: 'Covers the v0.1.24 tab context-menu move actions added after the feature
+
   catalog was last updated: Move to last, Move left, Move to first, and Move right.
-covers: [F1.5]
-tags: [smoke, p1, main, right-menu, tabs]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F1.5
+tags:
+- smoke
+- p1
+- main
+- right-menu
+- tabs
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"welcome-open-local-terminal\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - dblclick: '[data-testid="tab-title"] >> nth=1'
-  - wait_for: '[data-testid="tab-title-input"]'
-  - fill: {selector: '[data-testid="tab-title-input"]', value: "Terminal 1"}
-  - press: {key: "Enter", selector: '[data-testid="tab-title-input"]'}
-  - wait: 0.3
-  - click: "[data-testid=\"new-local-terminal\"]"
-  - wait: 0.3
-  - click: "[data-testid=\"new-local-terminal\"]"
-  - wait: 0.3
-  - assert_count: {selector: '[data-testid="tab-item"]', min: 4}
-  - right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - assert_menu_items: ["Move to first", "Move left", "Move right", "Move to last"]
-  - click: '[data-testid="context-menu-item-move-to-last"]'
-  - wait: 0.5
-  - assert_attribute:
-      selector: '[data-testid="tab-item"] >> nth=3'
-      name: "data-tab-title"
-      equals: "Terminal 1"
-  - right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - click: '[data-testid="context-menu-item-move-left"]'
-  - wait: 0.5
-  - assert_attribute:
-      selector: '[data-testid="tab-item"] >> nth=2'
-      name: "data-tab-title"
-      equals: "Terminal 1"
-  - right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - click: '[data-testid="context-menu-item-move-to-first"]'
-  - wait: 0.5
-  - assert_attribute:
-      selector: '[data-testid="tab-item"] >> nth=0'
-      name: "data-tab-title"
-      equals: "Terminal 1"
-  - right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - click: '[data-testid="context-menu-item-move-right"]'
-  - wait: 0.5
-  - assert_attribute:
-      selector: '[data-testid="tab-item"] >> nth=1'
-      name: "data-tab-title"
-      equals: "Terminal 1"
-  - screenshot: 108-tab-context-menu-move-actions.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- dblclick: '[data-testid="tab-title"] >> nth=1'
+- wait_for: '[data-testid="tab-title-input"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: Terminal 1
+- press:
+    key: Enter
+    selector: '[data-testid="tab-title-input"]'
+- wait: 0.3
+- click: '[data-testid="new-local-terminal"]'
+- wait: 0.3
+- click: '[data-testid="new-local-terminal"]'
+- wait: 0.3
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    min: 4
+- right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_menu_items:
+  - Move to first
+  - Move left
+  - Move right
+  - Move to last
+- click: '[data-testid="context-menu-item-move-to-last"]'
+- wait: 0.5
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=3'
+    name: data-tab-title
+    equals: Terminal 1
+- right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="context-menu-item-move-left"]'
+- wait: 0.5
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=2'
+    name: data-tab-title
+    equals: Terminal 1
+- right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="context-menu-item-move-to-first"]'
+- wait: 0.5
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=0'
+    name: data-tab-title
+    equals: Terminal 1
+- right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="context-menu-item-move-right"]'
+- wait: 0.5
+- assert_attribute:
+    selector: '[data-testid="tab-item"] >> nth=1'
+    name: data-tab-title
+    equals: Terminal 1
+- screenshot: 108-tab-context-menu-move-actions.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tab context menu moves tabs to fixed positions：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 6
+    - 7
+    - 9
+    - 11
+    - 14
+    - 17
+    - 20
+    - 22
+    - 25
+    - 27
+    - 30
+    - 32
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"tab-title-input\"]"}'
+    - step: 13
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 4}}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 16
+      expectation: '{"assert_menu_items": ["Move to first", "Move left", "Move right", "Move to last"]}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=3", "name": "data-tab-title",
+        "equals": "Terminal 1"}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=2", "name": "data-tab-title",
+        "equals": "Terminal 1"}}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=0", "name": "data-tab-title",
+        "equals": "Terminal 1"}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=1", "name": "data-tab-title",
+        "equals": "Terminal 1"}}'
+    results:
+    - 34
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

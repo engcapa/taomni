@@ -1,45 +1,104 @@
 id: TC-auto-F5-5
 title: Application theme switcher exposes Light / Dark / System preview options in settings
-description: |
-  Auto-generated focused coverage for F5.5 (application theme). The
+description: 'Auto-generated focused coverage for F5.5 (application theme). The
+
   AppThemeSwitcher renders a preview dropdown in the settings panel with
+
   option rows (data-testid="app-theme-{light,dark,system}"). TC-015 already exercises
+
   the title-bar tray cycle button — this case drives the explicit picker
+
   used inside the settings tab and verifies each click is honored by the
+
   document attribute and persisted to localStorage.
-covers: [F5.5]
-tags: [auto-generated, smoke, p1, settings, theme, needs-review]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F5.5
+tags:
+- auto-generated
+- smoke
+- p1
+- settings
+- theme
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 30
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="ribbon-settings"]'
-  - click: '[data-testid="ribbon-settings"]'
-  - wait_for: '[data-testid="settings-panel"]'
-  - click: '[data-testid="settings-group-toggle-general"]'
-  - assert_visible: '[data-testid="app-theme-select"]'
-  - click: '[data-testid="app-theme-select"]'
-  - assert_visible: '[data-testid="app-theme-light"]'
-  - assert_visible: '[data-testid="app-theme-dark"]'
-  - assert_visible: '[data-testid="app-theme-system"]'
-
-  - click: '[data-testid="app-theme-light"]'
-  - wait: 0.5
-  - eval_readonly:
-      expression: 'document.documentElement.getAttribute("data-app-theme")'
-      contains: light
-
-  - click: '[data-testid="app-theme-select"]'
-  - click: '[data-testid="app-theme-dark"]'
-  - wait: 0.5
-  - eval_readonly:
-      expression: 'document.documentElement.getAttribute("data-app-theme")'
-      contains: dark
-
-  - click: '[data-testid="app-theme-select"]'
-  - click: '[data-testid="app-theme-system"]'
-  - wait: 0.5
-  - assert_localstorage: { key: "taomni.appTheme.v1", exists: true }
-
-  - screenshot: F5.5-theme-switcher.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- assert_visible: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-select"]'
+- assert_visible: '[data-testid="app-theme-light"]'
+- assert_visible: '[data-testid="app-theme-dark"]'
+- assert_visible: '[data-testid="app-theme-system"]'
+- click: '[data-testid="app-theme-light"]'
+- wait: 0.5
+- eval_readonly:
+    expression: document.documentElement.getAttribute("data-app-theme")
+    contains: light
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-dark"]'
+- wait: 0.5
+- eval_readonly:
+    expression: document.documentElement.getAttribute("data-app-theme")
+    contains: dark
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-system"]'
+- wait: 0.5
+- assert_localstorage:
+    key: taomni.appTheme.v1
+    exists: true
+- screenshot: F5.5-theme-switcher.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Application theme switcher exposes Light / Dark / System preview options in settings：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 11
+    - 14
+    - 15
+    - 18
+    - 19
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"app-theme-select\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"app-theme-light\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"app-theme-dark\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"app-theme-system\"]"}'
+    - step: 13
+      expectation: '{"eval_readonly": {"expression": "document.documentElement.getAttribute(\"data-app-theme\")",
+        "contains": "light"}}'
+    - step: 17
+      expectation: '{"eval_readonly": {"expression": "document.documentElement.getAttribute(\"data-app-theme\")",
+        "contains": "dark"}}'
+    - step: 21
+      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "exists": true}}'
+    results:
+    - 21
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

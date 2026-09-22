@@ -1,29 +1,85 @@
 id: TC-046
 title: Tunnel manager toggles authentication display globally
-covers: [F8.2]
-tags: [legacy-imported, p1, tunnel]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+covers:
+- F8.2
+tags:
+- legacy-imported
+- p1
+- tunnel
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="app-main-menu"]'
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-tools"]'
-  - click: '[data-testid="context-menu-item-tunneling"]'
-  - wait_for: "[data-testid=\"tunnel-manager\"]"
-  - click: "[data-testid=\"tunnel-new\"]"
-  - wait_for: "[data-testid=\"tunnel-editor\"]"
-  - fill: {selector: "input[placeholder=\"e.g. postgres-replica\"]", value: qa-ui-auto-tunnel-auth}
-  - fill: {selector: "input[placeholder=\"ssh.example.com\"]", value: "${cfg.ssh.host}"}
-  - fill: {selector: "input[placeholder=\"user\"]", value: "${cfg.ssh.user}"}
-  - fill: {selector: "input[placeholder=\"22\"]", value: "${cfg.ssh.port}"}
-  - fill: {selector: 'input[placeholder="0"]', value: "19190"}
-  - fill: {selector: 'input[placeholder="db.internal"]', value: 127.0.0.1}
-  - fill: {selector: 'input[placeholder="5432"]', value: '5432'}
-  - click: '[data-testid="tunnel-editor-save"]'
-  - wait: 1
-  - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-ui-auto-tunnel-auth\""
-  - click: '[data-testid="tunnel-manager"] tr:has-text("qa-ui-auto-tunnel-auth") button[title*="credentials" i]'
-  - wait: 1
-  - seed_dialog: {confirm: true}
-  - screenshot: 046-tunnel-auth-display.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="app-main-menu"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-tunneling"]'
+- wait_for: '[data-testid="tunnel-manager"]'
+- click: '[data-testid="tunnel-new"]'
+- wait_for: '[data-testid="tunnel-editor"]'
+- fill:
+    selector: input[placeholder="e.g. postgres-replica"]
+    value: qa-ui-auto-tunnel-auth
+- fill:
+    selector: input[placeholder="ssh.example.com"]
+    value: ${cfg.ssh.host}
+- fill:
+    selector: input[placeholder="user"]
+    value: ${cfg.ssh.user}
+- fill:
+    selector: input[placeholder="22"]
+    value: ${cfg.ssh.port}
+- fill:
+    selector: input[placeholder="0"]
+    value: '19190'
+- fill:
+    selector: input[placeholder="db.internal"]
+    value: 127.0.0.1
+- fill:
+    selector: input[placeholder="5432"]
+    value: '5432'
+- click: '[data-testid="tunnel-editor-save"]'
+- wait: 1
+- wait_for: '[data-testid="tunnel-manager"] >> text="qa-ui-auto-tunnel-auth"'
+- click: '[data-testid="tunnel-manager"] tr:has-text("qa-ui-auto-tunnel-auth") button[title*="credentials" i]'
+- assert_attribute:
+    selector: '[data-testid="tunnel-row-toggle-reveal"]'
+    name: title
+    equals: Hide credentials
+- click: '[data-testid="tunnel-row-toggle-reveal"]'
+- assert_attribute:
+    selector: '[data-testid="tunnel-row-toggle-reveal"]'
+    name: title
+    equals: Show credentials
+- wait: 1
+- seed_dialog:
+    confirm: true
+- screenshot: 046-tunnel-auth-display.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 隧道行凭据显示与隐藏按钮提示随实际操作往返
+    actions:
+    - 19
+    - 21
+    checkpoints:
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tunnel-row-toggle-reveal\"]", "name": "title",
+        "equals": "Hide credentials"}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tunnel-row-toggle-reveal\"]", "name": "title",
+        "equals": "Show credentials"}}'
+    results:
+    - 22
+  visual:
+  - check: 检查截图中表格列、行名、按钮不重叠/截断，排序或操作反馈可见。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图记录评审。
+  native:
+  - check: 本用例只验证浏览器渲染交互；系统级输入、桌面窗口与真实持久化需独立 native 验证。
+    method: external
+    reason: 按实际执行模式与指定边界解释证据。

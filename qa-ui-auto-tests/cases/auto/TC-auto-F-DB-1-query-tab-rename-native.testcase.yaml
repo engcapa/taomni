@@ -1,101 +1,181 @@
 id: TC-auto-F-DB-1-query-tab-rename-native
 title: Native query tab rename connects MySQL, records history and survives a WebView reload
-description: |
-  Creates a real MySQL session against the configured QA database, renames the
+description: 'Creates a real MySQL session against the configured QA database, renames the
+
   query tab, runs a statement, verifies the history name chip, then reloads the
+
   WebView and reopens the session to prove the custom name is restored from the
+
   QA application SQLite workspace. Cross-platform native target (Linux, macOS, Windows).
-covers: [F-DB-1]
-tags: [database, sql, query-tab, rename, persistence, native-boundary, needs-review]
-modes: [native]
-native_platforms: [Linux, macOS, Windows]
-fixtures: [reset_db, mysql_required]
+
+  '
+covers:
+- F-DB-1
+tags:
+- database
+- sql
+- query-tab
+- rename
+- persistence
+- native-boundary
+- needs-review
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- mysql_required
 timeout_sec: 300
 steps:
-  - open: ${cfg.app.base_url}
-  - vault_first_run: qa-native-rename-password
-  - wait_for: '[data-testid="welcome-panel"]'
-  # Expand the Sessions panel idempotently on every native OS. The
-  # in-bar app menu is hidden on native macOS by design, so switch away
-  # first: a bare side-tab-sessions click would toggle-collapse a fresh
-  # profile instead of selecting.
-  - click: '[data-testid="side-tab-tools"]'
-  - click: '[data-testid="side-tab-sessions"]'
-  - wait_for: '[data-testid="session-tree"]'
-  - wait_for: '[data-testid="session-new"]'
-  - click: '[data-testid="session-new"]'
-  - wait_for: '[data-testid="session-editor"]'
-  - click: '[data-testid="session-proto-mysql"]'
-  - wait_for:
-      selector: '[data-testid="session-database-section"]'
-      timeout_sec: 10
-  - fill:
-      selector: '[data-testid="session-host"]'
-      value: ${cfg.database.host}
-  - fill:
-      selector: '[data-testid="session-port"]'
-      value: "${cfg.database.port}"
-  - fill:
-      selector: 'input[aria-label="Database username"]'
-      value: ${cfg.database.user}
-  - fill:
-      selector: 'input[aria-label="Database password"]'
-      value: ${cfg.database.password}
-  - fill:
-      selector: 'input[aria-label="Database name"]'
-      value: ${cfg.database.database}
-  # Store the password in the initialized vault so reopening the session can connect.
-  - click: '[data-testid="db-save-in-vault"]'
-  - click: '[data-testid="session-section-bookmark"]'
-  - wait_for: '[data-testid="bookmark-settings"]'
-  - fill:
-      selector: '[data-testid="session-name"]'
-      value: qa-ui-auto-rename-native
-  - click: '[data-testid="session-save"]'
-  # A fresh QA profile has an empty vault: the on-demand gate asks for a master
-  # password before the save can store the DB password reference.
-  - wait_for:
-      selector: '[data-testid="vault-setup-pw1"]'
-      timeout_sec: 15
-  - fill:
-      selector: '[data-testid="vault-setup-pw1"]'
-      value: qa-native-rename-master
-  - fill:
-      selector: '[data-testid="vault-setup-pw2"]'
-      value: qa-native-rename-master
-  - click: '[data-testid="vault-setup-confirm"]'
-  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rename-native"]'
-  - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rename-native"]'
-  - wait_for:
-      selector: '[data-testid="db-query-tab"]'
-      timeout_sec: 60
-  - assert_not_visible: '[data-testid="db-connection-error-banner"]'
-  - wait: 2
-  - dblclick: '[data-testid="db-query-tab"]'
-  - wait_for: '[data-testid="db-query-tab-input"]'
-  - wait: 1
-  - type: native-orders
-  - press: Enter
-  - assert_text:
-      selector: '[data-testid="db-query-tab"]'
-      contains: native-orders
-  - click: '[data-testid="sql-editor"] .cm-content'
-  - type: select 1
-  - click: '[data-testid="db-run-current-statement"]'
-  - wait_for:
-      selector: '[data-testid="query-result-grid"]'
-      timeout_sec: 60
-  - click: '[data-testid="db-query-history-toggle"]'
-  - wait_for:
-      selector: '[data-testid="db-query-history-entry"]'
-      timeout_sec: 30
-  - assert_text:
-      selector: '[data-testid="db-query-history-entry-name"]'
-      contains: native-orders
-  # The query workspace snapshot (including the custom tab name) autosaves on
-  # a 5s cadence plus a debounce; the restore half of this pair runs after an
-  # app restart and can only see it once a tick has landed. Wait past one
-  # cadence before the case ends, so the persisted row is deterministic
-  # instead of racing the harness teardown.
-  - wait: 8
-  - screenshot: native-query-tab-rename-history.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-rename-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.database.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.database.port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.database.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.database.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.database.database}
+- click: '[data-testid="db-save-in-vault"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-rename-native
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-pw1"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-native-rename-master
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-native-rename-master
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rename-native"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rename-native"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- wait: 2
+- dblclick: '[data-testid="db-query-tab"]'
+- wait_for: '[data-testid="db-query-tab-input"]'
+- wait: 1
+- type: native-orders
+- press: Enter
+- assert_text:
+    selector: '[data-testid="db-query-tab"]'
+    contains: native-orders
+- click: '[data-testid="sql-editor"] .cm-content'
+- type: select 1
+- click: '[data-testid="db-run-current-statement"]'
+- wait_for:
+    selector: '[data-testid="query-result-grid"]'
+    timeout_sec: 60
+- click: '[data-testid="db-query-history-toggle"]'
+- wait_for:
+    selector: '[data-testid="db-query-history-entry"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="db-query-history-entry-name"]'
+    contains: native-orders
+- wait: 8
+- screenshot: native-query-tab-rename-history.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native query tab rename connects MySQL, records history and survives a WebView reload：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 27
+    - 31
+    - 34
+    - 35
+    - 37
+    - 38
+    - 39
+    - 41
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]", "timeout_sec": 10}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-pw1\"]", "timeout_sec": 15}}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-rename-native\"]"}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-tab\"]", "timeout_sec": 60}}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"db-connection-error-banner\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"db-query-tab-input\"]"}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-query-tab\"]", "contains": "native-orders"}}'
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"query-result-grid\"]", "timeout_sec": 60}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-history-entry\"]", "timeout_sec": 30}}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-query-history-entry-name\"]", "contains": "native-orders"}}'
+    results:
+    - 42
+    - 43
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

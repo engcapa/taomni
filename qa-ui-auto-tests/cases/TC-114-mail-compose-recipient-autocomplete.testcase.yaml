@@ -1,63 +1,136 @@
 id: TC-114
 title: Mail compose recipient autocomplete and current-domain completion
-description: |
-  Opens a browser-stub Mail tab through QuickConnect, opens the compose dialog,
+description: 'Opens a browser-stub Mail tab through QuickConnect, opens the compose dialog,
+
   accepts one cached contact suggestion, then verifies that an unmatched
+
   local-part ending in @ offers the current account domain and accepts it with
+
   Tab.
-covers: [F-MAIL-1]
-tags: [mail, smoke, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-MAIL-1
+tags:
+- mail
+- smoke
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="status-bar"]'
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - wait_for: '[data-testid="quick-connect"]'
-  - fill:
-      selector: '[data-testid="qc-input"]'
-      value: 'mail://san.zhang%40yourmail.com@imap.yourmail.com:993'
-  - click: '[data-testid="qc-submit"]'
-  - wait_for: '[data-testid="mail-client-tab"]'
-  - click: '[data-testid="mail-compose-open"]'
-  - wait_for: '[data-testid="mail-compose-dialog"]'
-  - assert_visible: '[data-testid="mail-recipient-to"]'
-  - assert_visible: '[data-testid="mail-recipient-cc"]'
-  - assert_visible: '[data-testid="mail-recipient-bcc"]'
-  - fill:
-      selector: '[data-testid="mail-recipient-to"] input'
-      value: 'ops'
-  - wait_for: '[data-testid="mail-recipient-suggestion"]'
-  - assert_text:
-      selector: '[data-testid="mail-recipient-suggestions"]'
-      contains: 'ops@example.com'
-  - click: '[data-testid="mail-recipient-suggestion"]'
-  - assert_visible: '[data-testid="mail-recipient-chip"]'
-  - assert_text:
-      selector: '[data-testid="mail-recipient-to"]'
-      contains: 'ops@example.com'
-  - fill:
-      selector: '[data-testid="mail-recipient-cc"] input'
-      value: 'si.li@'
-  - wait_for: '[data-testid="mail-recipient-suggestion"]'
-  - assert_text:
-      selector: '[data-testid="mail-recipient-suggestions"]'
-      contains: 'si.li@yourmail.com'
-  - assert_text:
-      selector: '[data-testid="mail-recipient-suggestions"]'
-      contains: 'current domain'
-  - press: Tab
-  - assert_text:
-      selector: '[data-testid="mail-recipient-cc"]'
-      contains: 'si.li@yourmail.com'
-  - fill:
-      selector: '[data-testid="mail-recipient-bcc"] input'
-      value: 'audit@example.com'
-  - press: Enter
-  - assert_text:
-      selector: '[data-testid="mail-recipient-bcc"]'
-      contains: 'audit@example.com'
-  - screenshot: mail-114-recipient-autocomplete.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="quick-connect"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: mail://san.zhang%40yourmail.com@imap.yourmail.com:993
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- click: '[data-testid="mail-compose-open"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- assert_visible: '[data-testid="mail-recipient-to"]'
+- assert_visible: '[data-testid="mail-recipient-cc"]'
+- assert_visible: '[data-testid="mail-recipient-bcc"]'
+- fill:
+    selector: '[data-testid="mail-recipient-to"] input'
+    value: ops
+- wait_for: '[data-testid="mail-recipient-suggestion"]'
+- assert_text:
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    contains: ops@example.com
+- click: '[data-testid="mail-recipient-suggestion"]'
+- assert_visible: '[data-testid="mail-recipient-chip"]'
+- assert_text:
+    selector: '[data-testid="mail-recipient-to"]'
+    contains: ops@example.com
+- fill:
+    selector: '[data-testid="mail-recipient-cc"] input'
+    value: si.li@
+- wait_for: '[data-testid="mail-recipient-suggestion"]'
+- assert_text:
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    contains: si.li@yourmail.com
+- assert_text:
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    contains: current domain
+- press: Tab
+- assert_text:
+    selector: '[data-testid="mail-recipient-cc"]'
+    contains: si.li@yourmail.com
+- fill:
+    selector: '[data-testid="mail-recipient-bcc"] input'
+    value: audit@example.com
+- press: Enter
+- assert_text:
+    selector: '[data-testid="mail-recipient-bcc"]'
+    contains: audit@example.com
+- screenshot: mail-114-recipient-autocomplete.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Mail compose recipient autocomplete and current-domain completion：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 4
+    - 5
+    - 7
+    - 8
+    - 10
+    - 15
+    - 18
+    - 21
+    - 25
+    - 27
+    - 28
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"quick-connect\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"mail-compose-dialog\"]"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"mail-recipient-to\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"mail-recipient-cc\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"mail-recipient-bcc\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"mail-recipient-suggestion\"]"}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-recipient-suggestions\"]", "contains": "ops@example.com"}}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"mail-recipient-chip\"]"}'
+    - step: 20
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-recipient-to\"]", "contains": "ops@example.com"}}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"mail-recipient-suggestion\"]"}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-recipient-suggestions\"]", "contains": "si.li@yourmail.com"}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-recipient-suggestions\"]", "contains": "current
+        domain"}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-recipient-cc\"]", "contains": "si.li@yourmail.com"}}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-recipient-bcc\"]", "contains": "audit@example.com"}}'
+    results:
+    - 29
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

@@ -63,6 +63,9 @@ def lint_cases(cases_dir: Path) -> tuple[int, int, list[str]]:
             all_errors.append(f"{path}: YAML parse error: {e}")
             continue
         errs = _validate(doc, TESTCASE_SCHEMA, str(path))
+        if not errs:
+            from .behavior_contract import validate_contract
+            errs.extend(f"{path}: {error}" for error in validate_contract(doc))
         all_errors.extend(errs)
         if errs:
             continue

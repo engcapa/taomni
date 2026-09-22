@@ -1,17 +1,55 @@
 id: TC-005
 title: Local terminal opens and accepts input in native mode
-covers: [F2.1, F2.2]
-tags: [legacy-imported, local, p0, terminal]
-modes: [native]
-fixtures: [reset_db]
+covers:
+- F2.1
+- F2.2
+tags:
+- legacy-imported
+- local
+- p0
+- terminal
+modes:
+- native
+fixtures:
+- reset_db
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"welcome-open-local-terminal\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 1
-  - click: "[data-testid=\"terminal-pane\"]"
-  - type: echo qa-ui-auto-local
-  - press: Enter
-  - wait: 2
-  - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-ui-auto-local}
-  - screenshot: 005-local-terminal.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 1
+- click: '[data-testid="terminal-pane"]'
+- type: echo qa-ui-auto-local
+- press: Enter
+- wait: 2
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-ui\-auto\-local\r?$
+    timeout_sec: 15
+- screenshot: 005-local-terminal.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 本机终端打开后接受键盘命令，输出独立的精确结果行。
+    actions:
+    - 1
+    - 2
+    - 5
+    - 6
+    - 7
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 9
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ui\\-auto\\-local\\r?$",
+        "timeout_sec": 15}}'
+    results:
+    - 9
+  visual:
+  - check: 终端字体、提示符与光标不重叠。
+    method: manual
+    reason: 截图必须单独评审，不能由功能步骤通过推导视觉通过。
+  native:
+  - check: native 模式验证当前 Linux 的本地进程与 PTY；Windows/macOS 未验证。
+    method: automated
+    reason: 按实际执行模式解释；其他平台不继承 Linux 证据。

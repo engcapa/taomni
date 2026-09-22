@@ -1,32 +1,77 @@
 id: TC-103
 title: Common commands palette opens, filters, and dismisses
-description: |
-  Smoke test for F4.12. Open a local terminal, invoke the palette via its
+description: 'Smoke test for F4.12. Open a local terminal, invoke the palette via its
+
   shortcut (Ctrl+Shift+P) or right-click → "Common commands", filter the
+
   list, then close with Escape.
-covers: [F4.12]
-tags: [smoke, p1, terminal, palette]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F4.12
+tags:
+- smoke
+- p1
+- terminal
+- palette
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 30
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-open-local-terminal"]'
-  - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 15
-  - click: '[data-testid="terminal-pane"]'
-  - press: Control+Shift+P
-  - wait_for:
-      selector: '[data-testid="commands-palette"]'
-      timeout_sec: 5
-  - assert_visible: '[data-testid="commands-search"]'
-  - assert_visible: '[data-testid="commands-list"]'
-  - fill:
-      selector: '[data-testid="commands-search"]'
-      value: "ls"
-  - wait: 0.5
-  - press: Escape
-  - assert_not_visible: '[data-testid="commands-palette"]'
-  - screenshot: 103-commands-palette.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 15
+- click: '[data-testid="terminal-pane"]'
+- press: Control+Shift+P
+- wait_for:
+    selector: '[data-testid="commands-palette"]'
+    timeout_sec: 5
+- assert_visible: '[data-testid="commands-search"]'
+- assert_visible: '[data-testid="commands-list"]'
+- fill:
+    selector: '[data-testid="commands-search"]'
+    value: ls
+- wait: 0.5
+- press: Escape
+- assert_not_visible: '[data-testid="commands-palette"]'
+- screenshot: 103-commands-palette.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Common commands palette opens, filters, and dismisses：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 10
+    - 12
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 15}}'
+    - step: 7
+      expectation: '{"wait_for": {"selector": "[data-testid=\"commands-palette\"]", "timeout_sec": 5}}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"commands-search\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"commands-list\"]"}'
+    - step: 13
+      expectation: '{"assert_not_visible": "[data-testid=\"commands-palette\"]"}'
+    results:
+    - 13
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

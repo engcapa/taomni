@@ -1,23 +1,80 @@
 id: TC-034
 title: Status bar reflects active terminal count and theme label
-covers: [F1.7]
-tags: [legacy-imported, main, p1, status-bar]
-modes: [browser, native]
-fixtures: [reset_db]
+covers:
+- F1.7
+tags:
+- legacy-imported
+- main
+- p1
+- status-bar
+modes:
+- browser
+- native
+fixtures:
+- reset_db
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: "[data-testid=\"status-bar\"]"
-  - assert_text: {selector: "[data-testid=\"status-bar\"]", contains: "Theme:"}
-  - assert_text: {selector: "[data-testid=\"status-bar\"]", contains: sessions}
-  - assert_text: {selector: "[data-testid=\"status-bar\"]", contains: terminals}
-  - click: "[data-testid=\"welcome-open-local-terminal\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 1
-  - assert_text: {selector: "[data-testid=\"status-bar\"]", contains: 1 terminals}
-  - click: "[data-testid=\"new-local-terminal\"]"
-  - wait: 1
-  - assert_text: {selector: "[data-testid=\"status-bar\"]", contains: 2 terminals}
-  - click: "button[aria-label=\"Cycle application theme\"]"
-  - wait: 1
-  - assert_text: {selector: "[data-testid=\"status-bar\"]", contains: "Theme:"}
-  - screenshot: 034-status-bar-counts.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: 'Theme:'
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: sessions
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: terminals
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 1
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: 1 terminals
+- click: '[data-testid="new-local-terminal"]'
+- wait: 1
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: 2 terminals
+- click: button[aria-label="Cycle application theme"]
+- wait: 1
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: 'Theme:'
+- screenshot: 034-status-bar-counts.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Status bar reflects active terminal count and theme label：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 6
+    - 10
+    - 13
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 3
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Theme:"}}'
+    - step: 4
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "sessions"}}'
+    - step: 5
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "terminals"}}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "1 terminals"}}'
+    - step: 12
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "2 terminals"}}'
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Theme:"}}'
+    results:
+    - 15
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

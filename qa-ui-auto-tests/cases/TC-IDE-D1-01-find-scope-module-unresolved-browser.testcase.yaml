@@ -1,50 +1,112 @@
 id: TC-IDE-D1-01-find-scope-module-unresolved-browser
-title: "Find scope selector with unresolved module notice in browser"
-description: |
-  Browser gate case (ED-FIND-003 A1/A3). Opens the Find in Files panel,
+title: Find scope selector with unresolved module notice in browser
+description: 'Browser gate case (ED-FIND-003 A1/A3). Opens the Find in Files panel,
+
   asserts the Project/Module/Directory scope selector, switches to Module
+
   scope, and proves fail-closed: the stub preview has no ready facts, so the
+
   panel renders the unresolved scope notice with its reason and never starts
+
   a backend search. Real search, masks, and cancel are covered by unit tests
+
   and the native provider gate.
-covers: [F25.5]
-tags: [code-workspace, ide-find, find-scope, browser-gate, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-find
+- find-scope
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 180
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - press: Control+Shift+F
-  - wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
-  - assert_visible: '[data-testid="code-workspace-find-scope-select"]'
-  - select_option:
-      selector: '[data-testid="code-workspace-find-scope-select"]'
-      label: "Module"
-  - assert_visible: '[data-testid="code-workspace-find-scope-notice"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-find-scope-notice"]'
-      contains: "build backend"
-      timeout_sec: 10
-  # Directory scope exposes a separate target input; keep the module failure
-  # assertion above and verify this renderer-owned scope control independently.
-  - select_option:
-      selector: '[data-testid="code-workspace-find-scope-select"]'
-      label: "Directory"
-  - assert_visible: '[data-testid="code-workspace-find-directory-input"]'
-  - fill:
-      selector: '[data-testid="code-workspace-find-directory-input"]'
-      value: src
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-find-directory-input"]'
-      name: value
-      equals: src
-  - screenshot: tc-ide-d1-01-scope-unresolved.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- press: Control+Shift+F
+- wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
+- assert_visible: '[data-testid="code-workspace-find-scope-select"]'
+- select_option:
+    selector: '[data-testid="code-workspace-find-scope-select"]'
+    label: Module
+- assert_visible: '[data-testid="code-workspace-find-scope-notice"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-find-scope-notice"]'
+    contains: build backend
+    timeout_sec: 10
+- select_option:
+    selector: '[data-testid="code-workspace-find-scope-select"]'
+    label: Directory
+- assert_visible: '[data-testid="code-workspace-find-directory-input"]'
+- fill:
+    selector: '[data-testid="code-workspace-find-directory-input"]'
+    value: src
+- assert_attribute:
+    selector: '[data-testid="code-workspace-find-directory-input"]'
+    name: value
+    equals: src
+- screenshot: tc-ide-d1-01-scope-unresolved.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Find scope selector with unresolved module notice in browser：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 14
+    - 17
+    - 19
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-find-in-files-panel\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-find-scope-select\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-find-scope-notice\"]"}'
+    - step: 16
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-scope-notice\"]", "contains":
+        "build backend", "timeout_sec": 10}}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-find-directory-input\"]"}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-find-directory-input\"]", "name":
+        "value", "equals": "src"}}'
+    results:
+    - 20
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

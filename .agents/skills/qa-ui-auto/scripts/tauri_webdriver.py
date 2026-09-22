@@ -559,6 +559,9 @@ class NativeSession:
         return len(elements)
 
     def right_click(self, selector: str) -> str:
+        return self.pointer_button_click(selector, 2)
+
+    def pointer_button_click(self, selector: str, button: int) -> str:
         element = self.find(selector, interactive=True)
         origin = {"element-6066-11e4-a52e-4f735466cecf": element}
         # Scroll only; dispatch the actual context click through W3C input.
@@ -572,13 +575,13 @@ class NativeSession:
                 "parameters": {"pointerType": "mouse"},
                 "actions": [
                     {"type": "pointerMove", "duration": 0, "origin": origin, "x": 0, "y": 0},
-                    {"type": "pointerDown", "button": 2},
-                    {"type": "pointerUp", "button": 2},
+                    {"type": "pointerDown", "button": button},
+                    {"type": "pointerUp", "button": button},
                 ],
             }]})
         finally:
             self.request("DELETE", self.endpoint("/actions"))
-        return f"right-clicked {selector}"
+        return f"pointer button {button} clicked {selector}"
 
     def focus(self, selector: str) -> str:
         """Focus for locator-scoped keys without activating a button/tree row."""

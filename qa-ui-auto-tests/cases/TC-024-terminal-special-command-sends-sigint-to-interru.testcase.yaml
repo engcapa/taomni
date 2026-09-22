@@ -1,41 +1,109 @@
 id: TC-024
 title: Terminal Special Command sends SIGINT to interrupt foreground process
-covers: [F3.1]
-tags: [legacy-imported, p1, signal, terminal]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+covers:
+- F3.1
+tags:
+- legacy-imported
+- p1
+- signal
+- terminal
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - wait_for: '[data-testid="qc-input"]'
-  - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
-  - click: "[data-testid=\"qc-submit\"]"
-  - wait_for: "[data-testid=\"auth-prompt\"]"
-  - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
-  - click: "[data-testid=\"auth-submit\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait_for:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-      timeout_sec: 20
-  - terminal_input:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-      text: "sleep 60 && echo qa-should-not-appear"
-      submit: true
-  - wait: 1
-  - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - hover: '[data-testid="context-menu"] >> text=Special Command'
-  - wait_for: "[data-testid=\"context-menu\"] >> text=\"SIGINT (Interrupt)\""
-  - click: "[data-testid=\"context-menu\"] >> text=\"SIGINT (Interrupt)\""
-  - wait_for:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-      timeout_sec: 20
-  - terminal_input:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-      text: echo qa-after-sigint
-      submit: true
-  - wait: 1
-  - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-after-sigint}
-  - screenshot: 024-terminal-sigint.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 20
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: sleep 60 && echo qa-should-not-appear
+    submit: true
+- wait: 1
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- hover: '[data-testid="context-menu"] >> text=Special Command'
+- wait_for: '[data-testid="context-menu"] >> text="SIGINT (Interrupt)"'
+- click: '[data-testid="context-menu"] >> text="SIGINT (Interrupt)"'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 20
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo qa-after-sigint
+    submit: true
+- wait: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-after\-sigint\r?$
+    timeout_sec: 15
+- screenshot: 024-terminal-sigint.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 向运行中的 sleep 发送 SIGINT 后，后续命令在15秒内产生独立精确输出，证明不再等待60秒。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 9
+    - 10
+    - 13
+    - 15
+    - 17
+    - 19
+    - 21
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 12
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
+        "timeout_sec": 20}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"] >> text=\"SIGINT (Interrupt)\""}'
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
+        "timeout_sec": 20}}'
+    - step: 23
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-after\\-sigint\\r?$",
+        "timeout_sec": 15}}'
+    results:
+    - 23
+  visual:
+  - check: 特殊命令子菜单无越界遮挡。
+    method: manual
+    reason: 截图必须单独评审，不能由功能步骤通过推导视觉通过。
+  native:
+  - check: 真实 SSH 远端进程信号由桥接服务执行；本机 PTY 信号另需 native。
+    method: external
+    reason: 按实际执行模式解释；其他平台不继承 Linux 证据。

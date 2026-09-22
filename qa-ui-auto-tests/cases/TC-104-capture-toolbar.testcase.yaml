@@ -1,27 +1,67 @@
 id: TC-104
 title: Capture toolbar mounts and exposes the camera menu
-description: |
-  Smoke test for F4.13 (capture/screenshot/GIF). Open a local terminal,
+description: 'Smoke test for F4.13 (capture/screenshot/GIF). Open a local terminal,
+
   verify the FloatingToolbar→CaptureToolbar mounts, click the camera
+
   dropdown to expose the menu, then dismiss.
-covers: [F4.13]
-tags: [smoke, p1, terminal, capture]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F4.13
+tags:
+- smoke
+- p1
+- terminal
+- capture
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 30
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-open-local-terminal"]'
-  - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 15
-  - wait_for:
-      selector: '[data-testid="capture-toolbar"]'
-      timeout_sec: 5
-  - assert_visible: '[data-testid="capture-menu"]'
-  - click: '[data-testid="capture-menu"]'
-  - wait: 0.5
-  - assert_visible: '[data-testid="capture-menu-dropdown"] >> text=Save visible PNG'
-  - press: Escape
-  - screenshot: 104-capture-toolbar.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 15
+- wait_for:
+    selector: '[data-testid="capture-toolbar"]'
+    timeout_sec: 5
+- assert_visible: '[data-testid="capture-menu"]'
+- click: '[data-testid="capture-menu"]'
+- wait: 0.5
+- assert_visible: '[data-testid="capture-menu-dropdown"] >> text=Save visible PNG'
+- press: Escape
+- screenshot: 104-capture-toolbar.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Capture toolbar mounts and exposes the camera menu：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 7
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 15}}'
+    - step: 5
+      expectation: '{"wait_for": {"selector": "[data-testid=\"capture-toolbar\"]", "timeout_sec": 5}}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"capture-menu\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"capture-menu-dropdown\"] >> text=Save visible PNG"}'
+    results:
+    - 9
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

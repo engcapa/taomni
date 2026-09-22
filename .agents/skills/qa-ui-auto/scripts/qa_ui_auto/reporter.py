@@ -86,6 +86,17 @@ def write_markdown(report_root: Path, data: dict[str, Any]) -> Path:
             f"| {c.get('duration_sec', 0):.1f}s | {notes} |"
         )
     failures = [c for c in cases if c["status"] == "failed"]
+    mapped = [c for c in cases if c.get("verification", {}).get("requirements")]
+    if mapped:
+        lines.extend(["", "## Requirement checkpoints", "",
+                      "Static review and runtime results are separate. Boundary checklists are not passes.", "",
+                      "| Case | Requirement | Review | Execution | Step evidence |",
+                      "|---|---|---|---|---|"])
+        for case in mapped:
+            verification = case["verification"]
+            for req in verification["requirements"]:
+                refs = ", ".join(f"{e['step']}:{e['status']}" for e in req["evidence"])
+                lines.append(f"| {case['id']} | {req['id']} | {verification['review']} | {req['status']} | {refs} |")
     slow_steps = sorted(
         [(c['id'], step) for c in cases for step in c.get('step_timings', [])],
         key=lambda item: item[1]['duration_sec'], reverse=True,

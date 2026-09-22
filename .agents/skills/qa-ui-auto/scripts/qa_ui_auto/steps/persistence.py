@@ -41,11 +41,9 @@ def step_reload_window(ctx: StepContext, args: Any) -> None:
     _ = args
     if ctx.dry_run:
         return
-    # Defer through setTimeout: a synchronous reload inside evaluate would
-    # never return (the document tears down mid-call).
-    ctx.page.evaluate(  # type: ignore[attr-defined]
-        "() => { window.setTimeout(() => window.location.reload(), 0); }"
-    )
+    # Wait for the new document. Looking for the old welcome panel immediately
+    # after setTimeout(location.reload) can return before navigation starts.
+    ctx.page.reload(wait_until="domcontentloaded")  # type: ignore[attr-defined]
     try:
         ctx.page.wait_for_selector("[data-testid='welcome-panel']", timeout=30_000)  # type: ignore[attr-defined]
     except Exception as e:  # noqa: BLE001

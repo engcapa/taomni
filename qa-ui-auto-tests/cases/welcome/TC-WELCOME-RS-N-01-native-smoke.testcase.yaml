@@ -1,46 +1,95 @@
 id: TC-WELCOME-RS-N-01-native-smoke
-title: "Linux native smoke: restore empty state, real local PTY launch, snapshot commit"
-description: |
-  V-10 Linux slice (design docs-feature/welcome-recents-session-restore-design.md
+title: 'Linux native smoke: restore empty state, real local PTY launch, snapshot commit'
+description: 'V-10 Linux slice (design docs-feature/welcome-recents-session-restore-design.md
+
   §8). Fresh isolated app-data: the restore entry starts empty/disabled;
+
   opening a real host local terminal through the Welcome directory entry
+
   produces a genuine WebKitGTK/PTY tab; the run-snapshot collector commits the
+
   saved LocalShell tab into taomni.db, verified on disk after the case.
-covers: [F1.6]
-tags: [welcome, native-gate, p1, needs-review]
-modes: [native]
-fixtures: [reset_db]
+
+  '
+covers:
+- F1.6
+tags:
+- welcome
+- native-gate
+- p1
+- needs-review
+modes:
+- native
+fixtures:
+- reset_db
 timeout_sec: 420
 steps:
-  - open: "${cfg.app.base_url}"
-  - vault_first_run: "qa-native-gate-password"
-  - wait_for: '[data-testid="welcome-panel"]'
-
-  # Fresh profile: restore entry is empty and disabled.
-  - wait_for:
-      selector: '[data-testid="welcome-restore-status"][data-state="empty"]'
-      timeout_sec: 30
-  - assert_attribute: {selector: '[data-testid="welcome-restore-last-session"]', name: disabled, equals: ''}
-
-  # Real local terminal through the Welcome local-terminal entry.
-  - click: '[data-testid="welcome-open-local-terminal"]'
-  - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 30
-
-  # Promote the terminal into a saved LocalShell session so the collector
-  # commits a snapshot: switch back to Welcome and open the directories tab.
-  - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-directories"]'
-  - wait_for: '[data-testid="welcome-local-directories"]'
-  - assert_visible: '[data-testid="welcome-local-directory"]'
-  - assert_visible: '[data-testid="welcome-local-directory-filter"]'
-  - screenshot: F1.6-native-welcome-directories.png
-
-  # Back on the Welcome tab: the live local terminal without a saved id must
-  # NOT make the restore entry available by itself (it lacks a confirmed-cwd
-  # whitelist entry only after OSC reporting; report what the state is).
-  - wait: 2
-  - assert_visible: '[data-testid="welcome-restore-status"]'
-  - screenshot: F1.6-native-restore-state.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- wait_for:
+    selector: '[data-testid="welcome-restore-status"][data-state="empty"]'
+    timeout_sec: 30
+- assert_attribute:
+    selector: '[data-testid="welcome-restore-last-session"]'
+    name: disabled
+    equals: ''
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 30
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-directories"]'
+- wait_for: '[data-testid="welcome-local-directories"]'
+- assert_visible: '[data-testid="welcome-local-directory"]'
+- assert_visible: '[data-testid="welcome-local-directory-filter"]'
+- screenshot: F1.6-native-welcome-directories.png
+- wait: 2
+- assert_visible: '[data-testid="welcome-restore-status"]'
+- screenshot: F1.6-native-restore-state.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 'Linux native smoke: restore empty state, real local PTY launch, snapshot commit：按步骤执行后，所有声明的可观察结果均满足。'
+    actions:
+    - 1
+    - 2
+    - 6
+    - 8
+    - 10
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"empty\"]",
+        "timeout_sec": 30}}'
+    - step: 5
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-last-session\"]", "name":
+        "disabled", "equals": ""}}'
+    - step: 7
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"welcome-local-directories\"]"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"welcome-local-directory\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"welcome-local-directory-filter\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"welcome-restore-status\"]"}'
+    results:
+    - 11
+    - 12
+    - 13
+    - 16
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

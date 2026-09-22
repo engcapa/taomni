@@ -1,37 +1,107 @@
 id: TC-auto-F1-5-tab-details-overlay
 title: Visible tab details overlay and active detach menu
-description: |
-  Exercises all three detail-overlay entry points introduced for F1.5. A local
+description: 'Exercises all three detail-overlay entry points introduced for F1.5. A local
+
   terminal supplies a second visible tab; hovering one tab title reveals only
+
   its rich card, Ctrl+Shift+H toggles every viewport-visible card, and hovering
+
   the stacked-tabs info button reveals them as well. The case then verifies
+
   that Detach is discoverable from the Open Tabs menu.
-covers: [F1.5]
-tags: [auto-generated, smoke, needs-review, tabs, terminal]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F1.5
+tags:
+- auto-generated
+- smoke
+- needs-review
+- tabs
+- terminal
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 25
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="tab-bar"]'
-  - click: '[data-testid="new-local-terminal"]'
-  - wait_for: '[data-testid="terminal-pane"]'
-  - assert_count: {selector: '[data-testid="tab-item"]', min: 2}
-  - hover: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
-  - wait_for: '[data-testid="tab-details-overlay"]'
-  - assert_count: {selector: '[data-testid^="tab-details-card-"]', equal: 1}
-  - hover: '[data-testid="terminal-pane"]'
-  - assert_not_visible: '[data-testid="tab-details-overlay"]'
-  # Mod+Shift+H: product matches Meta on macOS, Control elsewhere.
-  - press: Mod+Shift+H
-  - assert_count: {selector: '[data-testid^="tab-details-card-"]', min: 2}
-  - press: Mod+Shift+H
-  - assert_not_visible: '[data-testid="tab-details-overlay"]'
-  - hover: '[data-testid="tab-details-hover"]'
-  - wait_for: '[data-testid="tab-details-overlay"]'
-  - assert_count: {selector: '[data-testid^="tab-details-card-"]', min: 2}
-  - click: '[data-testid="tab-more"]'
-  - wait_for: '[data-testid="open-tabs-menu"]'
-  - assert_visible: '[data-testid="open-tabs-detach-active"]'
-  - screenshot: f1-5-tab-details-overlay.png
-  - click: '[data-testid="open-tabs-detach-active"]'
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="tab-bar"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    min: 2
+- hover: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+- wait_for: '[data-testid="tab-details-overlay"]'
+- assert_count:
+    selector: '[data-testid^="tab-details-card-"]'
+    equal: 1
+- hover: '[data-testid="terminal-pane"]'
+- assert_not_visible: '[data-testid="tab-details-overlay"]'
+- press: Mod+Shift+H
+- assert_count:
+    selector: '[data-testid^="tab-details-card-"]'
+    min: 2
+- press: Mod+Shift+H
+- assert_not_visible: '[data-testid="tab-details-overlay"]'
+- hover: '[data-testid="tab-details-hover"]'
+- wait_for: '[data-testid="tab-details-overlay"]'
+- assert_count:
+    selector: '[data-testid^="tab-details-card-"]'
+    min: 2
+- click: '[data-testid="tab-more"]'
+- wait_for: '[data-testid="open-tabs-menu"]'
+- assert_visible: '[data-testid="open-tabs-detach-active"]'
+- screenshot: f1-5-tab-details-overlay.png
+- click: '[data-testid="open-tabs-detach-active"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Visible tab details overlay and active detach menu：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 6
+    - 9
+    - 11
+    - 13
+    - 15
+    - 18
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"tab-bar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 5
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 2}}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"tab-details-overlay\"]"}'
+    - step: 8
+      expectation: '{"assert_count": {"selector": "[data-testid^=\"tab-details-card-\"]", "equal": 1}}'
+    - step: 10
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-details-overlay\"]"}'
+    - step: 12
+      expectation: '{"assert_count": {"selector": "[data-testid^=\"tab-details-card-\"]", "min": 2}}'
+    - step: 14
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-details-overlay\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"tab-details-overlay\"]"}'
+    - step: 17
+      expectation: '{"assert_count": {"selector": "[data-testid^=\"tab-details-card-\"]", "min": 2}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"open-tabs-menu\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"open-tabs-detach-active\"]"}'
+    results:
+    - 19
+    - 20
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

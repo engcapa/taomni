@@ -1,34 +1,86 @@
 id: TC-NOTES-002
 title: Notes create, edit title, and complete
-description: |
-  Verifies the notes CRUD surface (F-TAO-1): New note opens the editor, the
+description: 'Verifies the notes CRUD surface (F-TAO-1): New note opens the editor, the
+
   title commits on blur, the note appears in the recent-incomplete list, and
+
   toggling it complete removes it from the default view (completed notes leave
+
   the recent-incomplete view). Browser preview persists via the localStorage
+
   notes.db stub.
-covers: [F-TAO-1]
-tags: [notes, tao, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-TAO-1
+tags:
+- notes
+- tao
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="status-bar"]'
-  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-  - click: '[data-testid="ai-chat-drawer-ribbon"]'
-  - wait_for: '[data-testid="ai-chat-drawer"]'
-  - click: '[data-testid="tao-hub-tab-notes"]'
-  - wait_for: '[data-testid="notes-panel"]'
-  # Create → the editor opens for the new (untitled) note.
-  - click: '[data-testid="notes-new"]'
-  - wait_for: '[data-testid="note-editor"]'
-  - fill: { selector: '[data-testid="note-editor-title"]', value: "QA note alpha" }
-  # Leaving the editor commits the title on blur.
-  - click: '[data-testid="note-editor-back"]'
-  - wait_for: '[data-testid="notes-panel"]'
-  - assert_text: { selector: '[data-testid="notes-list"]', contains: "QA note alpha" }
-  # Completing it drops the note from the recent-incomplete view.
-  - click: '[data-testid="notes-toggle-complete"]'
-  - wait: 0.5
-  - assert_not_visible: '[data-testid="notes-list"] >> text="QA note alpha"'
-  - screenshot: notes-002-create-complete.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- wait_for: '[data-testid="notes-panel"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: QA note alpha
+- click: '[data-testid="note-editor-back"]'
+- wait_for: '[data-testid="notes-panel"]'
+- assert_text:
+    selector: '[data-testid="notes-list"]'
+    contains: QA note alpha
+- click: '[data-testid="notes-toggle-complete"]'
+- wait: 0.5
+- assert_not_visible: '[data-testid="notes-list"] >> text="QA note alpha"'
+- screenshot: notes-002-create-complete.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Notes create, edit title, and complete：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 6
+    - 8
+    - 10
+    - 11
+    - 14
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"notes-panel\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"note-editor\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"notes-panel\"]"}'
+    - step: 13
+      expectation: '{"assert_text": {"selector": "[data-testid=\"notes-list\"]", "contains": "QA note alpha"}}'
+    - step: 16
+      expectation: '{"assert_not_visible": "[data-testid=\"notes-list\"] >> text=\"QA note alpha\""}'
+    results:
+    - 16
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

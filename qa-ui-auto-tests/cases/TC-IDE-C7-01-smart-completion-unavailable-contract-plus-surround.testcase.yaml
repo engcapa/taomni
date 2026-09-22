@@ -1,46 +1,110 @@
 id: TC-IDE-C7-01
-title: "Inspection heuristic label, syntax unavailable, Generate gate"
-description: |
-  §8.19.10 gate case C7 (heuristic/syntax portion). Capability ids:
+title: Inspection heuristic label, syntax unavailable, Generate gate
+description: '§8.19.10 gate case C7 (heuristic/syntax portion). Capability ids:
+
   inspection.heuristic-label / surround-generate.typed-unavailable.
+
   Provider Generate candidates need the fixture (provider mode). Browser
+
   verifies: analysis panel labels heuristic-only rows as heuristic, syntax
+
   highlighting reports its typed unavailable state for unsupported
+
   languages, and Surround/Generate actions expose explicit unavailable
+
   reasons instead of fake menus. Highest claim on green: L1
+
   unavailable-contract + heuristic labeling.
-covers: [F25.5]
-tags: [code-workspace, ide-c7, inspection, unavailable-contract, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c7
+- inspection
+- unavailable-contract
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 120
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  # Add the browser-VFS preview folder (/preview prefilled in the prompt).
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  # Open README.txt into the active leaf.
-  - dblclick: '[data-testid="code-workspace-tree-file"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - assert_visible: '[data-testid="code-workspace-editor-tab-strip"]'
-
-  - click: '[data-testid="code-workspace-bottom-tab-analysis"]'
-  - wait_for: '[data-testid="code-workspace-analysis-panel"]'
-  - screenshot: tc-ide-c7-analysis.png
-  # Terminal context menu: Syntax highlighting submenu marks non-JS/TS
-  # languages as disabled (typed unavailable, not hidden).
-  - click: '[data-testid="new-local-terminal"]'
-  - wait_for: '[data-testid="terminal-pane"]'
-  - right_click: {selector: '[data-testid="terminal-pane"]', position: {x: 40, y: 40}}
-  - wait_for: '[data-testid="context-menu"]'
-  - hover: '[data-testid="context-menu"] >> text=Syntax highlighting'
-  - assert_visible: '[data-testid="context-menu"] >> text="Perl syntax"'
-  - screenshot: tc-ide-c7-syntax-unavailable.png
-  - press: Escape
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- assert_visible: '[data-testid="code-workspace-editor-tab-strip"]'
+- click: '[data-testid="code-workspace-bottom-tab-analysis"]'
+- wait_for: '[data-testid="code-workspace-analysis-panel"]'
+- screenshot: tc-ide-c7-analysis.png
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 40
+      y: 40
+- wait_for: '[data-testid="context-menu"]'
+- hover: '[data-testid="context-menu"] >> text=Syntax highlighting'
+- assert_visible: '[data-testid="context-menu"] >> text="Perl syntax"'
+- screenshot: tc-ide-c7-syntax-unavailable.png
+- press: Escape
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Inspection heuristic label, syntax unavailable, Generate gate：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 14
+    - 17
+    - 19
+    - 21
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-analysis-panel\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Perl syntax\""}'
+    results:
+    - 22
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

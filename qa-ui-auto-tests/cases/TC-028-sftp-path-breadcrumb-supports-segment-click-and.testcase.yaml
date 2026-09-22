@@ -1,38 +1,207 @@
 id: TC-028
 title: SFTP path breadcrumb supports segment click and inline editing
-covers: [F7.2]
-tags: [breadcrumb, legacy-imported, navigation, p1, sftp]
-modes: [browser]
-fixtures: [reset_db, ssh_required, sftp_required]
+covers:
+- F7.2
+tags:
+- breadcrumb
+- legacy-imported
+- navigation
+- p1
+- sftp
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
+- sftp_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - wait_for: '[data-testid="qc-input"]'
-  - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
-  - click: "[data-testid=\"qc-submit\"]"
-  - wait_for: "[data-testid=\"auth-prompt\"]"
-  - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
-  - click: "[data-testid=\"auth-submit\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 2
-  - click: "[data-testid=\"attached-sftp-toggle\"]"
-  - wait_for: "[data-testid=\"sftp-browser\"]"
-  - click: "[data-testid=\"sftp-remote-path\"]"
-  - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
-  - press: Enter
-  - wait: 1
-  - click: "[data-testid=\"sftp-remote-up\"]"
-  - wait: 1
-  - click: "[data-testid=\"sftp-remote-up\"]"
-  - wait: 1
-  - click: "[data-testid=\"sftp-remote-back\"]"
-  - wait: 1
-  - click: "[data-testid=\"sftp-remote-forward\"]"
-  - wait: 1
-  - click: "[data-testid=\"sftp-remote-path\"]"
-  - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: /}
-  - press: Enter
-  - wait: 1
-  - screenshot: 028-sftp-breadcrumb.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 2
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
+    text: mkdir -p '${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b' && printf '\nQA_PATH_READY\n'
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_PATH_READY\r?$
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-remote-pane"]'
+- click: '[data-testid="sftp-remote-path"]'
+- fill:
+    selector: '[data-testid="sftp-remote-path"]'
+    value: ${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b
+- press: Enter
+- click: '[data-testid="sftp-remote-path"]'
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: ${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b
+- press: Escape
+- assert_not_visible: input[data-testid="sftp-remote-path"]
+- click: '[data-testid="sftp-remote-up"]'
+- click: '[data-testid="sftp-remote-path"]'
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: ${cfg.sftp.remote_test_dir}/qa-path-TC028/a
+- press: Escape
+- assert_not_visible: input[data-testid="sftp-remote-path"]
+- click: '[data-testid="sftp-remote-up"]'
+- click: '[data-testid="sftp-remote-path"]'
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: ${cfg.sftp.remote_test_dir}/qa-path-TC028
+- press: Escape
+- assert_not_visible: input[data-testid="sftp-remote-path"]
+- click: '[data-testid="sftp-remote-back"]'
+- click: '[data-testid="sftp-remote-path"]'
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: ${cfg.sftp.remote_test_dir}/qa-path-TC028/a
+- press: Escape
+- assert_not_visible: input[data-testid="sftp-remote-path"]
+- click: '[data-testid="sftp-remote-forward"]'
+- click: '[data-testid="sftp-remote-path"]'
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: ${cfg.sftp.remote_test_dir}/qa-path-TC028
+- press: Escape
+- assert_not_visible: input[data-testid="sftp-remote-path"]
+- click: '[data-testid="sftp-remote-path"] span button:has-text("tmp")'
+- click: '[data-testid="sftp-remote-path"]'
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: /tmp
+- press: Escape
+- assert_not_visible: input[data-testid="sftp-remote-path"]
+- click: '[data-testid="sftp-remote-path"]'
+- fill:
+    selector: '[data-testid="sftp-remote-path"]'
+    value: /
+- press: Enter
+- click: '[data-testid="sftp-remote-path"]'
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: /
+- press: Escape
+- assert_not_visible: input[data-testid="sftp-remote-path"]
+- screenshot: 028-sftp-breadcrumb.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SFTP path breadcrumb supports segment click and inline editing：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 9
+    - 10
+    - 14
+    - 16
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 25
+    - 26
+    - 28
+    - 30
+    - 31
+    - 33
+    - 35
+    - 36
+    - 38
+    - 40
+    - 41
+    - 43
+    - 45
+    - 46
+    - 48
+    - 50
+    - 51
+    - 52
+    - 53
+    - 55
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]"}'
+    - step: 15
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_PATH_READY\\r?$"}}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-pane\"]"}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
+        "equals": "${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b"}}'
+    - step: 24
+      expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 27
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
+        "equals": "${cfg.sftp.remote_test_dir}/qa-path-TC028/a"}}'
+    - step: 29
+      expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
+        "equals": "${cfg.sftp.remote_test_dir}/qa-path-TC028"}}'
+    - step: 34
+      expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
+        "equals": "${cfg.sftp.remote_test_dir}/qa-path-TC028/a"}}'
+    - step: 39
+      expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 42
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
+        "equals": "${cfg.sftp.remote_test_dir}/qa-path-TC028"}}'
+    - step: 44
+      expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
+        "equals": "/tmp"}}'
+    - step: 49
+      expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
+        "equals": "/"}}'
+    - step: 56
+      expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
+    results:
+    - 56
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

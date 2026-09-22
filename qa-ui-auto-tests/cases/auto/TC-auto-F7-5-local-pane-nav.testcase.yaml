@@ -1,54 +1,113 @@
 id: TC-auto-F7-5
 title: SFTP local pane navigation toolbar exposes path / back / forward / up / refresh
-description: |
-  Auto-generated focused coverage for F7.5 (panel interactions). Existing
-  cases focus on the remote pane; this one drives the local pane's
+description: 'Auto-generated focused coverage for F7.5 (panel interactions). Existing
+
+  cases focus on the remote pane; this one drives the local pane''s
+
   navigation toolbar so each interactive testid is exercised at least
+
   once. Opens an SFTP session, navigates the local pane up to its parent
+
   via sftp-local-up, walks back / forward via the history buttons,
+
   refreshes, and asserts the breadcrumb exposes the local-path testid.
-covers: [F7.5]
-tags: [auto-generated, smoke, p1, sftp, panel, needs-review]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+
+  '
+covers:
+- F7.5
+tags:
+- auto-generated
+- smoke
+- p1
+- sftp
+- panel
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 timeout_sec: 90
 steps:
-  - open: ${cfg.app.base_url}
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - wait_for: '[data-testid="qc-input"]'
-  - fill: {selector: '[data-testid="qc-input"]', value: 'ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}'}
-  - click: '[data-testid="qc-submit"]'
-  - wait_for: '[data-testid="auth-prompt"]'
-  - fill: {selector: '[data-testid="auth-password"]', value: '${env.QA_SSH_PASSWORD}'}
-  - click: '[data-testid="auth-submit"]'
-  - wait_for: '[data-testid="terminal-pane"]'
-  - wait: 2
-  - click: '[data-testid="attached-sftp-toggle"]'
-  - wait_for: '[data-testid="sftp-browser"]'
-
-  # Local pane is mounted with its toolbar
-  - assert_visible: '[data-testid="sftp-local-pane"]'
-  - assert_visible: '[data-testid="sftp-local-list"]'
-  - assert_visible: '[data-testid="sftp-local-refresh"]'
-
-  # Path breadcrumb is editable — click activates edit mode, Escape cancels
-  - click: '[data-testid="sftp-local-path"]'
-  - press: Escape
-  - wait: 0.3
-
-  # Walk Up to parent — establishes history; then Back/Forward
-  - click: '[data-testid="sftp-local-up"]'
-  - wait: 0.8
-  - click: '[data-testid="sftp-local-back"]'
-  - wait: 0.8
-  - click: '[data-testid="sftp-local-forward"]'
-  - wait: 0.8
-
-  # Refresh keeps the pane mounted
-  - click: '[data-testid="sftp-local-refresh"]'
-  - wait: 0.8
-  - assert_visible: '[data-testid="sftp-local-pane"]'
-
-  - screenshot: F7.5-local-pane-nav.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 2
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- assert_visible: '[data-testid="sftp-local-pane"]'
+- assert_visible: '[data-testid="sftp-local-list"]'
+- assert_visible: '[data-testid="sftp-local-refresh"]'
+- click: '[data-testid="sftp-local-path"]'
+- press: Escape
+- wait: 0.3
+- click: '[data-testid="sftp-local-up"]'
+- wait: 0.8
+- click: '[data-testid="sftp-local-back"]'
+- wait: 0.8
+- click: '[data-testid="sftp-local-forward"]'
+- wait: 0.8
+- click: '[data-testid="sftp-local-refresh"]'
+- wait: 0.8
+- assert_visible: '[data-testid="sftp-local-pane"]'
+- screenshot: F7.5-local-pane-nav.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SFTP local pane navigation toolbar exposes path / back / forward / up / refresh：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 9
+    - 10
+    - 13
+    - 18
+    - 19
+    - 21
+    - 23
+    - 25
+    - 27
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-list\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-refresh\"]"}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
+    results:
+    - 29
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

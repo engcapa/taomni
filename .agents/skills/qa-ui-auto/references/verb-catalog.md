@@ -31,7 +31,8 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 |------|------|-------|
 | `click` | selector string **or** `{selector, modifiers?, position?, force?}` | `modifiers` ⊆ `Alt/Control/Meta/Shift`. |
 | `dblclick` | same as click | |
-| `right_click` | same as click | Native supports selector only (W3C right button); rich click options are browser-only and fail explicitly. Use before `assert_menu_items`; `click_menu` is browser-only. |
+| `middle_click` | selector string | Browser/native: real middle-button input; verifies tab auxiliary-click routing when paired with a close result assertion. |
+| `right_click` | same as click | Native supports selector only (W3C right button); rich click options are browser-only and fail explicitly. Use before `assert_menu_items`; `click_menu` supports an exact visible label in native mode. |
 | `hover` | selector | |
 | `drag_to` | `{from, to}` | Both selectors. |
 | `native_click` | `{selector}` | Native Linux/X11 only. Activates the exact test executable window and sends W3C pointer actions through its packaged WebKitGTK session; testcase assertions own the postcondition. |
@@ -63,6 +64,8 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_visible` | selector | Up to 15s wait. |
 | `assert_not_visible` | selector | Up to 15s wait for hidden. |
 | `assert_text` | `{selector, contains, timeout_sec?}` | Polls `text_content` and `data-terminal-text` (xterm canvas fallback). |
+| `assert_text_equals` | `{selector, equals, timeout_sec?}` | Browser/native: requires exactly one DOM match and exact `textContent`, preserving whitespace. No substring or terminal-buffer fallback. |
+| `assert_items` | `{selector, equals: [string, ...], attribute?, timeout_sec?}` | Browser/native: exact ordered list of all matching DOM textContent values (or named attributes). Checks missing, extra, duplicate, reordered and changed items. For editor contents select `.cm-line` and include empty trailing lines; for virtualized documents use disk assertions for full content. |
 | `assert_pattern` | `{selector, regex, timeout_sec?}` | Browser and native; polls Python regex against element text (terminal buffer fallback for `terminal-pane`). Use anchored output assertions to distinguish shell output from command echo, and await shell readiness before typing. |
 | `assert_count` | `{selector, min?/max?/equal?}` | Browser/native. Pick at least one bound; checks current count, including hidden matches. Wait for readiness separately. |
 | `assert_url` | URL substring | |

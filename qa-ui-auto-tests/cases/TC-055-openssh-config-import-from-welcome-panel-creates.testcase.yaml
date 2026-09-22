@@ -1,17 +1,53 @@
 id: TC-055
 title: OpenSSH config import moved out of Welcome panel
-covers: [F6.6]
-tags: [import, legacy-imported, openssh, p1, session]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+covers:
+- F6.6
+tags:
+- import
+- legacy-imported
+- openssh
+- p1
+- session
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: "[data-testid=\"welcome-panel\"]"
-  - assert_not_visible: '[data-testid="welcome-panel"] >> text="Import OpenSSH config"'
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-sessions"]'
-  - hover: '[data-testid="menu-import-sessions"]'
-  - assert_visible: '[data-testid="import-openssh"]'
-  - press: Escape
-  - press: Escape
-  - screenshot: 055-openssh-config-import.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_not_visible: '[data-testid="welcome-panel"] >> text="Import OpenSSH config"'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-sessions"]'
+- hover: '[data-testid="menu-import-sessions"]'
+- assert_visible: '[data-testid="import-openssh"]'
+- press: Escape
+- press: Escape
+- screenshot: 055-openssh-config-import.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: OpenSSH config import moved out of Welcome panel：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 5
+    - 6
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 3
+      expectation: '{"assert_not_visible": "[data-testid=\"welcome-panel\"] >> text=\"Import OpenSSH config\""}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"import-openssh\"]"}'
+    results:
+    - 7
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

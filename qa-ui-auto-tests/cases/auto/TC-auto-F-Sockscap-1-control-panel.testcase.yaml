@@ -1,91 +1,201 @@
 id: TC-auto-F-Sockscap-1
 title: SocksCap panel opens and browser-preview controls transition safely
-description: |
-  F-Sockscap-1 browser smoke coverage. The browser runtime deliberately has no
+description: 'F-Sockscap-1 browser smoke coverage. The browser runtime deliberately has no
+
   OS packet capture, so Start must enter its degraded preview state rather than
+
   claim Linux capture is active. This case verifies the panel entry point,
+
   status refresh, rule dry-run, Start → Stop transition, and recovery action.
+
   Privileged nftables/cgroup capture and Linux launch-only capture are verified
+
   separately by Rust/Vitest tests and native desktop validation.
-covers: [F-Sockscap-1]
-tags: [auto-generated, smoke, needs-review, network, sockscap]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-Sockscap-1
+tags:
+- auto-generated
+- smoke
+- needs-review
+- network
+- sockscap
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="sidebar"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - click: '[data-testid="sidebar-tool-sockscap"]'
-  - wait_for: '[data-testid="sockscap-panel"]'
-  - assert_visible: '[data-testid="sockscap-start"]'
-  - assert_visible: '[data-testid="sockscap-refresh-status"]'
-  - assert_visible: '[data-testid="sockscap-recover"]'
-  - click: '[data-testid="sockscap-refresh-status"]'
-  - assert_attribute:
-      selector: '[data-testid="sockscap-section-profile-toggle"]'
-      name: aria-expanded
-      equals: "false"
-  - click: '[data-testid="sockscap-section-profile-toggle"]'
-  - click: '[data-testid="sockscap-section-profile-toggle"]'
-  - assert_attribute:
-      selector: '[data-testid="sockscap-section-scope-toggle"]'
-      name: aria-expanded
-      equals: "false"
-  - click: '[data-testid="sockscap-section-scope-toggle"]'
-  - click: '[data-testid="sockscap-section-scope-toggle"]'
-  - assert_attribute:
-      selector: '[data-testid="sockscap-section-upstream-toggle"]'
-      name: aria-expanded
-      equals: "false"
-  - click: '[data-testid="sockscap-section-upstream-toggle"]'
-  - click: '[data-testid="sockscap-section-upstream-toggle"]'
-  - assert_attribute:
-      selector: '[data-testid="sockscap-section-rules-toggle"]'
-      name: aria-expanded
-      equals: "false"
-  - click: '[data-testid="sockscap-section-rules-toggle"]'
-  - click: '[data-testid="sockscap-section-rules-toggle"]'
-  - assert_attribute:
-      selector: '[data-testid="sockscap-section-gfwlist-toggle"]'
-      name: aria-expanded
-      equals: "false"
-  - click: '[data-testid="sockscap-section-gfwlist-toggle"]'
-  - click: '[data-testid="sockscap-section-gfwlist-toggle"]'
-  - assert_attribute:
-      selector: '[data-testid="sockscap-domains-toggle"]'
-      name: aria-expanded
-      equals: "false"
-  - click: '[data-testid="sockscap-domains-toggle"]'
-  - click: '[data-testid="sockscap-domains-toggle"]'
-  - assert_attribute:
-      selector: '[data-testid="sockscap-section-test-toggle"]'
-      name: aria-expanded
-      equals: "false"
-  - click: '[data-testid="sockscap-section-test-toggle"]'
-  - fill:
-      selector: '[data-testid="sockscap-test-host"]'
-      value: www.google.com
-  - click: '[data-testid="sockscap-test-target"]'
-  - assert_visible: '[data-testid="sockscap-test-detail"]'
-  - click: '[data-testid="sockscap-test-detail-close"]'
-  - click: '[data-testid="sockscap-add-profile"]'
-  - assert_text:
-      selector: '[data-testid="sockscap-panel"]'
-      contains: 方案 2
-  - click: '[data-testid="sockscap-start"]'
-  - wait_for: '[data-testid="sockscap-probe-fail-dialog"]'
-  - click: '[data-testid="sockscap-probe-fail-force"]'
-  - wait_for: '[data-testid="sockscap-stop"]'
-  - assert_visible: '[data-testid="sockscap-locked-banner"]'
-  - assert_disabled: '[data-testid="sockscap-add-profile"]'
-  - click: '[data-testid="sockscap-section-rules-toggle"]'
-  - assert_disabled: '[data-testid="sockscap-rules-editor"]'
-  - click: '[data-testid="sockscap-section-gfwlist-toggle"]'
-  - assert_disabled: '[data-testid="sockscap-refresh-gfw"]'
-  - assert_disabled: '[data-testid="sockscap-import-gfw"]'
-  - assert_disabled: '[data-testid="sockscap-block-quic"]'
-  - click: '[data-testid="sockscap-stop"]'
-  - wait_for: '[data-testid="sockscap-start"]'
-  - click: '[data-testid="sockscap-recover"]'
-  - screenshot: sockscap-control-panel.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-sockscap"]'
+- wait_for: '[data-testid="sockscap-panel"]'
+- assert_visible: '[data-testid="sockscap-start"]'
+- assert_visible: '[data-testid="sockscap-refresh-status"]'
+- assert_visible: '[data-testid="sockscap-recover"]'
+- click: '[data-testid="sockscap-refresh-status"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-profile-toggle"]'
+    name: aria-expanded
+    equals: 'false'
+- click: '[data-testid="sockscap-section-profile-toggle"]'
+- click: '[data-testid="sockscap-section-profile-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-scope-toggle"]'
+    name: aria-expanded
+    equals: 'false'
+- click: '[data-testid="sockscap-section-scope-toggle"]'
+- click: '[data-testid="sockscap-section-scope-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-upstream-toggle"]'
+    name: aria-expanded
+    equals: 'false'
+- click: '[data-testid="sockscap-section-upstream-toggle"]'
+- click: '[data-testid="sockscap-section-upstream-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-rules-toggle"]'
+    name: aria-expanded
+    equals: 'false'
+- click: '[data-testid="sockscap-section-rules-toggle"]'
+- click: '[data-testid="sockscap-section-rules-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-gfwlist-toggle"]'
+    name: aria-expanded
+    equals: 'false'
+- click: '[data-testid="sockscap-section-gfwlist-toggle"]'
+- click: '[data-testid="sockscap-section-gfwlist-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-domains-toggle"]'
+    name: aria-expanded
+    equals: 'false'
+- click: '[data-testid="sockscap-domains-toggle"]'
+- click: '[data-testid="sockscap-domains-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="sockscap-section-test-toggle"]'
+    name: aria-expanded
+    equals: 'false'
+- click: '[data-testid="sockscap-section-test-toggle"]'
+- fill:
+    selector: '[data-testid="sockscap-test-host"]'
+    value: www.google.com
+- click: '[data-testid="sockscap-test-target"]'
+- assert_visible: '[data-testid="sockscap-test-detail"]'
+- click: '[data-testid="sockscap-test-detail-close"]'
+- click: '[data-testid="sockscap-add-profile"]'
+- assert_text:
+    selector: '[data-testid="sockscap-panel"]'
+    contains: 方案 2
+- click: '[data-testid="sockscap-start"]'
+- wait_for: '[data-testid="sockscap-probe-fail-dialog"]'
+- click: '[data-testid="sockscap-probe-fail-force"]'
+- wait_for: '[data-testid="sockscap-stop"]'
+- assert_visible: '[data-testid="sockscap-locked-banner"]'
+- assert_disabled: '[data-testid="sockscap-add-profile"]'
+- click: '[data-testid="sockscap-section-rules-toggle"]'
+- assert_disabled: '[data-testid="sockscap-rules-editor"]'
+- click: '[data-testid="sockscap-section-gfwlist-toggle"]'
+- assert_disabled: '[data-testid="sockscap-refresh-gfw"]'
+- assert_disabled: '[data-testid="sockscap-import-gfw"]'
+- assert_disabled: '[data-testid="sockscap-block-quic"]'
+- click: '[data-testid="sockscap-stop"]'
+- wait_for: '[data-testid="sockscap-start"]'
+- click: '[data-testid="sockscap-recover"]'
+- screenshot: sockscap-control-panel.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SocksCap panel opens and browser-preview controls transition safely：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 4
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 33
+    - 34
+    - 36
+    - 38
+    - 42
+    - 44
+    - 48
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"sockscap-panel\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"sockscap-start\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"sockscap-refresh-status\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"sockscap-recover\"]"}'
+    - step: 10
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-profile-toggle\"]", "name":
+        "aria-expanded", "equals": "false"}}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-scope-toggle\"]", "name":
+        "aria-expanded", "equals": "false"}}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-upstream-toggle\"]", "name":
+        "aria-expanded", "equals": "false"}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-rules-toggle\"]", "name":
+        "aria-expanded", "equals": "false"}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-gfwlist-toggle\"]", "name":
+        "aria-expanded", "equals": "false"}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-domains-toggle\"]", "name": "aria-expanded",
+        "equals": "false"}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sockscap-section-test-toggle\"]", "name":
+        "aria-expanded", "equals": "false"}}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"sockscap-test-detail\"]"}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sockscap-panel\"]", "contains": "方案 2"}}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"sockscap-probe-fail-dialog\"]"}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"sockscap-stop\"]"}'
+    - step: 40
+      expectation: '{"assert_visible": "[data-testid=\"sockscap-locked-banner\"]"}'
+    - step: 41
+      expectation: '{"assert_disabled": "[data-testid=\"sockscap-add-profile\"]"}'
+    - step: 43
+      expectation: '{"assert_disabled": "[data-testid=\"sockscap-rules-editor\"]"}'
+    - step: 45
+      expectation: '{"assert_disabled": "[data-testid=\"sockscap-refresh-gfw\"]"}'
+    - step: 46
+      expectation: '{"assert_disabled": "[data-testid=\"sockscap-import-gfw\"]"}'
+    - step: 47
+      expectation: '{"assert_disabled": "[data-testid=\"sockscap-block-quic\"]"}'
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"sockscap-start\"]"}'
+    results:
+    - 49
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

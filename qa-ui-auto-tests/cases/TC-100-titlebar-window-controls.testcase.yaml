@@ -1,33 +1,86 @@
 id: TC-100
 title: Custom title bar renders window controls and tray
-description: |
-  Smoke test for F1.3 (custom title bar). Verifies the unified control bar, the
+description: 'Smoke test for F1.3 (custom title bar). Verifies the unified control bar, the
+
   dedicated window drag handle, the three window controls
+
   (minimize/maximize/close), and the normal-width tray are mounted at startup.
+
   Window-min/max/close are asserted as display-only — clicking them would tear
+
   down the test window. The theme-cycle button is clicked once to confirm the
+
   interactive contract.
-covers: [F1.3]
-tags: [smoke, p1, main, window]
-modes: [browser]
-# WindowControls render only on non-macOS chrome (ControlBar hides them on
-# macOS in favour of the traffic-light inset). Linux/Windows prove the
-# three-button surface; macOS hosts skip explicitly, coverage stays global.
-browser_platforms: [Linux, Windows]
-fixtures: [reset_db]
+
+  '
+covers:
+- F1.3
+tags:
+- smoke
+- p1
+- main
+- window
+modes:
+- browser
+browser_platforms:
+- Linux
+- Windows
+fixtures:
+- reset_db
 timeout_sec: 30
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="control-bar"]'
-  - assert_visible: '[data-testid="control-bar"]'
-  - assert_visible: '[data-testid="window-drag-handle"]'
-  - assert_visible: '[data-testid="window-controls"]'
-  - assert_visible: '[data-testid="window-min"]'
-  - assert_visible: '[data-testid="window-max"]'
-  - assert_visible: '[data-testid="window-close"]'
-  - assert_visible: '[data-testid="titlebar-tray"]'
-  - assert_visible: '[data-testid="theme-cycle"]'
-  - click: '[data-testid="theme-cycle"]'
-  - wait: 0.5
-  - assert_localstorage: { key: "taomni.appTheme.v1", exists: true }
-  - screenshot: 100-titlebar.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="control-bar"]'
+- assert_visible: '[data-testid="control-bar"]'
+- assert_visible: '[data-testid="window-drag-handle"]'
+- assert_visible: '[data-testid="window-controls"]'
+- assert_visible: '[data-testid="window-min"]'
+- assert_visible: '[data-testid="window-max"]'
+- assert_visible: '[data-testid="window-close"]'
+- assert_visible: '[data-testid="titlebar-tray"]'
+- assert_visible: '[data-testid="theme-cycle"]'
+- click: '[data-testid="theme-cycle"]'
+- wait: 0.5
+- assert_localstorage:
+    key: taomni.appTheme.v1
+    exists: true
+- screenshot: 100-titlebar.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Custom title bar renders window controls and tray：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 11
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"control-bar\"]"}'
+    - step: 3
+      expectation: '{"assert_visible": "[data-testid=\"control-bar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"window-drag-handle\"]"}'
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"window-controls\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"window-min\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"window-max\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"window-close\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"titlebar-tray\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"theme-cycle\"]"}'
+    - step: 13
+      expectation: '{"assert_localstorage": {"key": "taomni.appTheme.v1", "exists": true}}'
+    results:
+    - 13
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

@@ -1,65 +1,136 @@
 id: TC-auto-F1-9
 title: Control bar core commands dispatch Session / SFTP / Settings / Help to the right surface
-description: |
-  Coverage for F1.9 (core command dispatch via ControlBar). Exercises the
-  four primary commands dispatched from the unified app menu:
-    - new-remote-session → SessionEditor opens with SSH proto preselected
-    - new-sftp           → SessionEditor opens with SFTP proto preselected
-    - settings           → settings tab mounts
-    - help               → About dialog opens
-covers: [F1.9]
-tags: [auto-generated, smoke, p1, main, commands, needs-review]
-modes: [browser]
-fixtures: [reset_db]
+description: "Coverage for F1.9 (core command dispatch via ControlBar). Exercises the\nfour primary commands dispatched\
+  \ from the unified app menu:\n  - new-remote-session → SessionEditor opens with SSH proto preselected\n  - new-sftp\
+  \           → SessionEditor opens with SFTP proto preselected\n  - settings           → settings tab mounts\n\
+  \  - help               → About dialog opens\n"
+covers:
+- F1.9
+tags:
+- auto-generated
+- smoke
+- p1
+- main
+- commands
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 60
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="app-main-menu"]'
-  - assert_visible: '[data-testid="app-main-menu"]'
-
-  # command-session → SessionEditor with SSH preselected
-  - click: '[data-testid="app-main-menu"]'
-  - wait_for: '[data-testid="context-menu"]'
-  - assert_visible: '[data-testid="context-menu-item-new-remote-session"]'
-  - click: '[data-testid="context-menu-item-new-remote-session"]'
-  - wait_for: '[data-testid="session-editor"]'
-  - assert_visible: '[data-testid="session-proto-ssh"]'
-  - press: Escape
-  - wait_for:
-      selector: '[data-testid="session-editor"]'
-      state: detached
-      timeout_sec: 5
-
-  # command-sftp → SessionEditor with SFTP preselected
-  - click: '[data-testid="app-main-menu"]'
-  - wait_for: '[data-testid="context-menu"]'
-  - assert_visible: '[data-testid="context-menu-item-new-sftp"]'
-  - click: '[data-testid="context-menu-item-new-sftp"]'
-  - wait_for: '[data-testid="session-editor"]'
-  - assert_visible: '[data-testid="session-proto-sftp"]'
-  - press: Escape
-  - wait_for:
-      selector: '[data-testid="session-editor"]'
-      state: detached
-      timeout_sec: 5
-
-  # ribbon-settings → settings panel mounts in a tab
-  - wait_for: '[data-testid="ribbon-settings"]'
-  - assert_visible: '[data-testid="ribbon-settings"]'
-  - click: '[data-testid="ribbon-settings"]'
-  - wait_for: '[data-testid="settings-panel"]'
-  - assert_visible: '[data-testid="settings-panel"]'
-
-  # command-help → About dialog opens
-  - click: '[data-testid="app-main-menu"]'
-  - wait_for: '[data-testid="context-menu"]'
-  - assert_visible: '[data-testid="context-menu-item-help"]'
-  - click: '[data-testid="context-menu-item-help"]'
-  - wait_for: '[data-testid="about-dialog"]'
-  - assert_visible: '[data-testid="about-dialog"]'
-  - press: Escape
-  - wait_for:
-      selector: '[data-testid="about-dialog"]'
-      state: detached
-      timeout_sec: 5
-  - screenshot: F1.9-commands.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="app-main-menu"]'
+- assert_visible: '[data-testid="app-main-menu"]'
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="context-menu-item-new-remote-session"]'
+- click: '[data-testid="context-menu-item-new-remote-session"]'
+- wait_for: '[data-testid="session-editor"]'
+- assert_visible: '[data-testid="session-proto-ssh"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="context-menu-item-new-sftp"]'
+- click: '[data-testid="context-menu-item-new-sftp"]'
+- wait_for: '[data-testid="session-editor"]'
+- assert_visible: '[data-testid="session-proto-sftp"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+    timeout_sec: 5
+- wait_for: '[data-testid="ribbon-settings"]'
+- assert_visible: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- assert_visible: '[data-testid="settings-panel"]'
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="context-menu-item-help"]'
+- click: '[data-testid="context-menu-item-help"]'
+- wait_for: '[data-testid="about-dialog"]'
+- assert_visible: '[data-testid="about-dialog"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="about-dialog"]'
+    state: detached
+    timeout_sec: 5
+- screenshot: F1.9-commands.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Control bar core commands dispatch Session / SFTP / Settings / Help to the right surface：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 7
+    - 10
+    - 12
+    - 15
+    - 18
+    - 22
+    - 25
+    - 28
+    - 31
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"app-main-menu\"]"}'
+    - step: 3
+      expectation: '{"assert_visible": "[data-testid=\"app-main-menu\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-new-remote-session\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"session-proto-ssh\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-new-sftp\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"session-proto-sftp\"]"}'
+    - step: 19
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"ribbon-settings\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-help\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"about-dialog\"]"}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"about-dialog\"]"}'
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"about-dialog\"]", "state": "detached", "timeout_sec":
+        5}}'
+    results:
+    - 32
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

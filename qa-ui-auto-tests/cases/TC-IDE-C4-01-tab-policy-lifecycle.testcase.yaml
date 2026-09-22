@@ -1,207 +1,402 @@
 id: TC-IDE-C4-01
-title: "Editor tab policy eviction, dirty confirmation, and lifecycle receipt"
-description: |
-  ED-TABS-004 browser lifecycle case. Builds a deterministic pinned + clean +
+title: Editor tab policy eviction, dirty confirmation, and lifecycle receipt
+description: 'ED-TABS-004 browser lifecycle case. Builds a deterministic pinned + clean +
+
   dirty three-tab fixture in the browser VFS, previews exact victims, verifies
+
   dirty cancellation has zero effect, then confirms the same plan and matches
+
   active-tab/layout/resource observations to the production receipt. It also
+
   observes that a fully committed cleanup leaves no recovery banner or replay
+
   affordance behind. Browser mode has no honest didClose transport-failure
+
   fixture -- all four cleanup stages resolve in the browser Tauri stub -- so the
+
   A4 failure/replay branch is certified by the mounted production test and is
+
   not claimed here. Highest green claim: A1-A3 browser-wired lifecycle plus the
+
   negative recovery-surface observation.
-covers: [F25.5]
-tags: [code-workspace, ide-c4, tab-policy, lifecycle, accessibility, p0]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c4
+- tab-policy
+- lifecycle
+- accessibility
+- p0
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 180
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-
-  # Add the browser-VFS preview root and open its seeded README permanently.
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
-
-  # Create two more real VFS files. New File opens each as a permanent tab.
-  - click: '[data-testid="code-workspace-tree-new-file"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - fill:
-      selector: '[data-testid="text-input-dialog-input"]'
-      value: alpha.txt
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="alpha.txt"]'
-  - click: '[data-testid="code-workspace-tree-new-file"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - fill:
-      selector: '[data-testid="text-input-dialog-input"]'
-      value: beta.txt
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="beta.txt"]'
-  - assert_count:
-      selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]'
-      equal: 3
-
-  # Pin README, then dirty the active beta buffer. Alpha is the only clean,
-  # unpinned victim and beta is the confirmation-gated second victim.
-  - right_click: '[data-testid="code-workspace-editor-tab-strip"] button[title*="README.txt"]'
-  - click_menu: Pin Tab
-  - assert_count:
-      selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key][data-pinned="true"]'
-      equal: 1
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - type: dirty beta buffer
-  - assert_text:
-      selector: '[data-testid="code-workspace-tree-file"][data-path="beta.txt"]'
-      contains: "*"
-
-  # A1 + accessibility: change the numeric limit and observe the exact plan.
-  - click: '[data-testid="code-workspace-tab-policy-settings"]'
-  - wait_for: '[data-testid="workspace-tab-policy-settings-dialog"]'
-  # Closing without applying must remove the dialog and allow a clean reopen;
-  # the lifecycle assertions below then exercise the actual apply flow.
-  - click: '[data-testid="workspace-tab-policy-close"]'
-  - assert_count:
-      selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
-      equal: 0
-  - click: '[data-testid="code-workspace-tab-policy-settings"]'
-  - wait_for: '[data-testid="workspace-tab-policy-settings-dialog"]'
-  - assert_attribute:
-      selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
-      name: role
-      equals: dialog
-  - assert_attribute:
-      selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
-      name: aria-modal
-      equals: "true"
-  - assert_attribute:
-      selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
-      name: aria-label
-      equals: Editor tab policy settings
-  - eval_readonly:
-      expression: 'document.activeElement?.getAttribute("data-testid") === "workspace-tab-policy-limit"'
-      expect_truthy: true
-  - fill:
-      selector: '[data-testid="workspace-tab-policy-limit"]'
-      value: "1"
-  - wait_for: '[data-testid="workspace-tab-policy-eviction-preview"]'
-  - assert_text:
-      selector: '[data-testid="workspace-tab-policy-eviction-preview"]'
-      contains: alpha.txt
-  - assert_text:
-      selector: '[data-testid="workspace-tab-policy-eviction-preview"]'
-      contains: beta.txt
-  - assert_text:
-      selector: '[data-testid="workspace-tab-policy-eviction-preview"]'
-      contains: "1 tab(s) with unsaved changes require confirmation"
-
-  # A2 cancel: the app-owned confirmation rejects the transaction. The draft
-  # dialog remains mounted, focus returns to Apply, and no effect is reported.
-  - click: '[data-testid="workspace-tab-policy-apply"]'
-  - wait_for: '[data-testid="confirm-dialog"]'
-  - assert_attribute:
-      selector: '[data-testid="confirm-dialog"]'
-      name: role
-      equals: dialog
-  - assert_attribute:
-      selector: '[data-testid="confirm-dialog"]'
-      name: aria-label
-      equals: Apply editor tab policy
-  - assert_text:
-      selector: '[data-testid="confirm-dialog-message"]'
-      contains: beta.txt
-  - click: '[data-testid="confirm-dialog-cancel"]'
-  - wait_for: '[data-testid="code-workspace-tab"][data-tab-policy-receipt-status="aborted"]'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-tab"]'
-      name: data-tab-policy-limit
-      equals: "12"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-tab"]'
-      name: data-tab-policy-receipt-evicted-count
-      equals: "0"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-tab"]'
-      name: data-tab-policy-receipt-cleanup-count
-      equals: "0"
-  - assert_count:
-      selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]'
-      equal: 3
-  - eval_readonly:
-      expression: 'document.activeElement?.getAttribute("data-testid") === "workspace-tab-policy-apply"'
-      expect_truthy: true
-  - eval_readonly:
-      expression: 'document.querySelector("[data-layout-revision]")?.getAttribute("data-layout-revision") === document.querySelector("[data-tab-policy-receipt-layout-revision]")?.getAttribute("data-tab-policy-receipt-layout-revision")'
-      expect_truthy: true
-
-  # A2 confirm + A3 receipt: keyboard activation commits exactly two victims,
-  # keeps pinned README active, and closes both buffer resources/history rows.
-  - click: '[data-testid="workspace-tab-policy-apply"]'
-  - wait_for: '[data-testid="confirm-dialog"]'
-  - press:
-      key: Enter
-      selector: '[data-testid="confirm-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tab"][data-tab-policy-receipt-status="applied"][data-tab-policy-limit="1"]'
-  - assert_count:
-      selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
-      equal: 0
-  - assert_count:
-      selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]'
-      equal: 1
-  - assert_count:
-      selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key][data-active="true"] button[title*="README.txt"]'
-      equal: 1
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-tab"]'
-      name: data-tab-policy-receipt-evicted-count
-      equals: "2"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-tab"]'
-      name: data-tab-policy-receipt-cleanup-count
-      equals: "2"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-tab"]'
-      name: data-tab-policy-receipt-cleanup-committed-count
-      equals: "2"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-tab"]'
-      name: data-tab-policy-receipt-cleanup-recovery-count
-      equals: "0"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-tab"]'
-      name: data-resource-recovery-count
-      equals: "0"
-  # A fully committed cleanup must leave no recovery surface behind. This is the
-  # honest browser-side observation of the recovery contract: the banner and its
-  # replay affordance are absent precisely because every stage succeeded. The
-  # failure branch itself has no browser-reachable transport (see the header
-  # note) and is certified by the mounted production test instead.
-  - assert_not_visible: '[data-testid="workspace-resource-cleanup-recovery"]'
-  - assert_count:
-      selector: '[data-testid="workspace-resource-cleanup-recovery-item"]'
-      equal: 0
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-tab"]'
-      name: data-reopen-stack-count
-      equals: "2"
-  - eval_readonly:
-      expression: 'document.querySelector("[data-layout-revision]")?.getAttribute("data-layout-revision") === document.querySelector("[data-tab-policy-receipt-layout-revision]")?.getAttribute("data-tab-policy-receipt-layout-revision")'
-      expect_truthy: true
-  - eval_readonly:
-      expression: 'document.querySelector("[data-active-editor-key]")?.getAttribute("data-active-editor-key") === document.querySelector("[data-tab-policy-receipt-active-key]")?.getAttribute("data-tab-policy-receipt-active-key")'
-      expect_truthy: true
-  - eval_readonly:
-      expression: 'document.querySelector("[data-open-resource-count]")?.getAttribute("data-open-resource-count") === document.querySelector("[data-tab-policy-receipt-open-resource-count]")?.getAttribute("data-tab-policy-receipt-open-resource-count")'
-      expect_truthy: true
-  - eval_readonly:
-      expression: 'document.activeElement?.getAttribute("data-testid") === "code-workspace-tab-policy-settings"'
-      expect_truthy: true
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: alpha.txt
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="alpha.txt"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: beta.txt
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="beta.txt"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]'
+    equal: 3
+- right_click: '[data-testid="code-workspace-editor-tab-strip"] button[title*="README.txt"]'
+- click_menu: Pin Tab
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key][data-pinned="true"]'
+    equal: 1
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- type: dirty beta buffer
+- assert_text:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="beta.txt"]'
+    contains: '*'
+- click: '[data-testid="code-workspace-tab-policy-settings"]'
+- wait_for: '[data-testid="workspace-tab-policy-settings-dialog"]'
+- click: '[data-testid="workspace-tab-policy-close"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
+    equal: 0
+- click: '[data-testid="code-workspace-tab-policy-settings"]'
+- wait_for: '[data-testid="workspace-tab-policy-settings-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
+    name: role
+    equals: dialog
+- assert_attribute:
+    selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
+    name: aria-modal
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
+    name: aria-label
+    equals: Editor tab policy settings
+- eval_readonly:
+    expression: document.activeElement?.getAttribute("data-testid") === "workspace-tab-policy-limit"
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="workspace-tab-policy-limit"]'
+    value: '1'
+- wait_for: '[data-testid="workspace-tab-policy-eviction-preview"]'
+- assert_text:
+    selector: '[data-testid="workspace-tab-policy-eviction-preview"]'
+    contains: alpha.txt
+- assert_text:
+    selector: '[data-testid="workspace-tab-policy-eviction-preview"]'
+    contains: beta.txt
+- assert_text:
+    selector: '[data-testid="workspace-tab-policy-eviction-preview"]'
+    contains: 1 tab(s) with unsaved changes require confirmation
+- click: '[data-testid="workspace-tab-policy-apply"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="confirm-dialog"]'
+    name: role
+    equals: dialog
+- assert_attribute:
+    selector: '[data-testid="confirm-dialog"]'
+    name: aria-label
+    equals: Apply editor tab policy
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: beta.txt
+- click: '[data-testid="confirm-dialog-cancel"]'
+- wait_for: '[data-testid="code-workspace-tab"][data-tab-policy-receipt-status="aborted"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tab"]'
+    name: data-tab-policy-limit
+    equals: '12'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tab"]'
+    name: data-tab-policy-receipt-evicted-count
+    equals: '0'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tab"]'
+    name: data-tab-policy-receipt-cleanup-count
+    equals: '0'
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]'
+    equal: 3
+- eval_readonly:
+    expression: document.activeElement?.getAttribute("data-testid") === "workspace-tab-policy-apply"
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector("[data-layout-revision]")?.getAttribute("data-layout-revision") === document.querySelector("[data-tab-policy-receipt-layout-revision]")?.getAttribute("data-tab-policy-receipt-layout-revision")
+    expect_truthy: true
+- click: '[data-testid="workspace-tab-policy-apply"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- press:
+    key: Enter
+    selector: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tab"][data-tab-policy-receipt-status="applied"][data-tab-policy-limit="1"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab-policy-settings-dialog"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key][data-active="true"] button[title*="README.txt"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tab"]'
+    name: data-tab-policy-receipt-evicted-count
+    equals: '2'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tab"]'
+    name: data-tab-policy-receipt-cleanup-count
+    equals: '2'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tab"]'
+    name: data-tab-policy-receipt-cleanup-committed-count
+    equals: '2'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tab"]'
+    name: data-tab-policy-receipt-cleanup-recovery-count
+    equals: '0'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tab"]'
+    name: data-resource-recovery-count
+    equals: '0'
+- assert_not_visible: '[data-testid="workspace-resource-cleanup-recovery"]'
+- assert_count:
+    selector: '[data-testid="workspace-resource-cleanup-recovery-item"]'
+    equal: 0
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tab"]'
+    name: data-reopen-stack-count
+    equals: '2'
+- eval_readonly:
+    expression: document.querySelector("[data-layout-revision]")?.getAttribute("data-layout-revision") === document.querySelector("[data-tab-policy-receipt-layout-revision]")?.getAttribute("data-tab-policy-receipt-layout-revision")
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector("[data-active-editor-key]")?.getAttribute("data-active-editor-key") === document.querySelector("[data-tab-policy-receipt-active-key]")?.getAttribute("data-tab-policy-receipt-active-key")
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector("[data-open-resource-count]")?.getAttribute("data-open-resource-count") ===
+      document.querySelector("[data-tab-policy-receipt-open-resource-count]")?.getAttribute("data-tab-policy-receipt-open-resource-count")
+    expect_truthy: true
+- eval_readonly:
+    expression: document.activeElement?.getAttribute("data-testid") === "code-workspace-tab-policy-settings"
+    expect_truthy: true
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Editor tab policy eviction, dirty confirmation, and lifecycle receipt：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 13
+    - 15
+    - 16
+    - 18
+    - 20
+    - 21
+    - 24
+    - 25
+    - 27
+    - 28
+    - 30
+    - 32
+    - 34
+    - 40
+    - 45
+    - 50
+    - 58
+    - 60
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.txt\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"alpha.txt\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"beta.txt\"]"}'
+    - step: 23
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]",
+        "equal": 3}}'
+    - step: 26
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key][data-pinned=\"true\"]",
+        "equal": 1}}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"beta.txt\"]",
+        "contains": "*"}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab-policy-settings-dialog\"]"}'
+    - step: 33
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab-policy-settings-dialog\"]", "equal":
+        0}}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab-policy-settings-dialog\"]"}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab-policy-settings-dialog\"]",
+        "name": "role", "equals": "dialog"}}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab-policy-settings-dialog\"]",
+        "name": "aria-modal", "equals": "true"}}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab-policy-settings-dialog\"]",
+        "name": "aria-label", "equals": "Editor tab policy settings"}}'
+    - step: 39
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") ===
+        \"workspace-tab-policy-limit\"", "expect_truthy": true}}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab-policy-eviction-preview\"]"}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-tab-policy-eviction-preview\"]", "contains":
+        "alpha.txt"}}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-tab-policy-eviction-preview\"]", "contains":
+        "beta.txt"}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-tab-policy-eviction-preview\"]", "contains":
+        "1 tab(s) with unsaved changes require confirmation"}}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"confirm-dialog\"]", "name": "role", "equals":
+        "dialog"}}'
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"confirm-dialog\"]", "name": "aria-label",
+        "equals": "Apply editor tab policy"}}'
+    - step: 49
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "beta.txt"}}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-tab-policy-receipt-status=\"aborted\"]"}'
+    - step: 52
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tab\"]", "name": "data-tab-policy-limit",
+        "equals": "12"}}'
+    - step: 53
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tab\"]", "name": "data-tab-policy-receipt-evicted-count",
+        "equals": "0"}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tab\"]", "name": "data-tab-policy-receipt-cleanup-count",
+        "equals": "0"}}'
+    - step: 55
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]",
+        "equal": 3}}'
+    - step: 56
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") ===
+        \"workspace-tab-policy-apply\"", "expect_truthy": true}}'
+    - step: 57
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-layout-revision]\")?.getAttribute(\"data-layout-revision\")
+        === document.querySelector(\"[data-tab-policy-receipt-layout-revision]\")?.getAttribute(\"data-tab-policy-receipt-layout-revision\")",
+        "expect_truthy": true}}'
+    - step: 59
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 61
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-tab-policy-receipt-status=\"applied\"][data-tab-policy-limit=\"1\"]"}'
+    - step: 62
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab-policy-settings-dialog\"]", "equal":
+        0}}'
+    - step: 63
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]",
+        "equal": 1}}'
+    - step: 64
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key][data-active=\"true\"]
+        button[title*=\"README.txt\"]", "equal": 1}}'
+    - step: 65
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tab\"]", "name": "data-tab-policy-receipt-evicted-count",
+        "equals": "2"}}'
+    - step: 66
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tab\"]", "name": "data-tab-policy-receipt-cleanup-count",
+        "equals": "2"}}'
+    - step: 67
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tab\"]", "name": "data-tab-policy-receipt-cleanup-committed-count",
+        "equals": "2"}}'
+    - step: 68
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tab\"]", "name": "data-tab-policy-receipt-cleanup-recovery-count",
+        "equals": "0"}}'
+    - step: 69
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tab\"]", "name": "data-resource-recovery-count",
+        "equals": "0"}}'
+    - step: 70
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-resource-cleanup-recovery\"]"}'
+    - step: 71
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-resource-cleanup-recovery-item\"]",
+        "equal": 0}}'
+    - step: 72
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tab\"]", "name": "data-reopen-stack-count",
+        "equals": "2"}}'
+    - step: 73
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-layout-revision]\")?.getAttribute(\"data-layout-revision\")
+        === document.querySelector(\"[data-tab-policy-receipt-layout-revision]\")?.getAttribute(\"data-tab-policy-receipt-layout-revision\")",
+        "expect_truthy": true}}'
+    - step: 74
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-active-editor-key]\")?.getAttribute(\"data-active-editor-key\")
+        === document.querySelector(\"[data-tab-policy-receipt-active-key]\")?.getAttribute(\"data-tab-policy-receipt-active-key\")",
+        "expect_truthy": true}}'
+    - step: 75
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-open-resource-count]\")?.getAttribute(\"data-open-resource-count\")
+        === document.querySelector(\"[data-tab-policy-receipt-open-resource-count]\")?.getAttribute(\"data-tab-policy-receipt-open-resource-count\")",
+        "expect_truthy": true}}'
+    - step: 76
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") ===
+        \"code-workspace-tab-policy-settings\"", "expect_truthy": true}}'
+    results:
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 69
+    - 70
+    - 71
+    - 72
+    - 73
+    - 74
+    - 75
+    - 76
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

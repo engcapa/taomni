@@ -1,114 +1,220 @@
 id: TC-SSH-VI-001
 title: Remote SSH terminal vi comprehensive operations (navigation, yank/paste, edit, :q!, :wq)
-description: |
-  Native verification across Windows, Linux, and macOS that connects to a remote SSH server,
+description: 'Native verification across Windows, Linux, and macOS that connects to a remote SSH server,
+
   exercises vi/vim text insertion, cursor navigation (j/k), line yank and paste (yy/p),
+
   word replacement/editing (cw), discarding changes with :q!, and saving changes with :wq,
+
   verifying both discarded and persisted disk states.
-covers: [F3.1, F2.2, F6.4, F1.8]
-tags: [native, ssh, terminal, vi, vim, p0]
-modes: [native]
-native_platforms: [Linux, macOS, Windows]
-fixtures: [reset_db, ssh_required]
+
+  '
+covers:
+- F3.1
+- F2.2
+- F6.4
+- F1.8
+tags:
+- native
+- ssh
+- terminal
+- vi
+- vim
+- p0
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- ssh_required
 timeout_sec: 90
 steps:
-  - open: "${cfg.app.base_url}"
-  # Reveal the QuickConnect bar without the in-bar app menu: that menu is
-  # hidden on native macOS by design (native global menu). Seeding the
-  # persisted visibility flag and reloading selects the same UI on all three
-  # platforms; Menu-path coverage stays in the browser-only cases.
-  - seed_storage:
-      key: taomni.quickConnectVisible
-      value: 'true'
-  - reload_window: null
-  - wait_for: '[data-testid="qc-input"]'
-  - fill: {selector: '[data-testid="qc-input"]', value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
-  - click: '[data-testid="qc-submit"]'
-  - wait_for: '[data-testid="auth-prompt"]'
-  - fill: {selector: '[data-testid="auth-password"]', value: "${env.QA_SSH_PASSWORD}"}
-  - click: '[data-testid="auth-submit"]'
-  - wait_for: '[data-testid="terminal-pane"]'
-  - wait: 3
-  - click: '[data-testid="terminal-pane"]'
-
-  # Phase 1: Initialize file and verify :q! discards unsaved changes
-  - type: "rm -f /tmp/taomni_vi_test.txt"
-  - press: Enter
-  - wait: 1
-  - type: "echo 'Alpha Line Original' > /tmp/taomni_vi_test.txt"
-  - press: Enter
-  - wait: 1
-  - type: "echo 'Beta Line Original' >> /tmp/taomni_vi_test.txt"
-  - press: Enter
-  - wait: 1
-  - type: "vi /tmp/taomni_vi_test.txt"
-  - press: Enter
-  - wait: 2
-  - type: "i"
-  - wait: 0.5
-  - type: "DISCARD_THIS_UNSAVED_TEXT"
-  - wait: 0.5
-  - press: Escape
-  - wait: 0.5
-  - type: ":q!"
-  - press: Enter
-  - wait: 2
-  - type: "cat /tmp/taomni_vi_test.txt"
-  - press: Enter
-  - wait: 1
-  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Alpha Line Original"}
-  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Beta Line Original"}
-  - type: "grep -c DISCARD_THIS /tmp/taomni_vi_test.txt || echo 0"
-  - press: Enter
-  - wait: 1
-  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "0"}
-
-  # Phase 2: Open file, test navigation (j/k), yank & paste (yy/p), word modification (cw), append (o), and :wq
-  - type: "vi /tmp/taomni_vi_test.txt"
-  - press: Enter
-  - wait: 2
-  # Move cursor down (j) then up (k) then down (j)
-  - type: "j"
-  - wait: 0.5
-  - type: "k"
-  - wait: 0.5
-  - type: "j"
-  - wait: 0.5
-  # Yank line (yy) and paste below (p)
-  - type: "yy"
-  - wait: 0.5
-  - type: "p"
-  - wait: 0.5
-  # Modify text on the new line: jump to start of line (0) and change word (cw)
-  - type: "0"
-  - wait: 0.5
-  - type: "cw"
-  - wait: 0.5
-  - type: "Replaced"
-  - wait: 0.5
-  - press: Escape
-  - wait: 0.5
-  # Open new line below (o) and insert text
-  - type: "o"
-  - wait: 0.5
-  - type: "Gamma Line Appended"
-  - wait: 0.5
-  - press: Escape
-  - wait: 0.5
-  # Save and exit with :wq
-  - type: ":wq"
-  - press: Enter
-  - wait: 2
-
-  # Phase 3: Verify final saved content and clean up
-  - type: "cat /tmp/taomni_vi_test.txt"
-  - press: Enter
-  - wait: 1
-  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Alpha Line Original"}
-  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Beta Line Original"}
-  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Replaced Line Original"}
-  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Gamma Line Appended"}
-  - type: "rm -f /tmp/taomni_vi_test.txt"
-  - press: Enter
-  - wait: 0.5
-  - screenshot: "ssh-vi-comprehensive.png"
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 3
+- click: '[data-testid="terminal-pane"]'
+- type: rm -f /tmp/taomni_vi_test.txt
+- press: Enter
+- wait: 1
+- type: echo 'Alpha Line Original' > /tmp/taomni_vi_test.txt
+- press: Enter
+- wait: 1
+- type: echo 'Beta Line Original' >> /tmp/taomni_vi_test.txt
+- press: Enter
+- wait: 1
+- type: vi /tmp/taomni_vi_test.txt
+- press: Enter
+- wait: 2
+- type: i
+- wait: 0.5
+- type: DISCARD_THIS_UNSAVED_TEXT
+- wait: 0.5
+- press: Escape
+- wait: 0.5
+- type: :q!
+- press: Enter
+- wait: 2
+- type: cat /tmp/taomni_vi_test.txt
+- press: Enter
+- wait: 1
+- assert_text:
+    selector: '[data-testid="terminal-pane"]'
+    contains: Alpha Line Original
+- assert_text:
+    selector: '[data-testid="terminal-pane"]'
+    contains: Beta Line Original
+- type: grep -c DISCARD_THIS /tmp/taomni_vi_test.txt || echo 0
+- press: Enter
+- wait: 1
+- assert_text:
+    selector: '[data-testid="terminal-pane"]'
+    contains: '0'
+- type: vi /tmp/taomni_vi_test.txt
+- press: Enter
+- wait: 2
+- type: j
+- wait: 0.5
+- type: k
+- wait: 0.5
+- type: j
+- wait: 0.5
+- type: yy
+- wait: 0.5
+- type: p
+- wait: 0.5
+- type: '0'
+- wait: 0.5
+- type: cw
+- wait: 0.5
+- type: Replaced
+- wait: 0.5
+- press: Escape
+- wait: 0.5
+- type: o
+- wait: 0.5
+- type: Gamma Line Appended
+- wait: 0.5
+- press: Escape
+- wait: 0.5
+- type: :wq
+- press: Enter
+- wait: 2
+- type: cat /tmp/taomni_vi_test.txt
+- press: Enter
+- wait: 1
+- assert_text:
+    selector: '[data-testid="terminal-pane"]'
+    contains: Alpha Line Original
+- assert_text:
+    selector: '[data-testid="terminal-pane"]'
+    contains: Beta Line Original
+- assert_text:
+    selector: '[data-testid="terminal-pane"]'
+    contains: Replaced Line Original
+- assert_text:
+    selector: '[data-testid="terminal-pane"]'
+    contains: Gamma Line Appended
+- type: rm -f /tmp/taomni_vi_test.txt
+- press: Enter
+- wait: 0.5
+- screenshot: ssh-vi-comprehensive.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Remote SSH terminal vi comprehensive operations (navigation, yank/paste, edit, :q!, :wq)：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 9
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 19
+    - 20
+    - 22
+    - 23
+    - 25
+    - 27
+    - 29
+    - 31
+    - 32
+    - 34
+    - 35
+    - 39
+    - 40
+    - 43
+    - 44
+    - 46
+    - 48
+    - 50
+    - 52
+    - 54
+    - 56
+    - 58
+    - 60
+    - 62
+    - 64
+    - 66
+    - 68
+    - 70
+    - 71
+    - 73
+    - 74
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "Alpha Line Original"}}'
+    - step: 38
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "Beta Line Original"}}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "0"}}'
+    - step: 76
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "Alpha Line Original"}}'
+    - step: 77
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "Beta Line Original"}}'
+    - step: 78
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "Replaced Line Original"}}'
+    - step: 79
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "Gamma Line Appended"}}'
+    results:
+    - 76
+    - 77
+    - 78
+    - 79
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

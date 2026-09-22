@@ -1,34 +1,114 @@
 id: TC-036
 title: Session tree creates folders and moves a session via context menu
-covers: [F6.2]
-tags: [folders, legacy-imported, p1, session]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+covers:
+- F6.2
+tags:
+- folders
+- legacy-imported
+- p1
+- session
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"session-new\"]"
-  - wait_for: "[data-testid=\"session-editor\"]"
-  - fill: {selector: "[data-testid=\"session-host\"]", value: "${cfg.ssh.host}"}
-  - fill: {selector: "[data-testid=\"session-port\"]", value: "${cfg.ssh.port}"}
-  - send_text_via_label: {label_contains: Specify username, checked: true}
-  - fill: {selector: "[data-testid=\"session-user\"]", value: "${cfg.ssh.user}"}
-  - click: "[data-testid=\"session-section-bookmark\"]"
-  - wait_for: "[data-testid=\"bookmark-settings\"]"
-  - fill: {selector: "[data-testid=\"session-name\"]", value: qa-ui-auto-folder-target}
-  - click: "[data-testid=\"session-save\"]"
-  - wait_for: "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-folder-target\"]"
-  - right_click: { selector: "[data-testid=\"session-tree\"]", position: { x: 16, y: 16 } }
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
-  - wait_for: "[data-testid=\"folder-name-dialog\"]"
-  - fill: {selector: "[data-testid=\"folder-name-dialog-input\"]", value: qa-ui-auto-group}
-  - click: "[data-testid=\"folder-name-dialog-confirm\"]"
-  - wait: 1
-  - right_click: "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-folder-target\"]"
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - hover: '[data-testid="context-menu"] >> text="Move to folder"'
-  - wait_for: '[data-testid="context-menu"] >> text=/qa-ui-auto-group/'
-  - click: '[data-testid="context-menu"] >> text=/qa-ui-auto-group/'
-  - wait: 1
-  - assert_visible: "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-group\""
-  - screenshot: 036-session-tree-folders.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- send_text_via_label:
+    label_contains: Specify username
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-folder-target
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-folder-target"]'
+- right_click:
+    selector: '[data-testid="session-tree"]'
+    position:
+      x: 16
+      y: 16
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
+- wait_for: '[data-testid="folder-name-dialog"]'
+- fill:
+    selector: '[data-testid="folder-name-dialog-input"]'
+    value: qa-ui-auto-group
+- click: '[data-testid="folder-name-dialog-confirm"]'
+- wait: 1
+- right_click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-folder-target"]'
+- wait_for: '[data-testid="context-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Move to folder"'
+- wait_for: '[data-testid="context-menu"] >> text=/qa-ui-auto-group/'
+- click: '[data-testid="context-menu"] >> text=/qa-ui-auto-group/'
+- wait: 1
+- assert_visible: '[data-testid="session-tree"] >> text="qa-ui-auto-group"'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0]?.group_path === "User sessions / qa-ui-auto-group"
+    expect_truthy: true
+- screenshot: 036-session-tree-folders.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 创建文件夹后经右键移动会话，保存的 group_path 精确指向新建文件夹。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 10
+    - 11
+    - 13
+    - 15
+    - 17
+    - 18
+    - 20
+    - 22
+    - 24
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-folder-target\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"folder-name-dialog\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"] >> text=/qa-ui-auto-group/"}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-group\""}'
+    - step: 27
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0]?.group_path
+        === \"User sessions / qa-ui-auto-group\"", "expect_truthy": true}}'
+    results:
+    - 26
+    - 27
+  visual:
+  - check: 文件夹树缩进与会话归属易辨认。
+    method: manual
+    reason: 截图必须单独评审，不能由功能步骤通过推导视觉通过。
+  native:
+  - check: 浏览器 localStorage 证明会话持久化模型，桌面数据库需要 native 单独证明。
+    method: external
+    reason: 按实际执行模式解释；其他平台不继承 Linux 证据。

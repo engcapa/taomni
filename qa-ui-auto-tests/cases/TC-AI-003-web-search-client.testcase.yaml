@@ -1,35 +1,103 @@
 id: TC-AI-003
 title: Web Search panel exposes native vs client provider matrix
-description: |
-  F-AI-2.5 ProviderCaps + WebSearchPanel UI surface: the settings panel must let
+description: 'F-AI-2.5 ProviderCaps + WebSearchPanel UI surface: the settings panel must let
+
   the user pick from at least 6 search providers (SearXNG / Tavily / Serper
+
   / Brave / Exa / Google CSE) and offer the four-tier confirmation modes
+
   (per_call / per_thread / always / disabled). Smoke check only — no actual
+
   network calls.
-covers: [F-AI-2.5, F-AI-2.1]
-tags: [ai, web-search, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-AI-2.5
+- F-AI-2.1
+tags:
+- ai
+- web-search
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="ribbon-settings"]'
-  - click: '[data-testid="ribbon-settings"]'
-  - wait_for: '[data-testid="settings-group-toggle-ai"]'
-  - click: '[data-testid="settings-group-toggle-ai"]'
-  - wait_for: 'text=Web Search'
-  - assert_visible: 'text="Web Search"'
-  - click: '[data-testid="ai-websearch-enable-toggle"]'
-  - assert_visible: '[data-testid="settings-panel"] >> text=SearXNG'
-  - assert_visible: '[data-testid="settings-panel"] >> text=Tavily'
-  - assert_visible: '[data-testid="settings-panel"] >> text=Serper'
-  - assert_visible: '[data-testid="settings-panel"] >> text=Brave Search'
-  - assert_visible: '[data-testid="settings-panel"] >> text=Exa'
-  - assert_visible: '[data-testid="settings-panel"] >> text=Google CSE'
-  # Confirmation modes (when enabled). English defaults from i18n
-  # locale "en"; zh-CN substitutes 每次确认 / 本 thread 静默 / etc.
-  - assert_visible: 'text="Confirm every time (default)"'
-  - assert_visible: 'text="Confirm once per thread"'
-  - assert_visible: 'text="Always allow"'
-  - assert_visible: 'text="Disabled"'
-  - screenshot: ai-003-web-search.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-group-toggle-ai"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- wait_for: text=Web Search
+- assert_visible: text="Web Search"
+- click: '[data-testid="ai-websearch-enable-toggle"]'
+- assert_visible: '[data-testid="settings-panel"] >> text=SearXNG'
+- assert_visible: '[data-testid="settings-panel"] >> text=Tavily'
+- assert_visible: '[data-testid="settings-panel"] >> text=Serper'
+- assert_visible: '[data-testid="settings-panel"] >> text=Brave Search'
+- assert_visible: '[data-testid="settings-panel"] >> text=Exa'
+- assert_visible: '[data-testid="settings-panel"] >> text=Google CSE'
+- assert_visible: text="Confirm every time (default)"
+- assert_visible: text="Confirm once per thread"
+- assert_visible: text="Always allow"
+- assert_visible: text="Disabled"
+- screenshot: ai-003-web-search.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Web Search panel exposes native vs client provider matrix：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 8
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-group-toggle-ai\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "text=Web Search"}'
+    - step: 7
+      expectation: '{"assert_visible": "text=\"Web Search\""}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=SearXNG"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Tavily"}'
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Serper"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Brave Search"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Exa"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"settings-panel\"] >> text=Google CSE"}'
+    - step: 15
+      expectation: '{"assert_visible": "text=\"Confirm every time (default)\""}'
+    - step: 16
+      expectation: '{"assert_visible": "text=\"Confirm once per thread\""}'
+    - step: 17
+      expectation: '{"assert_visible": "text=\"Always allow\""}'
+    - step: 18
+      expectation: '{"assert_visible": "text=\"Disabled\""}'
+    results:
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

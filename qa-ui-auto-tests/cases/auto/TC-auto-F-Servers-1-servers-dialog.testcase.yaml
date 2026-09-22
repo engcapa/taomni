@@ -1,61 +1,117 @@
 id: TC-auto-F-Servers-1-servers-dialog
 title: Local servers window opens, selects a server, shows settings and console
-description: |
-  Coverage smoke for F-Servers-1 (Local servers manager). The manager lives in a
+description: 'Coverage smoke for F-Servers-1 (Local servers manager). The manager lives in a
+
   standalone OS window (Tauri) / popup (browser) opened via open_detached_window
+
   with kind "servers". This case navigates directly to the detached route
+
   (`?servers=main`) so browser smoke can exercise the shell without relying on
+
   popup-switch support.
 
+
   Verifies the chrome (server list + settings pane + output console), selects a
+
   couple of server rows, and confirms the per-row Start/Stop/Settings actions
+
   and the live console controls are mounted.
 
+
   Actually starting/stopping a server binds a real port or spawns a system
+
   binary (x11vnc / nfsd / iperf3) — a side-effecting action that browser
+
   smoke cannot do safely — so this case does NOT click Start. It only
+
   verifies the dialog routes correctly and the controls exist, then closes
+
   via Cancel (non-destructive). Real start/stop is left to native/manual
+
   regression with the relevant tools installed.
-covers: [F-Servers-1]
-tags: [auto-generated, smoke, needs-review, servers, main]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-Servers-1
+tags:
+- auto-generated
+- smoke
+- needs-review
+- servers
+- main
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 30
 steps:
-  # Detached route: same URL shape the browser stub / Tauri window uses.
-  - open: ${cfg.app.base_url}?servers=main
-  - wait_for:
-      selector: '[data-testid="servers-dialog"]'
-      timeout_sec: 15
-  - assert_visible: '[data-testid="server-list"]'
-  - assert_visible: '[data-testid="server-settings"]'
-  # SSH/SFTP is the first row and selected by default. Selecting it is safe
-  # (no side effect); Start is asserted visible but NOT clicked — clicking it
-  # would bind a real port / spawn a system binary, which browser smoke avoids.
-  - assert_visible: '[data-testid="server-row-ssh"]'
-  - click: '[data-testid="server-row-ssh"]'
-  - assert_visible: '[data-testid="server-row-ssh-start"]'
-  # The per-row Settings button just (re)selects the row — safe to click.
-  - click: '[data-testid="server-row-ssh-settings"]'
-  - wait: 0.2
-  # Selecting another row swaps the settings pane (non-destructive).
-  - click: '[data-testid="server-row-http"]'
-  - wait: 0.2
-  - assert_visible: '[data-testid="server-settings"]'
-  - click: '[data-testid="server-row-rdp"]'
-  - wait: 0.2
-  - assert_visible: '[data-testid="server-settings"]'
-  # Live output console + its controls are mounted in the settings pane.
-  - assert_visible: '[data-testid="server-log"]'
-  # Auto-scroll is a non-destructive view toggle — click it (and the Clear
-  # button, which only empties the in-memory log buffer).
-  - assert_visible: '[data-testid="server-log-autoscroll"]'
-  - click: '[data-testid="server-log-autoscroll"]'
-  - assert_visible: '[data-testid="server-log-clear"]'
-  - screenshot: servers-1-dialog.png
-  # Cancel closes the window (browser: window.close may be blocked for
-  # scripted popups that were not opened by a user gesture — still assert
-  # the button is wired and clickable).
-  - assert_visible: '[data-testid="servers-dialog-cancel"]'
-  - click: '[data-testid="servers-dialog-cancel"]'
+- open: ${cfg.app.base_url}?servers=main
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 15
+- assert_visible: '[data-testid="server-list"]'
+- assert_visible: '[data-testid="server-settings"]'
+- assert_visible: '[data-testid="server-row-ssh"]'
+- click: '[data-testid="server-row-ssh"]'
+- assert_visible: '[data-testid="server-row-ssh-start"]'
+- click: '[data-testid="server-row-ssh-settings"]'
+- wait: 0.2
+- click: '[data-testid="server-row-http"]'
+- wait: 0.2
+- assert_visible: '[data-testid="server-settings"]'
+- click: '[data-testid="server-row-rdp"]'
+- wait: 0.2
+- assert_visible: '[data-testid="server-settings"]'
+- assert_visible: '[data-testid="server-log"]'
+- assert_visible: '[data-testid="server-log-autoscroll"]'
+- click: '[data-testid="server-log-autoscroll"]'
+- assert_visible: '[data-testid="server-log-clear"]'
+- screenshot: servers-1-dialog.png
+- assert_visible: '[data-testid="servers-dialog-cancel"]'
+- click: '[data-testid="servers-dialog-cancel"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Local servers window opens, selects a server, shows settings and console：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 6
+    - 8
+    - 10
+    - 13
+    - 18
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 15}}'
+    - step: 3
+      expectation: '{"assert_visible": "[data-testid=\"server-list\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"server-settings\"]"}'
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"server-row-ssh\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"server-row-ssh-start\"]"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"server-settings\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"server-settings\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"server-log\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"server-log-autoscroll\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"server-log-clear\"]"}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"servers-dialog-cancel\"]"}'
+    results:
+    - 19
+    - 21
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

@@ -1,184 +1,322 @@
 id: TC-IDE-BOOKMARK-01
-title: "Mnemonic bookmarks, groups, history, and resource lifecycle"
-description: |
-  ED-BOOKMARK-001 browser slice. Opens the browser-VFS README buffer and
+title: Mnemonic bookmarks, groups, history, and resource lifecycle
+description: 'ED-BOOKMARK-001 browser slice. Opens the browser-VFS README buffer and
+
   exercises the mounted bookmark owner: F11 toggle, group rename with Enter
+
   and Escape focus recovery, mnemonic conflict replacement, keyboard jump,
+
   Back history, remove, and delete/recreate missing-target recovery.
+
   Browser VFS proves the browser-wired UI and model transitions only; it does
+
   not claim native filesystem or IDEA runtime parity. Highest claim on green:
+
   L1 browser-wired bookmark lifecycle contract.
-covers: [F25.5]
-tags: [code-workspace, ide-bookmark, bookmarks, keyboard, lifecycle, p1, smoke]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-bookmark
+- bookmarks
+- keyboard
+- lifecycle
+- p1
+- smoke
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 180
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"]'
-  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
-
-  # A1: F11 creates a persistent bookmark and opens its separate panel.
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press:
-      key: F11
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - wait_for: '[data-testid="code-workspace-todos-panel"]'
-  - assert_count:
-      selector: '[data-testid="code-workspace-bookmark-item"]'
-      equal: 1
-  - assert_text:
-      selector: '[data-testid="code-workspace-todos-panel"]'
-      contains: Bookmarks
-
-  # A3: exercise both explicit group buttons, then keep the keyboard commit
-  # and Escape recovery paths covered as well.
-  - click: '[data-testid="code-workspace-bookmark-group-rename"]'
-  - fill:
-      selector: '[data-testid="code-workspace-bookmark-group-input"]'
-      value: Review
-  - click: '[data-testid="code-workspace-bookmark-group-save"]'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-bookmark-group"]'
-      name: data-group-name
-      equals: Review
-  - click: '[data-testid="code-workspace-bookmark-group-rename"]'
-  - fill:
-      selector: '[data-testid="code-workspace-bookmark-group-input"]'
-      value: Canceled
-  - click: '[data-testid="code-workspace-bookmark-group-cancel"]'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-bookmark-group"]'
-      name: data-group-name
-      equals: Review
-  - click: '[data-testid="code-workspace-bookmark-group-rename"]'
-  - fill:
-      selector: '[data-testid="code-workspace-bookmark-group-input"]'
-      value: Entered
-  - press:
-      key: Enter
-      selector: '[data-testid="code-workspace-bookmark-group-input"]'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-bookmark-group"]'
-      name: data-group-name
-      equals: Entered
-  - click: '[data-testid="code-workspace-bookmark-group-rename"]'
-  - fill:
-      selector: '[data-testid="code-workspace-bookmark-group-input"]'
-      value: Canceled
-  - press:
-      key: Escape
-      selector: '[data-testid="code-workspace-bookmark-group-input"]'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-bookmark-group"]'
-      name: data-group-name
-      equals: Entered
-  - eval_readonly:
-      expression: "document.activeElement?.getAttribute('data-testid') === 'code-workspace-bookmark-group-rename'"
-      expect_truthy: true
-  # Remove the first bookmark through its mounted control before creating the
-  # mnemonic entries; this keeps remove coverage independent of file deletion.
-  - click: '[data-testid="code-workspace-bookmark-remove"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-todos-panel"]'
-      contains: "No bookmarks yet"
-
-  # A1: assign a mnemonic, then assign the same mnemonic on the next line.
-  # The production model must clear the old mnemonic rather than duplicate it.
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press:
-      key: Control+F11
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - fill:
-      selector: '[data-testid="text-input-dialog-input"]'
-      value: J
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-bookmark-item"]'
-  - click: '[data-testid="code-workspace-bookmark-group-rename"]'
-  - fill:
-      selector: '[data-testid="code-workspace-bookmark-group-input"]'
-      value: Review
-  - press:
-      key: Enter
-      selector: '[data-testid="code-workspace-bookmark-group-input"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press:
-      key: Mod+Home
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - press:
-      key: ArrowDown
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - press:
-      key: Control+F11
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - fill:
-      selector: '[data-testid="text-input-dialog-input"]'
-      value: J
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - assert_count:
-      selector: '[data-testid="code-workspace-bookmark-item"]'
-      equal: 2
-  - assert_count:
-      selector: '[data-testid="code-workspace-bookmark-mnemonic"]'
-      equal: 1
-  - click: '[data-testid="code-workspace-bookmark-open"]'
-  - assert_visible: '[data-testid="code-workspace-editor"] .cm-content'
-
-  # A2: Ctrl+J jumps from line one to the current J bookmark and records the
-  # origin so the mounted Back control can restore it.
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press:
-      key: Mod+Home
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - press:
-      key: Mod+J
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "Jumped to bookmark [J]"
-  - assert_enabled: '[data-testid="code-workspace-nav-back"]'
-  - click: '[data-testid="code-workspace-nav-back"]'
-
-  # A3: delete through the focused tree action. The bookmark identities stay
-  # visible as missing until the same resource is recreated.
-  - click: '[data-testid="code-workspace-tree-file"]'
-  - press:
-      key: Delete
-      selector: '[data-testid="code-workspace-tree-file"]'
-  - wait_for: '[data-testid="confirm-dialog"]'
-  - click: '[data-testid="confirm-dialog-confirm"]'
-  - wait_for:
-      selector: '[data-testid="code-workspace-bookmark-item"][data-state="missing"]'
-      timeout_sec: 15
-  - assert_text:
-      selector: '[data-testid="code-workspace-bookmark-missing"]'
-      contains: Missing target
-  - assert_count:
-      selector: '[data-testid="code-workspace-bookmark-item"][data-state="missing"]'
-      equal: 2
-
-  # Recreate the deleted resource through the real mounted New File action.
-  - click: '[data-testid="code-workspace-tree-new-file"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - fill:
-      selector: '[data-testid="text-input-dialog-input"]'
-      value: README.txt
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
-  - wait_for:
-      selector: '[data-testid="code-workspace-bookmark-item"][data-state="current"]'
-      timeout_sec: 15
-  - assert_count:
-      selector: '[data-testid="code-workspace-bookmark-item"][data-state="missing"]'
-      equal: 0
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: F11
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="code-workspace-todos-panel"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-bookmark-item"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="code-workspace-todos-panel"]'
+    contains: Bookmarks
+- click: '[data-testid="code-workspace-bookmark-group-rename"]'
+- fill:
+    selector: '[data-testid="code-workspace-bookmark-group-input"]'
+    value: Review
+- click: '[data-testid="code-workspace-bookmark-group-save"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-bookmark-group"]'
+    name: data-group-name
+    equals: Review
+- click: '[data-testid="code-workspace-bookmark-group-rename"]'
+- fill:
+    selector: '[data-testid="code-workspace-bookmark-group-input"]'
+    value: Canceled
+- click: '[data-testid="code-workspace-bookmark-group-cancel"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-bookmark-group"]'
+    name: data-group-name
+    equals: Review
+- click: '[data-testid="code-workspace-bookmark-group-rename"]'
+- fill:
+    selector: '[data-testid="code-workspace-bookmark-group-input"]'
+    value: Entered
+- press:
+    key: Enter
+    selector: '[data-testid="code-workspace-bookmark-group-input"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-bookmark-group"]'
+    name: data-group-name
+    equals: Entered
+- click: '[data-testid="code-workspace-bookmark-group-rename"]'
+- fill:
+    selector: '[data-testid="code-workspace-bookmark-group-input"]'
+    value: Canceled
+- press:
+    key: Escape
+    selector: '[data-testid="code-workspace-bookmark-group-input"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-bookmark-group"]'
+    name: data-group-name
+    equals: Entered
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-bookmark-group-rename'
+    expect_truthy: true
+- click: '[data-testid="code-workspace-bookmark-remove"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-todos-panel"]'
+    contains: No bookmarks yet
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: Control+F11
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: J
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-bookmark-item"]'
+- click: '[data-testid="code-workspace-bookmark-group-rename"]'
+- fill:
+    selector: '[data-testid="code-workspace-bookmark-group-input"]'
+    value: Review
+- press:
+    key: Enter
+    selector: '[data-testid="code-workspace-bookmark-group-input"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: Mod+Home
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowDown
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: Control+F11
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: J
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-bookmark-item"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="code-workspace-bookmark-mnemonic"]'
+    equal: 1
+- click: '[data-testid="code-workspace-bookmark-open"]'
+- assert_visible: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: Mod+Home
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: Mod+J
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Jumped to bookmark [J]
+- assert_enabled: '[data-testid="code-workspace-nav-back"]'
+- click: '[data-testid="code-workspace-nav-back"]'
+- click: '[data-testid="code-workspace-tree-file"]'
+- press:
+    key: Delete
+    selector: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-bookmark-item"][data-state="missing"]'
+    timeout_sec: 15
+- assert_text:
+    selector: '[data-testid="code-workspace-bookmark-missing"]'
+    contains: Missing target
+- assert_count:
+    selector: '[data-testid="code-workspace-bookmark-item"][data-state="missing"]'
+    equal: 2
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: README.txt
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-bookmark-item"][data-state="current"]'
+    timeout_sec: 15
+- assert_count:
+    selector: '[data-testid="code-workspace-bookmark-item"][data-state="missing"]'
+    equal: 0
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Mnemonic bookmarks, groups, history, and resource lifecycle：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 13
+    - 14
+    - 18
+    - 19
+    - 20
+    - 22
+    - 23
+    - 24
+    - 26
+    - 27
+    - 28
+    - 30
+    - 31
+    - 32
+    - 35
+    - 37
+    - 38
+    - 40
+    - 41
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+    - 51
+    - 52
+    - 55
+    - 57
+    - 58
+    - 59
+    - 62
+    - 63
+    - 64
+    - 66
+    - 70
+    - 72
+    - 73
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-todos-panel\"]"}'
+    - step: 16
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"]", "equal": 1}}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-todos-panel\"]", "contains": "Bookmarks"}}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]", "name":
+        "data-group-name", "equals": "Review"}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]", "name":
+        "data-group-name", "equals": "Review"}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]", "name":
+        "data-group-name", "equals": "Entered"}}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bookmark-group\"]", "name":
+        "data-group-name", "equals": "Entered"}}'
+    - step: 34
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'') ===
+        ''code-workspace-bookmark-group-rename''", "expect_truthy": true}}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-todos-panel\"]", "contains": "No
+        bookmarks yet"}}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-bookmark-item\"]"}'
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"]", "equal": 2}}'
+    - step: 54
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-mnemonic\"]", "equal":
+        1}}'
+    - step: 56
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
+    - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Jumped to
+        bookmark [J]"}}'
+    - step: 61
+      expectation: '{"assert_enabled": "[data-testid=\"code-workspace-nav-back\"]"}'
+    - step: 65
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 67
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]",
+        "timeout_sec": 15}}'
+    - step: 68
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-bookmark-missing\"]", "contains":
+        "Missing target"}}'
+    - step: 69
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]",
+        "equal": 2}}'
+    - step: 71
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 74
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.txt\"]"}'
+    - step: 75
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"current\"]",
+        "timeout_sec": 15}}'
+    - step: 76
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]",
+        "equal": 0}}'
+    results:
+    - 74
+    - 75
+    - 76
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

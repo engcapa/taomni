@@ -1,68 +1,174 @@
 id: TC-auto-F11-2-sdk-toolchains
 title: Register and manage a Kotlin SDK toolchain
-description: |
-  Exercises the browser-backed SDK registry from Settings. The case verifies
+description: 'Exercises the browser-backed SDK registry from Settings. The case verifies
+
   all four supported SDK families are present, probes and registers a Kotlin
+
   installation, promotes it to the Kotlin default, refreshes and edits it,
+
   verifies persistence, then removes it to leave the registry clean.
-covers: [F11.2]
-tags: [auto-generated, smoke, needs-review, settings, sdk, kotlin]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F11.2
+tags:
+- auto-generated
+- smoke
+- needs-review
+- settings
+- sdk
+- kotlin
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="ribbon-settings"]'
-  - click: '[data-testid="ribbon-settings"]'
-  - wait_for: '[data-testid="settings-panel"]'
-  - fill: {selector: '[data-testid="settings-search-input"]', value: kotlin}
-  - assert_visible: '[data-testid="sdk-settings"]'
-
-  # Every requested SDK family has its own registry/default surface.
-  - assert_text: {selector: '[data-testid="sdk-kind-java"]', contains: "Java / JDK"}
-  - assert_text: {selector: '[data-testid="sdk-kind-kotlin"]', contains: Kotlin}
-  - assert_text: {selector: '[data-testid="sdk-kind-scala"]', contains: Scala}
-  - assert_text: {selector: '[data-testid="sdk-kind-python"]', contains: Python}
-
-  # Browser discovery is deterministic and empty, but the interaction and
-  # explicit empty result are still part of the supported workflow.
-  - click: '[data-testid="sdk-discover"]'
-  - wait_for: '[data-testid="sdk-discovery-results"]'
-  - assert_text: {selector: '[data-testid="sdk-discovery-results"]', contains: "No new ready installations were found."}
-  - click: '[data-testid="sdk-discovery-close"]'
-
-  # Register a Kotlin compiler separately from Java/JDK.
-  - click: '[data-testid="sdk-add"]'
-  - wait_for: '[data-testid="sdk-editor"]'
-  - select_option: {selector: '[data-testid="sdk-editor-kind"]', value: kotlin}
-  - fill: {selector: '[data-testid="sdk-editor-name"]', value: "QA Kotlin 2.1"}
-  - fill: {selector: '[data-testid="sdk-editor-location"]', value: "/opt/kotlin-2.1.20"}
-  - click: '[data-testid="sdk-editor-probe-button"]'
-  - assert_text: {selector: '[data-testid="sdk-editor-probe"]', contains: "2.1.20"}
-  - click: '[data-testid="sdk-editor-save"]'
-  - wait_for: '[data-testid^="sdk-row-"]'
-  - assert_text: {selector: '[data-testid^="sdk-row-"]', contains: "QA Kotlin 2.1"}
-
-  # Default selection is persisted and shared with workspace resolution.
-  - select_option: {selector: '[data-testid="sdk-default-kotlin"]', label: "QA Kotlin 2.1"}
-  - assert_localstorage:
-      key: taomni.stub.sdkRegistry.v1
-      contains: '"defaults":[{"kind":"kotlin"'
-  - click: '[data-testid="sdk-refresh-all"]'
-  - click: '[data-testid="sdk-installation-refresh"]'
-
-  # Edit uses the same probe/save path and preserves the installation id.
-  - click: '[data-testid="sdk-installation-edit"]'
-  - wait_for: '[data-testid="sdk-editor"]'
-  - fill: {selector: '[data-testid="sdk-editor-name"]', value: "QA Kotlin 2.1 updated"}
-  - click: '[data-testid="sdk-editor-save"]'
-  - assert_text: {selector: '[data-testid^="sdk-row-"]', contains: "QA Kotlin 2.1 updated"}
-
-  # Remove is confirmed and also clears the default binding.
-  - seed_dialog: {prompt: [], confirm: true}
-  - click: '[data-testid="sdk-installation-remove"]'
-  - wait_for: {selector: '[data-testid^="sdk-row-"]', state: detached}
-  - assert_localstorage:
-      key: taomni.stub.sdkRegistry.v1
-      contains: '"installations":[]'
-  - screenshot: F11.2-sdk-toolchains.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: kotlin
+- assert_visible: '[data-testid="sdk-settings"]'
+- assert_text:
+    selector: '[data-testid="sdk-kind-java"]'
+    contains: Java / JDK
+- assert_text:
+    selector: '[data-testid="sdk-kind-kotlin"]'
+    contains: Kotlin
+- assert_text:
+    selector: '[data-testid="sdk-kind-scala"]'
+    contains: Scala
+- assert_text:
+    selector: '[data-testid="sdk-kind-python"]'
+    contains: Python
+- click: '[data-testid="sdk-discover"]'
+- wait_for: '[data-testid="sdk-discovery-results"]'
+- assert_text:
+    selector: '[data-testid="sdk-discovery-results"]'
+    contains: No new ready installations were found.
+- click: '[data-testid="sdk-discovery-close"]'
+- click: '[data-testid="sdk-add"]'
+- wait_for: '[data-testid="sdk-editor"]'
+- select_option:
+    selector: '[data-testid="sdk-editor-kind"]'
+    value: kotlin
+- fill:
+    selector: '[data-testid="sdk-editor-name"]'
+    value: QA Kotlin 2.1
+- fill:
+    selector: '[data-testid="sdk-editor-location"]'
+    value: /opt/kotlin-2.1.20
+- click: '[data-testid="sdk-editor-probe-button"]'
+- assert_text:
+    selector: '[data-testid="sdk-editor-probe"]'
+    contains: 2.1.20
+- click: '[data-testid="sdk-editor-save"]'
+- wait_for: '[data-testid^="sdk-row-"]'
+- assert_text:
+    selector: '[data-testid^="sdk-row-"]'
+    contains: QA Kotlin 2.1
+- select_option:
+    selector: '[data-testid="sdk-default-kotlin"]'
+    label: QA Kotlin 2.1
+- assert_localstorage:
+    key: taomni.stub.sdkRegistry.v1
+    contains: '"defaults":[{"kind":"kotlin"'
+- click: '[data-testid="sdk-refresh-all"]'
+- click: '[data-testid="sdk-installation-refresh"]'
+- click: '[data-testid="sdk-installation-edit"]'
+- wait_for: '[data-testid="sdk-editor"]'
+- fill:
+    selector: '[data-testid="sdk-editor-name"]'
+    value: QA Kotlin 2.1 updated
+- click: '[data-testid="sdk-editor-save"]'
+- assert_text:
+    selector: '[data-testid^="sdk-row-"]'
+    contains: QA Kotlin 2.1 updated
+- seed_dialog:
+    prompt: []
+    confirm: true
+- click: '[data-testid="sdk-installation-remove"]'
+- wait_for:
+    selector: '[data-testid^="sdk-row-"]'
+    state: detached
+- assert_localstorage:
+    key: taomni.stub.sdkRegistry.v1
+    contains: '"installations":[]'
+- screenshot: F11.2-sdk-toolchains.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Register and manage a Kotlin SDK toolchain：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 11
+    - 14
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 25
+    - 27
+    - 28
+    - 29
+    - 31
+    - 32
+    - 34
+    - 35
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"ribbon-settings\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"sdk-settings\"]"}'
+    - step: 7
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-java\"]", "contains": "Java / JDK"}}'
+    - step: 8
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-kotlin\"]", "contains": "Kotlin"}}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-scala\"]", "contains": "Scala"}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-kind-python\"]", "contains": "Python"}}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"sdk-discovery-results\"]"}'
+    - step: 13
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-discovery-results\"]", "contains": "No new
+        ready installations were found."}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"sdk-editor\"]"}'
+    - step: 21
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sdk-editor-probe\"]", "contains": "2.1.20"}}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid^=\"sdk-row-\"]"}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid^=\"sdk-row-\"]", "contains": "QA Kotlin 2.1"}}'
+    - step: 26
+      expectation: '{"assert_localstorage": {"key": "taomni.stub.sdkRegistry.v1", "contains": "\"defaults\":[{\"kind\":\"kotlin\""}}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"sdk-editor\"]"}'
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid^=\"sdk-row-\"]", "contains": "QA Kotlin 2.1 updated"}}'
+    - step: 36
+      expectation: '{"wait_for": {"selector": "[data-testid^=\"sdk-row-\"]", "state": "detached"}}'
+    - step: 37
+      expectation: '{"assert_localstorage": {"key": "taomni.stub.sdkRegistry.v1", "contains": "\"installations\":[]"}}'
+    results:
+    - 36
+    - 37
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

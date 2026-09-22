@@ -244,7 +244,7 @@ def step_assert_attribute(ctx: StepContext, args: Any) -> None:
         return
     loc = ctx.page.locator(selector).first  # type: ignore[attr-defined]
     actual = loc.get_attribute(name)
-    if actual is None and name == "value":
+    if name == "value":
         try:
             actual = loc.input_value()
         except Exception:

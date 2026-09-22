@@ -1,41 +1,181 @@
 id: TC-027
 title: SFTP file table sorts by column header click
-covers: [F7.2]
-tags: [columns, legacy-imported, p1, sftp, sorting]
-modes: [browser, native]
-fixtures: [reset_db, ssh_required, sftp_required]
+covers:
+- F7.2
+tags:
+- columns
+- legacy-imported
+- p1
+- sftp
+- sorting
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+- sftp_required
 steps:
-  - open: "${cfg.app.base_url}"
-  # Reveal the QuickConnect bar without the in-bar app menu: that menu is
-  # hidden on native macOS by design (native global menu). Seeding the
-  # persisted visibility flag and reloading selects the same UI on all three
-  # platforms; Menu-path coverage stays in the browser-only cases.
-  - seed_storage:
-      key: taomni.quickConnectVisible
-      value: 'true'
-  - reload_window: null
-  - wait_for: '[data-testid="qc-input"]'
-  - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
-  - click: "[data-testid=\"qc-submit\"]"
-  - wait_for: "[data-testid=\"auth-prompt\"]"
-  - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
-  - click: "[data-testid=\"auth-submit\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 4
-  - click: "[data-testid=\"attached-sftp-toggle\"]"
-  - wait_for: "[data-testid=\"sftp-browser\"]"
-  - click: "[data-testid=\"sftp-remote-path\"]"
-  - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
-  - press: Enter
-  - wait: 2
-  - click: "[data-testid=\"col-header-name\"]"
-  - wait: 1
-  - click: "[data-testid=\"col-header-name\"]"
-  - wait: 1
-  - click: "[data-testid=\"col-header-size\"]"
-  - wait: 1
-  - click: "[data-testid=\"col-header-modified\"]"
-  - wait: 1
-  - click: "[data-testid=\"col-header-type\"]"
-  - wait: 1
-  - screenshot: 027-sftp-column-sort.png
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 4
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
+    text: mkdir -p '${cfg.sftp.remote_test_dir}/qa-sort-TC027/folder' && printf abc > '${cfg.sftp.remote_test_dir}/qa-sort-TC027/a.log'
+      && printf b > '${cfg.sftp.remote_test_dir}/qa-sort-TC027/b.txt' && printf cc > '${cfg.sftp.remote_test_dir}/qa-sort-TC027/c.csv'
+      && touch -t 202001030000 '${cfg.sftp.remote_test_dir}/qa-sort-TC027/a.log' && touch -t 202001020000 '${cfg.sftp.remote_test_dir}/qa-sort-TC027/b.txt'
+      && touch -t 202001010000 '${cfg.sftp.remote_test_dir}/qa-sort-TC027/c.csv' && printf '\nQA_SORT_READY\n'
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_SORT_READY\r?$
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-remote-pane"]'
+- click: '[data-testid="sftp-remote-path"]'
+- fill:
+    selector: '[data-testid="sftp-remote-path"]'
+    value: ${cfg.sftp.remote_test_dir}/qa-sort-TC027
+- press: Enter
+- assert_items:
+    selector: '[data-testid="sftp-remote-pane"] tr[data-row] td:first-child > div > span:first-of-type'
+    equals:
+    - folder
+    - a.log
+    - b.txt
+    - c.csv
+- click: '[data-testid="sftp-remote-pane"] [data-testid="col-header-name"]'
+- assert_items:
+    selector: '[data-testid="sftp-remote-pane"] tr[data-row] td:first-child > div > span:first-of-type'
+    equals:
+    - folder
+    - c.csv
+    - b.txt
+    - a.log
+- click: '[data-testid="sftp-remote-pane"] [data-testid="col-header-name"]'
+- assert_items:
+    selector: '[data-testid="sftp-remote-pane"] tr[data-row] td:first-child > div > span:first-of-type'
+    equals:
+    - folder
+    - a.log
+    - b.txt
+    - c.csv
+- click: '[data-testid="sftp-remote-pane"] [data-testid="col-header-size"]'
+- assert_items:
+    selector: '[data-testid="sftp-remote-pane"] tr[data-row] td:first-child > div > span:first-of-type'
+    equals:
+    - folder
+    - b.txt
+    - c.csv
+    - a.log
+- click: '[data-testid="sftp-remote-pane"] [data-testid="col-header-size"]'
+- assert_items:
+    selector: '[data-testid="sftp-remote-pane"] tr[data-row] td:first-child > div > span:first-of-type'
+    equals:
+    - folder
+    - a.log
+    - c.csv
+    - b.txt
+- click: '[data-testid="sftp-remote-pane"] [data-testid="col-header-modified"]'
+- assert_items:
+    selector: '[data-testid="sftp-remote-pane"] tr[data-row] td:first-child > div > span:first-of-type'
+    equals:
+    - folder
+    - c.csv
+    - b.txt
+    - a.log
+- click: '[data-testid="sftp-remote-pane"] [data-testid="col-header-modified"]'
+- assert_items:
+    selector: '[data-testid="sftp-remote-pane"] tr[data-row] td:first-child > div > span:first-of-type'
+    equals:
+    - folder
+    - a.log
+    - b.txt
+    - c.csv
+- click: '[data-testid="sftp-remote-pane"] [data-testid="col-header-type"]'
+- assert_items:
+    selector: '[data-testid="sftp-remote-pane"] tr[data-row] td:first-child > div > span:first-of-type'
+    equals:
+    - folder
+    - c.csv
+    - a.log
+    - b.txt
+- click: '[data-testid="sftp-remote-pane"] [data-testid="col-header-type"]'
+- assert_items:
+    selector: '[data-testid="sftp-remote-pane"] tr[data-row] td:first-child > div > span:first-of-type'
+    equals:
+    - folder
+    - b.txt
+    - a.log
+    - c.csv
+- screenshot: 027-sftp-column-sort.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 已知大小/时间/扩展名的文件列表保持目录优先，名称/大小/时间/类型分别正确升降序
+    actions:
+    - 15
+    - 17
+    - 18
+    - 19
+    - 21
+    - 23
+    - 25
+    - 27
+    - 29
+    - 31
+    - 33
+    - 35
+    checkpoints:
+    - step: 20
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-pane\"] tr[data-row] td:first-child
+        > div > span:first-of-type", "equals": ["folder", "a.log", "b.txt", "c.csv"]}}'
+    - step: 22
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-pane\"] tr[data-row] td:first-child
+        > div > span:first-of-type", "equals": ["folder", "c.csv", "b.txt", "a.log"]}}'
+    - step: 24
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-pane\"] tr[data-row] td:first-child
+        > div > span:first-of-type", "equals": ["folder", "a.log", "b.txt", "c.csv"]}}'
+    - step: 26
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-pane\"] tr[data-row] td:first-child
+        > div > span:first-of-type", "equals": ["folder", "b.txt", "c.csv", "a.log"]}}'
+    - step: 28
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-pane\"] tr[data-row] td:first-child
+        > div > span:first-of-type", "equals": ["folder", "a.log", "c.csv", "b.txt"]}}'
+    - step: 30
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-pane\"] tr[data-row] td:first-child
+        > div > span:first-of-type", "equals": ["folder", "c.csv", "b.txt", "a.log"]}}'
+    - step: 32
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-pane\"] tr[data-row] td:first-child
+        > div > span:first-of-type", "equals": ["folder", "a.log", "b.txt", "c.csv"]}}'
+    - step: 34
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-pane\"] tr[data-row] td:first-child
+        > div > span:first-of-type", "equals": ["folder", "c.csv", "a.log", "b.txt"]}}'
+    - step: 36
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-pane\"] tr[data-row] td:first-child
+        > div > span:first-of-type", "equals": ["folder", "b.txt", "a.log", "c.csv"]}}'
+    results:
+    - 36
+  visual:
+  - check: 检查截图中表格列、行名、按钮不重叠/截断，排序或操作反馈可见。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图记录评审。
+  native:
+  - check: 按 native 模式在 Linux WebKitGTK 执行同一工作流；本用例不包含 Windows/macOS 运行证据。
+    method: automated
+    reason: 按实际执行模式与指定边界解释证据。
