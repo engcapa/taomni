@@ -855,6 +855,7 @@
   ↳ `[data-testid="app-theme-light"]` — alias
   ↳ `[data-testid="app-theme-system"]` — alias
 - `button[aria-label="Cycle application theme"]` — interactive [optional] — F5.5.theme-icon-button
+- `html` — display — F5.5.root-theme-attr
 
 ## main/welcome (F1.6)
 
@@ -1269,12 +1270,19 @@
 - `[data-testid="sftp-local-list"]` — display — F7.2.local-list
 - `[data-testid="sftp-remote-list"]` — display — F7.2.remote-list
 - `[data-testid="col-header-name"]` — interactive — F7.2.col-header-name
+  ↳ `[data-testid="sftp-remote-pane"] [data-testid="col-header-name"]` — alias
 - `[data-testid="col-header-size"]` — interactive — F7.2.col-header-size
+  ↳ `[data-testid="sftp-remote-pane"] [data-testid="col-header-size"]` — alias
 - `[data-testid="col-header-type"]` — interactive — F7.2.col-header-type
+  ↳ `[data-testid="sftp-remote-pane"] [data-testid="col-header-type"]` — alias
 - `[data-testid="col-header-modified"]` — interactive — F7.2.col-header-modified
+  ↳ `[data-testid="sftp-remote-pane"] [data-testid="col-header-modified"]` — alias
 - `[data-testid="col-resize-name"]` — interactive — F7.2.col-resize-name
+  ↳ `[data-testid="sftp-remote-pane"] [data-testid="col-resize-name"]` — alias
 - `[data-testid="col-resize-size"]` — interactive — F7.2.col-resize-size
+  ↳ `[data-testid="sftp-remote-pane"] [data-testid="col-resize-size"]` — alias
 - `[data-testid="col-resize-modified"]` — interactive — F7.2.col-resize-modified
+  ↳ `[data-testid="sftp-remote-pane"] [data-testid="col-resize-modified"]` — alias
 - `[data-testid="breadcrumb-drives-root"]` — interactive [optional] — F7.2.breadcrumb-drives-root
 - `[data-testid="sftp-preview-close"]` — interactive [optional] — F7.2.preview-close
 
@@ -1295,6 +1303,8 @@
 - `[data-testid="sftp-local-path"]` — interactive — F7.5.local-path
 - `[data-testid="sftp-remote-path"]` — interactive — F7.5.remote-path
   ↳ `input[data-testid="sftp-remote-path"]` — alias
+- `[data-testid="sftp-local-path-edit"]` — interactive — F7.5.local-path-edit
+- `[data-testid="sftp-remote-path-edit"]` — interactive — F7.5.remote-path-edit
 - `[data-testid="sftp-local-back"]` — interactive — F7.5.local-back
 - `[data-testid="sftp-local-forward"]` — interactive — F7.5.local-forward
 - `[data-testid="sftp-local-up"]` — interactive — F7.5.local-up
@@ -1337,6 +1347,7 @@
   ↳ `text="Rename"` — alias
 - `[data-testid="context-menu-item-delete"]` — interactive [optional] — F7.5.ctx-delete
 - `[aria-label="Permissions"]` — display — F7.5.chmod-dialog
+- `#chmod-octal` — interactive — F7.5.chmod-octal
 - `role=button[name="Apply"]` — interactive — F7.5.chmod-apply
 
 ## terminal/appearance (F5.2)
@@ -1418,6 +1429,10 @@
 - `text="Syntax highlighting"` — interactive [optional] — F4.3.syntax-highlighting
 - `text="Default"` — interactive [optional] — F4.3.syntax-default
 - `text="Error/Warning/Success keywords"` — interactive [optional] — F4.3.syntax-keywords
+- `.terminal-keyword-error` — display — F4.3.keyword-error
+- `.terminal-keyword-warning` — display — F4.3.keyword-warning
+- `.terminal-keyword-success` — display — F4.3.keyword-success
+- `.terminal-keyword-hit` — display — F4.3.keyword-hit
 
 ## terminal/right-menu (F4.4)
 

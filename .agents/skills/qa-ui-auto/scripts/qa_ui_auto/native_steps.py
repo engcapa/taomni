@@ -594,8 +594,15 @@ def _host_write_file(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(args, dict) or not {"path", "text"} <= set(args):
         raise StepError("host_write_file: expected {path, text}")
     requested = Path(str(args["path"])).expanduser()
+    # Allow staging a new path (e.g. mixed-shape new file) as long as the
+    # parent exists inside the report root. Mutation of existing files keeps
+    # working; creation no longer fails with "cannot resolve".
     try:
-        target = requested.resolve(strict=True)
+        if requested.exists():
+            target = requested.resolve(strict=True)
+        else:
+            parent = requested.parent.resolve(strict=True)
+            target = (parent / requested.name).resolve(strict=False)
     except OSError as exc:
         raise StepError(f"host_write_file: cannot resolve {requested}: {exc}") from exc
     report_root = ctx.case_dir.parent.resolve()

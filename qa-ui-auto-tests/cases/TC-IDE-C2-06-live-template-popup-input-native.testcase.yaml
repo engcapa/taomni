@@ -94,7 +94,7 @@ steps:
     timeout_sec: 10
 - assert_text_equals:
     selector: '[data-testid="code-workspace-editor"] .cm-line:nth-child(9)'
-    equals: System.out.println("App.main()");
+    equals: '        System.out.println("App.main()");'
     timeout_sec: 30
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
@@ -147,7 +147,7 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]", "timeout_sec": 10}}'
     - step: 20
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:nth-child(9)",
-        "equals": "System.out.println(\"App.main()\");", "timeout_sec": 30}}'
+        "equals": "        System.out.println(\"App.main()\");", "timeout_sec": 30}}'
     - step: 22
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:nth-child(9)",
         "equals": "sout", "timeout_sec": 30}}'

@@ -50,7 +50,7 @@ steps:
 - assert_visible: '[data-testid="sftp-local-pane"]'
 - assert_visible: '[data-testid="sftp-local-list"]'
 - assert_visible: '[data-testid="sftp-local-refresh"]'
-- click: '[data-testid="sftp-local-path"]'
+- click: '[data-testid="sftp-local-path-edit"]'
 - press: Escape
 - wait: 0.3
 - click: '[data-testid="sftp-local-up"]'

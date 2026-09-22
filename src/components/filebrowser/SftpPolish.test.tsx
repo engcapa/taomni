@@ -421,6 +421,27 @@ describe("sftpController.download empty-local-dir fallback", () => {
 });
 
 describe("PathBreadcrumb Windows drives root", () => {
+  it("edits the current path without navigating and keeps segment navigation available", () => {
+    const onNavigate = vi.fn();
+    const onSubmit = vi.fn();
+    const { getByTestId, getByText } = render(
+      <PathBreadcrumb testId="review-path" path="/tmp/qa-path-TC028/a/b"
+        onNavigate={onNavigate} onSubmit={onSubmit} />,
+    );
+    fireEvent.click(getByTestId("review-path-edit"));
+    expect(getByTestId("review-path")).toHaveValue("/tmp/qa-path-TC028/a/b");
+    expect(getByTestId("review-path")).toHaveFocus();
+    expect(onNavigate).not.toHaveBeenCalled();
+    fireEvent.keyDown(getByTestId("review-path"), { key: "Escape" });
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(getByText("tmp"));
+    expect(onNavigate).toHaveBeenCalledExactlyOnceWith("/tmp");
+    fireEvent.click(getByTestId("review-path-edit"));
+    fireEvent.change(getByTestId("review-path"), { target: { value: "/etc" } });
+    fireEvent.keyDown(getByTestId("review-path"), { key: "Enter" });
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith("/etc");
+  });
+
   it("uses the compact horizontal scroller for a long path", () => {
     const { getByTestId, getByText } = render(
       <PathBreadcrumb

@@ -41,12 +41,12 @@ steps:
     regex: (?m)^QA_PATH_READY\r?$
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-remote-pane"]'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - fill:
     selector: '[data-testid="sftp-remote-path"]'
     value: ${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b
 - press: Enter
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
@@ -54,7 +54,7 @@ steps:
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-up"]'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
@@ -62,7 +62,7 @@ steps:
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-up"]'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
@@ -70,7 +70,7 @@ steps:
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-back"]'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
@@ -78,7 +78,7 @@ steps:
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-forward"]'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
@@ -86,19 +86,19 @@ steps:
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - click: '[data-testid="sftp-remote-path"] span button:has-text("tmp")'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
     equals: /tmp
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - fill:
     selector: '[data-testid="sftp-remote-path"]'
     value: /
 - press: Enter
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value

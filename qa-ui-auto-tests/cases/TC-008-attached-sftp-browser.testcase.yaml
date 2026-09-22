@@ -53,8 +53,9 @@ steps:
 - set_remote_path: ${cfg.sftp.remote_test_dir}
 - wait: 1
 - click: '[data-testid="sftp-remote-refresh"]'
-- wait: 1
-- click: '[data-testid="sftp-remote-path"]'
+- wait: 2
+- click: '[data-testid="sftp-remote-path-edit"]'
+- wait_for: input[data-testid="sftp-remote-path"]
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
@@ -98,10 +99,12 @@ verification:
     - step: 18
       expectation: '{"assert_visible": "[data-testid=\"col-header-type\"]"}'
     - step: 24
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 25
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
         "equals": "${cfg.sftp.remote_test_dir}"}}'
     results:
-    - 24
+    - 25
   visual:
   - check: 双栏标题、列头与路径栏不重叠。
     method: manual

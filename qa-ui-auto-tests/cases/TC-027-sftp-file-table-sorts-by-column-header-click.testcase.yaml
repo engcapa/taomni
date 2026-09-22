@@ -33,7 +33,9 @@ steps:
 - click: '[data-testid="auth-submit"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - wait: 4
-- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
     text: mkdir -p '${cfg.sftp.remote_test_dir}/qa-sort-TC027/folder' && printf abc > '${cfg.sftp.remote_test_dir}/qa-sort-TC027/a.log'
@@ -46,7 +48,7 @@ steps:
     regex: (?m)^QA_SORT_READY\r?$
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-remote-pane"]'
-- click: '[data-testid="sftp-remote-path"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
 - fill:
     selector: '[data-testid="sftp-remote-path"]'
     value: ${cfg.sftp.remote_test_dir}/qa-sort-TC027

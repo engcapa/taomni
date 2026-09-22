@@ -76,7 +76,7 @@ def step_set_remote_path(ctx: StepContext, args: Any) -> None:
         return
     page = ctx.page
     inp = page.locator('[data-testid="sftp-remote-path"]').first  # type: ignore[attr-defined]
-    inp.click()
+    page.locator('[data-testid="sftp-remote-path-edit"]').first.click()  # type: ignore[attr-defined]
     inp.fill(path)
     inp.press("Enter")
 

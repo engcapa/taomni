@@ -59,7 +59,7 @@ steps:
 - click: '[data-testid="confirm-dialog-confirm"]'
 - assert_not_visible: '[data-testid="confirm-dialog"]'
 - wait: 1
-- assert_not_visible: '[data-testid="sftp-browser"] tr[title$="/qa-ui-auto-dblclick.txt"]'
+- assert_not_visible: '[data-testid="sftp-remote-pane"] tr[title$="/qa-ui-auto-dblclick.txt"]'
 - screenshot: 049-sftp-double-click-download.png
 verification:
   review: reviewed
@@ -110,7 +110,7 @@ verification:
     - step: 35
       expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
     - step: 37
-      expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"] tr[title$=\"/qa-ui-auto-dblclick.txt\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-remote-pane\"] tr[title$=\"/qa-ui-auto-dblclick.txt\"]"}'
     results:
     - 35
     - 37
