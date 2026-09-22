@@ -64,6 +64,9 @@ steps:
                 Assert.assertTrue(App.class.getDeclaredMethods().length > 0);
             }
         }
+  # The retained fixture's .mvn/maven.config makes every Maven terminal record
+  # the JDK actually observed inside the app PTY. This distinguishes runner
+  # preparation from end-to-end SDK propagation.
   - reload_window: null
   - click: '[data-testid="welcome-history-tab-workspaces"]'
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
@@ -83,7 +86,11 @@ steps:
       timeout_sec: 60
 
   # Provider run configuration: edit, save, reset, copy, select, and delete.
-  - click: '[data-testid="code-workspace-bottom-tab-run"]'
+  # Run can live in the overflow menu on smaller hosted desktops. Its normal
+  # workspace action opens the same panel regardless of the dock's width.
+  - press:
+      key: Alt+4
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
   - wait_for: '[data-testid="code-workspace-run-panel"]'
   - wait_for:
       selector: '[data-testid^="run-panel-configuration-java-main:"]'
@@ -166,9 +173,13 @@ steps:
       timeout_sec: 90
   - click: '[data-testid="build-panel-build-project"]'
   - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - wait_for:
+      selector: '[data-testid="build-panel-build-project"]:not(:disabled)'
+      state: attached
+      timeout_sec: 90
   - assert_pattern:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-      regex: '(?s).*BUILD SUCCESS.*'
+      regex: '(?s).*Java version:\s+21(?:[.,\s]|$).*BUILD SUCCESS.*'
       timeout_sec: 60
   - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
   - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
@@ -177,9 +188,13 @@ steps:
   - assert_not_visible: '[data-testid="build-panel-execution-error"]'
   - click: '[data-testid="build-panel-rebuild-project"]'
   - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - wait_for:
+      selector: '[data-testid="build-panel-rebuild-project"]:not(:disabled)'
+      state: attached
+      timeout_sec: 120
   - assert_pattern:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-      regex: '(?s).*BUILD SUCCESS.*'
+      regex: '(?s).*Java version:\s+21(?:[.,\s]|$).*BUILD SUCCESS.*'
       timeout_sec: 60
   - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
   - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
@@ -188,9 +203,13 @@ steps:
   - assert_not_visible: '[data-testid="build-panel-execution-error"]'
   - click: '[data-testid^="build-panel-target-build:"]'
   - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+  - wait_for:
+      selector: '[data-testid="build-panel-build-project"]:not(:disabled)'
+      state: attached
+      timeout_sec: 90
   - assert_pattern:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-      regex: '(?s).*BUILD SUCCESS.*'
+      regex: '(?s).*Java version:\s+21(?:[.,\s]|$).*BUILD SUCCESS.*'
       timeout_sec: 60
 
   # Java test discovery, execution, result ingestion, failure details, rerun.

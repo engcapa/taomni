@@ -10,10 +10,31 @@ from unittest import TestCase, skipUnless
 from unittest.mock import Mock, call, patch
 
 from qa_ui_auto import native_steps
-from tauri_webdriver import NativeSession, WebDriverError
+from tauri_webdriver import NativeHarness, NativeSession, WebDriverError
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_per_case_java_runtime_does_not_leak_into_next_session(self):
+        harness = NativeHarness({"app": {"tooling_java_home": "/jdk21"}}, Path("/qa/run"))
+        harness.driver = Mock()
+        with patch("tauri_webdriver.NativeSession") as factory:
+            harness.create_session(tooling_java_home="/jdk25")
+            self.assertIn('"/jdk25"', factory.return_value.execute.call_args.args[0])
+            harness.create_session()
+            self.assertIn('"/jdk21"', factory.return_value.execute.call_args.args[0])
+        self.assertEqual(harness.cfg["app"]["tooling_java_home"], "/jdk21")
+
+    def test_windows_driver_uses_the_apps_isolated_webview_profile(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.request = Mock(return_value={"sessionId": "session-1"})
+        session.install_console_hook = Mock()
+        with patch("tauri_webdriver.platform.system", return_value="Windows"), \
+             patch.dict(os.environ, {"NEWMOB_DATA_DIR": "/qa/run/native-appdata"}):
+            session.start()
+        options = session.request.call_args.args[2]["capabilities"]["alwaysMatch"]["tauri:options"]
+        self.assertEqual(options["webviewOptions"]["userDataFolder"],
+                         str(Path("/qa/run/native-appdata/com.taomni.app.qa/webview")))
+
     def test_right_click_uses_right_button_and_releases_on_failure(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
@@ -60,8 +81,11 @@ class NativeSessionTransportTest(TestCase):
 
     def test_loopback_driver_bypasses_system_proxy(self):
         class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
             def do_GET(self):
+                self.server.observed.append((self.client_address, self.headers.get('Connection')))
                 self.send_response(200)
+                self.send_header('Content-Length', '26')
                 self.end_headers()
                 self.wfile.write(b'{"value": {"ready": true}}')
 
@@ -69,12 +93,17 @@ class NativeSessionTransportTest(TestCase):
                 pass
 
         server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        server.observed = []
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
             with patch("urllib.request.getproxies", return_value={"http": "http://127.0.0.1:1"}):
                 session = NativeSession(f"http://127.0.0.1:{server.server_port}", Path("unused"))
                 self.assertEqual(session.request("GET", "/status"), {"ready": True})
+                self.assertEqual(session.request("GET", "/status"), {"ready": True})
+                self.assertEqual(server.observed[0][0], server.observed[1][0])
+                self.assertNotIn('close', [connection for _, connection in server.observed])
+                session._connection.close()
         finally:
             server.shutdown()
             server.server_close()
@@ -139,24 +168,26 @@ class NativeSessionFillTest(TestCase):
         click_call = call("POST", "/session/session-1/element/element-1/click", {})
         self.assertEqual(session.request.call_args_list.count(click_call), 2)
 
-    def test_input_fill_preserves_clear_and_value_contract(self) -> None:
+    def test_input_fill_keeps_blur_committing_control_focused(self) -> None:
         session = self.session(False)
 
         result = session.fill("input[name=title]", "Taomni")
 
         self.assertEqual(result, "filled input[name=title]")
-        self.assertIn(
+        self.assertNotIn(
             call("POST", "/session/session-1/element/element-1/clear", {}),
             session.request.call_args_list,
         )
-        self.assertIn(
-            call(
-                "POST",
-                "/session/session-1/element/element-1/value",
-                {"text": "Taomni", "value": list("Taomni")},
-            ),
-            session.request.call_args_list,
-        )
+        self.assertFalse(any(c.args[1].endswith('/value') for c in session.request.call_args_list))
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
+        session.type_text.assert_called_once_with("Taomni")
+
+    def test_macos_fill_replaces_value_without_synthetic_backspace(self) -> None:
+        session = self.session(False)
+        with patch("tauri_webdriver.platform.system", return_value="Darwin"):
+            session.fill("input[name=title]", "Taomni")
+        session.request.assert_called_once_with(
+            "POST", "/session/session-1/element/element-1/value", {"text": "Taomni"})
         session.press_combo.assert_not_called()
         session.type_text.assert_not_called()
 
@@ -319,6 +350,30 @@ class NativeKeysVerbTest(TestCase):
             self.assertEqual(artifact["keys"], ["Tab", "Control+v"])
             self.assertNotIn("text", artifact)
 
+    def test_native_keys_can_focus_target_before_verifying_ownership(self) -> None:
+        session = Mock()
+        session.execute.side_effect = [True, None, []]
+
+        with TemporaryDirectory() as directory, patch.object(native_steps.time, "sleep"):
+            case_dir = Path(directory)
+            ctx = native_steps.NativeStepContext(session, case_dir, {})
+            native_steps.VERBS["native_keys"](ctx, {
+                "selector": ".cm-content",
+                "keys": ["Control+z"],
+                "transport": "webdriver",
+                "focus_target": True,
+            })
+
+            session.focus.assert_called_once_with(".cm-content")
+            session.press_combos.assert_called_once_with(["Control+z"])
+            artifact = json.loads(
+                (case_dir / "native-key-observation.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                artifact["focus_verification"],
+                "WebDriver focus then immediate DOM probe",
+            )
+
     def test_native_keys_accepts_explicit_focus_precondition_during_driver_fault(self) -> None:
         session = Mock()
         session.application = Path("/tmp/taomni")
@@ -351,6 +406,77 @@ class NativeKeysVerbTest(TestCase):
                 (case_dir / "native-key-observation.json").read_text(encoding="utf-8")
             )
             self.assertEqual(artifact["focus_verification"], "testcase precondition")
+
+    def test_native_keys_waits_for_readiness_and_requires_consumed_keydown(self) -> None:
+        session = Mock()
+        session.application = Path("/tmp/taomni")
+        session.find.return_value = "popup"
+        session.execute.side_effect = [
+            True,
+            None,
+            True,
+            True,
+            {"stable": True, "stableMs": 200},
+            [{"type": "keydown", "key": "ArrowDown", "defaultPrevented": True}],
+        ]
+
+        def press(keys: list[str]) -> None:
+            self.assertEqual(session.execute.call_count, 5)
+            self.assertEqual(keys, ["ArrowDown"])
+
+        session.press_combos.side_effect = press
+        with TemporaryDirectory() as directory, patch.object(native_steps.time, "sleep"):
+            case_dir = Path(directory)
+            ctx = native_steps.NativeStepContext(session, case_dir, {})
+            result = native_steps.VERBS["native_keys"](ctx, {
+                "selector": ".cm-content",
+                "keys": ["ArrowDown"],
+                "transport": "webdriver",
+                "ready_selector": ".cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)",
+                "ready_timeout_sec": 3,
+                "ready_stable_sec": 0.2,
+                "require_keydown_prevented": True,
+            })
+
+            self.assertIn("injected 1", result)
+            listener_script = session.execute.call_args_list[1].args[0]
+            self.assertIn("setTimeout", listener_script)
+            session.find.assert_called_with(
+                ".cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)",
+                timeout=0.5,
+            )
+            artifact = json.loads(
+                (case_dir / "native-key-observation.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(artifact["require_keydown_prevented"])
+            self.assertEqual(
+                artifact["ready_selector"],
+                ".cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)",
+            )
+            self.assertEqual(artifact["ready_stable_sec"], 0.2)
+
+    def test_native_keys_rejects_unconsumed_keydown_after_recording_evidence(self) -> None:
+        session = Mock()
+        session.application = Path("/tmp/taomni")
+        session.execute.side_effect = [
+            True,
+            None,
+            [{"type": "keydown", "key": "ArrowDown", "defaultPrevented": False}],
+        ]
+        with TemporaryDirectory() as directory, patch.object(native_steps.time, "sleep"):
+            case_dir = Path(directory)
+            ctx = native_steps.NativeStepContext(session, case_dir, {})
+            with self.assertRaisesRegex(
+                native_steps.StepError,
+                "keydown was not consumed.*arrowdown",
+            ):
+                native_steps.VERBS["native_keys"](ctx, {
+                    "selector": ".cm-content",
+                    "keys": ["ArrowDown"],
+                    "transport": "webdriver",
+                    "require_keydown_prevented": True,
+                })
+            self.assertTrue((case_dir / "native-key-observation.json").is_file())
 
 
 class NativeClickVerbTest(TestCase):

@@ -1,14 +1,17 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
 import { TerminalDockPanel, type TerminalDockHandle } from "./TerminalDockPanel";
 
 const registryMocks = vi.hoisted(() => ({
   getTerminal: vi.fn(),
 }));
+const runtimeMocks = vi.hoisted(() => ({
+  getAppPlatform: vi.fn(() => "linux"),
+}));
 
 vi.mock("../../../../lib/terminal/terminalRegistry", () => registryMocks);
-vi.mock("../../../../lib/runtime", () => ({ getAppPlatform: () => "linux" }));
+vi.mock("../../../../lib/runtime", () => runtimeMocks);
 
 vi.mock("../../../terminal/TerminalPanel", () => ({
   TerminalPanel: ({
@@ -35,6 +38,11 @@ vi.mock("../../../terminal/TerminalPanel", () => ({
     </div>
   ),
 }));
+
+beforeEach(() => {
+  runtimeMocks.getAppPlatform.mockReturnValue("linux");
+  registryMocks.getTerminal.mockReset();
+});
 
 afterEach(cleanup);
 
@@ -90,6 +98,27 @@ describe("TerminalDockPanel", () => {
     expect(screen.getByTestId("mock-terminal")).toHaveAttribute("data-workspace-root", "/repo/app");
     fireEvent.click(screen.getByLabelText("Close src"));
     expect(screen.queryByTestId("mock-terminal")).not.toBeInTheDocument();
+  });
+
+  it("binds a Windows file-URI task cwd to its workspace SDK root", async () => {
+    runtimeMocks.getAppPlatform.mockReturnValue("windows");
+    const handle = createRef<TerminalDockHandle>();
+    render(
+      <TerminalDockPanel
+        ref={handle}
+        workspaceInstanceId="ws"
+        roots={[{ id: "app", name: "app", path: "D:\\repo\\app", kind: "folder" }]}
+        defaultCwd="D:\\repo\\app"
+        active={false}
+      />,
+    );
+
+    handle.current?.runCommand("mvn compile", "/D:/repo/app", "compile");
+
+    expect(await screen.findByTestId("mock-terminal")).toHaveAttribute(
+      "data-workspace-root",
+      "D:\\repo\\app",
+    );
   });
 
   it("wraps task commands with an exit marker and reports completion", async () => {

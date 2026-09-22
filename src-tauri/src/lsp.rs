@@ -195,6 +195,10 @@ pub struct LspDocumentStatus {
     pub display_name: Option<String>,
     pub available: bool,
     pub active: bool,
+    /// True once the provider can answer semantic requests for this workspace.
+    /// JDT LS initializes before Maven/Gradle import and reports this separately.
+    #[serde(default)]
+    pub semantic_ready: bool,
     pub selected_command_id: Option<String>,
     pub selected_command: Option<String>,
     pub install_hint: Option<String>,
@@ -1137,6 +1141,7 @@ struct LspSession {
     /// report atomically.
     diagnostic_partial_results: Mutex<HashMap<String, Vec<Value>>>,
     diagnostic_provider_generation: AtomicU64,
+    semantic_ready: AtomicBool,
     capabilities: RwLock<Option<LspCapabilitySummary>>,
     server_capabilities: RwLock<Value>,
     /// `serverInfo` from the initialize result (§8.20.3 W2 provider identity).
@@ -1438,6 +1443,7 @@ impl LspManager {
                 display_name: None,
                 available: false,
                 active: false,
+                semantic_ready: false,
                 selected_command_id: None,
                 selected_command: None,
                 install_hint: None,
@@ -1461,17 +1467,20 @@ impl LspManager {
         let map_key = command
             .as_ref()
             .map(|cmd| session_key(document, preset, cmd, &sdk_environment).map_key());
-        let (active, starting, capabilities) = if let Some(cmd) = command.as_ref() {
+        let (active, starting, semantic_ready, capabilities) = if let Some(cmd) = command.as_ref() {
             let key = session_key(document, preset, cmd, &sdk_environment);
             match self.sessions.lock().await.get(&key.map_key()) {
-                Some(LspSessionEntry::Ready(session)) => {
-                    (true, false, session.capabilities.read().await.clone())
-                }
-                Some(LspSessionEntry::Starting(_)) => (false, true, None),
-                None => (false, false, None),
+                Some(LspSessionEntry::Ready(session)) => (
+                    true,
+                    false,
+                    session.semantic_ready.load(Ordering::SeqCst),
+                    session.capabilities.read().await.clone(),
+                ),
+                Some(LspSessionEntry::Starting(_)) => (false, true, false, None),
+                None => (false, false, false, None),
             }
         } else {
-            (false, false, None)
+            (false, false, false, None)
         };
         let using_custom = custom_command_to_preset(custom_command).is_some();
         let binary_available = command.is_some();
@@ -1501,6 +1510,7 @@ impl LspManager {
             display_name: Some(preset.display_name.clone()),
             available,
             active,
+            semantic_ready,
             selected_command_id,
             selected_command,
             // Only advertise install guidance when the binary is missing. Always
@@ -2899,6 +2909,7 @@ fn session_start_error_status(
         display_name: Some(preset.display_name.clone()),
         available: true,
         active: false,
+        semantic_ready: false,
         selected_command_id: Some(command.id.clone()),
         selected_command: Some(command_line(&command.command, &command.args)),
         // Binary was found; this is a runtime/start failure, not "please install".
@@ -3010,6 +3021,7 @@ impl LspSession {
             diagnostic_pull_lock: Mutex::new(()),
             diagnostic_partial_results: Mutex::new(HashMap::new()),
             diagnostic_provider_generation: AtomicU64::new(0),
+            semantic_ready: AtomicBool::new(!is_jdtls),
             capabilities: RwLock::new(None),
             server_capabilities: RwLock::new(Value::Null),
             server_info: RwLock::new(None),
@@ -3986,6 +3998,22 @@ impl LspSession {
         }
         if method == "$/progress" {
             self.handle_progress_notification(params).await;
+            return;
+        }
+        if method == "language/status" {
+            if command_is_jdtls(&self.command)
+                && language_status_is_service_ready(params)
+                && !self.semantic_ready.swap(true, Ordering::SeqCst)
+            {
+                // The existing refresh channel re-queries open documents and
+                // carries the updated provider status back to the renderer.
+                self.client_bridge
+                    .emit_diagnostics_refresh(LspDiagnosticsRefreshEvent {
+                        workspace_id: self.key.workspace_id.clone(),
+                        preset_id: self.key.preset_id.clone(),
+                        root_uri: self.root_uri.clone(),
+                    });
+            }
             return;
         }
         if method == "window/showMessage" {
@@ -5128,6 +5156,13 @@ fn parse_show_message_request(params: Option<&Value>) -> Option<ParsedShowMessag
         message,
         actions,
     })
+}
+
+fn language_status_is_service_ready(params: Option<&Value>) -> bool {
+    params
+        .and_then(|value| value.get("type"))
+        .and_then(Value::as_str)
+        .is_some_and(|status| status == "ServiceReady")
 }
 
 fn parse_show_message_notification(params: Option<&Value>) -> Option<ParsedShowMessage> {
@@ -12965,6 +13000,21 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
             })))
             .is_none()
         );
+    }
+
+    #[test]
+    fn jdtls_service_ready_status_is_distinct_from_initialize() {
+        assert!(language_status_is_service_ready(Some(&json!({
+            "type": "ServiceReady",
+            "message": "ServiceReady"
+        }))));
+        assert!(!language_status_is_service_ready(Some(&json!({
+            "type": "Started"
+        }))));
+        assert!(!language_status_is_service_ready(Some(&json!({
+            "message": "ServiceReady"
+        }))));
+        assert!(!language_status_is_service_ready(None));
     }
 
     #[test]

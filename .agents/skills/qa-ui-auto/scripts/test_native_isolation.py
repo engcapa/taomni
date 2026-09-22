@@ -5,6 +5,7 @@ import contextlib
 import io
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
@@ -142,6 +143,87 @@ class NativeIsolationTest(unittest.TestCase):
                 evidence = json.loads((root / "run" / "native-isolation.json").read_text())
                 self.assertEqual(evidence["identifier"], native_build.QA_APP_ID)
 
+    def test_harness_pins_configured_jdk_for_the_webdriver_application(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = recorded_binary(root)
+            harness = native.NativeHarness({
+                "app": {
+                    "native_binary": str(binary),
+                    "tooling_java_home": str(root / "jdk-21"),
+                },
+            }, root / "run")
+            harness.driver = Mock()
+            with (
+                patch.object(native.platform, "system", return_value="Linux"),
+                patch.dict(os.environ, {"JAVA_HOME": "old-jdk", "PATH": "system-path"}),
+            ):
+                with harness:
+                    self.assertEqual(os.environ["JAVA_HOME"], str(root / "jdk-21"))
+                    self.assertEqual(
+                        os.environ["PATH"],
+                        os.pathsep.join((str(root / "jdk-21" / "bin"), "system-path")),
+                    )
+                self.assertEqual(os.environ["JAVA_HOME"], "old-jdk")
+                self.assertEqual(os.environ["PATH"], "system-path")
+
+            evidence = json.loads((root / "run" / "native-isolation.json").read_text())
+            self.assertEqual(evidence["tooling_environment"], {
+                "JAVA_HOME": str(root / "jdk-21"),
+                "PATH_prepend": str(root / "jdk-21" / "bin"),
+            })
+
+    def test_harness_seeds_prepared_jdk_into_run_owned_sdk_registry(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = recorded_binary(root)
+            java_home = root / "jdk-21"
+            java = java_home / "bin" / "java.exe"
+            java.parent.mkdir(parents=True)
+            java.write_bytes(b"test executable")
+            harness = native.NativeHarness({
+                "app": {
+                    "native_binary": str(binary),
+                    "tooling_java_home": str(java_home),
+                },
+            }, root / "run")
+            harness.driver = Mock()
+            probe = subprocess.CompletedProcess(
+                [str(java), "-version"],
+                0,
+                stdout="",
+                stderr='openjdk version "21.0.12.1" 2026-08-18 LTS',
+            )
+            with (
+                patch.object(native.platform, "system", return_value="Windows"),
+                patch.dict(os.environ, {"JAVA_HOME": "old-jdk", "PATH": "system-path"}),
+                patch.object(native.subprocess, "run", return_value=probe),
+                patch.object(native, "NativeSession") as session_factory,
+            ):
+                with harness:
+                    harness.create_session()
+
+            registry_path = (
+                root / "run" / "native-appconfig" / native_build.QA_APP_ID
+                / "taomni" / "sdk.json"
+            )
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+            self.assertEqual(registry["defaults"], [{
+                "kind": "java",
+                "sdkId": "qa-prepared-java",
+            }])
+            self.assertEqual(registry["installations"][0]["location"], str(java_home))
+            self.assertEqual(registry["installations"][0]["version"], "21.0.12.1")
+            session_factory.return_value.start.assert_called_once_with()
+
+            evidence = json.loads(
+                (root / "run" / "native-isolation.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                evidence["tooling_sdk_registry"]["registry_path"],
+                str(registry_path),
+            )
+
     def test_unrecorded_binary_never_starts_driver(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -201,6 +283,67 @@ class NativeIsolationTest(unittest.TestCase):
                 os.environ.pop("NEWMOB_DATA_DIR", None)
                 with self.assertRaises(RuntimeError):
                     reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
+
+    def test_reset_retries_a_transient_windows_webview_profile_lock(self):
+        with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Windows"):
+            root = Path(directory)
+            env = native.native_isolation_env(root / "run")
+            profile = Path(env["NEWMOB_DATA_DIR"]) / native_build.QA_APP_ID
+            profile.mkdir(parents=True)
+            (profile / "chrome_debug.log").write_text("locked", encoding="utf-8")
+            real_rmtree = shutil.rmtree
+            attempts = 0
+
+            def transient_lock(path):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise PermissionError("WebView2 is still closing")
+                return real_rmtree(path)
+
+            with (
+                patch.dict(os.environ, env),
+                patch.object(reset_db.shutil, "rmtree", side_effect=transient_lock),
+                patch.object(reset_db.time, "sleep"),
+            ):
+                reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
+
+            self.assertEqual(attempts, 2)
+            self.assertFalse(profile.exists())
+
+    def test_reset_retries_windows_profile_mutation_errors(self):
+        with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Windows"):
+            root = Path(directory)
+            env = native.native_isolation_env(root / "run")
+            profile = Path(env["NEWMOB_DATA_DIR"]) / native_build.QA_APP_ID
+            profile.mkdir(parents=True)
+            (profile / "DIPS-wal").write_text("closing", encoding="utf-8")
+            real_rmtree = shutil.rmtree
+            attempts = 0
+
+            class WinError(OSError):
+                def __init__(self, code):
+                    super().__init__(f"[WinError {code}] transient profile mutation")
+                    self.winerror = code
+
+            def transient_mutation(path):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise FileNotFoundError("DIPS-wal disappeared during cleanup")
+                if attempts == 2:
+                    raise WinError(145)
+                return real_rmtree(path)
+
+            with (
+                patch.dict(os.environ, env),
+                patch.object(reset_db.shutil, "rmtree", side_effect=transient_mutation),
+                patch.object(reset_db.time, "sleep"),
+            ):
+                reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
+
+            self.assertEqual(attempts, 3)
+            self.assertFalse(profile.exists())
 
     def test_reset_refuses_missing_or_wrong_run_environment(self):
         with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Linux"):
@@ -274,7 +417,7 @@ class NativeIsolationTest(unittest.TestCase):
             driver = native.TauriDriverProcess({"webdriver": {"port": 4450, "native_port": 4451}}, Path(directory))
             proc = Mock()
             proc.poll.return_value = None
-            with patch.object(native.platform, "system", return_value="Linux"), patch.object(native, "_tcp_ok", side_effect=[False, False, True]), patch.object(native.subprocess, "Popen", return_value=proc) as spawn:
+            with patch.object(native.platform, "system", return_value="Linux"), patch.object(native, "_tcp_ok", side_effect=[False, False, True, True]), patch.object(native.subprocess, "Popen", return_value=proc) as spawn:
                 driver.start()
                 self.assertEqual(spawn.call_args.args[0], ["tauri-driver", "--port", "4450", "--native-port", "4451"])
                 driver.stop()

@@ -589,7 +589,10 @@ files:
 controls:
   - id: terminal-pane
     selector: '[data-testid="terminal-pane"]'
-    kind: interactive       # type / send_keys go here
+    kind: interactive
+  - id: terminal-keyboard-target
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    kind: interactive       # xterm input target driven through terminal_input
   - id: attached-sftp-toggle
     selector: '[data-testid="attached-sftp-toggle"]'
     kind: interactive
@@ -1910,6 +1913,8 @@ controls:
   - id: remote-path
     selector: '[data-testid="sftp-remote-path"]'
     kind: interactive
+    aliases:
+      - 'input[data-testid="sftp-remote-path"]'  # transient edit-mode input
   # toolbar — local side
   - id: local-back
     selector: '[data-testid="sftp-local-back"]'

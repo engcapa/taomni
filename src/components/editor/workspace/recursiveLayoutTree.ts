@@ -1106,11 +1106,23 @@ export function atomicCloseTabInLeaf(
     },
   };
 
+  // Closing the last tab in the active leaf leaves that leaf mounted as an
+  // empty split pane. Keep keyboard/action routing attached to a surviving
+  // editor leaf instead of leaving the workspace active group without an
+  // editor command port. This matters for native key delivery, where focusing
+  // the survivor through WebDriver does not emit the pane's mouse activation.
+  const nextActiveGroupId = activeGroupId === leafId && nextOrder.length === 0
+    ? getAllLeafNodes(newTree)
+      .map((candidate) => candidate.id)
+      .find((candidateId) => (nextGroups[candidateId]?.openOrder.length ?? 0) > 0)
+      ?? activeGroupId
+    : activeGroupId;
+
   return {
     kind: "changed",
     tree: newTree,
     groups: nextGroups,
-    activeGroupId,
+    activeGroupId: nextActiveGroupId,
   };
 }
 

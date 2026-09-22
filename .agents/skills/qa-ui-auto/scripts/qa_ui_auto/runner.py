@@ -233,7 +233,7 @@ def _run_browser_case_inner(payload: dict) -> dict:
                 verb, raw_args = tc_mod.step_verb_and_args(step)
                 last_step_index = i
                 last_verb = verb
-                args = cfg_mod.resolve(raw_args, cfg=cfg, env=env)
+                args = cfg_mod.resolve(raw_args, cfg=cfg, env=env, fixture=ctx.values)
                 last_args = args
                 if verb not in STEP_REGISTRY:
                     raise StepError(f"unknown verb: {verb}")
@@ -467,7 +467,10 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     r["timings"]["fixtures_sec"] = time.monotonic() - fixture_started
                     session_started = time.monotonic()
                     harness.deadline = deadline
-                    session = harness.create_session()
+                    java25_home = (cfg.get("app", {}).get("tooling_java25_home")
+                                   if "java25_projects" in c.fixtures else None)
+                    session = (harness.create_session(tooling_java_home=java25_home)
+                               if java25_home else harness.create_session())
                     r["timings"]["session_setup_sec"] = time.monotonic() - session_started
                     nctx: NativeStepContext | None = None
                     try:
@@ -543,6 +546,9 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                 }
             if r["status"] == "failed":
                 r["failure"]["artifacts"] = failure_artifacts
+            with suppress(Exception):
+                from .native_diagnostics import collect
+                collect(case_dir, report_root, failed=r["status"] == "failed")
             r["duration_sec"] = time.time() - started
             results.append(r)
     return results
@@ -761,7 +767,26 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--report-dir", help="isolated output directory")
     ap.add_argument("--keep-runs", type=int, help="retained runs in output directory; 0 disables rotation")
     ap.add_argument("--require-pass", action="store_true", help="fail if any selected case skips")
+    ap.add_argument("--selection", type=Path, help="input-verified CI selection manifest")
+    ap.add_argument("--selection-entry", help="entry ID inside --selection")
     args = ap.parse_args(argv)
+    ci_entry = None
+    if args.selection or args.selection_entry:
+        if not (args.selection and args.selection_entry) or args.filter or args.tag:
+            ap.error("--selection and --selection-entry are required together; do not combine with filters")
+        from .ci import selection_entry
+        from .verification import host_platform
+        try:
+            _, ci_entry = selection_entry(args.selection, args.selection_entry)
+            if ci_entry["platform"] != host_platform():
+                raise ValueError("CI selection platform differs from host")
+            if args.mode and args.mode != ci_entry["mode"]:
+                raise ValueError("CI selection mode differs")
+            args.mode = ci_entry["mode"]
+            args.filter = ",".join(ci_entry["selected_ids"])
+        except (OSError, ValueError) as exc:
+            print(f"qa-ui-auto: CI selection error: {exc}", file=sys.stderr)
+            return 2
 
     try:
         cfg = cfg_mod.load_config(args.config)
@@ -790,6 +815,9 @@ def main(argv: list[str] | None = None) -> int:
         tags=[t.strip() for t in args.tag.split(",")] if args.tag else None,
         ids=[t.strip() for t in args.filter.split(",")] if args.filter else None,
     )
+    if ci_entry:
+        order = {cid: i for i, cid in enumerate(ci_entry["selected_ids"])}
+        selected.sort(key=lambda case: order[case.id])
     if not selected:
         print(
             f"qa-ui-auto: 0 cases matched filters "
@@ -930,6 +958,8 @@ def main(argv: list[str] | None = None) -> int:
     reporter.write_summary(report_root, summary)
     md = reporter.write_markdown(report_root, summary)
     reporter.write_junit(report_root, summary)
+    from .report_secrets import redact_report
+    redact_report(report_root)
     print("\n" + md.read_text(encoding="utf-8"))
 
     # ED-REL-001: emit runner-owned execution receipt

@@ -23,18 +23,73 @@ def step_fill(ctx: StepContext, args: Any) -> None:
 
 @verb("type")
 def step_type(ctx: StepContext, args: Any) -> None:
-    text = str(args)
+    selector, text = _typing_args("type", args)
     if ctx.dry_run:
         return
+    if selector:
+        ctx.page.locator(selector).first.focus()  # type: ignore[attr-defined]
     ctx.page.keyboard.type(text)  # type: ignore[attr-defined]
 
 
 @verb("send_keys")
 def step_send_keys(ctx: StepContext, args: Any) -> None:
-    text = str(args)
+    selector, text = _typing_args("send_keys", args)
     if ctx.dry_run:
         return
+    if selector:
+        ctx.page.locator(selector).first.focus()  # type: ignore[attr-defined]
     ctx.page.keyboard.type(text)  # type: ignore[attr-defined]
+
+
+@verb("terminal_input")
+def step_terminal_input(ctx: StepContext, args: Any) -> None:
+    selector, text, submit = _terminal_input_args(args)
+    if ctx.dry_run:
+        return
+    focused = ctx.page.locator(selector).first.evaluate(  # type: ignore[attr-defined]
+        """(element, payload) => {
+          element.focus();
+          const data = payload.text + (payload.submit ? "\\r" : "");
+          element.dispatchEvent(new InputEvent("input", {
+            data,
+            inputType: "insertText",
+            bubbles: true,
+            composed: false,
+          }));
+          return document.activeElement === element;
+        }""",
+        {"text": text, "submit": submit},
+    )
+    if focused is not True:
+        raise StepError(f"terminal_input: target could not receive focus: {selector}")
+
+
+def _typing_args(verb_name: str, args: Any) -> tuple[str | None, str]:
+    if isinstance(args, str):
+        return None, args
+    if (
+        isinstance(args, dict)
+        and set(args) == {"selector", "text"}
+        and isinstance(args["selector"], str)
+        and isinstance(args["text"], str)
+    ):
+        return args["selector"], args["text"]
+    raise StepError(f"{verb_name}: expected string or {{selector, text}}")
+
+
+def _terminal_input_args(args: Any) -> tuple[str, str, bool]:
+    if not isinstance(args, dict) or set(args) - {"selector", "text", "submit"}:
+        raise StepError("terminal_input: expected {selector, text, submit?}")
+    selector = args.get("selector")
+    text = args.get("text")
+    submit = args.get("submit", False)
+    if not isinstance(selector, str) or not selector:
+        raise StepError("terminal_input: selector must be a non-empty string")
+    if not isinstance(text, str):
+        raise StepError("terminal_input: text must be a string")
+    if not isinstance(submit, bool):
+        raise StepError("terminal_input: submit must be a boolean")
+    return selector, text, submit
 
 
 @verb("compose_text")

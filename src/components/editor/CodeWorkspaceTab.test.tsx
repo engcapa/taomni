@@ -5985,6 +5985,51 @@ describe("CodeWorkspaceTab", () => {
     expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-split").openFiles[fileKey]).toBeUndefined();
   });
 
+  it("keeps keyboard history routed to the survivor when the active split leaf closes", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-active-split-close",
+      workspaceInstanceId: "instance-active-split-close",
+      name: "Active split close",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "alpha\nbeta\n"));
+    lspMocks.lspDetectServers.mockResolvedValue([csharpStatus({ available: false, active: false })]);
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+    await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
+
+    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
+    const activeSplitPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") !== "primary")!;
+    const primaryView = EditorView.findFromDOM(primaryPane.querySelector<HTMLElement>(".cm-editor")!)!;
+    primaryView.dispatch({ changes: { from: 0, to: 0, insert: "HEAD;" } });
+    await waitFor(() => expect(
+      EditorView.findFromDOM(activeSplitPane.querySelector<HTMLElement>(".cm-editor")!)!.state.doc.toString(),
+    ).toBe("HEAD;alpha\nbeta\n"));
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-active-split-close",
+    ).activeEditorGroupId).not.toBe("primary");
+
+    // The split created above is the active group. Closing its only tab must
+    // transfer action ownership to the surviving primary leaf even when the
+    // next key is delivered directly to that leaf without a pane mousedown.
+    fireEvent.click(within(activeSplitPane).getByTitle("Close"));
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-active-split-close").activeEditorGroupId,
+    ).toBe("primary"));
+    await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
+
+    const primaryContent = primaryPane.querySelector<HTMLElement>(".cm-content")!;
+    fireEvent.keyDown(primaryContent, { key: "z", code: "KeyZ", ctrlKey: true });
+    await waitFor(() => expect(primaryView.state.doc.toString()).toBe("alpha\nbeta\n"));
+  });
+
   // ED-AUDIT-009 A1: two real leaves of one file share ONE logical history —
   // an edit in either leaf reaches the other in real time without clobbering
   // its caret/scroll, and one undo/redo stroke issued from one leaf reverts
@@ -7301,6 +7346,46 @@ describe("CodeWorkspaceTab", () => {
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-encoding-save")
         .openFiles["root:app:src/main.txt"]?.encoding,
     ).toBe("ISO-8859-1");
+  });
+
+  it("opens a queued encoding chooser after an in-flight save settles", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-encoding-save-race",
+      workspaceInstanceId: "instance-encoding-save-race",
+      name: "Encoding Save Race",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.txt" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.txt", "before\n"));
+    let resolveWrite!: (ack: WorkspaceWriteAck) => void;
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(() => new Promise((resolve) => {
+      resolveWrite = resolve;
+    }));
+
+    const rendered = renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.txt");
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-encoding-save-race",
+    ).openFiles["root:app:src/main.txt"]?.dirty).toBe(true));
+
+    fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-encoding-save-race",
+    ).openFiles["root:app:src/main.txt"]?.saving).toBe(true));
+    act(() => useCodeWorkspaceStatusStore.getState().actions?.chooseEncoding?.());
+    expect(screen.queryByTestId("file-encoding-dialog")).toBeNull();
+
+    await act(async () => {
+      resolveWrite(writeAck(file("src/main.txt", "before\nbefore\n", { hash: "hash-saved" })));
+    });
+    expect(await screen.findByTestId("file-encoding-dialog")).toBeInTheDocument();
   });
 
   it("reloads the active file with an explicit encoding from the status action", async () => {
@@ -10572,14 +10657,15 @@ end_of_record
     });
 
     it("restores pending recovery entries through the real UI after reopen", async () => {
-      const { disk, workspace } = setupWorkspace("recovery-restore", "src/reader.ts");
+      runtimeState.tauri = true;
+      const { disk, workspace } = setupWorkspace("recovery-restore", "src/main.ts");
       // The interrupted transaction already applied its post-state on disk.
       disk["src/main.ts"] = POST["src/main.ts"];
       disk["src/other.ts"] = POST["src/other.ts"];
       seedPendingJournal();
 
       renderWorkspace(workspace, {});
-      await screen.findByTitle("app / src/reader.ts");
+      await screen.findByTitle("app / src/main.ts");
       // RC-02: auto-discover opens the review dialog (figure A) instead of a
       // global confirm. Restore via the dialog; the second confirm reuses the
       // mocked app dialog (default true).
@@ -10593,6 +10679,22 @@ end_of_record
       await waitFor(() => expect(disk["src/other.ts"]).toBe(PRE["src/other.ts"]));
       expect(getRefactorRecoveryJournalV2("rec-reopen-1")?.status).toBe("rolled-back");
       expect(useAppStore.getState().statusMessage).toContain("Refactor recovery complete: restored 2");
+
+      // Windows can deliver the restore-owned delete half of a rename after
+      // the buffer has already been remapped/opened at the restored path.
+      await act(async () => {
+        await emit("lsp://external-file-change", {
+          workspaceId: "instance-recovery-restore",
+          path: "/repo/app/src/main.ts",
+          type: 3,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 240));
+      });
+      expect(useAppStore.getState().statusMessage).toContain("Refactor recovery complete: restored 2");
+      expect(selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        "instance-recovery-restore",
+      ).openFiles["root:app:src/main.ts"]?.error).toBeNull();
     });
 
     it("closes an already-restored pending entry idempotently without rewriting files", async () => {

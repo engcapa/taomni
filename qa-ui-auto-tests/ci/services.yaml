@@ -1,0 +1,3 @@
+# Linux x64 manifests resolved for the hosted QA service provider.
+ssh_image: linuxserver/openssh-server@sha256:47f82202bcbffe214cea77dc7f5ed24b875e81ce6ebf0e0368e2954727bf5116
+mysql_image: mysql@sha256:8c19b656bb381f163750b238852bd377ba5764e1ec30cdd3f02e55cf8e2f89b7

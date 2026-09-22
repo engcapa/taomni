@@ -1696,7 +1696,7 @@ async function main() {
 
   const toolchain = {
     java: { path: javaPath.replace(homedir(), "~"), version: javaInfo.version, info: javaInfo },
-    jdtls: { home: jdtls.home.replace(homedir(), "~"), version: jdtls.version },
+    jdtls: { home: "${JDTLS_HOME}", version: jdtls.version },
     gradle: gradle ? { version: gradle.version, home: gradle.home.replace(homedir(), "~") } : null,
     mavenCliDetected: mvnVersion,
   };

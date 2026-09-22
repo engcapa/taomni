@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,12 @@ LOCAL_STORAGE_PREFIXES = [
     "taomni.tab.",
     "taomni.recent.",
 ]
+
+# WebView2 can mutate its LevelDB/profile directory while EdgeDriver is
+# acknowledging session deletion. These Windows errors are transient only for
+# this already-validated run-owned profile; unrelated filesystem errors must
+# still fail setup instead of being hidden.
+_WINDOWS_PROFILE_TRANSIENT_ERRORS = {2, 3, 5, 32, 33, 145}
 
 
 def setup(ctx: Any) -> None:
@@ -101,5 +108,34 @@ def _reset_native(ctx: Any) -> None:
     if any(target.resolve() != target for target in targets):
         raise RuntimeError("reset_db refuses symlinked QA profile paths")
     for target in targets:
-        if target.exists():
+        _remove_native_profile(target)
+
+
+def _remove_native_profile(target: Path, timeout_sec: float = 10.0) -> None:
+    """Remove one run-owned profile after the previous WebView exits.
+
+    EdgeDriver can acknowledge DELETE /session shortly before WebView2 releases
+    chrome_debug.log. Retrying the same already-validated profile keeps case
+    isolation deterministic without broadening the cleanup boundary.
+    """
+    deadline = time.monotonic() + timeout_sec
+    while target.exists():
+        try:
             shutil.rmtree(target)
+            return
+        except OSError as error:
+            # A concurrent WebView2 cleanup can remove the file between
+            # rmtree's scan and unlink, or briefly leave the directory nonempty
+            # while releasing a handle. Treat only those known transient cases
+            # as retryable and re-check the validated target boundary.
+            winerror = getattr(error, "winerror", None)
+            transient = isinstance(error, (FileNotFoundError, PermissionError)) or (
+                winerror in _WINDOWS_PROFILE_TRANSIENT_ERRORS
+            )
+            if not transient:
+                raise
+            if not target.exists():
+                return
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(min(0.2, max(0.0, deadline - time.monotonic())))

@@ -50,6 +50,8 @@ steps:
   - press:
       key: Mod+c
       selector: '[data-testid="code-workspace-editor"] .cm-content'
+  # Copy commits the history asynchronously after the OS clipboard write.
+  - wait_for: '[data-testid="code-workspace-tab"][data-clipboard-history-revision="1"]'
   - press:
       key: Mod+Shift+v
       selector: '[data-testid="code-workspace-editor"] .cm-content'

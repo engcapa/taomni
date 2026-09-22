@@ -192,6 +192,51 @@ describe("LspStatusPill", () => {
 
     expect(screen.getByText("TypeScript")).toBeInTheDocument();
     expect(screen.queryByTestId("code-workspace-lsp-open-settings")).not.toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-lsp-status-pill")).toHaveAttribute(
+      "data-semantic-ready",
+      "true",
+    );
+  });
+
+  it("distinguishes an initialized Java server from semantic readiness", () => {
+    const { rerender } = render(
+      <LspStatusPill
+        state={lspState({
+          status: {
+            active: true,
+            available: true,
+            displayName: "Java",
+            semanticReady: false,
+          },
+        })}
+        diagnostics={[]}
+      />,
+    );
+
+    expect(screen.getByText("Java indexing…")).toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-lsp-status-pill")).toHaveAttribute(
+      "data-semantic-ready",
+      "false",
+    );
+
+    rerender(
+      <LspStatusPill
+        state={lspState({
+          status: {
+            active: true,
+            available: true,
+            displayName: "Java",
+            semanticReady: true,
+          },
+        })}
+        diagnostics={[]}
+      />,
+    );
+    expect(screen.getByText("Java")).toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-lsp-status-pill")).toHaveAttribute(
+      "data-semantic-ready",
+      "true",
+    );
   });
 
   it("renders language names with primary code text (readable on light chrome)", () => {

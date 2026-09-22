@@ -178,6 +178,14 @@ python .agents/skills/qa-ui-auto/scripts/fixtures.py stop
 The manual command's credentials are disposable test values only; prefer
 environment variables or workspace secrets and never commit them.
 
+## GitHub Hosted Execution
+
+For manual/nightly/reusable three-platform browser/native jobs, use the independent
+[CI runbook](../../../../qa-ui-auto-tests/ci/README.md). The workflow plans exact
+case IDs and dependencies before provisioning runner-local services. Inspect its
+selection manifest, raw receipts and aggregate summary; hosted capability gaps
+are not passes. The original E2E/native/release workflows remain separate.
+
 ## Execution And Evidence
 
 - Native uses the separately built `com.taomni.app.qa`, isolated data/config/cache

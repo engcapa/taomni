@@ -21,7 +21,9 @@ steps:
   - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
   - click: "[data-testid=\"auth-submit\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 4
+  - wait_for:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+      timeout_sec: 60
   - click: "[data-testid=\"attached-sftp-toggle\"]"
   - wait_for: "[data-testid=\"sftp-browser\"]"
   # The attached pane navigates to the SSH home on mount. Setting the path
@@ -32,11 +34,15 @@ steps:
   - wait_for:
       selector: '[data-testid="sftp-remote-list"] tbody tr'
       timeout_sec: 30
-  - click: "[data-testid=\"sftp-remote-path\"]"
+  # Click the segment container, whose separator area enters path edit mode.
+  - click: '[data-testid="sftp-remote-path"] > span:last-child > svg'
+  - wait_for: 'input[data-testid="sftp-remote-path"]'
   - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
   - press: Enter
   - wait: 1
-  - click: "[data-testid=\"sftp-remote-path\"]"
+  # Click the segment container, whose separator area enters path edit mode.
+  - click: '[data-testid="sftp-remote-path"] > span:last-child > svg'
+  - wait_for: 'input[data-testid="sftp-remote-path"]'
   - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
   - press: Enter
   - assert_text:
@@ -45,9 +51,10 @@ steps:
       timeout_sec: 15
   - click: "[data-testid=\"sftp-remote-open-terminal-here\"]"
   - wait: 3
-  - click: "[data-testid=\"terminal-pane\"]"
-  - type: pwd
-  - press: Enter
+  - terminal_input:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+      text: pwd
+      submit: true
   - wait: 2
-  - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: "${cfg.sftp.remote_test_dir}"}
+  - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: "${fixture.sftp_shell_test_dir}"}
   - screenshot: 012-sftp-open-terminal-here.png

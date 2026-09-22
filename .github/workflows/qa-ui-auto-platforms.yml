@@ -1,0 +1,305 @@
+name: QA UI Auto Platforms
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Test scope
+        type: choice
+        options: [smoke, all, impacted, selected]
+        default: smoke
+      head:
+        description: Commit/ref to test (empty = workflow ref)
+        type: string
+      base:
+        description: Explicit base commit/ref for impacted scope
+        type: string
+      platforms:
+        description: Comma-separated linux,windows,macos
+        type: string
+        default: linux,windows,macos
+      modes:
+        description: Comma-separated browser,native
+        type: string
+        default: browser,native
+      case_ids:
+        description: Exact case IDs (selected, or additions to impacted)
+        type: string
+      features:
+        description: Feature IDs (union with case IDs/tags)
+        type: string
+      tags:
+        description: Tags (union)
+        type: string
+      publish_issues:
+        description: Update deduplicated failure issues
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      scope: {type: string, default: smoke}
+      head: {type: string, default: ''}
+      base: {type: string, default: ''}
+      platforms: {type: string, default: 'linux,windows,macos'}
+      modes: {type: string, default: 'browser,native'}
+      case_ids: {type: string, default: ''}
+      features: {type: string, default: ''}
+      tags: {type: string, default: ''}
+      publish_issues: {type: boolean, default: false}
+  schedule:
+    - cron: '17 19 * * *'
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+  PYTHONUTF8: '1'
+  PYTHONIOENCODING: utf-8
+  PYTHONUNBUFFERED: '1'
+  DEV_PROXY_ALLOW_PRIVATE: '1'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      has_cases: ${{ steps.plan.outputs.has_cases }}
+      head: ${{ steps.plan.outputs.head }}
+      artifact_key: ${{ steps.invocation.outputs.key }}
+    steps:
+      - name: Allocate invocation identity
+        id: invocation
+        run: python3 -c 'import os, uuid; open(os.environ["GITHUB_OUTPUT"], "a").write("key=" + uuid.uuid4().hex + "\n")'
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1
+      - name: Validate QA tools
+        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services
+      - name: Plan exact cases and dependencies
+        id: plan
+        env:
+          QA_SCOPE: ${{ github.event_name == 'schedule' && 'all' || inputs.scope || 'smoke' }}
+          QA_BASE: ${{ inputs.base }}
+          QA_PLATFORMS: ${{ inputs.platforms }}
+          QA_MODES: ${{ inputs.modes }}
+          QA_CASE_IDS: ${{ inputs.case_ids }}
+          QA_FEATURES: ${{ inputs.features }}
+          QA_TAGS: ${{ inputs.tags }}
+        run: python -m qa_ui_auto.ci plan
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qa-selection-${{ steps.invocation.outputs.key }}
+          path: qa-ui-auto-report/selection.json
+          if-no-files-found: error
+
+  execute:
+    needs: plan
+    if: needs.plan.outputs.has_cases == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.head }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: qa-selection-${{ needs.plan.outputs.artifact_key }}
+          path: qa-ui-auto-report
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: ${{ matrix.mode }}
+      - name: Linux native and service dependencies
+        if: runner.os == 'Linux' && matrix.mode == 'native'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev libudev-dev nasm xvfb xauth openbox wmctrl xdotool x11-utils x11-xserver-utils libxtst6 dbus-x11 xclip python3-tk python3-gi gir1.2-gtk-3.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons fonts-noto-cjk
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.mode == 'native'
+      - uses: arduino/setup-protoc@v3
+        if: matrix.mode == 'native'
+        with:
+          repo-token: ${{ github.token }}
+      - uses: swatinem/rust-cache@v2
+        if: matrix.mode == 'native'
+        with:
+          workspaces: src-tauri -> target/qa-ui-auto
+          shared-key: qa-platforms-${{ matrix.platform_key }}
+          key: hosted-services-v2
+          cache-on-failure: true
+          cache-workspace-crates: true
+      - name: Windows build tools and WebView2 driver
+        if: runner.os == 'Windows' && matrix.mode == 'native'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+          $runtimeRoot = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
+          $runtime = Get-ChildItem -LiteralPath $runtimeRoot -Directory | Where-Object Name -Match '^\d+\.\d+\.\d+\.\d+$' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+          if (-not $runtime) { throw 'WebView2 runtime unavailable' }
+          $zip = Join-Path $env:RUNNER_TEMP 'qa-edgedriver.zip'
+          $driver = Join-Path $env:RUNNER_TEMP 'qa-edgedriver'
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
+          Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
+          $driver >> $env:GITHUB_PATH
+      - name: macOS build dependencies
+        if: runner.os == 'macOS' && matrix.mode == 'native'
+        run: |
+          brew install krb5
+          echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
+          echo "LIBGSSAPI_PREFIX=$(brew --prefix krb5)" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$(brew --prefix krb5)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Native adapter
+        if: matrix.mode == 'native' && runner.os != 'macOS'
+        run: cargo install tauri-driver --locked
+      - name: Java 25 project runtime
+        uses: actions/setup-java@v4
+        if: contains(matrix.capabilities, 'java25')
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Retain Java 25 runtime
+        if: contains(matrix.capabilities, 'java25')
+        run: echo "JAVA25_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        if: contains(matrix.capabilities, 'java')
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        if: contains(matrix.capabilities, 'java')
+        with:
+          gradle-version: '9.1.0'
+      - name: Prepare local service packages
+        if: contains(matrix.capabilities, 'ssh') || contains(matrix.capabilities, 'mysql')
+        env:
+          QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
+        run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
+      - name: Run selected cases (Linux native desktop)
+        if: runner.os == 'Linux' && matrix.mode == 'native'
+        env:
+          QA_ENTRY: ${{ matrix.id }}
+        run: >-
+          dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24 -nolisten tcp'
+          python .agents/skills/qa-ui-auto/scripts/ci_execute.py
+          --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY"
+          --report "qa-ui-auto-report/$QA_ENTRY"
+      - name: Run selected cases
+        if: runner.os != 'Linux' || matrix.mode != 'native'
+        env:
+          QA_ENTRY: ${{ matrix.id }}
+        run: >-
+          python .agents/skills/qa-ui-auto/scripts/ci_execute.py
+          --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY"
+          --report "qa-ui-auto-report/$QA_ENTRY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-${{ matrix.id }}-${{ needs.plan.outputs.artifact_key }}
+          path: |
+            qa-ui-auto-report/${{ matrix.id }}/
+            !qa-ui-auto-report/${{ matrix.id }}/**/native-appdata/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**
+            !qa-ui-auto-report/${{ matrix.id }}/**/_workdirs/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  summarize:
+    name: qa-ui-auto-platforms-result
+    if: always()
+    needs: [plan, execute]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.head || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: qa-*-${{ needs.plan.outputs.artifact_key }}
+          path: qa-downloads
+      - name: Collect reports without altering runner receipts
+        run: python .agents/skills/qa-ui-auto/scripts/ci_collect.py qa-downloads qa-ui-auto-report
+      - name: Verify results
+        run: python -m qa_ui_auto.ci report --selection qa-ui-auto-report/selection.json --reports qa-ui-auto-report
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-summary-${{ needs.plan.outputs.artifact_key }}
+          path: |
+            qa-ui-auto-report/ci-summary.json
+            qa-ui-auto-report/summary.md
+            qa-ui-auto-report/selection.json
+          if-no-files-found: warn
+
+  publish-issues:
+    if: >-
+      always() && (inputs.publish_issues ||
+      (github.event_name == 'schedule' && vars.QA_UI_AUTO_PUBLISH_ISSUES == 'true')) &&
+      github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
+    needs: [plan, summarize]
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: qa-ui-auto-issue-publisher
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # No checkout or execution of the tested source in this privileged job.
+      - uses: actions/download-artifact@v4
+        with:
+          name: qa-summary-${{ needs.plan.outputs.artifact_key }}
+          path: qa-summary
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const summary = JSON.parse(fs.readFileSync('qa-summary/ci-summary.json', 'utf8'));
+            if (String(summary.run_id) !== String(context.runId)) throw new Error('Wrong run artifact');
+            const { owner, repo } = context.repo;
+            const issues = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
+            const groups = new Map();
+            for (const failure of summary.failures || []) {
+              const key = `${failure.entry}/${failure.case}`;
+              if (!groups.has(key)) groups.set(key, []);
+              groups.get(key).push(String(failure.message).slice(0, 2500));
+            }
+            for (const [key, messages] of [...groups].slice(0, 50)) {
+              const fingerprint = crypto.createHash('sha256').update(key).digest('hex').slice(0, 24);
+              const marker = `<!-- qa-ui-auto:${fingerprint} -->`;
+              const title = `[QA UI Auto] ${key}`.slice(0, 200);
+              const safeMessages = messages.map(m => m.replace(/@/g, '@\u200b').replace(/`/g, "'")).join('\n\n');
+              const body = `${marker}\n\n${key.replace(/@/g, '@\u200b')} failed.\n\n` +
+                `Run: https://github.com/${owner}/${repo}/actions/runs/${context.runId}\n\n` +
+                `Tested commit: ${summary.head}\n\n\`\`\`text\n${safeMessages}\n\`\`\`\n\n` +
+                'See the run summary and artifacts for original receipts, screenshots and setup logs. This QA workflow is independent of PR/release gates.';
+              const existing = issues.find(i => !i.pull_request && (i.body || '').includes(marker));
+              if (existing) await github.rest.issues.update({owner, repo, issue_number: existing.number, body});
+              else await github.rest.issues.create({owner, repo, title, body});
+            }

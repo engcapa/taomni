@@ -112,7 +112,11 @@ import { extractTerminalCommand } from "../../lib/terminalCommand";
 import { normalizeLocalStartCwd } from "../../lib/terminalCwd";
 import { inferTerminalProgram } from "../../lib/terminalActivity";
 import { buildSshCwdIntegration, buildLocalZshCwdIntegration } from "../../lib/terminalShellIntegration";
-import { buildInteractiveCommandInput, renderTerminalTask } from "../../lib/terminal/commandInput";
+import {
+  buildInteractiveCommandInput,
+  renderTerminalTask,
+  type TerminalTaskVariables,
+} from "../../lib/terminal/commandInput";
 import { registerTerminal, consumeTerminalDetachPending } from "../../lib/terminal/terminalRegistry";
 import {
   ZmodemSession,
@@ -396,6 +400,7 @@ export function TerminalPanel({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const sdkTaskEnvironmentRef = useRef<Record<string, string>>({});
   const connectionStateRef = useRef<TerminalConnectionState>("idle");
   const reconnectSshRef = useRef<(() => void) | null>(null);
   // Mirrors `sessionIdRef.current` as state so the registry-effect below
@@ -598,6 +603,7 @@ export function TerminalPanel({
   // polling window. Keep a deferred installer so the first later idle prompt
   // can still enable continuous OSC 7 cwd reporting.
   const installSshCwdIntegrationRef = useRef<(() => boolean) | null>(null);
+  const automationInputSettlingRef = useRef(false);
   const webglAddonRef = useRef<{
     addon: WebglAddon;
     contextLossDisposable: { dispose: () => void } | null;
@@ -1661,6 +1667,17 @@ export function TerminalPanel({
   const sendSpecialSignal = useCallback((signal: string, fallback?: string) => {
     const sid = sessionIdRef.current;
     if (!sid) return;
+    // PTY-backed SSH sessions receive terminal control bytes more reliably
+    // than SSH channel requests on Windows OpenSSH/ConPTY. Some servers
+    // acknowledge channel.signal(SIGINT) by closing the channel, which leaves
+    // the interactive session unusable even though Ctrl-C is supported.
+    if (ssh && fallback) {
+      writeInput(fallback);
+      appendEvent("signal", `Sent ${signal} control character`);
+      setStatusMessage(`Sent ${signal}`);
+      focusTerminal();
+      return;
+    }
     sendTerminalSignal(sid, signal)
       .then(() => {
         appendEvent("signal", `Sent ${signal}`);
@@ -2336,6 +2353,8 @@ export function TerminalPanel({
     let sockscapLaunchTimer: ReturnType<typeof setTimeout> | undefined;
     let launchedSockscapPid: number | null = null;
 
+    automationInputSettlingRef.current = Boolean(ssh && !adoptedTerminalRef.current);
+
     const submitLocalDirectoryUse = (path: string) => {
       const backendSessionId = sessionIdRef.current;
       if (!backendSessionId) {
@@ -2626,7 +2645,26 @@ export function TerminalPanel({
       }
     });
     const scrollDisposable = term.onScroll(() => setViewportVersion((v) => v + 1));
-    const renderDisposable = term.onRender(() => setViewportVersion((v) => v + 1));
+    const syncAutomationState = () => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      panel.setAttribute("data-terminal-text", getBufferText(term));
+      if (
+        connectionStateRef.current === "connected" &&
+        !automationInputSettlingRef.current &&
+        terminalAtIdlePrompt(term)
+      ) {
+        panel.setAttribute("data-terminal-ready", "true");
+      } else {
+        panel.removeAttribute("data-terminal-ready");
+      }
+    };
+    syncAutomationState();
+    const automationStateTimer = window.setInterval(syncAutomationState, 500);
+    const renderDisposable = term.onRender(() => {
+      setViewportVersion((v) => v + 1);
+      syncAutomationState();
+    });
     const resizeDisposable = term.onResize(({ cols, rows }) => {
       setViewportVersion((v) => v + 1);
       appendEvent("resize", `${cols}x${rows}`);
@@ -2696,6 +2734,7 @@ export function TerminalPanel({
             compositionBufferRef.current.push(filtered);
           } else {
             term.write(filtered, () => {
+              syncAutomationState();
               if (activityPromptTimer) clearTimeout(activityPromptTimer);
               activityPromptTimer = setTimeout(() => {
                 if (
@@ -2710,7 +2749,15 @@ export function TerminalPanel({
                       activitySource: "input-heuristic",
                     });
                   }
-                  installSshCwdIntegrationRef.current?.();
+                  if (installSshCwdIntegrationRef.current) {
+                    installSshCwdIntegrationRef.current();
+                  } else if (
+                    automationInputSettlingRef.current &&
+                    !injectedInputEchoSuppressorRef.current
+                  ) {
+                    automationInputSettlingRef.current = false;
+                    syncAutomationState();
+                  }
                 }
               }, 120);
             });
@@ -2784,6 +2831,7 @@ export function TerminalPanel({
       sessionId: string;
       shellId: string | null;
       directoryUseWarning?: string | null;
+      taskEnvironment?: Record<string, string>;
     };
 
     const cancelPendingMfa = () => {
@@ -2838,6 +2886,9 @@ export function TerminalPanel({
 
       clearConnectionListeners();
       connectionStateRef.current = "disconnected";
+      automationInputSettlingRef.current = false;
+      installSshCwdIntegrationRef.current = null;
+      injectedInputEchoSuppressorRef.current = null;
       sessionIdRef.current = null;
       setRegisteredSessionId(null);
       zmodemRef.current = null;
@@ -2870,7 +2921,7 @@ export function TerminalPanel({
     };
 
     const handleConnected = async (
-      { sessionId: connectedSid, shellId, directoryUseWarning }: ConnectResult,
+      { sessionId: connectedSid, shellId, directoryUseWarning, taskEnvironment }: ConnectResult,
       mode: ConnectMode,
     ) => {
       if (destroyed) {
@@ -2888,6 +2939,7 @@ export function TerminalPanel({
 
       connectionStateRef.current = "connected";
       sessionIdRef.current = connectedSid;
+      sdkTaskEnvironmentRef.current = taskEnvironment ?? {};
       if (isLocalRef.current) flushPendingLocalDirectoryReports(connectedSid);
       lastTerminalSizeSyncRef.current = null;
       setRegisteredSessionId(connectedSid);
@@ -2924,6 +2976,7 @@ export function TerminalPanel({
       // an idle prompt. The terminal is usable immediately; this only defers the
       // background hook. Shared by the SSH remote shell and the local macOS zsh.
       const scheduleCwdIntegrationInstall = (targetSid: string, integrationCommand: string) => {
+        if (ssh && !adopted) automationInputSettlingRef.current = true;
         let integrationAttempts = 0;
         let integrationInstalling = false;
         const MAX_INTEGRATION_ATTEMPTS = 12; // ~6s of polling for a slow login
@@ -2963,6 +3016,14 @@ export function TerminalPanel({
           if (integrationAttempts < MAX_INTEGRATION_ATTEMPTS) {
             integrationAttempts += 1;
             window.setTimeout(pollForCwdIntegration, 500);
+          } else if (installSshCwdIntegrationRef.current === installCwdIntegration) {
+            // A shell that never exposes a prompt (or a non-POSIX prompt that
+            // cannot accept the integration command) must not block normal
+            // input forever. Stop retrying and expose the stable output we do
+            // have; cwd reporting remains unavailable for this session.
+            installSshCwdIntegrationRef.current = null;
+            automationInputSettlingRef.current = false;
+            syncAutomationState();
           }
         };
         window.setTimeout(pollForCwdIntegration, 500);
@@ -3037,6 +3098,9 @@ export function TerminalPanel({
       onSessionLaunchFailedRef.current?.(err);
       cancelPendingMfa();
       connectionStateRef.current = ssh ? "disconnected" : "idle";
+      automationInputSettlingRef.current = false;
+      installSshCwdIntegrationRef.current = null;
+      injectedInputEchoSuppressorRef.current = null;
       sessionIdRef.current = null;
       pendingLocalDirectoryReportsRef.current = [];
       setRegisteredSessionId(null);
@@ -3066,6 +3130,9 @@ export function TerminalPanel({
       clearConnectionListeners();
       cancelPendingMfa();
       connectionStateRef.current = mode === "reconnect" ? "reconnecting" : "connecting";
+      automationInputSettlingRef.current = true;
+      installSshCwdIntegrationRef.current = null;
+      injectedInputEchoSuppressorRef.current = null;
       if (tabId) setTerminalRuntime(tabId, { state: "connecting", program: undefined });
       sessionIdRef.current = null;
       setRegisteredSessionId(null);
@@ -3222,8 +3289,8 @@ export function TerminalPanel({
         handleRawOutput,
         workspaceRootRef.current,
       )
-        .then(({ sessionId, shellId, directoryUseWarning }) =>
-          handleConnected({ sessionId, shellId, directoryUseWarning }, "initial"),
+        .then(({ sessionId, shellId, directoryUseWarning, taskEnvironment }) =>
+          handleConnected({ sessionId, shellId, directoryUseWarning, taskEnvironment }, "initial"),
         )
         .catch((err) => handleConnectFailure(err, "initial"));
     }
@@ -3237,9 +3304,11 @@ export function TerminalPanel({
       renderDisposable.dispose();
       resizeDisposable.dispose();
       clearTimeout(resizeTimer);
+      window.clearInterval(automationStateTimer);
       if (activityPromptTimer) clearTimeout(activityPromptTimer);
       if (sockscapLaunchTimer) clearTimeout(sockscapLaunchTimer);
       installSshCwdIntegrationRef.current = null;
+      automationInputSettlingRef.current = false;
       unlistenExit?.();
       unlistenForwardError?.();
       unlistenAuthPrompt?.();
@@ -3271,6 +3340,7 @@ export function TerminalPanel({
       fitAddonRef.current = null;
       searchAddonRef.current = null;
       sessionIdRef.current = null;
+      sdkTaskEnvironmentRef.current = {};
       pendingLocalDirectoryReportsRef.current = [];
       connectionStateRef.current = "idle";
       reconnectSshRef.current = null;
@@ -3506,20 +3576,6 @@ export function TerminalPanel({
   const captureThemeRef = useRef({ resolvedTheme, fontFamily, fontSize });
   captureThemeRef.current = { resolvedTheme, fontFamily, fontSize };
 
-  // Keep data-terminal-text in sync so WebDriver / automation can read
-  // terminal content without depending on xterm's canvas rendering.
-  useEffect(() => {
-    const el = panelRef.current;
-    if (!el) return;
-    const update = () => {
-      const term = termRef.current;
-      el.setAttribute("data-terminal-text", term ? getBufferText(term) : "");
-    };
-    update();
-    const id = window.setInterval(update, 500);
-    return () => window.clearInterval(id);
-  }, []);
-
   // Register this terminal in the global registry so the AI Chat Drawer can
   // pull buffer context (`@terminal:last-N`) and push commands back into it
   // (the assistant's "Send to terminal" button on rendered code blocks).
@@ -3563,11 +3619,17 @@ export function TerminalPanel({
       },
       runTask: (command: string, taskVariables) => {
         if (readOnlyRef.current) return;
+        const sdkTaskVariables = Object.fromEntries(
+          Object.entries(sdkTaskEnvironmentRef.current).map(([name, value]) => [
+            name,
+            { value, mode: "replace" as const },
+          ]),
+        ) satisfies TerminalTaskVariables;
         const task = renderTerminalTask(command, {
           platform: getAppPlatform(),
           shellId: resolvedLocalShellId ?? localShell?.id ?? null,
           shellName: localShell?.name ?? null,
-        }, taskVariables);
+        }, { ...sdkTaskVariables, ...taskVariables });
         const suppressor = createTaskStartOutputSuppressor(
           task.startMarker,
           task.displayCommand,

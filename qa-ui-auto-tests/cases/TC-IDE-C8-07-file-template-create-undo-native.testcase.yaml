@@ -93,7 +93,22 @@ steps:
       path: "${fixture.maven_single_root}/src/main/java/com/example/single/QaTemplateSmoke.java"
       contains: "public class QaTemplateSmoke"
       timeout_sec: 30
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - press: Mod+z
+  # Disk writes precede tree refresh/openFile and the dialog's async onCreate
+  # completion. The App.java pane already exists, so its presence cannot prove
+  # creation has finished or that Ctrl+Z will reach the workspace history.
+  - wait_for:
+      selector: '[data-testid="new-java-class-dialog"]'
+      state: detached
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: "public class QaTemplateSmoke"
+      timeout_sec: 30
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      focus_target: true
+      require_keydown_prevented: true
+      keys: ["Mod+z"]
   - assert_not_visible: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/QaTemplateSmoke.java"]'
   - screenshot: tc-ide-c8-07-file-template-create-undo.png

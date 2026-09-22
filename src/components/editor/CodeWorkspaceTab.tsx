@@ -1843,6 +1843,7 @@ export function CodeWorkspaceTab({
   );
   const [fileEncodingDialogOpen, setFileEncodingDialogOpen] = useState(false);
   const [saveObservations, setSaveObservations] = useState<Record<string, SaveObservationRecord>>({});
+  const pendingEncodingDialogFileKeyRef = useRef<string | null>(null);
   const pendingWorkspaceRecoveryKeysRef = useRef(new Set<string>());
   useEffect(() => {
     setSaveObservations({});
@@ -6791,10 +6792,11 @@ export function CodeWorkspaceTab({
       return absolute !== null && fsPathEquals(absolute, normalizedPath);
     });
     refreshTree();
+    // Restore can remap a renamed file back into the open-file registry before
+    // Windows delivers the old delete notification. Consume that owned echo
+    // before either the open- or closed-file status path handles it.
+    if (restoreEchoSuppressorRef.current.shouldSuppress(fsPathComparisonKey(normalizedPath))) return;
     if (!file) {
-      // ED-AUDIT-014: a closed file we just restore-wrote echoes back
-      // through the watcher; skip only the misleading status note.
-      if (restoreEchoSuppressorRef.current.shouldSuppress(fsPathComparisonKey(normalizedPath))) return;
       setStatusMessage(`File changed on disk: ${change.path}`);
       return;
     }
@@ -7979,9 +7981,29 @@ export function CodeWorkspaceTab({
 
   const openFileEncodingDialog = useCallback(() => {
     const file = activeKey ? openFilesRef.current[activeKey] : null;
-    if (!file || file.library || file.loading || file.saving) return;
+    if (!file || file.library || file.loading) return;
+    if (file.saving) {
+      // Saving is an asynchronous transaction. Queue the user's intent so a
+      // status-bar click that lands in the save/writeback window is honored
+      // after the same active file reaches a settled state.
+      pendingEncodingDialogFileKeyRef.current = activeKey;
+      return;
+    }
     setFileEncodingDialogOpen(true);
   }, [activeKey]);
+
+  useEffect(() => {
+    const pendingKey = pendingEncodingDialogFileKeyRef.current;
+    if (!pendingKey) return;
+    if (pendingKey !== activeKey) {
+      pendingEncodingDialogFileKeyRef.current = null;
+      return;
+    }
+    const file = openFilesRef.current[pendingKey];
+    if (!file || file.library || file.loading || file.saving) return;
+    pendingEncodingDialogFileKeyRef.current = null;
+    setFileEncodingDialogOpen(true);
+  }, [activeFile, activeKey]);
 
   const cycleActiveFileEol = useCallback(() => {
     const key = activeKey;

@@ -34,3 +34,44 @@ class NativeAssertionsTest(TestCase):
         ctx.session.right_click.assert_not_called()
         run_native_step(ctx, "right_click", "#row")
         ctx.session.right_click.assert_called_once_with("#row")
+
+    def test_type_can_focus_an_explicit_target_before_input(self):
+        ctx = Mock()
+        ctx.session.type_text.return_value = "typed"
+        result = run_native_step(
+            ctx,
+            "type",
+            {"selector": ".xterm-helper-textarea", "text": "whoami"},
+        )
+        self.assertEqual(result, "typed")
+        ctx.session.focus.assert_called_once_with(".xterm-helper-textarea")
+        ctx.session.type_text.assert_called_once_with("whoami")
+
+    def test_type_rejects_malformed_rich_arguments(self):
+        ctx = Mock()
+        with self.assertRaisesRegex(StepError, "expected string"):
+            run_native_step(ctx, "send_keys", {"selector": "#terminal"})
+        ctx.session.focus.assert_not_called()
+        ctx.session.type_text.assert_not_called()
+
+    def test_terminal_input_dispatches_xterm_data_and_submit(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = {"found": True, "focused": True}
+        result = run_native_step(ctx, "terminal_input", {
+            "selector": ".xterm-helper-textarea",
+            "text": "echo ready",
+            "submit": True,
+        })
+        script = ctx.session.execute.call_args.args[0]
+        self.assertIn("new InputEvent", script)
+        self.assertIn("echo ready", script)
+        self.assertEqual(result, "sent 10 chars to xterm input and submitted")
+
+    def test_terminal_input_requires_a_real_target(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = {"found": False, "focused": False}
+        with self.assertRaisesRegex(StepError, "target not found"):
+            run_native_step(ctx, "terminal_input", {
+                "selector": ".xterm-helper-textarea",
+                "text": "echo ready",
+            })

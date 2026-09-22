@@ -1,27 +1,37 @@
-"""jdtls_required: probe for the versioned jdtls fixture used by the
-§8.19.10 provider-mode editor cases (TC-IDE-C2-01 / TC-IDE-C6-02).
-
-The probe checks that a JDK launcher is resolvable on PATH. The full
-fixture matrix (maven-single / maven-multi-module / gradle-single /
-gradle-multi-module under src/components/editor/workspace/__fixtures__/jdtls)
-is provisioned by the R3 native runner; this browser/native gate only needs
-to know whether ANY Java provider run is possible. Missing JDK raises
-FixtureSkip so the case reports environment-blocked — never a stub pass.
-"""
-
+"""Require an executable JDK and an installed JDTLS distribution for native cases."""
 from __future__ import annotations
 
+import os
+from pathlib import Path
+import platform
+import re
 import shutil
+import subprocess
 from typing import Any
 
 
 def setup(ctx: Any) -> None:
-    missing = [name for name in ("java",) if shutil.which(name) is None]
-    if missing:
-        from . import FixtureSkip
+    from . import FixtureSkip
 
-        raise FixtureSkip(
-            f"jdtls fixture prerequisites missing on PATH: {', '.join(missing)}. "
-            "Provision a JDK 21 (and the __fixtures__/jdtls projects for the "
-            "native runner) — qa-ui-auto does not auto-fallback to stubs."
-        )
+    java = shutil.which("java")
+    if not java:
+        raise FixtureSkip("JDTLS requires JDK 21+ on PATH")
+    version = subprocess.run([java, "-version"], capture_output=True, text=True, timeout=15)
+    match = re.search(r'version "(\d+)', version.stderr + version.stdout)
+    if version.returncode or not match or int(match.group(1)) < 21:
+        raise FixtureSkip("JDTLS requires an executable JDK 21+")
+    if (getattr(ctx, "cfg", {}).get("app") or {}).get("mode") != "native":
+        return
+    launcher = shutil.which("jdtls")
+    if not launcher:
+        raise FixtureSkip("native Java provider requires jdtls on PATH")
+    raw = os.environ.get("JDTLS_HOME")
+    if raw:
+        home = Path(raw)
+        suffix = {"Linux": "linux", "Windows": "win", "Darwin": "mac"}[platform.system()]
+        if platform.machine().lower() in {"arm64", "aarch64"}:
+            suffix += "_arm"
+        if not list((home / "plugins").glob("org.eclipse.equinox.launcher*.jar")) or not (home / ("config_" + suffix)).is_dir():
+            raise FixtureSkip(f"incomplete JDTLS distribution for {platform.system()}/{platform.machine()}")
+    # CI also sends initialize and checks capabilities before launching the app.
+    # Actual semantic assertions remain in each selected native case.

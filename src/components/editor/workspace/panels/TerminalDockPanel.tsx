@@ -17,6 +17,7 @@ import {
   type TerminalTaskVariables,
 } from "../../../../lib/terminal/commandInput";
 import { getAppPlatform } from "../../../../lib/runtime";
+import { normalizeLocalStartCwd } from "../../../../lib/terminalCwd";
 import type { WorkspaceTaskExecution } from "../../../../lib/editor/workspace";
 import type { CodeWorkspaceRootInfo } from "../../../../types";
 
@@ -33,9 +34,14 @@ interface WorkspaceTerminalInstance {
 }
 
 function rootForCwd(roots: CodeWorkspaceRootInfo[], cwd: string): string | null {
-  const windows = getAppPlatform() === "windows";
+  const platform = getAppPlatform();
+  const windows = platform === "windows";
   const normalize = (value: string) => {
-    const normalized = value.replace(/\\/g, "/").replace(/\/+$/, "");
+    // Provider paths can arrive in file-URI form (`/D:/repo`) while recents
+    // retain the native drive form (`D:/repo`). Use the same normalization as
+    // terminal startup before deciding which root supplies the SDK environment.
+    const localPath = windows ? normalizeLocalStartCwd(value, platform) ?? value : value;
+    const normalized = localPath.replace(/\\/g, "/").replace(/\/+$/, "");
     return windows ? normalized.toLowerCase() : normalized;
   };
   const normalizedCwd = normalize(cwd);

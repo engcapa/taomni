@@ -24,7 +24,7 @@ def main(argv: list[str] | None = None) -> int:
         from .verification import main as verification_main
         return verification_main([args.command, *flags])
     from .runner import main as runner_main
-    if not any(flag == "--mode" or flag.startswith("--mode=") for flag in flags):
+    if not any(flag in {"--mode", "--selection"} or flag.startswith(("--mode=", "--selection=")) for flag in flags):
         flags.extend(["--mode", "browser"])
     return runner_main(flags)
 

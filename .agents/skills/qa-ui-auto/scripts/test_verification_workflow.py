@@ -186,11 +186,16 @@ class VerificationTest(unittest.TestCase):
             root = Path(directory)
             source = root / "sample"
             source.mkdir()
+            (source / ".mvn").mkdir()
             (source / "pom.xml").write_text("sample project")
             ctx = SimpleNamespace(case_dir=root / "case", values={})
             with patch.object(java_sample_projects, "SAMPLES", {"maven_single_root": (source, "pom.xml")}):
                 java_sample_projects.setup(ctx)
             isolated = Path(ctx.values["maven_single_root"])
+            self.assertEqual(
+                (isolated / ".mvn" / "maven.config").read_text(encoding="utf-8"),
+                "--show-version\n",
+            )
             (isolated / "pom.xml").write_text("changed by native test")
             self.assertEqual((source / "pom.xml").read_text(), "sample project")
 

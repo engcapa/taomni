@@ -5,6 +5,7 @@ import { TerminalPanel, collectTerminalBlockSelectionText } from "./TerminalPane
 import { DEFAULT_TERMINAL_PROFILE, SYSTEM_TERMINAL_THEME } from "../../lib/terminalProfile";
 import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 import { useAppStore } from "../../stores/appStore";
+import { getTerminal } from "../../lib/terminal/terminalRegistry";
 
 const terminalMocks = vi.hoisted(() => {
   const focus = vi.fn();
@@ -12,6 +13,7 @@ const terminalMocks = vi.hoisted(() => {
   const oscHandlers = new Map<number, (data: string) => boolean | Promise<boolean>>();
   const state = {
     onDataHandler: null as ((data: string) => void) | null,
+    onRenderHandler: null as (() => void) | null,
     onResizeHandler: null as ((size: { cols: number; rows: number }) => void) | null,
     customKeyEventHandler: null as ((event: KeyboardEvent) => boolean) | null,
   };
@@ -45,7 +47,10 @@ const terminalMocks = vi.hoisted(() => {
       }),
       onBinary: vi.fn(() => ({ dispose: vi.fn() })),
       onScroll: vi.fn(() => ({ dispose: vi.fn() })),
-      onRender: vi.fn(() => ({ dispose: vi.fn() })),
+      onRender: vi.fn((handler: () => void) => {
+        state.onRenderHandler = handler;
+        return { dispose: vi.fn() };
+      }),
       onResize: vi.fn((handler: (size: { cols: number; rows: number }) => void) => {
         state.onResizeHandler = handler;
         return { dispose: vi.fn() };
@@ -306,6 +311,7 @@ describe("TerminalPanel focus behavior", () => {
     window.localStorage.clear();
     terminalMocks.oscHandlers.clear();
     terminalMocks.state.onDataHandler = null;
+    terminalMocks.state.onRenderHandler = null;
     terminalMocks.state.onResizeHandler = null;
     terminalMocks.state.customKeyEventHandler = null;
     ipcMocks.terminalExitHandlers.clear();
@@ -349,6 +355,97 @@ describe("TerminalPanel focus behavior", () => {
 
     await waitFor(() => {
       expect(terminalMocks.focus).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("re-applies the workspace SDK environment for tasks after shell startup", async () => {
+    ipcMocks.createLocalTerminal.mockImplementation(async (sessionId: string) => ({
+      sessionId,
+      shellId: "powershell",
+      taskEnvironment: {
+        JAVA_HOME: "C:\\Program Files\\Java\\jdk-21",
+        PATH: "C:\\Program Files\\Java\\jdk-21\\bin;C:\\Windows\\System32",
+      },
+    }));
+    render(
+      <TerminalPanel
+        tabId="sdk-task"
+        visible
+        workspaceRoot="C:\\repo"
+        localShell={{ id: "powershell", name: "PowerShell" }}
+      />,
+    );
+
+    await waitFor(() => expect(getTerminal("sdk-task")?.runTask).toBeTypeOf("function"));
+    ipcMocks.writeTerminal.mockClear();
+    act(() => {
+      getTerminal("sdk-task")?.runTask?.("mvn.cmd test", {
+        MAVEN_OPTS: { value: "--add-opens=java.base/java.lang=ALL-UNNAMED", mode: "append" },
+      });
+    });
+
+    const encoded = (ipcMocks.writeTerminal.mock.calls as unknown[][])[0]?.[1] as string;
+    const command = atob(encoded);
+    expect(command).toContain("$env:JAVA_HOME='C:\\Program Files\\Java\\jdk-21'");
+    expect(command).toContain("$env:PATH='C:\\Program Files\\Java\\jdk-21\\bin;C:\\Windows\\System32'");
+    expect(command).toContain("$env:MAVEN_OPTS=if ([string]::IsNullOrWhiteSpace");
+  });
+
+  it("lets explicit task variables override workspace SDK defaults", async () => {
+    ipcMocks.createLocalTerminal.mockImplementation(async (sessionId: string) => ({
+      sessionId,
+      shellId: "powershell",
+      taskEnvironment: { JAVA_HOME: "C:\\sdk\\jdk-21" },
+    }));
+    render(
+      <TerminalPanel
+        tabId="sdk-task-override"
+        visible
+        workspaceRoot="C:\\repo"
+        localShell={{ id: "powershell", name: "PowerShell" }}
+      />,
+    );
+
+    await waitFor(() => expect(getTerminal("sdk-task-override")?.runTask).toBeTypeOf("function"));
+    ipcMocks.writeTerminal.mockClear();
+    act(() => {
+      getTerminal("sdk-task-override")?.runTask?.("java -version", {
+        JAVA_HOME: { value: "C:\\task\\jdk-17", mode: "replace" },
+      });
+    });
+
+    const encoded = (ipcMocks.writeTerminal.mock.calls as unknown[][])[0]?.[1] as string;
+    const command = atob(encoded);
+    expect(command).toContain("$env:JAVA_HOME='C:\\task\\jdk-17'");
+    expect(command).not.toContain("C:\\sdk\\jdk-21");
+  });
+
+  it("mirrors rendered terminal text and idle-prompt readiness for automation", async () => {
+    render(<TerminalPanel visible />);
+
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    const lines = ["qa-output", "runner$ "].map((text) => ({
+      isWrapped: false,
+      translateToString: vi.fn(() => text),
+    }));
+    term.buffer.active = {
+      type: "normal",
+      length: 2,
+      baseY: 0,
+      cursorY: 1,
+      cursorX: 8,
+      viewportY: 0,
+      getLine: vi.fn((index: number) => lines[index]),
+    };
+
+    act(() => terminalMocks.state.onRenderHandler?.());
+
+    expect(screen.getByTestId("terminal-pane")).toHaveAttribute(
+      "data-terminal-text",
+      "qa-output\nrunner$ ",
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("terminal-pane")).toHaveAttribute("data-terminal-ready", "true");
     });
   });
 
@@ -452,6 +549,10 @@ describe("TerminalPanel focus behavior", () => {
     };
     term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());
     ipcMocks.writeTerminal.mockClear();
+    const panel = screen.getByTestId("terminal-pane");
+
+    act(() => terminalMocks.state.onRenderHandler?.());
+    expect(panel).not.toHaveAttribute("data-terminal-ready");
 
     await act(async () => {
       onOutput?.(new TextEncoder().encode(prompt));
@@ -465,6 +566,17 @@ describe("TerminalPanel focus behavior", () => {
           atob(encoded).includes("__taomni_osc7"),
       );
       expect(integrationWrite).toBeTruthy();
+    });
+    expect(panel).not.toHaveAttribute("data-terminal-ready");
+
+    await act(async () => {
+      onOutput?.(
+        new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${prompt}`),
+      );
+    });
+
+    await waitFor(() => {
+      expect(panel).toHaveAttribute("data-terminal-ready", "true");
     });
   });
 

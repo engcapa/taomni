@@ -7,10 +7,12 @@ It speaks the small W3C WebDriver subset needed by the qa-ui-auto DSL.
 from __future__ import annotations
 
 import base64
+import http.client
 from contextlib import suppress
 import json
 import os
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -71,6 +73,91 @@ def native_isolation_env(report_root: Path) -> dict[str, str]:
             "NEWMOB_CACHE_DIR": str(paths["cache"]),
         }
     raise WebDriverError("native isolation is unsupported on this OS")
+
+
+def native_tooling_env(cfg: dict) -> tuple[dict[str, str], dict[str, str]]:
+    """Pin the configured tooling JDK in the WebDriver-launched application.
+
+    On Windows the application is a grandchild of tauri-driver and
+    msedgedriver. Seeding the renderer's LSP setting does not affect Maven or
+    workspace terminals, so the process environment must carry the same JDK.
+    """
+    configured = cfg.get("app", {}).get("tooling_java_home")
+    if not configured:
+        return {}, {}
+    home = str(Path(str(configured)).expanduser())
+    java_bin = str(Path(home) / "bin")
+    inherited_path = os.environ.get("PATH", "")
+    process_env = {
+        "JAVA_HOME": home,
+        "PATH": java_bin if not inherited_path else os.pathsep.join((java_bin, inherited_path)),
+    }
+    evidence = {"JAVA_HOME": home, "PATH_prepend": java_bin}
+    return process_env, evidence
+
+
+def seed_native_tooling_sdk(report_root: Path, java_home: str) -> dict[str, str]:
+    """Register the prepared JDK before the isolated QA application starts.
+
+    Process inheritance remains the fallback, but it is not an observable SDK
+    selection contract across the Windows tauri-driver/msedgedriver launch
+    chain. A run-owned registry gives workspace terminals and build tools the
+    same explicit JDK that the native session supplies to JDTLS.
+    """
+    home = Path(java_home).expanduser()
+    executable_name = "java.exe" if platform.system() == "Windows" else "java"
+    java = home / "bin" / executable_name
+    if not java.is_file():
+        raise WebDriverError(f"Configured tooling JDK has no executable: {java}")
+    probe = subprocess.run(
+        [str(java), "-version"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    output = f"{probe.stderr}\n{probe.stdout}"
+    match = re.search(r'version\s+"([^"]+)"', output)
+    if probe.returncode != 0 or not match:
+        raise WebDriverError(f"Configured tooling JDK version probe failed: {java}")
+    version = match.group(1)
+
+    isolation = native_isolation_env(report_root)
+    if raw_config := isolation.get("NEWMOB_CONFIG_DIR"):
+        config_dir = Path(raw_config) / QA_APP_ID
+    else:
+        config_dir = Path(isolation["XDG_CONFIG_HOME"])
+    registry_path = config_dir / "taomni" / "sdk.json"
+    run_root = report_root.resolve()
+    if not registry_path.resolve().is_relative_to(run_root):
+        raise WebDriverError("Tooling SDK registry must stay inside the native run directory")
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    sdk_id = "qa-prepared-java"
+    registry = {
+        "schemaVersion": 1,
+        "installations": [{
+            "id": sdk_id,
+            "kind": "java",
+            "name": f"QA prepared JDK {version}",
+            "location": str(home),
+            "executables": {"java": str(java)},
+            "version": version,
+            "vendor": None,
+            "architecture": None,
+            "origin": "manual",
+            "status": "ready",
+            "lastError": None,
+            "lastProbedAt": None,
+        }],
+        "defaults": [{"kind": "java", "sdkId": sdk_id}],
+        "bindings": [],
+    }
+    registry_path.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+    return {
+        "id": sdk_id,
+        "java_home": str(home),
+        "java_version": version,
+        "registry_path": str(registry_path),
+    }
 
 
 def _tcp_ok(host: str, port: int, timeout: float = 1.0) -> bool:
@@ -185,7 +272,7 @@ class TauriDriverProcess:
             env = dict(os.environ)
             env["TAOMNI_QA_WEBDRIVER_HOST"] = self.host
             env["TAOMNI_QA_WEBDRIVER_PORT"] = str(self.port)
-            with out.open("w", encoding="utf-8") as stdout, err.open("w", encoding="utf-8") as stderr:
+            with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
                 self.proc = subprocess.Popen(
                     [str(self.application.resolve())],
                     cwd=ROOT,
@@ -284,6 +371,9 @@ class NativeSession:
         self.transport = "macOS WKWebView bridge" if platform.system() == "Darwin" else "tauri-driver"
         # A local driver must remain reachable when the desktop uses a proxy.
         host = urllib.parse.urlsplit(self.driver_url).hostname
+        self._local_endpoint = (urllib.parse.urlsplit(self.driver_url)
+                                if host in {"localhost", "127.0.0.1", "::1"} else None)
+        self._connection: http.client.HTTPConnection | None = None
         self._open = (urllib.request.build_opener(urllib.request.ProxyHandler({})).open
                       if host in {"localhost", "127.0.0.1", "::1"} else urllib.request.urlopen)
 
@@ -297,8 +387,30 @@ class NativeSession:
         )
         try:
             timeout = min(120, self.deadline.remaining()) if self.deadline else 120
-            with self._open(req, timeout=timeout) as r:
-                data = r.read().decode("utf-8")
+            if self._local_endpoint and self._local_endpoint.scheme == "http":
+                # urllib unconditionally adds Connection: close. Forwarded
+                # by tauri-driver, this causes WebKitGTK to reset responses
+                # mid-flight. Keep the sequential W3C session on HTTP/1.1.
+                if self._connection is None:
+                    self._connection = http.client.HTTPConnection(
+                        self._local_endpoint.hostname, self._local_endpoint.port, timeout=timeout)
+                if self._connection.sock:
+                    self._connection.sock.settimeout(timeout)
+                self._connection.timeout = timeout
+                try:
+                    self._connection.request(method, path, body=body, headers=headers)
+                    response = self._connection.getresponse()
+                    data = response.read().decode("utf-8")
+                    if response.status >= 400:
+                        raise WebDriverError(f"HTTP {response.status}: {data}")
+                except Exception:
+                    self._connection.close()
+                    self._connection = None
+                    # Never retry an action whose delivery is uncertain.
+                    raise
+            else:
+                with self._open(req, timeout=timeout) as r:
+                    data = r.read().decode("utf-8")
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")
             raise WebDriverError(f"HTTP {e.code}: {detail}") from e
@@ -320,6 +432,16 @@ class NativeSession:
                 }
             }
         }
+        if platform.system() == "Windows":
+            # The QA app chooses an explicit WebView profile. EdgeDriver must
+            # watch that same directory for DevToolsActivePort instead of a
+            # separate temporary profile (which causes session init to hang).
+            data_root = os.environ.get("NEWMOB_DATA_DIR")
+            if not data_root:
+                raise WebDriverError("Windows WebView2 session requires the QA data directory")
+            payload["capabilities"]["alwaysMatch"]["tauri:options"]["webviewOptions"] = {
+                "userDataFolder": str(Path(data_root) / QA_APP_ID / "webview")
+            }
         value = self.request("POST", "/session", payload)
         sid = value.get("sessionId") if isinstance(value, dict) else None
         if not sid:
@@ -368,6 +490,9 @@ class NativeSession:
                 self.request("DELETE", f"/session/{self.session_id}")
             finally:
                 self.session_id = None
+                if self._connection:
+                    self._connection.close()
+                    self._connection = None
                 if self._on_close is not None:
                     self._on_close()
 
@@ -645,15 +770,19 @@ class NativeSession:
                 if line:
                     self.type_text(line)
             return f"filled contenteditable {selector}"
-        try:
-            self.request("POST", self.element_path(element, "/clear"), {})
-        except WebDriverError:
-            pass
-        self.request(
-            "POST",
-            self.element_path(element, "/value"),
-            {"text": text, "value": list(text)},
-        )
+        if platform.system() == "Darwin":
+            # The WKWebView bridge's value endpoint replaces the value using
+            # the native DOM setter and React input events without blurring.
+            # Its synthetic keyboard adapter cannot perform OS select-all.
+            self.request("POST", self.element_path(element, "/value"), {"text": text})
+            return f"filled {selector}"
+        # WebDriver /clear unfocuses form controls. Blur-committing inputs
+        # (path breadcrumbs, rename fields) disappear before /value arrives.
+        # Select and replace through keyboard input while retaining focus.
+        self.request("POST", self.element_path(element, "/click"), {})
+        self.press_combo("Mod+a")
+        self.press_combo("Backspace")
+        self.type_text(text)
         return f"filled {selector}"
 
     def send_keys(self, text: str) -> str:
@@ -859,6 +988,10 @@ class NativeSession:
         data = self.request("GET", self.endpoint("/screenshot"))
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(base64.b64decode(str(data)))
+        target.with_suffix(target.suffix + ".metadata.json").write_text(
+            json.dumps({"capture_kind": "webview", "platform": platform.system(),
+                        "actor": "WKWebView.takeSnapshot" if platform.system() == "Darwin" else "WebDriver",
+                        "screen_recording_required": False}), encoding="utf-8")
         return str(target)
 
     def execute(self, script: str) -> Any:
@@ -927,20 +1060,23 @@ class NativeHarness:
             identity = verify_identity(self.application)
         except ValueError as exc:
             raise WebDriverError(str(exc)) from exc
-        overrides = native_isolation_env(self.report_root)
+        isolation_overrides = native_isolation_env(self.report_root)
+        tooling_overrides, tooling_evidence = native_tooling_env(self.cfg)
+        overrides = {**isolation_overrides, **tooling_overrides}
         if identity.get("source_sha256"):
             from qa_ui_auto.provenance import source_identity
             if identity["source_sha256"] != source_identity(ROOT):
                 raise WebDriverError("QA binary source is stale; run native_build.py")
         self._previous_env = {key: os.environ.get(key) for key in overrides}
         try:
-            for value in overrides.values():
+            for value in isolation_overrides.values():
                 Path(value).mkdir(parents=True, exist_ok=True)
             os.environ.update(overrides)
             self.report_root.mkdir(parents=True, exist_ok=True)
             (self.report_root / "native-isolation.json").write_text(
                 json.dumps({"identifier": QA_APP_ID, "binary": str(self.application.resolve()),
-                            "binary_sha256": identity["binary_sha256"], "environment": overrides,
+                            "binary_sha256": identity["binary_sha256"], "environment": isolation_overrides,
+                            "tooling_environment": tooling_evidence,
                             "source_sha256": identity.get("source_sha256"),
                             "profile": identity.get("profile")}, indent=2) + "\n",
                 encoding="utf-8",
@@ -962,12 +1098,29 @@ class NativeHarness:
                     os.environ[key] = previous
             self._previous_env.clear()
 
-    def create_session(self) -> NativeSession:
+    def create_session(self, *, tooling_java_home: str | None = None) -> NativeSession:
         self.driver.ensure_running()
+        java_home = tooling_java_home or self.cfg.get("app", {}).get("tooling_java_home")
+        if java_home and self._previous_env:
+            sdk_evidence = seed_native_tooling_sdk(self.report_root, str(java_home))
+            isolation_path = self.report_root / "native-isolation.json"
+            isolation_evidence = json.loads(isolation_path.read_text(encoding="utf-8"))
+            isolation_evidence["tooling_sdk_registry"] = sdk_evidence
+            isolation_path.write_text(
+                json.dumps(isolation_evidence, indent=2) + "\n",
+                encoding="utf-8",
+            )
         session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
         session.deadline = getattr(self, "deadline", None)
         try:
             session.start()
+            # A Java 25 project must not change the JDK used by unrelated
+            # JDK 21 provider fixtures in the same selected suite.
+            if java_home:
+                session.execute(
+                    "window.localStorage.setItem('taomni.codeWorkspace.lspJavaHome.v1', "
+                    + json.dumps(str(java_home)) + "); return true;"
+                )
         except BaseException:
             # If readiness fails after the bridge has started, there is no
             # session object for the runner's normal finally block to close.
