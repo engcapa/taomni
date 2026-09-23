@@ -52,6 +52,13 @@ def jump_target_endpoint(system: str, mapped_port: int) -> tuple[str, int]:
     return "127.0.0.1", 2222 if system == "Linux" else mapped_port
 
 
+def sshd_forwarding_policy(private: Path) -> tuple[Path, str]:
+    config = private / "sshd_config.d" / "qa-forwarding.conf"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    config.write_text("AllowTcpForwarding yes\nPermitOpen any\n", encoding="utf-8")
+    return config, "/config/sshd/sshd_config.d/qa-forwarding.conf:ro"
+
+
 def retry(probe, seconds=120):
     end = time.monotonic() + seconds
     while True:
@@ -124,13 +131,15 @@ class Services:
         self.stack.callback(stop)
         return process
 
-    def docker(self, suffix, image, internal_port, environment):
+    def docker(self, suffix, image, internal_port, environment, volumes=()):
         name = f"{self.namespace}-{suffix}"
         self.cleanup_command(["docker", "rm", "-f", name])
         argv = ["docker", "run", "-d", "--rm", "--name", name,
                 "-p", f"127.0.0.1::{internal_port}"]
         for key, value in environment.items():
             argv += ["-e", f"{key}={value}"]
+        for source, target in volumes:
+            argv += ["-v", f"{source}:{target}"]
         command([*argv, image])
         self.resources.append(name)
         return int(command(["docker", "port", name, str(internal_port)]).splitlines()[0].rsplit(":", 1)[1])
@@ -236,8 +245,10 @@ class Services:
         system = platform.system()
         if system == "Linux":
             user, remote_dir = "testuser", "/tmp/qa-ui-auto-temp"
+            forwarding_config = sshd_forwarding_policy(self.private)
             port = self.docker("sshd", self.images["ssh_image"], 2222,
-                               {"USER_NAME": user, "USER_PASSWORD": password, "PASSWORD_ACCESS": "true"})
+                               {"USER_NAME": user, "USER_PASSWORD": password, "PASSWORD_ACCESS": "true"},
+                               volumes=[forwarding_config])
         else:
             user, port, remote_dir = self.local_ssh(password)
         import paramiko

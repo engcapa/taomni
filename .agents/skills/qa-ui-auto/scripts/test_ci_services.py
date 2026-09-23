@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from ci_services import Services, install, jump_target_endpoint
+from ci_services import Services, install, jump_target_endpoint, sshd_forwarding_policy
 from qa_ui_auto.__main__ import main
 
 
@@ -15,6 +15,17 @@ class HostedServicesTest(unittest.TestCase):
     def test_jump_target_endpoint_uses_host_port_on_macos_and_windows(self):
         self.assertEqual(jump_target_endpoint("Darwin", 32768), ("127.0.0.1", 32768))
         self.assertEqual(jump_target_endpoint("Windows", 32768), ("127.0.0.1", 32768))
+
+    def test_linux_ssh_fixture_mounts_tcp_forwarding_policy(self):
+        with tempfile.TemporaryDirectory() as directory, patch("ci_services.command", side_effect=["container-id", "127.0.0.1:32768"]) as run:
+            config, target = sshd_forwarding_policy(Path(directory))
+            service = Services(Path(directory), ["ssh"], {})
+            port = service.docker("sshd", "linuxserver/openssh-server:test", 2222,
+                                  {"USER_NAME": "testuser"}, volumes=[(config, target)])
+            self.assertEqual(config.read_text(encoding="utf-8"), "AllowTcpForwarding yes\nPermitOpen any\n")
+            self.assertEqual(port, 32768)
+            self.assertIn(f"{config}:{target}", run.call_args_list[0].args[0])
+
 
     def test_browser_sftp_fixture_resolves_shell_path_after_setup(self):
         from qa_ui_auto.runner import _run_browser_case
