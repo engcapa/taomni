@@ -29,10 +29,13 @@ steps:
 - click: '[data-testid="auth-submit"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - wait_for:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-    timeout_sec: 20
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]:is([data-terminal-ready="true"], [data-terminal-text*="SSH disconnected"], [data-terminal-text*="Press Enter to retry"])'
+    timeout_sec: 60
 - click: '[data-testid="terminal-pane"]'
-- wait: 1
+- press: Enter
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
 - right_click:
     selector: '[data-testid="terminal-pane"]'
     position:
@@ -76,21 +79,23 @@ verification:
   - id: R1
     requirement: 录制一次命令、停止录制后快捷键回放，独立输出行从一次增加到恰好两次
     actions:
-    - 17
-    - 19
-    - 24
-    - 29
+    - 18
+    - 20
+    - 25
+    - 30
     checkpoints:
-    - step: 23
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 24
       expectation: '{"assert_visible": "text=\"Stop macro recording\""}'
-    - step: 28
+    - step: 29
       expectation: '{"eval_readonly": {"expression": "(document.querySelector(''[data-terminal-text]'').getAttribute(\"data-terminal-text\").match(/^qa-macro-payload\\r?$/gm)
         || []).length === 1", "expect_truthy": true}}'
-    - step: 31
+    - step: 32
       expectation: '{"eval_readonly": {"expression": "(document.querySelector(''[data-terminal-text]'').getAttribute(\"data-terminal-text\").match(/^qa-macro-payload\\r?$/gm)
         || []).length === 2", "expect_truthy": true}}'
     results:
-    - 31
+    - 32
   visual:
   - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
     method: manual

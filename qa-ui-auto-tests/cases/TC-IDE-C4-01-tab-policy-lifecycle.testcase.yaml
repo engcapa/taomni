@@ -141,9 +141,7 @@ steps:
 - assert_count:
     selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]'
     equal: 3
-- eval_readonly:
-    expression: document.activeElement?.getAttribute("data-testid") === "workspace-tab-policy-apply"
-    expect_truthy: true
+- wait_for: '[data-testid="workspace-tab-policy-apply"]:focus'
 - eval_readonly:
     expression: document.querySelector("[data-layout-revision]")?.getAttribute("data-layout-revision") === document.querySelector("[data-tab-policy-receipt-layout-revision]")?.getAttribute("data-tab-policy-receipt-layout-revision")
     expect_truthy: true
@@ -318,8 +316,7 @@ verification:
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]",
         "equal": 3}}'
     - step: 56
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") ===
-        \"workspace-tab-policy-apply\"", "expect_truthy": true}}'
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab-policy-apply\"]:focus"}'
     - step: 57
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-layout-revision]\")?.getAttribute(\"data-layout-revision\")
         === document.querySelector(\"[data-tab-policy-receipt-layout-revision]\")?.getAttribute(\"data-tab-policy-receipt-layout-revision\")",
