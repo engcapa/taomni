@@ -1,0 +1,194 @@
+id: TC-121
+title: Saved SSH sessions edit and persist port-forward endpoints
+covers:
+- F6.2
+- F6.3
+tags:
+- forwards
+- session
+- settings
+- ssh
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh-forward-edit.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '2222'
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa-forward-user
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- fill:
+    selector: input[aria-label="New forward local address"]
+    value: 127.0.0.1:19090
+- fill:
+    selector: input[aria-label="New forward remote address"]
+    value: service.internal:80
+- fill:
+    selector: input[aria-label="New forward description"]
+    value: qa-forward-original
+- click: '[data-testid="session-forward-add"]'
+- wait_for: '[data-testid="session-editor"] input[aria-label="Forward local address"]'
+- assert_attribute:
+    selector: input[aria-label="Forward local address"]
+    name: value
+    equals: 127.0.0.1:19090
+- assert_attribute:
+    selector: input[aria-label="Forward remote address"]
+    name: value
+    equals: service.internal:80
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-forward-edit
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-forward-edit"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-forward-edit"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- fill:
+    selector: input[aria-label="Forward local address"]
+    value: 127.0.0.1:19091
+- fill:
+    selector: input[aria-label="Forward remote address"]
+    value: service.internal:8080
+- fill:
+    selector: input[aria-label="Forward description"]
+    value: qa-forward-edited
+- assert_attribute:
+    selector: input[aria-label="Forward local address"]
+    name: value
+    equals: 127.0.0.1:19091
+- assert_attribute:
+    selector: input[aria-label="Forward remote address"]
+    name: value
+    equals: service.internal:8080
+- assert_attribute:
+    selector: input[aria-label="Forward description"]
+    name: value
+    equals: qa-forward-edited
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-forward-edit"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-forward-edit"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- assert_attribute:
+    selector: input[aria-label="Forward local address"]
+    name: value
+    equals: 127.0.0.1:19091
+- assert_attribute:
+    selector: input[aria-label="Forward remote address"]
+    name: value
+    equals: service.internal:8080
+- assert_attribute:
+    selector: input[aria-label="Forward description"]
+    name: value
+    equals: qa-forward-edited
+- screenshot: 121-ssh-forward-edit.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A saved SSH session can edit both port-forward endpoints, persist the changes, and restore them when reopened.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 26
+    - 28
+    - 29
+    - 30
+    - 34
+    - 36
+    - 37
+    - 39
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"] input[aria-label=\"Forward local address\"]"}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19090"}}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:80"}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-forward-edit\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19091"}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:8080"}}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-forward-edited"}}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-forward-edit\"]"}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19091"}}'
+    - step: 42
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:8080"}}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-forward-edited"}}'
+    results:
+    - 16
+    - 17
+    - 22
+    - 31
+    - 32
+    - 33
+    - 35
+    - 41
+    - 42
+    - 43
+  visual:
+  - check: The saved forward rows and updated endpoints remain readable without clipping in the editor.
+    method: manual
+    reason: Value assertions do not establish row layout or text clipping.
+  native:
+  - check: Native SQLite persistence of the initial SSH forward configuration is exercised by TC-003; this renderer edit case uses the browser storage bridge.
+    method: external
+    reason: Browser mode cannot establish the packaged app's database write path.

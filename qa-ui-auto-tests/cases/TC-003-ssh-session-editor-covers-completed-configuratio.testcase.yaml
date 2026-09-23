@@ -118,18 +118,6 @@ steps:
     selector: input[aria-label="Forward description"]
     name: value
     equals: qa-ui-auto-forward
-- press:
-    selector: input[aria-label="Forward local address"]
-    key: End
-- press:
-    selector: input[aria-label="Forward local address"]
-    key: Backspace
-- type:
-    selector: input[aria-label="Forward local address"]
-    text: '1'
-- fill:
-    selector: input[aria-label="Forward remote address"]
-    value: 127.0.0.1:22
 - fill:
     selector: input[aria-label="Forward description"]
     value: qa-ui-auto-forward-edited
@@ -205,15 +193,11 @@ verification:
     - 46
     - 52
     - 53
-    - 54
-    - 55
-    - 56
     - 57
-    - 61
-    - 63
-    - 64
-    - 66
-    - 71
+    - 59
+    - 60
+    - 62
+    - 67
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
@@ -263,27 +247,27 @@ verification:
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "127.0.0.1:22"}}'
     - step: 51
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-ui-auto-forward"}}'
-    - step: 58
+    - step: 54
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 59
+    - step: 55
       expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "Created by qa-ui-auto"}}'
-    - step: 60
+    - step: 56
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "qa, e2e, ssh"}}'
-    - step: 62
+    - step: 58
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-settings\"]"}'
-    - step: 65
+    - step: 61
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 68
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19091"}}'
-    - step: 69
+    - step: 64
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19090"}}'
+    - step: 65
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "127.0.0.1:22"}}'
-    - step: 70
+    - step: 66
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-ui-auto-forward-edited"}}'
-    - step: 72
+    - step: 68
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 73
+    - step: 69
       expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "Created by qa-ui-auto"}}'
-    - step: 74
+    - step: 70
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "qa, e2e, ssh"}}'
     results:
     - 36
@@ -295,14 +279,14 @@ verification:
     - 49
     - 50
     - 51
-    - 59
-    - 60
-    - 62
-    - 68
+    - 55
+    - 56
+    - 58
+    - 64
+    - 65
+    - 66
     - 69
     - 70
-    - 73
-    - 74
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
