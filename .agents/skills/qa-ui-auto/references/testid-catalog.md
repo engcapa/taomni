@@ -1106,6 +1106,9 @@
 - `[data-testid="session-section-database"]` — interactive [optional] — F6.3.section-database
 - `[data-testid="session-hbase-section"]` — display [optional] — F6.3.hbase-section
 - `[data-testid="advanced-ssh-settings"]` — display — F6.3.advanced-body
+- `[data-testid="session-x11-forwarding-toggle"]` — interactive — F6.3.advanced-x11-forwarding
+- `[data-testid="session-x11-trusted-toggle"]` — interactive — F6.3.advanced-x11-trusted
+- `[data-testid="session-compression-toggle"]` — interactive — F6.3.advanced-compression
 - `[data-testid="terminal-settings"]` — display [optional] — F6.3.terminal-body
 - `[data-testid="network-settings"]` — display — F6.3.network-body
 - `[data-testid="bookmark-settings"]` — display — F6.3.bookmark-body

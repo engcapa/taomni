@@ -1557,6 +1557,15 @@ controls:
   - id: advanced-body
     selector: '[data-testid="advanced-ssh-settings"]'
     kind: display
+  - id: advanced-x11-forwarding
+    selector: '[data-testid="session-x11-forwarding-toggle"]'
+    kind: interactive
+  - id: advanced-x11-trusted
+    selector: '[data-testid="session-x11-trusted-toggle"]'
+    kind: interactive
+  - id: advanced-compression
+    selector: '[data-testid="session-compression-toggle"]'
+    kind: interactive
   - id: terminal-body
     selector: '[data-testid="terminal-settings"]'
     kind: display

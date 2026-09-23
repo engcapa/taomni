@@ -539,18 +539,18 @@ function AdvancedSshSettings({
     <div data-testid="advanced-ssh-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
       <Field label={t("sessionEditor2.fieldX11")}>
         <label className="flex items-center gap-1.5">
-          <Checkbox checked={x11} onChange={setX11} />
+          <Checkbox dataTestId="session-x11-forwarding-toggle" checked={x11} onChange={setX11} />
           {t("sessionEditor2.enable")}
         </label>
         <label className={`flex items-center gap-1.5 ml-3 ${x11 ? "" : "opacity-50"}`} title={t("sessionEditor2.x11TrustedHint")}>
-          <Checkbox checked={x11Trusted} onChange={setX11Trusted} disabled={!x11} />
+          <Checkbox dataTestId="session-x11-trusted-toggle" checked={x11Trusted} onChange={setX11Trusted} disabled={!x11} />
           {t("sessionEditor2.x11Trusted")}
         </label>
       </Field>
 
       <Field label={t("sessionEditor2.fieldCompression")}>
         <label className="flex items-center gap-1.5">
-          <Checkbox checked={compression} onChange={setCompression} />
+          <Checkbox dataTestId="session-compression-toggle" checked={compression} onChange={setCompression} />
           {t("sessionEditor2.compressionLabel")}
         </label>
       </Field>
