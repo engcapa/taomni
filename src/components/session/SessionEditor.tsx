@@ -393,15 +393,18 @@ function Checkbox({
   checked,
   onChange,
   disabled,
+  dataTestId,
 }: {
   checked: boolean;
   onChange?: (v: boolean) => void;
   disabled?: boolean;
+  dataTestId?: string;
 }) {
   return (
     <input
       type="checkbox"
       className="taomni-checkbox"
+      data-testid={dataTestId}
       data-checked={checked}
       checked={checked}
       disabled={disabled}
@@ -4214,7 +4217,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 </button>
               </div>
               <label className="col-span-3 text-[12px] flex items-center gap-1.5 justify-end">
-                <Checkbox checked={specifyUser} onChange={setSpecifyUser} />
+                <Checkbox checked={specifyUser} onChange={setSpecifyUser} dataTestId="session-specify-username" />
                 <span>{t("sessionEditor2.specifyUsername")}</span>
               </label>
               <input
@@ -4761,6 +4764,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             {isSSH && needsHost && (
               <button
                 className="taomni-btn shrink-0 flex items-center gap-1.5"
+                data-testid="session-test-connection"
                 onClick={handleTestConnection}
                 disabled={testing}
                 type="button"

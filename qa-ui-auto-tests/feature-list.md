@@ -1482,6 +1482,9 @@ controls:
   - id: user
     selector: '[data-testid="session-user"]'
     kind: interactive
+  - id: specify-username
+    selector: '[data-testid="session-specify-username"]'
+    kind: interactive
   - id: port
     selector: '[data-testid="session-port"]'
     kind: interactive
@@ -1637,6 +1640,12 @@ controls:
     selector: 'input[aria-label="Keyboard shortcut"]'
     kind: interactive
   # Footer
+  - id: test-connection
+    selector: '[data-testid="session-test-connection"]'
+    kind: interactive
+  - id: test-result-summary
+    selector: '[data-testid="session-test-result-summary"]'
+    kind: display
   - id: save
     selector: '[data-testid="session-save"]'
     kind: interactive
@@ -3479,6 +3488,18 @@ controls:
     optional: true
   - id: confirm-dialog-confirm
     selector: '[data-testid="confirm-dialog-confirm"]'
+    kind: interactive
+    optional: true
+  - id: alert-dialog
+    selector: '[data-testid="alert-dialog"]'
+    kind: display
+    optional: true
+  - id: alert-dialog-message
+    selector: '[data-testid="alert-dialog-message"]'
+    kind: display
+    optional: true
+  - id: alert-dialog-ok
+    selector: '[data-testid="alert-dialog-ok"]'
     kind: interactive
     optional: true
 -->

@@ -1086,6 +1086,7 @@
 - `input[aria-label="Mail password or app password token"]` — interactive [optional] — F6.3.mail-password
 - `[data-testid="session-host"]` — interactive — F6.3.host
 - `[data-testid="session-user"]` — interactive — F6.3.user
+- `[data-testid="session-specify-username"]` — interactive — F6.3.specify-username
 - `[data-testid="session-port"]` — interactive — F6.3.port
 - `[data-testid="session-name"]` — interactive — F6.3.name
 - `[data-testid="session-file-target"]` — interactive [optional] — F6.3.file-target
@@ -1129,6 +1130,8 @@
 - `input[aria-label="Tags"]` — interactive — F6.3.bookmark-tags
 - `input[aria-label="Additional parameters"]` — interactive — F6.3.bookmark-extra-params
 - `input[aria-label="Keyboard shortcut"]` — interactive — F6.3.bookmark-shortcut
+- `[data-testid="session-test-connection"]` — interactive — F6.3.test-connection
+- `[data-testid="session-test-result-summary"]` — display — F6.3.test-result-summary
 - `[data-testid="session-save"]` — interactive — F6.3.save
 
 ## sessions (F6.4)
@@ -1537,6 +1540,9 @@
 - `[data-testid="confirm-dialog-message"]` — display [optional] — F-Confirm-1.confirm-dialog-message
 - `[data-testid="confirm-dialog-cancel"]` — interactive [optional] — F-Confirm-1.confirm-dialog-cancel
 - `[data-testid="confirm-dialog-confirm"]` — interactive [optional] — F-Confirm-1.confirm-dialog-confirm
+- `[data-testid="alert-dialog"]` — display [optional] — F-Confirm-1.alert-dialog
+- `[data-testid="alert-dialog-message"]` — display [optional] — F-Confirm-1.alert-dialog-message
+- `[data-testid="alert-dialog-ok"]` — interactive [optional] — F-Confirm-1.alert-dialog-ok
 
 ## ui/i18n (F-I18n-1)
 

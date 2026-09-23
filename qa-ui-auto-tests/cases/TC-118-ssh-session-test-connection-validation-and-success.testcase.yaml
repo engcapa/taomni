@@ -1,0 +1,151 @@
+id: TC-118
+title: SSH session test connection validates inputs and reaches the configured host
+covers:
+- F6.3
+tags:
+- ssh
+- session
+- settings
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-test-connection"]'
+- wait_for: '[data-testid="alert-dialog"]'
+- assert_text:
+    selector: '[data-testid="alert-dialog-message"]'
+    contains: Host and username are required
+- click: '[data-testid="alert-dialog-ok"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-test-connection"]'
+- wait_for: '[data-testid="alert-dialog"]'
+- assert_text:
+    selector: '[data-testid="alert-dialog-message"]'
+    contains: Enter password above to test
+- click: '[data-testid="alert-dialog-ok"]'
+- click: '[data-testid="session-section-advanced"]'
+- fill:
+    selector: 'input[aria-label="SSH password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="session-test-connection"]'
+- wait_for: '[data-testid="alert-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="alert-dialog"]'
+    name: data-tone
+    equals: success
+- assert_pattern:
+    selector: '[data-testid="alert-dialog-message"]'
+    regex: '^(?:Connection successful(?: \(\d+ms\))?|Authenticated to .+ as .+)$'
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_pattern:
+    selector: '[data-testid="session-test-result-summary"]'
+    regex: '^(?:Connection successful(?: \(\d+ms\))?|Authenticated to .+ as .+)$'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-ssh-test-connection
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-test-connection"]'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].host === "${cfg.ssh.host}"
+    expect_truthy: true
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].port === Number("${cfg.ssh.port}")
+    expect_truthy: true
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].username === "${cfg.ssh.user}"
+    expect_truthy: true
+- screenshot: 118-ssh-session-test-connection.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SSH connection test reports missing host/user and password, then succeeds after valid connection settings are supplied.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 22
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 6
+      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "Host and username are required"}}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 14
+      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "Enter password above to test"}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "success"}}'
+    - step: 21
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$"}}'
+    - step: 23
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$"}}'
+    results:
+    - 6
+    - 14
+    - 20
+    - 21
+    - 23
+  - id: R2
+    requirement: The successfully tested host, port, and username are saved on the SSH session bookmark.
+    actions:
+    - 24
+    - 26
+    - 27
+    checkpoints:
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-test-connection\"]"}'
+    - step: 29
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].host === \"${cfg.ssh.host}\"", "expect_truthy": true}}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].port === Number(\"${cfg.ssh.port}\")", "expect_truthy": true}}'
+    - step: 31
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].username === \"${cfg.ssh.user}\"", "expect_truthy": true}}'
+    results:
+    - 28
+    - 29
+    - 30
+    - 31
+  visual:
+  - check: The SSH connection test result remains readable and the saved session is visible in the session tree.
+    method: manual
+    reason: Functional assertions do not assess the visual layout or text clipping.
+  native:
+  - check: Native mode completes the connection test through Tauri SSH IPC against the hosted disposable sshd.
+    method: automated
+    reason: Browser mode uses the Vite SSH bridge and cannot prove the packaged Rust SSH backend.
