@@ -45,6 +45,16 @@ steps:
 - click: '[data-testid="session-section-advanced"]'
 - fill:
     selector: 'input[aria-label="SSH password"]'
+    value: qa-ui-auto-wrong-password
+- click: '[data-testid="session-test-connection"]'
+- wait_for: '[data-testid="alert-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="alert-dialog"]'
+    name: data-tone
+    equals: error
+- click: '[data-testid="alert-dialog-ok"]'
+- fill:
+    selector: 'input[aria-label="SSH password"]'
     value: ${env.QA_SSH_PASSWORD}
 - click: '[data-testid="session-test-connection"]'
 - wait_for: '[data-testid="alert-dialog"]'
@@ -67,7 +77,7 @@ steps:
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-test-connection"]'
 - right_click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-test-connection"]'
-- click_menu: Edit
+- click_menu: Edit...
 - wait_for: '[data-testid="session-editor"]'
 - assert_attribute:
     selector: '[data-testid="session-host"]'
@@ -86,7 +96,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH connection test reports missing host/user and password, then succeeds after valid connection settings are supplied.
+    requirement: SSH connection test validates required fields, rejects an incorrect password, then succeeds after valid credentials are supplied.
     actions:
     - 1
     - 2
@@ -103,7 +113,13 @@ verification:
     - 17
     - 18
     - 19
+    - 20
+    - 21
     - 22
+    - 23
+    - 24
+    - 25
+    - 26
     checkpoints:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
@@ -116,41 +132,49 @@ verification:
     - step: 19
       expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
     - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "error"}}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 25
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "success"}}'
-    - step: 21
+    - step: 26
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$"}}'
-    - step: 23
+    - step: 28
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$"}}'
     results:
     - 6
     - 14
     - 20
-    - 21
-    - 23
+    - 25
+    - 26
+    - 28
   - id: R2
     requirement: The successfully tested host, port, and username are saved on the SSH session bookmark.
     actions:
-    - 24
-    - 26
-    - 27
     - 29
     - 30
-    checkpoints:
-    - step: 28
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-test-connection\"]"}'
-    - step: 31
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
-    - step: 33
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
-    - step: 34
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
-    results:
-    - 28
+    - 31
     - 32
     - 33
     - 34
+    - 35
+    - 36
+    checkpoints:
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-test-connection\"]"}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
+    results:
+    - 33
+    - 37
+    - 38
+    - 39
   visual:
   - check: The SSH connection test result remains readable and the saved session is visible in the session tree.
     method: manual

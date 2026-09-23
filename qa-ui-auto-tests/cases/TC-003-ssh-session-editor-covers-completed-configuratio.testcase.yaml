@@ -77,35 +77,94 @@ steps:
     selector: input[aria-label="Tags"]
     value: qa, e2e, ssh
 - click: '[data-testid="session-save"]'
-- wait_for: '[data-testid="session-tree"] >> text="qa-ui-auto-ssh-settings"'
-- eval_readonly:
-    expression: JSON.parse(JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].options_json).startupCmd ===
-      "echo qa-ui-auto-session"
-    expect_truthy: true
-- eval_readonly:
-    expression: JSON.parse(JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].options_json).description ===
-      "Created by qa-ui-auto"
-    expect_truthy: true
-- eval_readonly:
-    expression: JSON.parse(JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].options_json).networkSettings.proxyKind
-      === "http"
-    expect_truthy: true
-- eval_readonly:
-    expression: JSON.parse(JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].options_json).networkSettings.proxyHost
-      === "proxy.example.test"
-    expect_truthy: true
-- eval_readonly:
-    expression: JSON.parse(JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].options_json).networkSettings.localForwards[0].local
-      === "127.0.0.1:19090"
-    expect_truthy: true
-- eval_readonly:
-    expression: JSON.parse(JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].options_json).networkSettings.localForwards[0].remote
-      === "127.0.0.1:22"
-    expect_truthy: true
-- eval_readonly:
-    expression: JSON.parse(JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].options_json).networkSettings.localForwards[0].desc
-      === "qa-ui-auto-forward"
-    expect_truthy: true
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-settings"]'
+- right_click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-settings"]'
+- click_menu: Edit...
+- wait_for: '[data-testid="session-editor"]'
+- assert_attribute:
+    selector: '[data-testid="session-host"]'
+    name: value
+    equals: ${cfg.ssh.host}
+- assert_attribute:
+    selector: '[data-testid="session-port"]'
+    name: value
+    equals: ${cfg.ssh.port}
+- assert_attribute:
+    selector: '[data-testid="session-user"]'
+    name: value
+    equals: ${cfg.ssh.user}
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- assert_attribute:
+    selector: input[aria-label="Execute command"]
+    name: value
+    equals: echo qa-ui-auto-session
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- assert_attribute:
+    selector: input[aria-label="Proxy host"]
+    name: value
+    equals: proxy.example.test
+- assert_attribute:
+    selector: input[aria-label="Forward local address"]
+    name: value
+    equals: 127.0.0.1:19090
+- assert_attribute:
+    selector: input[aria-label="Forward remote address"]
+    name: value
+    equals: 127.0.0.1:22
+- assert_attribute:
+    selector: input[aria-label="Forward description"]
+    name: value
+    equals: qa-ui-auto-forward
+- fill:
+    selector: input[aria-label="Forward local address"]
+    value: 127.0.0.1:19091
+- fill:
+    selector: input[aria-label="Forward remote address"]
+    value: 127.0.0.1:22
+- fill:
+    selector: input[aria-label="Forward description"]
+    value: qa-ui-auto-forward-edited
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- assert_attribute:
+    selector: textarea[aria-label="Description notes"]
+    name: value
+    equals: Created by qa-ui-auto
+- assert_attribute:
+    selector: input[aria-label="Tags"]
+    name: value
+    equals: qa, e2e, ssh
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-settings"]'
+- right_click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-settings"]'
+- click_menu: Edit...
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- assert_attribute:
+    selector: input[aria-label="Forward local address"]
+    name: value
+    equals: 127.0.0.1:19091
+- assert_attribute:
+    selector: input[aria-label="Forward remote address"]
+    name: value
+    equals: 127.0.0.1:22
+- assert_attribute:
+    selector: input[aria-label="Forward description"]
+    name: value
+    equals: qa-ui-auto-forward-edited
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- assert_attribute:
+    selector: textarea[aria-label="Description notes"]
+    name: value
+    equals: Created by qa-ui-auto
+- assert_attribute:
+    selector: input[aria-label="Tags"]
+    name: value
+    equals: qa, e2e, ssh
 - screenshot: 003-ssh-session-settings.png
 verification:
   review: reviewed
@@ -133,6 +192,19 @@ verification:
     - 33
     - 34
     - 35
+    - 37
+    - 38
+    - 43
+    - 46
+    - 52
+    - 53
+    - 54
+    - 55
+    - 59
+    - 61
+    - 62
+    - 64
+    - 69
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
@@ -163,37 +235,65 @@ verification:
     - step: 31
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
     - step: 36
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-ssh-settings\""}'
-    - step: 37
-      expectation: '{"eval_readonly": {"expression": "JSON.parse(JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].options_json).startupCmd
-        === \"echo qa-ui-auto-session\"", "expect_truthy": true}}'
-    - step: 38
-      expectation: '{"eval_readonly": {"expression": "JSON.parse(JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].options_json).description
-        === \"Created by qa-ui-auto\"", "expect_truthy": true}}'
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-settings\"]"}'
     - step: 39
-      expectation: '{"eval_readonly": {"expression": "JSON.parse(JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].options_json).networkSettings.proxyKind
-        === \"http\"", "expect_truthy": true}}'
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 40
-      expectation: '{"eval_readonly": {"expression": "JSON.parse(JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].options_json).networkSettings.proxyHost
-        === \"proxy.example.test\"", "expect_truthy": true}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
     - step: 41
-      expectation: '{"eval_readonly": {"expression": "JSON.parse(JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].options_json).networkSettings.localForwards[0].local
-        === \"127.0.0.1:19090\"", "expect_truthy": true}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
     - step: 42
-      expectation: '{"eval_readonly": {"expression": "JSON.parse(JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].options_json).networkSettings.localForwards[0].remote
-        === \"127.0.0.1:22\"", "expect_truthy": true}}'
-    - step: 43
-      expectation: '{"eval_readonly": {"expression": "JSON.parse(JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].options_json).networkSettings.localForwards[0].desc
-        === \"qa-ui-auto-forward\"", "expect_truthy": true}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "echo qa-ui-auto-session"}}'
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "proxy.example.test"}}'
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19090"}}'
+    - step: 50
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "127.0.0.1:22"}}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-ui-auto-forward"}}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "Created by qa-ui-auto"}}'
+    - step: 58
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "qa, e2e, ssh"}}'
+    - step: 60
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-settings\"]"}'
+    - step: 63
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 66
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19091"}}'
+    - step: 67
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "127.0.0.1:22"}}'
+    - step: 68
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-ui-auto-forward-edited"}}'
+    - step: 70
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 71
+      expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "Created by qa-ui-auto"}}'
+    - step: 72
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "qa, e2e, ssh"}}'
     results:
     - 36
-    - 37
-    - 38
-    - 39
     - 40
     - 41
     - 42
-    - 43
+    - 45
+    - 48
+    - 49
+    - 50
+    - 51
+    - 57
+    - 58
+    - 60
+    - 66
+    - 67
+    - 68
+    - 71
+    - 72
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

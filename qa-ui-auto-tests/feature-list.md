@@ -1591,6 +1591,10 @@ controls:
     selector: 'input[aria-label="Jump port"]'
     kind: interactive
     optional: true
+  - id: network-jump-password
+    selector: 'input[aria-label="Jump password"]'
+    kind: interactive
+    optional: true
   # Network inputs
   - id: network-proxy-kind
     selector: '[data-testid="session-proxy-kind"]'
@@ -1620,6 +1624,18 @@ controls:
   - id: network-new-forward-desc
     selector: 'input[aria-label="New forward description"]'
     kind: interactive
+  - id: network-forward-local
+    selector: 'input[aria-label="Forward local address"]'
+    kind: interactive
+    optional: true        # rendered for each saved forwarding row
+  - id: network-forward-remote
+    selector: 'input[aria-label="Forward remote address"]'
+    kind: interactive
+    optional: true        # rendered for each saved forwarding row
+  - id: network-forward-desc
+    selector: 'input[aria-label="Forward description"]'
+    kind: interactive
+    optional: true        # rendered for each saved forwarding row
   # Bookmark inputs
   - id: bookmark-background
     selector: 'input[aria-label="Background image"]'

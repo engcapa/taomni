@@ -1115,6 +1115,7 @@
 - `input[aria-label="Jump host"]` — interactive [optional] — F6.3.advanced-jump-host
 - `input[aria-label="Jump user"]` — interactive [optional] — F6.3.advanced-jump-user
 - `input[aria-label="Jump port"]` — interactive [optional] — F6.3.advanced-jump-port
+- `input[aria-label="Jump password"]` — interactive [optional] — F6.3.network-jump-password
 - `[data-testid="session-proxy-kind"]` — interactive [optional] — F6.3.network-proxy-kind
 - `input[aria-label="Proxy host"]` — interactive — F6.3.network-proxy-host
 - `input[aria-label="Proxy port"]` — interactive — F6.3.network-proxy-port
@@ -1124,6 +1125,9 @@
 - `input[aria-label="New forward local address"]` — interactive — F6.3.network-new-forward-local
 - `input[aria-label="New forward remote address"]` — interactive — F6.3.network-new-forward-remote
 - `input[aria-label="New forward description"]` — interactive — F6.3.network-new-forward-desc
+- `input[aria-label="Forward local address"]` — interactive [optional] — F6.3.network-forward-local
+- `input[aria-label="Forward remote address"]` — interactive [optional] — F6.3.network-forward-remote
+- `input[aria-label="Forward description"]` — interactive [optional] — F6.3.network-forward-desc
 - `input[aria-label="Background image"]` — interactive — F6.3.bookmark-background
 - `input[aria-label="Background opacity"]` — interactive — F6.3.bookmark-bg-opacity
 - `textarea[aria-label="Description notes"]` — interactive — F6.3.bookmark-description
