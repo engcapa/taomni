@@ -62,11 +62,11 @@ def teardown(ctx: Any) -> None:
 
 
 def _reset_browser(ctx: Any) -> None:
-    """Wipe localStorage keys we own. Done via a tiny script after navigation,
-    so we postpone until the page is loaded — emit a marker and let the runner
-    clear at the start of the case (before opening the URL we just clear in
-    a post-goto hook). For now, set a per-context init script that wipes on
-    every page load.
+    """Reset once per isolated case, preserving state during reload/reopen checks.
+
+    Each runner case owns a fresh browser context. A sessionStorage marker
+    prevents the init script from deleting the very persistence being tested
+    on subsequent navigation in that case. It never escapes the case context.
     """
     page = getattr(ctx, "page", None)
     if page is None:
@@ -74,6 +74,9 @@ def _reset_browser(ctx: Any) -> None:
     keys_payload = LOCAL_STORAGE_KEYS
     prefixes_payload = LOCAL_STORAGE_PREFIXES
     init_script = (
+        "(() => { "
+        "try { if (sessionStorage.getItem('qa-ui-auto.reset-complete')) return; "
+        "sessionStorage.setItem('qa-ui-auto.reset-complete', '1'); } catch (_) { return; } "
         "const keys = " + repr(keys_payload) + ";"
         "const prefixes = " + repr(prefixes_payload) + ";"
         "try { for (const k of keys) localStorage.removeItem(k); }"
@@ -84,6 +87,7 @@ def _reset_browser(ctx: Any) -> None:
         "    localStorage.removeItem(k);"
         "  } } }"
         " catch (_) {} "
+        "})();"
     )
     # The page may already have something open; clear immediately too.
     try:

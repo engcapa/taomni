@@ -1,34 +1,93 @@
 id: TC-NOTES-006
 title: Chat drawer pins to the top edge as a stacked band
-description: |
-  Verifies top/bottom pinned Chat (F-TAO-1, plan §8): moving the drawer to the
+description: 'Verifies top/bottom pinned Chat (F-TAO-1, plan §8): moving the drawer to the
+
   top edge and pinning it docks it as a full-width band (data-position=top,
+
   data-pinned=true) that a click outside does not dismiss. Left/right side-column
+
   pinning and the narrow-window floating fallback are unit-tested in
+
   src/lib/chat/chatDock.test.ts and the ChatDrawer suite.
-covers: [F-TAO-1]
-tags: [notes, tao, chat, pin, p2]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-TAO-1
+tags:
+- notes
+- tao
+- chat
+- pin
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="status-bar"]'
-  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-  - click: '[data-testid="ai-chat-drawer-ribbon"]'
-  - wait_for: '[data-testid="ai-chat-drawer"]'
-  # Move the drawer to the top edge via the position menu.
-  - click: '[data-testid="ai-chat-drawer-position"]'
-  - click: '[data-testid="ai-chat-drawer"] >> text="Top"'
-  - wait: 0.3
-  - assert_attribute: { selector: '[data-testid="ai-chat-drawer"]', name: 'data-position', equals: 'top' }
-  # Pin it → it becomes a stacked band that stays put.
-  - click: '[data-testid="ai-chat-drawer-pin"]'
-  - wait: 0.3
-  - assert_attribute: { selector: '[data-testid="ai-chat-drawer"]', name: 'data-pinned', equals: 'true' }
-  - assert_attribute: { selector: '[data-testid="ai-chat-drawer"]', name: 'data-position', equals: 'top' }
-  # A click on the status bar (outside the drawer) must NOT dismiss a pinned drawer.
-  - click: '[data-testid="status-bar"]'
-  - wait: 0.3
-  - assert_visible: '[data-testid="ai-chat-drawer"]'
-  - screenshot: notes-006-chat-top-pin.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="ai-chat-drawer-position"]'
+- click: '[data-testid="ai-chat-drawer"] >> text="Top"'
+- wait: 0.3
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer"]'
+    name: data-position
+    equals: top
+- click: '[data-testid="ai-chat-drawer-pin"]'
+- wait: 0.3
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer"]'
+    name: data-pinned
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer"]'
+    name: data-position
+    equals: top
+- click: '[data-testid="status-bar"]'
+- wait: 0.3
+- assert_visible: '[data-testid="ai-chat-drawer"]'
+- screenshot: notes-006-chat-top-pin.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Chat drawer pins to the top edge as a stacked band：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 6
+    - 7
+    - 10
+    - 14
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 9
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"]", "name": "data-position",
+        "equals": "top"}}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"]", "name": "data-pinned",
+        "equals": "true"}}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"]", "name": "data-position",
+        "equals": "top"}}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer\"]"}'
+    results:
+    - 16
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

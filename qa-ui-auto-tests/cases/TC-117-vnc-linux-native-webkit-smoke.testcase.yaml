@@ -1,15 +1,54 @@
 id: TC-117
 title: Linux WebKitGTK launches the VNC-capable desktop bundle
-description: |
-  Native Linux release-path smoke for F9.6. tauri-driver starts the compiled
+description: 'Native Linux release-path smoke for F9.6. tauri-driver starts the compiled
+
   Tauri binary through WebKitWebDriver and captures the first WebKitGTK frame.
+
   Protocol pixels, input and system clipboard remain covered by QEMU/Rust and
+
   the documented X11/Wayland real-machine matrix.
-covers: [F9.6]
-tags: [smoke, p0, vnc, linux, webkitgtk]
-modes: [native]
-fixtures: []
+
+  '
+covers:
+- F9.6
+tags:
+- smoke
+- p0
+- vnc
+- linux
+- webkitgtk
+modes:
+- native
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - screenshot: 117-vnc-linux-webkitgtk.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="welcome-open-local-terminal"]'
+- screenshot: 117-vnc-linux-webkitgtk.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 隔离 Linux 桌面包启动并通过首次凭据设置后，欢迎页与终端入口就绪
+    actions:
+    - 1
+    - 2
+    checkpoints:
+    - step: 3
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
+    results:
+    - 3
+    - 4
+  visual:
+  - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图记录评审。
+  native:
+  - check: 按 native 模式在 Linux WebKitGTK 执行同一工作流；本用例不包含 Windows/macOS 运行证据。 只证明启动，不证明 VNC 协议、远端像素、系统剪贴板或输入转发。
+    method: automated
+    reason: 按实际执行模式与指定边界解释证据。

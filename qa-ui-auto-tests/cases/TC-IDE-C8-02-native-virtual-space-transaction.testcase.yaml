@@ -1,145 +1,289 @@
 id: TC-IDE-C8-02
-title: "Native virtual space multi-caret transaction and one undo"
-description: |
-  ED-VSPACE-003 packaged Linux/WebKitGTK slice. Enters a real temporary
+title: Native virtual space multi-caret transaction and one undo
+description: 'ED-VSPACE-003 packaged Linux/WebKitGTK slice. Enters a real temporary
+
   workspace through persisted recents, enables Virtual Space through the
+
   production action palette, then verifies mixed-direction occurrence
+
   selections, three independent desired columns, deferred padding, Shift
+
   anchor reversal, and one undo in the Tauri runtime. It then injects physical
+
   X11 keys through fcitx5/wbpy and verifies composition movement has zero
+
   accidental dispatch. Highest claim on green: packaged Linux A1-A4 slice.
-covers: [F25.5, F25.3]
-tags: [code-workspace, ide-c8, virtual-space, navigation, caret, native-gate, p0]
-modes: [native]
-fixtures: [linux_x11_required, reset_db, workspace_root]
+
+  '
+covers:
+- F25.5
+- F25.3
+tags:
+- code-workspace
+- ide-c8
+- virtual-space
+- navigation
+- caret
+- native-gate
+- p0
+modes:
+- native
+fixtures:
+- linux_x11_required
+- reset_db
+- workspace_root
 timeout_sec: 300
 steps:
-  - open: "${cfg.app.base_url}"
-  - vault_first_run: "qa-native-gate-password"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - seed_storage:
-      key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-c8","name":"qa-c8","roots":[{"id":"r1","name":"qa-c8","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756100000000,"isGitRepo":false}]'
-  - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-
-  # Seed the deterministic document before enabling virtual-space policy;
-  # this keeps setup input separate from the transaction under test.
-  - fill:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      value: prefixXXlongprefixX
-
-  - click: '[data-testid="code-workspace-tab"]'
-  - press: Control+Shift+N
-  - wait_for:
-      selector: '[data-testid="code-workspace-search-everywhere"]'
-      timeout_sec: 30
-  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-of-type(5)'
-  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
-  - type: Editor Appearance Settings
-  - press: Enter
-  - wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
-  - click: '[data-testid="workspace-editor-appearance-virtual-space-after-line-end"]'
-  - click: '[data-testid="workspace-editor-appearance-virtual-space-at-file-bottom"]'
-  - click: '[data-testid="workspace-editor-appearance-apply"]'
-  - wait: 1
-
-  # The packaged WebDriver key actions exercise the production transaction;
-  # the IME portion below crosses the real X11/GTK input boundary.
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+Home
-  - press: ArrowRight
-  - press: ArrowRight
-  - press: ArrowRight
-  - press: ArrowRight
-  - press: ArrowRight
-  - press: ArrowRight
-  - press: ArrowRight
-  - press: Enter
-  - press: ArrowRight
-  - press: Enter
-  - eval_readonly:
-      expression: 'JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent, document.querySelectorAll(".cm-line")[2]?.textContent])'
-      contains: '["prefixX","X","longprefixX"]'
-  - press: Control+Home
-  - press: End
-  - press: Shift+ArrowLeft
-  - press: Alt+j
-  - press: Alt+j
-  - press: ArrowRight
-  - press: ArrowDown
-  - type: Z
-  - eval_readonly:
-      expression: 'JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent, document.querySelectorAll(".cm-line")[2]?.textContent])'
-      contains: '["prefixX","X      Z","lZongprefixXZ"]'
-  - press: Control+z
-  - eval_readonly:
-      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX" && document.querySelectorAll(".cm-line")[1]?.textContent === "X" && document.querySelectorAll(".cm-line")[2]?.textContent === "longprefixX"'
-      expect_truthy: true
-
-  # ED-AUDIT-002: one undo restores the virtual caret together with the text.
-  # Escape clears the flow-restored overflow; Control+Home+End parks a real
-  # caret at the line-0 end, Shift+ArrowLeft+Alt+j re-creates the three
-  # X-occurrence carets (Control+Home collapsed the earlier clones), and
-  # ArrowRight+End parks every caret one visual column past its own line
-  # end. Typing W materializes exactly one padding space per caret, one undo
-  # restores the text, and typing V again re-manufactures the same padding
-  # through the RESTORED virtual caret.
-  - press: Escape
-  - press: Control+Home
-  - press: End
-  - press: Shift+ArrowLeft
-  - press: Alt+j
-  - press: Alt+j
-  - press: ArrowRight
-  - press: End
-  - type: W
-  - eval_readonly:
-      expression: 'JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent, document.querySelectorAll(".cm-line")[2]?.textContent])'
-      contains: '["prefixX W","X W","longprefixX W"]'
-  - press: Control+z
-  - eval_readonly:
-      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX" && document.querySelectorAll(".cm-line")[1]?.textContent === "X" && document.querySelectorAll(".cm-line")[2]?.textContent === "longprefixX"'
-      expect_truthy: true
-  - type: V
-  - eval_readonly:
-      expression: 'JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent, document.querySelectorAll(".cm-line")[2]?.textContent])'
-      contains: '["prefixX V","X V","longprefixX V"]'
-  - press: Control+z
-  - eval_readonly:
-      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX"'
-      expect_truthy: true
-
-  - press: Escape
-  - press: Control+Home
-  - press: ArrowDown
-  - press: Shift+ArrowDown
-  - press: Shift+ArrowUp
-  - press: Shift+ArrowUp
-  - press: Shift+ArrowDown
-  - type: Q
-  - eval_readonly:
-      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX" && document.querySelectorAll(".cm-line")[1]?.textContent === "QX" && document.querySelectorAll(".cm-line")[2]?.textContent === "longprefixX"'
-      expect_truthy: true
-  - press: Control+z
-  - press: Control+Home
-  # Send one harmless physical key through the packaged WebKitGTK input
-  # boundary so the client-owned fcitx context receives FocusIn before the
-  # engine assertion below.
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: [Escape]
-      focus_prechecked: true
-  - native_ime_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      expected_engine: wbpy
-      keys: [w, q, ArrowDown, Escape, w, q, i, Space]
-  - eval_readonly:
-      expression: 'JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent, document.querySelectorAll(".cm-line")[2]?.textContent])'
-      contains: '["你prefixX","X","longprefixX"]'
-  - screenshot: tc-ide-c8-native-virtual-space.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-c8","name":"qa-c8","roots":[{"id":"r1","name":"qa-c8","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: prefixXXlongprefixX
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-of-type(5)'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Editor Appearance Settings
+- press: Enter
+- wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+- click: '[data-testid="workspace-editor-appearance-virtual-space-after-line-end"]'
+- click: '[data-testid="workspace-editor-appearance-virtual-space-at-file-bottom"]'
+- click: '[data-testid="workspace-editor-appearance-apply"]'
+- wait: 1
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: Enter
+- press: ArrowRight
+- press: Enter
+- eval_readonly:
+    expression: JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent,
+      document.querySelectorAll(".cm-line")[2]?.textContent])
+    contains: '["prefixX","X","longprefixX"]'
+- press: Control+Home
+- press: End
+- press: Shift+ArrowLeft
+- press: Alt+j
+- press: Alt+j
+- press: ArrowRight
+- press: ArrowDown
+- type: Z
+- eval_readonly:
+    expression: JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent,
+      document.querySelectorAll(".cm-line")[2]?.textContent])
+    contains: '["prefixX","X      Z","lZongprefixXZ"]'
+- press: Control+z
+- eval_readonly:
+    expression: document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX" && document.querySelectorAll(".cm-line")[1]?.textContent
+      === "X" && document.querySelectorAll(".cm-line")[2]?.textContent === "longprefixX"
+    expect_truthy: true
+- press: Escape
+- press: Control+Home
+- press: End
+- press: Shift+ArrowLeft
+- press: Alt+j
+- press: Alt+j
+- press: ArrowRight
+- press: End
+- type: W
+- eval_readonly:
+    expression: JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent,
+      document.querySelectorAll(".cm-line")[2]?.textContent])
+    contains: '["prefixX W","X W","longprefixX W"]'
+- press: Control+z
+- eval_readonly:
+    expression: document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX" && document.querySelectorAll(".cm-line")[1]?.textContent
+      === "X" && document.querySelectorAll(".cm-line")[2]?.textContent === "longprefixX"
+    expect_truthy: true
+- type: V
+- eval_readonly:
+    expression: JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent,
+      document.querySelectorAll(".cm-line")[2]?.textContent])
+    contains: '["prefixX V","X V","longprefixX V"]'
+- press: Control+z
+- eval_readonly:
+    expression: document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX"
+    expect_truthy: true
+- press: Escape
+- press: Control+Home
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowUp
+- press: Shift+ArrowUp
+- press: Shift+ArrowDown
+- type: Q
+- eval_readonly:
+    expression: document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX" && document.querySelectorAll(".cm-line")[1]?.textContent
+      === "QX" && document.querySelectorAll(".cm-line")[2]?.textContent === "longprefixX"
+    expect_truthy: true
+- press: Control+z
+- press: Control+Home
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Escape
+    focus_prechecked: true
+- native_ime_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    expected_engine: wbpy
+    keys:
+    - w
+    - q
+    - ArrowDown
+    - Escape
+    - w
+    - q
+    - i
+    - Space
+- eval_readonly:
+    expression: JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent,
+      document.querySelectorAll(".cm-line")[2]?.textContent])
+    contains: '["你prefixX","X","longprefixX"]'
+- screenshot: tc-ide-c8-native-virtual-space.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native virtual space multi-caret transaction and one undo：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 10
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 18
+    - 19
+    - 21
+    - 22
+    - 23
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 47
+    - 49
+    - 50
+    - 51
+    - 52
+    - 53
+    - 54
+    - 55
+    - 56
+    - 57
+    - 59
+    - 61
+    - 63
+    - 65
+    - 66
+    - 67
+    - 68
+    - 69
+    - 70
+    - 71
+    - 72
+    - 74
+    - 75
+    - 76
+    - 77
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
+        30}}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]"}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
+        document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
+        "contains": "[\"prefixX\",\"X\",\"longprefixX\"]"}}'
+    - step: 46
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
+        document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
+        "contains": "[\"prefixX\",\"X      Z\",\"lZongprefixXZ\"]"}}'
+    - step: 48
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
+        \"prefixX\" && document.querySelectorAll(\".cm-line\")[1]?.textContent === \"X\" && document.querySelectorAll(\".cm-line\")[2]?.textContent
+        === \"longprefixX\"", "expect_truthy": true}}'
+    - step: 58
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
+        document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
+        "contains": "[\"prefixX W\",\"X W\",\"longprefixX W\"]"}}'
+    - step: 60
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
+        \"prefixX\" && document.querySelectorAll(\".cm-line\")[1]?.textContent === \"X\" && document.querySelectorAll(\".cm-line\")[2]?.textContent
+        === \"longprefixX\"", "expect_truthy": true}}'
+    - step: 62
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
+        document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
+        "contains": "[\"prefixX V\",\"X V\",\"longprefixX V\"]"}}'
+    - step: 64
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
+        \"prefixX\"", "expect_truthy": true}}'
+    - step: 73
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
+        \"prefixX\" && document.querySelectorAll(\".cm-line\")[1]?.textContent === \"QX\" && document.querySelectorAll(\".cm-line\")[2]?.textContent
+        === \"longprefixX\"", "expect_truthy": true}}'
+    - step: 78
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
+        document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
+        "contains": "[\"你prefixX\",\"X\",\"longprefixX\"]"}}'
+    results:
+    - 78
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

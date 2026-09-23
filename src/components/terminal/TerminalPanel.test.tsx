@@ -580,6 +580,68 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it("releases SSH readiness when a slow Windows shell never reports OSC 7", async () => {
+    const originalPlatform = window.navigator.platform;
+    Object.defineProperty(window.navigator, "platform", { configurable: true, value: "Win32" });
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
+    let onOutput: ((data: Uint8Array) => void) | undefined;
+    ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
+      onOutput = args[9] as (data: Uint8Array) => void;
+      return "terminal-session";
+    });
+
+    try {
+      render(<TerminalPanel tabId="windows-ssh" visible ssh={sshInfo} />);
+      await waitFor(() => expect(onOutput).toBeTypeOf("function"));
+
+      const term = terminalMocks.terminalCtor.mock.results[0].value;
+      const prompt = "user@host MINGW64 ~\n$ ";
+      term.buffer.active = {
+        type: "normal",
+        length: 2,
+        baseY: 0,
+        cursorY: 1,
+        cursorX: 2,
+        getLine: vi.fn((row: number) => ({
+          isWrapped: false,
+          translateToString: () => prompt.split("\n")[row],
+        })),
+      };
+      term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());
+      const panel = screen.getByTestId("terminal-pane");
+
+      vi.useFakeTimers();
+      await act(async () => {
+        onOutput?.(new TextEncoder().encode(prompt));
+        vi.advanceTimersByTime(120);
+      });
+      expect((ipcMocks.writeTerminal.mock.calls as unknown[][]).some(([, encoded]) =>
+        typeof encoded === "string" && atob(encoded).includes("__taomni_osc7"),
+      )).toBe(true);
+      expect(panel).not.toHaveAttribute("data-terminal-ready");
+
+      await act(async () => {
+        vi.advanceTimersByTime(5_000);
+        onOutput?.(new TextEncoder().encode(" __taomni_hist_restore=;"));
+      });
+      expect(panel).not.toHaveAttribute("data-terminal-ready");
+      expect(term.write.mock.calls.some(([data]: [string | Uint8Array]) =>
+        (typeof data === "string" ? data : new TextDecoder().decode(data)).includes("__taomni_hist_restore"),
+      )).toBe(false);
+
+      await act(async () => {
+        vi.advanceTimersByTime(25_000);
+      });
+      expect(panel).toHaveAttribute("data-terminal-ready", "true");
+    } finally {
+      vi.useRealTimers();
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+    }
+  });
+
   it("does not load the WebGL renderer inside the macOS Tauri webview", async () => {
     const originalPlatform = window.navigator.platform;
     Object.defineProperty(window.navigator, "platform", {
@@ -595,6 +657,124 @@ describe("TerminalPanel focus behavior", () => {
         expect(terminalMocks.terminalCtor).toHaveBeenCalled();
       });
       expect(webglMocks.ctor).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+    }
+  });
+
+  it("keeps a browser Windows SSH terminal ready without injecting startup integration", async () => {
+    const originalPlatform = window.navigator.platform;
+    Object.defineProperty(window.navigator, "platform", { configurable: true, value: "Win32" });
+    let onOutput: ((data: Uint8Array) => void) | undefined;
+    ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
+      onOutput = args[9] as (data: Uint8Array) => void;
+      return "terminal-session";
+    });
+
+    try {
+      render(<TerminalPanel tabId="browser-windows-ssh" visible ssh={sshInfo} />);
+      await waitFor(() => expect(onOutput).toBeTypeOf("function"));
+
+      const term = terminalMocks.terminalCtor.mock.results[0].value;
+      const prompt = "user@host MINGW64 ~\n$ ";
+      term.buffer.active = {
+        type: "normal",
+        length: 2,
+        baseY: 0,
+        cursorY: 1,
+        cursorX: 2,
+        getLine: vi.fn((row: number) => ({
+          isWrapped: false,
+          translateToString: () => prompt.split("\n")[row],
+        })),
+      };
+      term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());
+      const panel = screen.getByTestId("terminal-pane");
+
+      vi.useFakeTimers();
+      await act(async () => {
+        onOutput?.(new TextEncoder().encode(prompt));
+        vi.advanceTimersByTime(120);
+      });
+
+      expect(panel).toHaveAttribute("data-terminal-ready", "true");
+      expect((ipcMocks.writeTerminal.mock.calls as unknown[][]).some(([, encoded]) =>
+        typeof encoded === "string" && atob(encoded).includes("__taomni_osc7"),
+      )).toBe(false);
+    } finally {
+      vi.useRealTimers();
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+    }
+  });
+
+  it("applies an initial cwd with a short browser Windows SSH probe", async () => {
+    const originalPlatform = window.navigator.platform;
+    Object.defineProperty(window.navigator, "platform", { configurable: true, value: "Win32" });
+    let onOutput: ((data: Uint8Array) => void) | undefined;
+    ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
+      onOutput = args[9] as (data: Uint8Array) => void;
+      return "terminal-session";
+    });
+
+    try {
+      render(
+        <TerminalPanel
+          tabId="browser-windows-ssh-initial-cwd"
+          visible
+          ssh={sshInfo}
+          initialCwd="C:/qa-temp"
+        />,
+      );
+      await waitFor(() => expect(onOutput).toBeTypeOf("function"));
+
+      const term = terminalMocks.terminalCtor.mock.results[0].value;
+      const prompt = "user@host MINGW64 ~\n$ ";
+      term.buffer.active = {
+        type: "normal",
+        length: 2,
+        baseY: 0,
+        cursorY: 1,
+        cursorX: 2,
+        getLine: vi.fn((row: number) => ({
+          isWrapped: false,
+          translateToString: () => prompt.split("\n")[row],
+        })),
+      };
+      term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());
+      const panel = screen.getByTestId("terminal-pane");
+
+      await act(async () => {
+        onOutput?.(new TextEncoder().encode(prompt));
+        await new Promise((resolve) => window.setTimeout(resolve, 150));
+      });
+
+      let probeWrite: unknown[] | undefined;
+      await waitFor(() => {
+        probeWrite = (ipcMocks.writeTerminal.mock.calls as unknown[][]).find(([, encoded]) =>
+          typeof encoded === "string" && atob(encoded).includes("__taomni_cwd_sync_done"),
+        );
+        expect(probeWrite).toBeTruthy();
+      });
+      expect(probeWrite).toBeTruthy();
+      expect(atob(probeWrite?.[1] as string)).toContain("cd 'C:/qa-temp'");
+      expect(atob(probeWrite?.[1] as string)).not.toContain("__taomni_osc7");
+      expect(panel).not.toHaveAttribute("data-terminal-ready");
+
+      await act(async () => {
+        onOutput?.(
+          new TextEncoder().encode(`\x1b]7;file://example.test/C:/qa-temp\x1b\\${prompt}`),
+        );
+      });
+
+      await waitFor(() => {
+        expect(panel).toHaveAttribute("data-terminal-ready", "true");
+      });
     } finally {
       Object.defineProperty(window.navigator, "platform", {
         configurable: true,

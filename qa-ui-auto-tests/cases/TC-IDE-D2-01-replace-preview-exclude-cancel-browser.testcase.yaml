@@ -1,84 +1,161 @@
 id: TC-IDE-D2-01-replace-preview-exclude-cancel-browser
-title: "Replace preview exclusion and cancel in browser"
-description: |
-  Browser gate case (ED-FIND-004 A1/A2). Fills the preview file with two
+title: Replace preview exclusion and cancel in browser
+description: 'Browser gate case (ED-FIND-004 A1/A2). Fills the preview file with two
+
   needle lines, searches through the stub VFS backend, opens the structured
+
   replace preview, excludes one occurrence, and proves the count rebuilds
+
   (2 of 2 -> 1 of 2) and Cancel commits nothing (editor text byte-identical).
+
   The commit/undo path against real files is covered by unit tests and the
+
   native provider gate.
-covers: [F25.5]
-tags: [code-workspace, ide-find, replace, browser-gate, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-find
+- replace
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 180
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - fill:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      value: "first needle line\nsecond needle line\n"
-  - press: Control+s
-  - wait: 1
-  - press: Control+Shift+F
-  - wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
-  - fill:
-      selector: '[aria-label="Search query"]'
-      value: "needle"
-  - press: Enter
-  - wait_for: '[data-testid="code-workspace-find-file-group"]'
-  - assert_visible: '[data-testid="code-workspace-find-match-hit"]'
-  - fill:
-      selector: '[aria-label="Replace text"]'
-      value: "thread"
-  - click: '[data-testid="code-workspace-find-replace-all"]'
-  - wait_for: '[data-testid="code-workspace-replace-preview"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-replace-counts"]'
-      contains: "2 of 2"
-      timeout_sec: 10
-  - assert_visible: '[data-testid="code-workspace-replace-file-toggle"]'
-  # This file-level control is a custom toggle rather than an input[type=checkbox].
-  - click: '[data-testid="code-workspace-replace-file-toggle"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-replace-counts"]'
-      contains: "0 of 2"
-      timeout_sec: 10
-  - assert_text:
-      selector: '[data-testid="code-workspace-replace-preview"]'
-      contains: "Every occurrence is excluded"
-  - click: '[data-testid="code-workspace-replace-cancel"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "second needle line"
-      timeout_sec: 10
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: 'first needle line
 
-  # Reopen the frozen preview to cover the per-occurrence exclusion branch.
-  - click: '[data-testid="code-workspace-find-replace-all"]'
-  - wait_for: '[data-testid="code-workspace-replace-preview"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-replace-counts"]'
-      contains: "2 of 2"
-      timeout_sec: 10
-  - click: '[data-testid="code-workspace-replace-usage"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-replace-counts"]'
-      contains: "1 of 2"
-      timeout_sec: 10
-  - click: '[data-testid="code-workspace-replace-cancel"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "second needle line"
-      timeout_sec: 10
-  - screenshot: tc-ide-d2-01-replace-cancel.png
+      second needle line
+
+      '
+- press: Control+s
+- wait: 1
+- press: Control+Shift+F
+- wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
+- fill:
+    selector: '[aria-label="Search query"]'
+    value: needle
+- press: Enter
+- wait_for: '[data-testid="code-workspace-find-file-group"]'
+- assert_visible: '[data-testid="code-workspace-find-match-hit"]'
+- fill:
+    selector: '[aria-label="Replace text"]'
+    value: thread
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-counts"]'
+    contains: 2 of 2
+    timeout_sec: 10
+- assert_visible: '[data-testid="code-workspace-replace-file-toggle"]'
+- click: '[data-testid="code-workspace-replace-file-toggle"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-counts"]'
+    contains: 0 of 2
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-preview"]'
+    contains: Every occurrence is excluded
+- click: '[data-testid="code-workspace-replace-cancel"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - first needle line
+    - second needle line
+    - ''
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-counts"]'
+    contains: 2 of 2
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-replace-usage"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-counts"]'
+    contains: 1 of 2
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-replace-cancel"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - first needle line
+    - second needle line
+    - ''
+    timeout_sec: 10
+- screenshot: tc-ide-d2-01-replace-cancel.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 替换预览文件排除使计数从2降到0，取消后完整缓冲区不变
+    actions:
+    - 24
+    - 28
+    - 31
+    checkpoints:
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
+        "2 of 2", "timeout_sec": 10}}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-replace-file-toggle\"]"}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
+        "0 of 2", "timeout_sec": 10}}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-preview\"]", "contains":
+        "Every occurrence is excluded"}}'
+    - step: 32
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
+        "equals": ["first needle line", "second needle line", ""], "timeout_sec": 10}}'
+    results:
+    - 32
+  - id: R2
+    requirement: 重新打开预览恢复2项；排除单条变为1项，取消后所有行仍完全不变
+    actions:
+    - 33
+    - 36
+    - 38
+    checkpoints:
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
+        "2 of 2", "timeout_sec": 10}}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
+        "1 of 2", "timeout_sec": 10}}'
+    - step: 39
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
+        "equals": ["first needle line", "second needle line", ""], "timeout_sec": 10}}'
+    results:
+    - 39
+  visual:
+  - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图记录评审。
+  native:
+  - check: 真实磁盘替换提交和撤销由 TC-IDE-D2-02-replace-commit-undo-native 验证；此处只证明 browser VFS 预览及取消。
+    method: external
+    reason: 按实际执行模式与指定边界解释证据。

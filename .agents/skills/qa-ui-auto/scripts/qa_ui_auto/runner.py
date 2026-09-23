@@ -81,12 +81,15 @@ def _init_browser_worker() -> None:
 
 def _timed_step(result: dict, index: int, verb: str, action, deadline=None) -> None:
     started = time.monotonic()
+    status = "failed"
     try:
         with using_deadline(deadline):
             action()
+        status = "passed"
     finally:
         result.setdefault("step_timings", []).append({
             "index": index, "verb": verb, "duration_sec": time.monotonic() - started,
+            "status": status,
         })
 
 
@@ -346,6 +349,7 @@ def _serialize_case(c: tc_mod.TestCase) -> dict:
         "skip": c.skip,
         "browser_platforms": c.browser_platforms,
         "steps": c.steps,
+        "verification": c.verification,
     }
 
 
@@ -919,8 +923,12 @@ def main(argv: list[str] | None = None) -> int:
 
     duration = time.time() - started
     results.sort(key=lambda r: r["id"])
+    from .behavior_contract import execution_contract
+    contracts = {c.id: c.verification for c in selected}
     for result in results:
         result["case_sha256"] = case_digests.get(result["id"])
+        result["verification"] = execution_contract(
+            contracts[result["id"]], result, dry_run=args.dry_run)
     identity_stable = identity == execution_identity(Path.cwd())
     identity_stable = identity_stable and all(
         c.source_path and c.source_path.exists() and input_digest(c.source_path) == case_digests[c.id]

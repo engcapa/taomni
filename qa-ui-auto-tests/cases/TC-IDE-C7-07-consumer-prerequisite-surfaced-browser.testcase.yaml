@@ -1,39 +1,101 @@
 id: TC-IDE-C7-07-consumer-prerequisite-surfaced-browser
-title: "Consumer prerequisite identified on badge in browser"
-description: |
-  Browser gate case (ED-PROJECT-005 A4). In the stub preview no ready
+title: Consumer prerequisite identified on badge in browser
+description: 'Browser gate case (ED-PROJECT-005 A4). In the stub preview no ready
+
   project snapshot can exist, so every semantic consumer must fail closed
+
   AND the UI must name the missing prerequisite instead of going silent:
+
   the status badge exposes a Project facts title naming the failed state,
+
   and the labeled refresh control offers the explicit remediation. The
+
   ready path (generation-pinned requests) is proven by unit tests and the
+
   native provider gates.
-covers: [F25.5]
-tags: [code-workspace, ide-c7, project-structure, consumer-prerequisite, browser-gate, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c7
+- project-structure
+- consumer-prerequisite
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 180
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - wait_for:
-      selector: '[data-testid="project-facts-status-badge"]'
-      timeout_sec: 60
-  - assert_attribute:
-      selector: '[data-testid="project-facts-status-badge"]'
-      name: title
-      equals: "Maven tooling returned no usable result; ready project facts require a build backend"
-  - assert_visible: '[data-testid="project-facts-refresh-btn"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-tree-file"]'
-      contains: "README"
-      timeout_sec: 10
-  - screenshot: tc-ide-c7-07-prerequisite.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- wait_for:
+    selector: '[data-testid="project-facts-status-badge"]'
+    timeout_sec: 60
+- assert_attribute:
+    selector: '[data-testid="project-facts-status-badge"]'
+    name: title
+    equals: Maven tooling returned no usable result; ready project facts require a build backend
+- assert_visible: '[data-testid="project-facts-refresh-btn"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-tree-file"]'
+    contains: README
+    timeout_sec: 10
+- screenshot: tc-ide-c7-07-prerequisite.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Consumer prerequisite identified on badge in browser：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"project-facts-status-badge\"]", "timeout_sec": 60}}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"project-facts-status-badge\"]", "name": "title",
+        "equals": "Maven tooling returned no usable result; ready project facts require a build backend"}}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"project-facts-refresh-btn\"]"}'
+    - step: 14
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree-file\"]", "contains": "README",
+        "timeout_sec": 10}}'
+    results:
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

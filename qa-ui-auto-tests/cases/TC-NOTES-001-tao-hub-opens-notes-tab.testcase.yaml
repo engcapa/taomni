@@ -1,27 +1,79 @@
 id: TC-NOTES-001
 title: Tao Hub opens the Notes tab and remembers the last-used tab
-description: |
-  Verifies the unified Tao Hub (F-TAO-1): the Tao Ribbon opens the drawer, the
+description: 'Verifies the unified Tao Hub (F-TAO-1): the Tao Ribbon opens the drawer, the
+
   header exposes the Chat | 便签 tab strip, switching to the Notes tab mounts the
+
   notes panel (new-note + search toolbar), and the choice persists to
+
   localStorage so the ribbon reopens the last-used tab. UI plumbing only.
-covers: [F-TAO-1]
-tags: [notes, tao, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-TAO-1
+tags:
+- notes
+- tao
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="status-bar"]'
-  # On the Welcome tab the drawer is collapsed to the Tao Ribbon.
-  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-  - click: '[data-testid="ai-chat-drawer-ribbon"]'
-  - wait_for: '[data-testid="ai-chat-drawer"]'
-  - assert_visible: '[data-testid="tao-hub-tab-chat"]'
-  - assert_visible: '[data-testid="tao-hub-tab-notes"]'
-  - click: '[data-testid="tao-hub-tab-notes"]'
-  - wait_for: '[data-testid="notes-panel"]'
-  - assert_visible: '[data-testid="notes-new"]'
-  - assert_visible: '[data-testid="notes-search"]'
-  - assert_localstorage: { key: "taomni.taoHub.lastTab.v1", equals: "notes" }
-  - screenshot: notes-001-hub-notes-tab.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- assert_visible: '[data-testid="tao-hub-tab-chat"]'
+- assert_visible: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- wait_for: '[data-testid="notes-panel"]'
+- assert_visible: '[data-testid="notes-new"]'
+- assert_visible: '[data-testid="notes-search"]'
+- assert_localstorage:
+    key: taomni.taoHub.lastTab.v1
+    equals: notes
+- screenshot: notes-001-hub-notes-tab.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tao Hub opens the Notes tab and remembers the last-used tab：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 8
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"tao-hub-tab-chat\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"tao-hub-tab-notes\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"notes-panel\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"notes-new\"]"}'
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"notes-search\"]"}'
+    - step: 12
+      expectation: '{"assert_localstorage": {"key": "taomni.taoHub.lastTab.v1", "equals": "notes"}}'
+    results:
+    - 9
+    - 10
+    - 11
+    - 12
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

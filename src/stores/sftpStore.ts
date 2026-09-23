@@ -538,6 +538,9 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
       set((state) => {
         const cur = state.sessions[sessionId];
         if (!cur) return state;
+        const nextEntries = listing.entries;
+        const alive = new Set(nextEntries.map((e) => e.path));
+        const prunedSelection = cur[side].selection.filter((p) => alive.has(p));
         return {
           sessions: {
             ...state.sessions,
@@ -546,6 +549,7 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
               [side]: {
                 ...cur[side],
                 ...listingState(listing),
+                selection: prunedSelection,
                 loading: false,
                 error: null,
               },
@@ -577,6 +581,20 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
   },
 
   navigate: async (sessionId, side, path) => {
+    // The pane mounts before the SFTP channel has finished attaching. A path
+    // submitted during that interval must wait for the channel and initial
+    // listing, otherwise it fails with "not attached" or is overwritten.
+    if (side === "remote") {
+      const attaching = inFlightAttaches.get(sessionId);
+      if (attaching) {
+        try {
+          await attaching;
+        } catch {
+          return; // attach already published the connection error
+        }
+        if (!get().sessions[sessionId]?.attached) return;
+      }
+    }
     const sess = get().ensureSession(sessionId);
     const prev = sess[side];
     set((state) => ({

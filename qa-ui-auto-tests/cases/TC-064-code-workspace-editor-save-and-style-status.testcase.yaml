@@ -1,14 +1,49 @@
 id: TC-064
 title: Code Workspace tab opens and presents editor workspace shell
-covers: [F25.1]
-tags: [code-workspace, editor, p1]
-modes: [browser]
-fixtures: [reset_db]
+covers:
+- F25.1
+tags:
+- code-workspace
+- editor
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: "[data-testid=\"tab-bar\"]"
-  - click: "[data-testid=\"side-tab-tools\"]"
-  - click: "[data-testid=\"sidebar-tool-code-workspace\"]"
-  - wait_for: "[data-testid=\"code-workspace-tab\"]"
-  - assert_count: {selector: '[data-testid="code-workspace-tab"]', equal: 1}
-  - screenshot: 064-code-workspace-shell.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="tab-bar"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- screenshot: 064-code-workspace-shell.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Code Workspace tab opens and presents editor workspace shell：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 4
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"tab-bar\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 6
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    results:
+    - 5
+    - 6
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

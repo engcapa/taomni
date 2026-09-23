@@ -1,80 +1,163 @@
 id: TC-IDE-C2-06-live-template-popup-input-native
-title: "Java Live Template popup input interaction on native"
-description: |
-  Native verification for RT-01..06 on desktop targets. Opens real Java workspace,
+title: Java Live Template popup input interaction on native
+description: 'Native verification for RT-01..06 on desktop targets. Opens real Java workspace,
+
   types `sout`, waits for provider proposals and confirms autocomplete popup
+
   is stable and operable (not disabled). Navigates with ArrowDown to `soutm`,
+
   accepts with Enter without spurious newlines, asserts provider method name
+
   resolution (`App.main()`), and verifies undo restores abbreviation.
-covers: [F25.5]
-tags: [code-workspace, ide-c2, completion, live-template, native-gate, p0]
-modes: [native]
-fixtures: [reset_db, java_sample_projects]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c2
+- completion
+- live-template
+- native-gate
+- p0
+modes:
+- native
+fixtures:
+- reset_db
+- java_sample_projects
 timeout_sec: 600
 steps:
-  - open: "${cfg.app.base_url}"
-  - vault_first_run: "qa-native-c206-password"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - seed_storage:
-      key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-c2-06","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1788566400000,"isGitRepo":false}]'
-  - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-lsp-status-pill"]'
-      contains: "Java"
-      timeout_sec: 60
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
-      keys: ["Mod+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "Home", "Enter", "ArrowUp"]
-  - type: "sout"
-  - wait_for:
-      selector: '.cm-tooltip-autocomplete'
-      timeout_sec: 30
-  # The local source opens first. Wait until the provider result has been merged;
-  # native_keys then polls the rebuilt popup after its own input setup so a late
-  # collision refresh cannot restart CodeMirror's interaction guard underneath
-  # the delivered ArrowDown.
-  - wait_for:
-      selector: '.cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)'
-      timeout_sec: 30
-  - assert_text:
-      selector: '.cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)'
-      contains: "soutm"
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
-      keys: ["ArrowDown"]
-      ready_selector: '.cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)'
-      ready_timeout_sec: 30
-      ready_stable_sec: 1.0
-      require_keydown_prevented: true
-  - assert_text:
-      selector: '.cm-tooltip-autocomplete [aria-selected="true"]'
-      contains: "soutm"
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
-      keys: ["Enter"]
-      ready_selector: '.cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)[aria-selected="true"]'
-      ready_timeout_sec: 30
-      ready_stable_sec: 1.0
-      require_keydown_prevented: true
-  - wait_for:
-      selector: '[data-testid="code-workspace-editor"]'
-      timeout_sec: 10
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: 'System.out.println("App.main()");'
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
-      keys: ["Mod+z"]
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "sout"
-  - screenshot: tc-ide-c2-06-live-template-native.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-c206-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-c2-06","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1788566400000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-lsp-status-pill"]'
+    contains: Java
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Mod+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - Home
+    - Enter
+    - ArrowUp
+- type: sout
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 30
+- wait_for:
+    selector: .cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel
+    timeout_sec: 30
+- assert_text:
+    selector: .cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel
+    contains: soutm
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - ArrowDown
+    ready_selector: .cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel
+    ready_timeout_sec: 30
+    ready_stable_sec: 1.0
+    require_keydown_prevented: true
+- assert_text:
+    selector: .cm-tooltip-autocomplete [aria-selected="true"] .cm-completionLabel
+    contains: soutm
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Enter
+    ready_selector: .cm-tooltip-autocomplete li:nth-of-type(2)[aria-selected="true"] .cm-completionLabel
+    ready_timeout_sec: 30
+    ready_stable_sec: 1.0
+    require_keydown_prevented: true
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"]'
+    timeout_sec: 10
+- assert_text_equals:
+    selector: '[data-testid="code-workspace-editor"] .cm-line:nth-child(9)'
+    equals: '        System.out.println("App.main()");'
+    timeout_sec: 30
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Mod+z
+- assert_text_equals:
+    selector: '[data-testid="code-workspace-editor"] .cm-line:nth-child(9)'
+    equals: "        sout"
+    timeout_sec: 30
+- screenshot: tc-ide-c2-06-live-template-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Java Live Template popup input interaction on native：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 10
+    - 11
+    - 12
+    - 16
+    - 18
+    - 21
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
+        "Java", "timeout_sec": 60}}'
+    - step: 13
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 30}}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel",
+        "timeout_sec": 30}}'
+    - step: 15
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel",
+        "contains": "soutm"}}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete [aria-selected=\"true\"] .cm-completionLabel", "contains":
+        "soutm"}}'
+    - step: 19
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]", "timeout_sec": 10}}'
+    - step: 20
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:nth-child(9)",
+        "equals": "        System.out.println(\"App.main()\");", "timeout_sec": 30}}'
+    - step: 22
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:nth-child(9)",
+        "equals": "        sout", "timeout_sec": 30}}'
+    results:
+    - 22
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

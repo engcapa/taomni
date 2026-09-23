@@ -1,73 +1,171 @@
 id: TC-auto-F-Sidebar-1
 title: SessionTree Ctrl+click multi-select drives "Connect selected sessions (N)"
-description: |
-  F-Sidebar-1: regression test for the multi-select feature added in
+description: 'F-Sidebar-1: regression test for the multi-select feature added in
+
   v0.1.30. Creates two saved sessions, single-clicks the first to select,
+
   Ctrl+clicks the second to extend selection, and confirms both rows
+
   carry `data-selected="true"`. Right-clicking either row should produce a
+
   "Connect selected sessions (2)" menu entry.
-covers: [F-Sidebar-1]
-tags: [auto-generated, sessions, sidebar, multi-select, p1, needs-review]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+
+  '
+covers:
+- F-Sidebar-1
+tags:
+- auto-generated
+- sessions
+- sidebar
+- multi-select
+- p1
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 timeout_sec: 60
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="session-tree"]'
-  # Create session A.
-  - click: '[data-testid="session-new"]'
-  - wait_for: '[data-testid="session-editor"]'
-  - fill: {selector: '[data-testid="session-host"]', value: '${cfg.ssh.host}'}
-  - fill: {selector: '[data-testid="session-port"]', value: '${cfg.ssh.port}'}
-  - send_text_via_label: {label_contains: Specify username, checked: true}
-  - wait: 1
-  - fill: {selector: '[data-testid="session-user"]', value: '${cfg.ssh.user}'}
-  - click: '[data-testid="session-section-bookmark"]'
-  - wait_for: '[data-testid="bookmark-settings"]'
-  - fill: {selector: '[data-testid="session-name"]', value: 'qa-multi-a'}
-  - click: '[data-testid="session-save"]'
-  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
-  # Create session B.
-  - click: '[data-testid="session-new"]'
-  - wait_for: '[data-testid="session-editor"]'
-  - fill: {selector: '[data-testid="session-host"]', value: '${cfg.ssh.host}'}
-  - fill: {selector: '[data-testid="session-port"]', value: '${cfg.ssh.port}'}
-  - send_text_via_label: {label_contains: Specify username, checked: true}
-  - wait: 1
-  - fill: {selector: '[data-testid="session-user"]', value: '${cfg.ssh.user}'}
-  - click: '[data-testid="session-section-bookmark"]'
-  - wait_for: '[data-testid="bookmark-settings"]'
-  - fill: {selector: '[data-testid="session-name"]', value: 'qa-multi-b'}
-  - click: '[data-testid="session-save"]'
-  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
-  # Single-click A → A selected.
-  - click: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
-  - assert_attribute:
-      selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
-      name: data-selected
-      equals: 'true'
-  # Mod+click B → both selected (Meta on macOS: a Control+click is
-  # delivered as a right-click by the OS/Chromium convention there).
-  - click:
-      selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
-      modifiers: [Mod]
-  - assert_attribute:
-      selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
-      name: data-selected
-      equals: 'true'
-  - assert_attribute:
-      selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
-      name: data-selected
-      equals: 'true'
-  # Right-click reveals the multi-connect entry.
-  - right_click: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
-  - wait_for: '[data-testid="context-menu"]'
-  - assert_visible: '[data-testid="context-menu"] >> text="Connect selected sessions (2)"'
-  - press: Escape
-  # Plain click on A drops B's selection back.
-  - click: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
-  - assert_attribute:
-      selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
-      name: data-selected
-      equals: 'false'
-  - screenshot: sidebar-multi-select.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- send_text_via_label:
+    label_contains: Specify username
+    checked: true
+- wait: 1
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-multi-a
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- send_text_via_label:
+    label_contains: Specify username
+    checked: true
+- wait: 1
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-multi-b
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
+- assert_attribute:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
+    name: data-selected
+    equals: 'true'
+- click:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
+    modifiers:
+    - Mod
+- assert_attribute:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
+    name: data-selected
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
+    name: data-selected
+    equals: 'true'
+- right_click: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="context-menu"] >> text="Connect selected sessions (2)"'
+- press: Escape
+- click: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
+- assert_attribute:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
+    name: data-selected
+    equals: 'false'
+- screenshot: sidebar-multi-select.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SessionTree Ctrl+click multi-select drives "Connect selected sessions (N)"：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+    - 12
+    - 13
+    - 15
+    - 17
+    - 18
+    - 19
+    - 21
+    - 22
+    - 24
+    - 25
+    - 27
+    - 29
+    - 32
+    - 35
+    - 36
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-multi-a\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-multi-b\"]"}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-multi-a\"]",
+        "name": "data-selected", "equals": "true"}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-multi-a\"]",
+        "name": "data-selected", "equals": "true"}}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-multi-b\"]",
+        "name": "data-selected", "equals": "true"}}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 34
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Connect selected sessions (2)\""}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-multi-b\"]",
+        "name": "data-selected", "equals": "false"}}'
+    results:
+    - 37
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

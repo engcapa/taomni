@@ -1,8 +1,9 @@
 id: TC-IDE-FINDFOCUS-01
 title: Focused F0 Find navigation, recovery, Replace and split remount
-description: ED-FINDFOCUS-001 / V-FF-03 self-check. Exact UTF-8/LF F0 is created through UI in isolated browser VFS. True
-  focus before chords; automatic first match, Enter/Shift+Enter, Esc selection, repeat, invalid/zero recovery, retained Replace/undo
-  and split. Does not prove native disk, IME or provider. Second F0 tree is [54,58), corrected against original bytes.
+description: ED-FINDFOCUS-001 / V-FF-03 self-check. Exact UTF-8/LF F0 is created through UI in isolated browser
+  VFS. True focus before chords; automatic first match, Enter/Shift+Enter, Esc selection, repeat, invalid/zero recovery,
+  retained Replace/undo and split. Does not prove native disk, IME or provider. Second F0 tree is [54,58), corrected
+  against original bytes.
 covers:
 - F25.1
 - F25.5
@@ -398,3 +399,376 @@ steps:
     selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line:nth-child(3)'
     regex: ^$
 - screenshot: after-split.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Focused F0 Find navigation, recovery, Replace and split remount：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 4
+    - 6
+    - 8
+    - 9
+    - 12
+    - 13
+    - 15
+    - 16
+    - 18
+    - 19
+    - 21
+    - 22
+    - 24
+    - 25
+    - 27
+    - 28
+    - 30
+    - 31
+    - 33
+    - 34
+    - 36
+    - 37
+    - 39
+    - 40
+    - 42
+    - 44
+    - 45
+    - 49
+    - 50
+    - 52
+    - 55
+    - 57
+    - 58
+    - 62
+    - 63
+    - 65
+    - 68
+    - 70
+    - 71
+    - 75
+    - 76
+    - 78
+    - 81
+    - 83
+    - 84
+    - 88
+    - 89
+    - 91
+    - 94
+    - 96
+    - 97
+    - 99
+    - 100
+    - 101
+    - 103
+    - 104
+    - 105
+    - 107
+    - 110
+    - 117
+    - 120
+    - 128
+    - 129
+    - 130
+    - 132
+    - 135
+    - 142
+    - 145
+    - 153
+    - 154
+    - 156
+    - 157
+    - 159
+    - 161
+    - 162
+    - 164
+    - 166
+    - 167
+    - 168
+    - 169
+    - 170
+    - 171
+    - 172
+    - 173
+    - 174
+    - 176
+    - 177
+    - 178
+    - 183
+    - 186
+    - 188
+    - 189
+    - 190
+    - 192
+    - 194
+    - 196
+    - 197
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-root\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 17
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 23
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 35
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 41
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 46
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-observation-status=\"ready\"][data-active-editor-key$=\"fixture/README.md\"]"}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[contenteditable=\"true\"]"}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"true\"]"}'
+    - step: 53
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"false\"]"}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "false"}}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 59
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 60
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-observation-status=\"ready\"][data-active-editor-key$=\"fixture/src/main/example.txt\"]"}'
+    - step: 61
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[contenteditable=\"true\"]"}'
+    - step: 64
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"true\"]"}'
+    - step: 66
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"false\"]"}'
+    - step: 67
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "false"}}'
+    - step: 69
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 72
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 73
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-observation-status=\"ready\"][data-active-editor-key$=\"fixture/docs/notes.txt\"]"}'
+    - step: 74
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[contenteditable=\"true\"]"}'
+    - step: 77
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"true\"]"}'
+    - step: 79
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"false\"]"}'
+    - step: 80
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "false"}}'
+    - step: 82
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 85
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 86
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-observation-status=\"ready\"][data-active-editor-key$=\"fixture/tests/sample.txt\"]"}'
+    - step: 87
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[contenteditable=\"true\"]"}'
+    - step: 90
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"true\"]"}'
+    - step: 92
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"false\"]"}'
+    - step: 93
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "false"}}'
+    - step: 95
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 98
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 102
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
+    - step: 106
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')",
+        "expect_truthy": true}}'
+    - step: 108
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "1 / 2"}}'
+    - step: 109
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-replace-row"}'
+    - step: 111
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "2 / 2"}}'
+    - step: 112
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')",
+        "expect_truthy": true}}'
+    - step: 113
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
+        "equal": 3}}'
+    - step: 114
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)",
+        "regex": "^Project\\ tree\\ example$"}}'
+    - step: 115
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)",
+        "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+    - step: 116
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)",
+        "regex": "^$"}}'
+    - step: 118
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "1 / 2"}}'
+    - step: 121
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-search\"]"}'
+    - step: 122
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-content'')",
+        "expect_truthy": true}}'
+    - step: 123
+      expectation: '{"eval_readonly": {"expression": "window.getSelection().toString() === ''tree''", "expect_truthy":
+        true}}'
+    - step: 124
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
+        "equal": 3}}'
+    - step: 125
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)",
+        "regex": "^Project\\ tree\\ example$"}}'
+    - step: 126
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)",
+        "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+    - step: 127
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)",
+        "regex": "^$"}}'
+    - step: 131
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')",
+        "expect_truthy": true}}'
+    - step: 133
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "1 / 2"}}'
+    - step: 134
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-replace-row"}'
+    - step: 136
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "2 / 2"}}'
+    - step: 137
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')",
+        "expect_truthy": true}}'
+    - step: 138
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
+        "equal": 3}}'
+    - step: 139
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)",
+        "regex": "^Project\\ tree\\ example$"}}'
+    - step: 140
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)",
+        "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+    - step: 141
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)",
+        "regex": "^$"}}'
+    - step: 143
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "1 / 2"}}'
+    - step: 146
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-search\"]"}'
+    - step: 147
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-content'')",
+        "expect_truthy": true}}'
+    - step: 148
+      expectation: '{"eval_readonly": {"expression": "window.getSelection().toString() === ''tree''", "expect_truthy":
+        true}}'
+    - step: 149
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
+        "equal": 3}}'
+    - step: 150
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)",
+        "regex": "^Project\\ tree\\ example$"}}'
+    - step: 151
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)",
+        "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+    - step: 152
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)",
+        "regex": "^$"}}'
+    - step: 155
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "0 matches"}}'
+    - step: 158
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "Invalid pattern"}}'
+    - step: 160
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "1 / 2"}}'
+    - step: 163
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "0 matches"}}'
+    - step: 165
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "1 / 2"}}'
+    - step: 175
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains":
+        "Project bush example"}}'
+    - step: 179
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
+        "equal": 3}}'
+    - step: 180
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)",
+        "regex": "^Project\\ tree\\ example$"}}'
+    - step: 181
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)",
+        "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+    - step: 182
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)",
+        "regex": "^$"}}'
+    - step: 184
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"false\"]"}'
+    - step: 185
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "false"}}'
+    - step: 187
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 191
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-search\"]", "equal": 1}}'
+    - step: 193
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "1 / 2"}}'
+    - step: 195
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
+        "contains": "2 / 2"}}'
+    - step: 198
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 199
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
+        "equal": 3}}'
+    - step: 200
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)",
+        "regex": "^Project\\ tree\\ example$"}}'
+    - step: 201
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)",
+        "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+    - step: 202
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)",
+        "regex": "^$"}}'
+    results:
+    - 198
+    - 199
+    - 200
+    - 201
+    - 202
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

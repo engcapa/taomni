@@ -586,6 +586,41 @@ describe("FileBrowser → FilePanel toolbar wiring", () => {
     });
   });
 
+  it("maps a Git Bash cwd to the Windows SFTP namespace only for Windows servers", async () => {
+    const user = userEvent.setup();
+    seedSession();
+    useSftpStore.setState((state) => ({
+      sessions: {
+        ...state.sessions,
+        [SESSION_ID]: {
+          ...state.sessions[SESSION_ID],
+          homeDir: "/C:/Users/test",
+          remote: { ...state.sessions[SESSION_ID].remote, path: "/C:/Users/test" },
+        },
+      },
+    }));
+    const onRequestTerminalCwd = vi.fn(() => true);
+    const { rerender } = render(
+      <FileBrowser
+        sessionId={SESSION_ID} host="example.com" port={22} username="user"
+        authMethod="password" authData={null} cwdHint="/c/old" cwdHintVersion={0}
+        onRequestTerminalCwd={onRequestTerminalCwd}
+      />,
+    );
+
+    await user.click(screen.getByTitle(/Query the terminal cwd/i));
+    rerender(
+      <FileBrowser
+        sessionId={SESSION_ID} host="example.com" port={22} username="user"
+        authMethod="password" authData={null} cwdHint="/c/qa-temp/project" cwdHintVersion={1}
+        onRequestTerminalCwd={onRequestTerminalCwd}
+      />,
+    );
+    await waitFor(() => {
+      expect(useSftpStore.getState().sessions[SESSION_ID].remote.path).toBe("/C:/qa-temp/project");
+    });
+  });
+
   it("consumes a pending terminal upload request through the SFTP browser", async () => {
     seedSession();
     const onHandled = vi.fn();

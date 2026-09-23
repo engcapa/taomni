@@ -1,29 +1,82 @@
 id: TC-auto-F12-1-vault-setup-validation
 title: Vault setup dialog validates password requirements
-covers: [F12.1]
-tags: [auto-generated, smoke, needs-review, vault, validation]
-modes: [native]
-fixtures: [reset_db]
+covers:
+- F12.1
+tags:
+- auto-generated
+- smoke
+- needs-review
+- vault
+- validation
+modes:
+- native
+fixtures:
+- reset_db
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: "[data-testid=\"tab-bar\"]"
-  - click: "[data-testid=\"ribbon-settings\"]"
-  - wait_for: "[data-testid=\"settings-panel\"]"
-  - click: '[data-testid="settings-group-toggle-security"]'
-  - wait_for: '[data-testid="vault-settings"]'
-  - assert_visible: '[data-testid="vault-settings"]'
-  # Open setup dialog
-  - click: '[data-testid="vault-init-button"]'
-  - wait_for: '[data-testid="vault-setup-dialog"]'
-  # Type a short password — should show "too short" warning
-  - fill: {selector: '[data-testid="vault-setup-pw1"]', value: "short"}
-  - assert_visible: '[data-testid="vault-setup-too-short"]'
-  # Type mismatched passwords
-  - fill: {selector: '[data-testid="vault-setup-pw1"]', value: "LongEnough1!"}
-  - fill: {selector: '[data-testid="vault-setup-pw2"]', value: "Different99!"}
-  - assert_visible: '[data-testid="vault-setup-mismatch"]'
-  # Cancel should close the dialog
-  - click: '[data-testid="vault-setup-cancel"]'
-  - wait: 0.5
-  - assert_text: {selector: '[data-testid="vault-state-badge"]', contains: "empty"}
-  - screenshot: auto-F12-1-vault-setup-validation.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="tab-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-security"]'
+- wait_for: '[data-testid="vault-settings"]'
+- assert_visible: '[data-testid="vault-settings"]'
+- click: '[data-testid="vault-init-button"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: short
+- assert_visible: '[data-testid="vault-setup-too-short"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: LongEnough1!
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: Different99!
+- assert_visible: '[data-testid="vault-setup-mismatch"]'
+- click: '[data-testid="vault-setup-cancel"]'
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="vault-state-badge"]'
+    contains: empty
+- screenshot: auto-F12-1-vault-setup-validation.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Vault setup dialog validates password requirements：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 8
+    - 10
+    - 12
+    - 13
+    - 15
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"tab-bar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"vault-settings\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"vault-settings\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"vault-setup-dialog\"]"}'
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"vault-setup-too-short\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"vault-setup-mismatch\"]"}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vault-state-badge\"]", "contains": "empty"}}'
+    results:
+    - 17
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

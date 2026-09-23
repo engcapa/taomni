@@ -34,6 +34,7 @@ class TestCase:
     skip: str | None = None
     steps: list[dict[str, Any]] = field(default_factory=list)
     source_path: Path | None = None
+    verification: dict[str, Any] = field(default_factory=dict)
 
     def supports_mode(self, mode: str) -> bool:
         return mode in self.modes
@@ -60,6 +61,9 @@ def validate_doc(doc: dict, *, source: str) -> list[str]:
     for err in validator.iter_errors(doc):
         path = "/".join(str(p) for p in err.absolute_path) or "<root>"
         errors.append(f"{source}: {path}: {err.message}")
+    if not errors:
+        from .behavior_contract import validate_contract
+        errors.extend(f"{source}: {e}" for e in validate_contract(doc))
     return errors
 
 
@@ -89,6 +93,7 @@ def load_case(path: Path) -> TestCase:
         skip=raw.get("skip"),
         steps=list(raw["steps"]),
         source_path=path,
+        verification=raw.get("verification", {}),
     )
 
 

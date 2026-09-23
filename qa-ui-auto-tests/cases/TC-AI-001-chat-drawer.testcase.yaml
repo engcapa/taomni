@@ -1,62 +1,137 @@
 id: TC-AI-001
 title: AI Chat Drawer opens, lists threads, and shows attachment chips
-description: |
-  Verifies the AI Chat Drawer surface (F-AI-2.4): Welcome exposes Chat Tao,
+description: 'Verifies the AI Chat Drawer surface (F-AI-2.4): Welcome exposes Chat Tao,
+
   opening it creates a tab-bound drawer, the header exposes New / History /
+
   position / pin / hide controls, the composer exposes attach and resize controls,
+
   top/bottom floating mode exposes the drawer opacity slider,
+
   the composer placeholder advertises the
+
   @reference syntax, typing `@terminal:last-30` raises an attachment chip,
+
   and hiding the drawer leaves a Tao ribbon that can reopen it.
+
   Does not exercise streaming or send (those need a real LLM key);
+
   the assertion target is UI plumbing only.
-covers: [F-AI-2.4]
-tags: [ai, drawer, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-AI-2.4
+tags:
+- ai
+- drawer
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="status-bar"]'
-  # PTT button mounted in title bar
-  - assert_visible: '[data-testid="ptt-button"]'
-  # welcome-open-chat-tao was removed; chat opens from a terminal's floating toggle
-  - click: '[data-testid="welcome-open-local-terminal"]'
-  - wait_for: '[data-testid="terminal-pane"]'
-  - click: '[data-testid="tab-chat-toggle"]'
-  - wait_for: '[data-testid="ai-chat-drawer"]'
-  # Drawer header shows New / History / layout / hide buttons (English defaults
-  # — locale switcher can change them, see F-i18n-1).
-  - assert_visible: 'button[title="New chat"]'
-  - assert_visible: 'button[title="History"]'
-  - assert_visible: '[data-testid="ai-chat-drawer-position"]'
-  - assert_visible: '[data-testid="ai-chat-drawer-pin"]'
-  - assert_visible: '[data-testid="ai-chat-drawer-hide"]'
-  # Move to top floating mode; opacity controls only exist for top/bottom floating drawers.
-  - click: '[data-testid="ai-chat-drawer-position"]'
-  - click: '[data-testid="ai-chat-drawer"] >> text=Top'
-  - wait_for: '[data-testid="ai-chat-drawer-opacity"]'
-  - click: '[data-testid="ai-chat-drawer-opacity"]'
-  - wait_for: '[data-testid="ai-chat-drawer-opacity-slider"]'
-  - click: '[data-testid="ai-chat-drawer-opacity-slider"]'
-  - assert_visible: '[data-testid="ai-chat-composer"]'
-  - assert_visible: '[data-testid="ai-chat-attach-button"]'
-  - assert_visible: '[data-testid="ai-chat-composer-resize"]'
-  # Composer placeholder advertises @reference syntax
-  - assert_attribute:
-      selector: '[data-testid="ai-chat-drawer"] textarea'
-      name: placeholder
-      equals: 'Type a message... (Ctrl+Enter to send · supports @terminal:last-50 / @file:./error.log)'
-  # Type a message with an attachment ref → chip should appear
-  - fill:
-      selector: '[data-testid="ai-chat-drawer"] textarea'
-      value: 'show me what failed @terminal:last-30'
-  - wait_for: '[data-testid="attachment-chip"]'
-  - assert_visible: '[data-testid="attachment-chip"]'
-  - screenshot: ai-001-drawer.png
-  # Hiding should collapse to the current edge ribbon.
-  - click: '[data-testid="ai-chat-drawer-hide"]'
-  - assert_not_visible: '[data-testid="ai-chat-drawer"]'
-  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-  - click: '[data-testid="ai-chat-drawer-ribbon"]'
-  - wait_for: '[data-testid="ai-chat-drawer"]'
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- assert_visible: '[data-testid="ptt-button"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="tab-chat-toggle"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- assert_visible: button[title="New chat"]
+- assert_visible: button[title="History"]
+- assert_visible: '[data-testid="ai-chat-drawer-position"]'
+- assert_visible: '[data-testid="ai-chat-drawer-pin"]'
+- assert_visible: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="ai-chat-drawer-position"]'
+- click: '[data-testid="ai-chat-drawer"] >> text=Top'
+- wait_for: '[data-testid="ai-chat-drawer-opacity"]'
+- click: '[data-testid="ai-chat-drawer-opacity"]'
+- wait_for: '[data-testid="ai-chat-drawer-opacity-slider"]'
+- click: '[data-testid="ai-chat-drawer-opacity-slider"]'
+- assert_visible: '[data-testid="ai-chat-composer"]'
+- assert_visible: '[data-testid="ai-chat-attach-button"]'
+- assert_visible: '[data-testid="ai-chat-composer-resize"]'
+- assert_attribute:
+    selector: '[data-testid="ai-chat-drawer"] textarea'
+    name: placeholder
+    equals: Type a message... (Ctrl+Enter to send · supports @terminal:last-50 / @file:./error.log)
+- fill:
+    selector: '[data-testid="ai-chat-drawer"] textarea'
+    value: show me what failed @terminal:last-30
+- wait_for: '[data-testid="attachment-chip"]'
+- assert_visible: '[data-testid="attachment-chip"]'
+- screenshot: ai-001-drawer.png
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"]'
+- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: AI Chat Drawer opens, lists threads, and shows attachment chips：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 6
+    - 13
+    - 14
+    - 16
+    - 18
+    - 23
+    - 27
+    - 30
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 3
+      expectation: '{"assert_visible": "[data-testid=\"ptt-button\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "button[title=\"New chat\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "button[title=\"History\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer-position\"]"}'
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer-pin\"]"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-drawer-hide\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-opacity\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-opacity-slider\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-composer\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-attach-button\"]"}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"ai-chat-composer-resize\"]"}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"] textarea", "name": "placeholder",
+        "equals": "Type a message... (Ctrl+Enter to send · supports @terminal:last-50 / @file:./error.log)"}}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"attachment-chip\"]"}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"attachment-chip\"]"}'
+    - step: 28
+      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    results:
+    - 31
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

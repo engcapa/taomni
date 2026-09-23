@@ -1,50 +1,129 @@
 id: TC-021
 title: Terminal theme preview picker hot-swaps without reconnecting
-covers: [F5.1, F5.2]
-tags: [appearance, legacy-imported, p1, terminal, theme]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+covers:
+- F5.1
+- F5.2
+tags:
+- appearance
+- legacy-imported
+- p1
+- terminal
+- theme
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - wait_for: '[data-testid="qc-input"]'
-  - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
-  - click: "[data-testid=\"qc-submit\"]"
-  - wait_for: "[data-testid=\"auth-prompt\"]"
-  - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
-  - click: "[data-testid=\"auth-submit\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait_for:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-      timeout_sec: 20
-  - terminal_input:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-      text: echo qa-theme-marker
-      submit: true
-  - wait: 1
-  - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - hover: '[data-testid="context-menu-item-appearance"]'
-  - wait: 0.5
-  - assert_count: { selector: '[data-testid^="terminal-context-theme-option-"]', min: 3 }
-  - click: '[data-testid^="terminal-context-theme-option-"] >> nth=0'
-  - wait: 1
-  - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-theme-marker}
-  # The theme gallery stays open over the terminal and neither Escape nor an
-  # outside click dismisses it reliably; use the Find item to close the menu
-  # (proven pattern from TC-007), then close the find bar again.
-  - click: "[data-testid=\"context-menu-item-find\"]"
-  - wait_for: "input[placeholder=\"Find\"]"
-  - click: '[data-testid="terminal-pane"] button:has-text("Close")'
-  - wait_for:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-      timeout_sec: 20
-  - terminal_input:
-      selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-      text: echo qa-theme-still-alive
-      submit: true
-  - wait: 1
-  - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-theme-still-alive}
-  - screenshot: 021-terminal-theme-hot-swap.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo qa-theme-marker
+    submit: true
+- wait: 1
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- hover: '[data-testid="context-menu-item-appearance"]'
+- wait: 0.5
+- assert_count:
+    selector: '[data-testid^="terminal-context-theme-option-"]'
+    min: 3
+- click: '[data-testid^="terminal-context-theme-option-"] >> nth=0'
+- wait: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-theme\-marker\r?$
+    timeout_sec: 15
+- click: '[data-testid="context-menu-item-find"]'
+- wait_for: input[placeholder="Find"]
+- click: '[data-testid="terminal-pane"] button:has-text("Close")'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo qa-theme-still-alive
+    submit: true
+- wait: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-theme\-still\-alive\r?$
+    timeout_sec: 15
+- screenshot: 021-terminal-theme-hot-swap.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Terminal theme preview picker hot-swaps without reconnecting：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 9
+    - 10
+    - 13
+    - 15
+    - 17
+    - 20
+    - 23
+    - 25
+    - 27
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 12
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
+        "timeout_sec": 60}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 19
+      expectation: '{"assert_count": {"selector": "[data-testid^=\"terminal-context-theme-option-\"]", "min": 3}}'
+    - step: 22
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-theme\\-marker\\r?$",
+        "timeout_sec": 15}}'
+    - step: 24
+      expectation: '{"wait_for": "input[placeholder=\"Find\"]"}'
+    - step: 26
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
+        "timeout_sec": 60}}'
+    - step: 29
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-theme\\-still\\-alive\\r?$",
+        "timeout_sec": 15}}'
+    results:
+    - 29
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

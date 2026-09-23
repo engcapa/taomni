@@ -1,64 +1,170 @@
 id: TC-IDE-C2-03-completion-choice-undo-native
-title: "Basic completion choice and one undo over real JDT LS in packaged app"
-description: |
-  §8.19.10 native gate case (ED-COMP-004 A1). Enters the in-repo
+title: Basic completion choice and one undo over real JDT LS in packaged app
+description: '§8.19.10 native gate case (ED-COMP-004 A1). Enters the in-repo
+
   single-module Maven sample through persisted recents (no native picker),
+
   waits for the real JDT LS provider, places the caret after the bare `Stri`
-  token with physical keys, fires explicit completion, accepts the top
-  choice, and proves one undo restores the prefix. The request carries the
+
+  token with physical keys, fires explicit completion with Alt+/ (Ctrl+Space is reserved by the CI IME),
+  explicitly clicks the java.lang.String candidate (provider order varies), and proves one undo restores the prefix. The request carries the
+
   effective project scope recorded from the ready same-workspace snapshot
+
   (unit-proven on the telemetry ring); this gate proves the production
+
   completion path stays green with the scope wiring live on a real provider.
+
   Highest claim on green: L2 provider-backed (Linux).
-covers: [F25.5]
-tags: [code-workspace, ide-c2, completion, native-gate, p1]
-modes: [native]
-fixtures: [reset_db, java_sample_projects]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c2
+- completion
+- native-gate
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- java_sample_projects
 timeout_sec: 600
 steps:
-  - open: "${cfg.app.base_url}"
-  - vault_first_run: "qa-native-gate-password"
-  - wait_for: '[data-testid="welcome-panel"]'
-  # Enter the real sample project through persisted recents (no native picker).
-  - seed_storage:
-      key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-c2","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
-  - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - wait_for:
-      selector: '[data-testid="code-workspace-editor-pane"]'
-      timeout_sec: 60
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "completionTargets"
-      timeout_sec: 60
-  - assert_text:
-      selector: '[data-testid="code-workspace-lsp-status-pill"]'
-      contains: "Java"
-      timeout_sec: 60
-  # Caret after the bare `Stri` token (line 21, column 16).
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowRight"]
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+Space"]
-  - wait: 3
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Enter"]
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "            String"
-      timeout_sec: 60
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+z"]
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "            Stri"
-      timeout_sec: 30
-  - screenshot: tc-ide-c2-03-completion-undo.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-c2","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: completionTargets
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-lsp-status-pill"]'
+    contains: Java
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+    - ArrowRight
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Alt+/
+    require_keydown_prevented: true
+- wait: 0.3
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 30
+- click: xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel')
+    and normalize-space(.)='String - java.lang']
+- assert_text_equals:
+    selector: '[data-testid="code-workspace-editor"] .cm-line:nth-child(21)'
+    equals: '            String'
+    timeout_sec: 60
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+z
+- assert_text_equals:
+    selector: '[data-testid="code-workspace-editor"] .cm-line:nth-child(21)'
+    equals: '            Stri'
+    timeout_sec: 60
+- screenshot: tc-ide-c2-03-completion-undo.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Basic completion choice and one undo over real JDT LS in packaged app：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 12
+    - 13
+    - 14
+    - 17
+    - 19
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec":
+        60}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains":
+        "completionTargets", "timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
+        "Java", "timeout_sec": 60}}'
+    - step: 16
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 30}}'
+    - step: 18
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:nth-child(21)",
+        "equals": "            String", "timeout_sec": 60}}'
+    - step: 20
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:nth-child(21)",
+        "equals": "            Stri", "timeout_sec": 60}}'
+    results:
+    - 20
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

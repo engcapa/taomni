@@ -1,41 +1,117 @@
 id: TC-110
 title: Terminal split view supports layouts, input locks, and MultiExec target count
-covers: [F-Split-1, F4.11]
-tags: [smoke, p1, terminal, split, multiexec]
-modes: [browser]
-fixtures: [reset_db]
+covers:
+- F-Split-1
+- F4.11
+tags:
+- smoke
+- p1
+- terminal
+- split
+- multiexec
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 60
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-open-local-terminal"]'
-  - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 20
-  - click: '[data-testid="new-local-terminal"]'
-  - wait_for:
-      selector: '[data-testid="tab-item"] >> nth=2'
-      timeout_sec: 5
-  - click: '[data-testid="tab-split-view"]'
-  - wait_for:
-      selector: '[data-testid="terminal-split-toolbar"]'
-      timeout_sec: 5
-  - assert_visible: '[data-testid="terminal-split-panes"]'
-  - assert_visible: '[data-testid="terminal-split-resize-handle"]'
-  - click: '[data-testid="terminal-split-layout-vertical"]'
-  - assert_attribute: {selector: '[data-testid="terminal-split-panes"]', name: data-layout, equals: vertical}
-  - assert_visible: '[data-testid="terminal-split-resize-handle"]'
-  - click: '[data-testid="terminal-split-layout-grid"]'
-  - assert_attribute: {selector: '[data-testid="terminal-split-panes"]', name: data-layout, equals: grid}
-  - assert_visible: '[data-testid="terminal-split-grid-column-resize-handle"]'
-  - click: '[data-testid="terminal-split-layout-horizontal"]'
-  - assert_attribute: {selector: '[data-testid="terminal-split-panes"]', name: data-layout, equals: horizontal}
-  - click: '[data-testid^="terminal-split-lock-"]'
-  - assert_visible: '[data-testid="terminal-input-locked"]'
-  - click: '[data-testid="tab-multiexec-toggle"]'
-  - wait_for:
-      selector: '[data-testid="multiexec-bar"]'
-      timeout_sec: 5
-  - click: '[data-testid="multiexec-bar"] >> text="All"'
-  - assert_visible: '[data-testid="multiexec-bar"] >> text="1 / 2"'
-  - screenshot: 110-terminal-split-smoke.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 20
+- click: '[data-testid="new-local-terminal"]'
+- wait_for:
+    selector: '[data-testid="tab-item"] >> nth=2'
+    timeout_sec: 5
+- click: '[data-testid="tab-split-view"]'
+- wait_for:
+    selector: '[data-testid="terminal-split-toolbar"]'
+    timeout_sec: 5
+- assert_visible: '[data-testid="terminal-split-panes"]'
+- assert_visible: '[data-testid="terminal-split-resize-handle"]'
+- click: '[data-testid="terminal-split-layout-vertical"]'
+- assert_attribute:
+    selector: '[data-testid="terminal-split-panes"]'
+    name: data-layout
+    equals: vertical
+- assert_visible: '[data-testid="terminal-split-resize-handle"]'
+- click: '[data-testid="terminal-split-layout-grid"]'
+- assert_attribute:
+    selector: '[data-testid="terminal-split-panes"]'
+    name: data-layout
+    equals: grid
+- assert_visible: '[data-testid="terminal-split-grid-column-resize-handle"]'
+- click: '[data-testid="terminal-split-layout-horizontal"]'
+- assert_attribute:
+    selector: '[data-testid="terminal-split-panes"]'
+    name: data-layout
+    equals: horizontal
+- click: '[data-testid^="terminal-split-lock-"]'
+- assert_visible: '[data-testid="terminal-input-locked"]'
+- click: '[data-testid="tab-multiexec-toggle"]'
+- wait_for:
+    selector: '[data-testid="multiexec-bar"]'
+    timeout_sec: 5
+- click: '[data-testid="multiexec-bar"] >> text="All"'
+- assert_visible: '[data-testid="multiexec-bar"] >> text="1 / 2"'
+- screenshot: 110-terminal-split-smoke.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Terminal split view supports layouts, input locks, and MultiExec target count：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 11
+    - 14
+    - 17
+    - 19
+    - 21
+    - 23
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 20}}'
+    - step: 6
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"] >> nth=2", "timeout_sec": 5}}'
+    - step: 8
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-split-toolbar\"]", "timeout_sec": 5}}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"terminal-split-panes\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"terminal-split-resize-handle\"]"}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-split-panes\"]", "name": "data-layout",
+        "equals": "vertical"}}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"terminal-split-resize-handle\"]"}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-split-panes\"]", "name": "data-layout",
+        "equals": "grid"}}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"terminal-split-grid-column-resize-handle\"]"}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-split-panes\"]", "name": "data-layout",
+        "equals": "horizontal"}}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"terminal-input-locked\"]"}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"multiexec-bar\"]", "timeout_sec": 5}}'
+    - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"multiexec-bar\"] >> text=\"1 / 2\""}'
+    results:
+    - 24
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

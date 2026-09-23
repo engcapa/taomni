@@ -1,63 +1,171 @@
 id: TC-018
 title: Session editor protocol switch shows protocol-specific shell
-covers: [F6.3]
-tags: [legacy-imported, p1, protocol, session]
-modes: [browser]
-fixtures: [reset_db]
+covers:
+- F6.3
+tags:
+- legacy-imported
+- p1
+- protocol
+- session
+modes:
+- browser
+fixtures:
+- reset_db
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"session-new\"]"
-  - wait_for: "[data-testid=\"session-editor\"]"
-  - click: "[data-testid=\"session-proto-ssh\"]"
-  - assert_visible: "[data-testid=\"advanced-ssh-settings\"]"
-  - click: "[data-testid=\"session-proto-sftp\"]"
-  - wait: 1
-  - assert_visible: "[data-testid=\"session-host\"]"
-  - assert_visible: "[data-testid=\"session-user\"]"
-  - click: "[data-testid=\"session-proto-rdp\"]"
-  - wait: 1
-  - assert_visible: "[data-testid=\"session-host\"]"
-  - click: "[data-testid=\"session-proto-vnc\"]"
-  - wait: 1
-  - assert_visible: "[data-testid=\"session-host\"]"
-  - click: "[data-testid=\"session-proto-browser\"]"
-  - wait: 1
-  - assert_visible: "[data-testid=\"session-host\"]"
-  - fill:
-      selector: "[data-testid=\"session-host\"]"
-      value: "https://docs.example.test"
-  - click: "[data-testid=\"session-proto-ftp\"]"
-  - wait: 1
-  - assert_visible: "[data-testid=\"session-host\"]"
-  - assert_visible: "[data-testid=\"session-port\"]"
-  - click: "[data-testid=\"session-proto-telnet\"]"
-  - wait: 1
-  - assert_visible: "[data-testid=\"session-host\"]"
-  - click: "[data-testid=\"session-proto-rlogin\"]"
-  - wait: 1
-  - assert_visible: "[data-testid=\"session-host\"]"
-  - click: "[data-testid=\"session-proto-mosh\"]"
-  - wait: 1
-  - assert_visible: "[data-testid=\"session-host\"]"
-  - click: "[data-testid=\"session-proto-serial\"]"
-  - wait_for: "[data-testid=\"session-serial-section\"]"
-  - assert_visible: "[data-testid=\"session-serial-device\"]"
-  - assert_visible: "[data-testid=\"session-serial-baud\"]"
-  - fill:
-      selector: "[data-testid=\"session-serial-device\"]"
-      value: "/dev/ttyUSB0"
-  - fill:
-      selector: "[data-testid=\"session-serial-baud\"]"
-      value: "115200"
-  - click: "[data-testid=\"session-proto-shell\"]"
-  - wait_for: "[data-testid=\"session-local-shell-section\"]"
-  - assert_visible: "[data-testid=\"local-shell-preview\"]"
-  - assert_not_visible: "[data-testid=\"session-planned-client-note\"]"
-  - click: "[data-testid=\"session-proto-ssh\"]"
-  - assert_visible: "[data-testid=\"advanced-ssh-settings\"]"
-  - fill:
-      selector: "[data-testid=\"session-host\"]"
-      value: "ssh -p 2202 qa@ssh-import.example.test"
-  - click: "[data-testid=\"session-port\"]"
-  - assert_visible: "[data-testid=\"session-editor\"] >> text=\"SSH command imported into this session.\""
-  - screenshot: 018-session-protocol-switch.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-ssh"]'
+- assert_visible: '[data-testid="advanced-ssh-settings"]'
+- click: '[data-testid="session-proto-sftp"]'
+- wait: 1
+- assert_visible: '[data-testid="session-host"]'
+- assert_visible: '[data-testid="session-user"]'
+- click: '[data-testid="session-proto-rdp"]'
+- wait: 1
+- assert_visible: '[data-testid="session-host"]'
+- click: '[data-testid="session-proto-vnc"]'
+- wait: 1
+- assert_visible: '[data-testid="session-host"]'
+- click: '[data-testid="session-proto-browser"]'
+- wait: 1
+- assert_visible: '[data-testid="session-host"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: https://docs.example.test
+- click: '[data-testid="session-proto-ftp"]'
+- wait: 1
+- assert_visible: '[data-testid="session-host"]'
+- assert_visible: '[data-testid="session-port"]'
+- click: '[data-testid="session-proto-telnet"]'
+- wait: 1
+- assert_visible: '[data-testid="session-host"]'
+- click: '[data-testid="session-proto-rlogin"]'
+- wait: 1
+- assert_visible: '[data-testid="session-host"]'
+- click: '[data-testid="session-proto-mosh"]'
+- wait: 1
+- assert_visible: '[data-testid="session-host"]'
+- click: '[data-testid="session-proto-serial"]'
+- wait_for: '[data-testid="session-serial-section"]'
+- assert_visible: '[data-testid="session-serial-device"]'
+- assert_visible: '[data-testid="session-serial-baud"]'
+- fill:
+    selector: '[data-testid="session-serial-device"]'
+    value: /dev/ttyUSB0
+- fill:
+    selector: '[data-testid="session-serial-baud"]'
+    value: '115200'
+- click: '[data-testid="session-proto-shell"]'
+- wait_for: '[data-testid="session-local-shell-section"]'
+- assert_visible: '[data-testid="local-shell-preview"]'
+- assert_not_visible: '[data-testid="session-planned-client-note"]'
+- click: '[data-testid="session-proto-ssh"]'
+- assert_visible: '[data-testid="advanced-ssh-settings"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh -p 2202 qa@ssh-import.example.test
+- click: '[data-testid="session-port"]'
+- assert_visible: '[data-testid="session-editor"] >> text="SSH command imported into this session."'
+- assert_attribute:
+    selector: '[data-testid="session-host"]'
+    name: value
+    equals: ssh-import.example.test
+- assert_attribute:
+    selector: '[data-testid="session-port"]'
+    name: value
+    equals: '2202'
+- assert_attribute:
+    selector: '[data-testid="session-user"]'
+    name: value
+    equals: qa
+- screenshot: 018-session-protocol-switch.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Session editor protocol switch shows protocol-specific shell：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 6
+    - 10
+    - 13
+    - 16
+    - 19
+    - 20
+    - 24
+    - 27
+    - 30
+    - 33
+    - 37
+    - 38
+    - 39
+    - 43
+    - 45
+    - 46
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"session-user\"]"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"session-port\"]"}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"session-serial-section\"]"}'
+    - step: 35
+      expectation: '{"assert_visible": "[data-testid=\"session-serial-device\"]"}'
+    - step: 36
+      expectation: '{"assert_visible": "[data-testid=\"session-serial-baud\"]"}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"session-local-shell-section\"]"}'
+    - step: 41
+      expectation: '{"assert_visible": "[data-testid=\"local-shell-preview\"]"}'
+    - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"session-planned-client-note\"]"}'
+    - step: 44
+      expectation: '{"assert_visible": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"session-editor\"] >> text=\"SSH command imported into this
+        session.\""}'
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals":
+        "ssh-import.example.test"}}'
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals":
+        "2202"}}'
+    - step: 50
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals":
+        "qa"}}'
+    results:
+    - 47
+    - 48
+    - 49
+    - 50
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

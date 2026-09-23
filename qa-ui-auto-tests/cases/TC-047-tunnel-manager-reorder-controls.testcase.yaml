@@ -1,43 +1,131 @@
 id: TC-047
 title: Tunnel manager reorder controls
-covers: [F8.2]
-tags: [legacy-imported, p1, reorder, tunnel]
-modes: [browser]
-fixtures: [reset_db, ssh_required]
+covers:
+- F8.2
+tags:
+- legacy-imported
+- p1
+- reorder
+- tunnel
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="app-main-menu"]'
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-tools"]'
-  - click: '[data-testid="context-menu-item-tunneling"]'
-  - wait_for: "[data-testid=\"tunnel-manager\"]"
-  - click: "[data-testid=\"tunnel-new\"]"
-  - wait_for: "[data-testid=\"tunnel-editor\"]"
-  - fill: {selector: "input[placeholder=\"e.g. postgres-replica\"]", value: qa-tunnel-1}
-  - fill: {selector: "input[placeholder=\"ssh.example.com\"]", value: "${cfg.ssh.host}"}
-  - fill: {selector: "input[placeholder=\"user\"]", value: "${cfg.ssh.user}"}
-  - fill: {selector: "input[placeholder=\"22\"]", value: "${cfg.ssh.port}"}
-  - fill: {selector: 'input[placeholder="0"]', value: "19191"}
-  - fill: {selector: 'input[placeholder="db.internal"]', value: "127.0.0.1"}
-  - fill: {selector: 'input[placeholder="5432"]', value: "5432"}
-  - click: '[data-testid="tunnel-editor-save"]'
-  - wait: 1
-  - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-tunnel-1\""
-  - click: "[data-testid=\"tunnel-new\"]"
-  - wait_for: "[data-testid=\"tunnel-editor\"]"
-  - fill: {selector: "input[placeholder=\"e.g. postgres-replica\"]", value: qa-tunnel-2}
-  - fill: {selector: "input[placeholder=\"ssh.example.com\"]", value: "${cfg.ssh.host}"}
-  - fill: {selector: "input[placeholder=\"user\"]", value: "${cfg.ssh.user}"}
-  - fill: {selector: "input[placeholder=\"22\"]", value: "${cfg.ssh.port}"}
-  - fill: {selector: 'input[placeholder="0"]', value: "19192"}
-  - fill: {selector: 'input[placeholder="db.internal"]', value: "127.0.0.1"}
-  - fill: {selector: 'input[placeholder="5432"]', value: "5432"}
-  - click: '[data-testid="tunnel-editor-save"]'
-  - wait: 1
-  - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-tunnel-2\""
-  - click: '[data-testid="tunnel-manager"] tr:has-text("qa-tunnel-1") button[title*="Move down" i]'
-  - wait: 1
-  - seed_dialog: {confirm: true}
-  - wait: 1
-  - seed_dialog: {confirm: true}
-  - screenshot: 047-tunnel-reorder.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="app-main-menu"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-tunneling"]'
+- wait_for: '[data-testid="tunnel-manager"]'
+- click: '[data-testid="tunnel-new"]'
+- wait_for: '[data-testid="tunnel-editor"]'
+- fill:
+    selector: input[placeholder="e.g. postgres-replica"]
+    value: qa-tunnel-1
+- fill:
+    selector: input[placeholder="ssh.example.com"]
+    value: ${cfg.ssh.host}
+- fill:
+    selector: input[placeholder="user"]
+    value: ${cfg.ssh.user}
+- fill:
+    selector: input[placeholder="22"]
+    value: ${cfg.ssh.port}
+- fill:
+    selector: input[placeholder="0"]
+    value: '19191'
+- fill:
+    selector: input[placeholder="db.internal"]
+    value: 127.0.0.1
+- fill:
+    selector: input[placeholder="5432"]
+    value: '5432'
+- click: '[data-testid="tunnel-editor-save"]'
+- wait: 1
+- wait_for: '[data-testid="tunnel-manager"] >> text="qa-tunnel-1"'
+- click: '[data-testid="tunnel-new"]'
+- wait_for: '[data-testid="tunnel-editor"]'
+- fill:
+    selector: input[placeholder="e.g. postgres-replica"]
+    value: qa-tunnel-2
+- fill:
+    selector: input[placeholder="ssh.example.com"]
+    value: ${cfg.ssh.host}
+- fill:
+    selector: input[placeholder="user"]
+    value: ${cfg.ssh.user}
+- fill:
+    selector: input[placeholder="22"]
+    value: ${cfg.ssh.port}
+- fill:
+    selector: input[placeholder="0"]
+    value: '19192'
+- fill:
+    selector: input[placeholder="db.internal"]
+    value: 127.0.0.1
+- fill:
+    selector: input[placeholder="5432"]
+    value: '5432'
+- click: '[data-testid="tunnel-editor-save"]'
+- wait: 1
+- wait_for: '[data-testid="tunnel-manager"] >> text="qa-tunnel-2"'
+- assert_items:
+    selector: '[data-testid="tunnel-row"] td:nth-child(2) > div:first-child'
+    equals:
+    - qa-tunnel-1
+    - qa-tunnel-2
+- click: '[data-testid="tunnel-manager"] tr:has-text("qa-tunnel-1") button[title*="Move down" i]'
+- assert_items:
+    selector: '[data-testid="tunnel-row"] td:nth-child(2) > div:first-child'
+    equals:
+    - qa-tunnel-2
+    - qa-tunnel-1
+- assert_disabled: '[data-testid="tunnel-row"]:last-child [data-testid="tunnel-row-move-down"]'
+- assert_disabled: '[data-testid="tunnel-row"]:first-child [data-testid="tunnel-row-move-up"]'
+- wait: 1
+- seed_dialog:
+    confirm: true
+- wait: 1
+- seed_dialog:
+    confirm: true
+- screenshot: 047-tunnel-reorder.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 下移第一条隧道精确交换两行，并禁止越界移动
+    actions:
+    - 7
+    - 16
+    - 19
+    - 28
+    - 32
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"tunnel-manager\"] >> text=\"qa-tunnel-1\""}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"tunnel-manager\"] >> text=\"qa-tunnel-2\""}'
+    - step: 31
+      expectation: '{"assert_items": {"selector": "[data-testid=\"tunnel-row\"] td:nth-child(2) > div:first-child",
+        "equals": ["qa-tunnel-1", "qa-tunnel-2"]}}'
+    - step: 33
+      expectation: '{"assert_items": {"selector": "[data-testid=\"tunnel-row\"] td:nth-child(2) > div:first-child",
+        "equals": ["qa-tunnel-2", "qa-tunnel-1"]}}'
+    - step: 34
+      expectation: '{"assert_disabled": "[data-testid=\"tunnel-row\"]:last-child [data-testid=\"tunnel-row-move-down\"]"}'
+    - step: 35
+      expectation: '{"assert_disabled": "[data-testid=\"tunnel-row\"]:first-child [data-testid=\"tunnel-row-move-up\"]"}'
+    results:
+    - 33
+    - 34
+    - 35
+  visual:
+  - check: 检查截图中表格列、行名、按钮不重叠/截断，排序或操作反馈可见。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图记录评审。
+  native:
+  - check: 本用例只验证浏览器渲染交互；系统级输入、桌面窗口与真实持久化需独立 native 验证。
+    method: external
+    reason: 按实际执行模式与指定边界解释证据。

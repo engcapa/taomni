@@ -1,91 +1,177 @@
 id: TC-IDE-CHROME-02
-title: "Editor banner lifecycle, keyboard focus, and setup routing"
-description: |
-  ED-CHROME-002 browser slice. Creates a C# buffer in the browser VFS so the
+title: Editor banner lifecycle, keyboard focus, and setup routing
+description: 'ED-CHROME-002 browser slice. Creates a C# buffer in the browser VFS so the
+
   production LSP boundary returns its typed unavailable state. Verifies the
+
   file-scoped banner survives switching away and back, exposes accessible
+
   actions and dismissal, keeps its action focus in the banner, and routes
+
   Configure to the single Language Servers settings owner. Browser VFS does
+
   not prove native filesystem or provider behavior; action failure recovery is
+
   covered by the focused EditorBanner unit test.
-covers: [F25.5]
-tags: [code-workspace, ide-chrome, editor-banner, unavailable-contract, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-chrome
+- editor-banner
+- unavailable-contract
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 180
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-
-  # Add the browser-VFS preview folder (/preview prefilled in the prompt).
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-
-  # Create a real VFS C# file; opening it drives the production LSP session.
-  - click: '[data-testid="code-workspace-tree-new-file"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - fill:
-      selector: '[data-testid="text-input-dialog-input"]'
-      value: Program.cs
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="Program.cs"]'
-  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
-
-  # A1: an unavailable condition is file-scoped and is restored when the file
-  # becomes active again; the banner is above the editor, not a toast.
-  - wait_for: '[data-testid="code-workspace-editor-banners"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor-banners"]'
-      contains: "Language Server Degraded"
-      timeout_sec: 15
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor-banners"]'
-      contains: "C# language server is not available in browser preview"
-      timeout_sec: 15
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
-  - assert_not_visible: '[data-testid="code-workspace-editor-banners"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="Program.cs"]'
-  - wait_for: '[data-testid="code-workspace-editor-banners"]'
-  - assert_visible: '[data-testid="code-workspace-editor-banners"]'
-
-  # A3: the real browser focus chain reaches both banner controls by keyboard,
-  # and the banner's block ends before the editor surface starts.
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-editor-banners"]'
-      name: role
-      equals: region
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-editor-banners"]'
-      name: aria-live
-      equals: polite
-  - assert_visible: '[data-testid="banner-action-open-settings"]'
-  - assert_visible: '[data-testid^="banner-dismiss-"]'
-  - press:
-      key: Tab
-      selector: '[data-testid="banner-action-open-settings"]'
-  - eval_readonly:
-      expression: >-
-        document.activeElement?.getAttribute('data-testid')?.startsWith('banner-dismiss-')
-      expect_truthy: true
-  - press:
-      key: Shift+Tab
-      selector: '[data-testid^="banner-dismiss-"]'
-  - eval_readonly:
-      expression: >-
-        document.activeElement?.getAttribute('data-testid') === 'banner-action-open-settings'
-      expect_truthy: true
-
-  # A2: Configure reaches the one settings owner and focuses the C# preset.
-  - click: '[data-testid="banner-action-open-settings"]'
-  - wait_for: '[data-testid="language-servers-settings"]'
-  - wait_for: '[data-testid="language-server-row-csharp"]'
-  - assert_attribute:
-      selector: '[data-testid="language-server-row-csharp"]'
-      name: data-focused
-      equals: "true"
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: Program.cs
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Program.cs"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="code-workspace-editor-banners"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-banners"]'
+    contains: Language Server Degraded
+    timeout_sec: 15
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-banners"]'
+    contains: C# language server is not available in browser preview
+    timeout_sec: 15
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+- assert_not_visible: '[data-testid="code-workspace-editor-banners"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Program.cs"]'
+- wait_for: '[data-testid="code-workspace-editor-banners"]'
+- assert_visible: '[data-testid="code-workspace-editor-banners"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor-banners"]'
+    name: role
+    equals: region
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor-banners"]'
+    name: aria-live
+    equals: polite
+- assert_visible: '[data-testid="banner-action-open-settings"]'
+- assert_visible: '[data-testid^="banner-dismiss-"]'
+- press:
+    key: Tab
+    selector: '[data-testid="banner-action-open-settings"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid')?.startsWith('banner-dismiss-')
+    expect_truthy: true
+- press:
+    key: Shift+Tab
+    selector: '[data-testid^="banner-dismiss-"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'banner-action-open-settings'
+    expect_truthy: true
+- click: '[data-testid="banner-action-open-settings"]'
+- wait_for: '[data-testid="language-servers-settings"]'
+- wait_for: '[data-testid="language-server-row-csharp"]'
+- assert_attribute:
+    selector: '[data-testid="language-server-row-csharp"]'
+    name: data-focused
+    equals: 'true'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Editor banner lifecycle, keyboard focus, and setup routing：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 13
+    - 14
+    - 20
+    - 22
+    - 29
+    - 31
+    - 33
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"Program.cs\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-banners\"]"}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-banners\"]", "contains":
+        "Language Server Degraded", "timeout_sec": 15}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-banners\"]", "contains":
+        "C# language server is not available in browser preview", "timeout_sec": 15}}'
+    - step: 21
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-banners\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-banners\"]"}'
+    - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-banners\"]"}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-banners\"]", "name":
+        "role", "equals": "region"}}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-banners\"]", "name":
+        "aria-live", "equals": "polite"}}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"banner-action-open-settings\"]"}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid^=\"banner-dismiss-\"]"}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'')?.startsWith(''banner-dismiss-'')",
+        "expect_truthy": true}}'
+    - step: 32
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'') ===
+        ''banner-action-open-settings''", "expect_truthy": true}}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"language-servers-settings\"]"}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"language-server-row-csharp\"]"}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"language-server-row-csharp\"]", "name": "data-focused",
+        "equals": "true"}}'
+    results:
+    - 34
+    - 35
+    - 36
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

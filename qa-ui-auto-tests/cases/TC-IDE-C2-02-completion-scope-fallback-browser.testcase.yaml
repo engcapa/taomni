@@ -1,38 +1,96 @@
 id: TC-IDE-C2-02-completion-scope-fallback-browser
-title: "Explicit completion names missing project scope in browser"
-description: |
-  Browser gate case (ED-COMP-004 A3). In the stub preview no ready project
+title: Explicit completion names missing project scope in browser
+description: 'Browser gate case (ED-COMP-004 A3). In the stub preview no ready project
+
   snapshot can exist, so an explicitly invoked completion (Ctrl+Space) must
+
   record scope-facts-missing and name the missing prerequisite once via the
+
   status bar instead of guessing module scope. Typing-triggered popups stay
+
   silent by contract (covered by unit tests). The ready-scope path is proven
+
   by unit tests and the native provider gate.
-covers: [F25.5]
-tags: [code-workspace, ide-c2, completion, browser-gate, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c2
+- completion
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 180
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+Space
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "Completion project scope unavailable"
-      timeout_sec: 20
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "using document scope"
-      timeout_sec: 10
-  - screenshot: tc-ide-c2-02-scope-fallback.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Space
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Completion project scope unavailable
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: using document scope
+    timeout_sec: 10
+- screenshot: tc-ide-c2-02-scope-fallback.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Explicit completion names missing project scope in browser：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 13
+    - 14
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Completion
+        project scope unavailable", "timeout_sec": 20}}'
+    - step: 16
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "using document
+        scope", "timeout_sec": 10}}'
+    results:
+    - 15
+    - 16
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

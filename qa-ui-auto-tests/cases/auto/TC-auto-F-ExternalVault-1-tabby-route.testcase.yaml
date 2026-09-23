@@ -1,29 +1,79 @@
 id: TC-auto-F-ExternalVault-1
 title: Tabby import menu route is reachable; vault unlock dialog scaffold
-description: |
-  F-ExternalVault-1: the dialog is only mounted in flight, after a Tabby
+description: 'F-ExternalVault-1: the dialog is only mounted in flight, after a Tabby
+
   config file with an encrypted vault block is parsed. Driving the actual
-  unlock requires an OS file picker we can't easily synthesise from
+
+  unlock requires an OS file picker we can''t easily synthesise from
+
   Playwright in browser mode. This case anchors the menu route only — the
+
   dialog testids stay optional, and a follow-up that wires `upload_file`
+
   through a transient input shim can flesh it out.
-covers: [F-ExternalVault-1]
-tags: [auto-generated, sessions, import, vault, p2, needs-review]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-ExternalVault-1
+tags:
+- auto-generated
+- sessions
+- import
+- vault
+- p2
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="session-tree"]'
-  - right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
-  - wait_for: '[data-testid="context-menu"]'
-  - hover: '[data-testid="context-menu"] >> text="Import sessions from third-party programs"'
-  - wait: 1
-  - assert_visible: '[data-testid="context-menu"] >> text="Import Tabby sessions"'
-  - hover: '[data-testid="context-menu"] >> text="Import Tabby sessions"'
-  - wait: 1
-  # Submenu has two leaves — config.yaml file + scanned local config.
-  - assert_visible: '[data-testid="context-menu"] >> text="From config.yaml"'
-  - assert_visible: '[data-testid="context-menu"] >> text="From local Tabby config"'
-  - press: Escape
-  - screenshot: external-vault-route.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="session-tree"]'
+- right_click:
+    selector: '[data-testid="session-tree"]'
+    position:
+      x: 16
+      y: 16
+- wait_for: '[data-testid="context-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Import sessions from third-party programs"'
+- wait: 1
+- assert_visible: '[data-testid="context-menu"] >> text="Import Tabby sessions"'
+- hover: '[data-testid="context-menu"] >> text="Import Tabby sessions"'
+- wait: 1
+- assert_visible: '[data-testid="context-menu"] >> text="From config.yaml"'
+- assert_visible: '[data-testid="context-menu"] >> text="From local Tabby config"'
+- press: Escape
+- screenshot: external-vault-route.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tabby import menu route is reachable; vault unlock dialog scaffold：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 8
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Import Tabby sessions\""}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"From config.yaml\""}'
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"From local Tabby config\""}'
+    results:
+    - 10
+    - 11
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

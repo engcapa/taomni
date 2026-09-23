@@ -17,6 +17,7 @@ import {
   sftpRemove,
   sftpRename,
   sftpResumeTransfer,
+  sftpStat,
   sftpUpload,
   sftpUploadBytes,
   sftpUploadDir,
@@ -370,6 +371,16 @@ export function useSftpController(sessionId: string) {
       try {
         await sftpChmod(sessionId, path, mode, side);
         await refreshPane(sessionId, side);
+        if (side === "remote") {
+          const actualMode = (await sftpStat(sessionId, path, side)).mode & 0o777;
+          const requestedMode = mode & 0o777;
+          if (actualMode !== requestedMode) {
+            throw new Error(
+              `remote server ignored requested permissions (expected ${requestedMode.toString(8)}, got ${actualMode.toString(8)})`,
+            );
+          }
+        }
+        setStatus(`Permissions updated: ${path}`);
       } catch (err) {
         setStatus(`chmod failed: ${err instanceof Error ? err.message : err}`);
       }

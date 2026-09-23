@@ -844,6 +844,18 @@ controls:
     selector: 'text="Error/Warning/Success keywords"'
     kind: interactive
     optional: true
+  - id: keyword-error
+    selector: '.terminal-keyword-error'
+    kind: display
+  - id: keyword-warning
+    selector: '.terminal-keyword-warning'
+    kind: display
+  - id: keyword-success
+    selector: '.terminal-keyword-success'
+    kind: display
+  - id: keyword-hit
+    selector: '.terminal-keyword-hit'
+    kind: display
 -->
 
 - Default / Error-Warning-Success keywords / Unix shell / Cisco / Perl / SQL
@@ -1230,6 +1242,9 @@ controls:
     selector: 'button[aria-label="Cycle application theme"]'
     kind: interactive
     optional: true       # AppThemeIconButton — currently unused outside the title-bar tray
+  - id: root-theme-attr
+    selector: 'html'
+    kind: display
 -->
 
 - `localStorage` key `taomni.appTheme.v1`
@@ -1791,24 +1806,38 @@ controls:
   - id: col-header-name
     selector: '[data-testid="col-header-name"]'
     kind: interactive       # click to sort
+    aliases:
+      - '[data-testid="sftp-remote-pane"] [data-testid="col-header-name"]'
   - id: col-header-size
     selector: '[data-testid="col-header-size"]'
     kind: interactive
+    aliases:
+      - '[data-testid="sftp-remote-pane"] [data-testid="col-header-size"]'
   - id: col-header-type
     selector: '[data-testid="col-header-type"]'
     kind: interactive
+    aliases:
+      - '[data-testid="sftp-remote-pane"] [data-testid="col-header-type"]'
   - id: col-header-modified
     selector: '[data-testid="col-header-modified"]'
     kind: interactive
+    aliases:
+      - '[data-testid="sftp-remote-pane"] [data-testid="col-header-modified"]'
   - id: col-resize-name
     selector: '[data-testid="col-resize-name"]'
     kind: interactive       # drag handle
+    aliases:
+      - '[data-testid="sftp-remote-pane"] [data-testid="col-resize-name"]'
   - id: col-resize-size
     selector: '[data-testid="col-resize-size"]'
     kind: interactive
+    aliases:
+      - '[data-testid="sftp-remote-pane"] [data-testid="col-resize-size"]'
   - id: col-resize-modified
     selector: '[data-testid="col-resize-modified"]'
     kind: interactive
+    aliases:
+      - '[data-testid="sftp-remote-pane"] [data-testid="col-resize-modified"]'
   - id: breadcrumb-drives-root
     selector: '[data-testid="breadcrumb-drives-root"]'
     kind: interactive
@@ -1915,6 +1944,12 @@ controls:
     kind: interactive
     aliases:
       - 'input[data-testid="sftp-remote-path"]'  # transient edit-mode input
+  - id: local-path-edit
+    selector: '[data-testid="sftp-local-path-edit"]'
+    kind: interactive
+  - id: remote-path-edit
+    selector: '[data-testid="sftp-remote-path-edit"]'
+    kind: interactive
   # toolbar — local side
   - id: local-back
     selector: '[data-testid="sftp-local-back"]'
@@ -2066,6 +2101,9 @@ controls:
   - id: chmod-dialog
     selector: '[aria-label="Permissions"]'
     kind: display
+  - id: chmod-octal
+    selector: '#chmod-octal'
+    kind: interactive
   - id: chmod-apply
     selector: 'role=button[name="Apply"]'
     kind: interactive
@@ -6027,6 +6065,10 @@ controls:
     selector: '.cm-tooltip-autocomplete'
     kind: display
     optional: true       # CodeMirror-owned completion list while suggestions are active
+  - id: editor-completion-string-candidate
+    selector: "xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel') and normalize-space(.)='String - java.lang']"
+    kind: interactive
+    optional: true       # Java provider candidate; position varies with provider ranking
   - id: editor-lightbulb               # gutter quick-fix button for the diagnostic line
     selector: '[data-testid="code-workspace-lightbulb"]'
     kind: interactive

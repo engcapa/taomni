@@ -31,7 +31,8 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 |------|------|-------|
 | `click` | selector string **or** `{selector, modifiers?, position?, force?}` | `modifiers` ⊆ `Alt/Control/Meta/Shift`. |
 | `dblclick` | same as click | |
-| `right_click` | same as click | Native supports selector only (W3C right button); rich click options are browser-only and fail explicitly. Use before `assert_menu_items`; `click_menu` is browser-only. |
+| `middle_click` | selector string | Browser/native: real middle-button input; verifies tab auxiliary-click routing when paired with a close result assertion. |
+| `right_click` | same as click | Native supports selector only (W3C right button); rich click options are browser-only and fail explicitly. Use before `assert_menu_items`; `click_menu` supports an exact visible label in native mode. |
 | `hover` | selector | |
 | `drag_to` | `{from, to}` | Both selectors. |
 | `native_click` | `{selector}` | Native Linux/X11 only. Activates the exact test executable window and sends W3C pointer actions through its packaged WebKitGTK session; testcase assertions own the postcondition. |
@@ -47,7 +48,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `fill` | `{selector, value}` | Replaces field content. |
 | `type` | string or `{selector, text}` | Types into the current focus, or focuses `selector` immediately before typing. Prefer `fill` for ordinary inputs. |
 | `send_keys` | string or `{selector, text}` | Same as `type`. |
-| `terminal_input` | `{selector, text, submit?}` | Dispatches standards-based text input to xterm's helper textarea, then optionally submits with CR. This exercises xterm `onData`, the product input path, and the real PTY while avoiding hidden-textarea key synthesis differences in Windows Chromium/WebView2. It is renderer/WebView automation, not physical OS keyboard evidence. Wait for `data-terminal-ready="true"` first. |
+| `terminal_input` | `{selector, text, submit?}` | Dispatches standards-based text input to xterm's helper textarea, then optionally submits with a separate Enter key. A text-free Shift key cycle first resets xterm’s stale keypress suppression state. This exercises xterm `onData`, the product input path, and the real PTY while avoiding hidden-textarea key synthesis differences in Windows Chromium/WebView2. It is renderer/WebView automation, not physical OS keyboard evidence. Wait for `data-terminal-ready="true"` first. |
 | `compose_text` | `{selector, text, during_key?}` | Browser-only composition lifecycle; optionally dispatches one composing key before committing text. Never substitutes for native IME evidence. |
 | `native_keys` | `{selector, keys, transport?, focus_target?, focus_prechecked?, ready_selector?, ready_timeout_sec?, ready_stable_sec?, require_keydown_prevented?}` | Requires the selector to own focus. `focus_target: true` first focuses it through WebDriver and then verifies ownership; use this when a platform click does not reliably transfer DOM focus. Default `transport: x11` injects XTest keys through Linux/X11 and identifies the Taomni window. `transport: webdriver` uses W3C actions in the platform WebView (Windows/Linux), not OS-level input. `ready_selector` is polled after input setup and immediately before delivery; `ready_stable_sec` additionally requires the same element and markup to remain stable. `require_keydown_prevented` observes each keydown after event dispatch and proves it was consumed. `focus_prechecked: true` is limited to a testcase that asserted focus immediately before a driver fault; it omits WebDriver probes/event collection and records that limitation. `focus_target` and `focus_prechecked` are mutually exclusive. Testcase assertions own the postcondition. |
 | `native_ime_keys` | `{selector, expected_engine, keys}` | Native Linux/X11 only. Injects physical XTest keys through the named configured fcitx5 engine and records an observation artifact; testcase assertions must verify the committed result. |
@@ -63,6 +64,8 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_visible` | selector | Up to 15s wait. |
 | `assert_not_visible` | selector | Up to 15s wait for hidden. |
 | `assert_text` | `{selector, contains, timeout_sec?}` | Polls `text_content` and `data-terminal-text` (xterm canvas fallback). |
+| `assert_text_equals` | `{selector, equals, timeout_sec?}` | Browser/native: requires exactly one DOM match and exact `textContent`, preserving whitespace. No substring or terminal-buffer fallback. |
+| `assert_items` | `{selector, equals: [string, ...], attribute?, timeout_sec?}` | Browser/native: exact ordered list of all matching DOM textContent values (or named attributes). Checks missing, extra, duplicate, reordered and changed items. For editor contents select `.cm-line` and include empty trailing lines; for virtualized documents use disk assertions for full content. |
 | `assert_pattern` | `{selector, regex, timeout_sec?}` | Browser and native; polls Python regex against element text (terminal buffer fallback for `terminal-pane`). Use anchored output assertions to distinguish shell output from command echo, and await shell readiness before typing. |
 | `assert_count` | `{selector, min?/max?/equal?}` | Browser/native. Pick at least one bound; checks current count, including hidden matches. Wait for readiness separately. |
 | `assert_url` | URL substring | |

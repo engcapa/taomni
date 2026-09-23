@@ -6,6 +6,29 @@ from qa_ui_auto.steps import StepError
 
 
 class NativeAssertionsTest(TestCase):
+    def test_checkbox_requires_real_input_and_observed_transition(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = None
+        with self.assertRaisesRegex(StepError, "missing checkbox"):
+            run_native_step(ctx, "set_check", {"selector": "#check", "checked": False})
+        ctx.session.click.assert_not_called()
+        ctx.session.execute.side_effect = [False, False]
+        with self.assertRaisesRegex(StepError, "did not become"):
+            run_native_step(ctx, "set_check", {"selector": "#check", "checked": True})
+        ctx.session.execute.side_effect = [False, True]
+        run_native_step(ctx, "set_check", {"selector": "#check", "checked": True})
+
+    def test_menu_click_uses_webdriver_and_rejects_ambiguous_label(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = None
+        with self.assertRaisesRegex(StepError, "one visible exact"):
+            run_native_step(ctx, "click_menu", "Local History")
+        ctx.session.request.assert_not_called()
+        ctx.session.execute.return_value = {"element-6066-11e4-a52e-4f735466cecf": "menu-leaf"}
+        ctx.session.element_path.return_value = "/session/test/element/menu-leaf/click"
+        run_native_step(ctx, "click_menu", "Local History")
+        ctx.session.request.assert_called_once_with("POST", "/session/test/element/menu-leaf/click", {})
+
     def test_count_checks_all_bounds_and_requires_a_bound(self):
         ctx = Mock()
         ctx.session.count.return_value = 2
@@ -65,7 +88,14 @@ class NativeAssertionsTest(TestCase):
         script = ctx.session.execute.call_args.args[0]
         self.assertIn("new InputEvent", script)
         self.assertIn("echo ready", script)
+        self.assertEqual([c.args[0] for c in ctx.session.press_combo.call_args_list], ["Shift", "Enter"])
         self.assertEqual(result, "sent 10 chars to xterm input and submitted")
+
+    def test_terminal_input_without_submit_does_not_press_enter(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = {"found": True, "focused": True}
+        run_native_step(ctx, "terminal_input", {"selector": ".xterm-helper-textarea", "text": "draft"})
+        ctx.session.press_combo.assert_called_once_with("Shift")
 
     def test_terminal_input_requires_a_real_target(self):
         ctx = Mock()
@@ -75,3 +105,4 @@ class NativeAssertionsTest(TestCase):
                 "selector": ".xterm-helper-textarea",
                 "text": "echo ready",
             })
+        self.assertNotIn("Enter", [c.args[0] for c in ctx.session.press_combo.call_args_list])

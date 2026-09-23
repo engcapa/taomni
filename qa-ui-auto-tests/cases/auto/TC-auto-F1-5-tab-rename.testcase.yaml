@@ -1,34 +1,85 @@
 id: TC-auto-F1-5-tab-rename
 title: Tab rename via double-click and context menu
-covers: [F1.5]
-tags: [auto-generated, smoke, needs-review, tabs]
-modes: [browser]
-fixtures: [reset_db]
+covers:
+- F1.5
+tags:
+- auto-generated
+- smoke
+- needs-review
+- tabs
+modes:
+- browser
+fixtures:
+- reset_db
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: "[data-testid=\"tab-bar\"]"
-  # Open a local terminal tab
-  - click: "[data-testid=\"new-local-terminal\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 0.5
-  - assert_count: {selector: '[data-testid="tab-item"]', min: 2}
-  # Verify tab-title elements exist
-  - assert_visible: '[data-testid="tab-title"]'
-  # Double-click the terminal tab title (nth=1, index 0 is Welcome which is not renameable)
-  - dblclick: '[data-testid="tab-title"] >> nth=1'
-  - wait_for: '[data-testid="tab-title-input"]'
-  # Type a new name and confirm with Enter
-  - fill: {selector: '[data-testid="tab-title-input"]', value: "My Custom Tab"}
-  - press: {key: "Enter", selector: '[data-testid="tab-title-input"]'}
-  - wait: 0.3
-  # Verify the rename took effect
-  - assert_visible: '[data-testid="tab-item"][data-tab-title="My Custom Tab"]'
-  # Now test Escape cancels rename: double-click again
-  - dblclick: '[data-testid="tab-title"] >> nth=1'
-  - wait_for: '[data-testid="tab-title-input"]'
-  - fill: {selector: '[data-testid="tab-title-input"]', value: "Should Not Save"}
-  - press: {key: "Escape", selector: '[data-testid="tab-title-input"]'}
-  - wait: 0.3
-  # Title should still be the previously saved name
-  - assert_visible: '[data-testid="tab-item"][data-tab-title="My Custom Tab"]'
-  - screenshot: auto-F1-5-tab-rename.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="tab-bar"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 0.5
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    min: 2
+- assert_visible: '[data-testid="tab-title"]'
+- dblclick: '[data-testid="tab-title"] >> nth=1'
+- wait_for: '[data-testid="tab-title-input"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: My Custom Tab
+- press:
+    key: Enter
+    selector: '[data-testid="tab-title-input"]'
+- wait: 0.3
+- assert_visible: '[data-testid="tab-item"][data-tab-title="My Custom Tab"]'
+- dblclick: '[data-testid="tab-title"] >> nth=1'
+- wait_for: '[data-testid="tab-title-input"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: Should Not Save
+- press:
+    key: Escape
+    selector: '[data-testid="tab-title-input"]'
+- wait: 0.3
+- assert_visible: '[data-testid="tab-item"][data-tab-title="My Custom Tab"]'
+- screenshot: auto-F1-5-tab-rename.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tab rename via double-click and context menu：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 8
+    - 10
+    - 11
+    - 14
+    - 16
+    - 17
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"tab-bar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 6
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 2}}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"tab-title\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"tab-title-input\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"tab-item\"][data-tab-title=\"My Custom Tab\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"tab-title-input\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"tab-item\"][data-tab-title=\"My Custom Tab\"]"}'
+    results:
+    - 19
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

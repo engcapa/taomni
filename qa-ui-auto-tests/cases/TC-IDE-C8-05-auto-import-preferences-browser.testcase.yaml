@@ -1,53 +1,124 @@
 id: TC-IDE-C8-05-auto-import-preferences-browser
-title: "Auto Import Settings dialog manages independent on-the-fly and paste preferences in browser"
-description: |
-  Browser gate case (ED-IMPORT-001). Opens the code workspace, invokes Auto Import Settings
+title: Auto Import Settings dialog manages independent on-the-fly and paste preferences in browser
+description: 'Browser gate case (ED-IMPORT-001). Opens the code workspace, invokes Auto Import Settings
+
   from Search Everywhere Actions, verifies presence of independent on-the-fly and paste
+
   preference controls, toggles preferences, saves, and closes the modal cleanly.
-covers: [F25.5]
-tags: [code-workspace, ide-c8, auto-import, preferences, browser-gate, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c8
+- auto-import
+- preferences
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 180
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - click: '[data-testid="code-workspace-tab"]'
-  - wait: 0.3
-  - press: Control+Shift+N
-  - wait_for:
-      selector: '[data-testid="code-workspace-search-everywhere"]'
-      timeout_sec: 30
-  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
-  - type: Auto Import Settings
-  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Auto Import Settings'
-  - wait_for:
-      selector: '[data-testid="auto-import-settings-dialog"]'
-      timeout_sec: 20
-  - wait_for: '[data-testid="auto-import-on-the-fly-checkbox"]'
-  - wait_for: '[data-testid="auto-import-paste-mode-select"]'
-  - click: '[data-testid="auto-import-on-the-fly-checkbox"]'
-  - click: '[data-testid="auto-import-optimize-on-the-fly-checkbox"]'
-  - select_option:
-      selector: '[data-testid="auto-import-paste-mode-select"]'
-      value: all
-  - assert_attribute:
-      selector: '[data-testid="auto-import-paste-mode-select"]'
-      name: value
-      equals: all
-  - click: '[data-testid="auto-import-reset-button"]'
-  - eval_readonly:
-      expression: '!document.querySelector("[data-testid" + String.fromCharCode(61) + "\"auto-import-optimize-on-the-fly-checkbox\"]")?.checked && document.querySelector("[data-testid" + String.fromCharCode(61) + "\"auto-import-paste-mode-select\"]")?.value === "ask"'
-      expect_truthy: true
-  - click: '[data-testid="auto-import-save-button"]'
-  - assert_text:
-      selector: '[data-testid="auto-import-settings-dialog"]'
-      contains: "Settings saved!"
-  - click: '[data-testid="auto-import-close-button"]'
-  - wait: 0.2
-  - screenshot: tc-ide-c8-05-auto-import-settings.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tab"]'
+- wait: 0.3
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Auto Import Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Auto Import Settings'
+- wait_for:
+    selector: '[data-testid="auto-import-settings-dialog"]'
+    timeout_sec: 20
+- wait_for: '[data-testid="auto-import-on-the-fly-checkbox"]'
+- wait_for: '[data-testid="auto-import-paste-mode-select"]'
+- click: '[data-testid="auto-import-on-the-fly-checkbox"]'
+- click: '[data-testid="auto-import-optimize-on-the-fly-checkbox"]'
+- select_option:
+    selector: '[data-testid="auto-import-paste-mode-select"]'
+    value: all
+- assert_attribute:
+    selector: '[data-testid="auto-import-paste-mode-select"]'
+    name: value
+    equals: all
+- click: '[data-testid="auto-import-reset-button"]'
+- eval_readonly:
+    expression: '!document.querySelector("[data-testid" + String.fromCharCode(61) + "\"auto-import-optimize-on-the-fly-checkbox\"]")?.checked
+      && document.querySelector("[data-testid" + String.fromCharCode(61) + "\"auto-import-paste-mode-select\"]")?.value
+      === "ask"'
+    expect_truthy: true
+- click: '[data-testid="auto-import-save-button"]'
+- assert_text:
+    selector: '[data-testid="auto-import-settings-dialog"]'
+    contains: Settings saved!
+- click: '[data-testid="auto-import-close-button"]'
+- wait: 0.2
+- screenshot: tc-ide-c8-05-auto-import-settings.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Auto Import Settings dialog manages independent on-the-fly and paste preferences in browser：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 18
+    - 19
+    - 20
+    - 22
+    - 24
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 10
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
+        30}}'
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"auto-import-settings-dialog\"]", "timeout_sec": 20}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"auto-import-on-the-fly-checkbox\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"auto-import-paste-mode-select\"]"}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"auto-import-paste-mode-select\"]", "name":
+        "value", "equals": "all"}}'
+    - step: 23
+      expectation: '{"eval_readonly": {"expression": "!document.querySelector(\"[data-testid\" + String.fromCharCode(61)
+        + \"\\\"auto-import-optimize-on-the-fly-checkbox\\\"]\")?.checked && document.querySelector(\"[data-testid\"
+        + String.fromCharCode(61) + \"\\\"auto-import-paste-mode-select\\\"]\")?.value === \"ask\"", "expect_truthy":
+        true}}'
+    - step: 25
+      expectation: '{"assert_text": {"selector": "[data-testid=\"auto-import-settings-dialog\"]", "contains": "Settings
+        saved!"}}'
+    results:
+    - 25
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

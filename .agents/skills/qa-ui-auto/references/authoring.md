@@ -188,3 +188,28 @@ together; check/implement native support where appropriate. Validate the argumen
 contract and execute a representative case. Evidence rollup, release-plan and
 artifact scripts remain available when their existing contracts are needed;
 routine case maintenance does not require them.
+
+## Executable behavior contracts
+
+Use `verification` to map requirements to 1-based YAML step indices. Each requirement
+has `id`, `requirement`, `actions`, `checkpoints: [{step, expectation}]`, and `results`
+(the decisive checkpoint indices). Set `review: pending` until semantic review
+confirms the actions and assertions establish the stated requirement; generated
+mappings do not constitute that review. Update indices when inserting steps.
+
+Declare `visual` and `native` checklists separately, each entry with `check`,
+`method: automated|manual|external|not-applicable`, and a concrete `reason`.
+Native/manual boundaries must identify their checks or remaining gap. A screenshot
+is an artifact, not a visual verdict. Browser assertions cannot certify native effects.
+
+`python -m qa_ui_auto contracts --gate` requires reviewed, structurally valid
+contracts for every selected case. The gate detects missing/out-of-range references,
+non-asserting results, and results preceding actions. It does not infer complete
+requirements or certify assertion strength. The run report maps each requirement
+to actual step pass/fail/unrun evidence; dry-runs never produce passing checkpoints.
+
+Use `assert_text_equals` / `assert_items` for complete deterministic content,
+ordered rows and unchanged editor text. A substring assertion is appropriate for
+one necessary message within variable output, but not a claim that the entire
+content is unchanged. Terminal command echo cannot prove execution: assert a
+separate anchored output line, and check repetition counts when proving replay.

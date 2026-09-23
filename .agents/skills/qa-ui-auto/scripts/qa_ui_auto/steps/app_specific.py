@@ -76,7 +76,7 @@ def step_set_remote_path(ctx: StepContext, args: Any) -> None:
         return
     page = ctx.page
     inp = page.locator('[data-testid="sftp-remote-path"]').first  # type: ignore[attr-defined]
-    inp.click()
+    page.locator('[data-testid="sftp-remote-path-edit"]').first.click()  # type: ignore[attr-defined]
     inp.fill(path)
     inp.press("Enter")
 
@@ -236,23 +236,28 @@ def step_assert_attribute(ctx: StepContext, args: Any) -> None:
     Args: {selector, name, equals}.
     """
     if not isinstance(args, dict):
-        raise StepError("assert_attribute: expected {selector, name, equals}")
+        raise StepError("assert_attribute: expected {selector, name, equals|matches}")
     selector = args["selector"]
     name = args["name"]
-    expected = args["equals"]
+    expected = args.get("equals")
+    pattern = args.get("matches")
+    if expected is None and pattern is None:
+        raise StepError("assert_attribute: expected equals or matches")
     if ctx.dry_run:
         return
     loc = ctx.page.locator(selector).first  # type: ignore[attr-defined]
     actual = loc.get_attribute(name)
-    if actual is None and name == "value":
+    if name == "value":
         try:
             actual = loc.input_value()
         except Exception:
             pass
-    if str(actual) != str(expected):
-        raise StepError(
-            f"{selector}[{name}]={actual!r} != {expected!r}"
-        )
+    if pattern is not None:
+        import re
+        if re.fullmatch(str(pattern), str(actual)) is None:
+            raise StepError(f"{selector}[{name}]={actual!r} does not match {pattern!r}")
+    elif str(actual) != str(expected):
+        raise StepError(f"{selector}[{name}]={actual!r} != {expected!r}")
 
 
 @verb("assert_disabled")

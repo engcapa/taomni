@@ -1,37 +1,100 @@
 id: TC-NOTES-004
 title: Notes floating panel and theme
-description: |
-  Verifies notes theming + the singleton floating panel (F-TAO-1): the settings
+description: 'Verifies notes theming + the singleton floating panel (F-TAO-1): the settings
+
   gear opens the theme/panel controls, selecting the "paper" theme re-themes the
+
   notes root instantly (data-notes-theme=paper) and persists to note prefs,
+
   switching to floating mode pops the single FloatingNotesPanel out of the hub,
+
   and docking returns it to the hub.
-covers: [F-TAO-1]
-tags: [notes, tao, theme, p2]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-TAO-1
+tags:
+- notes
+- tao
+- theme
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="status-bar"]'
-  - wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-  - click: '[data-testid="ai-chat-drawer-ribbon"]'
-  - wait_for: '[data-testid="ai-chat-drawer"]'
-  - click: '[data-testid="tao-hub-tab-notes"]'
-  - wait_for: '[data-testid="notes-panel"]'
-  - click: '[data-testid="notes-settings-toggle"]'
-  - wait_for: '[data-testid="note-theme-settings"]'
-  - click: '[data-testid="note-theme-select"]'
-  - click: '[data-testid="note-theme-paper"]'
-  - wait: 0.3
-  - assert_attribute: { selector: '[data-testid="notes-panel"]', name: 'data-notes-theme', equals: 'paper' }
-  # Pop out into the single floating panel.
-  - click: '[data-testid="notes-floating-toggle"]'
-  - wait_for: '[data-testid="floating-notes-panel"]'
-  - assert_count: { selector: '[data-testid="floating-notes-panel"]', equal: 1 }
-  - assert_localstorage: { key: "taomni.stub.notePrefs.v1", contains: "paper" }
-  # Dock back to the hub.
-  - click: '[data-testid="floating-notes-dock"]'
-  - wait: 0.3
-  - assert_not_visible: '[data-testid="floating-notes-panel"]'
-  - screenshot: notes-004-floating-theme.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
+- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- wait_for: '[data-testid="notes-panel"]'
+- click: '[data-testid="notes-settings-toggle"]'
+- wait_for: '[data-testid="note-theme-settings"]'
+- click: '[data-testid="note-theme-select"]'
+- click: '[data-testid="note-theme-paper"]'
+- wait: 0.3
+- assert_attribute:
+    selector: '[data-testid="notes-panel"]'
+    name: data-notes-theme
+    equals: paper
+- click: '[data-testid="notes-floating-toggle"]'
+- wait_for: '[data-testid="floating-notes-panel"]'
+- assert_count:
+    selector: '[data-testid="floating-notes-panel"]'
+    equal: 1
+- assert_localstorage:
+    key: taomni.stub.notePrefs.v1
+    contains: paper
+- click: '[data-testid="floating-notes-dock"]'
+- wait: 0.3
+- assert_not_visible: '[data-testid="floating-notes-panel"]'
+- screenshot: notes-004-floating-theme.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Notes floating panel and theme：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 6
+    - 8
+    - 10
+    - 11
+    - 14
+    - 18
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"notes-panel\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"note-theme-settings\"]"}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"notes-panel\"]", "name": "data-notes-theme",
+        "equals": "paper"}}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"floating-notes-panel\"]"}'
+    - step: 16
+      expectation: '{"assert_count": {"selector": "[data-testid=\"floating-notes-panel\"]", "equal": 1}}'
+    - step: 17
+      expectation: '{"assert_localstorage": {"key": "taomni.stub.notePrefs.v1", "contains": "paper"}}'
+    - step: 20
+      expectation: '{"assert_not_visible": "[data-testid=\"floating-notes-panel\"]"}'
+    results:
+    - 20
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

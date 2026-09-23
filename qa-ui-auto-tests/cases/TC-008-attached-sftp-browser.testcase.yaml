@@ -1,40 +1,115 @@
 id: TC-008
 title: Attached SFTP browser opens from an SSH terminal and navigates
-description: |
-  Establish an SSH terminal via QuickConnect, toggle the attached SFTP
+description: 'Establish an SSH terminal via QuickConnect, toggle the attached SFTP
+
   browser, set the remote path to the configured test dir, and verify
+
   both panes plus the transfer queue are mounted.
+
   Requires ssh.host and sftp.remote_test_dir reachable and QA_SSH_PASSWORD set.
-covers: [F3.1, F7.1, F7.2, F7.4]
-tags: [ssh, sftp, attached, p0]
-modes: [browser]
-fixtures: [reset_db, ssh_required, sftp_required]
+
+  '
+covers:
+- F3.1
+- F7.1
+- F7.2
+- F7.4
+tags:
+- ssh
+- sftp
+- attached
+- p0
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
+- sftp_required
 timeout_sec: 90
 steps:
-  - open: ${cfg.app.base_url}
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - wait_for: '[data-testid="quick-connect"]'
-  - quick_connect: { url: 'ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}' }
-  - auth: ${env.QA_SSH_PASSWORD}
-  - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 30
-  - wait: 3
-  - attach_sftp: {}
-  - wait_for:
-      selector: '[data-testid="sftp-browser"]'
-      timeout_sec: 15
-  - assert_visible: '[data-testid="sftp-remote-pane"]'
-  - assert_visible: '[data-testid="sftp-local-pane"]'
-  - assert_visible: '[data-testid="sftp-transfer-queue"]'
-  - assert_visible: '[data-testid="col-header-name"]'
-  - assert_visible: '[data-testid="col-header-size"]'
-  - assert_visible: '[data-testid="col-header-modified"]'
-  - assert_visible: '[data-testid="col-header-type"]'
-  - set_remote_path: '${cfg.sftp.remote_test_dir}'
-  - wait: 1
-  - click: '[data-testid="sftp-remote-refresh"]'
-  - wait: 1
-  - screenshot: 008-attached-sftp-browser.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="quick-connect"]'
+- quick_connect:
+    url: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- auth: ${env.QA_SSH_PASSWORD}
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 30
+- wait: 3
+- attach_sftp: {}
+- wait_for:
+    selector: '[data-testid="sftp-browser"]'
+    timeout_sec: 15
+- assert_visible: '[data-testid="sftp-remote-pane"]'
+- assert_visible: '[data-testid="sftp-local-pane"]'
+- assert_visible: '[data-testid="sftp-transfer-queue"]'
+- assert_visible: '[data-testid="col-header-name"]'
+- assert_visible: '[data-testid="col-header-size"]'
+- assert_visible: '[data-testid="col-header-modified"]'
+- assert_visible: '[data-testid="col-header-type"]'
+- set_remote_path: ${cfg.sftp.remote_test_dir}
+- wait: 1
+- click: '[data-testid="sftp-remote-refresh"]'
+- wait: 2
+- click: '[data-testid="sftp-remote-path-edit"]'
+- wait_for: input[data-testid="sftp-remote-path"]
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: ${cfg.sftp.remote_test_dir}
+- screenshot: 008-attached-sftp-browser.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SSH 会话附属 SFTP 显示双栏及传输队列；导航和刷新后路径精确等于目标目录。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 10
+    - 19
+    - 21
+    - 23
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"quick-connect\"]"}'
+    - step: 8
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 15}}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"col-header-name\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"col-header-size\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"col-header-modified\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"col-header-type\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
+        "equals": "${cfg.sftp.remote_test_dir}"}}'
+    results:
+    - 25
+  visual:
+  - check: 双栏标题、列头与路径栏不重叠。
+    method: manual
+    reason: 截图必须单独评审，不能由功能步骤通过推导视觉通过。
+  native:
+  - check: 浏览器远端使用真实 SFTP；本地窗格是 VFS，不能证明本机磁盘读写。
+    method: external
+    reason: 按实际执行模式解释；其他平台不继承 Linux 证据。

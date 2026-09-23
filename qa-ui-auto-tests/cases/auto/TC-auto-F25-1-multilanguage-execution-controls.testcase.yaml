@@ -1,114 +1,335 @@
 id: TC-auto-F25-1
 title: Code Workspace multilingual execution controls
-description: |
-  Browser smoke for the capability-driven Code Workspace Build, Run, and
+description: 'Browser smoke for the capability-driven Code Workspace Build, Run, and
+
   Debug surfaces. It verifies the empty-workspace capability state, panel
+
   navigation, and persistence of all runtime/build/debug tool overrides.
-covers: [F25.1, F25.2]
-tags: [auto-generated, smoke, needs-review, code-workspace]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.1
+- F25.2
+tags:
+- auto-generated
+- smoke
+- needs-review
+- code-workspace
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 60
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - assert_visible: '[data-testid="code-workspace-tab"]'
-  - hover: '[data-testid="code-workspace-build-project"]'
-  - assert_disabled: '[data-testid="code-workspace-build-project"]'
-  - hover: '[data-testid="code-workspace-run-target"]'
-  - assert_disabled: '[data-testid="code-workspace-run-target"]'
-  - hover: '[data-testid="code-workspace-debug-target"]'
-  - assert_disabled: '[data-testid="code-workspace-debug-target"]'
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- assert_visible: '[data-testid="code-workspace-tab"]'
+- hover: '[data-testid="code-workspace-build-project"]'
+- assert_disabled: '[data-testid="code-workspace-build-project"]'
+- hover: '[data-testid="code-workspace-run-target"]'
+- assert_disabled: '[data-testid="code-workspace-run-target"]'
+- hover: '[data-testid="code-workspace-debug-target"]'
+- assert_disabled: '[data-testid="code-workspace-debug-target"]'
+- click: '[data-testid="code-workspace-bottom-tab-run"]'
+- assert_visible: '[data-testid="code-workspace-run-panel"]'
+- fill:
+    selector: '[data-testid="run-panel-custom-command"]'
+    value: echo smoke
+- click: '[data-testid="run-panel-add-custom-task"]'
+- click: '[data-testid="run-panel-refresh"]'
+- click: '[data-testid="run-panel-configure-tools"]'
+- assert_visible: '[data-testid="workspace-build-run-tools-dialog"]'
+- fill:
+    selector: '[data-testid="workspace-tool-cargo"]'
+    value: cargo-custom
+- fill:
+    selector: '[data-testid="workspace-tool-go"]'
+    value: go-custom
+- fill:
+    selector: '[data-testid="workspace-tool-node"]'
+    value: node-custom
+- fill:
+    selector: '[data-testid="workspace-tool-npm"]'
+    value: npm-custom
+- fill:
+    selector: '[data-testid="workspace-tool-pnpm"]'
+    value: pnpm-custom
+- fill:
+    selector: '[data-testid="workspace-tool-yarn"]'
+    value: yarn-custom
+- fill:
+    selector: '[data-testid="workspace-tool-python"]'
+    value: python-custom
+- fill:
+    selector: '[data-testid="workspace-tool-cmake"]'
+    value: cmake-custom
+- fill:
+    selector: '[data-testid="workspace-tool-dotnet"]'
+    value: dotnet-custom
+- fill:
+    selector: '[data-testid="workspace-tool-maven"]'
+    value: maven-custom
+- fill:
+    selector: '[data-testid="workspace-tool-gradle"]'
+    value: gradle-custom
+- fill:
+    selector: '[data-testid="workspace-tool-sbt"]'
+    value: sbt-custom
+- fill:
+    selector: '[data-testid="workspace-tool-swift"]'
+    value: swift-custom
+- fill:
+    selector: '[data-testid="workspace-tool-lldbDap"]'
+    value: lldb-dap-custom
+- fill:
+    selector: '[data-testid="workspace-tool-delve"]'
+    value: dlv-custom
+- fill:
+    selector: '[data-testid="workspace-tool-debugpy"]'
+    value: debugpy-custom
+- fill:
+    selector: '[data-testid="workspace-tool-jsDebug"]'
+    value: js-debug-custom
+- fill:
+    selector: '[data-testid="workspace-tool-netcoredbg"]'
+    value: netcoredbg-custom
+- fill:
+    selector: '[data-testid="workspace-maven-run-jvm-args"]'
+    value: --add-opens=java.base/java.lang=ALL-UNNAMED
+- set_check:
+    selector: '[data-testid="workspace-maven-inherit-argline"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="workspace-debug-step-filters-enabled"]'
+    checked: true
+- fill:
+    selector: '[data-testid="workspace-debug-step-filter-patterns"]'
+    value: 'java.*
 
-  - click: '[data-testid="code-workspace-bottom-tab-run"]'
-  - assert_visible: '[data-testid="code-workspace-run-panel"]'
-  - fill: { selector: '[data-testid="run-panel-custom-command"]', value: "echo smoke" }
-  - click: '[data-testid="run-panel-add-custom-task"]'
-  - click: '[data-testid="run-panel-refresh"]'
-  - click: '[data-testid="run-panel-configure-tools"]'
-  - assert_visible: '[data-testid="workspace-build-run-tools-dialog"]'
-  - fill: { selector: '[data-testid="workspace-tool-cargo"]', value: "cargo-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-go"]', value: "go-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-node"]', value: "node-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-npm"]', value: "npm-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-pnpm"]', value: "pnpm-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-yarn"]', value: "yarn-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-python"]', value: "python-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-cmake"]', value: "cmake-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-dotnet"]', value: "dotnet-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-maven"]', value: "maven-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-gradle"]', value: "gradle-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-sbt"]', value: "sbt-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-swift"]', value: "swift-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-lldbDap"]', value: "lldb-dap-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-delve"]', value: "dlv-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-debugpy"]', value: "debugpy-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-jsDebug"]', value: "js-debug-custom" }
-  - fill: { selector: '[data-testid="workspace-tool-netcoredbg"]', value: "netcoredbg-custom" }
-  - fill:
-      selector: '[data-testid="workspace-maven-run-jvm-args"]'
-      value: "--add-opens=java.base/java.lang=ALL-UNNAMED"
-  - set_check: { selector: '[data-testid="workspace-maven-inherit-argline"]', checked: false }
-  - set_check: { selector: '[data-testid="workspace-debug-step-filters-enabled"]', checked: true }
-  - fill:
-      selector: '[data-testid="workspace-debug-step-filter-patterns"]'
-      value: "java.*\njavax.*\norg.test.*"
-  - set_check: { selector: '[data-testid="workspace-debug-skip-synthetics"]', checked: true }
-  - set_check: { selector: '[data-testid="workspace-debug-skip-static-init"]', checked: true }
-  - set_check: { selector: '[data-testid="workspace-debug-skip-constructors"]', checked: true }
-  - click: '[data-testid="workspace-build-run-tools-save"]'
-  - eval_readonly:
-      expression: "JSON.stringify(localStorage).includes('cargo-custom') && JSON.stringify(localStorage).includes('netcoredbg-custom')"
-      expect_truthy: true
+      javax.*
 
-  - click: '[data-testid="run-panel-configure-tools"]'
-  - assert_visible: '[data-testid="workspace-build-run-tools-dialog"]'
-  - click: '[data-testid="workspace-build-run-tools-close"]'
-  - click: '[data-testid="run-panel-configure-tools"]'
-  - click: '[data-testid="workspace-build-run-tools-cancel"]'
-
-  - click: '[data-testid="code-workspace-bottom-tab-build"]'
-  - assert_visible: '[data-testid="code-workspace-build-panel"]'
-  - click: '[data-testid="build-panel-refresh"]'
-  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
-  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
-  - click: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
-  - hover: '[data-testid="code-workspace-bottom-tab-tests"]'
-  - assert_visible: '[data-testid="code-workspace-tests-panel"]'
-  - assert_disabled: '[data-testid="tests-load-results"]'
-  - click: '[data-testid="code-workspace-bottom-tab-analysis"]'
-  - assert_visible: '[data-testid="code-workspace-analysis-panel"]'
-  - assert_visible: '[data-testid="analysis-semantic-index"]'
-  - assert_visible: '[data-testid="analysis-lsp-status"]'
-  - assert_visible: '[data-testid="analysis-inspection-profile"]'
-  - assert_visible: '[data-testid="analysis-inspection-baseline"]'
-  - click: '[data-testid="analysis-baseline-create"]'
-  - click: '[data-testid="analysis-baseline-import"]'
-  - assert_visible: '[data-testid="analysis-inspection-suppressions"]'
-  - assert_visible: '[data-testid="analysis-data-flow"]'
-  - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
-  - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
-  - click: '[data-testid="code-workspace-bottom-tab-overflow-debug"]'
-  - hover: '[data-testid="code-workspace-bottom-tab-debug"]'
-  - assert_visible: '[data-testid="debug-panel"]'
-  - click: '[data-testid="debug-subtab-breakpoints"]'
-  - assert_visible: '[data-testid="debug-function-breakpoints"]'
-  - assert_visible: '[data-testid="debug-data-breakpoints"]'
-  - fill: { selector: '[data-testid="debug-function-breakpoint-input"]', value: "Service.run" }
-  - click: '[data-testid="debug-function-breakpoint-add"]'
-  - assert_visible: '[data-testid="debug-function-breakpoint-row"][data-function-name="Service.run"]'
-  - set_check: { selector: '[data-testid^="debug-function-breakpoint-enabled-"]', checked: false }
-  - set_check: { selector: '[data-testid^="debug-function-breakpoint-enabled-"]', checked: true }
-  - click: '[data-testid^="debug-function-breakpoint-edit-"]'
-  - fill: { selector: '[data-testid^="debug-function-breakpoint-condition-"]', value: "ready" }
-  - press: { selector: '[data-testid^="debug-function-breakpoint-condition-"]', key: "Enter" }
-  - fill: { selector: '[data-testid^="debug-function-breakpoint-hit-"]', value: "3" }
-  - press: { selector: '[data-testid^="debug-function-breakpoint-hit-"]', key: "Enter" }
-  - assert_text: { selector: '[data-testid="debug-function-breakpoint-row"]', contains: "if ready" }
-  - assert_text: { selector: '[data-testid="debug-function-breakpoint-row"]', contains: "hit 3" }
-  - click: '[data-testid^="debug-function-breakpoint-remove-"]'
-  - assert_count: { selector: '[data-testid="debug-function-breakpoint-row"]', equal: 0 }
-  - screenshot: auto-F25-1-multilanguage-execution-controls.png
+      org.test.*'
+- set_check:
+    selector: '[data-testid="workspace-debug-skip-synthetics"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="workspace-debug-skip-static-init"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="workspace-debug-skip-constructors"]'
+    checked: true
+- click: '[data-testid="workspace-build-run-tools-save"]'
+- eval_readonly:
+    expression: JSON.stringify(localStorage).includes('cargo-custom') && JSON.stringify(localStorage).includes('netcoredbg-custom')
+    expect_truthy: true
+- click: '[data-testid="run-panel-configure-tools"]'
+- assert_visible: '[data-testid="workspace-build-run-tools-dialog"]'
+- click: '[data-testid="workspace-build-run-tools-close"]'
+- click: '[data-testid="run-panel-configure-tools"]'
+- click: '[data-testid="workspace-build-run-tools-cancel"]'
+- click: '[data-testid="code-workspace-bottom-tab-build"]'
+- assert_visible: '[data-testid="code-workspace-build-panel"]'
+- click: '[data-testid="build-panel-refresh"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+- wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
+- hover: '[data-testid="code-workspace-bottom-tab-tests"]'
+- assert_visible: '[data-testid="code-workspace-tests-panel"]'
+- assert_disabled: '[data-testid="tests-load-results"]'
+- click: '[data-testid="code-workspace-bottom-tab-analysis"]'
+- assert_visible: '[data-testid="code-workspace-analysis-panel"]'
+- assert_visible: '[data-testid="analysis-semantic-index"]'
+- assert_visible: '[data-testid="analysis-lsp-status"]'
+- assert_visible: '[data-testid="analysis-inspection-profile"]'
+- assert_visible: '[data-testid="analysis-inspection-baseline"]'
+- click: '[data-testid="analysis-baseline-create"]'
+- click: '[data-testid="analysis-baseline-import"]'
+- assert_visible: '[data-testid="analysis-inspection-suppressions"]'
+- assert_visible: '[data-testid="analysis-data-flow"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+- wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow-debug"]'
+- hover: '[data-testid="code-workspace-bottom-tab-debug"]'
+- assert_visible: '[data-testid="debug-panel"]'
+- click: '[data-testid="debug-subtab-breakpoints"]'
+- assert_visible: '[data-testid="debug-function-breakpoints"]'
+- assert_visible: '[data-testid="debug-data-breakpoints"]'
+- fill:
+    selector: '[data-testid="debug-function-breakpoint-input"]'
+    value: Service.run
+- click: '[data-testid="debug-function-breakpoint-add"]'
+- assert_visible: '[data-testid="debug-function-breakpoint-row"][data-function-name="Service.run"]'
+- set_check:
+    selector: '[data-testid^="debug-function-breakpoint-enabled-"]'
+    checked: false
+- set_check:
+    selector: '[data-testid^="debug-function-breakpoint-enabled-"]'
+    checked: true
+- click: '[data-testid^="debug-function-breakpoint-edit-"]'
+- fill:
+    selector: '[data-testid^="debug-function-breakpoint-condition-"]'
+    value: ready
+- press:
+    selector: '[data-testid^="debug-function-breakpoint-condition-"]'
+    key: Enter
+- fill:
+    selector: '[data-testid^="debug-function-breakpoint-hit-"]'
+    value: '3'
+- press:
+    selector: '[data-testid^="debug-function-breakpoint-hit-"]'
+    key: Enter
+- assert_text:
+    selector: '[data-testid="debug-function-breakpoint-row"]'
+    contains: if ready
+- assert_text:
+    selector: '[data-testid="debug-function-breakpoint-row"]'
+    contains: hit 3
+- click: '[data-testid^="debug-function-breakpoint-remove-"]'
+- assert_count:
+    selector: '[data-testid="debug-function-breakpoint-row"]'
+    equal: 0
+- screenshot: auto-F25-1-multilanguage-execution-controls.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Code Workspace multilingual execution controls：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 13
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 47
+    - 49
+    - 50
+    - 51
+    - 52
+    - 54
+    - 55
+    - 57
+    - 58
+    - 61
+    - 67
+    - 68
+    - 71
+    - 73
+    - 74
+    - 76
+    - 79
+    - 80
+    - 82
+    - 83
+    - 84
+    - 85
+    - 86
+    - 87
+    - 88
+    - 91
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"assert_disabled": "[data-testid=\"code-workspace-build-project\"]"}'
+    - step: 10
+      expectation: '{"assert_disabled": "[data-testid=\"code-workspace-run-target\"]"}'
+    - step: 12
+      expectation: '{"assert_disabled": "[data-testid=\"code-workspace-debug-target\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-run-panel\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"workspace-build-run-tools-dialog\"]"}'
+    - step: 46
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify(localStorage).includes(''cargo-custom'') &&
+        JSON.stringify(localStorage).includes(''netcoredbg-custom'')", "expect_truthy": true}}'
+    - step: 48
+      expectation: '{"assert_visible": "[data-testid=\"workspace-build-run-tools-dialog\"]"}'
+    - step: 53
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-build-panel\"]"}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
+    - step: 59
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tests-panel\"]"}'
+    - step: 60
+      expectation: '{"assert_disabled": "[data-testid=\"tests-load-results\"]"}'
+    - step: 62
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-analysis-panel\"]"}'
+    - step: 63
+      expectation: '{"assert_visible": "[data-testid=\"analysis-semantic-index\"]"}'
+    - step: 64
+      expectation: '{"assert_visible": "[data-testid=\"analysis-lsp-status\"]"}'
+    - step: 65
+      expectation: '{"assert_visible": "[data-testid=\"analysis-inspection-profile\"]"}'
+    - step: 66
+      expectation: '{"assert_visible": "[data-testid=\"analysis-inspection-baseline\"]"}'
+    - step: 69
+      expectation: '{"assert_visible": "[data-testid=\"analysis-inspection-suppressions\"]"}'
+    - step: 70
+      expectation: '{"assert_visible": "[data-testid=\"analysis-data-flow\"]"}'
+    - step: 72
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
+    - step: 75
+      expectation: '{"assert_visible": "[data-testid=\"debug-panel\"]"}'
+    - step: 77
+      expectation: '{"assert_visible": "[data-testid=\"debug-function-breakpoints\"]"}'
+    - step: 78
+      expectation: '{"assert_visible": "[data-testid=\"debug-data-breakpoints\"]"}'
+    - step: 81
+      expectation: '{"assert_visible": "[data-testid=\"debug-function-breakpoint-row\"][data-function-name=\"Service.run\"]"}'
+    - step: 89
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]", "contains":
+        "if ready"}}'
+    - step: 90
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]", "contains":
+        "hit 3"}}'
+    - step: 92
+      expectation: '{"assert_count": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]", "equal": 0}}'
+    results:
+    - 92
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

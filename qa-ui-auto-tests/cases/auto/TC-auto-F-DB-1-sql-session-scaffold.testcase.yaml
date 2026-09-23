@@ -1,79 +1,158 @@
 id: TC-auto-F-DB-1-sql-session-scaffold
 title: SQL session opens its offline query library and saves a query
-description: |
-  Creates a MySQL session in browser mode, opens it into the expected offline
+description: 'Creates a MySQL session in browser mode, opens it into the expected offline
+
   state, and verifies that the SQL editor and shared Query Library remain
+
   available even though db_connect is unavailable. Saves a connection-scoped
+
   query through the browser SQLite stub and exercises namespace/search filters.
-covers: [F-DB-1, F-DB-4, F6.3]
-tags: [auto-generated, smoke, needs-review, database, sql, query-library, no-connect]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-DB-1
+- F-DB-4
+- F6.3
+tags:
+- auto-generated
+- smoke
+- needs-review
+- database
+- sql
+- query-library
+- no-connect
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="sidebar"]'
-  - wait_for: '[data-testid="session-new"]'
-  - click: '[data-testid="session-new"]'
-  - wait_for: '[data-testid="session-editor"]'
-  # Selecting a DB proto auto-switches to the database section.
-  - click: '[data-testid="session-proto-mysql"]'
-  - wait_for:
-      selector: '[data-testid="session-database-section"]'
-      timeout_sec: 5
-  - assert_visible: '[data-testid="database-settings"]'
-  # Connection fields (host/port are shared top-of-form controls owned by F6.3).
-  - fill:
-      selector: '[data-testid="session-host"]'
-      value: db-host.example.test
-  - fill:
-      selector: '[data-testid="session-port"]'
-      value: "3306"
-  # Engine-specific DB form fields (aria-label inputs in DatabaseSettings).
-  - fill:
-      selector: 'input[aria-label="Database username"]'
-      value: qa_user
-  - fill:
-      selector: 'input[aria-label="Database name"]'
-      value: qa_db
-  # Name the bookmark and save.
-  - click: '[data-testid="session-section-bookmark"]'
-  - wait_for: '[data-testid="bookmark-settings"]'
-  - fill:
-      selector: '[data-testid="session-name"]'
-      value: qa-ui-auto-mysql
-  - click: '[data-testid="session-save"]'
-  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-mysql"]'
-  - open_session: { name: qa-ui-auto-mysql, double_click: true }
-  - wait_for: '[data-testid="db-connection-error-banner"]'
-  - assert_visible: '[data-testid="sql-editor"]'
-  - click: '[data-testid="db-query-library-tab"]'
-  - wait_for: '[data-testid="query-library-panel"]'
-  - click: '[data-testid="query-library-all-namespaces"]'
-  - click: '[data-testid="query-library-current-namespace"]'
-  - set_check:
-      selector: '[data-testid="query-library-show-archived"]'
-      checked: true
-  - set_check:
-      selector: '[data-testid="query-library-show-archived"]'
-      checked: false
-  - click: '[data-testid="query-library-create"]'
-  - wait_for: '[data-testid="query-library-dialog"]'
-  - fill:
-      selector: '[data-testid="query-library-name"]'
-      value: qa-ui-auto-query
-  - fill:
-      selector: '[data-testid="query-library-content"]'
-      value: SELECT 42;
-  - select_option:
-      selector: '[data-testid="query-library-scope"]'
-      value: connection
-  - click: '[data-testid="query-library-save"]'
-  - wait_for: '[data-testid^="saved-query-"]'
-  - fill:
-      selector: '[data-testid="query-library-search"]'
-      value: qa-ui-auto-query
-  - assert_count:
-      selector: '[data-testid^="saved-query-"]'
-      equal: 1
-  - screenshot: db-1-query-library.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 5
+- assert_visible: '[data-testid="database-settings"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: db-host.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '3306'
+- fill:
+    selector: input[aria-label="Database username"]
+    value: qa_user
+- fill:
+    selector: input[aria-label="Database name"]
+    value: qa_db
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-mysql
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-mysql"]'
+- open_session:
+    name: qa-ui-auto-mysql
+    double_click: true
+- wait_for: '[data-testid="db-connection-error-banner"]'
+- assert_visible: '[data-testid="sql-editor"]'
+- click: '[data-testid="db-query-library-tab"]'
+- wait_for: '[data-testid="query-library-panel"]'
+- click: '[data-testid="query-library-all-namespaces"]'
+- click: '[data-testid="query-library-current-namespace"]'
+- set_check:
+    selector: '[data-testid="query-library-show-archived"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="query-library-show-archived"]'
+    checked: false
+- click: '[data-testid="query-library-create"]'
+- wait_for: '[data-testid="query-library-dialog"]'
+- fill:
+    selector: '[data-testid="query-library-name"]'
+    value: qa-ui-auto-query
+- fill:
+    selector: '[data-testid="query-library-content"]'
+    value: SELECT 42;
+- select_option:
+    selector: '[data-testid="query-library-scope"]'
+    value: connection
+- click: '[data-testid="query-library-save"]'
+- wait_for: '[data-testid^="saved-query-"]'
+- fill:
+    selector: '[data-testid="query-library-search"]'
+    value: qa-ui-auto-query
+- assert_count:
+    selector: '[data-testid^="saved-query-"]'
+    equal: 1
+- screenshot: db-1-query-library.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SQL session opens its offline query library and saves a query：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 6
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 15
+    - 16
+    - 18
+    - 21
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 32
+    - 34
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 7
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]", "timeout_sec": 5}}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"database-settings\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-mysql\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"db-connection-error-banner\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"sql-editor\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"query-library-panel\"]"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"query-library-dialog\"]"}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid^=\"saved-query-\"]"}'
+    - step: 35
+      expectation: '{"assert_count": {"selector": "[data-testid^=\"saved-query-\"]", "equal": 1}}'
+    results:
+    - 35
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

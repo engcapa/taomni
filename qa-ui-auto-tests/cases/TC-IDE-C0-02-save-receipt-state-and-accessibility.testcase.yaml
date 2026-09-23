@@ -1,175 +1,332 @@
 id: TC-IDE-C0-02
-title: "Save receipt dirty/saved state, keyboard focus, announcement, and undo"
-description: |
-  ED-SAVE-004 browser behavior and accessibility slice. It opens the browser
+title: Save receipt dirty/saved state, keyboard focus, announcement, and undo
+description: 'ED-SAVE-004 browser behavior and accessibility slice. It opens the browser
+
   VFS through the production workspace entry, uses the real CodeMirror save
+
   shortcut at 200% editor zoom, and observes only production receipt metadata.
+
   It verifies dirty/saved state, receipt identity and hashes, live-region
+
   semantics, focus retention, and one undo back to the saved text. It then
+
   saves again from the restored-clean buffer and requires a fresh, distinct
+
   receipt (new encoded-bytes hash, write-count 1). The browser VFS is not
+
   native disk evidence; stale in-flight behavior is covered by the mounted
+
   deferred-writer regression and real bytes by TC-IDE-C0-01.
-covers: [F25.5, F1.7]
-tags: [code-workspace, ide-c0, save, receipt, accessibility, p0]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+- F1.7
+tags:
+- code-workspace
+- ide-c0
+- save
+- receipt
+- accessibility
+- p0
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 240
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - assert_visible: '[data-testid="code-workspace-file-status"]'
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- assert_visible: '[data-testid="code-workspace-file-status"]'
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Editor Appearance Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance Settings'
+- wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+- fill:
+    selector: '[data-testid="workspace-editor-appearance-font-size-px"]'
+    value: '26'
+- click: '[data-testid="workspace-editor-appearance-apply"]'
+- wait_for:
+    selector: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+    state: detached
+- assert_text:
+    selector: '[data-testid="code-workspace-zoom-reset"]'
+    contains: 26px
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: 'receipt line one
 
-  # Set the editor to the product's 200% equivalent before exercising save.
-  - click: '[data-testid="code-workspace-tab"]'
-  - press: Control+Shift+N
-  - wait_for:
-      selector: '[data-testid="code-workspace-search-everywhere"]'
-      timeout_sec: 30
-  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
-  - type: Editor Appearance Settings
-  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance Settings'
-  - wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
-  - fill:
-      selector: '[data-testid="workspace-editor-appearance-font-size-px"]'
-      value: "26"
-  - click: '[data-testid="workspace-editor-appearance-apply"]'
-  - wait_for:
-      selector: '[data-testid="workspace-editor-appearance-settings-dialog"]'
-      state: detached
-  - assert_text:
-      selector: '[data-testid="code-workspace-zoom-reset"]'
-      contains: "26px"
-
-  - fill:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      value: "receipt line one\nreceipt line two"
-  - wait: 1
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: dirty
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: role
-      equals: status
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: aria-live
-      equals: polite
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: aria-atomic
-      equals: "true"
-  - assert_text:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      contains: "Unsaved changes"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      name: role
-      equals: textbox
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      name: aria-multiline
-      equals: "true"
-  - eval_readonly:
-      expression: 'document.querySelector(".cm-content:focus")?.matches(".cm-content")'
-      expect_truthy: true
-
-  - press: Control+s
-  - wait: 1
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: saved
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: saved-current
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-write-count
-      equals: "1"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-dirty
-      equals: "false"
-  - eval_readonly:
-      expression: '/^[a-f0-9]{64}$/.test(document.getElementById("code-workspace-save-observation")?.getAttribute("data-encoded-bytes-sha256") ?? "")'
-      expect_truthy: true
-  - eval_readonly:
-      expression: 'document.getElementById("code-workspace-save-observation")?.hasAttribute("data-final-text-sha256")'
-      expect_truthy: true
-  - assert_text:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      contains: "Saved README.txt"
-  - eval_readonly:
-      expression: 'document.querySelector(".cm-content:focus")?.matches(".cm-content")'
-      expect_truthy: true
-
-  # One editor undo returns to the receipt-backed saved text without moving focus.
-  - type: X
-  - wait: 0.5
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: dirty
-  - press: Control+z
-  - wait: 0.5
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: clean
-  - eval_readonly:
-      expression: 'document.querySelector(".cm-content:focus")?.matches(".cm-content")'
-      expect_truthy: true
-
-  # ED-AUDIT-004: a save after undo-back-to-clean must produce a fresh,
-  # distinct receipt - not a replay of the first transaction's hashes.
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
-  - type: "2"
-  - wait: 0.5
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: dirty
-  - press: Control+s
-  - wait: 1
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: saved
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: saved-current
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-write-count
-      equals: "1"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-dirty
-      equals: "false"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-encoded-bytes-sha256
-      # Distinct from the first receipt's 196c3d60... hash: the second
-      # transaction encoded the new buffer text.
-      equals: "5eebea28ed7980381dff6dedc26f77ca7340bfccb34f6869f83435a0fe4983c1"
-  - eval_readonly:
-      expression: 'document.querySelector(".cm-content:focus")?.matches(".cm-content")'
-      expect_truthy: true
-  - screenshot: tc-ide-c0-browser-save-receipt.png
+      receipt line two'
+- wait: 1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: dirty
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: role
+    equals: status
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: aria-live
+    equals: polite
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: aria-atomic
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    contains: Unsaved changes
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    name: role
+    equals: textbox
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    name: aria-multiline
+    equals: 'true'
+- eval_readonly:
+    expression: document.querySelector(".cm-content:focus")?.matches(".cm-content")
+    expect_truthy: true
+- press: Control+s
+- wait: 1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: saved
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: saved-current
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-write-count
+    equals: '1'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'false'
+- eval_readonly:
+    expression: /^[a-f0-9]{64}$/.test(document.getElementById("code-workspace-save-observation")?.getAttribute("data-encoded-bytes-sha256")
+      ?? "")
+    expect_truthy: true
+- eval_readonly:
+    expression: document.getElementById("code-workspace-save-observation")?.hasAttribute("data-final-text-sha256")
+    expect_truthy: true
+- assert_text:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    contains: Saved README.txt
+- eval_readonly:
+    expression: document.querySelector(".cm-content:focus")?.matches(".cm-content")
+    expect_truthy: true
+- type: X
+- wait: 0.5
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: dirty
+- press: Control+z
+- wait: 0.5
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: clean
+- eval_readonly:
+    expression: document.querySelector(".cm-content:focus")?.matches(".cm-content")
+    expect_truthy: true
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+End
+- type: '2'
+- wait: 0.5
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: dirty
+- press: Control+s
+- wait: 1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: saved
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: saved-current
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-write-count
+    equals: '1'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-encoded-bytes-sha256
+    equals: 5eebea28ed7980381dff6dedc26f77ca7340bfccb34f6869f83435a0fe4983c1
+- eval_readonly:
+    expression: document.querySelector(".cm-content:focus")?.matches(".cm-content")
+    expect_truthy: true
+- screenshot: tc-ide-c0-browser-save-receipt.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Save receipt dirty/saved state, keyboard focus, announcement, and undo：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 14
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 23
+    - 26
+    - 36
+    - 46
+    - 49
+    - 53
+    - 54
+    - 55
+    - 58
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-file-status\"]"}'
+    - step: 16
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
+        30}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]"}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]", "state":
+        "detached"}}'
+    - step: 25
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-zoom-reset\"]", "contains": "26px"}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "dirty"}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "role", "equals": "status"}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "aria-live", "equals": "polite"}}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "aria-atomic", "equals": "true"}}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "contains":
+        "Unsaved changes"}}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "role", "equals": "textbox"}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "aria-multiline", "equals": "true"}}'
+    - step: 35
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
+        "expect_truthy": true}}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "saved"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "saved-current"}}'
+    - step: 40
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-write-count", "equals": "1"}}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "false"}}'
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "/^[a-f0-9]{64}$/.test(document.getElementById(\"code-workspace-save-observation\")?.getAttribute(\"data-encoded-bytes-sha256\")
+        ?? \"\")", "expect_truthy": true}}'
+    - step: 43
+      expectation: '{"eval_readonly": {"expression": "document.getElementById(\"code-workspace-save-observation\")?.hasAttribute(\"data-final-text-sha256\")",
+        "expect_truthy": true}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "contains":
+        "Saved README.txt"}}'
+    - step: 45
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
+        "expect_truthy": true}}'
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "dirty"}}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "clean"}}'
+    - step: 52
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
+        "expect_truthy": true}}'
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "dirty"}}'
+    - step: 60
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "saved"}}'
+    - step: 61
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "saved-current"}}'
+    - step: 62
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-write-count", "equals": "1"}}'
+    - step: 63
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "false"}}'
+    - step: 64
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-encoded-bytes-sha256", "equals": "5eebea28ed7980381dff6dedc26f77ca7340bfccb34f6869f83435a0fe4983c1"}}'
+    - step: 65
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
+        "expect_truthy": true}}'
+    results:
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

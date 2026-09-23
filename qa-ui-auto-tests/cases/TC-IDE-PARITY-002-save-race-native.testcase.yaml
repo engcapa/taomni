@@ -1,958 +1,1540 @@
 id: TC-IDE-PARITY-002
-title: "ED-PARITY-002 save-while-typing W0/W1/W2 byte + dirty retention baseline (native desktop)"
-description: |
-  ED-PARITY-002 / REQ-11 / CW-EDIT-003 packaged native desktop slice. It
-  proves with real native writes, real acknowledgements and real watched-file
-  notifications that a save freezes B1 on disk while newer typing keeps its
-  own live buffer:
-
-  - W0: an edit typed after the prepare/history await and before the byte
-    writer cancels the save with ZERO writer calls (disk still B0).
-  - W1: an edit typed after the REAL native writer was invoked but before its
-    real ack is delivered keeps the live buffer and dirty flag (disk B1).
-  - W2: an edit typed after the real ack and before the real watched-files
-    notification completes keeps the live buffer (RISK-01 regression).
-
-  The W0/W1/W2 holds are controlled by the isolated QA build's save-race gate
-  (`save_race_*` verbs; a production binary fails them explicitly). The gate
-  never fabricates acks/hashes: the writer, the ack and the watcher call are
-  the production ones; only the delivery time point is held while the runner
-  types through the real editor. In-page enter/release/revision/invoke/ack
-  order is persisted as `save-race-trace.json` evidence.
-
-  It also covers: one independent single-character undo group and a fresh
-  explicit save; a real external rewrite + Decide Later then typed conflict
-  with zero disk effect; explicit Load Disk restore then a successful save; an
-  ISO-8859-1 unrepresentable-character failure with zero disk effect and
-  recovery, plus a UTF-8 BOM+CRLF hold variant; and three controlled
-  response-loss faults whose REAL read-back proves the intended bytes landed
-  (committed), that a restored-old disk classifies as none and recovers, and
-  that foreign disk content produces an unknown result with a recovery row,
-  a blocked retry, a zero-write Decide Later and an explicit Acknowledge that
-  unblocks a successful retry.
-
-  Owner invalidation: closing the last view during the held real ack settles
-  as committed-writeback-discarded; after reload the Recovery center shows the
-  row and its Reopen action loads the real B1 bytes into the editor.
-
-  Focus/selection/undo-grouping/cursor facts are recorded into
-  `save-race-notes.json`; IDEA comparison (REF-PARITY-002-WIN-20260916) and
-  remaining unverified layers are recorded in the ED-PARITY-002 report, not
-  claimed here.
-covers: [F25.5, F1.7]
-tags: [code-workspace, ide-parity, save, save-race, w0-w1-w2, recovery, native, cross-platform, p0]
-modes: [native]
-native_platforms: [Linux, macOS, Windows]
-fixtures: [reset_db, editor_save_race]
+title: ED-PARITY-002 save-while-typing W0/W1/W2 byte + dirty retention baseline (native desktop)
+description: "ED-PARITY-002 / REQ-11 / CW-EDIT-003 packaged native desktop slice. It\nproves with real native writes,\
+  \ real acknowledgements and real watched-file\nnotifications that a save freezes B1 on disk while newer typing\
+  \ keeps its\nown live buffer:\n\n- W0: an edit typed after the prepare/history await and before the byte\n  writer\
+  \ cancels the save with ZERO writer calls (disk still B0).\n- W1: an edit typed after the REAL native writer was\
+  \ invoked but before its\n  real ack is delivered keeps the live buffer and dirty flag (disk B1).\n- W2: an edit\
+  \ typed after the real ack and before the real watched-files\n  notification completes keeps the live buffer (RISK-01\
+  \ regression).\n\nThe W0/W1/W2 holds are controlled by the isolated QA build's save-race gate\n(`save_race_*`\
+  \ verbs; a production binary fails them explicitly). The gate\nnever fabricates acks/hashes: the writer, the ack\
+  \ and the watcher call are\nthe production ones; only the delivery time point is held while the runner\ntypes\
+  \ through the real editor. In-page enter/release/revision/invoke/ack\norder is persisted as `save-race-trace.json`\
+  \ evidence.\n\nIt also covers: one independent single-character undo group and a fresh\nexplicit save; a real\
+  \ external rewrite + Decide Later then typed conflict\nwith zero disk effect; explicit Load Disk restore then\
+  \ a successful save; an\nISO-8859-1 unrepresentable-character failure with zero disk effect and\nrecovery, plus\
+  \ a UTF-8 BOM+CRLF hold variant; and three controlled\nresponse-loss faults whose REAL read-back proves the intended\
+  \ bytes landed\n(committed), that a restored-old disk classifies as none and recovers, and\nthat foreign disk\
+  \ content produces an unknown result with a recovery row,\na blocked retry, a zero-write Decide Later and an explicit\
+  \ Acknowledge that\nunblocks a successful retry.\n\nOwner invalidation: closing the last view during the held\
+  \ real ack settles\nas committed-writeback-discarded; after reload the Recovery center shows the\nrow and its\
+  \ Reopen action loads the real B1 bytes into the editor.\n\nFocus/selection/undo-grouping/cursor facts are recorded\
+  \ into\n`save-race-notes.json`; IDEA comparison (REF-PARITY-002-WIN-20260916) and\nremaining unverified layers\
+  \ are recorded in the ED-PARITY-002 report, not\nclaimed here.\n"
+covers:
+- F25.5
+- F1.7
+tags:
+- code-workspace
+- ide-parity
+- save
+- save-race
+- w0-w1-w2
+- recovery
+- native
+- cross-platform
+- p0
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- editor_save_race
 timeout_sec: 600
 steps:
-  - open: "${cfg.app.base_url}"
-  # Fresh isolated app-data => empty vault => first-run master-password gate.
-  - vault_first_run: "qa-native-gate-password"
-  - wait_for: '[data-testid="welcome-panel"]'
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-parity-002","name":"qa-parity-002","roots":[{"id":"r1","name":"qa-parity-002","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="edit.txt"]'
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit.txt
+    equals: 2b7edc22ece15ead9636ecf67c54fa5e48bb7c4325409a7651fda976073ae88d
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: clean
+- save_race_note:
+    label: s0-focus-open
+    expression: document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName
+- screenshot: s0-open-b0-clean.png
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- save_race_note:
+    label: s1-focus-before-save
+    expression: document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName
+- type: S
+- wait: 0.6
+- save_race_note:
+    label: s1-cursor-before-save
+    expression: document.querySelector("[data-testid\x3d\"status-bar-workspace-cursor\"]")?.textContent
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: dirty
+- press: Mod+s
+- assert_file_receipt:
+    path: ${fixture.workspace_root}/edit.txt
+    selector: '[data-testid="code-workspace-save-observation"]'
+    encoding: UTF-8
+    bom: false
+    eol: lf
+    expected_text: 'alpha Alpha ALPHA
 
-  # Enter the isolated host workspace through persisted recents (no native
-  # folder picker). The path-qualified row guards against other recents.
-  - seed_storage:
-      key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-parity-002","name":"qa-parity-002","roots":[{"id":"r1","name":"qa-parity-002","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756100000000,"isGitRepo":false}]'
-  - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="edit.txt"]'
+      tree tree
 
-  # ---------------------------------------------------------------------
-  # S0: open the reference B0 file. Disk bytes and dirty state are clean.
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit.txt"
-      equals: 2b7edc22ece15ead9636ecf67c54fa5e48bb7c4325409a7651fda976073ae88d
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: clean
-  - save_race_note:
-      label: s0-focus-open
-      expression: 'document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName'
-  - screenshot: s0-open-b0-clean.png
+      line three
 
-  # ---------------------------------------------------------------------
-  # S1: type S at the end and Mod+S. Disk becomes B1 with a fresh receipt;
-  # the live buffer is clean again (no append, no EOL/BOM change).
-  # ---------------------------------------------------------------------
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - save_race_note:
-      label: s1-focus-before-save
-      expression: 'document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName'
-  - type: "S"
-  # The editor commits text into React store state on a 220 ms idle flush; the
-  # sr-only observation node derives from that state.
-  - wait: 0.6
-  - save_race_note:
-      label: s1-cursor-before-save
-      expression: 'document.querySelector("[data-testid\x3d\"status-bar-workspace-cursor\"]")?.textContent'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: dirty
-  - press: Mod+s
-  - assert_file_receipt:
-      path: "${fixture.workspace_root}/edit.txt"
-      selector: '[data-testid="code-workspace-save-observation"]'
-      encoding: UTF-8
-      bom: false
-      eol: lf
-      expected_text: "alpha Alpha ALPHA\ntree tree\nline three\nS"
-      require_history: true
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-dirty
-      equals: "false"
-  - save_race_note:
-      label: s1-focus-after-save
-      expression: 'document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName'
-  - save_race_note:
-      label: s1-cursor-after-save
-      expression: 'document.querySelector("[data-testid\x3d\"status-bar-workspace-cursor\"]")?.textContent'
-  - screenshot: s1-saved-b1.png
+      S'
+    require_history: true
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'false'
+- save_race_note:
+    label: s1-focus-after-save
+    expression: document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName
+- save_race_note:
+    label: s1-cursor-after-save
+    expression: document.querySelector("[data-testid\x3d\"status-bar-workspace-cursor\"]")?.textContent
+- screenshot: s1-saved-b1.png
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-w0.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: S
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeS
+- save_race_arm:
+    stage: prepare
+    filePath: ${fixture.workspace_root}/edit-w0.txt
+    timeoutMs: 60000
+- press: Mod+s
+- save_race_wait_entered:
+    stage: prepare
+    timeout_sec: 20
+- type: X
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeSX
+- save_race_release: null
+- wait: 1
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeSX
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: cancelled
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'true'
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-w0.txt
+    equals: 2b7edc22ece15ead9636ecf67c54fa5e48bb7c4325409a7651fda976073ae88d
+- save_race_trace:
+    artifact: s2-w0-trace.json
+    expect_contains:
+    - arm
+    - enter
+    - release
+    - commit-settled
+    require_settled_kind: cancelled
+    forbid_between:
+      anchor: arm
+      until: commit-settled
+      events:
+      - writer-invoked
+      - ack-delivered
+      - watcher-invoked
+- screenshot: s2-w0-cancelled.png
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-w1.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: S
+- save_race_arm:
+    stage: ack
+    filePath: ${fixture.workspace_root}/edit-w1.txt
+    timeoutMs: 60000
+- press: Mod+s
+- save_race_wait_entered:
+    stage: ack
+    timeout_sec: 20
+- type: X
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeSX
+- save_race_release: null
+- wait: 1
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeSX
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: saved-stale-snapshot
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-disk-effect
+    equals: committed
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-w1.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- save_race_trace:
+    artifact: s2-w1-trace.json
+    expect_contains:
+    - arm
+    - writer-invoked
+    - enter
+    - release
+    - ack-delivered
+    - commit-settled
+    require_ack_hashes: true
+    require_settled_kind: saved-stale-snapshot
+- screenshot: s2-w1-ack-held.png
+- press: Mod+z
+- wait: 0.5
+- save_race_note:
+    label: s2-w1-undo-text
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-w1.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- screenshot: s2-w1-undo-grouping.png
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-w2.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: S
+- save_race_arm:
+    stage: watcher
+    filePath: ${fixture.workspace_root}/edit-w2.txt
+    timeoutMs: 60000
+- press: Mod+s
+- save_race_wait_entered:
+    stage: watcher
+    timeout_sec: 20
+- type: X
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeSX
+- save_race_release: null
+- wait: 1
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeSX
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: saved-stale-snapshot
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'true'
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-w2.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- save_race_trace:
+    artifact: s2-w2-trace.json
+    expect_contains:
+    - arm
+    - writer-invoked
+    - ack-delivered
+    - watcher-invoked
+    - enter
+    - release
+    - commit-settled
+    require_ack_hashes: true
+    require_settled_kind: saved-stale-snapshot
+- screenshot: s2-w2-watcher-held.png
+- press: Mod+z
+- wait: 0.5
+- save_race_note:
+    label: s2-w2-undo-text
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-w2.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- press: ArrowLeft
+- press: ArrowRight
+- type: X
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeSX
+- wait: 0.6
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: dirty
+- press: Mod+z
+- wait: 0.5
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeS
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent?.indexOf("line
+      threeSX") === -1
+    expect_truthy: true
+- save_race_note:
+    label: s3-cursor-after-undo
+    expression: document.querySelector("[data-testid\x3d\"status-bar-workspace-cursor\"]")?.textContent
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- type: X
+- press: Mod+s
+- assert_file_receipt:
+    path: ${fixture.workspace_root}/edit.txt
+    selector: '[data-testid="code-workspace-save-observation"]'
+    encoding: UTF-8
+    bom: false
+    eol: lf
+    expected_text: 'alpha Alpha ALPHA
 
-  # ---------------------------------------------------------------------
-  # S2-W0 (edit-w0.txt, independent B0 copy): type S => B1 dirty with disk
-  # still B0. Mod+S is held BEFORE the byte writer; typing X lands in the
-  # live buffer only, and releasing cancels the save with zero writer calls.
-  # ---------------------------------------------------------------------
-  # Let the tree finish any async re-render (project facts / watcher refresh)
-  # so the file row cannot go stale between element lookup and the click.
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-w0.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "S"
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeS'
-  - save_race_arm:
-      stage: prepare
-      filePath: "${fixture.workspace_root}/edit-w0.txt"
-      timeoutMs: 60000
-  - press: Mod+s
-  - save_race_wait_entered:
-      stage: prepare
-      timeout_sec: 20
-  - type: "X"
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeSX'
-  - save_race_release: null
-  - wait: 1
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeSX'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: cancelled
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-dirty
-      equals: "true"
-  # Zero writer calls: the host bytes are still exactly B0.
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-w0.txt"
-      equals: 2b7edc22ece15ead9636ecf67c54fa5e48bb7c4325409a7651fda976073ae88d
-  - save_race_trace:
-      artifact: s2-w0-trace.json
-      expect_contains: [arm, enter, release, commit-settled]
-      require_settled_kind: cancelled
-      forbid_between:
-        anchor: arm
-        until: commit-settled
-        events: [writer-invoked, ack-delivered, watcher-invoked]
-  - screenshot: s2-w0-cancelled.png
+      tree tree
 
-  # ---------------------------------------------------------------------
-  # S2-W1 (edit-w1.txt): type S => B1 dirty. Mod+S invokes the REAL writer;
-  # the ack delivery is held. Typing X then releasing must keep the live
-  # B2 buffer and dirty flag while disk stays at the frozen B1 bytes.
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-w1.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "S"
-  - save_race_arm:
-      stage: ack
-      filePath: "${fixture.workspace_root}/edit-w1.txt"
-      timeoutMs: 60000
-  - press: Mod+s
-  - save_race_wait_entered:
-      stage: ack
-      timeout_sec: 20
-  - type: "X"
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeSX'
-  - save_race_release: null
-  - wait: 1
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeSX'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: saved-stale-snapshot
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-dirty
-      equals: "true"
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-disk-effect
-      equals: committed
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-w1.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  - save_race_trace:
-      artifact: s2-w1-trace.json
-      expect_contains: [arm, writer-invoked, enter, release, ack-delivered, commit-settled]
-      require_ack_hashes: true
-      require_settled_kind: saved-stale-snapshot
-  - screenshot: s2-w1-ack-held.png
-  # Record the actual undo grouping after the race (DEC-04: never forced to
-  # match IDEA). The disk must not roll back with the buffer.
-  - press: Mod+z
-  - wait: 0.5
-  - save_race_note:
-      label: s2-w1-undo-text
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-w1.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  - screenshot: s2-w1-undo-grouping.png
+      line three
 
-  # ---------------------------------------------------------------------
-  # S2-W2 (edit-w2.txt, RISK-01): real writer ack delivered, REAL watcher
-  # notify invoked, merge not yet run. Typing X in that window must survive
-  # the merge and keep dirty=true.
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-w2.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "S"
-  - save_race_arm:
-      stage: watcher
-      filePath: "${fixture.workspace_root}/edit-w2.txt"
-      timeoutMs: 60000
-  - press: Mod+s
-  - save_race_wait_entered:
-      stage: watcher
-      timeout_sec: 20
-  - type: "X"
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeSX'
-  - save_race_release: null
-  - wait: 1
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeSX'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: saved-stale-snapshot
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-dirty
-      equals: "true"
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-w2.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  - save_race_trace:
-      artifact: s2-w2-trace.json
-      expect_contains: [arm, writer-invoked, ack-delivered, watcher-invoked, enter, release, commit-settled]
-      require_ack_hashes: true
-      require_settled_kind: saved-stale-snapshot
-  - screenshot: s2-w2-watcher-held.png
-  # Record the actual W2 undo grouping too; the disk stays frozen.
-  - press: Mod+z
-  - wait: 0.5
-  - save_race_note:
-      label: s2-w2-undo-text
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-w2.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+      SX'
+    require_history: true
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit.txt
+    equals: 75699982db826f8191ba939313abc59ee80b767b1e2a51776a17f81585317900
+- save_race_note:
+    label: s3-focus-after-save
+    expression: document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName
+- screenshot: s3-undo-then-save-b2.png
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-conflict.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: S
+- host_write_file:
+    path: ${fixture.workspace_root}/edit-conflict.txt
+    text: 'EXTERNAL
 
-  # ---------------------------------------------------------------------
-  # S3 (edit.txt): stable B1 base. Move the caret, type one independent
-  # character, undo it: buffer returns to B1 and the disk never rolls back.
-  # Then a fresh explicit save lands the new B2 bytes with a new receipt.
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - press: ArrowLeft
-  - press: ArrowRight
-  - type: "X"
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeSX'
-  - wait: 0.6
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: dirty
-  - press: Mod+z
-  - wait: 0.5
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeS'
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent?.indexOf("line threeSX") === -1'
-      expect_truthy: true
-  - save_race_note:
-      label: s3-cursor-after-undo
-      expression: 'document.querySelector("[data-testid\x3d\"status-bar-workspace-cursor\"]")?.textContent'
-  # Undo is buffer-only: the saved B1 bytes stay on disk.
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  - type: "X"
-  - press: Mod+s
-  - assert_file_receipt:
-      path: "${fixture.workspace_root}/edit.txt"
-      selector: '[data-testid="code-workspace-save-observation"]'
-      encoding: UTF-8
-      bom: false
-      eol: lf
-      expected_text: "alpha Alpha ALPHA\ntree tree\nline three\nSX"
-      require_history: true
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit.txt"
-      equals: 75699982db826f8191ba939313abc59ee80b767b1e2a51776a17f81585317900
-  - save_race_note:
-      label: s3-focus-after-save
-      expression: 'document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName'
-  - screenshot: s3-undo-then-save-b2.png
+      '
+- wait_for:
+    selector: '[data-testid="external-file-conflict-dialog"]'
+    timeout_sec: 30
+- screenshot: s4-conflict-dialog.png
+- click: '[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]'
+- assert_not_visible: '[data-testid="external-file-conflict-dialog"]'
+- save_race_note:
+    label: s4-focus-after-dismiss
+    expression: document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-conflict.txt
+    equals: c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeS
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+s
+- wait: 1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: conflict
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-disk-effect
+    equals: none
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'true'
+- eval_readonly:
+    expression: '!document.getElementById("code-workspace-save-observation")?.hasAttribute("data-receipt-id")'
+    expect_truthy: true
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-conflict.txt
+    equals: c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9
+- save_race_trace:
+    artifact: s4-conflict-trace.json
+    require_settled_kind: conflict
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-conflict2.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: S
+- host_write_file:
+    path: ${fixture.workspace_root}/edit-conflict2.txt
+    text: 'EXTERNAL
 
-  # ---------------------------------------------------------------------
-  # S4 (edit-conflict.txt): real host rewrite under a dirty buffer raises
-  # the conflict dialog. Decide Later removes only the queue entry: buffer
-  # and disk are untouched, and the next explicit save is a typed conflict
-  # with zero disk effect.
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-conflict.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "S"
-  - host_write_file:
-      path: "${fixture.workspace_root}/edit-conflict.txt"
-      text: "EXTERNAL\n"
-  - wait_for:
-      selector: '[data-testid="external-file-conflict-dialog"]'
-      timeout_sec: 30
-  - screenshot: s4-conflict-dialog.png
-  - click: '[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]'
-  - assert_not_visible: '[data-testid="external-file-conflict-dialog"]'
-  - save_race_note:
-      label: s4-focus-after-dismiss
-      expression: 'document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName'
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-conflict.txt"
-      equals: c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeS'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+s
-  - wait: 1
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: conflict
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-disk-effect
-      equals: none
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-dirty
-      equals: "true"
-  - eval_readonly:
-      expression: '!document.getElementById("code-workspace-save-observation")?.hasAttribute("data-receipt-id")'
-      expect_truthy: true
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-conflict.txt"
-      equals: c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9
-  - save_race_trace:
-      artifact: s4-conflict-trace.json
-      require_settled_kind: conflict
+      '
+- wait_for:
+    selector: '[data-testid="external-file-conflict-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="external-file-conflict-dialog"] footer button:nth-of-type(2)'
+- wait: 1
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: EXTERNAL
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-conflict2.txt
+    equals: c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: Z
+- press: Mod+s
+- assert_file_receipt:
+    path: ${fixture.workspace_root}/edit-conflict2.txt
+    selector: '[data-testid="code-workspace-save-observation"]'
+    encoding: UTF-8
+    bom: false
+    eol: lf
+    expected_text: 'EXTERNAL
 
-  # ---------------------------------------------------------------------
-  # S5 (edit-conflict2.txt): same real external rewrite, but the explicit
-  # Load Disk action replaces the buffer with the disk text; a follow-up
-  # independent edit + save succeeds.
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-conflict2.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "S"
-  - host_write_file:
-      path: "${fixture.workspace_root}/edit-conflict2.txt"
-      text: "EXTERNAL\n"
-  - wait_for:
-      selector: '[data-testid="external-file-conflict-dialog"]'
-      timeout_sec: 30
-  - click: '[data-testid="external-file-conflict-dialog"] footer button:nth-of-type(2)'
-  - wait: 1
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'EXTERNAL'
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-conflict2.txt"
-      equals: c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "Z"
-  - press: Mod+s
-  - assert_file_receipt:
-      path: "${fixture.workspace_root}/edit-conflict2.txt"
-      selector: '[data-testid="code-workspace-save-observation"]'
-      encoding: UTF-8
-      bom: false
-      eol: lf
-      expected_text: "EXTERNAL\nZ"
-      require_history: true
-  - screenshot: s5-load-disk-then-save.png
+      Z'
+    require_history: true
+- screenshot: s5-load-disk-then-save.png
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-encoding.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: S
+- press: Mod+s
+- wait_for:
+    selector: '[data-testid="code-workspace-save-observation"][data-state="saved"]'
+    timeout_sec: 30
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-encoding.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- click: '[data-testid="status-bar-workspace-encoding"]'
+- wait_for: '[data-testid="file-encoding-dialog"]'
+- select_option:
+    selector: '[data-testid="file-encoding-select"]'
+    value: ISO-8859-1
+- wait: 0.2
+- click: '[data-testid="file-encoding-convert"]'
+- wait: 0.3
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: 你
+- press: Mod+s
+- wait: 1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: failed
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-disk-effect
+    equals: none
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'true'
+- eval_readonly:
+    expression: '!document.getElementById("code-workspace-save-observation")?.hasAttribute("data-receipt-id")'
+    expect_truthy: true
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-encoding.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- screenshot: s6-encoding-failed.png
+- press: Mod+z
+- wait: 0.5
+- click: '[data-testid="status-bar-workspace-encoding"]'
+- wait_for: '[data-testid="file-encoding-dialog"]'
+- select_option:
+    selector: '[data-testid="file-encoding-select"]'
+    value: UTF-8
+- wait: 0.2
+- click: '[data-testid="file-encoding-convert"]'
+- wait: 0.3
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+s
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-encoding.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- click: '[data-testid="status-bar-workspace-encoding"]'
+- wait_for: '[data-testid="file-encoding-dialog"]'
+- select_option:
+    selector: '[data-testid="file-encoding-select"]'
+    value: UTF-8
+- click: '[data-testid="file-encoding-bom"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute("data-testid") === "file-encoding-bom" && document.activeElement?.checked
+    expect_truthy: true
+- wait: 0.2
+- click: '[data-testid="file-encoding-convert"]'
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"status-bar-message\"]")?.textContent
+    contains: save as UTF-8 BOM
+- click: '[data-testid="status-bar-workspace-eol"]'
+- wait: 0.3
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+s
+- assert_file_receipt:
+    path: ${fixture.workspace_root}/edit-encoding.txt
+    selector: '[data-testid="code-workspace-save-observation"]'
+    encoding: UTF-8
+    bom: true
+    eol: crlf
+    expected_text: 'alpha Alpha ALPHA
 
-  # ---------------------------------------------------------------------
-  # S6 (edit-encoding.txt): ISO-8859-1 cannot encode 你. The save fails with
-  # zero disk effect and stays dirty; undo + switching policy back to UTF-8
-  # recovers. A UTF-8 BOM + CRLF representative variant is added, including
-  # a watcher hold that keeps a new input while the frozen BOM+CRLF bytes
-  # stay on disk.
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-encoding.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "S"
-  - press: Mod+s
-  - wait_for:
-      selector: '[data-testid="code-workspace-save-observation"][data-state="saved"]'
-      timeout_sec: 30
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-encoding.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  - click: '[data-testid="status-bar-workspace-encoding"]'
-  - wait_for: '[data-testid="file-encoding-dialog"]'
-  - select_option: {selector: '[data-testid="file-encoding-select"]', value: ISO-8859-1}
-  - wait: 0.2
-  - click: '[data-testid="file-encoding-convert"]'
-  - wait: 0.3
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "你"
-  - press: Mod+s
-  - wait: 1
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: failed
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-disk-effect
-      equals: none
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-dirty
-      equals: "true"
-  - eval_readonly:
-      expression: '!document.getElementById("code-workspace-save-observation")?.hasAttribute("data-receipt-id")'
-      expect_truthy: true
-  # The target bytes are exactly the pre-failure B1 bytes.
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-encoding.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  - screenshot: s6-encoding-failed.png
-  # Undo the unrepresentable character and switch the policy back to UTF-8.
-  - press: Mod+z
-  - wait: 0.5
-  - click: '[data-testid="status-bar-workspace-encoding"]'
-  - wait_for: '[data-testid="file-encoding-dialog"]'
-  - select_option: {selector: '[data-testid="file-encoding-select"]', value: UTF-8}
-  - wait: 0.2
-  - click: '[data-testid="file-encoding-convert"]'
-  - wait: 0.3
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+s
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-encoding.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  # UTF-8 BOM + CRLF representative variant on the same B1 logical text.
-  - click: '[data-testid="status-bar-workspace-encoding"]'
-  - wait_for: '[data-testid="file-encoding-dialog"]'
-  - select_option: {selector: '[data-testid="file-encoding-select"]', value: UTF-8}
-  - click: '[data-testid="file-encoding-bom"]'
-  - eval_readonly:
-      expression: 'document.activeElement?.getAttribute("data-testid") === "file-encoding-bom" && document.activeElement?.checked'
-      expect_truthy: true
-  - wait: 0.2
-  - click: '[data-testid="file-encoding-convert"]'
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"status-bar-message\"]")?.textContent'
-      contains: 'save as UTF-8 BOM'
-  - click: '[data-testid="status-bar-workspace-eol"]'
-  - wait: 0.3
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+s
-  - assert_file_receipt:
-      path: "${fixture.workspace_root}/edit-encoding.txt"
-      selector: '[data-testid="code-workspace-save-observation"]'
-      encoding: UTF-8
-      bom: true
-      eol: crlf
-      expected_text: "alpha Alpha ALPHA\ntree tree\nline three\nS"
-      require_history: false
-  - screenshot: s6-bom-crlf-saved.png
-  # BOM+CRLF hold variant: a W2-class watcher hold on the same policy. The
-  # frozen disk keeps the B1+X BOM+CRLF bytes while the live buffer gets Y.
-  - save_race_note:
-      label: s6-bom-crlf-focus-before-hold
-      expression: 'document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "X"
-  - wait: 0.6
-  - save_race_arm:
-      stage: watcher
-      filePath: "${fixture.workspace_root}/edit-encoding.txt"
-      timeoutMs: 60000
-  - press: Mod+s
-  - save_race_wait_entered:
-      stage: watcher
-      timeout_sec: 20
-  - type: "Y"
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeSXY'
-  - save_race_release: null
-  - wait: 1
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeSXY'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: saved-stale-snapshot
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-dirty
-      equals: "true"
-  # Frozen bytes: BOM + CRLF B1+X, exactly 47 bytes.
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-encoding.txt"
-      equals: e1f9874b4479b6d4ff06d264a4c16fedf0f6c74ad205a7f48b5899514d189dba
-  - save_race_trace:
-      artifact: s6-bom-crlf-watcher-trace.json
-      expect_contains: [arm, writer-invoked, ack-delivered, watcher-invoked, enter, release, commit-settled]
-      require_ack_hashes: true
-      require_settled_kind: saved-stale-snapshot
-  - screenshot: s6-bom-crlf-watcher-held.png
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+s
-  - assert_file_receipt:
-      path: "${fixture.workspace_root}/edit-encoding.txt"
-      selector: '[data-testid="code-workspace-save-observation"]'
-      encoding: UTF-8
-      bom: true
-      eol: crlf
-      expected_text: "alpha Alpha ALPHA\ntree tree\nline three\nSXY"
-      require_history: true
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-encoding.txt"
-      equals: 237aa6c59e51a8885aacf16a92af0514f2f7d741303d67f2f20058809d503198
+      tree tree
 
-  # ---------------------------------------------------------------------
-  # S7a (edit-unknown.txt): controlled QA response loss. The REAL native
-  # write completes but its response is withheld, so the production
-  # unknown-effect path must re-read the real disk bytes and prove the
-  # intended bytes landed (committed) instead of guessing.
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-unknown.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "S"
-  - save_race_arm:
-      stage: fault
-      mode: unknown-response
-      filePath: "${fixture.workspace_root}/edit-unknown.txt"
-      timeoutMs: 60000
-  - press: Mod+s
-  - wait: 1.5
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: saved-current
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-disk-effect
-      equals: committed
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-unknown.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  - save_race_trace:
-      artifact: s7-unknown-response-trace.json
-      expect_contains: [arm, writer-invoked, fault-injected, unknown-readback, commit-settled]
-      require_settled_kind: saved-current
-      require_readback_outcome: committed
-  - screenshot: s7-unknown-readback-committed.png
+      line three
 
-  # ---------------------------------------------------------------------
-  # S7b (edit-unknown-old.txt): delayed response fault while the host
-  # restores the OLD bytes. The real read-back sees the old hash, classifies
-  # confirmed-none and the retry is allowed (and lands B1).
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-unknown-old.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "S"
-  - save_race_arm:
-      stage: fault
-      mode: unknown-response-delay
-      filePath: "${fixture.workspace_root}/edit-unknown-old.txt"
-      timeoutMs: 60000
-  - press: Mod+s
-  - save_race_wait_entered:
-      stage: fault
-      timeout_sec: 20
-  # Restore the exact old B0 bytes while the real response is withheld.
-  - host_write_file:
-      path: "${fixture.workspace_root}/edit-unknown-old.txt"
-      text: "alpha Alpha ALPHA\ntree tree\nline three\n"
-  - save_race_release: null
-  - wait: 1.5
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: failed
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-disk-effect
-      equals: none
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-dirty
-      equals: "true"
-  - eval_readonly:
-      expression: '!document.getElementById("code-workspace-save-observation")?.hasAttribute("data-receipt-id")'
-      expect_truthy: true
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-unknown-old.txt"
-      equals: 2b7edc22ece15ead9636ecf67c54fa5e48bb7c4325409a7651fda976073ae88d
-  - save_race_trace:
-      artifact: s7-old-trace.json
-      expect_contains: [arm, writer-invoked, fault-pending, enter, release, fault-injected, unknown-readback, commit-settled]
-      require_settled_kind: failed
-      require_readback_outcome: none
-  - screenshot: s7-old-confirmed-none.png
-  # Recovery: the retry is allowed and lands the frozen B1 bytes. The
-  # pre-failure attempt already snapshotted the identical B0 preimage, so the
-  # deduplicated history id is legitimately absent here.
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+s
-  - assert_file_receipt:
-      path: "${fixture.workspace_root}/edit-unknown-old.txt"
-      selector: '[data-testid="code-workspace-save-observation"]'
-      encoding: UTF-8
-      bom: false
-      eol: lf
-      expected_text: "alpha Alpha ALPHA\ntree tree\nline three\nS"
-      require_history: false
-  # Optionally leave the file saved on disk as B1.
+      S'
+    require_history: false
+- screenshot: s6-bom-crlf-saved.png
+- save_race_note:
+    label: s6-bom-crlf-focus-before-hold
+    expression: document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: X
+- wait: 0.6
+- save_race_arm:
+    stage: watcher
+    filePath: ${fixture.workspace_root}/edit-encoding.txt
+    timeoutMs: 60000
+- press: Mod+s
+- save_race_wait_entered:
+    stage: watcher
+    timeout_sec: 20
+- type: Y
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeSXY
+- save_race_release: null
+- wait: 1
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeSXY
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: saved-stale-snapshot
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'true'
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-encoding.txt
+    equals: e1f9874b4479b6d4ff06d264a4c16fedf0f6c74ad205a7f48b5899514d189dba
+- save_race_trace:
+    artifact: s6-bom-crlf-watcher-trace.json
+    expect_contains:
+    - arm
+    - writer-invoked
+    - ack-delivered
+    - watcher-invoked
+    - enter
+    - release
+    - commit-settled
+    require_ack_hashes: true
+    require_settled_kind: saved-stale-snapshot
+- screenshot: s6-bom-crlf-watcher-held.png
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+s
+- assert_file_receipt:
+    path: ${fixture.workspace_root}/edit-encoding.txt
+    selector: '[data-testid="code-workspace-save-observation"]'
+    encoding: UTF-8
+    bom: true
+    eol: crlf
+    expected_text: 'alpha Alpha ALPHA
 
-  # ---------------------------------------------------------------------
-  # S7c (edit-unknown-foreign.txt): delayed response fault while the host
-  # writes FOREIGN bytes. The real read-back sees neither intended nor old:
-  # failed/unknown with a recovery id; the retry is blocked with no writer
-  # call. After reload the recovery center shows the foreign-blocked row;
-  # Decide Later closes it with zero extra writes, and an explicit
-  # Acknowledge removes it, after which a fresh edit saves successfully.
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-unknown-foreign.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "S"
-  - save_race_arm:
-      stage: fault
-      mode: unknown-response-delay
-      filePath: "${fixture.workspace_root}/edit-unknown-foreign.txt"
-      timeoutMs: 60000
-  - press: Mod+s
-  - save_race_wait_entered:
-      stage: fault
-      timeout_sec: 20
-  - host_write_file:
-      path: "${fixture.workspace_root}/edit-unknown-foreign.txt"
-      text: "FOREIGN\n"
-  - save_race_release: null
-  - wait: 1.5
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: failed
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-disk-effect
-      equals: unknown
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: recovery
-  - eval_readonly:
-      expression: '!!document.getElementById("code-workspace-save-observation")?.getAttribute("data-recovery-id")'
-      expect_truthy: true
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-unknown-foreign.txt"
-      equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
-  - save_race_trace:
-      artifact: s7-foreign-trace.json
-      expect_contains: [arm, writer-invoked, fault-pending, enter, release, fault-injected, unknown-readback, commit-settled]
-      require_settled_kind: failed
-      require_readback_outcome: foreign
-  - screenshot: s7-foreign-unknown.png
-  # The host mutation settles as a real external-conflict dialog; Decide Later
-  # keeps both sides and must not write anything.
-  - wait_for:
-      selector: '[data-testid="external-file-conflict-dialog"]'
-      timeout_sec: 30
-  - click: '[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]'
-  - assert_not_visible: '[data-testid="external-file-conflict-dialog"]'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-result-kind
-      equals: failed
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-disk-effect
-      equals: unknown
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: recovery
-  - eval_readonly:
-      expression: '!!document.getElementById("code-workspace-save-observation")?.getAttribute("data-recovery-id")'
-      expect_truthy: true
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-unknown-foreign.txt"
-      equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
-  # Blind retry is blocked before any writer call.
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+s
-  - wait: 0.6
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"status-bar-message\"]")?.textContent'
-      contains: 'Save blocked'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-disk-effect
-      equals: unknown
-  - eval_readonly:
-      expression: '!document.getElementById("code-workspace-save-observation")?.hasAttribute("data-receipt-id")'
-      expect_truthy: true
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-unknown-foreign.txt"
-      equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
-  # Reload #1: the recovery center must surface the persisted ledger row.
-  # Tabs are not restored across a reload in this app, so the workspace is
-  # re-entered through the same persisted recents row.
-  - reload_window: null
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
-  - wait_for:
-      selector: '[data-testid="code-workspace-tab"]'
-      timeout_sec: 60
-  - wait_for:
-      selector: '[data-testid="workspace-recovery-dialog"]'
-      timeout_sec: 60
-  - click: '[data-testid="workspace-recovery-disk-results-tab"]'
-  - assert_text:
-      selector: '[data-testid="workspace-recovery-disk-results"]'
-      contains: 'edit-unknown-foreign.txt'
-  - assert_text:
-      selector: '[data-testid="workspace-recovery-disk-result-row"]'
-      contains: 'Foreign content · retries blocked'
-  - save_race_note:
-      label: s7-foreign-ledger-row-reload1
-      expression: 'document.querySelector("[data-testid\x3d\"workspace-recovery-disk-result-row\"]")?.textContent'
-  - screenshot: s7-foreign-recovery-center.png
-  # Decide Later: closing the recovery UI writes nothing.
-  - click: '[data-testid="workspace-recovery-dialog"] footer button:last-of-type'
-  - assert_not_visible: '[data-testid="workspace-recovery-dialog"]'
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-unknown-foreign.txt"
-      equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
-  # Reload #2: explicit Acknowledge resolves the row and unblocks saving.
-  - reload_window: null
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
-  - wait_for:
-      selector: '[data-testid="workspace-recovery-dialog"]'
-      timeout_sec: 60
-  - click: '[data-testid="workspace-recovery-disk-results-tab"]'
-  - assert_text:
-      selector: '[data-testid="workspace-recovery-disk-result-row"]'
-      contains: 'Foreign content · retries blocked'
-  - click: '[data-testid="workspace-recovery-disk-result-row"] button[title="Acknowledge only this row and unblock saving this path"]'
-  - assert_text:
-      selector: '[data-testid="workspace-recovery-disk-results"]'
-      contains: 'No unresolved disk results'
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"status-bar-message\"]")?.textContent'
-      contains: 'Acknowledged disk result'
-  - click: '[data-testid="workspace-recovery-dialog"] footer button:last-of-type'
-  - assert_not_visible: '[data-testid="workspace-recovery-dialog"]'
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-unknown-foreign.txt"
-      equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
-  # Post-resolution retry: a fresh edit saves over the clean FOREIGN buffer.
-  - click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key="root:r1:edit-unknown-foreign.txt"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "Z"
-  - wait: 0.6
-  - press: Mod+s
-  - assert_file_receipt:
-      path: "${fixture.workspace_root}/edit-unknown-foreign.txt"
-      selector: '[data-testid="code-workspace-save-observation"]'
-      encoding: UTF-8
-      bom: false
-      eol: lf
-      expected_text: "FOREIGN\nZ"
-      require_history: true
-  - screenshot: s7-foreign-acknowledged-retry.png
+      tree tree
 
-  # ---------------------------------------------------------------------
-  # S8 (edit-close.txt): close the buffer while the REAL ack is held. The
-  # late result must not resurrect the tab; the bytes stay committed on
-  # disk and a persisted recovery ledger row is shown by the Recovery
-  # center, whose Reopen action loads the real B1 bytes into the editor.
-  # ---------------------------------------------------------------------
-  - wait: 0.8
-  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-close.txt"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+End
-  - type: "S"
-  - save_race_arm:
-      stage: ack
-      filePath: "${fixture.workspace_root}/edit-close.txt"
-      timeoutMs: 60000
-  - press: Mod+s
-  - save_race_wait_entered:
-      stage: ack
-      timeout_sec: 20
-  - click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key="root:r1:edit-close.txt"] button[title="Close"]'
-  - wait_for: '[data-testid="confirm-dialog"]'
-  - click: '[data-testid="confirm-dialog-confirm"]'
-  - assert_count:
-      selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key="root:r1:edit-close.txt"]'
-      equal: 0
-  # The hold releases itself as `owner-invalidated` when the buffer is gone;
-  # the real ack is then delivered to a dead owner (no explicit release).
-  - wait: 1.5
-  # The real write landed; the buffer was never resurrected and focus was not
-  # stolen back into an editor.
-  - assert_count:
-      selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key="root:r1:edit-close.txt"]'
-      equal: 0
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-close.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  - save_race_note:
-      label: s8-focus-after-settle
-      expression: 'document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName'
-  - save_race_trace:
-      artifact: s8-close-during-ack-trace.json
-      expect_contains: [arm, writer-invoked, enter, owner-invalidated, ack-delivered, commit-settled]
-      require_ack_hashes: true
-      require_settled_kind: committed-writeback-discarded
-  - screenshot: s8-close-during-ack.png
-  # Reload: the Recovery center must show the persisted row for this exact
-  # path and transaction, and its Reopen must load the real B1 bytes.
-  - reload_window: null
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
-  - wait_for:
-      selector: '[data-testid="code-workspace-tab"]'
-      timeout_sec: 60
-  - wait_for:
-      selector: '[data-testid="workspace-recovery-dialog"]'
-      timeout_sec: 60
-  - click: '[data-testid="workspace-recovery-disk-results-tab"]'
-  - assert_text:
-      selector: '[data-testid="workspace-recovery-disk-results"]'
-      contains: 'edit-close.txt'
-  - assert_text:
-      selector: '[data-testid="workspace-recovery-disk-result-row"]'
-      contains: 'Saved to disk · editor writeback discarded'
-  - assert_text:
-      selector: '[data-testid="workspace-recovery-disk-result-row"]'
-      contains: 'writeback-discarded'
-  - save_race_note:
-      label: s8-ledger-row
-      expression: 'document.querySelector("[data-testid\x3d\"workspace-recovery-disk-result-row\"]")?.textContent'
-  - screenshot: s8-recovery-center.png
-  - click: '[data-testid="workspace-recovery-disk-result-row"] button[title="Open the file as it is on disk right now"]'
-  - wait_for:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      timeout_sec: 30
-  - wait: 0.6
-  - eval_readonly:
-      expression: 'document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent'
-      contains: 'line threeS'
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-save-observation"]'
-      name: data-state
-      equals: clean
-  - assert_file_sha256:
-      path: "${fixture.workspace_root}/edit-close.txt"
-      equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
-  - save_race_note:
-      label: s8-focus-after-reopen
-      expression: 'document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName'
-  - screenshot: s8-recovery-reopen-b1.png
-  - click: '[data-testid="workspace-recovery-disk-result-row"] button[title="Acknowledge only this row and unblock saving this path"]'
-  - assert_text:
-      selector: '[data-testid="workspace-recovery-disk-results"]'
-      contains: 'No unresolved disk results'
-  - click: '[data-testid="workspace-recovery-dialog"] footer button:last-of-type'
-  - assert_not_visible: '[data-testid="workspace-recovery-dialog"]'
+      line three
+
+      SXY'
+    require_history: true
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-encoding.txt
+    equals: 237aa6c59e51a8885aacf16a92af0514f2f7d741303d67f2f20058809d503198
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-unknown.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: S
+- save_race_arm:
+    stage: fault
+    mode: unknown-response
+    filePath: ${fixture.workspace_root}/edit-unknown.txt
+    timeoutMs: 60000
+- press: Mod+s
+- wait: 1.5
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: saved-current
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-disk-effect
+    equals: committed
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-unknown.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- save_race_trace:
+    artifact: s7-unknown-response-trace.json
+    expect_contains:
+    - arm
+    - writer-invoked
+    - fault-injected
+    - unknown-readback
+    - commit-settled
+    require_settled_kind: saved-current
+    require_readback_outcome: committed
+- screenshot: s7-unknown-readback-committed.png
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-unknown-old.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: S
+- save_race_arm:
+    stage: fault
+    mode: unknown-response-delay
+    filePath: ${fixture.workspace_root}/edit-unknown-old.txt
+    timeoutMs: 60000
+- press: Mod+s
+- save_race_wait_entered:
+    stage: fault
+    timeout_sec: 20
+- host_write_file:
+    path: ${fixture.workspace_root}/edit-unknown-old.txt
+    text: 'alpha Alpha ALPHA
+
+      tree tree
+
+      line three
+
+      '
+- save_race_release: null
+- wait: 1.5
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: failed
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-disk-effect
+    equals: none
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-dirty
+    equals: 'true'
+- eval_readonly:
+    expression: '!document.getElementById("code-workspace-save-observation")?.hasAttribute("data-receipt-id")'
+    expect_truthy: true
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-unknown-old.txt
+    equals: 2b7edc22ece15ead9636ecf67c54fa5e48bb7c4325409a7651fda976073ae88d
+- save_race_trace:
+    artifact: s7-old-trace.json
+    expect_contains:
+    - arm
+    - writer-invoked
+    - fault-pending
+    - enter
+    - release
+    - fault-injected
+    - unknown-readback
+    - commit-settled
+    require_settled_kind: failed
+    require_readback_outcome: none
+- screenshot: s7-old-confirmed-none.png
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+s
+- assert_file_receipt:
+    path: ${fixture.workspace_root}/edit-unknown-old.txt
+    selector: '[data-testid="code-workspace-save-observation"]'
+    encoding: UTF-8
+    bom: false
+    eol: lf
+    expected_text: 'alpha Alpha ALPHA
+
+      tree tree
+
+      line three
+
+      S'
+    require_history: false
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-unknown-foreign.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: S
+- save_race_arm:
+    stage: fault
+    mode: unknown-response-delay
+    filePath: ${fixture.workspace_root}/edit-unknown-foreign.txt
+    timeoutMs: 60000
+- press: Mod+s
+- save_race_wait_entered:
+    stage: fault
+    timeout_sec: 20
+- host_write_file:
+    path: ${fixture.workspace_root}/edit-unknown-foreign.txt
+    text: 'FOREIGN
+
+      '
+- save_race_release: null
+- wait: 1.5
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: failed
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-disk-effect
+    equals: unknown
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: recovery
+- eval_readonly:
+    expression: '!!document.getElementById("code-workspace-save-observation")?.getAttribute("data-recovery-id")'
+    expect_truthy: true
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-unknown-foreign.txt
+    equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
+- save_race_trace:
+    artifact: s7-foreign-trace.json
+    expect_contains:
+    - arm
+    - writer-invoked
+    - fault-pending
+    - enter
+    - release
+    - fault-injected
+    - unknown-readback
+    - commit-settled
+    require_settled_kind: failed
+    require_readback_outcome: foreign
+- screenshot: s7-foreign-unknown.png
+- wait_for:
+    selector: '[data-testid="external-file-conflict-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]'
+- assert_not_visible: '[data-testid="external-file-conflict-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-result-kind
+    equals: failed
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-disk-effect
+    equals: unknown
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: recovery
+- eval_readonly:
+    expression: '!!document.getElementById("code-workspace-save-observation")?.getAttribute("data-recovery-id")'
+    expect_truthy: true
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-unknown-foreign.txt
+    equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+s
+- wait: 0.6
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"status-bar-message\"]")?.textContent
+    contains: Save blocked
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-disk-effect
+    equals: unknown
+- eval_readonly:
+    expression: '!document.getElementById("code-workspace-save-observation")?.hasAttribute("data-receipt-id")'
+    expect_truthy: true
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-unknown-foreign.txt
+    equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tab"]'
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="workspace-recovery-dialog"]'
+    timeout_sec: 60
+- click: '[data-testid="workspace-recovery-disk-results-tab"]'
+- assert_text:
+    selector: '[data-testid="workspace-recovery-disk-results"]'
+    contains: edit-unknown-foreign.txt
+- assert_text:
+    selector: '[data-testid="workspace-recovery-disk-result-row"]'
+    contains: Foreign content · retries blocked
+- save_race_note:
+    label: s7-foreign-ledger-row-reload1
+    expression: document.querySelector("[data-testid\x3d\"workspace-recovery-disk-result-row\"]")?.textContent
+- screenshot: s7-foreign-recovery-center.png
+- click: '[data-testid="workspace-recovery-dialog"] footer button:last-of-type'
+- assert_not_visible: '[data-testid="workspace-recovery-dialog"]'
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-unknown-foreign.txt
+    equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for:
+    selector: '[data-testid="workspace-recovery-dialog"]'
+    timeout_sec: 60
+- click: '[data-testid="workspace-recovery-disk-results-tab"]'
+- assert_text:
+    selector: '[data-testid="workspace-recovery-disk-result-row"]'
+    contains: Foreign content · retries blocked
+- click: '[data-testid="workspace-recovery-disk-result-row"] button[title="Acknowledge only this row and unblock
+    saving this path"]'
+- assert_text:
+    selector: '[data-testid="workspace-recovery-disk-results"]'
+    contains: No unresolved disk results
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"status-bar-message\"]")?.textContent
+    contains: Acknowledged disk result
+- click: '[data-testid="workspace-recovery-dialog"] footer button:last-of-type'
+- assert_not_visible: '[data-testid="workspace-recovery-dialog"]'
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-unknown-foreign.txt
+    equals: 861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2
+- click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key="root:r1:edit-unknown-foreign.txt"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: Z
+- wait: 0.6
+- press: Mod+s
+- assert_file_receipt:
+    path: ${fixture.workspace_root}/edit-unknown-foreign.txt
+    selector: '[data-testid="code-workspace-save-observation"]'
+    encoding: UTF-8
+    bom: false
+    eol: lf
+    expected_text: 'FOREIGN
+
+      Z'
+    require_history: true
+- screenshot: s7-foreign-acknowledged-retry.png
+- wait: 0.8
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="edit-close.txt"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: S
+- save_race_arm:
+    stage: ack
+    filePath: ${fixture.workspace_root}/edit-close.txt
+    timeoutMs: 60000
+- press: Mod+s
+- save_race_wait_entered:
+    stage: ack
+    timeout_sec: 20
+- click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key="root:r1:edit-close.txt"] button[title="Close"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key="root:r1:edit-close.txt"]'
+    equal: 0
+- wait: 1.5
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key="root:r1:edit-close.txt"]'
+    equal: 0
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-close.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- save_race_note:
+    label: s8-focus-after-settle
+    expression: document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName
+- save_race_trace:
+    artifact: s8-close-during-ack-trace.json
+    expect_contains:
+    - arm
+    - writer-invoked
+    - enter
+    - owner-invalidated
+    - ack-delivered
+    - commit-settled
+    require_ack_hashes: true
+    require_settled_kind: committed-writeback-discarded
+- screenshot: s8-close-during-ack.png
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tab"]'
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="workspace-recovery-dialog"]'
+    timeout_sec: 60
+- click: '[data-testid="workspace-recovery-disk-results-tab"]'
+- assert_text:
+    selector: '[data-testid="workspace-recovery-disk-results"]'
+    contains: edit-close.txt
+- assert_text:
+    selector: '[data-testid="workspace-recovery-disk-result-row"]'
+    contains: Saved to disk · editor writeback discarded
+- assert_text:
+    selector: '[data-testid="workspace-recovery-disk-result-row"]'
+    contains: writeback-discarded
+- save_race_note:
+    label: s8-ledger-row
+    expression: document.querySelector("[data-testid\x3d\"workspace-recovery-disk-result-row\"]")?.textContent
+- screenshot: s8-recovery-center.png
+- click: '[data-testid="workspace-recovery-disk-result-row"] button[title="Open the file as it is on disk right
+    now"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 30
+- wait: 0.6
+- eval_readonly:
+    expression: document.querySelector("[data-testid\x3d\"code-workspace-editor\"] .cm-content")?.textContent
+    contains: line threeS
+- assert_attribute:
+    selector: '[data-testid="code-workspace-save-observation"]'
+    name: data-state
+    equals: clean
+- assert_file_sha256:
+    path: ${fixture.workspace_root}/edit-close.txt
+    equals: 77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172
+- save_race_note:
+    label: s8-focus-after-reopen
+    expression: document.activeElement?.getAttribute("data-testid") ?? document.activeElement?.className ?? document.activeElement?.tagName
+- screenshot: s8-recovery-reopen-b1.png
+- click: '[data-testid="workspace-recovery-disk-result-row"] button[title="Acknowledge only this row and unblock
+    saving this path"]'
+- assert_text:
+    selector: '[data-testid="workspace-recovery-disk-results"]'
+    contains: No unresolved disk results
+- click: '[data-testid="workspace-recovery-dialog"] footer button:last-of-type'
+- assert_not_visible: '[data-testid="workspace-recovery-dialog"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: ED-PARITY-002 save-while-typing W0/W1/W2 byte + dirty retention baseline (native desktop)：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 11
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 24
+    - 28
+    - 29
+    - 32
+    - 34
+    - 35
+    - 36
+    - 38
+    - 39
+    - 40
+    - 41
+    - 43
+    - 52
+    - 54
+    - 55
+    - 56
+    - 57
+    - 58
+    - 59
+    - 60
+    - 62
+    - 71
+    - 73
+    - 77
+    - 79
+    - 80
+    - 81
+    - 82
+    - 83
+    - 84
+    - 85
+    - 87
+    - 95
+    - 97
+    - 100
+    - 102
+    - 103
+    - 104
+    - 105
+    - 106
+    - 110
+    - 114
+    - 116
+    - 117
+    - 120
+    - 123
+    - 125
+    - 126
+    - 127
+    - 128
+    - 131
+    - 133
+    - 136
+    - 137
+    - 146
+    - 148
+    - 149
+    - 150
+    - 151
+    - 153
+    - 157
+    - 158
+    - 159
+    - 160
+    - 164
+    - 166
+    - 167
+    - 168
+    - 169
+    - 172
+    - 174
+    - 176
+    - 178
+    - 179
+    - 180
+    - 181
+    - 189
+    - 191
+    - 193
+    - 195
+    - 197
+    - 198
+    - 200
+    - 202
+    - 203
+    - 206
+    - 208
+    - 210
+    - 211
+    - 214
+    - 215
+    - 216
+    - 217
+    - 219
+    - 220
+    - 221
+    - 222
+    - 224
+    - 232
+    - 233
+    - 237
+    - 239
+    - 240
+    - 241
+    - 242
+    - 243
+    - 251
+    - 253
+    - 254
+    - 255
+    - 256
+    - 257
+    - 258
+    - 259
+    - 260
+    - 269
+    - 270
+    - 273
+    - 275
+    - 276
+    - 277
+    - 278
+    - 279
+    - 280
+    - 281
+    - 282
+    - 292
+    - 299
+    - 300
+    - 306
+    - 308
+    - 309
+    - 312
+    - 315
+    - 317
+    - 320
+    - 322
+    - 323
+    - 325
+    - 327
+    - 330
+    - 333
+    - 334
+    - 335
+    - 336
+    - 338
+    - 342
+    - 344
+    - 345
+    - 346
+    - 347
+    - 348
+    - 349
+    - 350
+    - 352
+    - 357
+    - 360
+    - 362
+    - 363
+    - 366
+    - 370
+    - 372
+    - 378
+    - 380
+    - 382
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"edit.txt\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 13
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit.txt", "equals": "2b7edc22ece15ead9636ecf67c54fa5e48bb7c4325409a7651fda976073ae88d"}}'
+    - step: 14
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "clean"}}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "dirty"}}'
+    - step: 25
+      expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/edit.txt", "selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "encoding": "UTF-8", "bom": false, "eol": "lf", "expected_text": "alpha Alpha ALPHA\ntree tree\nline three\nS",
+        "require_history": true}}'
+    - step: 26
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 27
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "false"}}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeS"}}'
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeSX"}}'
+    - step: 45
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeSX"}}'
+    - step: 46
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "cancelled"}}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "true"}}'
+    - step: 48
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-w0.txt", "equals": "2b7edc22ece15ead9636ecf67c54fa5e48bb7c4325409a7651fda976073ae88d"}}'
+    - step: 49
+      expectation: '{"save_race_trace": {"artifact": "s2-w0-trace.json", "expect_contains": ["arm", "enter", "release",
+        "commit-settled"], "require_settled_kind": "cancelled", "forbid_between": {"anchor": "arm", "until": "commit-settled",
+        "events": ["writer-invoked", "ack-delivered", "watcher-invoked"]}}}'
+    - step: 53
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 61
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeSX"}}'
+    - step: 64
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeSX"}}'
+    - step: 65
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "saved-stale-snapshot"}}'
+    - step: 66
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "true"}}'
+    - step: 67
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-disk-effect", "equals": "committed"}}'
+    - step: 68
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-w1.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 69
+      expectation: '{"save_race_trace": {"artifact": "s2-w1-trace.json", "expect_contains": ["arm", "writer-invoked",
+        "enter", "release", "ack-delivered", "commit-settled"], "require_ack_hashes": true, "require_settled_kind":
+        "saved-stale-snapshot"}}'
+    - step: 74
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-w1.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 78
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 86
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeSX"}}'
+    - step: 89
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeSX"}}'
+    - step: 90
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "saved-stale-snapshot"}}'
+    - step: 91
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "true"}}'
+    - step: 92
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-w2.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 93
+      expectation: '{"save_race_trace": {"artifact": "s2-w2-trace.json", "expect_contains": ["arm", "writer-invoked",
+        "ack-delivered", "watcher-invoked", "enter", "release", "commit-settled"], "require_ack_hashes": true, "require_settled_kind":
+        "saved-stale-snapshot"}}'
+    - step: 98
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-w2.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 101
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 107
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeSX"}}'
+    - step: 109
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "dirty"}}'
+    - step: 112
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeS"}}'
+    - step: 113
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent?.indexOf(\"line threeSX\") === -1", "expect_truthy": true}}'
+    - step: 115
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 118
+      expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/edit.txt", "selector": "[data-testid=\"code-workspace-save-observation\"]",
+        "encoding": "UTF-8", "bom": false, "eol": "lf", "expected_text": "alpha Alpha ALPHA\ntree tree\nline three\nSX",
+        "require_history": true}}'
+    - step: 119
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit.txt", "equals": "75699982db826f8191ba939313abc59ee80b767b1e2a51776a17f81585317900"}}'
+    - step: 124
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 129
+      expectation: '{"wait_for": {"selector": "[data-testid=\"external-file-conflict-dialog\"]", "timeout_sec":
+        30}}'
+    - step: 132
+      expectation: '{"assert_not_visible": "[data-testid=\"external-file-conflict-dialog\"]"}'
+    - step: 134
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-conflict.txt", "equals": "c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9"}}'
+    - step: 135
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeS"}}'
+    - step: 139
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "conflict"}}'
+    - step: 140
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-disk-effect", "equals": "none"}}'
+    - step: 141
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "true"}}'
+    - step: 142
+      expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"code-workspace-save-observation\")?.hasAttribute(\"data-receipt-id\")",
+        "expect_truthy": true}}'
+    - step: 143
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-conflict.txt", "equals": "c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9"}}'
+    - step: 144
+      expectation: '{"save_race_trace": {"artifact": "s4-conflict-trace.json", "require_settled_kind": "conflict"}}'
+    - step: 147
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 152
+      expectation: '{"wait_for": {"selector": "[data-testid=\"external-file-conflict-dialog\"]", "timeout_sec":
+        30}}'
+    - step: 155
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "EXTERNAL"}}'
+    - step: 156
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-conflict2.txt", "equals": "c0cd94660e03e9ce34eccf2ebff469c2ee8b1d331e557ddfe9f473781f6c3ea9"}}'
+    - step: 161
+      expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/edit-conflict2.txt", "selector":
+        "[data-testid=\"code-workspace-save-observation\"]", "encoding": "UTF-8", "bom": false, "eol": "lf", "expected_text":
+        "EXTERNAL\nZ", "require_history": true}}'
+    - step: 165
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 170
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-save-observation\"][data-state=\"saved\"]",
+        "timeout_sec": 30}}'
+    - step: 171
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-encoding.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 173
+      expectation: '{"wait_for": "[data-testid=\"file-encoding-dialog\"]"}'
+    - step: 183
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "failed"}}'
+    - step: 184
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-disk-effect", "equals": "none"}}'
+    - step: 185
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "true"}}'
+    - step: 186
+      expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"code-workspace-save-observation\")?.hasAttribute(\"data-receipt-id\")",
+        "expect_truthy": true}}'
+    - step: 187
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-encoding.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 192
+      expectation: '{"wait_for": "[data-testid=\"file-encoding-dialog\"]"}'
+    - step: 199
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-encoding.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 201
+      expectation: '{"wait_for": "[data-testid=\"file-encoding-dialog\"]"}'
+    - step: 204
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") ===
+        \"file-encoding-bom\" && document.activeElement?.checked", "expect_truthy": true}}'
+    - step: 207
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"status-bar-message\\\"]\")?.textContent",
+        "contains": "save as UTF-8 BOM"}}'
+    - step: 212
+      expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/edit-encoding.txt", "selector":
+        "[data-testid=\"code-workspace-save-observation\"]", "encoding": "UTF-8", "bom": true, "eol": "crlf", "expected_text":
+        "alpha Alpha ALPHA\ntree tree\nline three\nS", "require_history": false}}'
+    - step: 223
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeSXY"}}'
+    - step: 226
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeSXY"}}'
+    - step: 227
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "saved-stale-snapshot"}}'
+    - step: 228
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "true"}}'
+    - step: 229
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-encoding.txt", "equals": "e1f9874b4479b6d4ff06d264a4c16fedf0f6c74ad205a7f48b5899514d189dba"}}'
+    - step: 230
+      expectation: '{"save_race_trace": {"artifact": "s6-bom-crlf-watcher-trace.json", "expect_contains": ["arm",
+        "writer-invoked", "ack-delivered", "watcher-invoked", "enter", "release", "commit-settled"], "require_ack_hashes":
+        true, "require_settled_kind": "saved-stale-snapshot"}}'
+    - step: 234
+      expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/edit-encoding.txt", "selector":
+        "[data-testid=\"code-workspace-save-observation\"]", "encoding": "UTF-8", "bom": true, "eol": "crlf", "expected_text":
+        "alpha Alpha ALPHA\ntree tree\nline three\nSXY", "require_history": true}}'
+    - step: 235
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-encoding.txt", "equals": "237aa6c59e51a8885aacf16a92af0514f2f7d741303d67f2f20058809d503198"}}'
+    - step: 238
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 245
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "saved-current"}}'
+    - step: 246
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-disk-effect", "equals": "committed"}}'
+    - step: 247
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-unknown.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 248
+      expectation: '{"save_race_trace": {"artifact": "s7-unknown-response-trace.json", "expect_contains": ["arm",
+        "writer-invoked", "fault-injected", "unknown-readback", "commit-settled"], "require_settled_kind": "saved-current",
+        "require_readback_outcome": "committed"}}'
+    - step: 252
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 262
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "failed"}}'
+    - step: 263
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-disk-effect", "equals": "none"}}'
+    - step: 264
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "true"}}'
+    - step: 265
+      expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"code-workspace-save-observation\")?.hasAttribute(\"data-receipt-id\")",
+        "expect_truthy": true}}'
+    - step: 266
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-unknown-old.txt", "equals":
+        "2b7edc22ece15ead9636ecf67c54fa5e48bb7c4325409a7651fda976073ae88d"}}'
+    - step: 267
+      expectation: '{"save_race_trace": {"artifact": "s7-old-trace.json", "expect_contains": ["arm", "writer-invoked",
+        "fault-pending", "enter", "release", "fault-injected", "unknown-readback", "commit-settled"], "require_settled_kind":
+        "failed", "require_readback_outcome": "none"}}'
+    - step: 271
+      expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/edit-unknown-old.txt", "selector":
+        "[data-testid=\"code-workspace-save-observation\"]", "encoding": "UTF-8", "bom": false, "eol": "lf", "expected_text":
+        "alpha Alpha ALPHA\ntree tree\nline three\nS", "require_history": false}}'
+    - step: 274
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 284
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "failed"}}'
+    - step: 285
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-disk-effect", "equals": "unknown"}}'
+    - step: 286
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "recovery"}}'
+    - step: 287
+      expectation: '{"eval_readonly": {"expression": "!!document.getElementById(\"code-workspace-save-observation\")?.getAttribute(\"data-recovery-id\")",
+        "expect_truthy": true}}'
+    - step: 288
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-unknown-foreign.txt", "equals":
+        "861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2"}}'
+    - step: 289
+      expectation: '{"save_race_trace": {"artifact": "s7-foreign-trace.json", "expect_contains": ["arm", "writer-invoked",
+        "fault-pending", "enter", "release", "fault-injected", "unknown-readback", "commit-settled"], "require_settled_kind":
+        "failed", "require_readback_outcome": "foreign"}}'
+    - step: 291
+      expectation: '{"wait_for": {"selector": "[data-testid=\"external-file-conflict-dialog\"]", "timeout_sec":
+        30}}'
+    - step: 293
+      expectation: '{"assert_not_visible": "[data-testid=\"external-file-conflict-dialog\"]"}'
+    - step: 294
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-result-kind", "equals": "failed"}}'
+    - step: 295
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-disk-effect", "equals": "unknown"}}'
+    - step: 296
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "recovery"}}'
+    - step: 297
+      expectation: '{"eval_readonly": {"expression": "!!document.getElementById(\"code-workspace-save-observation\")?.getAttribute(\"data-recovery-id\")",
+        "expect_truthy": true}}'
+    - step: 298
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-unknown-foreign.txt", "equals":
+        "861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2"}}'
+    - step: 302
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"status-bar-message\\\"]\")?.textContent",
+        "contains": "Save blocked"}}'
+    - step: 303
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-disk-effect", "equals": "unknown"}}'
+    - step: 304
+      expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"code-workspace-save-observation\")?.hasAttribute(\"data-receipt-id\")",
+        "expect_truthy": true}}'
+    - step: 305
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-unknown-foreign.txt", "equals":
+        "861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2"}}'
+    - step: 307
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 310
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]", "timeout_sec": 60}}'
+    - step: 311
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-recovery-dialog\"]", "timeout_sec": 60}}'
+    - step: 313
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-recovery-disk-results\"]", "contains":
+        "edit-unknown-foreign.txt"}}'
+    - step: 314
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-recovery-disk-result-row\"]", "contains":
+        "Foreign content · retries blocked"}}'
+    - step: 318
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-recovery-dialog\"]"}'
+    - step: 319
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-unknown-foreign.txt", "equals":
+        "861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2"}}'
+    - step: 321
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 324
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-recovery-dialog\"]", "timeout_sec": 60}}'
+    - step: 326
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-recovery-disk-result-row\"]", "contains":
+        "Foreign content · retries blocked"}}'
+    - step: 328
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-recovery-disk-results\"]", "contains":
+        "No unresolved disk results"}}'
+    - step: 329
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"status-bar-message\\\"]\")?.textContent",
+        "contains": "Acknowledged disk result"}}'
+    - step: 331
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-recovery-dialog\"]"}'
+    - step: 332
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-unknown-foreign.txt", "equals":
+        "861bbb9fd984a70f43ae176609ecb9ba7f9d35d2db54ea8af5bafb51d67812e2"}}'
+    - step: 339
+      expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/edit-unknown-foreign.txt", "selector":
+        "[data-testid=\"code-workspace-save-observation\"]", "encoding": "UTF-8", "bom": false, "eol": "lf", "expected_text":
+        "FOREIGN\nZ", "require_history": true}}'
+    - step: 343
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 351
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 353
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key=\"root:r1:edit-close.txt\"]",
+        "equal": 0}}'
+    - step: 355
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key=\"root:r1:edit-close.txt\"]",
+        "equal": 0}}'
+    - step: 356
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-close.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 358
+      expectation: '{"save_race_trace": {"artifact": "s8-close-during-ack-trace.json", "expect_contains": ["arm",
+        "writer-invoked", "enter", "owner-invalidated", "ack-delivered", "commit-settled"], "require_ack_hashes":
+        true, "require_settled_kind": "committed-writeback-discarded"}}'
+    - step: 361
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 364
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]", "timeout_sec": 60}}'
+    - step: 365
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-recovery-dialog\"]", "timeout_sec": 60}}'
+    - step: 367
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-recovery-disk-results\"]", "contains":
+        "edit-close.txt"}}'
+    - step: 368
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-recovery-disk-result-row\"]", "contains":
+        "Saved to disk · editor writeback discarded"}}'
+    - step: 369
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-recovery-disk-result-row\"]", "contains":
+        "writeback-discarded"}}'
+    - step: 373
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec":
+        30}}'
+    - step: 375
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"code-workspace-editor\\\"]
+        .cm-content\")?.textContent", "contains": "line threeS"}}'
+    - step: 376
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-state", "equals": "clean"}}'
+    - step: 377
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/edit-close.txt", "equals": "77e11801e1006d4d36d0abb43cf57a9964954445acea8c6d017689796fa38172"}}'
+    - step: 381
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-recovery-disk-results\"]", "contains":
+        "No unresolved disk results"}}'
+    - step: 383
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-recovery-dialog\"]"}'
+    results:
+    - 383
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

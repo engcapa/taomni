@@ -1,111 +1,244 @@
 id: TC-IDE-C2-04-java25-completion-lsp-reuse-performance-native
-title: "Java 25 live-template keyboard completion, LSP reuse, and input latency"
-description: |
-  Creates and compiles isolated Maven and Gradle projects with Java 25 before
+title: Java 25 live-template keyboard completion, LSP reuse, and input latency
+description: 'Creates and compiles isolated Maven and Gradle projects with Java 25 before
+
   launching the packaged app. In the Maven source the provider already ships
-  the Eclipse `soutm` template, so the app's live template yields: physical
+
+  the Eclipse `soutm` template, so the app''s live template yields: physical
+
   Alt+/ opens the provider proposal and accepting it inserts the resolved
+
   enclosing method name. Abbreviations the provider does not own (for example
+
   `soutp`) stay app-owned and expand through the exact-abbreviation Tab path.
+
   Opening a Java file in another package must retain a
+
   single new jdtls process. Physical typing in that second source records the
+
   keydown-to-render p95 and enforces a 50 ms interaction budget. The Gradle
+
   build is independently proven by the fixture build receipt.
+
   Highest claim on green: L2 provider-backed native behavior and performance.
-covers: [F25.5]
-tags: [code-workspace, java25, completion, lsp, performance, native-gate, p0]
-modes: [native]
-fixtures: [reset_db, java25_projects]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- java25
+- completion
+- lsp
+- performance
+- native-gate
+- p0
+modes:
+- native
+fixtures:
+- reset_db
+- java25_projects
 timeout_sec: 600
 steps:
-  - open: "${cfg.app.base_url}"
-  - vault_first_run: "qa-native-java25-password"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - seed_storage:
-      key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-java25-completion","name":"maven-java25","roots":[{"id":"maven-java25","name":"maven-java25","path":"${fixture.java25_maven_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-java25","path":"src/main/java/com/example/app/App.java"},"lastOpenedAt":1788537600000,"isGitRepo":false}]'
-  - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.java25_maven_root}"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "completionTargets"
-      timeout_sec: 60
-  - assert_text:
-      selector: '[data-testid="code-workspace-lsp-status-pill"]'
-      contains: "Java"
-      timeout_sec: 60
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
-      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
-  # Provider-owned template: jdtls ships the Eclipse `soutm`, so the app's live
-  # template yields to it. Physical Alt+/ opens the provider proposal and
-  # accepting it inserts the resolved enclosing method name.
-  - type: "soutm"
-  - press: "Alt+/"
-  - wait_for:
-      selector: '.cm-tooltip-autocomplete'
-      timeout_sec: 10
-  - assert_text:
-      selector: '.cm-tooltip-autocomplete'
-      contains: "print current method to standard out"
-      timeout_sec: 10
-  # The provider owns the exact abbreviation: the app's placeholder entry must
-  # leave the popup once the provider result is merged (the popup stays open).
-  - wait: 1
-  - eval_readonly:
-      expression: 'document.querySelector(".cm-tooltip-autocomplete")?.textContent?.includes("Prints current method name to System.out") !== true && document.querySelector(".cm-tooltip-autocomplete") !== null'
-      expect_truthy: true
-  - press: Tab
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: 'System.out.println("App.completionTargets()");'
-      timeout_sec: 30
-  # Provider gap: jdtls has no `soutp`, so the app's live template still fills
-  # it and expands through the exact-abbreviation Tab path.
-  - press: Escape
-  - press: End
-  - press: Enter
-  - type: "soutp"
-  - press: Escape
-  - press: Tab
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "System.out.println();"
-      timeout_sec: 15
-  - press: Escape
-  - fill:
-      selector: '[data-testid="code-workspace-tree-filter"]'
-      value: "Helper"
-  - wait_for: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/other/Helper.java"]'
-  - dblclick: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/other/Helper.java"]'
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "// PERF:"
-      timeout_sec: 30
-  - assert_text:
-      selector: '[data-testid="code-workspace-lsp-status-pill"]'
-      contains: "Java"
-      timeout_sec: 60
-  - assert_native_process_delta:
-      pattern: org.eclipse.jdt.ls.core.id1
-      baseline: "${fixture.jdtls_process_count_before}"
-      max_delta: 1
-      timeout_sec: 10
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
-      keys: ["Control+End", "End"]
-  - native_editor_performance:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t"]
-      max_p95_ms: 50
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "abcdefghijklmnopqrst"
-      timeout_sec: 15
-  - screenshot: tc-ide-c2-04-java25-completion-performance.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-java25-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-java25-completion","name":"maven-java25","roots":[{"id":"maven-java25","name":"maven-java25","path":"${fixture.java25_maven_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-java25","path":"src/main/java/com/example/app/App.java"},"lastOpenedAt":1788537600000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.java25_maven_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: completionTargets
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-lsp-status-pill"]'
+    contains: Java
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Control+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - End
+- type: soutm
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 10
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: print current method to standard out
+    timeout_sec: 10
+- wait: 1
+- eval_readonly:
+    expression: document.querySelector(".cm-tooltip-autocomplete")?.textContent?.includes("Prints current method
+      name to System.out") !== true && document.querySelector(".cm-tooltip-autocomplete") !== null
+    expect_truthy: true
+- press: Tab
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: System.out.println("App.completionTargets()");
+    timeout_sec: 30
+- press: Escape
+- press: End
+- press: Enter
+- type: soutp
+- press: Escape
+- press: Tab
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: System.out.println();
+    timeout_sec: 15
+- press: Escape
+- fill:
+    selector: '[data-testid="code-workspace-tree-filter"]'
+    value: Helper
+- wait_for: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/other/Helper.java"]'
+- dblclick: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/other/Helper.java"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: '// PERF:'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="code-workspace-lsp-status-pill"]'
+    contains: Java
+    timeout_sec: 60
+- assert_native_process_delta:
+    pattern: org.eclipse.jdt.ls.core.id1
+    baseline: ${fixture.jdtls_process_count_before}
+    max_delta: 1
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Control+End
+    - End
+- native_editor_performance:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - a
+    - b
+    - c
+    - d
+    - e
+    - f
+    - g
+    - h
+    - i
+    - j
+    - k
+    - l
+    - m
+    - n
+    - o
+    - p
+    - q
+    - r
+    - s
+    - t
+    max_p95_ms: 50
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: abcdefghijklmnopqrst
+    timeout_sec: 15
+- screenshot: tc-ide-c2-04-java25-completion-performance.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Java 25 live-template keyboard completion, LSP reuse, and input latency：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 11
+    - 12
+    - 13
+    - 14
+    - 19
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 28
+    - 29
+    - 31
+    - 35
+    - 36
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "completionTargets",
+        "timeout_sec": 60}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
+        "Java", "timeout_sec": 60}}'
+    - step: 15
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 10}}'
+    - step: 16
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "print current method to
+        standard out", "timeout_sec": 10}}'
+    - step: 18
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\")?.textContent?.includes(\"Prints
+        current method name to System.out\") !== true && document.querySelector(\".cm-tooltip-autocomplete\") !==
+        null", "expect_truthy": true}}'
+    - step: 20
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println(\"App.completionTargets()\");",
+        "timeout_sec": 30}}'
+    - step: 27
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println();",
+        "timeout_sec": 15}}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-flat-file\"][data-path=\"src/main/java/com/example/other/Helper.java\"]"}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "// PERF:",
+        "timeout_sec": 30}}'
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
+        "Java", "timeout_sec": 60}}'
+    - step: 34
+      expectation: '{"assert_native_process_delta": {"pattern": "org.eclipse.jdt.ls.core.id1", "baseline": "${fixture.jdtls_process_count_before}",
+        "max_delta": 1, "timeout_sec": 10}}'
+    - step: 37
+      expectation: '{"native_editor_performance": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content",
+        "keys": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s",
+        "t"], "max_p95_ms": 50}}'
+    - step: 38
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "abcdefghijklmnopqrst",
+        "timeout_sec": 15}}'
+    results:
+    - 37
+    - 38
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

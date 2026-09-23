@@ -1,39 +1,156 @@
 id: TC-030
 title: SFTP creates and deletes a remote folder with multi-select
-covers: [F7.2]
-tags: [folder, legacy-imported, multi-select, p1, sftp]
-modes: [browser]
-fixtures: [reset_db, ssh_required, sftp_required]
+covers:
+- F7.2
+tags:
+- folder
+- legacy-imported
+- multi-select
+- p1
+- sftp
+modes:
+- browser
+fixtures:
+- reset_db
+- ssh_required
+- sftp_required
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - wait_for: '[data-testid="qc-input"]'
-  - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
-  - click: "[data-testid=\"qc-submit\"]"
-  - wait_for: "[data-testid=\"auth-prompt\"]"
-  - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
-  - click: "[data-testid=\"auth-submit\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - wait: 2
-  - click: "[data-testid=\"attached-sftp-toggle\"]"
-  - wait_for: "[data-testid=\"sftp-browser\"]"
-  - click: "[data-testid=\"sftp-remote-path\"]"
-  - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
-  - press: Enter
-  - wait: 1
-  - seed_dialog: {prompt: ["qa-ui-auto-folder-a", "qa-ui-auto-folder-b"], confirm: true}
-  - click: "[data-testid=\"sftp-remote-new-folder\"]"
-  - wait: 1
-  - click: "[data-testid=\"sftp-remote-new-folder\"]"
-  - wait: 1
-  - wait_for: "[data-testid=\"sftp-remote-pane\"] >> text=\"qa-ui-auto-folder-a\""
-  - wait_for: "[data-testid=\"sftp-remote-pane\"] >> text=\"qa-ui-auto-folder-b\""
-  - click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-folder-a"'
-  - click:
-      selector: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-folder-b"'
-      modifiers: [Mod]
-  - click: "[data-testid=\"sftp-remote-delete\"]"
-  - wait: 1
-  - screenshot: 030-sftp-folder-multiselect.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 2
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- click: '[data-testid="sftp-remote-path"]'
+- fill:
+    selector: '[data-testid="sftp-remote-path"]'
+    value: ${cfg.sftp.remote_test_dir}
+- press: Enter
+- wait: 1
+- click: '[data-testid="sftp-remote-new-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: qa-ui-auto-folder-a
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- wait: 1
+- click: '[data-testid="sftp-remote-new-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: qa-ui-auto-folder-b
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- wait: 1
+- wait_for: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-folder-a"'
+- wait_for: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-folder-b"'
+- click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-folder-a"'
+- click:
+    selector: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-folder-b"'
+    modifiers:
+    - Mod
+- click: '[data-testid="sftp-remote-delete"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- wait: 1
+- assert_not_visible: '[data-testid="sftp-remote-pane"] tr:has-text("qa-ui-auto-folder-a")'
+- assert_not_visible: '[data-testid="sftp-remote-pane"] tr:has-text("qa-ui-auto-folder-b")'
+- assert_not_visible: '[data-testid="sftp-browser"] tr[title$="/qa-ui-auto-folder-a"]'
+- assert_not_visible: '[data-testid="sftp-browser"] tr[title$="/qa-ui-auto-folder-b"]'
+- assert_pattern:
+    selector: '[data-testid="sftp-remote-pane"] > div:last-child'
+    regex: ^\d+ items?( • \d+ selected)?$
+- screenshot: 030-sftp-folder-multiselect.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SFTP creates and deletes a remote folder with multi-select：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 9
+    - 10
+    - 13
+    - 15
+    - 16
+    - 17
+    - 19
+    - 21
+    - 22
+    - 25
+    - 27
+    - 28
+    - 33
+    - 34
+    - 35
+    - 37
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 23
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-pane\"] >> text=\"qa-ui-auto-folder-a\""}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-pane\"] >> text=\"qa-ui-auto-folder-b\""}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 38
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 40
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-remote-pane\"] tr:has-text(\"qa-ui-auto-folder-a\")"}'
+    - step: 41
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-remote-pane\"] tr:has-text(\"qa-ui-auto-folder-b\")"}'
+    - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"] tr[title$=\"/qa-ui-auto-folder-a\"]"}'
+    - step: 43
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"] tr[title$=\"/qa-ui-auto-folder-b\"]"}'
+    - step: 44
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"sftp-remote-pane\"] > div:last-child", "regex":
+        "^\\d+ items?( • \\d+ selected)?$"}}'
+    results:
+    - 38
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

@@ -66,6 +66,7 @@ from qa_ui_auto.testcase import discover, step_verb_and_args  # noqa: E402
 
 
 INTERACTIVE_VERBS = {
+    "middle_click",
     "click", "dblclick", "right_click", "hover", "drag_to", "native_click",
     "native_pointer_drag",
     "fill", "type", "send_keys", "terminal_input", "press", "select_option", "upload_file",
@@ -73,6 +74,7 @@ INTERACTIVE_VERBS = {
     "quick_connect", "auth", "attach_sftp", "set_remote_path",
 }
 DISPLAY_VERBS = {
+    "assert_text_equals", "assert_items",
     "wait_for", "assert_visible", "assert_not_visible", "assert_text",
     "assert_pattern", "assert_count", "assert_attribute", "assert_disabled",
     "assert_enabled", "screenshot", "assert_menu_items",

@@ -69,6 +69,13 @@ def step_hover(ctx: StepContext, args: Any) -> None:
     loc.hover()
 
 
+@verb("middle_click")
+def step_middle_click(ctx: StepContext, args: Any) -> None:
+    selector = args if isinstance(args, str) else args["selector"]
+    if not ctx.dry_run:
+        ctx.page.locator(selector).first.click(button="middle")
+
+
 @verb("drag_to")
 def step_drag_to(ctx: StepContext, args: Any) -> None:
     src = ctx.page.locator(args["from"]).first  # type: ignore[attr-defined]

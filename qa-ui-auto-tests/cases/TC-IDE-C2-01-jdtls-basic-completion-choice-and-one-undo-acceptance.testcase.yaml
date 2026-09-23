@@ -1,223 +1,348 @@
 id: TC-IDE-C2-01
-title: "jdtls completion accept lands import+identifier and snippet as one undo each"
-description: |
-  ED-AUDIT-007 A1/A2 native gate. Enters the in-repo single-module Maven
-  sample through persisted recents (no native picker), waits for the real
-  JDT LS provider, then proves the two provider-backed acceptance forms
-  through the packaged app UI:
-
-  1. Import-on-resolve accept: the caret sits after the bare `StringUti`
-     token (the fixture's un-imported org.apache.commons.lang3 target).
-     Basic completion is fired explicitly. The CI-pinned JDTLS 1.50 provider
-     answers with the org.apache.commons.lang3 candidate; the case proves
-     its decorated package identity and accepts the selected item with Enter.
-     (JDTLS 1.61 also exposed a JDK-internal com.sun twin, but that is not the
-     provider version exercised by this hosted workflow.) Provider resolve supplies
-     one additionalTextEdit (the lang3 import). The acceptance must land
-     the identifier AND the import in one dispatch; saving proves the disk
-     bytes equal the provider trace's appliedSha256, and ONE Ctrl+Z plus a
-     save proves the disk bytes equal the original fixture hash again -
-     one undo reverts the whole acceptance (identifier + import together),
-     matching the real-provider acceptance hashes recorded by
-     run-jdtls-fixture.mjs (traces/maven-single.trace.json,
-     caseId dependency-source-import).
-  2. Snippet accept: the caret sits after the `appen` prefix of
-     `new StringBuilder().appen`; the top method choice is accepted with
-     Enter (jdtls advertises snippetSupport and the client capabilities
-     enable it), the call text must land, Tab must advance the snippet
-     tabstop without a document edit, and ONE Ctrl+Z must restore the
-     exact original line.
-
-  Highest claim on green: L2 provider-backed (Linux), packaged app UI over
-  a real jdtls process. All keystrokes use the self-activating XTest
-  native_keys transport: the W3C WebDriver press path is rejected by
-  WebKitGTK for Control+Space (preserved ED-COMP-004 failure).
-covers: [F25.5]
-tags: [code-workspace, ide-c2, completion, provider-fixture, native-gate, p1]
-modes: [native]
-fixtures: [reset_db, java_sample_projects, jdtls_required]
+title: jdtls completion accept lands import+identifier and snippet as one undo each
+description: "ED-AUDIT-007 A1/A2 native gate. Enters the in-repo single-module Maven\nsample through persisted recents\
+  \ (no native picker), waits for the real\nJDT LS provider, then proves the two provider-backed acceptance forms\n\
+  through the packaged app UI:\n\n1. Import-on-resolve accept: the caret sits after the bare `StringUti`\n   token\
+  \ (the fixture's un-imported org.apache.commons.lang3 target).\n   Basic completion is fired explicitly. The CI-pinned\
+  \ JDTLS 1.50 provider\n   answers with the org.apache.commons.lang3 candidate; the case proves\n   its decorated\
+  \ package identity and accepts the selected item with Enter.\n   (JDTLS 1.61 also exposed a JDK-internal com.sun\
+  \ twin, but that is not the\n   provider version exercised by this hosted workflow.) Provider resolve supplies\n\
+  \   one additionalTextEdit (the lang3 import). The acceptance must land\n   the identifier AND the import in one\
+  \ dispatch; saving proves the disk\n   bytes equal the provider trace's appliedSha256, and ONE Ctrl+Z plus a\n\
+  \   save proves the disk bytes equal the original fixture hash again -\n   one undo reverts the whole acceptance\
+  \ (identifier + import together),\n   matching the real-provider acceptance hashes recorded by\n   run-jdtls-fixture.mjs\
+  \ (traces/maven-single.trace.json,\n   caseId dependency-source-import).\n2. Snippet accept: the caret sits after\
+  \ the `appen` prefix of\n   `new StringBuilder().appen`; the top method choice is accepted with\n   Enter (jdtls\
+  \ advertises snippetSupport and the client capabilities\n   enable it), the call text must land, Tab must advance\
+  \ the snippet\n   tabstop without a document edit, and ONE Ctrl+Z must restore the\n   exact original line.\n\n\
+  Highest claim on green: L2 provider-backed (Linux), packaged app UI over\na real jdtls process. All keystrokes\
+  \ use the self-activating XTest\nnative_keys transport: the W3C WebDriver press path is rejected by\nWebKitGTK\
+  \ for Control+Space (preserved ED-COMP-004 failure).\n"
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c2
+- completion
+- provider-fixture
+- native-gate
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- java_sample_projects
+- jdtls_required
 timeout_sec: 600
-# Provider toolchain precondition: the maven-single fixture contract pins
-# JDK 21.0.4 (see __fixtures__/jdtls/README.md; the committed trace was
-# recorded on Zulu 21.0.4). The app auto-detects its tooling JDK as
-# Settings -> JAVA_HOME -> PATH -> common layouts, and /data/dev is not
-# scanned: invoking with the box default JDK 25 leaves dep-requiring
-# completions (this card's lang3 twin) empty while JDK-only locations
-# still complete, which fails as a popup timeout. Run native with e.g.
-# JAVA_HOME=/data/dev/jdk-21 so the launched JDT LS matches the fixture.
 steps:
-  - open: "${cfg.app.base_url}"
-  - vault_first_run: "qa-native-gate-password"
-  - wait_for: '[data-testid="welcome-panel"]'
-  # Enter the real sample project through persisted recents; WebDriver cannot
-  # operate the native folder picker opened by Add Folder to Workspace.
-  - seed_storage:
-      key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-c2-01","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
-  - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - wait_for:
-      selector: '[data-testid="code-workspace-editor-pane"]'
-      timeout_sec: 60
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "completionTargets"
-      timeout_sec: 60
-  - assert_text:
-      selector: '[data-testid="code-workspace-lsp-status-pill"]'
-      contains: "Java"
-      timeout_sec: 60
-
-  # ---- Import-on-resolve accept: one dispatch, one undo ----
-  # Caret after the bare `StringUti` token (1-based line 30; the trace's
-  # 0-based line 29 character 21). XTest bursts lose keys on some Linux
-  # desktops (29 downs landed on line 18 in run-20260909-123956), so the
-  # descent is paced in verified chunks: each waypoint assert is a
-  # condition-based wait and a misnavigation still fails here instead of
-  # as a confusing popup-content mismatch. No acceptance assertion changed.
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
-  - wait: 0.5
-  - assert_text:
-      selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: "Ln 11,"
-      timeout_sec: 10
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
-  - wait: 0.5
-  - assert_text:
-      selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: "Ln 21,"
-      timeout_sec: 10
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
-  # The status bar is 1-based: line 30 col 22 = caret after the bare
-  # `StringUti` token. Assert it before firing completion so a misnavigation
-  # fails here instead of as a confusing popup-content mismatch.
-  - assert_text:
-      # StatusBar renders `Ln {line}, Col {column}` (1-based).
-      selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: "Ln 30, Col 22"
-      timeout_sec: 10
-  - press: "Alt+/"
-  - wait_for:
-      selector: '.cm-tooltip-autocomplete'
-      timeout_sec: 90
-  - assert_text:
-      selector: '.cm-tooltip-autocomplete'
-      contains: "StringUtils"
-  # JDTLS 1.50 emits the project dependency as the selected candidate. The
-  # decorated displayLabel proves which provider symbol will be accepted.
-  - eval_readonly:
-      expression: "document.querySelectorAll('.cm-tooltip-autocomplete > ul > li').length > 0 && document.querySelector('.cm-tooltip-autocomplete li[aria-selected]').textContent.includes('org.apache.commons.lang3')"
-      expect_truthy: true
-  - screenshot: tc-ide-c2-01-popup.png
-  # Accept the selected org.apache.commons.lang3 item recorded by the trace.
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Enter"]
-  # Resolve supplies the import (~0.5s in the provider trace; 3s covers the
-  # gate timeout budget). The identifier line must read exactly StringUtils.
-  - wait: 3
-  - eval_readonly:
-      # Exact-line check: innerText keeps one \n per rendered line, so a
-      # \n-bounded substring proves the whole line (the 10th char i-vs-l
-      # keeps StringUti and StringUtils from colliding as prefixes).
-      # Callback-free form: the mutation guard bans arrow functions.
-      expression: "document.querySelector('.cm-content').innerText.includes('\\n            StringUtils\\n') && !document.querySelector('.cm-content').innerText.includes('\\n            StringUti\\n')"
-      expect_truthy: true
-  # Disk bytes: the acceptance (identifier + import) equals the provider
-  # trace's appliedSha256 for the same acceptance.
-  - press: Control+s
-  - assert_file_sha256:
-      path: "${fixture.maven_single_root}/src/main/java/com/example/single/App.java"
-      equals: "eeb6e0ed331b0512f0b284654482d6981a403cd957f3ba62c946df6ef1d44e30"
-      timeout_sec: 30
-  # ONE undo must revert the whole acceptance; the disk returns to the
-  # original fixture bytes (the trace's originalSha256 == revertedSha256).
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+z"]
-  - wait: 0.5
-  - eval_readonly:
-      expression: "document.querySelector('.cm-content').innerText.includes('\\n            StringUti\\n') && !document.querySelector('.cm-content').innerText.includes('\\n            StringUtils\\n')"
-      expect_truthy: true
-  - press: Control+s
-  - assert_file_sha256:
-      path: "${fixture.maven_single_root}/src/main/java/com/example/single/App.java"
-      equals: "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59"
-      timeout_sec: 30
-
-  # ---- Snippet accept: call text lands, Tab advances the stop, one undo ----
-  # Caret after the `appen` prefix (1-based line 27). Same paced descent as
-  # above: XTest bursts lose keys on some Linux desktops.
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
-  - wait: 0.5
-  - assert_text:
-      selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: "Ln 11,"
-      timeout_sec: 10
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
-  - wait: 0.5
-  - assert_text:
-      selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: "Ln 21,"
-      timeout_sec: 10
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
-  # Line 27 col 38 = caret after the `appen` prefix of
-  # `new StringBuilder().appen`.
-  - assert_text:
-      selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: "Ln 27, Col 38"
-      timeout_sec: 10
-  - press: "Alt+/"
-  - wait_for:
-      selector: '.cm-tooltip-autocomplete'
-      timeout_sec: 90
-  - assert_text:
-      selector: '.cm-tooltip-autocomplete'
-      contains: "append("
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Enter"]
-  - wait: 3
-  - eval_readonly:
-      expression: "document.querySelector('.cm-content').innerText.includes('StringBuilder().append(')"
-      expect_truthy: true
-  # Tab advances the snippet tabstop (selection-only dispatch, no doc edit).
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Tab"]
-  - eval_readonly:
-      expression: "document.querySelector('.cm-content').innerText.includes('StringBuilder().append(')"
-      expect_truthy: true
-  # ONE undo restores the exact original line.
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+z"]
-  - wait: 0.5
-  - eval_readonly:
-      # The original line ends with " StringBuilder().appen" (the "new "
-      # prefix is covered by the leading space; "new" is a banned token).
-      expression: "document.querySelector('.cm-content').innerText.includes(' StringBuilder().appen\\n')"
-      expect_truthy: true
-  # The case leaves the fixture copy byte-identical to the checkout.
-  - press: Control+s
-  - assert_file_sha256:
-      path: "${fixture.maven_single_root}/src/main/java/com/example/single/App.java"
-      equals: "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59"
-      timeout_sec: 30
-  - screenshot: tc-ide-c2-01-import-undo.png
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-c2-01","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: completionTargets
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-lsp-status-pill"]'
+    contains: Java
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 11,
+    timeout_sec: 10
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 21,
+    timeout_sec: 10
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - End
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 30, Col 22
+    timeout_sec: 10
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 90
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- eval_readonly:
+    expression: document.querySelectorAll('.cm-tooltip-autocomplete > ul > li').length > 0 && document.querySelector('.cm-tooltip-autocomplete
+      li[aria-selected]').textContent.includes('org.apache.commons.lang3')
+    expect_truthy: true
+- screenshot: tc-ide-c2-01-popup.png
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Enter
+- wait: 3
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('\n            StringUtils\n') && !document.querySelector('.cm-content').innerText.includes('\n            StringUti\n')
+    expect_truthy: true
+- press: Control+s
+- assert_file_sha256:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    equals: eeb6e0ed331b0512f0b284654482d6981a403cd957f3ba62c946df6ef1d44e30
+    timeout_sec: 30
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+z
+- wait: 0.5
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('\n            StringUti\n') && !document.querySelector('.cm-content').innerText.includes('\n            StringUtils\n')
+    expect_truthy: true
+- press: Control+s
+- assert_file_sha256:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    equals: d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 11,
+    timeout_sec: 10
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 21,
+    timeout_sec: 10
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - End
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 27, Col 38
+    timeout_sec: 10
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 90
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: append(
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Enter
+- wait: 3
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringBuilder().append(')
+    expect_truthy: true
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Tab
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringBuilder().append(')
+    expect_truthy: true
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+z
+- wait: 0.5
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes(' StringBuilder().appen\n')
+    expect_truthy: true
+- press: Control+s
+- assert_file_sha256:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    equals: d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59
+    timeout_sec: 30
+- screenshot: tc-ide-c2-01-import-undo.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: jdtls completion accept lands import+identifier and snippet as one undo each：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 12
+    - 13
+    - 16
+    - 19
+    - 21
+    - 26
+    - 29
+    - 31
+    - 34
+    - 36
+    - 37
+    - 40
+    - 43
+    - 45
+    - 48
+    - 51
+    - 53
+    - 56
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "completionTargets",
+        "timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
+        "Java", "timeout_sec": 60}}'
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
+        11,", "timeout_sec": 10}}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
+        21,", "timeout_sec": 10}}'
+    - step: 20
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
+        30, Col 22", "timeout_sec": 10}}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 90}}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "StringUtils"}}'
+    - step: 24
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-tooltip-autocomplete > ul
+        > li'').length > 0 && document.querySelector(''.cm-tooltip-autocomplete li[aria-selected]'').textContent.includes(''org.apache.commons.lang3'')",
+        "expect_truthy": true}}'
+    - step: 28
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-content'').innerText.includes(''\\n            StringUtils\\n'')
+        && !document.querySelector(''.cm-content'').innerText.includes(''\\n            StringUti\\n'')", "expect_truthy":
+        true}}'
+    - step: 30
+      expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java",
+        "equals": "eeb6e0ed331b0512f0b284654482d6981a403cd957f3ba62c946df6ef1d44e30", "timeout_sec": 30}}'
+    - step: 33
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-content'').innerText.includes(''\\n            StringUti\\n'')
+        && !document.querySelector(''.cm-content'').innerText.includes(''\\n            StringUtils\\n'')", "expect_truthy":
+        true}}'
+    - step: 35
+      expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java",
+        "equals": "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59", "timeout_sec": 30}}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
+        11,", "timeout_sec": 10}}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
+        21,", "timeout_sec": 10}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
+        27, Col 38", "timeout_sec": 10}}'
+    - step: 46
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 90}}'
+    - step: 47
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "append("}}'
+    - step: 50
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-content'').innerText.includes(''StringBuilder().append('')",
+        "expect_truthy": true}}'
+    - step: 52
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-content'').innerText.includes(''StringBuilder().append('')",
+        "expect_truthy": true}}'
+    - step: 55
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-content'').innerText.includes(''
+        StringBuilder().appen\\n'')", "expect_truthy": true}}'
+    - step: 57
+      expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java",
+        "equals": "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59", "timeout_sec": 30}}'
+    results:
+    - 57
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

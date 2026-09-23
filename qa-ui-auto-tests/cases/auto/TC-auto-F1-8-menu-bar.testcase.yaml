@@ -1,65 +1,145 @@
 id: TC-auto-F1-8
 title: Unified app menu exposes every section and dispatches commands
-description: |
-  Rewritten for F1.8 after the per-menu MenuBar was removed: one unified
+description: 'Rewritten for F1.8 after the per-menu MenuBar was removed: one unified
+
   app menu opens from the ControlBar app-main-menu button and renders
+
   top-level entries plus Sessions / View submenus on the shared
+
   context-menu surface. Exercises New local terminal end-to-end and
+
   verifies the status bar reflects the new tab.
-covers: [F1.8]
-tags: [auto-generated, smoke, p1, main, unified-menu, needs-review]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F1.8
+tags:
+- auto-generated
+- smoke
+- p1
+- main
+- unified-menu
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 60
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="app-main-menu"]'
-  - assert_visible: '[data-testid="app-main-menu"]'
-
-  # Top-level entries of the unified app menu
-  - click: '[data-testid="app-main-menu"]'
-  - wait_for: '[data-testid="context-menu"]'
-  - assert_visible: '[data-testid="context-menu-item-new-local-terminal"]'
-  - assert_visible: '[data-testid="context-menu"] >> text="New remote session…"'
-  - assert_visible: '[data-testid="context-menu"] >> text="Close active tab"'
-  - assert_visible: '[data-testid="context-menu-item-xserver"]'
-  - assert_visible: '[data-testid="context-menu"] >> text="Settings"'
-  - press: Escape
-  - wait_for:
-      selector: '[data-testid="context-menu"]'
-      state: detached
-      timeout_sec: 5
-
-  # Sessions submenu
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu"] >> text="Sessions"'
-  - assert_visible: '[data-testid="context-menu"] >> text="New session…"'
-  - assert_visible: '[data-testid="context-menu"] >> text="Show sessions"'
-  - assert_visible: '[data-testid="context-menu-item-reload-sessions"]'
-  - press: Escape
-  - press: Escape
-  - wait_for:
-      selector: '[data-testid="context-menu"]'
-      state: detached
-      timeout_sec: 5
-
-  # View submenu — sidebar toggle, quick connect, split
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - assert_visible: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - hover: '[data-testid="context-menu-item-toggle-sidebar"]'
-  - hover: '[data-testid="context-menu-item-split-terminal"]'
-  - press: Escape
-  - press: Escape
-  - wait_for:
-      selector: '[data-testid="context-menu"]'
-      state: detached
-      timeout_sec: 5
-
-  # End-to-end: New local terminal opens a terminal pane
-  - click: '[data-testid="app-main-menu"]'
-  - wait_for: '[data-testid="context-menu"]'
-  - click: '[data-testid="context-menu-item-new-local-terminal"]'
-  - wait_for: '[data-testid="terminal-pane"]'
-  - assert_text: {selector: '[data-testid="status-bar"]', contains: "1 terminals"}
-  - screenshot: F1.8-unified-menu.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="app-main-menu"]'
+- assert_visible: '[data-testid="app-main-menu"]'
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="context-menu-item-new-local-terminal"]'
+- assert_visible: '[data-testid="context-menu"] >> text="New remote session…"'
+- assert_visible: '[data-testid="context-menu"] >> text="Close active tab"'
+- assert_visible: '[data-testid="context-menu-item-xserver"]'
+- assert_visible: '[data-testid="context-menu"] >> text="Settings"'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Sessions"'
+- assert_visible: '[data-testid="context-menu"] >> text="New session…"'
+- assert_visible: '[data-testid="context-menu"] >> text="Show sessions"'
+- assert_visible: '[data-testid="context-menu-item-reload-sessions"]'
+- press: Escape
+- press: Escape
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- assert_visible: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- hover: '[data-testid="context-menu-item-toggle-sidebar"]'
+- hover: '[data-testid="context-menu-item-split-terminal"]'
+- press: Escape
+- press: Escape
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="context-menu-item-new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: 1 terminals
+- screenshot: F1.8-unified-menu.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Unified app menu exposes every section and dispatches commands：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 11
+    - 13
+    - 14
+    - 18
+    - 19
+    - 21
+    - 22
+    - 24
+    - 25
+    - 26
+    - 27
+    - 29
+    - 31
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"app-main-menu\"]"}'
+    - step: 3
+      expectation: '{"assert_visible": "[data-testid=\"app-main-menu\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-new-local-terminal\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"New remote session…\""}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Close active tab\""}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-xserver\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Settings\""}'
+    - step: 12
+      expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"New session…\""}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Show sessions\""}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-reload-sessions\"]"}'
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-toggle-quick-connect\"]"}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "1 terminals"}}'
+    results:
+    - 32
+    - 33
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

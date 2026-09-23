@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { ChevronRight, Home, HardDrive } from "lucide-react";
+import { ChevronRight, Home, HardDrive, Pencil } from "lucide-react";
 import { useT } from "../../lib/i18n";
 
 interface PathBreadcrumbProps {
@@ -108,48 +108,65 @@ export function PathBreadcrumb({
       }}
       title={t("fileBrowser.pathBreadcrumbEditTitle")}
     >
-      {homePath && homePath !== path && (
-        <button
-          type="button"
-          className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            onNavigate(homePath);
-          }}
-          title={t("fileBrowser.pathBreadcrumbHome")}
-        >
-          <Home className="w-3 h-3" />
-        </button>
-      )}
-      {isWindows && !isDrivesRoot && (
-        <button
-          type="button"
-          data-testid="breadcrumb-drives-root"
-          className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            onNavigate("\\\\");
-          }}
-          title={t("fileBrowser.pathBreadcrumbShowDrives")}
-        >
-          <HardDrive className="w-3 h-3" />
-        </button>
-      )}
-      {segments.map((seg, i) => (
-        <span key={`${seg.path}-${i}`} className="flex items-center shrink-0">
-          {i > 0 && <ChevronRight className="w-3 h-3 opacity-50" />}
+      <span className="flex items-center gap-0.5 min-w-0 overflow-x-auto">
+        {homePath && homePath !== path && (
           <button
             type="button"
             className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
             onClick={(e) => {
               e.stopPropagation();
-              onNavigate(seg.path);
+              onNavigate(homePath);
             }}
+            title={t("fileBrowser.pathBreadcrumbHome")}
           >
-            {seg.label || sep}
+            <Home className="w-3 h-3" />
           </button>
+        )}
+        {isWindows && !isDrivesRoot && (
+          <button
+            type="button"
+            data-testid="breadcrumb-drives-root"
+            className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigate("\\\\");
+            }}
+            title={t("fileBrowser.pathBreadcrumbShowDrives")}
+          >
+            <HardDrive className="w-3 h-3" />
+          </button>
+        )}
+        {segments.map((seg, i) => (
+          <span key={`${seg.path}-${i}`} className="flex items-center shrink-0">
+            {i > 0 && <ChevronRight className="w-3 h-3 opacity-50" />}
+            <button
+              type="button"
+              data-path={seg.path}
+              className="px-1 hover:bg-[var(--taomni-hover)] rounded shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigate(seg.path);
+              }}
+            >
+              {seg.label || sep}
+            </button>
         </span>
       ))}
+      </span>
+      <button
+        type="button"
+        data-testid={testId ? `${testId}-edit` : undefined}
+        aria-label={t("fileBrowser.pathBreadcrumbEditTitle")}
+        title={t("fileBrowser.pathBreadcrumbEditTitle")}
+        className="ml-auto px-1 shrink-0 hover:bg-[var(--taomni-hover)] rounded"
+        onClick={(e) => {
+          e.stopPropagation();
+          setEditValue(path);
+          setEditing(true);
+        }}
+      >
+        <Pencil className="w-3 h-3" />
+      </button>
     </div>
   );
 }

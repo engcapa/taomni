@@ -65,6 +65,12 @@ probes before the cases. Secrets are masked and referenced by environment name
 in config artifacts. No external server, repository secret or private network
 is required. Account/package mutations are limited to CI.
 
+The Windows SSH fixture uses Git Bash paths (`/c/...`), while OpenSSH SFTP
+reports `/C:/...`. Manual Sync verifies the translated path. The hosted Windows
+OpenSSH fixture acknowledges `chmod 600` without applying POSIX bits; `TC-010`
+requires an explicit unsupported-mode warning and unchanged `644` readback
+there, while Linux/macOS require the actual `600` readback.
+
 Java downloads are pinned by version and SHA256 in `toolchains.yaml`. JDTLS
 performs real LSP initialize and checks debug/test command registration when
 bundles are selected. Java Test 0.43.1 matches the ASM 9.8 family in JDTLS 1.50;

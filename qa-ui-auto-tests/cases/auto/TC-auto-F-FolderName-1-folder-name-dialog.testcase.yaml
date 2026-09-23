@@ -1,37 +1,99 @@
 id: TC-auto-F-FolderName-1
 title: Folder Name dialog creates a new sessions group
-description: |
-  F-FolderName-1: replaces the old window.prompt-based folder rename UX. We
-  open it via the SessionTree root context menu's "New folder" entry, type
+description: 'F-FolderName-1: replaces the old window.prompt-based folder rename UX. We
+
+  open it via the SessionTree root context menu''s "New folder" entry, type
+
   a name, hit Confirm, and assert the folder appears in the tree.
-covers: [F-FolderName-1]
-tags: [auto-generated, sessions, sidebar, folder, p1, needs-review]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F-FolderName-1
+tags:
+- auto-generated
+- sessions
+- sidebar
+- folder
+- p1
+- needs-review
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 45
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="session-tree"]'
-  - right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
-  - wait_for: '[data-testid="context-menu"]'
-  - click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
-  - wait_for: '[data-testid="folder-name-dialog"]'
-  - assert_visible: '[data-testid="folder-name-dialog-parent"]'
-  - fill:
-      selector: '[data-testid="folder-name-dialog-input"]'
-      value: 'qa-ui-auto-foldername'
-  - click: '[data-testid="folder-name-dialog-confirm"]'
-  - wait_for:
-      selector: '[data-testid="folder-name-dialog"]'
-      state: detached
-  - assert_visible: '[data-testid="session-tree"] >> text="qa-ui-auto-foldername"'
-  # Re-open and cancel — dialog must close without creating anything.
-  - right_click: {selector: '[data-testid="session-tree"]', position: {x: 16, y: 16}}
-  - wait_for: '[data-testid="context-menu"]'
-  - click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
-  - wait_for: '[data-testid="folder-name-dialog"]'
-  - click: '[data-testid="folder-name-dialog-cancel"]'
-  - wait_for:
-      selector: '[data-testid="folder-name-dialog"]'
-      state: detached
-  - screenshot: foldername-dialog.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="session-tree"]'
+- right_click:
+    selector: '[data-testid="session-tree"]'
+    position:
+      x: 16
+      y: 16
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
+- wait_for: '[data-testid="folder-name-dialog"]'
+- assert_visible: '[data-testid="folder-name-dialog-parent"]'
+- fill:
+    selector: '[data-testid="folder-name-dialog-input"]'
+    value: qa-ui-auto-foldername
+- click: '[data-testid="folder-name-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="folder-name-dialog"]'
+    state: detached
+- assert_visible: '[data-testid="session-tree"] >> text="qa-ui-auto-foldername"'
+- right_click:
+    selector: '[data-testid="session-tree"]'
+    position:
+      x: 16
+      y: 16
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="context-menu"] >> text=/new folder|new group|create folder/i'
+- wait_for: '[data-testid="folder-name-dialog"]'
+- click: '[data-testid="folder-name-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="folder-name-dialog"]'
+    state: detached
+- screenshot: foldername-dialog.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Folder Name dialog creates a new sessions group：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 8
+    - 9
+    - 12
+    - 14
+    - 16
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"folder-name-dialog\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"folder-name-dialog-parent\"]"}'
+    - step: 10
+      expectation: '{"wait_for": {"selector": "[data-testid=\"folder-name-dialog\"]", "state": "detached"}}'
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-foldername\""}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"folder-name-dialog\"]"}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"folder-name-dialog\"]", "state": "detached"}}'
+    results:
+    - 17
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

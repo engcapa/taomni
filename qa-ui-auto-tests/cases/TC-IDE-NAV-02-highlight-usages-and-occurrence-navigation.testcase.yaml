@@ -1,108 +1,190 @@
 id: TC-IDE-NAV-02
-title: "Highlight usages in file, occurrence stepping with wrap, and escape clearance"
-description: |
-  ED-NAV-002 browser slice. Opens a file in browser-VFS workspace, populates
+title: Highlight usages in file, occurrence stepping with wrap, and escape clearance
+description: 'ED-NAV-002 browser slice. Opens a file in browser-VFS workspace, populates
+
   repeating symbol occurrences, activates explicit Highlight Usages (Ctrl+Shift+F7),
+
   steps forward and backward through occurrences with wrap (Ctrl+Alt+Down / Ctrl+Alt+Up),
+
   asserts status feedback and CodeMirror occurrence decorations, and clears
+
   highlights via Escape. Verifies keyboard-only traversal, status announcements,
+
   and editor focus retention.
+
   Highest claim on green: L1 browser-wired occurrence highlight workflow.
-covers: [F25.5]
-tags: [code-workspace, ide-nav, occurrence-highlight, navigation, accessibility, p1]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-nav
+- occurrence-highlight
+- navigation
+- accessibility
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 120
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: 'item
 
-  # Populate repeating occurrences of symbol "item" into the editor
-  - fill:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      value: "item\nsecond item\nthird item"
-  - wait: 0.5
+      second item
 
-  # Position caret at the beginning of the document (on the first "item")
-  - press:
-      key: Mod+Home
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-
-  # Trigger workspace.highlightUsagesInFile via Ctrl+Shift+F7 (ED-NAV-002-A1)
-  - press:
-      key: Control+Shift+F7
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - wait_for: '[data-testid="status-bar-message"]'
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "Occurrence 1 of 3"
-  - eval_readonly:
-      expression: "document.querySelectorAll('.cm-lsp-usage-text').length > 0"
-      expect_truthy: true
-
-  # Advance to next occurrence via Ctrl+Alt+Down (ED-NAV-002-A2)
-  - press:
-      key: Control+Alt+ArrowDown
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "Occurrence 2 of 3"
-
-  # Advance to 3rd occurrence
-  - press:
-      key: Control+Alt+ArrowDown
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "Occurrence 3 of 3"
-
-  # Advance past last occurrence to wrap to occurrence 1 (ED-NAV-002-A2 wrap)
-  - press:
-      key: Control+Alt+ArrowDown
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "Occurrence 1 of 3"
-
-  # Step backwards with wrap to occurrence 3 via Ctrl+Alt+Up (ED-NAV-002-A2)
-  - press:
-      key: Control+Alt+ArrowUp
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "Occurrence 3 of 3"
-
-  # Accessibility assertion: editor retains focus, textbox role and aria-multiline are exposed
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      name: role
-      equals: textbox
-  - assert_attribute:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      name: aria-multiline
-      equals: "true"
-  - eval_readonly:
-      expression: "document.activeElement?.closest('.cm-editor') !== null"
-      expect_truthy: true
-
-  # Clear highlights with Escape (ED-NAV-002-A3)
-  - press:
-      key: Escape
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "Occurrence highlights cleared"
-  - eval_readonly:
-      expression: "document.querySelectorAll('.cm-lsp-usage-text').length === 0"
-      expect_truthy: true
+      third item'
+- wait: 0.5
+- press:
+    key: Mod+Home
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: Control+Shift+F7
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="status-bar-message"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Occurrence 1 of 3
+- eval_readonly:
+    expression: document.querySelectorAll('.cm-lsp-usage-text').length > 0
+    expect_truthy: true
+- press:
+    key: Control+Alt+ArrowDown
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Occurrence 2 of 3
+- press:
+    key: Control+Alt+ArrowDown
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Occurrence 3 of 3
+- press:
+    key: Control+Alt+ArrowDown
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Occurrence 1 of 3
+- press:
+    key: Control+Alt+ArrowUp
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Occurrence 3 of 3
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    name: role
+    equals: textbox
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    name: aria-multiline
+    equals: 'true'
+- eval_readonly:
+    expression: document.activeElement?.closest('.cm-editor') !== null
+    expect_truthy: true
+- press:
+    key: Escape
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Occurrence highlights cleared
+- eval_readonly:
+    expression: document.querySelectorAll('.cm-lsp-usage-text').length === 0
+    expect_truthy: true
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Highlight usages in file, occurrence stepping with wrap, and escape clearance：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 13
+    - 14
+    - 16
+    - 17
+    - 21
+    - 23
+    - 25
+    - 27
+    - 32
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"status-bar-message\"]"}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Occurrence
+        1 of 3"}}'
+    - step: 20
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-lsp-usage-text'').length >
+        0", "expect_truthy": true}}'
+    - step: 22
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Occurrence
+        2 of 3"}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Occurrence
+        3 of 3"}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Occurrence
+        1 of 3"}}'
+    - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Occurrence
+        3 of 3"}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "role", "equals": "textbox"}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "aria-multiline", "equals": "true"}}'
+    - step: 31
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.closest(''.cm-editor'') !== null",
+        "expect_truthy": true}}'
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Occurrence
+        highlights cleared"}}'
+    - step: 34
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-lsp-usage-text'').length ===
+        0", "expect_truthy": true}}'
+    results:
+    - 33
+    - 34
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

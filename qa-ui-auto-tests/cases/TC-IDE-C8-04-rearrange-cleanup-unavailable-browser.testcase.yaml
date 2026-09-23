@@ -1,76 +1,141 @@
 id: TC-IDE-C8-04-rearrange-cleanup-unavailable-browser
-title: "Rearrange and Cleanup unavailable provider reports honest message in browser"
-description: |
-  Browser gate case (ED-STYLE-002, ED-AUDIT-015/016). Opens an active file
+title: Rearrange and Cleanup unavailable provider reports honest message in browser
+description: 'Browser gate case (ED-STYLE-002, ED-AUDIT-015/016). Opens an active file
+
   in the code workspace, invokes Rearrange Code and Code Cleanup from Search
+
   Everywhere Actions, and proves both fail-closed unavailable paths: the
+
   status bar reports the honest failure and editor text remains untouched
+
   (zero commit, no fake success).
-covers: [F25.5]
-tags: [code-workspace, ide-c8, rearrange, cleanup, browser-gate, p2]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c8
+- rearrange
+- cleanup
+- browser-gate
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 180
 steps:
-  - open: "${cfg.app.base_url}"
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-tools"]'
-  - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="sidebar-tool-code-workspace"]'
-  - wait_for: '[data-testid="code-workspace-tab"]'
-  - click: '[data-testid="code-workspace-tree-add-folder"]'
-  - wait_for: '[data-testid="text-input-dialog"]'
-  - click: '[data-testid="text-input-dialog-confirm"]'
-  - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - dblclick: '[data-testid="code-workspace-tree-file"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - fill:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      value: "public class Sample {\n    public void beta() {}\n    public void alpha() {}\n}"
-  - click: '[data-testid="code-workspace-tab"]'
-  - wait: 0.3
-  - press: Control+Shift+N
-  - wait_for:
-      selector: '[data-testid="code-workspace-search-everywhere"]'
-      timeout_sec: 30
-  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
-  - type: Rearrange Code
-  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Rearrange Code'
-  # Unavailable path under live discovery (ED-AUDIT-015): advertised
-  # summaries never arbitrate, so the handler issues the live codeAction
-  # request; the browser stub has no synchronizable language server and the
-  # request fails closed with zero commits and no fake success. The exact
-  # message names the sync precondition (deterministic in browser: docs
-  # never sync without a real server).
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "finish synchronizing current editor buffers"
-      timeout_sec: 20
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "public void beta()"
-      timeout_sec: 10
-  - screenshot: tc-ide-c8-04-rearrange-unavailable.png
-  # Code Cleanup unavailable path (ED-AUDIT-016): same live-discovery
-  # fail-closed shape through the workspace.codeCleanup entry. The stub has
-  # no synchronizable server, so the request fails with the same sync
-  # precondition message and zero commits.
-  - press: Control+Shift+N
-  - wait_for:
-      selector: '[data-testid="code-workspace-search-everywhere"]'
-      timeout_sec: 30
-  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
-  - type: Code Cleanup
-  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Code Cleanup'
-  - assert_text:
-      selector: '[data-testid="status-bar-message"]'
-      contains: "finish synchronizing current editor buffers"
-      timeout_sec: 20
-  - assert_text:
-      selector: '[data-testid="code-workspace-editor"]'
-      contains: "public void beta()"
-      timeout_sec: 10
-  - screenshot: tc-ide-c8-04-cleanup-unavailable.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: "public class Sample {\n    public void beta() {}\n    public void alpha() {}\n}"
+- click: '[data-testid="code-workspace-tab"]'
+- wait: 0.3
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Rearrange Code
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Rearrange Code'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: finish synchronizing current editor buffers
+    timeout_sec: 20
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - public class Sample {
+    - '    public void beta() {}'
+    - '    public void alpha() {}'
+    - '}'
+- screenshot: tc-ide-c8-04-rearrange-unavailable.png
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Code Cleanup
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Code Cleanup'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: finish synchronizing current editor buffers
+    timeout_sec: 20
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - public class Sample {
+    - '    public void beta() {}'
+    - '    public void alpha() {}'
+    - '}'
+- screenshot: tc-ide-c8-04-cleanup-unavailable.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Actions触发重排无提供者时显示同步前提错误，整个文档不变
+    actions:
+    - 14
+    - 17
+    - 19
+    - 20
+    - 21
+    - 22
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
+        30}}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "finish synchronizing
+        current editor buffers", "timeout_sec": 20}}'
+    - step: 24
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
+        "equals": ["public class Sample {", "    public void beta() {}", "    public void alpha() {}", "}"]}}'
+    results:
+    - 23
+    - 24
+  - id: R2
+    requirement: Actions触发清理同样报告错误并保持整个文档不变
+    actions:
+    - 26
+    - 28
+    - 29
+    - 30
+    - 31
+    checkpoints:
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
+        30}}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "finish synchronizing
+        current editor buffers", "timeout_sec": 20}}'
+    - step: 33
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
+        "equals": ["public class Sample {", "    public void beta() {}", "    public void alpha() {}", "}"]}}'
+    results:
+    - 32
+    - 33
+  visual:
+  - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图记录评审。
+  native:
+  - check: 真实重排/清理由 TC-IDE-AUDIT-015-rearrange-sortmembers-native / TC-IDE-AUDIT-016-cleanup-unavailable-native
+      验证。
+    method: external
+    reason: 按实际执行模式与指定边界解释证据。

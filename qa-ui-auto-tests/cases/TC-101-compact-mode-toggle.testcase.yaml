@@ -1,29 +1,80 @@
 id: TC-101
 title: Unified app menu opens, dispatches, and survives reload
-description: |
-  Compact UI mode was removed from the product; this case now covers the
+description: 'Compact UI mode was removed from the product; this case now covers the
+
   surviving title-bar surface (F1.8): the unified app menu opens from
+
   app-main-menu, shows top-level entries, dismisses with Escape, and the
+
   shell renders identically after a reload.
-covers: [F1.4, F1.8]
-tags: [smoke, p1, main, window]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F1.4
+- F1.8
+tags:
+- smoke
+- p1
+- main
+- window
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 30
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="titlebar-tray"]'
-  - assert_visible: '[data-testid="app-main-menu"]'
-  - click: '[data-testid="app-main-menu"]'
-  - wait_for: '[data-testid="context-menu"]'
-  - assert_visible: '[data-testid="context-menu-item-new-local-terminal"]'
-  - assert_visible: '[data-testid="context-menu-item-xserver"]'
-  - press: Escape
-  - wait_for:
-      selector: '[data-testid="context-menu"]'
-      state: detached
-      timeout_sec: 5
-  - reload:
-  - wait_for: '[data-testid="titlebar-tray"]'
-  - assert_visible: '[data-testid="app-main-menu"]'
-  - screenshot: 101-unified-app-menu.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="titlebar-tray"]'
+- assert_visible: '[data-testid="app-main-menu"]'
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="context-menu-item-new-local-terminal"]'
+- assert_visible: '[data-testid="context-menu-item-xserver"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: detached
+    timeout_sec: 5
+- reload: null
+- wait_for: '[data-testid="titlebar-tray"]'
+- assert_visible: '[data-testid="app-main-menu"]'
+- screenshot: 101-unified-app-menu.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Unified app menu opens, dispatches, and survives reload：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 4
+    - 8
+    - 10
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"titlebar-tray\"]"}'
+    - step: 3
+      expectation: '{"assert_visible": "[data-testid=\"app-main-menu\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-new-local-terminal\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-xserver\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"titlebar-tray\"]"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"app-main-menu\"]"}'
+    results:
+    - 11
+    - 12
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

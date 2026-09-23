@@ -1,34 +1,83 @@
 id: TC-auto-F8-2-tunnel-activity-log
 title: Tunnel manager activity log expands and exposes the clear control
-description: |
-  Coverage smoke for F8.2's tunnel activity log (added in the v0.1.34
+description: 'Coverage smoke for F8.2''s tunnel activity log (added in the v0.1.34
+
   tunnel row/log work). Opens the tunnel manager, asserts the activity-log
+
   panel renders at the footer, toggles it open, and asserts the clear
+
   button appears. With no tunnel events the clear button is disabled, so
+
   the case asserts presence + disabled state rather than clicking it.
-covers: [F8.2]
-tags: [auto-generated, smoke, needs-review, tunnel, activity-log]
-modes: [browser]
-fixtures: [reset_db]
+
+  '
+covers:
+- F8.2
+tags:
+- auto-generated
+- smoke
+- needs-review
+- tunnel
+- activity-log
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 30
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="app-main-menu"]'
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-tools"]'
-  - click: '[data-testid="context-menu-item-tunneling"]'
-  - wait_for: '[data-testid="tunnel-manager"]'
-  - assert_visible: '[data-testid="tunnel-activity-log"]'
-  - assert_visible: '[data-testid="tunnel-activity-log-toggle"]'
-  # Expand the log to reveal the clear control.
-  - click: '[data-testid="tunnel-activity-log-toggle"]'
-  - wait_for:
-      selector: '[data-testid="tunnel-activity-log-clear"]'
-      timeout_sec: 5
-  - assert_visible: '[data-testid="tunnel-activity-log-clear"]'
-  # No tunnel events yet → clear is disabled.
-  - assert_disabled: '[data-testid="tunnel-activity-log-clear"]'
-  # Collapse again to confirm the toggle is reversible.
-  - click: '[data-testid="tunnel-activity-log-toggle"]'
-  - assert_not_visible: '[data-testid="tunnel-activity-log-clear"]'
-  - screenshot: f8-2-activity-log.png
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="app-main-menu"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- click: '[data-testid="context-menu-item-tunneling"]'
+- wait_for: '[data-testid="tunnel-manager"]'
+- assert_visible: '[data-testid="tunnel-activity-log"]'
+- assert_visible: '[data-testid="tunnel-activity-log-toggle"]'
+- click: '[data-testid="tunnel-activity-log-toggle"]'
+- wait_for:
+    selector: '[data-testid="tunnel-activity-log-clear"]'
+    timeout_sec: 5
+- assert_visible: '[data-testid="tunnel-activity-log-clear"]'
+- assert_disabled: '[data-testid="tunnel-activity-log-clear"]'
+- click: '[data-testid="tunnel-activity-log-toggle"]'
+- assert_not_visible: '[data-testid="tunnel-activity-log-clear"]'
+- screenshot: f8-2-activity-log.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tunnel manager activity log expands and exposes the clear control：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 3
+    - 4
+    - 5
+    - 9
+    - 13
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"app-main-menu\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"tunnel-manager\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"tunnel-activity-log\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"tunnel-activity-log-toggle\"]"}'
+    - step: 10
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tunnel-activity-log-clear\"]", "timeout_sec": 5}}'
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"tunnel-activity-log-clear\"]"}'
+    - step: 12
+      expectation: '{"assert_disabled": "[data-testid=\"tunnel-activity-log-clear\"]"}'
+    - step: 14
+      expectation: '{"assert_not_visible": "[data-testid=\"tunnel-activity-log-clear\"]"}'
+    results:
+    - 14
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。

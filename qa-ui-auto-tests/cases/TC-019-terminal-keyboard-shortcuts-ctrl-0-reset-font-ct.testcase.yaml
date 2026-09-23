@@ -1,25 +1,65 @@
 id: TC-019
 title: Terminal keyboard shortcuts (Ctrl+0 reset font, Ctrl+Shift+F find)
-covers: [F4.8]
-tags: [legacy-imported, p1, shortcuts, terminal]
-modes: [browser]
-fixtures: [reset_db]
+covers:
+- F4.8
+tags:
+- legacy-imported
+- p1
+- shortcuts
+- terminal
+modes:
+- browser
+fixtures:
+- reset_db
 steps:
-  - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"welcome-open-local-terminal\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
-  - click: "[data-testid=\"terminal-pane\"]"
-  - type: echo qa-shortcut-marker
-  - press: Enter
-  - wait: 1
-  - press: Control+Shift+F
-  - wait_for: "input[placeholder=\"Find\"]"
-  - fill: {selector: "input[placeholder=\"Find\"]", value: qa-shortcut-marker}
-  - press: Enter
-  - assert_pattern:
-      selector: 'span:has-text("Match")'
-      regex: '^(Match \d+/\d+|No matches)$'
-  - press: Escape
-  - press: Control+0
-  - wait: 1
-  - screenshot: 019-terminal-shortcuts.png
+- open: ${cfg.app.base_url}
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- click: '[data-testid="terminal-pane"]'
+- type: echo qa-shortcut-marker
+- press: Enter
+- wait: 1
+- press: Control+Shift+F
+- wait_for: input[placeholder="Find"]
+- fill:
+    selector: input[placeholder="Find"]
+    value: qa-shortcut-marker
+- press: Enter
+- assert_pattern:
+    selector: span:has-text("Match")
+    regex: ^(Match \d+/\d+|No matches)$
+- press: Escape
+- press: Control+0
+- wait: 1
+- screenshot: 019-terminal-shortcuts.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Terminal keyboard shortcuts (Ctrl+0 reset font, Ctrl+Shift+F find)：按步骤执行后，所有声明的可观察结果均满足。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 8
+    - 10
+    - 11
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "input[placeholder=\"Find\"]"}'
+    - step: 12
+      expectation: '{"assert_pattern": {"selector": "span:has-text(\"Match\")", "regex": "^(Match \\d+/\\d+|No matches)$"}}'
+    results:
+    - 12
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: external
+    reason: 明确记录执行边界和未验证平台。
