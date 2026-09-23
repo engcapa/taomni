@@ -2927,6 +2927,7 @@ export function TerminalPanel({
     const handleConnected = async (
       { sessionId: connectedSid, shellId, directoryUseWarning, taskEnvironment }: ConnectResult,
       mode: ConnectMode,
+      startupCommand?: string,
     ) => {
       if (destroyed) {
         const detachPending = tabId ? consumeTerminalDetachPending(tabId) : false;
@@ -2979,10 +2980,16 @@ export function TerminalPanel({
       // retain an event-driven installer that runs when output later settles at
       // an idle prompt. The terminal is usable immediately; this only defers the
       // background hook. Shared by the SSH remote shell and the local macOS zsh.
-      const scheduleCwdIntegrationInstall = (targetSid: string, integrationCommand: string) => {
+      const scheduleCwdIntegrationInstall = (
+        targetSid: string,
+        integrationCommand: string | null,
+        pendingStartupCommand?: string,
+      ) => {
+        if (!integrationCommand && !pendingStartupCommand) return;
         if (ssh && !adopted) automationInputSettlingRef.current = true;
         let integrationAttempts = 0;
         let integrationInstalling = false;
+        let startupCommandSent = false;
         const MAX_INTEGRATION_ATTEMPTS = 12; // ~6s of polling for a slow login
         const installCwdIntegration = (): boolean => {
           if (destroyed || sessionIdRef.current !== targetSid) {
@@ -2994,6 +3001,19 @@ export function TerminalPanel({
           if (integrationInstalling) return true;
           const liveTerm = termRef.current;
           if (!liveTerm || !terminalAtIdlePrompt(liveTerm)) return false;
+          if (pendingStartupCommand && !startupCommandSent) {
+            startupCommandSent = true;
+            writeTerminal(targetSid, encodeBase64(`${pendingStartupCommand}\r`)).catch((err) => {
+              appendEvent("error", `Failed to send SSH startup command: ${String(err)}`);
+            });
+            return false;
+          }
+          if (!integrationCommand) {
+            installSshCwdIntegrationRef.current = null;
+            automationInputSettlingRef.current = false;
+            syncAutomationState();
+            return true;
+          }
           integrationInstalling = true;
           const integrationTimeoutMs = /\bMINGW(?:32|64)\b/.test(getLastBufferLines(liveTerm, 3)) ? 30_000 : 4_000;
           if (installSshCwdIntegrationRef.current === installCwdIntegration) {
@@ -3034,6 +3054,8 @@ export function TerminalPanel({
           if (integrationAttempts < MAX_INTEGRATION_ATTEMPTS) {
             integrationAttempts += 1;
             window.setTimeout(pollForCwdIntegration, 500);
+          } else if (pendingStartupCommand && !startupCommandSent) {
+            // Keep the event-driven probe alive until a slow login exposes its prompt.
           } else if (installSshCwdIntegrationRef.current === installCwdIntegration) {
             // A shell that never exposes a prompt (or a non-POSIX prompt that
             // cannot accept the integration command) must not block normal
@@ -3071,7 +3093,9 @@ export function TerminalPanel({
           !isTauriRuntime() && getAppPlatform() === "windows";
         if (skipBrowserWindowsSshIntegration) {
           if (initialCwd) {
-            scheduleCwdIntegrationInstall(connectedSid, buildSshInitialCwdProbe(initialCwd));
+            scheduleCwdIntegrationInstall(connectedSid, buildSshInitialCwdProbe(initialCwd), startupCommand);
+          } else if (startupCommand) {
+            scheduleCwdIntegrationInstall(connectedSid, null, startupCommand);
           } else {
             automationInputSettlingRef.current = false;
             installSshCwdIntegrationRef.current = null;
@@ -3079,7 +3103,7 @@ export function TerminalPanel({
             syncAutomationState();
           }
         } else {
-          scheduleCwdIntegrationInstall(connectedSid, buildSshCwdIntegration(initialCwd));
+          scheduleCwdIntegrationInstall(connectedSid, buildSshCwdIntegration(initialCwd), startupCommand);
         }
       } else if (
         !commandTerminal &&
@@ -3188,6 +3212,8 @@ export function TerminalPanel({
       const ns = getSessionNetworkSettings(ssh.optionsJson);
       const opts = parseSessionOptions(ssh.optionsJson);
       const startupCommand = typeof opts.startupCmd === "string" ? opts.startupCmd.trim() : "";
+      const keepStartupCommandOpen = startupCommand.length > 0 && opts.doNotExit !== false;
+      const backendStartupCommand = startupCommand && !keepStartupCommandOpen ? startupCommand : null;
       createSshTerminal(
         targetSid,
         ssh.host,
@@ -3204,10 +3230,14 @@ export function TerminalPanel({
         // explicitly opts into untrusted.
         opts.x11 !== false,
         opts.x11Trusted !== false,
-        startupCommand || null,
-        startupCommand ? opts.doNotExit !== false : false,
+        backendStartupCommand,
+        keepStartupCommandOpen,
       )
-        .then((sessionId) => handleConnected({ sessionId, shellId: null }, mode))
+        .then((sessionId) => handleConnected(
+          { sessionId, shellId: null },
+          mode,
+          keepStartupCommandOpen ? startupCommand : undefined,
+        ))
         .catch((err) => handleConnectFailure(err, mode));
     };
 

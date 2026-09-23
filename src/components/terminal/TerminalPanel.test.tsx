@@ -1762,7 +1762,7 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
-  it("passes saved SSH startup command options to the backend", async () => {
+  it("waits for an idle SSH shell before sending the saved startup command", async () => {
     render(
       <TerminalPanel
         visible
@@ -1792,9 +1792,33 @@ describe("TerminalPanel focus behavior", () => {
       expect.any(Function),
       true,
       true,
-      "tmux new -A -s main",
+      null,
       true,
     );
+
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 600));
+    });
+    expect(ipcMocks.writeTerminal).not.toHaveBeenCalled();
+
+    const prompt = "user@host:~$ ";
+    term.buffer.active = {
+      type: "normal",
+      length: 1,
+      baseY: 0,
+      cursorY: 0,
+      cursorX: prompt.length,
+      viewportY: 0,
+      getLine: vi.fn(() => ({ isWrapped: false, translateToString: () => prompt })),
+    };
+
+    await waitFor(() => {
+      expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+        "terminal-session",
+        btoa("tmux new -A -s main\r"),
+      );
+    });
   });
 
   it("uses the latest measured terminal size when reconnecting SSH", async () => {

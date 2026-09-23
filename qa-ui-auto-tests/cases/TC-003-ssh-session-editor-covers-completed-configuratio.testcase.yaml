@@ -141,7 +141,7 @@ steps:
 - assert_attribute:
     selector: input[aria-label="Forward local address"]
     name: value
-    equals: 127.0.0.1:19091
+    equals: 127.0.0.1:19090
 - assert_attribute:
     selector: input[aria-label="Forward remote address"]
     name: value
