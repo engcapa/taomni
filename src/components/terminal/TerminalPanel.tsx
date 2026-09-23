@@ -2991,6 +2991,7 @@ export function TerminalPanel({
           const liveTerm = termRef.current;
           if (!liveTerm || !terminalAtIdlePrompt(liveTerm)) return false;
           integrationInstalling = true;
+          const integrationTimeoutMs = /\bMINGW(?:32|64)\b/.test(getLastBufferLines(liveTerm, 3)) ? 30_000 : 4_000;
           if (installSshCwdIntegrationRef.current === installCwdIntegration) {
             installSshCwdIntegrationRef.current = null;
           }
@@ -2999,12 +3000,25 @@ export function TerminalPanel({
           // it's just network latency, not shell startup). Bounded so a
           // non-POSIX shell — which never emits the OSC 7 — isn't blacked out
           // for too long before output resumes.
-          injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor(4000);
+          const suppressor = createOsc7BlankingSuppressor(integrationTimeoutMs);
+          injectedInputEchoSuppressorRef.current = suppressor;
+          window.setTimeout(() => {
+            if (
+              destroyed ||
+              sessionIdRef.current !== targetSid ||
+              injectedInputEchoSuppressorRef.current !== suppressor
+            ) return;
+            injectedInputEchoSuppressorRef.current = null;
+            automationInputSettlingRef.current = false;
+            syncAutomationState();
+          }, integrationTimeoutMs);
           writeTerminal(targetSid, encodeBase64(`${integrationCommand}\r`)).catch(() => {
-            if (sessionIdRef.current === targetSid) {
+            if (sessionIdRef.current === targetSid && injectedInputEchoSuppressorRef.current === suppressor) {
               integrationInstalling = false;
               installSshCwdIntegrationRef.current = installCwdIntegration;
               injectedInputEchoSuppressorRef.current = null;
+              automationInputSettlingRef.current = false;
+              syncAutomationState();
             }
           });
           return true;

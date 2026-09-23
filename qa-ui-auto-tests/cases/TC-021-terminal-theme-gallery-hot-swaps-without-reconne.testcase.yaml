@@ -32,7 +32,7 @@ steps:
 - wait_for: '[data-testid="terminal-pane"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-    timeout_sec: 20
+    timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo qa-theme-marker
@@ -60,7 +60,7 @@ steps:
 - click: '[data-testid="terminal-pane"] button:has-text("Close")'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-    timeout_sec: 20
+    timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo qa-theme-still-alive
@@ -101,7 +101,7 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 12
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
-        "timeout_sec": 20}}'
+        "timeout_sec": 60}}'
     - step: 16
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 19
@@ -113,7 +113,7 @@ verification:
       expectation: '{"wait_for": "input[placeholder=\"Find\"]"}'
     - step: 26
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
-        "timeout_sec": 20}}'
+        "timeout_sec": 60}}'
     - step: 29
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-theme\\-still\\-alive\\r?$",
         "timeout_sec": 15}}'

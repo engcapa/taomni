@@ -30,7 +30,7 @@ steps:
 - wait_for: '[data-testid="terminal-pane"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-    timeout_sec: 20
+    timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: sleep 60 && echo qa-should-not-appear
@@ -47,7 +47,7 @@ steps:
 - click: '[data-testid="context-menu"] >> text="SIGINT (Interrupt)"'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-    timeout_sec: 20
+    timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo qa-after-sigint
@@ -86,14 +86,14 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 12
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
-        "timeout_sec": 20}}'
+        "timeout_sec": 60}}'
     - step: 16
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 18
       expectation: '{"wait_for": "[data-testid=\"context-menu\"] >> text=\"SIGINT (Interrupt)\""}'
     - step: 20
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
-        "timeout_sec": 20}}'
+        "timeout_sec": 60}}'
     - step: 23
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-after\\-sigint\\r?$",
         "timeout_sec": 15}}'
