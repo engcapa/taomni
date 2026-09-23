@@ -38,14 +38,15 @@ steps:
     timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
-    text: mkdir -p '${cfg.sftp.remote_test_dir}/qa-sort-TC027/folder' && printf abc > '${cfg.sftp.remote_test_dir}/qa-sort-TC027/a.log'
-      && printf b > '${cfg.sftp.remote_test_dir}/qa-sort-TC027/b.txt' && printf cc > '${cfg.sftp.remote_test_dir}/qa-sort-TC027/c.csv'
-      && touch -t 202001030000 '${cfg.sftp.remote_test_dir}/qa-sort-TC027/a.log' && touch -t 202001020000 '${cfg.sftp.remote_test_dir}/qa-sort-TC027/b.txt'
-      && touch -t 202001010000 '${cfg.sftp.remote_test_dir}/qa-sort-TC027/c.csv' && printf '\nQA_SORT_READY\n'
+    text: mkdir -p '${cfg.sftp.remote_test_dir}/qa-sort-TC027/folder' && cd '${cfg.sftp.remote_test_dir}/qa-sort-TC027'
+      && printf abc > a.log && printf b > b.txt && printf cc > c.csv
+      && touch -t 202001030000 a.log && touch -t 202001020000 b.txt
+      && touch -t 202001010000 c.csv && printf '\nQA_SORT_READY\n'
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^QA_SORT_READY\r?$
+    timeout_sec: 30
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-remote-pane"]'
 - click: '[data-testid="sftp-remote-path-edit"]'
@@ -144,6 +145,8 @@ verification:
     - 33
     - 35
     checkpoints:
+    - step: 14
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_SORT_READY\\r?$", "timeout_sec": 30}}'
     - step: 20
       expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-pane\"] tr[data-row] td:first-child
         > div > span:first-of-type", "equals": ["folder", "a.log", "b.txt", "c.csv"]}}'

@@ -63,29 +63,29 @@ steps:
     selector: .cm-tooltip-autocomplete
     timeout_sec: 30
 - wait_for:
-    selector: .cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)
+    selector: .cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel
     timeout_sec: 30
 - assert_text:
-    selector: .cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)
+    selector: .cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel
     contains: soutm
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     transport: webdriver
     keys:
     - ArrowDown
-    ready_selector: .cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)
+    ready_selector: .cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel
     ready_timeout_sec: 30
     ready_stable_sec: 1.0
     require_keydown_prevented: true
 - assert_text:
-    selector: .cm-tooltip-autocomplete [aria-selected="true"]
+    selector: .cm-tooltip-autocomplete [aria-selected="true"] .cm-completionLabel
     contains: soutm
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     transport: webdriver
     keys:
     - Enter
-    ready_selector: .cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)[aria-selected="true"]
+    ready_selector: .cm-tooltip-autocomplete li:nth-of-type(2)[aria-selected="true"] .cm-completionLabel
     ready_timeout_sec: 30
     ready_stable_sec: 1.0
     require_keydown_prevented: true
@@ -135,13 +135,13 @@ verification:
     - step: 13
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 30}}'
     - step: 14
-      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)",
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel",
         "timeout_sec": 30}}'
     - step: 15
-      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-text:nth-of-type(2)",
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel",
         "contains": "soutm"}}'
     - step: 17
-      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete [aria-selected=\"true\"]", "contains":
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete [aria-selected=\"true\"] .cm-completionLabel", "contains":
         "soutm"}}'
     - step: 19
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]", "timeout_sec": 10}}'
