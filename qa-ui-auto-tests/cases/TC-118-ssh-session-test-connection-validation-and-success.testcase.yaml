@@ -66,15 +66,21 @@ steps:
     value: qa-ui-auto-ssh-test-connection
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-test-connection"]'
-- eval_readonly:
-    expression: JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].host === "${cfg.ssh.host}"
-    expect_truthy: true
-- eval_readonly:
-    expression: JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].port === Number("${cfg.ssh.port}")
-    expect_truthy: true
-- eval_readonly:
-    expression: JSON.parse(localStorage.getItem("taomni.sessions.v1"))[0].username === "${cfg.ssh.user}"
-    expect_truthy: true
+- right_click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-test-connection"]'
+- click_menu: Edit
+- wait_for: '[data-testid="session-editor"]'
+- assert_attribute:
+    selector: '[data-testid="session-host"]'
+    name: value
+    equals: "${cfg.ssh.host}"
+- assert_attribute:
+    selector: '[data-testid="session-port"]'
+    name: value
+    equals: "${cfg.ssh.port}"
+- assert_attribute:
+    selector: '[data-testid="session-user"]'
+    name: value
+    equals: "${cfg.ssh.user}"
 - screenshot: 118-ssh-session-test-connection.png
 verification:
   review: reviewed
@@ -127,20 +133,24 @@ verification:
     - 24
     - 26
     - 27
+    - 29
+    - 30
     checkpoints:
     - step: 28
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-test-connection\"]"}'
-    - step: 29
-      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].host === \"${cfg.ssh.host}\"", "expect_truthy": true}}'
-    - step: 30
-      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].port === Number(\"${cfg.ssh.port}\")", "expect_truthy": true}}'
     - step: 31
-      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.sessions.v1\"))[0].username === \"${cfg.ssh.user}\"", "expect_truthy": true}}'
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
     results:
     - 28
-    - 29
-    - 30
-    - 31
+    - 32
+    - 33
+    - 34
   visual:
   - check: The SSH connection test result remains readable and the saved session is visible in the session tree.
     method: manual
