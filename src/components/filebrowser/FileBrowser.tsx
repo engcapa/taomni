@@ -39,6 +39,11 @@ type Orientation = "horizontal" | "vertical";
 
 const ORIENTATION_KEY_PREFIX = "taomni.sftp.orientation.";
 
+function remotePathForTerminalCwd(cwd: string, homeDir: string | null | undefined): string {
+  if (!homeDir || !/^\/?[A-Za-z]:\//.test(homeDir)) return cwd;
+  return cwd.replace(/^\/([A-Za-z])(?=\/|$)/, (_match, drive: string) => `/${drive.toUpperCase()}:`);
+}
+
 function loadOrientation(scope: string, fallback: Orientation): Orientation {
   try {
     const v = localStorage.getItem(ORIENTATION_KEY_PREFIX + scope);
@@ -287,11 +292,12 @@ export function FileBrowser(props: FileBrowserProps) {
       return;
     }
     if (!session?.attached) return;
-    if (session.remote.path === props.cwdHint) {
-      setStatus(t("fileBrowser.statusAlreadyAt", { path: props.cwdHint }));
+    const remoteCwd = remotePathForTerminalCwd(props.cwdHint, session.homeDir);
+    if (session.remote.path === remoteCwd) {
+      setStatus(t("fileBrowser.statusAlreadyAt", { path: remoteCwd }));
       return;
     }
-    void navigate(props.sessionId, "remote", props.cwdHint);
+    void navigate(props.sessionId, "remote", remoteCwd);
   }, [
     clearTerminalSyncTimeout,
     navigate,
@@ -300,6 +306,7 @@ export function FileBrowser(props: FileBrowserProps) {
     props.onRequestTerminalCwd,
     props.sessionId,
     session?.attached,
+    session?.homeDir,
     session?.remote.path,
     setStatus,
   ]);
@@ -313,11 +320,12 @@ export function FileBrowser(props: FileBrowserProps) {
 
     pendingTerminalSyncRef.current = false;
     clearTerminalSyncTimeout();
-    if (session.remote.path === props.cwdHint) {
-      setStatus(t("fileBrowser.statusAlreadyAt", { path: props.cwdHint }));
+    const remoteCwd = remotePathForTerminalCwd(props.cwdHint, session.homeDir);
+    if (session.remote.path === remoteCwd) {
+      setStatus(t("fileBrowser.statusAlreadyAt", { path: remoteCwd }));
       return;
     }
-    void navigate(props.sessionId, "remote", props.cwdHint);
+    void navigate(props.sessionId, "remote", remoteCwd);
   }, [
     clearTerminalSyncTimeout,
     navigate,
@@ -325,6 +333,7 @@ export function FileBrowser(props: FileBrowserProps) {
     props.cwdHintVersion,
     props.sessionId,
     session?.attached,
+    session?.homeDir,
     session?.remote.path,
     setStatus,
   ]);

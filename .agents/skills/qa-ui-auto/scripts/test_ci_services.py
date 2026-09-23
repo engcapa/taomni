@@ -17,16 +17,22 @@ class HostedServicesTest(unittest.TestCase):
             observed = []
             case = {"id": "TC-probe", "title": "SFTP path", "tags": [], "covers": [],
                     "modes": ["browser"], "fixtures": ["sftp_required"],
-                    "steps": [{"open": "${fixture.sftp_shell_test_dir}"}]}
+                    "steps": [{"open": "${fixture.sftp_shell_test_dir}"},
+                              {"open": "${fixture.sftp_sync_test_dir}"},
+                              {"open": "${fixture.sftp_chmod_mode}"},
+                              {"open": "${fixture.sftp_chmod_status}"}]}
             cfg = {"app": {"base_url": "http://localhost"},
                    "sftp": {"host": "127.0.0.1", "port": 22,
-                            "remote_test_dir": "C:/qa-temp", "remote_shell_test_dir": "/c/qa-temp"}}
+                            "remote_test_dir": "C:/qa-temp", "remote_shell_test_dir": "/c/qa-temp",
+                            "chmod_readback_mode": "644"}}
             with patch('qa_ui_auto.runner._browser_context', return_value=browser), \
                  patch('qa_ui_auto.fixtures.sftp_required.socket.create_connection'), \
+                 patch('qa_ui_auto.fixtures.sftp_required.platform.system', return_value='Windows'), \
                  patch.dict('qa_ui_auto.runner.STEP_REGISTRY', {'open': lambda ctx, args: observed.append(args)}):
                 result = _run_browser_case({"case": case, "cfg": cfg, "env": {}, "report_root": directory, "worker_id": 0})
             self.assertEqual(result['status'], 'passed', result)
-            self.assertEqual(observed, ['/c/qa-temp'])
+            self.assertEqual(observed, ['/c/qa-temp', '/C:/qa-temp', '644',
+                                        'chmod failed: remote server ignored requested permissions'])
 
     def test_partial_provisioning_failure_releases_owned_resources(self):
         with tempfile.TemporaryDirectory() as directory, patch('ci_services.platform.system', return_value='Linux'):

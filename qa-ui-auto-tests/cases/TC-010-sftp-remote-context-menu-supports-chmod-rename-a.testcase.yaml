@@ -1,5 +1,5 @@
 id: TC-010
-title: SFTP remote context menu supports chmod, rename, and delete
+title: SFTP remote menu verifies chmod or reports unsupported modes, then renames and deletes
 covers:
 - F7.5
 tags:
@@ -94,7 +94,9 @@ steps:
 - click: role=button[name="Apply"]
 - assert_not_visible: '[aria-label="Permissions"]'
 - click: '[data-testid="terminal-pane"]'
-- wait: 1
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: ${fixture.sftp_chmod_status}
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
     text: printf '\nQA_MODE=%s\n' "$(stat -c %a '${cfg.sftp.remote_test_dir}/tc010/qa-ui-auto-menu.txt' 2>/dev/null
@@ -102,7 +104,7 @@ steps:
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
-    regex: (?m)^QA_MODE=600\r?$
+    regex: (?m)^QA_MODE=${fixture.sftp_chmod_mode}\r?$
 - wait: 1
 - right_click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-menu.txt"'
 - wait_for: '[data-testid="context-menu"]'
@@ -126,7 +128,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SFTP remote context menu supports chmod, rename, and delete：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: POSIX 服务器权限变更成功且读回 600；Windows OpenSSH 忽略 POSIX 权限时明确反馈并读回 644；重命名和删除仍可用。
     actions:
     - 1
     - 2
@@ -215,8 +217,10 @@ verification:
       expectation: '{"assert_attribute": {"selector": "#chmod-octal", "name": "value", "equals": "600"}}'
     - step: 50
       expectation: '{"assert_not_visible": "[aria-label=\"Permissions\"]"}'
+    - step: 52
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "${fixture.sftp_chmod_status}"}}'
     - step: 54
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_MODE=600\\r?$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_MODE=${fixture.sftp_chmod_mode}\\r?$"}}'
     - step: 57
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 59

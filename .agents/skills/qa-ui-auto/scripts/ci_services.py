@@ -308,8 +308,11 @@ class Services:
             sftp.close()
         cfg = {"host": "127.0.0.1", "port": port, "user": user, "password": "${env.QA_SSH_PASSWORD}"}
         shell_dir = "/c/" + remote_dir[3:] if platform.system() == "Windows" else remote_dir
+        sftp_shell_dir = "/" + remote_dir if platform.system() == "Windows" else remote_dir
         self.config.update(ssh=cfg.copy(), sftp={**cfg, "remote_test_dir": remote_dir,
-                                             "remote_shell_test_dir": shell_dir})
+                                             "remote_shell_test_dir": shell_dir,
+                                             "remote_sftp_shell_test_dir": sftp_shell_dir,
+                                             "chmod_readback_mode": "644" if platform.system() == "Windows" else "600"})
         return {"authentication": True, "pty_exec": True, "sftp_roundtrip": True, "port": port}
 
     def mysql(self):

@@ -34,7 +34,7 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     timeout_sec: 60
 - click: '[data-testid="attached-sftp-toggle"]'
-- wait_for: '[data-testid="sftp-browser"]'
+- wait_for: '[data-testid="sftp-remote-path"] button[data-path="/"]'
 - click: '[data-testid="terminal-pane"]'
 - wait: 1
 - terminal_input:
@@ -46,12 +46,12 @@ steps:
     regex: (?m)^QA_CWD_READY\r?$
 - wait: 1
 - click: '[data-testid="sftp-browser"] >> button[title*="sync the remote pane"]'
-- wait: 1
+- wait_for: '[data-testid="sftp-remote-path"] button[data-path="${fixture.sftp_sync_test_dir}"]'
 - click: '[data-testid="sftp-remote-path-edit"]'
 - assert_attribute:
     selector: input[data-testid="sftp-remote-path"]
     name: value
-    equals: ${fixture.sftp_shell_test_dir}
+    equals: ${fixture.sftp_sync_test_dir}
 - press: Escape
 - assert_not_visible: input[data-testid="sftp-remote-path"]
 - screenshot: 044-sftp-manual-sync.png
@@ -83,12 +83,12 @@ verification:
     - step: 11
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 14
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-path\"] button[data-path=\"/\"]"}'
     - step: 18
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD_READY\\r?$"}}'
     - step: 23
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "${fixture.sftp_shell_test_dir}"}}'
+        "equals": "${fixture.sftp_sync_test_dir}"}}'
     - step: 25
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
     results:
