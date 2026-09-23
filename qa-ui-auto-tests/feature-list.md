@@ -1628,6 +1628,9 @@ controls:
   - id: network-new-forward-desc
     selector: 'input[aria-label="New forward description"]'
     kind: interactive
+  - id: network-add-forward
+    selector: '[data-testid="session-forward-add"]'
+    kind: interactive
   - id: network-forward-local
     selector: 'input[aria-label="Forward local address"]'
     kind: interactive

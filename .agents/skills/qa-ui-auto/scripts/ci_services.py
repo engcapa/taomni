@@ -48,6 +48,10 @@ def free_port():
         return sock.getsockname()[1]
 
 
+def jump_target_endpoint(system: str, mapped_port: int) -> tuple[str, int]:
+    return "127.0.0.1", 2222 if system == "Linux" else mapped_port
+
+
 def retry(probe, seconds=120):
     end = time.monotonic() + seconds
     while True:
@@ -156,7 +160,8 @@ class Services:
             command(["sudo", "-n", "chown", "-R", f"{user}:staff", home, remote_dir])
             # The temporary account is owned by this VM/job, not a shared user.
             self.cleanup_command(["sudo", "-n", "rm", "-r", home, remote_dir])
-            lines += ["UsePAM yes", f"PidFile {private / 'sshd.pid'}"]
+            # Avoid PAM's keyboard-interactive fallback on a rejected password.
+            lines += ["UsePAM yes", "KbdInteractiveAuthentication no", f"PidFile {private / 'sshd.pid'}"]
             # Add only the disposable account when macOS restricts SSH login.
             group = subprocess.run(["dscl", ".", "-read", "/Groups/com.apple.access_ssh"], capture_output=True)
             if group.returncode == 0:
@@ -228,7 +233,8 @@ class Services:
 
     def ssh(self):
         password = secret("QA_SSH_PASSWORD")
-        if platform.system() == "Linux":
+        system = platform.system()
+        if system == "Linux":
             user, remote_dir = "testuser", "/tmp/qa-ui-auto-temp"
             port = self.docker("sshd", self.images["ssh_image"], 2222,
                                {"USER_NAME": user, "USER_PASSWORD": password, "PASSWORD_ACCESS": "true"})
@@ -307,12 +313,14 @@ class Services:
         finally:
             sftp.close()
         cfg = {"host": "127.0.0.1", "port": port, "user": user, "password": "${env.QA_SSH_PASSWORD}"}
-        shell_dir = "/c/" + remote_dir[3:] if platform.system() == "Windows" else remote_dir
-        sftp_shell_dir = "/" + remote_dir if platform.system() == "Windows" else remote_dir
+        shell_dir = "/c/" + remote_dir[3:] if system == "Windows" else remote_dir
+        sftp_shell_dir = "/" + remote_dir if system == "Windows" else remote_dir
+        jump_target_host, jump_target_port = jump_target_endpoint(system, port)
+        cfg.update(jump_target_host=jump_target_host, jump_target_port=jump_target_port)
         self.config.update(ssh=cfg.copy(), sftp={**cfg, "remote_test_dir": remote_dir,
                                              "remote_shell_test_dir": shell_dir,
                                              "remote_sftp_shell_test_dir": sftp_shell_dir,
-                                             "chmod_readback_mode": "644" if platform.system() == "Windows" else "600"})
+                                             "chmod_readback_mode": "644" if system == "Windows" else "600"})
         return {"authentication": True, "pty_exec": True, "sftp_roundtrip": True, "port": port}
 
     def mysql(self):

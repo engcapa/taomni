@@ -40,7 +40,7 @@ steps:
 - fill:
     selector: input[aria-label="New forward description"]
     value: qa-fwd-1
-- click: '[data-testid="session-editor"] >> text="Add"'
+- click: '[data-testid="session-forward-add"]'
 - wait_for: '[data-testid="session-editor"] input[aria-label="Forward local address"]'
 - assert_visible: '[data-testid="session-editor"] input[aria-label="Forward remote address"]'
 - fill:
@@ -52,7 +52,7 @@ steps:
 - fill:
     selector: input[aria-label="New forward description"]
     value: qa-fwd-broken
-- click: '[data-testid="session-editor"] >> text="Add"'
+- click: '[data-testid="session-forward-add"]'
 - wait: 1
 - assert_count:
     selector: '[data-testid="session-editor"] input[aria-label="Forward local address"]'

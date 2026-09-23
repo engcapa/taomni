@@ -22,10 +22,10 @@ steps:
 - wait_for: '[data-testid="session-editor"]'
 - fill:
     selector: '[data-testid="session-host"]'
-    value: ${cfg.ssh.host}
+    value: ${cfg.ssh.jump_target_host}
 - fill:
     selector: '[data-testid="session-port"]'
-    value: ${cfg.ssh.port}
+    value: ${cfg.ssh.jump_target_port}
 - set_check:
     selector: '[data-testid="session-specify-username"]'
     checked: true

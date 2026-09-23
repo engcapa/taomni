@@ -1126,6 +1126,7 @@
 - `input[aria-label="New forward local address"]` — interactive — F6.3.network-new-forward-local
 - `input[aria-label="New forward remote address"]` — interactive — F6.3.network-new-forward-remote
 - `input[aria-label="New forward description"]` — interactive — F6.3.network-new-forward-desc
+- `[data-testid="session-forward-add"]` — interactive — F6.3.network-add-forward
 - `input[aria-label="Forward local address"]` — interactive [optional] — F6.3.network-forward-local
 - `input[aria-label="Forward remote address"]` — interactive [optional] — F6.3.network-forward-remote
 - `input[aria-label="Forward description"]` — interactive [optional] — F6.3.network-forward-desc

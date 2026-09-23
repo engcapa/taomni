@@ -63,7 +63,7 @@ steps:
 - fill:
     selector: input[aria-label="New forward description"]
     value: qa-ui-auto-forward
-- click: '[data-testid="session-editor"] >> text="Add"'
+- click: '[data-testid="session-forward-add"]'
 - assert_visible: '[data-testid="session-editor"] input[aria-label="Forward local address"]'
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'

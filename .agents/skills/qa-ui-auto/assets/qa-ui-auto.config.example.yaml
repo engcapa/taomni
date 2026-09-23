@@ -23,6 +23,8 @@ webdriver:
 ssh:
   host: 127.0.0.1
   port: 2222
+  jump_target_host: 127.0.0.1
+  jump_target_port: 2222
   user: testuser
   password: ${env.QA_SSH_PASSWORD}
   # private_key_path: ~/.ssh/id_ed25519
