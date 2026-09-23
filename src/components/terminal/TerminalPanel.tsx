@@ -278,6 +278,10 @@ interface TerminalPanelProps {
 const DEFAULT_FONT_SIZE = 14;
 const CWD_QUERY_COMMAND =
   " printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; : __taomni_cwd_sync_done";
+function buildSshInitialCwdProbe(cwd: string): string {
+  return " cd '" + cwd.replace(/'/g, "'\\''") + "' 2>/dev/null;" + CWD_QUERY_COMMAND;
+}
+
 // PowerShell equivalent of the OSC 7 cwd probe. `printf` doesn't exist in
 // PowerShell, so we emit the escape sequence via [Console]::Write. The echo is
 // hidden by the OSC-7 blanking suppressor (which keys off the real escape byte
@@ -3063,7 +3067,20 @@ export function TerminalPanel({
         // source's cwd, the setup cd's there first (SSH can't set a start dir).
         // Best-effort POSIX (bash/zsh); a non-POSIX remote just errors on the
         // line, which the blanking suppressor hides up to its TTL.
-        scheduleCwdIntegrationInstall(connectedSid, buildSshCwdIntegration(initialCwd));
+        const skipBrowserWindowsSshIntegration =
+          !isTauriRuntime() && getAppPlatform() === "windows";
+        if (skipBrowserWindowsSshIntegration) {
+          if (initialCwd) {
+            scheduleCwdIntegrationInstall(connectedSid, buildSshInitialCwdProbe(initialCwd));
+          } else {
+            automationInputSettlingRef.current = false;
+            installSshCwdIntegrationRef.current = null;
+            injectedInputEchoSuppressorRef.current = null;
+            syncAutomationState();
+          }
+        } else {
+          scheduleCwdIntegrationInstall(connectedSid, buildSshCwdIntegration(initialCwd));
+        }
       } else if (
         !commandTerminal &&
         !adopted &&
