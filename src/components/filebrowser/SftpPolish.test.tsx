@@ -136,7 +136,13 @@ describe("SFTP file-list column width persistence", () => {
     expect(sizeHandle).toBeTruthy();
 
     fireEvent.mouseDown(sizeHandle, { clientX: 200 });
-    fireEvent(window, new MouseEvent("mousemove", { clientX: 250 }));
+    window.dispatchEvent(new MouseEvent("mousemove", { clientX: 250 }));
+
+    // A browser can read storage before React flushes the resize render.
+    expect(
+      JSON.parse(localStorage.getItem("taomni.sftp.cols.local") ?? "{}").size,
+    ).toBeGreaterThan(80);
+
     fireEvent(window, new MouseEvent("mouseup"));
 
     const stored = JSON.parse(
