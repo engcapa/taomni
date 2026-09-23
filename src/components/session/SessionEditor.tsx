@@ -821,7 +821,7 @@ function ProxyJumpFields({
                     onChange={(e) => patch({ jumpPassword: e.target.value })}
                   />
                   <label className="ml-2 flex items-center gap-1.5">
-                    <Checkbox checked={value.jumpSaveAuth} onChange={(v) => patch({ jumpSaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
+                    <Checkbox dataTestId="session-proxy-save-auth" checked={value.jumpSaveAuth} onChange={(v) => patch({ jumpSaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
                   </label>
                 </Field>
               ) : (
@@ -896,7 +896,7 @@ function ProxyJumpFields({
                   onChange={(e) => patch({ proxyPass: e.target.value })}
                 />
                 <label className="ml-2 flex items-center gap-1.5">
-                  <Checkbox checked={value.proxySaveAuth} onChange={(v) => patch({ proxySaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
+                  <Checkbox dataTestId="session-proxy-save-auth" checked={value.proxySaveAuth} onChange={(v) => patch({ proxySaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
                 </label>
               </Field>
               {onSaveAsProxySession && (
@@ -1026,7 +1026,7 @@ function NetworkSettings({
 
       <Field label={t("sessionEditor2.fieldKeepAlive")}>
         <label className="flex items-center gap-1.5">
-          <Checkbox checked={keepAlive} onChange={setKeepAlive} />
+          <Checkbox dataTestId="session-keepalive-toggle" checked={keepAlive} onChange={setKeepAlive} />
           {t("sessionEditor2.keepAliveSend")}
         </label>
         <input
@@ -1041,12 +1041,14 @@ function NetworkSettings({
       <Field label={t("sessionEditor2.fieldTcpOptions")}>
         <label className="flex items-center gap-1.5">
           <Checkbox
+            dataTestId="session-tcp-nodelay-toggle"
             checked={tcpNodelay}
             onChange={(v) => patch({ tcpNodelay: v, disableNagle: v })}
           /> {t("sessionEditor2.tcpNodelay")}
         </label>
         <label className="ml-3 flex items-center gap-1.5">
           <Checkbox
+            dataTestId="session-disable-nagle-toggle"
             checked={disableNagle}
             onChange={(v) => patch({ disableNagle: v, tcpNodelay: v })}
           /> {t("sessionEditor2.disableNagle")}
@@ -1055,6 +1057,7 @@ function NetworkSettings({
 
       <Field label={t("sessionEditor2.fieldIpVersion")}>
         <Select
+          dataTestId="session-ip-version"
           value={value.ipVersion}
           options={[
             { value: "auto", label: t("sessionEditor2.ipAuto") },

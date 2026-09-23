@@ -5,7 +5,6 @@ covers:
 - F6.5
 tags:
 - auth
-- legacy-imported
 - p1
 - session
 - ssh

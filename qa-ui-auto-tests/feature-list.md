@@ -1616,8 +1616,23 @@ controls:
   - id: network-proxy-password
     selector: 'input[aria-label="Proxy password"]'
     kind: interactive
+  - id: network-proxy-save-auth
+    selector: '[data-testid="session-proxy-save-auth"]'
+    kind: interactive
   - id: network-keepalive
     selector: 'input[aria-label="Keep-alive interval"]'
+    kind: interactive
+  - id: network-keepalive-toggle
+    selector: '[data-testid="session-keepalive-toggle"]'
+    kind: interactive
+  - id: network-tcp-nodelay
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
+    kind: interactive
+  - id: network-disable-nagle
+    selector: '[data-testid="session-disable-nagle-toggle"]'
+    kind: interactive
+  - id: network-ip-version
+    selector: '[data-testid="session-ip-version"]'
     kind: interactive
   - id: network-new-forward-local
     selector: 'input[aria-label="New forward local address"]'

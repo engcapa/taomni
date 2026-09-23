@@ -2739,6 +2739,7 @@ export function TerminalPanel({
           } else {
             term.write(filtered, () => {
               syncAutomationState();
+              installSshCwdIntegrationRef.current?.();
               if (activityPromptTimer) clearTimeout(activityPromptTimer);
               activityPromptTimer = setTimeout(() => {
                 if (
@@ -2990,6 +2991,12 @@ export function TerminalPanel({
         let integrationAttempts = 0;
         let integrationInstalling = false;
         let startupCommandSent = false;
+        let startupCommandOutputObserved = false;
+        let startupCommandPromptSnapshot: string | null = null;
+        const snapshotPromptBuffer = (liveTerm: Terminal) => {
+          const buffer = liveTerm.buffer.active;
+          return `${buffer.baseY + buffer.cursorY}:${buffer.cursorX}\n${getLastBufferLines(liveTerm, 5)}`;
+        };
         const MAX_INTEGRATION_ATTEMPTS = 12; // ~6s of polling for a slow login
         const installCwdIntegration = (): boolean => {
           if (destroyed || sessionIdRef.current !== targetSid) {
@@ -3000,14 +3007,23 @@ export function TerminalPanel({
           }
           if (integrationInstalling) return true;
           const liveTerm = termRef.current;
-          if (!liveTerm || !terminalAtIdlePrompt(liveTerm)) return false;
+          if (!liveTerm) return false;
           if (pendingStartupCommand && !startupCommandSent) {
+            if (!terminalAtIdlePrompt(liveTerm)) return false;
             startupCommandSent = true;
+            startupCommandPromptSnapshot = snapshotPromptBuffer(liveTerm);
             writeTerminal(targetSid, encodeBase64(`${pendingStartupCommand}\r`)).catch((err) => {
               appendEvent("error", `Failed to send SSH startup command: ${String(err)}`);
             });
             return false;
           }
+          if (pendingStartupCommand && !startupCommandOutputObserved) {
+            if (snapshotPromptBuffer(liveTerm) === startupCommandPromptSnapshot) return false;
+            startupCommandOutputObserved = true;
+            automationInputSettlingRef.current = false;
+            syncAutomationState();
+          }
+          if (!terminalAtIdlePrompt(liveTerm)) return false;
           if (!integrationCommand) {
             installSshCwdIntegrationRef.current = null;
             automationInputSettlingRef.current = false;
@@ -3024,6 +3040,7 @@ export function TerminalPanel({
           // it's just network latency, not shell startup). Bounded so a
           // non-POSIX shell — which never emits the OSC 7 — isn't blacked out
           // for too long before output resumes.
+          automationInputSettlingRef.current = true;
           const suppressor = createOsc7BlankingSuppressor(integrationTimeoutMs);
           injectedInputEchoSuppressorRef.current = suppressor;
           window.setTimeout(() => {
