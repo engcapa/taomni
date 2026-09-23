@@ -29,8 +29,8 @@ steps:
 - fill:
     selector: '[data-testid="session-port"]'
     value: ${cfg.ssh.port}
-- send_text_via_label:
-    label_contains: Specify username
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
     checked: true
 - wait: 1
 - fill:
@@ -79,7 +79,7 @@ steps:
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-settings"]'
 - right_click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-settings"]'
-- click_menu: Edit...
+- click: '[data-testid="context-menu-item-edit"]'
 - wait_for: '[data-testid="session-editor"]'
 - assert_attribute:
     selector: '[data-testid="session-host"]'
@@ -139,7 +139,7 @@ steps:
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-settings"]'
 - right_click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-settings"]'
-- click_menu: Edit...
+- click: '[data-testid="context-menu-item-edit"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-section-network"]'
 - wait_for: '[data-testid="network-settings"]'

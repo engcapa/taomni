@@ -1309,6 +1309,10 @@ controls:
   - id: session-edit
     selector: '[data-testid="session-edit"]'
     kind: interactive
+  - id: context-edit
+    selector: '[data-testid="context-menu-item-edit"]'
+    kind: interactive
+    optional: true       # visible from a saved session context menu
   - id: session-duplicate
     selector: '[data-testid="session-duplicate"]'
     kind: interactive

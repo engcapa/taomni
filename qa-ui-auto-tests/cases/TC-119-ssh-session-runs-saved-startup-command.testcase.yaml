@@ -46,10 +46,12 @@ steps:
     value: qa-ui-auto-startup-command
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-startup-command"]'
-- open_session:
-    name: qa-ui-auto-startup-command
-    double_click: true
-- auth: ${env.QA_SSH_PASSWORD}
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-startup-command"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 40
@@ -84,8 +86,9 @@ verification:
     - 14
     - 15
     - 17
-    - 18
-    - 21
+    - 19
+    - 20
+    - 23
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -97,15 +100,17 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
     - step: 16
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
-    - step: 19
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 21
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
-    - step: 20
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec": 20}}'
     - step: 22
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec": 20}}'
+    - step: 24
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-interactive\\-ready\\r?$", "timeout_sec": 15}}'
     results:
-    - 20
     - 22
+    - 24
   visual:
   - check: The startup command output and the following interactive command output are visible as separate readable terminal lines.
     method: manual

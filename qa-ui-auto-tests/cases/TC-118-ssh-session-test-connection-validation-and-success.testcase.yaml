@@ -77,7 +77,7 @@ steps:
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-test-connection"]'
 - right_click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-test-connection"]'
-- click_menu: Edit...
+- click: '[data-testid="context-menu-item-edit"]'
 - wait_for: '[data-testid="session-editor"]'
 - assert_attribute:
     selector: '[data-testid="session-host"]'

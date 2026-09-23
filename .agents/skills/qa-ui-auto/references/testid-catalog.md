@@ -1041,6 +1041,7 @@
 - `[data-testid="session-search"]` — interactive — F6.2.session-search
 - `[data-testid="session-new"]` — interactive — F6.2.session-new
 - `[data-testid="session-edit"]` — interactive — F6.2.session-edit
+- `[data-testid="context-menu-item-edit"]` — interactive [optional] — F6.2.context-edit
 - `[data-testid="session-duplicate"]` — interactive — F6.2.session-duplicate
 - `[data-testid="session-delete"]` — interactive — F6.2.session-delete
 - `[data-testid="context-menu-item-set-terminal-theme"]` — interactive [optional] — F6.2.context-set-terminal-theme
