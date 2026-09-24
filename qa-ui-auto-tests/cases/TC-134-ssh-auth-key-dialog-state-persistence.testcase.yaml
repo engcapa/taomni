@@ -43,17 +43,15 @@ steps:
 - set_check:
     selector: '[data-testid="session-save-in-vault"]'
     checked: true
-- assert_attribute:
-    selector: '[data-testid="session-save-in-vault"]'
-    name: data-checked
-    equals: 'true'
+- assert_count:
+    selector: '[data-testid="session-save-in-vault"]:checked'
+    equal: 1
 - set_check:
     selector: '[data-testid="session-save-in-vault"]'
     checked: false
-- assert_attribute:
-    selector: '[data-testid="session-save-in-vault"]'
-    name: data-checked
-    equals: 'false'
+- assert_count:
+    selector: '[data-testid="session-save-in-vault"]:checked'
+    equal: 0
 - click: '[data-testid="session-auth-privatekey"]'
 - assert_count:
     selector: '[data-testid="session-auth-privatekey"]:checked'
@@ -177,9 +175,9 @@ verification:
     - step: 13
       expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
     - step: 15
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-save-in-vault\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-save-in-vault\"]:checked", "equal": 1}}'
     - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-save-in-vault\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-save-in-vault\"]:checked", "equal": 0}}'
     - step: 19
       expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked", "equal": 1}}'
     - step: 20

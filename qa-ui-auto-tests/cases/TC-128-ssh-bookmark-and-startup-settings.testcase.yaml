@@ -16,7 +16,9 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="sidebar"]'
+- wait_for:
+    selector: '[data-testid="sidebar"]'
+    timeout_sec: 45
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
