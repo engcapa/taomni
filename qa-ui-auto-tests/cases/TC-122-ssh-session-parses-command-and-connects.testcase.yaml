@@ -1,0 +1,134 @@
+id: TC-122
+title: SSH session parses an OpenSSH command, saves the endpoint, and connects
+description: >-
+  Enter an OpenSSH command in the session host field, verify its endpoint and
+  username are parsed, save the bookmark, connect, authenticate, and run a
+  remote marker command.
+covers:
+- F6.2
+- F6.3
+- F6.5
+- F3.1
+tags:
+- ssh
+- session
+- settings
+- terminal
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh -p ${cfg.ssh.port} ${cfg.ssh.user}@${cfg.ssh.host}
+- click: '[data-testid="session-port"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: SSH command imported into this session.
+- assert_attribute:
+    selector: '[data-testid="session-host"]'
+    name: value
+    equals: ${cfg.ssh.host}
+- assert_attribute:
+    selector: '[data-testid="session-port"]'
+    name: value
+    equals: ${cfg.ssh.port}
+- assert_attribute:
+    selector: '[data-testid="session-specify-username"]'
+    name: data-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="session-user"]'
+    name: value
+    equals: ${cfg.ssh.user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-command-parsed-ssh
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-command-parsed-ssh"]'
+- open_session:
+    name: qa-ui-auto-command-parsed-ssh
+    double_click: true
+- wait_for: '[data-testid="auth-prompt"]'
+- auth: ${env.QA_SSH_PASSWORD}
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 40
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf 'qa-ssh-command-parsed-live\n'
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-ssh\-command\-parsed\-live\r?$
+    timeout_sec: 20
+- screenshot: 122-ssh-command-parsed-connect.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: An OpenSSH command entered in the host field populates the endpoint and enables the parsed username.
+    actions:
+    - 5
+    - 6
+    checkpoints:
+    - step: 7
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "SSH command imported into this session."}}'
+    - step: 8
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
+    - step: 9
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
+    - step: 10
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-specify-username\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 11
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
+    results:
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+  - id: R2
+    requirement: The parsed SSH endpoint is saved, used to authenticate, and accepts a remote command after connection.
+    actions:
+    - 12
+    - 14
+    - 15
+    - 16
+    - 17
+    - 19
+    - 21
+    checkpoints:
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-command-parsed-ssh\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
+    - step: 22
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-command\\-parsed\\-live\\r?$", "timeout_sec": 20}}'
+    results:
+    - 16
+    - 20
+    - 22
+  visual:
+  - check: The parsed connection fields, authentication prompt, and terminal marker remain readable without clipping.
+    method: manual
+    reason: Functional assertions do not assess field layout or terminal text clipping.
+  native:
+  - check: The packaged session database persists the parsed endpoint and the Rust SSH backend connects to the configured sshd.
+    method: automated
+    reason: Browser mode uses local-storage and SSH bridge stubs, not the packaged database or Rust SSH implementation.

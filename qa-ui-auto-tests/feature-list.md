@@ -804,16 +804,36 @@ controls:
     selector: 'text="Terminal display"'
     kind: interactive
     optional: true
+  - id: terminal-display-menu-item
+    selector: '[data-testid="context-menu-item-terminal-display"]'
+    kind: interactive
+    optional: true
   - id: read-only-toggle
     selector: 'text="Read-only terminal"'
     kind: interactive
+    optional: true
+  - id: read-only-menu-item
+    selector: '[data-testid="context-menu-item-read-only-terminal"]'
+    kind: interactive
+    optional: true
+  - id: read-only-state
+    selector: '[data-testid="terminal-read-only"]'
+    kind: display
     optional: true
   - id: scrollbar-toggle
     selector: 'text="Toggle terminal scrollbar"'
     kind: interactive
     optional: true
+  - id: scrollbar-menu-item
+    selector: '[data-testid="context-menu-item-toggle-terminal-scrollbar"]'
+    kind: interactive
+    optional: true
   - id: fullscreen-toggle
     selector: 'text="Fullscreen terminal"'
+    kind: interactive
+    optional: true
+  - id: fullscreen-menu-item
+    selector: '[data-testid="context-menu-item-fullscreen-terminal"]'
     kind: interactive
     optional: true
 -->
@@ -927,6 +947,14 @@ controls:
     optional: true
     aliases:
       - 'text="Event Log"'
+  - id: event-log-panel
+    selector: '[data-testid="terminal-event-log"]'
+    kind: display
+    optional: true
+  - id: event-log-close
+    selector: '[data-testid="terminal-event-log-close"]'
+    kind: interactive
+    optional: true
 -->
 
 - 已记录：connect / auth / resize / disconnect / error / 导出 / 日志 / 宏 / 信号
@@ -1309,6 +1337,10 @@ controls:
   - id: session-edit
     selector: '[data-testid="session-edit"]'
     kind: interactive
+  - id: context-edit
+    selector: '[data-testid="context-menu-item-edit"]'
+    kind: interactive
+    optional: true       # visible from a saved session context menu
   - id: session-duplicate
     selector: '[data-testid="session-duplicate"]'
     kind: interactive
@@ -1423,6 +1455,9 @@ controls:
   - id: proto-shell
     selector: '[data-testid="session-proto-shell"]'
     kind: interactive
+  - id: proto-proxy
+    selector: '[data-testid="session-proto-proxy"]'
+    kind: interactive
   - id: proto-file
     selector: '[data-testid="session-proto-file"]'
     kind: interactive
@@ -1482,6 +1517,9 @@ controls:
   - id: user
     selector: '[data-testid="session-user"]'
     kind: interactive
+  - id: specify-username
+    selector: '[data-testid="session-specify-username"]'
+    kind: interactive
   - id: port
     selector: '[data-testid="session-port"]'
     kind: interactive
@@ -1531,6 +1569,10 @@ controls:
     selector: '[data-testid="session-section-terminal"]'
     kind: interactive
     optional: true        # absent for Mail and RDP
+  - id: section-mappings
+    selector: '[data-testid="session-section-mappings"]'
+    kind: interactive
+    optional: true        # only present for SFTP sessions
   - id: section-appearance
     selector: '[data-testid="session-section-appearance"]'
     kind: interactive
@@ -1546,10 +1588,23 @@ controls:
     selector: '[data-testid="session-hbase-section"]'
     kind: display
     optional: true        # only present for HBaseShell; body owned by F-DB-3
+  - id: sftp-mappings-body
+    selector: '[data-testid="session-sftp-mappings-section"]'
+    kind: display
+    optional: true        # only present for the SFTP mappings section
   # Section bodies
   - id: advanced-body
     selector: '[data-testid="advanced-ssh-settings"]'
     kind: display
+  - id: advanced-x11-forwarding
+    selector: '[data-testid="session-x11-forwarding-toggle"]'
+    kind: interactive
+  - id: advanced-x11-trusted
+    selector: '[data-testid="session-x11-trusted-toggle"]'
+    kind: interactive
+  - id: advanced-compression
+    selector: '[data-testid="session-compression-toggle"]'
+    kind: interactive
   - id: terminal-body
     selector: '[data-testid="terminal-settings"]'
     kind: display
@@ -1560,9 +1615,15 @@ controls:
   - id: bookmark-body
     selector: '[data-testid="bookmark-settings"]'
     kind: display
-  # Advanced SSH inputs (aria-label fallback — selectors will fail when label text changes; promote to testids later)
+  # Advanced SSH inputs
   - id: advanced-execute-command
     selector: 'input[aria-label="Execute command"]'
+    kind: interactive
+  - id: advanced-remote-environment
+    selector: '[data-testid="session-remote-environment"]'
+    kind: interactive
+  - id: advanced-ssh-browser-type
+    selector: '[data-testid="session-ssh-browser-type"]'
     kind: interactive
   - id: advanced-ssh-password
     selector: 'input[aria-label="SSH password"]'
@@ -1576,6 +1637,21 @@ controls:
     selector: 'input[aria-label="Private key path"]'
     kind: interactive
     optional: true        # only when authMethod=PrivateKey
+  - id: advanced-do-not-exit
+    selector: '[data-testid="session-do-not-exit"]'
+    kind: interactive
+  - id: advanced-auth-password
+    selector: '[data-testid="session-auth-password"]'
+    kind: interactive
+  - id: advanced-auth-private-key
+    selector: '[data-testid="session-auth-privatekey"]'
+    kind: interactive
+  - id: advanced-auth-agent
+    selector: '[data-testid="session-auth-agent"]'
+    kind: interactive
+  - id: advanced-auth-gssapi
+    selector: '[data-testid="session-auth-gssapi"]'
+    kind: interactive
   - id: advanced-jump-host
     selector: 'input[aria-label="Jump host"]'
     kind: interactive
@@ -1586,6 +1662,22 @@ controls:
     optional: true
   - id: advanced-jump-port
     selector: 'input[aria-label="Jump port"]'
+    kind: interactive
+    optional: true
+  - id: network-jump-password
+    selector: '[data-testid="session-jump-password"]'
+    kind: interactive
+    optional: true
+  - id: network-jump-key
+    selector: '[data-testid="session-jump-key"]'
+    kind: interactive
+    optional: true
+  - id: network-jump-source
+    selector: '[data-testid="session-jump-source"]'
+    kind: interactive
+    optional: true
+  - id: network-jump-auth
+    selector: '[data-testid="session-jump-auth"]'
     kind: interactive
     optional: true
   # Network inputs
@@ -1605,8 +1697,27 @@ controls:
   - id: network-proxy-password
     selector: 'input[aria-label="Proxy password"]'
     kind: interactive
+  - id: network-proxy-save-auth
+    selector: '[data-testid="session-proxy-save-auth"]'
+    kind: interactive
+  - id: network-proxy-source
+    selector: '[data-testid="session-proxy-source"]'
+    kind: interactive
+    optional: true        # only when a saved Proxy session is available
   - id: network-keepalive
     selector: 'input[aria-label="Keep-alive interval"]'
+    kind: interactive
+  - id: network-keepalive-toggle
+    selector: '[data-testid="session-keepalive-toggle"]'
+    kind: interactive
+  - id: network-tcp-nodelay
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
+    kind: interactive
+  - id: network-disable-nagle
+    selector: '[data-testid="session-disable-nagle-toggle"]'
+    kind: interactive
+  - id: network-ip-version
+    selector: '[data-testid="session-ip-version"]'
     kind: interactive
   - id: network-new-forward-local
     selector: 'input[aria-label="New forward local address"]'
@@ -1617,9 +1728,31 @@ controls:
   - id: network-new-forward-desc
     selector: 'input[aria-label="New forward description"]'
     kind: interactive
+  - id: network-add-forward
+    selector: '[data-testid="session-forward-add"]'
+    kind: interactive
+  - id: network-forward-local
+    selector: 'input[aria-label="Forward local address"]'
+    kind: interactive
+    optional: true        # rendered for each saved forwarding row
+  - id: network-forward-remote
+    selector: 'input[aria-label="Forward remote address"]'
+    kind: interactive
+    optional: true        # rendered for each saved forwarding row
+  - id: network-forward-desc
+    selector: 'input[aria-label="Forward description"]'
+    kind: interactive
+    optional: true        # rendered for each saved forwarding row
+  - id: network-remove-forward
+    selector: '[data-testid^="session-forward-remove-"]'
+    kind: interactive
+    optional: true
   # Bookmark inputs
   - id: bookmark-background
     selector: 'input[aria-label="Background image"]'
+    kind: interactive
+  - id: bookmark-background-browse
+    selector: '[data-testid="session-background-browse"]'
     kind: interactive
   - id: bookmark-bg-opacity
     selector: 'input[aria-label="Background opacity"]'
@@ -1636,9 +1769,85 @@ controls:
   - id: bookmark-shortcut
     selector: 'input[aria-label="Keyboard shortcut"]'
     kind: interactive
+  - id: bookmark-folder
+    selector: '[data-testid="session-folder-select"]'
+    kind: interactive
+  - id: bookmark-custom-icon
+    selector: '[data-testid="session-custom-icon"]'
+    kind: interactive
+  - id: bookmark-disable-ai-write
+    selector: '[data-testid="session-disable-ai-write"]'
+    kind: interactive
+  - id: startup-auto-connect-testid
+    selector: '[data-testid="session-auto-connect"]'
+    kind: interactive
+  - id: startup-open-new-window-testid
+    selector: '[data-testid="session-open-new-window"]'
+    kind: interactive
+  - id: startup-reconnect-testid
+    selector: '[data-testid="session-reconnect"]'
+    kind: interactive
   # Footer
+  - id: test-connection
+    selector: '[data-testid="session-test-connection"]'
+    kind: interactive
+  - id: test-result-summary
+    selector: '[data-testid="session-test-result-summary"]'
+    kind: display
   - id: save
     selector: '[data-testid="session-save"]'
+    kind: interactive
+  - id: save-as-proxy-session
+    selector: '[data-testid="session-save-as-proxy-session"]'
+    kind: interactive
+    optional: true
+  - id: save-as-template
+    selector: '[data-testid="session-save-template"]'
+    kind: interactive
+  - id: reset
+    selector: '[data-testid="session-reset"]'
+    kind: interactive
+  - id: delete
+    selector: '[data-testid="session-delete-editor"]'
+    kind: interactive
+  - id: cancel
+    selector: 'button[aria-label="Cancel"]'
+    kind: interactive
+  - id: new-folder
+    selector: '[data-testid="session-new-folder"]'
+    kind: interactive
+  - id: cancel-testid
+    selector: '[data-testid="session-cancel"]'
+    kind: interactive
+  - id: editor-help
+    selector: '[data-testid="session-help"]'
+    kind: interactive
+  - id: editor-close
+    selector: '[data-testid="session-close"]'
+    kind: interactive
+  - id: host-lookup
+    selector: '[data-testid="session-host-lookup"]'
+    kind: interactive
+  - id: private-key-toggle
+    selector: '[data-testid="session-private-key-toggle"]'
+    kind: interactive
+  - id: private-key-browse
+    selector: '[data-testid="session-private-key-browse"]'
+    kind: interactive
+  - id: private-key-generate
+    selector: '[data-testid="session-private-key-generate"]'
+    kind: interactive
+  - id: expert-settings
+    selector: '[data-testid="session-expert-settings"]'
+    kind: interactive
+  - id: startup-auto-connect
+    selector: 'label:has-text("Auto-connect when Taomni starts") input[type="checkbox"]'
+    kind: interactive
+  - id: startup-open-new-window
+    selector: 'label:has-text("Open in new window") input[type="checkbox"]'
+    kind: interactive
+  - id: startup-reconnect
+    selector: 'label:has-text("Reconnect on disconnection") input[type="checkbox"]'
     kind: interactive
 -->
 
@@ -3468,6 +3677,9 @@ controls:
   - id: text-input-dialog-confirm
     selector: '[data-testid="text-input-dialog-confirm"]'
     kind: interactive
+  - id: text-input-dialog-cancel
+    selector: '[data-testid="text-input-dialog-cancel"]'
+    kind: interactive
     optional: true
   - id: confirm-dialog-message
     selector: '[data-testid="confirm-dialog-message"]'
@@ -3479,6 +3691,18 @@ controls:
     optional: true
   - id: confirm-dialog-confirm
     selector: '[data-testid="confirm-dialog-confirm"]'
+    kind: interactive
+    optional: true
+  - id: alert-dialog
+    selector: '[data-testid="alert-dialog"]'
+    kind: display
+    optional: true
+  - id: alert-dialog-message
+    selector: '[data-testid="alert-dialog-message"]'
+    kind: display
+    optional: true
+  - id: alert-dialog-ok
+    selector: '[data-testid="alert-dialog-ok"]'
     kind: interactive
     optional: true
 -->

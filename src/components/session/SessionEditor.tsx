@@ -393,15 +393,18 @@ function Checkbox({
   checked,
   onChange,
   disabled,
+  dataTestId,
 }: {
   checked: boolean;
   onChange?: (v: boolean) => void;
   disabled?: boolean;
+  dataTestId?: string;
 }) {
   return (
     <input
       type="checkbox"
       className="taomni-checkbox"
+      data-testid={dataTestId}
       data-checked={checked}
       checked={checked}
       disabled={disabled}
@@ -413,14 +416,17 @@ function Checkbox({
 function Radio({
   checked,
   onChange,
+  dataTestId,
 }: {
   checked: boolean;
   onChange?: () => void;
+  dataTestId?: string;
 }) {
   return (
     <input
       type="radio"
       className="taomni-radio"
+      data-testid={dataTestId}
       checked={checked}
       onChange={onChange}
     />
@@ -536,24 +542,25 @@ function AdvancedSshSettings({
     <div data-testid="advanced-ssh-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
       <Field label={t("sessionEditor2.fieldX11")}>
         <label className="flex items-center gap-1.5">
-          <Checkbox checked={x11} onChange={setX11} />
+          <Checkbox dataTestId="session-x11-forwarding-toggle" checked={x11} onChange={setX11} />
           {t("sessionEditor2.enable")}
         </label>
         <label className={`flex items-center gap-1.5 ml-3 ${x11 ? "" : "opacity-50"}`} title={t("sessionEditor2.x11TrustedHint")}>
-          <Checkbox checked={x11Trusted} onChange={setX11Trusted} disabled={!x11} />
+          <Checkbox dataTestId="session-x11-trusted-toggle" checked={x11Trusted} onChange={setX11Trusted} disabled={!x11} />
           {t("sessionEditor2.x11Trusted")}
         </label>
       </Field>
 
       <Field label={t("sessionEditor2.fieldCompression")}>
         <label className="flex items-center gap-1.5">
-          <Checkbox checked={compression} onChange={setCompression} />
+          <Checkbox dataTestId="session-compression-toggle" checked={compression} onChange={setCompression} />
           {t("sessionEditor2.compressionLabel")}
         </label>
       </Field>
 
       <Field label={t("sessionEditor2.fieldRemoteEnvironment")}>
         <Select
+          dataTestId="session-remote-environment"
           value={remoteEnv}
           options={[
             t("sessionEditor2.remoteEnvInteractive"),
@@ -577,13 +584,14 @@ function AdvancedSshSettings({
           onChange={(e) => setStartupCmd(e.target.value)}
         />
         <label className="ml-2 flex items-center gap-1.5">
-          <Checkbox checked={doNotExit} onChange={setDoNotExit} />
+          <Checkbox dataTestId="session-do-not-exit" checked={doNotExit} onChange={setDoNotExit} />
           {t("sessionEditor2.doNotExit")}
         </label>
       </Field>
 
       <Field label={t("sessionEditor2.fieldSshBrowserType")}>
         <Select
+          dataTestId="session-ssh-browser-type"
           value={sshBrowser}
           options={[
             t("sessionEditor2.sshBrowserSftp"),
@@ -608,6 +616,7 @@ function AdvancedSshSettings({
             ).map(([val, lbl]) => (
               <label key={val} className="flex items-center gap-1.5 cursor-pointer">
                 <Radio
+                  dataTestId={`session-auth-${val}`}
                   checked={authRadio === val}
                   onChange={() => setAuthRadio(val)}
                 />
@@ -653,7 +662,7 @@ function AdvancedSshSettings({
       </Field>
 
       <Field label={t("sessionEditor2.fieldPrivateKey")}>
-        <Checkbox checked={usePrivKey} onChange={setUsePrivKey} />
+        <Checkbox dataTestId="session-private-key-toggle" checked={usePrivKey} onChange={setUsePrivKey} />
         <input
           className="taomni-input flex-1 ml-2"
           value={keyPath}
@@ -662,16 +671,16 @@ function AdvancedSshSettings({
           aria-label={t("sessionEditor2.privateKeyAria")}
           placeholder={t("sessionEditor2.privateKeyPlaceholder")}
         />
-        <button className="taomni-btn ml-1" disabled={!usePrivKey} onClick={onBrowseKey} type="button">
+        <button data-testid="session-private-key-browse" className="taomni-btn ml-1" disabled={!usePrivKey} onClick={onBrowseKey} type="button">
           {t("sessionEditor2.browse")}
         </button>
-        <button className="taomni-btn ml-1" disabled type="button" title={t("sessionEditor2.generateTitle")}>
+        <button data-testid="session-private-key-generate" className="taomni-btn ml-1" disabled type="button" title={t("sessionEditor2.generateTitle")}>
           {t("sessionEditor2.generate")}
         </button>
       </Field>
 
       <Field label={t("sessionEditor2.fieldExpertSsh")}>
-        <button className="taomni-btn" type="button" disabled title={t("sessionEditor2.expertTitle")}>{t("sessionEditor2.openExpertSettings")}</button>
+        <button data-testid="session-expert-settings" className="taomni-btn" type="button" disabled title={t("sessionEditor2.expertTitle")}>{t("sessionEditor2.openExpertSettings")}</button>
         <span className="ml-2 text-[var(--taomni-text-muted)]">
           {t("sessionEditor2.expertDesc")}
         </span>
@@ -754,6 +763,7 @@ function ProxyJumpFields({
         <>
           <Field label={t("sessionEditor2.fieldJumpVia")}>
             <select
+              data-testid="session-jump-source"
               className="taomni-input w-72"
               value={value.jumpSessionId}
               aria-label={t("sessionEditor2.jumpViaAria")}
@@ -797,6 +807,7 @@ function ProxyJumpFields({
                   onChange={(e) => patch({ jumpUser: e.target.value })}
                 />
                 <select
+                  data-testid="session-jump-auth"
                   className="taomni-input w-28 ml-2"
                   value={value.jumpAuthKind}
                   aria-label={t("sessionEditor2.jumpAuthAria")}
@@ -812,19 +823,21 @@ function ProxyJumpFields({
                   <input
                     className="taomni-input w-64"
                     type="password"
+                    data-testid="session-jump-password"
                     placeholder={t("sessionEditor2.jumpPasswordPlaceholder")}
                     value={value.jumpPassword}
                     aria-label={t("sessionEditor2.jumpPasswordAria")}
                     onChange={(e) => patch({ jumpPassword: e.target.value })}
                   />
                   <label className="ml-2 flex items-center gap-1.5">
-                    <Checkbox checked={value.jumpSaveAuth} onChange={(v) => patch({ jumpSaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
+                    <Checkbox dataTestId="session-proxy-save-auth" checked={value.jumpSaveAuth} onChange={(v) => patch({ jumpSaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
                   </label>
                 </Field>
               ) : (
                 <Field label={t("sessionEditor2.fieldJumpKey")}>
                   <input
                     className="taomni-input w-72"
+                    data-testid="session-jump-key"
                     placeholder={t("sessionEditor2.jumpKeyPlaceholder")}
                     value={value.jumpKeyPath}
                     aria-label={t("sessionEditor2.jumpKeyAria")}
@@ -842,6 +855,7 @@ function ProxyJumpFields({
           {proxySessions.length > 0 && (
             <Field label={t("sessionEditor2.proxyViaSession")}>
               <select
+                data-testid="session-proxy-source"
                 className="taomni-input w-72"
                 value={value.proxySessionId || ""}
                 onChange={(e) => patch({ proxySessionId: e.target.value })}
@@ -893,12 +907,13 @@ function ProxyJumpFields({
                   onChange={(e) => patch({ proxyPass: e.target.value })}
                 />
                 <label className="ml-2 flex items-center gap-1.5">
-                  <Checkbox checked={value.proxySaveAuth} onChange={(v) => patch({ proxySaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
+                  <Checkbox dataTestId="session-proxy-save-auth" checked={value.proxySaveAuth} onChange={(v) => patch({ proxySaveAuth: v })} /> {t("sessionEditor2.proxySaveInVault")}
                 </label>
               </Field>
               {onSaveAsProxySession && (
                 <Field label="">
                   <button
+                    data-testid="session-save-as-proxy-session"
                     className="taomni-btn flex items-center gap-1.5"
                     type="button"
                     onClick={onSaveAsProxySession}
@@ -1023,7 +1038,7 @@ function NetworkSettings({
 
       <Field label={t("sessionEditor2.fieldKeepAlive")}>
         <label className="flex items-center gap-1.5">
-          <Checkbox checked={keepAlive} onChange={setKeepAlive} />
+          <Checkbox dataTestId="session-keepalive-toggle" checked={keepAlive} onChange={setKeepAlive} />
           {t("sessionEditor2.keepAliveSend")}
         </label>
         <input
@@ -1038,12 +1053,14 @@ function NetworkSettings({
       <Field label={t("sessionEditor2.fieldTcpOptions")}>
         <label className="flex items-center gap-1.5">
           <Checkbox
+            dataTestId="session-tcp-nodelay-toggle"
             checked={tcpNodelay}
             onChange={(v) => patch({ tcpNodelay: v, disableNagle: v })}
           /> {t("sessionEditor2.tcpNodelay")}
         </label>
         <label className="ml-3 flex items-center gap-1.5">
           <Checkbox
+            dataTestId="session-disable-nagle-toggle"
             checked={disableNagle}
             onChange={(v) => patch({ disableNagle: v, tcpNodelay: v })}
           /> {t("sessionEditor2.disableNagle")}
@@ -1052,6 +1069,7 @@ function NetworkSettings({
 
       <Field label={t("sessionEditor2.fieldIpVersion")}>
         <Select
+          dataTestId="session-ip-version"
           value={value.ipVersion}
           options={[
             { value: "auto", label: t("sessionEditor2.ipAuto") },
@@ -1105,7 +1123,7 @@ function NetworkSettings({
                       )
                     }
                   />
-                  <button className="taomni-btn" type="button" onClick={() => setForwards((items) => items.filter((item) => item.id !== forward.id))}>
+                  <button data-testid={`session-forward-remove-${forward.id}`} className="taomni-btn" type="button" onClick={() => setForwards((items) => items.filter((item) => item.id !== forward.id))}>
                     {t("sessionEditor2.forwardRemove")}
                   </button>
                 </div>
@@ -1125,7 +1143,7 @@ function NetworkSettings({
             <input className="taomni-input w-32" placeholder={t("sessionEditor2.forwardLocalPlaceholder")} value={newFwdLocal} aria-label={t("sessionEditor2.forwardLocalNewAria")} onChange={(e) => setNewFwdLocal(e.target.value)} />
             <input className="taomni-input w-40" placeholder={t("sessionEditor2.forwardRemotePlaceholder")} value={newFwdRemote} aria-label={t("sessionEditor2.forwardRemoteNewAria")} onChange={(e) => setNewFwdRemote(e.target.value)} />
             <input className="taomni-input flex-1" placeholder={t("sessionEditor2.forwardDescPlaceholder")} value={newFwdDesc} aria-label={t("sessionEditor2.forwardDescNewAria")} onChange={(e) => setNewFwdDesc(e.target.value)} />
-            <button className="taomni-btn" type="button" onClick={addForward} disabled={!newFwdLocal.trim() || !newFwdRemote.trim()}>{t("sessionEditor2.forwardAdd")}</button>
+            <button data-testid="session-forward-add" className="taomni-btn" type="button" onClick={addForward} disabled={!newFwdLocal.trim() || !newFwdRemote.trim()}>{t("sessionEditor2.forwardAdd")}</button>
           </div>
         </div>
       </Field>
@@ -1189,12 +1207,13 @@ function BookmarkSettings({
 
       <Field label={t("sessionEditor2.fieldSessionFolder")}>
         <Select
+          dataTestId="session-folder-select"
           value={groupPath || "User sessions"}
           className="w-[260px]"
           options={folderOptions}
           onChange={(value) => setGroupPath(value === "User sessions" ? "" : value)}
         />
-        <button className="taomni-btn ml-2 flex items-center gap-1" type="button" onClick={onNewFolder}>
+        <button data-testid="session-new-folder" className="taomni-btn ml-2 flex items-center gap-1" type="button" onClick={onNewFolder}>
           <FolderPlus className="w-3 h-3" /> {t("sessionEditor2.newFolderBtn")}
         </button>
       </Field>
@@ -1207,7 +1226,7 @@ function BookmarkSettings({
           <TerminalIcon className="w-4 h-4" style={{ color: "#2b5d8b" }} />
           {proto.toLowerCase()}
         </span>
-        <button className="taomni-btn ml-2" type="button" disabled title={t("sessionEditor2.customIconTitle")}>{t("sessionEditor2.customIconChange")}</button>
+        <button data-testid="session-custom-icon" className="taomni-btn ml-2" type="button" disabled title={t("sessionEditor2.customIconTitle")}>{t("sessionEditor2.customIconChange")}</button>
       </Field>
 
       <Field label={t("sessionEditor2.fieldBackgroundImage")}>
@@ -1219,6 +1238,7 @@ function BookmarkSettings({
           onChange={(e) => setBgImage(e.target.value)}
         />
         <button
+          data-testid="session-background-browse"
           className="taomni-btn ml-1"
           type="button"
           title={t("sessionEditor2.backgroundImageTitle")}
@@ -1258,7 +1278,7 @@ function BookmarkSettings({
 
       <Field label={t("sessionEditor2.fieldAiSafety")}>
         <label className="flex items-center gap-1.5" data-testid="disable-ai-write-toggle">
-          <Checkbox checked={disableAiWrite} onChange={setDisableAiWrite} />
+          <Checkbox dataTestId="session-disable-ai-write" checked={disableAiWrite} onChange={setDisableAiWrite} />
           {t("sessionEditor2.disableAiWriteLabel")}
         </label>
         <span className="ml-2 text-[var(--taomni-text-muted)]">
@@ -1289,15 +1309,15 @@ function BookmarkSettings({
       {proto !== "File" && (
         <Field label={t("sessionEditor2.fieldStartupBehavior")}>
           <label className="flex items-center gap-1.5">
-            <Checkbox checked={autoConnect} onChange={setAutoConnect} />
+            <Checkbox dataTestId="session-auto-connect" checked={autoConnect} onChange={setAutoConnect} />
             {t("sessionEditor2.autoConnect")}
           </label>
           <label className="ml-3 flex items-center gap-1.5">
-            <Checkbox checked={openNewWindow} onChange={setOpenNewWindow} />
+            <Checkbox dataTestId="session-open-new-window" checked={openNewWindow} onChange={setOpenNewWindow} />
             {t("sessionEditor2.openNewWindow")}
           </label>
           <label className="ml-3 flex items-center gap-1.5">
-            <Checkbox checked={reconnect} onChange={setReconnect} />
+            <Checkbox dataTestId="session-reconnect" checked={reconnect} onChange={setReconnect} />
             {t("sessionEditor2.reconnectOnDisconnect")}
           </label>
         </Field>
@@ -4128,6 +4148,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           </div>
           <div className="ml-auto flex items-center gap-2 text-[11px] opacity-95">
             <button
+              data-testid="session-help"
               title={t("sessionEditor2.helpTitle")}
               className="hover:bg-white/15 rounded p-0.5"
               onClick={() => setTestResult({ ok: true, msg: t("sessionEditor2.helpMessage") })}
@@ -4136,6 +4157,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               <HelpCircle className="w-3.5 h-3.5" />
             </button>
             <button
+              data-testid="session-close"
               title={t("sessionEditor2.closeTitle")}
               className="hover:bg-red-500 rounded p-0.5"
               onClick={onClose}
@@ -4205,6 +4227,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   placeholder={proto === "Browser" ? t("sessionEditor2.browserUrlPlaceholder") : t("sessionEditor2.remoteHostPlaceholder")}
                 />
                 <button
+                  data-testid="session-host-lookup"
                   title={t("sessionEditor2.lookup")}
                   className="taomni-btn px-2"
                   onClick={handleHostLookup}
@@ -4214,7 +4237,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 </button>
               </div>
               <label className="col-span-3 text-[12px] flex items-center gap-1.5 justify-end">
-                <Checkbox checked={specifyUser} onChange={setSpecifyUser} />
+                <Checkbox checked={specifyUser} onChange={setSpecifyUser} dataTestId="session-specify-username" />
                 <span>{t("sessionEditor2.specifyUsername")}</span>
               </label>
               <input
@@ -4761,6 +4784,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             {isSSH && needsHost && (
               <button
                 className="taomni-btn shrink-0 flex items-center gap-1.5"
+                data-testid="session-test-connection"
                 onClick={handleTestConnection}
                 disabled={testing}
                 type="button"
@@ -4809,10 +4833,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 {testing ? t("sessionEditor2.proxyTestTesting") : t("sessionEditor2.proxyTestBtn")}{shortcuts.test}
               </button>
             )}
-            <button className="taomni-btn shrink-0 flex items-center gap-1.5" type="button" onClick={() => void handleSaveTemplate()}>
+            <button data-testid="session-save-template" className="taomni-btn shrink-0 flex items-center gap-1.5" type="button" onClick={() => void handleSaveTemplate()}>
               <Save className="w-3.5 h-3.5" /> {t("sessionEditor2.saveTemplate")}
             </button>
-            <button className="taomni-btn shrink-0 flex items-center gap-1.5" type="button" onClick={handleReset}>
+            <button data-testid="session-reset" className="taomni-btn shrink-0 flex items-center gap-1.5" type="button" onClick={handleReset}>
               <RotateCcw className="w-3.5 h-3.5" /> {t("sessionEditor2.reset")}
             </button>
 
@@ -4841,6 +4865,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {isEdit && (
               <button
+                data-testid="session-delete-editor"
                 className="taomni-btn"
                 onClick={handleDelete}
                 type="button"
@@ -4850,6 +4875,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               </button>
             )}
             <button
+              data-testid="session-cancel"
               className="taomni-btn"
               onClick={onClose}
               type="button"

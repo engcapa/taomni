@@ -1,0 +1,189 @@
+id: TC-139
+title: SSH session connection retries credentials and persists the tested endpoint
+covers:
+- F6.3
+- F6.2
+tags:
+- ssh
+- session
+- settings
+- connection
+- authentication
+- persistence
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="sidebar"]'
+    timeout_sec: 45
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-ssh"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-test-connection"]'
+- wait_for: '[data-testid="alert-dialog"]'
+- assert_text:
+    selector: '[data-testid="alert-dialog-message"]'
+    contains: Enter password above to test
+- click: '[data-testid="alert-dialog-ok"]'
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- fill:
+    selector: 'input[aria-label="SSH password"]'
+    value: qa-ui-auto-wrong-password
+- click: '[data-testid="session-test-connection"]'
+- wait_for: '[data-testid="alert-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="alert-dialog"]'
+    name: data-tone
+    equals: error
+- click: '[data-testid="alert-dialog-ok"]'
+- fill:
+    selector: 'input[aria-label="SSH password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="session-test-connection"]'
+- wait_for: '[data-testid="alert-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="alert-dialog"]'
+    name: data-tone
+    equals: success
+- assert_pattern:
+    selector: '[data-testid="alert-dialog-message"]'
+    regex: '^(?:Connection successful(?: \(\d+ms\))?|Authenticated to .+ as .+)$'
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_pattern:
+    selector: '[data-testid="session-test-result-summary"]'
+    regex: '^(?:Connection successful(?: \(\d+ms\))?|Authenticated to .+ as .+)$'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-ssh-connection-retry
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-connection-retry"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-connection-retry"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- assert_attribute:
+    selector: '[data-testid="session-host"]'
+    name: value
+    equals: "${cfg.ssh.host}"
+- assert_attribute:
+    selector: '[data-testid="session-port"]'
+    name: value
+    equals: "${cfg.ssh.port}"
+- assert_attribute:
+    selector: '[data-testid="session-user"]'
+    name: value
+    equals: "${cfg.ssh.user}"
+- click: '[data-testid="session-cancel"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+- screenshot: 139-ssh-connection-retry.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SSH connection testing reports a missing password, rejects a wrong password, then reports a successful authenticated connection and exposes the same result in the editor summary.
+    actions:
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    checkpoints:
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 12
+      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "Enter password above to test"}}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "error"}}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "success"}}'
+    - step: 25
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$"}}'
+    - step: 27
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$"}}'
+    results:
+    - 12
+    - 19
+    - 24
+    - 25
+    - 27
+  - id: R2
+    requirement: The endpoint that passed the connection test is saved and reopens with the configured host, port, and username.
+    actions:
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    checkpoints:
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-connection-retry\"]"}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 32
+    - 35
+    - 36
+    - 37
+    - 38
+    - 40
+  visual:
+  - check: Authentication feedback and the saved endpoint remain readable without clipping.
+    method: manual
+    reason: Functional assertions do not assess layout.
+  native:
+  - check: Native mode runs the same retry and save flow against the runner-owned disposable SSH server.
+    method: automated
+    reason: The fixture and native Tauri SSH IPC establish the packaged connection boundary.

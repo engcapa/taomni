@@ -1,0 +1,126 @@
+id: TC-120
+title: SSH test connection authenticates through the configured jump host
+covers:
+- F3.2
+- F6.3
+tags:
+- ssh
+- session
+- settings
+- proxyjump
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.jump_target_host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.jump_target_port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- fill:
+    selector: 'input[aria-label="SSH password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: ssh-tunnel
+- wait_for: 'input[aria-label="Jump host"]'
+- assert_visible: 'input[aria-label="Jump port"]'
+- assert_visible: 'input[aria-label="Jump user"]'
+- assert_visible: '[data-testid="session-jump-password"]'
+- fill:
+    selector: 'input[aria-label="Jump host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: 'input[aria-label="Jump port"]'
+    value: ${cfg.ssh.port}
+- fill:
+    selector: 'input[aria-label="Jump user"]'
+    value: ${cfg.ssh.user}
+- fill:
+    selector: '[data-testid="session-jump-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="session-test-connection"]'
+- wait_for: '[data-testid="alert-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="alert-dialog"]'
+    name: data-tone
+    equals: success
+- assert_pattern:
+    selector: '[data-testid="alert-dialog-message"]'
+    regex: '^(?:Connection successful(?: \(\d+ms\))?|Authenticated to .+ as .+)$'
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_pattern:
+    selector: '[data-testid="session-test-result-summary"]'
+    regex: '^(?:Connection successful(?: \(\d+ms\))?|Authenticated to .+ as .+)$'
+- screenshot: 120-ssh-jump-host-test-connection.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The native SSH connection test uses the configured SSH jump host and succeeds with the target and jump credentials.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "input[aria-label=\"Jump host\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "success"}}'
+    - step: 26
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$"}}'
+    - step: 28
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$"}}'
+    results:
+    - 25
+    - 26
+    - 28
+  visual:
+  - check: Jump host fields, test status, and successful result remain readable in the native session editor.
+    method: manual
+    reason: Functional assertions do not assess field layout or text clipping.
+  native:
+  - check: The packaged SSH backend authenticates to the jump host, opens the forwarded target connection, and returns a successful connection test.
+    method: automated
+    reason: The browser SSH bridge does not establish the native russh ProxyJump path.
