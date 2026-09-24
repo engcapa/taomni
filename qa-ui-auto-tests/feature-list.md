@@ -1427,6 +1427,9 @@ controls:
   - id: proto-shell
     selector: '[data-testid="session-proto-shell"]'
     kind: interactive
+  - id: proto-proxy
+    selector: '[data-testid="session-proto-proxy"]'
+    kind: interactive
   - id: proto-file
     selector: '[data-testid="session-proto-file"]'
     kind: interactive
@@ -1580,6 +1583,12 @@ controls:
   - id: advanced-execute-command
     selector: 'input[aria-label="Execute command"]'
     kind: interactive
+  - id: advanced-remote-environment
+    selector: '[data-testid="session-remote-environment"]'
+    kind: interactive
+  - id: advanced-ssh-browser-type
+    selector: '[data-testid="session-ssh-browser-type"]'
+    kind: interactive
   - id: advanced-ssh-password
     selector: 'input[aria-label="SSH password"]'
     kind: interactive
@@ -1592,6 +1601,42 @@ controls:
     selector: 'input[aria-label="Private key path"]'
     kind: interactive
     optional: true        # only when authMethod=PrivateKey
+  - id: advanced-do-not-exit
+    selector: 'label:has-text("Do not exit after command ends") input[type="checkbox"]'
+    kind: interactive
+  - id: advanced-do-not-exit-testid
+    selector: '[data-testid="session-do-not-exit"]'
+    kind: interactive
+  - id: advanced-auth-password
+    selector: 'label:has-text("Password / keyboard-interactive") input[type="radio"]'
+    kind: interactive
+  - id: advanced-auth-private-key
+    selector: 'label:has-text("Use private key") input[type="radio"]'
+    kind: interactive
+  - id: advanced-auth-agent
+    selector: 'label:has-text("ssh-agent / Pageant") input[type="radio"]'
+    kind: interactive
+  - id: advanced-auth-gssapi
+    selector: 'label:has-text("GSSAPI (Kerberos)") input[type="radio"]'
+    kind: interactive
+  - id: advanced-auth-private-key-checked
+    selector: 'label:has-text("Use private key") input[type="radio"]:checked'
+    kind: display
+  - id: advanced-auth-gssapi-checked
+    selector: 'label:has-text("GSSAPI (Kerberos)") input[type="radio"]:checked'
+    kind: display
+  - id: advanced-auth-password-testid
+    selector: '[data-testid="session-auth-password"]'
+    kind: interactive
+  - id: advanced-auth-private-key-testid
+    selector: '[data-testid="session-auth-privatekey"]'
+    kind: interactive
+  - id: advanced-auth-agent-testid
+    selector: '[data-testid="session-auth-agent"]'
+    kind: interactive
+  - id: advanced-auth-gssapi-testid
+    selector: '[data-testid="session-auth-gssapi"]'
+    kind: interactive
   - id: advanced-jump-host
     selector: 'input[aria-label="Jump host"]'
     kind: interactive
@@ -1606,6 +1651,18 @@ controls:
     optional: true
   - id: network-jump-password
     selector: 'input[aria-label="Jump password"]'
+    kind: interactive
+    optional: true
+  - id: network-jump-key
+    selector: 'input[aria-label="Jump key path"]'
+    kind: interactive
+    optional: true
+  - id: network-jump-source
+    selector: '[data-testid="session-jump-source"]'
+    kind: interactive
+    optional: true
+  - id: network-jump-auth
+    selector: '[data-testid="session-jump-auth"]'
     kind: interactive
     optional: true
   # Network inputs
@@ -1667,9 +1724,16 @@ controls:
     selector: 'input[aria-label="Forward description"]'
     kind: interactive
     optional: true        # rendered for each saved forwarding row
+  - id: network-remove-forward
+    selector: '[data-testid^="session-forward-remove-"]'
+    kind: interactive
+    optional: true
   # Bookmark inputs
   - id: bookmark-background
     selector: 'input[aria-label="Background image"]'
+    kind: interactive
+  - id: bookmark-background-browse
+    selector: '[data-testid="session-background-browse"]'
     kind: interactive
   - id: bookmark-bg-opacity
     selector: 'input[aria-label="Background opacity"]'
@@ -1686,6 +1750,24 @@ controls:
   - id: bookmark-shortcut
     selector: 'input[aria-label="Keyboard shortcut"]'
     kind: interactive
+  - id: bookmark-folder
+    selector: '[data-testid="session-folder-select"]'
+    kind: interactive
+  - id: bookmark-custom-icon
+    selector: '[data-testid="session-custom-icon"]'
+    kind: interactive
+  - id: bookmark-disable-ai-write
+    selector: '[data-testid="session-disable-ai-write"]'
+    kind: interactive
+  - id: startup-auto-connect-testid
+    selector: '[data-testid="session-auto-connect"]'
+    kind: interactive
+  - id: startup-open-new-window-testid
+    selector: '[data-testid="session-open-new-window"]'
+    kind: interactive
+  - id: startup-reconnect-testid
+    selector: '[data-testid="session-reconnect"]'
+    kind: interactive
   # Footer
   - id: test-connection
     selector: '[data-testid="session-test-connection"]'
@@ -1695,6 +1777,58 @@ controls:
     kind: display
   - id: save
     selector: '[data-testid="session-save"]'
+    kind: interactive
+  - id: save-as-proxy-session
+    selector: 'button:has-text("Save as Proxy Session")'
+    kind: interactive
+    optional: true
+  - id: save-as-template
+    selector: 'button:has-text("Save as template")'
+    kind: interactive
+  - id: reset
+    selector: 'button:has-text("Reset")'
+    kind: interactive
+  - id: delete
+    selector: 'button:has-text("Delete")'
+    kind: interactive
+  - id: cancel
+    selector: 'button[aria-label="Cancel"]'
+    kind: interactive
+  - id: new-folder
+    selector: 'button:has-text("New folder")'
+    kind: interactive
+  - id: cancel-testid
+    selector: '[data-testid="session-cancel"]'
+    kind: interactive
+  - id: editor-help
+    selector: '[data-testid="session-help"]'
+    kind: interactive
+  - id: editor-close
+    selector: '[data-testid="session-close"]'
+    kind: interactive
+  - id: host-lookup
+    selector: '[data-testid="session-host-lookup"]'
+    kind: interactive
+  - id: private-key-toggle
+    selector: '[data-testid="session-private-key-toggle"]'
+    kind: interactive
+  - id: private-key-browse
+    selector: '[data-testid="session-private-key-browse"]'
+    kind: interactive
+  - id: private-key-generate
+    selector: '[data-testid="session-private-key-generate"]'
+    kind: interactive
+  - id: expert-settings
+    selector: '[data-testid="session-expert-settings"]'
+    kind: interactive
+  - id: startup-auto-connect
+    selector: 'label:has-text("Auto-connect when Taomni starts") input[type="checkbox"]'
+    kind: interactive
+  - id: startup-open-new-window
+    selector: 'label:has-text("Open in new window") input[type="checkbox"]'
+    kind: interactive
+  - id: startup-reconnect
+    selector: 'label:has-text("Reconnect on disconnection") input[type="checkbox"]'
     kind: interactive
 -->
 

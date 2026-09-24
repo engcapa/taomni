@@ -1,0 +1,314 @@
+id: TC-127
+title: SSH editor basic lookup, advanced selectors, authentication, and header actions
+covers:
+- F6.3
+tags:
+- ssh
+- session
+- settings
+- advanced
+- controls
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- assert_visible: '[data-testid="session-help"]'
+- assert_visible: '[data-testid="session-close"]'
+- assert_visible: '[data-testid="session-host-lookup"]'
+- assert_visible: '[data-testid="session-proto-ssh"]'
+- assert_visible: '[data-testid="session-section-advanced"]'
+- assert_visible: '[data-testid="session-section-network"]'
+- assert_visible: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: qauser@127.0.0.1:2222
+- click: '[data-testid="session-host-lookup"]'
+- assert_attribute:
+    selector: '[data-testid="session-host"]'
+    name: value
+    equals: 127.0.0.1
+- assert_attribute:
+    selector: '[data-testid="session-port"]'
+    name: value
+    equals: '2222'
+- assert_attribute:
+    selector: '[data-testid="session-user"]'
+    name: value
+    equals: qauser
+- assert_attribute:
+    selector: '[data-testid="session-specify-username"]'
+    name: data-checked
+    equals: 'true'
+- click: '[data-testid="session-help"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: Fill required fields, then OK to save this session.
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- assert_attribute:
+    selector: '[data-testid="session-remote-environment"]'
+    name: value
+    equals: Interactive shell
+- select_option:
+    selector: '[data-testid="session-remote-environment"]'
+    label: LXDE / LXQt desktop
+- assert_attribute:
+    selector: '[data-testid="session-remote-environment"]'
+    name: value
+    equals: LXDE / LXQt desktop
+- select_option:
+    selector: '[data-testid="session-remote-environment"]'
+    label: Xfce desktop
+- assert_attribute:
+    selector: '[data-testid="session-remote-environment"]'
+    name: value
+    equals: Xfce desktop
+- select_option:
+    selector: '[data-testid="session-remote-environment"]'
+    label: GNOME desktop
+- assert_attribute:
+    selector: '[data-testid="session-remote-environment"]'
+    name: value
+    equals: GNOME desktop
+- select_option:
+    selector: '[data-testid="session-remote-environment"]'
+    label: KDE Plasma desktop
+- assert_attribute:
+    selector: '[data-testid="session-remote-environment"]'
+    name: value
+    equals: KDE Plasma desktop
+- select_option:
+    selector: '[data-testid="session-remote-environment"]'
+    label: Awesome WM
+- assert_attribute:
+    selector: '[data-testid="session-remote-environment"]'
+    name: value
+    equals: Awesome WM
+- select_option:
+    selector: '[data-testid="session-remote-environment"]'
+    label: Custom command…
+- assert_attribute:
+    selector: '[data-testid="session-remote-environment"]'
+    name: value
+    equals: Custom command…
+- fill:
+    selector: 'input[aria-label="Execute command"]'
+    value: printf 'qa-advanced-control\n'
+- assert_attribute:
+    selector: 'input[aria-label="Execute command"]'
+    name: value
+    equals: printf 'qa-advanced-control\n'
+- set_check:
+    selector: '[data-testid="session-do-not-exit"]'
+    checked: false
+- assert_attribute:
+    selector: '[data-testid="session-do-not-exit"]'
+    name: data-checked
+    equals: 'false'
+- select_option:
+    selector: '[data-testid="session-ssh-browser-type"]'
+    label: SCP (enhanced speed)
+- assert_attribute:
+    selector: '[data-testid="session-ssh-browser-type"]'
+    name: value
+    equals: SCP (enhanced speed)
+- select_option:
+    selector: '[data-testid="session-ssh-browser-type"]'
+    label: SCP (compatibility)
+- assert_attribute:
+    selector: '[data-testid="session-ssh-browser-type"]'
+    name: value
+    equals: SCP (compatibility)
+- select_option:
+    selector: '[data-testid="session-ssh-browser-type"]'
+    label: Disabled
+- assert_attribute:
+    selector: '[data-testid="session-ssh-browser-type"]'
+    name: value
+    equals: Disabled
+- click: '[data-testid="session-auth-agent"]'
+- assert_count:
+    selector: '[data-testid="session-auth-agent"]:checked'
+    equal: 1
+- click: '[data-testid="session-auth-gssapi"]'
+- assert_count:
+    selector: '[data-testid="session-auth-gssapi"]:checked'
+    equal: 1
+- click: '[data-testid="session-auth-password"]'
+- assert_count:
+    selector: '[data-testid="session-auth-password"]:checked'
+    equal: 1
+- fill:
+    selector: 'input[aria-label="SSH password"]'
+    value: qa-ui-auto-password
+- assert_attribute:
+    selector: 'input[aria-label="SSH password"]'
+    name: type
+    equals: password
+- click: '[data-testid="session-auth-privatekey"]'
+- assert_count:
+    selector: '[data-testid="session-auth-privatekey"]:checked'
+    equal: 1
+- assert_enabled: '[data-testid="session-private-key-toggle"]'
+- set_check:
+    selector: '[data-testid="session-private-key-toggle"]'
+    checked: false
+- assert_attribute:
+    selector: '[data-testid="session-private-key-toggle"]'
+    name: data-checked
+    equals: 'false'
+- assert_disabled: 'input[aria-label="Private key path"]'
+- set_check:
+    selector: '[data-testid="session-private-key-toggle"]'
+    checked: true
+- assert_attribute:
+    selector: '[data-testid="session-private-key-toggle"]'
+    name: data-checked
+    equals: 'true'
+- assert_enabled: 'input[aria-label="Private key path"]'
+- click: '[data-testid="session-private-key-browse"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- assert_visible: '[data-testid="text-input-dialog-input"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: /home/qauser/.ssh/id_ed25519
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_attribute:
+    selector: 'input[aria-label="Private key path"]'
+    name: value
+    equals: /home/qauser/.ssh/id_ed25519
+- assert_disabled: '[data-testid="session-private-key-generate"]'
+- hover: '[data-testid="session-private-key-generate"]'
+- assert_disabled: '[data-testid="session-expert-settings"]'
+- hover: '[data-testid="session-expert-settings"]'
+- click: '[data-testid="session-close"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+- screenshot: 127-ssh-editor-basic-advanced-controls.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SSH editor lookup parses user, host, and port, exposes the header and section actions, and reports the help result.
+    actions:
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+    - 50
+    - 51
+    - 52
+    - 53
+    - 54
+    - 55
+    - 56
+    - 57
+    - 58
+    - 59
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 69
+    - 70
+    - 71
+    - 72
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"session-help\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"session-close\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"session-host-lookup\"]"}'
+    - step: 14
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "127.0.0.1"}}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "2222"}}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "qauser"}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Fill required fields"}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "Disabled"}}'
+    - step: 67
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/id_ed25519"}}'
+    - step: 73
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 14
+    - 15
+    - 16
+    - 19
+    - 21
+    - 54
+    - 67
+    - 73
+  visual:
+  - check: SSH header actions, advanced controls, and dialog text remain readable without overlap.
+    method: manual
+    reason: Functional assertions do not establish layout fidelity.
+  native:
+  - check: This browser case intentionally exercises the browser file-picker stub; packaged native dialog behavior remains unverified.
+    method: external
+    reason: The private-key picker is an OS dialog boundary and is covered here only through the browser fixture.

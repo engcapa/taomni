@@ -1,0 +1,315 @@
+id: TC-126
+title: SSH session editor supports reset, cancel, templates, folders, and forward removal
+covers:
+- F6.3
+- F6.2
+tags:
+- ssh
+- session
+- settings
+- lifecycle
+- forwards
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-ssh"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh-lifecycle.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '2222'
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa-lifecycle-user
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- fill:
+    selector: 'input[aria-label="Execute command"]'
+    value: printf 'qa-lifecycle-command\n'
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- fill:
+    selector: 'input[aria-label="New forward local address"]'
+    value: 127.0.0.1:19100
+- fill:
+    selector: 'input[aria-label="New forward remote address"]'
+    value: service.internal:80
+- fill:
+    selector: 'input[aria-label="New forward description"]'
+    value: lifecycle-forward-one
+- click: '[data-testid="session-forward-add"]'
+- fill:
+    selector: 'input[aria-label="New forward local address"]'
+    value: 127.0.0.1:19101
+- fill:
+    selector: 'input[aria-label="New forward remote address"]'
+    value: service.internal:81
+- fill:
+    selector: 'input[aria-label="New forward description"]'
+    value: lifecycle-forward-two
+- click: '[data-testid="session-forward-add"]'
+- assert_count:
+    selector: '[data-testid="network-settings"] input[aria-label="Forward local address"]'
+    equal: 2
+- click: '[data-testid="network-settings"] button:has-text("Remove")'
+- assert_count:
+    selector: '[data-testid="network-settings"] input[aria-label="Forward local address"]'
+    equal: 1
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-ssh-lifecycle
+- fill:
+    selector: 'input[aria-label="Background image"]'
+    value: /tmp/qa-ui-auto-terminal.png
+- fill:
+    selector: 'input[aria-label="Background opacity"]'
+    value: '42%'
+- fill:
+    selector: 'textarea[aria-label="Description notes"]'
+    value: lifecycle description
+- fill:
+    selector: 'input[aria-label="Tags"]'
+    value: ssh, lifecycle, qa
+- fill:
+    selector: 'input[aria-label="Keyboard shortcut"]'
+    value: Ctrl+Alt+9
+- set_check:
+    selector: 'label:has-text("Auto-connect when Taomni starts") input[type="checkbox"]'
+    checked: false
+- set_check:
+    selector: 'label:has-text("Open in new window") input[type="checkbox"]'
+    checked: true
+- set_check:
+    selector: 'label:has-text("Reconnect on disconnection") input[type="checkbox"]'
+    checked: false
+- click: 'button:has-text("New folder")'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: qa-ui-auto-ssh-folder
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: detached
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-lifecycle"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-lifecycle"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: changed-before-reset.example.test
+- click: 'button:has-text("Reset")'
+- assert_attribute:
+    selector: '[data-testid="session-host"]'
+    name: value
+    equals: ssh-lifecycle.example.test
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- assert_attribute:
+    selector: 'input[aria-label="Execute command"]'
+    name: value
+    equals: printf 'qa-lifecycle-command\n'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: discarded-session-name
+- click: 'button[aria-label="Cancel"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+- assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-lifecycle"]'
+- assert_not_visible: '[data-testid="session-tree-item"][data-session-name="discarded-session-name"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh-template.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '2222'
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa-template-user
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-template-source
+- click: 'button:has-text("Save as template")'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: Template saved
+- click: 'button[aria-label="Cancel"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-lifecycle"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: 'button:has-text("Delete")'
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-lifecycle"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="confirm-dialog"]'
+    state: detached
+- click: 'button:has-text("Delete")'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-lifecycle"]'
+    state: detached
+- screenshot: 126-ssh-session-lifecycle.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SSH forward rows can be removed and bookmark fields, startup toggles, and a new folder are accepted before saving.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    checkpoints:
+    - step: 23
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 2}}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
+    results:
+    - 23
+    - 25
+    - 38
+    - 43
+  - id: R2
+    requirement: Reset restores the saved SSH draft, Cancel discards edits, Save as template creates a template, and Delete requires confirmation.
+    actions:
+    - 49
+    - 50
+    - 51
+    - 52
+    - 53
+    - 54
+    - 55
+    - 56
+    - 57
+    - 58
+    - 59
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 69
+    - 70
+    - 71
+    - 72
+    - 73
+    - 74
+    - 75
+    - 76
+    - 77
+    - 78
+    - 79
+    - 80
+    - 81
+    - 82
+    - 83
+    checkpoints:
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-lifecycle.example.test"}}'
+    - step: 52
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-lifecycle-command\\n''"}}'
+    - step: 57
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    - step: 58
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
+    - step: 70
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Template saved"}}'
+    - step: 77
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 80
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 82
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 84
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]", "state": "detached"}}'
+    results:
+    - 49
+    - 52
+    - 57
+    - 58
+    - 70
+    - 77
+    - 80
+    - 82
+    - 84
+  visual:
+  - check: Lifecycle dialogs, bookmark values, and forward rows remain readable and do not overlap in the editor.
+    method: manual
+    reason: Functional assertions do not establish visual layout or clipping.
+  native:
+  - check: Browser mode covers the custom folder dialog and editor lifecycle; packaged native dialog/desktop behavior remains outside this browser-only case.
+    method: external
+    reason: The case deliberately stays browser-only because the background/file picker path is browser-stubbed.

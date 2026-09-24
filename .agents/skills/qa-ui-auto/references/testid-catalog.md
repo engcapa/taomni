@@ -1072,6 +1072,7 @@
 - `[data-testid="session-proto-serial"]` — interactive — F6.3.proto-serial
 - `[data-testid="session-proto-browser"]` — interactive — F6.3.proto-browser
 - `[data-testid="session-proto-shell"]` — interactive — F6.3.proto-shell
+- `[data-testid="session-proto-proxy"]` — interactive — F6.3.proto-proxy
 - `[data-testid="session-proto-file"]` — interactive [optional] — F6.3.proto-file
 - `[data-testid="session-proto-wsl"]` — interactive [optional] — F6.3.proto-wsl
 - `[data-testid="session-proto-mysql"]` — interactive [optional] — F6.3.proto-mysql
@@ -1113,13 +1114,30 @@
 - `[data-testid="network-settings"]` — display — F6.3.network-body
 - `[data-testid="bookmark-settings"]` — display — F6.3.bookmark-body
 - `input[aria-label="Execute command"]` — interactive — F6.3.advanced-execute-command
+- `[data-testid="session-remote-environment"]` — interactive — F6.3.advanced-remote-environment
+- `[data-testid="session-ssh-browser-type"]` — interactive — F6.3.advanced-ssh-browser-type
 - `input[aria-label="SSH password"]` — interactive [optional] — F6.3.advanced-ssh-password
 - `[data-testid="session-save-in-vault"]` — interactive [optional] — F6.3.save-in-vault
 - `input[aria-label="Private key path"]` — interactive [optional] — F6.3.advanced-private-key
+- `label:has-text("Do not exit after command ends") input[type="checkbox"]` — interactive — F6.3.advanced-do-not-exit
+- `[data-testid="session-do-not-exit"]` — interactive — F6.3.advanced-do-not-exit-testid
+- `label:has-text("Password / keyboard-interactive") input[type="radio"]` — interactive — F6.3.advanced-auth-password
+- `label:has-text("Use private key") input[type="radio"]` — interactive — F6.3.advanced-auth-private-key
+- `label:has-text("ssh-agent / Pageant") input[type="radio"]` — interactive — F6.3.advanced-auth-agent
+- `label:has-text("GSSAPI (Kerberos)") input[type="radio"]` — interactive — F6.3.advanced-auth-gssapi
+- `label:has-text("Use private key") input[type="radio"]:checked` — display — F6.3.advanced-auth-private-key-checked
+- `label:has-text("GSSAPI (Kerberos)") input[type="radio"]:checked` — display — F6.3.advanced-auth-gssapi-checked
+- `[data-testid="session-auth-password"]` — interactive — F6.3.advanced-auth-password-testid
+- `[data-testid="session-auth-privatekey"]` — interactive — F6.3.advanced-auth-private-key-testid
+- `[data-testid="session-auth-agent"]` — interactive — F6.3.advanced-auth-agent-testid
+- `[data-testid="session-auth-gssapi"]` — interactive — F6.3.advanced-auth-gssapi-testid
 - `input[aria-label="Jump host"]` — interactive [optional] — F6.3.advanced-jump-host
 - `input[aria-label="Jump user"]` — interactive [optional] — F6.3.advanced-jump-user
 - `input[aria-label="Jump port"]` — interactive [optional] — F6.3.advanced-jump-port
 - `input[aria-label="Jump password"]` — interactive [optional] — F6.3.network-jump-password
+- `input[aria-label="Jump key path"]` — interactive [optional] — F6.3.network-jump-key
+- `[data-testid="session-jump-source"]` — interactive [optional] — F6.3.network-jump-source
+- `[data-testid="session-jump-auth"]` — interactive [optional] — F6.3.network-jump-auth
 - `[data-testid="session-proxy-kind"]` — interactive [optional] — F6.3.network-proxy-kind
 - `input[aria-label="Proxy host"]` — interactive — F6.3.network-proxy-host
 - `input[aria-label="Proxy port"]` — interactive — F6.3.network-proxy-port
@@ -1138,15 +1156,40 @@
 - `input[aria-label="Forward local address"]` — interactive [optional] — F6.3.network-forward-local
 - `input[aria-label="Forward remote address"]` — interactive [optional] — F6.3.network-forward-remote
 - `input[aria-label="Forward description"]` — interactive [optional] — F6.3.network-forward-desc
+- `[data-testid^="session-forward-remove-"]` — interactive [optional] — F6.3.network-remove-forward
 - `input[aria-label="Background image"]` — interactive — F6.3.bookmark-background
+- `[data-testid="session-background-browse"]` — interactive — F6.3.bookmark-background-browse
 - `input[aria-label="Background opacity"]` — interactive — F6.3.bookmark-bg-opacity
 - `textarea[aria-label="Description notes"]` — interactive — F6.3.bookmark-description
 - `input[aria-label="Tags"]` — interactive — F6.3.bookmark-tags
 - `input[aria-label="Additional parameters"]` — interactive — F6.3.bookmark-extra-params
 - `input[aria-label="Keyboard shortcut"]` — interactive — F6.3.bookmark-shortcut
+- `[data-testid="session-folder-select"]` — interactive — F6.3.bookmark-folder
+- `[data-testid="session-custom-icon"]` — interactive — F6.3.bookmark-custom-icon
+- `[data-testid="session-disable-ai-write"]` — interactive — F6.3.bookmark-disable-ai-write
+- `[data-testid="session-auto-connect"]` — interactive — F6.3.startup-auto-connect-testid
+- `[data-testid="session-open-new-window"]` — interactive — F6.3.startup-open-new-window-testid
+- `[data-testid="session-reconnect"]` — interactive — F6.3.startup-reconnect-testid
 - `[data-testid="session-test-connection"]` — interactive — F6.3.test-connection
 - `[data-testid="session-test-result-summary"]` — display — F6.3.test-result-summary
 - `[data-testid="session-save"]` — interactive — F6.3.save
+- `button:has-text("Save as Proxy Session")` — interactive [optional] — F6.3.save-as-proxy-session
+- `button:has-text("Save as template")` — interactive — F6.3.save-as-template
+- `button:has-text("Reset")` — interactive — F6.3.reset
+- `button:has-text("Delete")` — interactive — F6.3.delete
+- `button[aria-label="Cancel"]` — interactive — F6.3.cancel
+- `button:has-text("New folder")` — interactive — F6.3.new-folder
+- `[data-testid="session-cancel"]` — interactive — F6.3.cancel-testid
+- `[data-testid="session-help"]` — interactive — F6.3.editor-help
+- `[data-testid="session-close"]` — interactive — F6.3.editor-close
+- `[data-testid="session-host-lookup"]` — interactive — F6.3.host-lookup
+- `[data-testid="session-private-key-toggle"]` — interactive — F6.3.private-key-toggle
+- `[data-testid="session-private-key-browse"]` — interactive — F6.3.private-key-browse
+- `[data-testid="session-private-key-generate"]` — interactive — F6.3.private-key-generate
+- `[data-testid="session-expert-settings"]` — interactive — F6.3.expert-settings
+- `label:has-text("Auto-connect when Taomni starts") input[type="checkbox"]` — interactive — F6.3.startup-auto-connect
+- `label:has-text("Open in new window") input[type="checkbox"]` — interactive — F6.3.startup-open-new-window
+- `label:has-text("Reconnect on disconnection") input[type="checkbox"]` — interactive — F6.3.startup-reconnect
 
 ## sessions (F6.4)
 

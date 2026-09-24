@@ -1,0 +1,234 @@
+id: TC-124
+title: SSH advanced options matrix persists remote environment, browser mode, and authentication
+covers:
+- F6.3
+tags:
+- ssh
+- session
+- settings
+- advanced
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-ssh"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh-advanced-matrix.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '2222'
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa-advanced-user
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(6) select'
+    label: Interactive shell
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(6) select'
+    label: LXDE / LXQt desktop
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(6) select'
+    label: Xfce desktop
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(6) select'
+    label: GNOME desktop
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(6) select'
+    label: KDE Plasma desktop
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(6) select'
+    label: Awesome WM
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(6) select'
+    label: Custom command…
+- assert_attribute:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(6) select'
+    name: value
+    equals: Custom command…
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(10) select'
+    label: SFTP protocol (recommended)
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(10) select'
+    label: SCP (enhanced speed)
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(10) select'
+    label: SCP (compatibility)
+- select_option:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(10) select'
+    label: Disabled
+- assert_attribute:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(10) select'
+    name: value
+    equals: Disabled
+- fill:
+    selector: 'input[aria-label="Execute command"]'
+    value: printf 'qa-advanced-command\n'
+- set_check:
+    selector: 'label:has-text("Do not exit after command ends") input[type="checkbox"]'
+    checked: false
+- assert_attribute:
+    selector: 'label:has-text("Do not exit after command ends") input[type="checkbox"]'
+    name: data-checked
+    equals: 'false'
+- click: 'label:has-text("Use private key") input[type="radio"]'
+- assert_enabled: 'input[aria-label="Private key path"]'
+- fill:
+    selector: 'input[aria-label="Private key path"]'
+    value: /home/qauser/.ssh/id_ed25519
+- click: 'label:has-text("ssh-agent / Pageant") input[type="radio"]'
+- assert_disabled: 'input[aria-label="Private key path"]'
+- click: 'label:has-text("GSSAPI (Kerberos)") input[type="radio"]'
+- assert_count:
+    selector: 'label:has-text("GSSAPI (Kerberos)") input[type="radio"]:checked'
+    equal: 1
+- click: 'label:has-text("Password / keyboard-interactive") input[type="radio"]'
+- assert_attribute:
+    selector: 'input[aria-label="SSH password"]'
+    name: type
+    equals: password
+- set_check:
+    selector: '[data-testid="session-save-in-vault"]'
+    checked: false
+- click: 'label:has-text("Use private key") input[type="radio"]'
+- set_check:
+    selector: 'label:has-text("Do not exit after command ends") input[type="checkbox"]'
+    checked: false
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-ssh-advanced-matrix
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-advanced-matrix"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-advanced-matrix"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- assert_attribute:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(6) select'
+    name: value
+    equals: Custom command…
+- assert_attribute:
+    selector: '[data-testid="advanced-ssh-settings"] > div:nth-of-type(10) select'
+    name: value
+    equals: Disabled
+- assert_attribute:
+    selector: 'input[aria-label="Execute command"]'
+    name: value
+    equals: printf 'qa-advanced-command\n'
+- assert_attribute:
+    selector: 'label:has-text("Do not exit after command ends") input[type="checkbox"]'
+    name: data-checked
+    equals: 'false'
+- assert_count:
+    selector: 'label:has-text("Use private key") input[type="radio"]:checked'
+    equal: 1
+- assert_attribute:
+    selector: 'input[aria-label="Private key path"]'
+    name: value
+    equals: /home/qauser/.ssh/id_ed25519
+- screenshot: 124-ssh-advanced-options-matrix.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Every SSH advanced remote-environment and SSH-browser option can be selected and the final choices persist after saving and reopening.
+    actions:
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(6) select", "name": "value", "equals": "Custom command…"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(10) select", "name": "value", "equals": "Disabled"}}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-matrix\"]"}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 50
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(6) select", "name": "value", "equals": "Custom command…"}}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(10) select", "name": "value", "equals": "Disabled"}}'
+    - step: 52
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-advanced-command\\n''"}}'
+    - step: 53
+      expectation: '{"assert_attribute": {"selector": "label:has-text(\"Do not exit after command ends\") input[type=\"checkbox\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 54
+      expectation: '{"assert_count": {"selector": "label:has-text(\"Use private key\") input[type=\"radio\"]:checked", "equal": 1}}'
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/id_ed25519"}}'
+    results:
+    - 24
+    - 44
+    - 50
+    - 51
+    - 52
+    - 53
+    - 54
+    - 55
+  visual:
+  - check: Advanced SSH controls, option text, and the restored private-key state remain readable without clipping.
+    method: manual
+    reason: DOM assertions do not establish visual layout or text clipping.
+  native:
+  - check: The packaged editor renders and persists the advanced SSH form without opening a connection.
+    method: automated
+    reason: This case exercises native SQLite/editor state but intentionally does not claim SSH authentication for a fake endpoint.
