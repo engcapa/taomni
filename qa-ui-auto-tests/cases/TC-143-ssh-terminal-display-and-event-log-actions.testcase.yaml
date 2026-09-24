@@ -49,9 +49,6 @@ steps:
     timeout_sec: 15
 - right_click:
     selector: '[data-testid="terminal-pane"]'
-    position:
-      x: 24
-      y: 24
 - wait_for: '[data-testid="context-menu"]'
 - hover: text="Terminal display"
 - click: text="Read-only terminal"
@@ -65,9 +62,6 @@ steps:
     matches: '(?s)(?!.*qa-ssh-read-only-blocked).*'
 - right_click:
     selector: '[data-testid="terminal-pane"]'
-    position:
-      x: 24
-      y: 24
 - wait_for: '[data-testid="context-menu"]'
 - hover: text="Terminal display"
 - click: text="Read-only terminal"
@@ -85,9 +79,6 @@ steps:
     timeout_sec: 15
 - right_click:
     selector: '[data-testid="terminal-pane"]'
-    position:
-      x: 24
-      y: 24
 - wait_for: '[data-testid="context-menu"]'
 - hover: text="Terminal display"
 - click: text="Toggle terminal scrollbar"
@@ -97,9 +88,6 @@ steps:
     matches: '.*terminal-hide-scrollbar.*'
 - right_click:
     selector: '[data-testid="terminal-pane"]'
-    position:
-      x: 24
-      y: 24
 - wait_for: '[data-testid="context-menu"]'
 - hover: text="Terminal display"
 - click: text="Toggle terminal scrollbar"
@@ -109,9 +97,6 @@ steps:
     matches: '(?!.*terminal-hide-scrollbar).*'
 - right_click:
     selector: '[data-testid="terminal-pane"]'
-    position:
-      x: 24
-      y: 24
 - wait_for: '[data-testid="context-menu"]'
 - hover: text="Terminal display"
 - click: text="Fullscreen terminal"
@@ -121,9 +106,6 @@ steps:
     matches: '.*fixed.*inset-0.*'
 - right_click:
     selector: '[data-testid="terminal-pane"]'
-    position:
-      x: 24
-      y: 24
 - wait_for: '[data-testid="context-menu"]'
 - hover: text="Terminal display"
 - click: text="Fullscreen terminal"
@@ -133,9 +115,6 @@ steps:
     matches: '(?!.*fixed.*inset-0).*'
 - right_click:
     selector: '[data-testid="terminal-pane"]'
-    position:
-      x: 24
-      y: 24
 - wait_for: '[data-testid="context-menu"]'
 - click: '[data-testid="context-menu-item-event-log"]'
 - wait_for: text="Event Log"
