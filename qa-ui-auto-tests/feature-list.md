@@ -6370,6 +6370,14 @@ controls:
     selector: '[data-testid="keymap-row-editor.replace"]'
     kind: display
     optional: true       # visible after filtering to the action
+  - id: keymap-row-editor-find         # the base holder in the ED-PARITY-004 reassignment sequence
+    selector: '[data-testid="keymap-row-editor.find"]'
+    kind: display
+    optional: true
+  - id: keymap-row-enable-toggle       # per-action enable/disable checkbox inside a row
+    selector: '[data-testid="keymap-row-editor.find"] input[type="checkbox"]'
+    kind: interactive
+    optional: true       # user-disabled actions stay visible with their label (A3.4)
   - id: keymap-add-editor-replace
     selector: '[data-testid="keymap-add-editor.replace"]'
     kind: interactive
@@ -6378,6 +6386,68 @@ controls:
     selector: '[data-testid="keymap-replace-editor.replace-0"]'
     kind: display
     optional: true       # only after recording a chord
+  # ED-PARITY-004 draft/Apply surface: scheme management, the inline recorder
+  # conflict warning and the OK/Cancel/Apply commit boundary.
+  - id: keymap-scheme-copy
+    selector: '[data-testid="keymap-scheme-copy"]'
+    kind: interactive
+    optional: true       # creates a user scheme so the rows become editable
+  - id: keymap-scheme-rename
+    selector: '[data-testid="keymap-scheme-rename"]'
+    kind: interactive
+    optional: true       # window.prompt; only for a user scheme
+  - id: keymap-scheme-reset
+    selector: '[data-testid="keymap-scheme-reset"]'
+    kind: interactive
+    optional: true       # draft-only: restores base inheritance on Apply
+  - id: keymap-scheme-delete
+    selector: '[data-testid="keymap-scheme-delete"]'
+    kind: interactive
+    optional: true       # draft-only: removes the user scheme on Apply
+  - id: keymap-remove-binding         # swatch remove, `keymap-remove-<action-id>-<index>`
+    selector: '[data-testid="keymap-remove-editor.replace-0"]'
+    kind: interactive
+    optional: true
+  - id: keymap-no-shortcut           # row shows no bindings after a reassignment
+    selector: '[data-testid="keymap-no-shortcut-editor.find"]'
+    kind: display
+    optional: true
+  - id: keymap-recorder               # inline keystroke recorder (never a modal)
+    selector: '[data-testid="keymap-recorder"]'
+    kind: display
+    optional: true       # only while recording
+  - id: keymap-recorder-strokes
+    selector: '[data-testid="keymap-recorder-strokes"]'
+    kind: display
+    optional: true       # captured stroke chips / "press keys…" placeholder
+  - id: keymap-recorder-ok            # advisory: stays enabled during a conflict
+    selector: '[data-testid="keymap-recorder-ok"]'
+    kind: interactive
+    optional: true
+  - id: keymap-recorder-cancel
+    selector: '[data-testid="keymap-recorder-cancel"]'
+    kind: interactive
+    optional: true       # discards the capture without touching the draft
+  - id: keymap-capture-conflicts      # DEC-02 inline "Already assigned to:" warning
+    selector: '[data-testid="keymap-capture-conflicts"]'
+    kind: display
+    optional: true       # scrollable list of every holder of the recorded stroke
+  - id: keymap-capture-conflict-entry # one holder row, `keymap-capture-conflict-<action-id>`
+    selector: '[data-testid="keymap-capture-conflict-editor.find"]'
+    kind: display
+    optional: true
+  - id: keymap-settings-ok            # commit + close
+    selector: '[data-testid="keymap-settings-ok"]'
+    kind: interactive
+    optional: true
+  - id: keymap-settings-cancel        # zero-write discard of the whole draft
+    selector: '[data-testid="keymap-settings-cancel"]'
+    kind: interactive
+    optional: true
+  - id: keymap-settings-apply         # the only commit edge; disabled when clean
+    selector: '[data-testid="keymap-settings-apply"]'
+    kind: interactive
+    optional: true
   # §8.20.2 W1 reference-information surfaces rendered by the workspace.
   - id: parameter-info-tooltip
     selector: '[data-testid="code-workspace-parameter-info"]'
@@ -6943,6 +7013,9 @@ controls:
       - '[data-testid="keymap-item-workspace.renameSymbol"]'
   - id: keymap-cheatsheet-footer-close
     selector: '[data-testid="keymap-cheatsheet-footer-close"]'
+    kind: interactive
+  - id: keymap-cheatsheet-close         # header X; ED-PARITY-004 S7 asserts its search box owns the keyboard
+    selector: '[data-testid="keymap-cheatsheet-close"]'
     kind: interactive
     optional: true
   - id: context-cut

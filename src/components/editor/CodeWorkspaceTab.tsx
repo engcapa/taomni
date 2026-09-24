@@ -15593,7 +15593,13 @@ export function CodeWorkspaceTab({
     const node = target instanceof Node ? target : null;
     const element = node instanceof Element ? node : node?.parentElement;
     return Boolean(element?.closest?.(
-      '[data-testid="code-workspace-editor-search"], [data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu], [data-testid="code-workspace-search-everywhere"]',
+      '[data-testid="code-workspace-editor-search"], [data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu], [data-testid="code-workspace-search-everywhere"]'
+      // ED-PARITY-004 S7/A3.5: the Keymap settings + Cheat Sheet surfaces own
+      // their own keyboard state. Their filter/search inputs must receive
+      // Ctrl+F as text instead of the workspace dispatcher opening the editor
+      // find panel behind the dialog. The Keymap recorder keeps working
+      // because it listens on window capture independently of this guard.
+      + ', [data-testid="workspace-keymap-settings-dialog"], [data-testid="keymap-cheatsheet-dialog"]',
     ));
   }, []);
 
@@ -15648,6 +15654,13 @@ export function CodeWorkspaceTab({
         setStatusMessage(`Action ${commandId}: ${result.message ?? result.reason}`);
       }
     },
+    // ED-PARITY-004 DEC-05: an ambiguous stroke used to be swallowed by all
+    // three dispatchers. Name the contenders so the rejection is observable.
+    onBindingConflict: (notice) => {
+      setStatusMessage(
+        `${notice.keybinding} is assigned to ${notice.actionIds.join(" and ")} — resolve it in Keymap Settings`,
+      );
+    },
   });
 
   const executeWorkspaceCommand = useCallback((
@@ -15692,15 +15705,20 @@ export function CodeWorkspaceTab({
     return () => attached.dispose();
   }, [visible]);
 
-  const applyKeymapScheme = useCallback((scheme: KeymapSchemeV3) => {
-    setKeymapSchemes((schemes) => {
-      const exists = schemes.some((entry) => entry.id === scheme.id);
-      return exists
-        ? schemes.map((entry) => (entry.id === scheme.id ? scheme : entry))
-        : [...schemes, scheme];
-    });
-    if (scheme.id !== activeKeymapSchemeId) setActiveKeymapSchemeId(scheme.id);
-  }, [activeKeymapSchemeId]);
+  // ED-PARITY-004 DEC-03: the Keymap dialog's Apply is the only edge that
+  // reaches this. `null` means the user deleted the active scheme and the app
+  // is back on the built-in defaults.
+  const applyKeymapScheme = useCallback((scheme: KeymapSchemeV3 | null) => {
+    if (scheme) {
+      setKeymapSchemes((schemes) => {
+        const exists = schemes.some((entry) => entry.id === scheme.id);
+        return exists
+          ? schemes.map((entry) => (entry.id === scheme.id ? scheme : entry))
+          : [...schemes, scheme];
+      });
+    }
+    setActiveKeymapSchemeId(scheme?.id ?? null);
+  }, []);
 
   // §8.16.5 N2.6: Ctrl+Tab MRU Switcher state. Hold-to-cycle, release-to-commit,
   // Esc cancels; hovering an entry previews without mutating MRU order.

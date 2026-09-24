@@ -475,3 +475,70 @@ Fixture：**[F0](references/fixture-catalog.md)**（项目树与无 provider 的
 - P0 需求：[overall-audit-plan-20260913.md#req-10](overall-audit-plan-20260913.md#req-10)
 - 场景矩阵：[capability-matrix.md#cw-set-002](capability-matrix.md#cw-set-002)
 - 历史只读来源：[shell-layout-2026.2.2-linux.md](references/shell-layout-2026.2.2-linux.md)（`r2-19/20/21`，仅证明 Settings/Keymap 入口存在）
+
+---
+
+## 13. P2 回填：AC → V → 实际测试 → 报告/断言
+
+> 执行平台 **Windows 11 / WebView2**，模式 browser + native。
+> 证据原件在 `qa-ui-auto-report/ed-parity-004/`（不入库）。
+> 状态：`done`（当前端完成；macOS/Linux 记为未验证）。
+
+### 13.1 实际用例与执行结果
+
+| 用例 | 模式 | 覆盖 | 结果 | 报告 |
+|---|---|---|---|---|
+| `TC-IDE-C1-01`（改写） | browser | S0/S1、草稿录制、Apply 提交边界 | ✅ 16.5s | `ed-parity-004/final/run-20260924-225702-962488200` |
+| `TC-IDE-PARITY-004-01` | browser | S2/S3/S3b/S3c/S5、A1.4/A1.5 | ✅ 23.7s | 同上 |
+| `TC-IDE-PARITY-004-02` | browser | S4a/S4b、A1.1–A1.3 | ✅ 21.9s | 同上 |
+| `TC-IDE-PARITY-004-03` | browser | S6/S7/S8、A1.6/A3.3/A3.4/A3.5 | ✅ 17.9s | 同上 |
+| `TC-IDE-PARITY-004-04` | native | A1.5 V2：真实 webview 上下文重启后持久化 | ✅ 14.9s | `ed-parity-004/native/run-20260924-225629-154181200` |
+| `TC-IDE-CW-UI-01-settings-actions-browser` | browser | 同 feature 家族保留回归闸（DEC-08） | ✅ 28.8s，93/93 步 | 同上 |
+
+单测：`KeymapSettingsDialog.test.tsx`（4 保留例改写为 Apply 边界 + 10 例新增）、
+`workspaceKeymapScheme.test.ts`（6 保留例 + 7 例新增）、
+`workspaceActionHostKeymap.test.ts`（5 保留例 + 3 例新增），
+连同 `workspaceKeymapRuntime.test.ts`、`KeymapCheatSheetDialog.test.tsx`、`workspaceActionHost.test.ts`、
+`debugEditorChrome.test.ts` 合计 **59/59 通过**；`src/components/editor/workspace/` 全量 **2299/2300**，
+唯一失败为**改前已存在**的 `CodeMirrorHost.completion-undo.test.tsx`（已用 stash 隔离生产改动复证）。
+scoped typecheck（DEC-09 七个 owner 路径 + 三个测试文件）**0 错误 / 0 范围外错误**。
+
+### 13.2 AC → V → 测试 → 报告
+
+| AC | V | 关键断言（实际执行） | 结果 |
+|---|---|---|---|
+| A1.1 冲突可见 | V1 | 录制 `Ctrl+f` 后 `keymap-capture-conflicts` 出现且含 `Already assigned to:`、指名 `editor.find`（标题+id）；OK 在冲突态仍可用 | ✅ 004-02 R1（step 49–54） |
+| A1.2 Cancel 零改变 | V1 | 取消录制后冲突区清空、草稿仍为 `Alt+Shift+R`、Apply 仍禁用、关闭后 `Ctrl+F` 仍执行 Find | ✅ 004-02 R2（step 55–64）、004-01 R4 |
+| A1.3 确认后无死键 | V1 | 确认+Apply 后 `editor.find` 失去 `Ctrl+F`、冲突徽标清零、`Ctrl+F` 真实执行 Replace；单测断言 `prepareBinding` 返回 `single` 且候选恰好 1 | ✅ 004-02 R3/R4（step 79–91）、`workspaceActionHostKeymap.test.ts` |
+| A1.4 Apply 唯一提交 | V1 | Apply 前存储无新 chord 且旧 chord 仍生效；Apply 后存储含新 chord 物理结构、新 chord 生效、旧 chord 不再命中 | ✅ 004-01 R1/R2（step 26–68） |
+| A1.5 重开可读 | V1+V2 | 同会话重开读到 `Alt+Shift+R`；**native** 销毁并重建真实 webview 上下文后仍读到并生效 | ✅ 004-01 R3、004-04 R2/R3 |
+| A1.6 保留行为 | V1 | Reset→Apply 回 `Ctrl+R` 并真实执行；Delete 后下拉回默认且仍可改键 | ✅ 004-03 R5/R6 |
+| A2 双侧对照 | V3 | 记录 `docs-feature/.../references/ed-parity-004-comparison.json`，`compare_idea.py` exit 0，9 件原件 sha256 全部 verified | ⚠️ 结论 `unverified`（见 §13.4） |
+| A3.1 fork/Reset/Delete/corrupt | V4 | Reset/Delete/默认回退实测；corrupt 隔离与空数组覆盖往返由 `workspaceKeymapScheme.test.ts` 覆盖 | ✅ 004-03 R5/R6 + 单测 |
+| A3.2 Ctrl vs Meta | V4 | 单测断言 `ctrl+KeyX` 与 `meta+KeyX` 是不同 identity；`Alt+Shift+R` / `Ctrl+F` 实机派发 | ✅ `workspaceKeymapScheme.test.ts` + 004-01/02 |
+| A3.3 IME/AltGr | V5 | 合成期间录制器捕获 0 stroke；`isComposing`/`Process`/`Dead`/AltGr 一律不录入 | ✅ 004-03 R3（step 55–62）+ 单测 |
+| A3.4 user-disabled 仍可见 | V4 | 取消勾选后该行仍显示并带 `Disabled in Keymap` | ✅ 004-03 R4（step 65–66） |
+| A3.5 保留绑定与 Shell 快捷键 | V4 | `Control+Shift+N`/`Control+Alt+/`/`Ctrl+Z` 可用；裸 F5 不可绑定；`debugEditorChrome.test.ts` 不变 | ✅ 004-03 R1/R3 + `debugEditorChrome.test.ts` |
+
+### 13.3 本轮相对 P1 设计的两处事实修正
+
+1. **A1.3 的字面预期「原占用者可见地变为 `no shortcut`」在本 fixture 不成立**：
+   `editor.find` 的 base 绑定是 `Ctrl+F` **与** `Meta+F` 两条。DEC-04 撤销的是**被争夺的那一个 stroke**，
+   因此重新指派后该行显示 `Meta+F` 而不是空。`Ctrl+F` 确实从该行消失、全局冲突徽标清零、
+   真实按键 `Ctrl+F` 只执行 Replace——A1.3 的实质目标（该 chord 可用候选恰好为 1）完全达成。
+   `004-02` 断言的是「`Ctrl+F` 不在该行 + `Meta+F` 仍在」，并显式记录该修正。
+2. **DEC-03 的 Apply 不关闭对话框**：真实 IDEA 2026.2.3 的 Settings 在 Apply 后保持打开、仅 OK 关闭
+   （参照包 §3.1/§3.5）。P1 写的「点 Apply → 对话框 detach」与目标不符，本轮按实测修正为
+   「Apply 保持打开、OK 关闭」。
+
+### 13.4 诚实的缺口
+
+| 缺口 | 状态 | 依据 / 后续 |
+|---|---|---|
+| IDEA 侧 Apply/OK 之后的状态 | **未观测** | 2026-09-24 采样全程只 Cancel，从未写过 `keymap*.xml`；参照包 §5/§6.1 给出隔离实例补采步骤 |
+| IDEA 侧 Copy / Reset / Delete 标签 | **未观测** | 同上；故对照记录只能签 `unverified`，不得签 `matched` |
+| 键帽 chip 精确几何 / DPI | **不可比较** | 参照包 §5；像素级对齐不在本卡完成上限内 |
+| macOS / Linux | **未验证** | 本轮仅 Windows 11 / WebView2。模型层按物理 `code` 匹配、`guessBase()` 按 `navigator.platform` 选 base，三端共用同一实现，但需在 macOS (`idea-macos`, Meta 语义) 与 Linux/WebKitGTK 上重跑 004-01..04 的 native 版本 |
+| 真实 IME 引擎会话 | **未验证** | browser 合成事件不能替代真实 IME；参照包 §5 已登记 |
+| 既有 `CodeMirrorHost.completion-undo.test.tsx` 失败 | **改前已存在** | 已用 `git stash` 隔离本卡生产改动复证同样失败；不在本卡范围，未修复 |
+| Search Everywhere 冻结评估可能 stale | **既有、非本卡引入** | 工程目录摄食期间动作目录重注册会使面板内的冻结评估变成 `stale-owner`，第 4 次打开对话框在长用例中偶发失效；`TC-IDE-PARITY-004-03` 已改为不依赖第 4 次打开。该问题属 action 目录/快照生命周期，未在本卡扩大范围 |

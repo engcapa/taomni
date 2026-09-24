@@ -14,6 +14,7 @@ import {
 import {
   type ActionInvocation,
   type ActionSnapshotItem,
+  type BindingConflictNotice,
   type KeyDispatchContextV2,
   type KeyDispatchResult,
   WorkspaceActionHost,
@@ -27,6 +28,8 @@ export interface UseWorkspaceActionsControllerOptions {
   getDefaultFocus?: () => WorkspaceFocus;
   contextData?: Partial<WorkspaceActionContext>;
   onCommandExecuted?: (commandId: string, result?: ActionResult) => void;
+  /** ED-PARITY-004 DEC-05: observable rejection for ambiguous strokes. */
+  onBindingConflict?: (notice: BindingConflictNotice) => void;
 }
 
 export interface WorkspaceActionsController {
@@ -58,6 +61,7 @@ export function useWorkspaceActionsController({
   getDefaultFocus,
   contextData,
   onCommandExecuted,
+  onBindingConflict,
 }: UseWorkspaceActionsControllerOptions): WorkspaceActionsController {
   const commandsRef = useRef(commands);
   commandsRef.current = commands;
@@ -77,6 +81,9 @@ export function useWorkspaceActionsController({
   const onCommandExecutedRef = useRef(onCommandExecuted);
   onCommandExecutedRef.current = onCommandExecuted;
 
+  const onBindingConflictRef = useRef(onBindingConflict);
+  onBindingConflictRef.current = onBindingConflict;
+
   const [revision, setRevision] = useState(0);
 
   // §8.16.3 Gate-R1 lifecycle: the host lives in lazily-created state (never
@@ -92,6 +99,7 @@ export function useWorkspaceActionsController({
     getDefaultFocus: () =>
       getDefaultFocusRef.current ? getDefaultFocusRef.current() : (activeFocusRef.current ?? "workspace"),
     onExecuted: (id, res) => onCommandExecutedRef.current?.(id, res),
+    onBindingConflict: (notice) => onBindingConflictRef.current?.(notice),
   }), [workspaceId]);
 
   const [host, setHost] = useState(() => createHost());

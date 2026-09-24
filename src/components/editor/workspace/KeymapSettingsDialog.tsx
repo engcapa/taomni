@@ -3,12 +3,17 @@ import { X } from "lucide-react";
 import type { ActionSnapshotItem } from "./workspaceActionHost";
 import {
   createKeymapScheme,
+  displaceStroke,
+  effectiveSchemeBindings,
+  findStrokeConflicts,
+  formatShortcut,
+  isReservedStroke,
   setActionBindings,
   setActionDisabled,
+  shortcutIdentity,
   strokeFromKeyboardEvent,
-  isReservedStroke,
-  formatShortcut,
   type KeymapBaseSchemeId,
+  type KeymapBindingSource,
   type KeymapSchemeV3,
   type Shortcut,
   type ShortcutStroke,
@@ -25,18 +30,54 @@ interface KeymapSettingsDialogProps {
   corruptDiagnostic?: string | null;
   onActiveSchemeChange: (schemeId: string | null) => void;
   onSchemesChange: (schemes: readonly KeymapSchemeV3[]) => void;
-  /** Persist + apply one scheme mutation to the live host. */
-  onApplyScheme: (scheme: KeymapSchemeV3) => void;
+  /**
+   * Persist + apply one scheme mutation to the live host. ED-PARITY-004
+   * DEC-03: this fires ONLY from Apply/OK. `null` means "fall back to the
+   * built-in defaults" (the user deleted the active scheme).
+   */
+  onApplyScheme: (scheme: KeymapSchemeV3 | null) => void;
   onClose: () => void;
 }
 
 type CaptureTarget = { actionId: string; replaceIndex: number | null };
 
+interface RowBinding {
+  shortcuts: readonly Shortcut[];
+  source: KeymapBindingSource;
+  /** Every other action whose effective bindings share one of these strokes. */
+  conflictsWith: { actionId: string; title: string; source: KeymapBindingSource }[];
+}
+
+function toShortcut(strokes: readonly ShortcutStroke[]): Shortcut {
+  return {
+    kind: "keyboard",
+    strokes: strokes.length === 2
+      ? ([strokes[0], strokes[1]] as [ShortcutStroke, ShortcutStroke])
+      : [strokes[0]],
+  };
+}
+
+function upsertScheme(
+  schemes: readonly KeymapSchemeV3[],
+  scheme: KeymapSchemeV3,
+): KeymapSchemeV3[] {
+  return schemes.some((entry) => entry.id === scheme.id)
+    ? schemes.map((entry) => (entry.id === scheme.id ? scheme : entry))
+    : [...schemes, scheme];
+}
+
 /**
- * IDEA-like Keymap settings surface (§8.18.2): scheme copy/rename/reset/
- * delete, action search, per-action shortcut swatches with add (keystroke
- * recording) / remove / enable-disable, conflict badges and reserved-key
- * warnings. The Cheat Sheet stays the read-only projection of the same data.
+ * IDEA-like Keymap settings surface (§8.18.2, ED-PARITY-004): scheme
+ * copy/rename/reset/delete, action search, per-action shortcut swatches with
+ * add (keystroke recording) / remove / enable-disable, and an INLINE live
+ * conflict warning inside the recorder.
+ *
+ * ED-PARITY-004 DEC-02..04: conflicts are advisory (never blocking) and are
+ * computed on the same physical stroke identity the dispatcher matches on, so
+ * `Ctrl+F` (base) and `Ctrl+f` (recorded) are ONE conflict, not two strings.
+ * DEC-03: every edit lands in a local draft; Apply/OK is the only edge that
+ * touches storage and the live host. The Cheat Sheet stays the read-only
+ * projection of the same data.
  */
 export function KeymapSettingsDialog({
   open,
@@ -50,6 +91,10 @@ export function KeymapSettingsDialog({
   onApplyScheme,
   onClose,
 }: KeymapSettingsDialogProps) {
+  // ED-PARITY-004 DEC-03: the whole surface edits a draft. Nothing below calls
+  // onSchemesChange / onActiveSchemeChange / onApplyScheme until Apply.
+  const [draftSchemes, setDraftSchemes] = useState<readonly KeymapSchemeV3[]>(schemes);
+  const [draftActiveId, setDraftActiveId] = useState<string | null>(activeSchemeId);
   const [filter, setFilter] = useState("");
   const [capture, setCapture] = useState<CaptureTarget | null>(null);
   /** §8.19.2: strokes recorded so far (one or two) in the active capture. */
@@ -59,33 +104,95 @@ export function KeymapSettingsDialog({
   const capturedStrokesRef = useRef<ShortcutStroke[]>([]);
   capturedStrokesRef.current = capturedStrokes;
 
-  const activeScheme = schemes.find((scheme) => scheme.id === activeSchemeId) ?? null;
+  // Re-entering the dialog always starts from the committed state.
+  useEffect(() => {
+    if (!open) return;
+    setDraftSchemes(schemes);
+    setDraftActiveId(activeSchemeId);
+    setCapture(null);
+    setCapturedStrokes([]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const effectiveForAction = useMemo(() => {
-    const map = new Map<string, { shortcuts: readonly Shortcut[]; disabled: boolean; conflictsWith: string[] }>();
-    const byStroke = new Map<string, string[]>();
-    for (const item of snapshot) {
-      for (const binding of item.keybindings ?? []) {
-        const list = byStroke.get(binding) ?? [];
-        list.push(item.id);
-        byStroke.set(binding, list);
-      }
-    }
-    for (const item of snapshot) {
-      const conflicts = new Set<string>();
-      for (const binding of item.keybindings ?? []) {
-        for (const other of byStroke.get(binding) ?? []) {
-          if (other !== item.id) conflicts.add(other);
-        }
-      }
-      map.set(item.id, {
-        shortcuts: parseDisplayBindings(item),
-        disabled: item.state.disabledReason === "userDisabled",
-        conflictsWith: [...conflicts],
-      });
-    }
+  const draftScheme = useMemo(
+    () => draftSchemes.find((scheme) => scheme.id === draftActiveId) ?? null,
+    [draftSchemes, draftActiveId],
+  );
+
+  /**
+   * Built-in defaults per action, taken from the host snapshot. Displacement
+   * and conflict detection both resolve through this map, exactly like
+   * `effectiveShortcuts` does on the live side.
+   */
+  const baseBindings = useMemo(() => {
+    const map = new Map<string, readonly Shortcut[]>();
+    for (const item of snapshot) map.set(item.id, item.baseShortcuts ?? []);
     return map;
   }, [snapshot]);
+
+  /** Draft-effective binding + conflict list per action, physical identity. */
+  const rowBindings = useMemo(() => {
+    const byIdentity = new Map<string, { actionId: string; title: string; source: KeymapBindingSource }[]>();
+    const resolved = new Map<string, { shortcuts: readonly Shortcut[]; source: KeymapBindingSource }>();
+    for (const item of snapshot) {
+      const effective = effectiveSchemeBindings(draftScheme, baseBindings, item.id);
+      resolved.set(item.id, effective);
+      // DEC-06: the row badge is the "is this scheme internally consistent"
+      // view, so it uses the SAME availability rule as dispatch and
+      // `getBindingDiagnostics`. An action that cannot execute right now (no
+      // bookmark, no editor, read-only) is not a routing conflict and must not
+      // raise a false ⚠. The recorder warning below is intentionally broader:
+      // like IDEA it names every declared holder.
+      if (item.state.availability !== "available") continue;
+      for (const shortcut of effective.shortcuts) {
+        const identity = shortcutIdentity(shortcut);
+        const list = byIdentity.get(identity) ?? [];
+        list.push({ actionId: item.id, title: item.title, source: effective.source });
+        byIdentity.set(identity, list);
+      }
+    }
+    const rows = new Map<string, RowBinding>();
+    for (const item of snapshot) {
+      const effective = resolved.get(item.id) ?? { shortcuts: [], source: "base" as const };
+      const seen = new Set<string>();
+      const conflictsWith: RowBinding["conflictsWith"] = [];
+      for (const shortcut of effective.shortcuts) {
+        for (const holder of byIdentity.get(shortcutIdentity(shortcut)) ?? []) {
+          if (holder.actionId === item.id || seen.has(holder.actionId)) continue;
+          seen.add(holder.actionId);
+          conflictsWith.push(holder);
+        }
+      }
+      rows.set(item.id, { shortcuts: effective.shortcuts, source: effective.source, conflictsWith });
+    }
+    return rows;
+  }, [snapshot, draftScheme, baseBindings]);
+
+  const displayPlatform: "mac" | "pc" = (draftScheme?.base ?? guessBase()) === "idea-macos" ? "mac" : "pc";
+
+  const closeRecorder = () => {
+    setCapture(null);
+    setCapturedStrokes([]);
+  };
+
+  const applyDraft = (close: boolean) => {
+    onSchemesChange(draftSchemes);
+    onActiveSchemeChange(draftActiveId);
+    onApplyScheme(draftScheme);
+    if (close) onClose();
+  };
+
+  /** Implicitly fork a user scheme from the defaults on first draft edit. */
+  function ensureMutableDraft(): KeymapSchemeV3 | null {
+    if (draftScheme && !draftScheme.readOnly) return draftScheme;
+    const forked = createKeymapScheme({
+      id: `keymap-user-${Date.now().toString(36)}`,
+      name: `${draftScheme?.name ?? defaultSchemeName} (copy)`,
+      base: (draftScheme?.base ?? guessBase()) as KeymapBaseSchemeId,
+    });
+    setDraftSchemes((current) => [...current, forked]);
+    setDraftActiveId(forked.id);
+    return forked;
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -93,6 +200,7 @@ export function KeymapSettingsDialog({
       const target = captureRef.current;
       if (!target) {
         if (event.key === "Escape") {
+          // DEC-03: discarding the draft is the Cancel path — zero writes.
           event.preventDefault();
           onClose();
         }
@@ -104,30 +212,29 @@ export function KeymapSettingsDialog({
       event.preventDefault();
       event.stopPropagation();
 
+      // ED-PARITY-004 A3.3: IME composition and AltGr must not be recorded.
+      // `key === "Dead"` is a dead-key wait, not a stroke.
+      if (event.isComposing || event.key === "Process" || event.key === "Dead") return;
+      if (event.getModifierState?.("AltGraph")) return;
+
       const commitStrokes = (strokes: readonly ShortcutStroke[]) => {
-        const scheme = ensureMutableScheme();
-        if (!scheme || strokes.length === 0) return;
-        const shortcut: Shortcut = {
-          kind: "keyboard",
-          strokes: strokes.length === 2
-            ? ([strokes[0], strokes[1]] as [ShortcutStroke, ShortcutStroke])
-            : [strokes[0]],
-        };
-        const current = [...(scheme.bindings[target.actionId] ?? [])];
-        let next: typeof current;
-        if (target.replaceIndex !== null) {
-          next = current.map((binding, index) => (index === target.replaceIndex ? shortcut : binding));
-        } else {
-          next = [...current, shortcut];
-        }
-        onApplyScheme(setActionBindings(scheme, target.actionId, next));
-        setCapture(null);
-        setCapturedStrokes([]);
+        if (strokes.length === 0) return;
+        const shortcut = toShortcut(strokes);
+        const scheme = ensureMutableDraft();
+        if (!scheme) return;
+        // DEC-04: the previous holder loses exactly this stroke, so the chord
+        // ends with one owner instead of a dispatch-time dead key.
+        const displaced = displaceStroke(scheme, baseBindings, target.actionId, shortcut);
+        const current = [...(displaced.bindings[target.actionId] ?? [])];
+        const next: readonly Shortcut[] = target.replaceIndex !== null
+          ? current.map((binding, index) => (index === target.replaceIndex ? shortcut : binding))
+          : [...current, shortcut];
+        setDraftSchemes((schemesNow) => upsertScheme(schemesNow, setActionBindings(displaced, target.actionId, next)));
+        closeRecorder();
       };
 
       if (event.key === "Escape") {
-        setCapture(null);
-        setCapturedStrokes([]);
+        closeRecorder();
         return;
       }
       if (["Control", "Meta", "Alt", "Shift"].includes(event.key)) return;
@@ -149,20 +256,30 @@ export function KeymapSettingsDialog({
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, schemes]);
+  }, [open, draftSchemes, draftActiveId]);
 
-  function ensureMutableScheme(): KeymapSchemeV3 | null {
-    if (activeScheme && !activeScheme.readOnly) return activeScheme;
-    // Implicitly fork a user scheme from the defaults on first edit.
-    const forked = createKeymapScheme({
-      id: `keymap-user-${Date.now().toString(36)}`,
-      name: `${activeScheme?.name ?? defaultSchemeName} (copy)`,
-      base: (activeScheme?.base ?? guessBase()) as KeymapBaseSchemeId,
+  /** Live DEC-02 warning for the strokes recorded so far. */
+  const captureShortcuts = useMemo(
+    () => (capturedStrokes.length > 0 ? toShortcut(capturedStrokes) : null),
+    [capturedStrokes],
+  );
+  const captureConflicts = useMemo(() => {
+    if (!captureShortcuts) return [];
+    const holders = findStrokeConflicts(draftScheme, baseBindings, captureShortcuts, {
+      ...(capture ? { targetActionId: capture.actionId } : {}),
     });
-    onSchemesChange([...schemes, forked]);
-    onActiveSchemeChange(forked.id);
-    return forked;
-  }
+    // DEC-02: every holder is named with its title AND its id, because Taomni
+    // has no menu-path hierarchy to disambiguate with.
+    return holders.map((holder) => ({
+      ...holder,
+      title: snapshot.find((item) => item.id === holder.actionId)?.title ?? holder.actionId,
+    }));
+  }, [captureShortcuts, draftScheme, baseBindings, capture, snapshot]);
+
+  const dirty = useMemo(
+    () => draftActiveId !== activeSchemeId || !sameSchemes(draftSchemes, schemes),
+    [draftSchemes, draftActiveId, schemes, activeSchemeId],
+  );
 
   const filteredActions = snapshot.filter((item) =>
     !filter.trim()
@@ -176,6 +293,7 @@ export function KeymapSettingsDialog({
     <div
       className="fixed inset-0 z-[900] flex items-center justify-center bg-black/40 p-4"
       onMouseDown={(event) => {
+        // DEC-03: overlay click is a Cancel path — discards the draft.
         if (event.target === event.currentTarget) onClose();
       }}
     >
@@ -193,19 +311,20 @@ export function KeymapSettingsDialog({
             aria-label="Keymap scheme"
             data-testid="keymap-scheme-select"
             className="ml-auto rounded border border-[var(--taomni-code-border)] bg-transparent px-1 py-0.5 text-xs"
-            value={activeSchemeId ?? ""}
-            onChange={(event) => onActiveSchemeChange(event.target.value || null)}
+            value={draftActiveId ?? ""}
+            onChange={(event) => setDraftActiveId(event.target.value || null)}
           >
             <option value="">{defaultSchemeName} (default)</option>
-            {schemes.map((scheme) => (
+            {draftSchemes.map((scheme) => (
               <option key={scheme.id} value={scheme.id}>{scheme.name}</option>
             ))}
           </select>
           <button
             type="button"
+            data-testid="keymap-scheme-copy"
             className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-hover)]"
             onClick={() => {
-              const source = activeScheme;
+              const source = draftScheme;
               const copy = createKeymapScheme({
                 id: `keymap-copy-${Date.now().toString(36)}`,
                 name: `${source?.name ?? defaultSchemeName} copy`,
@@ -215,47 +334,54 @@ export function KeymapSettingsDialog({
                 copy.bindings = { ...source.bindings };
                 copy.disabledActionIds = [...source.disabledActionIds];
               }
-              onSchemesChange([...schemes, copy]);
-              onActiveSchemeChange(copy.id);
+              setDraftSchemes([...draftSchemes, copy]);
+              setDraftActiveId(copy.id);
             }}
           >
             Copy
           </button>
           <button
             type="button"
+            data-testid="keymap-scheme-rename"
             className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
-            disabled={!activeScheme || activeScheme.readOnly}
+            disabled={!draftScheme || draftScheme.readOnly}
             onClick={() => {
-              if (!activeScheme) return;
-              const name = window.prompt("Scheme name", activeScheme.name);
+              if (!draftScheme) return;
+              const name = window.prompt("Scheme name", draftScheme.name);
               if (!name) return;
-              const renamed = { ...activeScheme, name, updatedAt: Date.now() };
-              onSchemesChange(schemes.map((scheme) => (scheme.id === renamed.id ? renamed : scheme)));
+              const renamed = { ...draftScheme, name, updatedAt: Date.now() };
+              setDraftSchemes(draftSchemes.map((scheme) => (scheme.id === renamed.id ? renamed : scheme)));
             }}
           >
             Rename
           </button>
           <button
             type="button"
+            data-testid="keymap-scheme-reset"
             className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
-            disabled={!activeScheme}
+            disabled={!draftScheme}
             onClick={() => {
-              if (!activeScheme) return;
+              if (!draftScheme) return;
               // Reset = restore built-in defaults: drop user delta bindings.
-              onApplyScheme({ ...activeScheme, bindings: {}, disabledActionIds: [], updatedAt: Date.now() });
+              setDraftSchemes(upsertScheme(draftSchemes, {
+                ...draftScheme,
+                bindings: {},
+                disabledActionIds: [],
+                updatedAt: Date.now(),
+              }));
             }}
           >
             Reset
           </button>
           <button
             type="button"
+            data-testid="keymap-scheme-delete"
             className="rounded px-2 py-0.5 text-xs hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
-            disabled={!activeScheme || activeScheme.readOnly}
+            disabled={!draftScheme || draftScheme.readOnly}
             onClick={() => {
-              if (!activeScheme) return;
-              const remaining = schemes.filter((scheme) => scheme.id !== activeScheme.id);
-              onSchemesChange(remaining);
-              onActiveSchemeChange(null);
+              if (!draftScheme) return;
+              setDraftSchemes(draftSchemes.filter((scheme) => scheme.id !== draftScheme.id));
+              setDraftActiveId(null);
             }}
           >
             Delete
@@ -271,7 +397,7 @@ export function KeymapSettingsDialog({
           </button>
         </div>
 
-        {(corruptDiagnostic || activeScheme?.readOnly) && (
+        {(corruptDiagnostic || draftScheme?.readOnly) && (
           <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-1.5 text-xs text-amber-500" role="status">
             {corruptDiagnostic
               ? "Stored keymap was corrupted; a backup was kept and defaults are active."
@@ -292,8 +418,14 @@ export function KeymapSettingsDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2" role="list" aria-label="Keymap actions">
           {filteredActions.map((item) => {
-            const info = effectiveForAction.get(item.id);
-            const mutable = !!activeScheme && !activeScheme.readOnly;
+            const row = rowBindings.get(item.id);
+            const shortcuts = row?.shortcuts ?? [];
+            // DEC-03: the row renders the DRAFT, not the live host. Reading
+            // `item.state.disabledReason` here would show the pre-Apply value
+            // and make the enable/disable checkbox appear inert until Apply.
+            const disabled = draftScheme?.disabledActionIds.includes(item.id) ?? false;
+            const conflicts = row?.conflictsWith ?? [];
+            const mutable = !!draftScheme && !draftScheme.readOnly;
             const capturing = capture?.actionId === item.id;
             return (
               <div
@@ -306,58 +438,64 @@ export function KeymapSettingsDialog({
                   <div className="truncate text-sm">{item.title}</div>
                   <div className="truncate text-[11px] opacity-60">
                     {item.category} · {item.id}
-                    {item.state.availability !== "available" && !info?.disabled
+                    {item.state.availability !== "available" && !disabled
                       ? ` · ${disabledReasonLabel(item.state.disabledReason) ?? "Unavailable here"}`
                       : ""}
-                    {info?.disabled ? " · Disabled in Keymap" : ""}
+                    {disabled ? " · Disabled in Keymap" : ""}
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {(item.keybindings ?? []).length === 0 && (
-                    <span className="text-[11px] opacity-50">no shortcut</span>
+                  {shortcuts.length === 0 && (
+                    <span data-testid={`keymap-no-shortcut-${item.id}`} className="text-[11px] opacity-50">no shortcut</span>
                   )}
-                  {(item.keybindings ?? []).map((binding, index) => (
-                    <span
-                      key={`${item.id}-${binding}-${index}`}
-                      className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 font-mono text-[11px]"
-                      title={info?.conflictsWith.length
-                        ? `Also used by: ${info.conflictsWith.join(", ")}`
-                        : undefined}
-                      {...(mutable && !capturing
-                        ? {
-                            role: "button",
-                            tabIndex: 0,
-                            "aria-label": `Replace shortcut ${binding} on ${item.title}`,
-                            "data-testid": `keymap-replace-${item.id}-${index}`,
-                            onClick: () => {
-                              setCapturedStrokes([]);
-                              setCapture({ actionId: item.id, replaceIndex: index });
-                            },
-                          }
-                        : {})}
-                    >
-                      {binding}
-                      {info?.conflictsWith.length ? (
-                        <span aria-label="conflict" className="text-amber-500">⚠</span>
-                      ) : null}
-                      {mutable && (
-                        <button
-                          type="button"
-                          aria-label={`Remove shortcut ${binding} from ${item.title}`}
-                          className="opacity-60 hover:opacity-100"
-                          onClick={() => {
-                            const scheme = ensureMutableScheme();
-                            if (!scheme) return;
-                            const parsed = parseDisplayBindings(item);
-                            const next = parsed.filter((_, i) => i !== index);
-                            onApplyScheme(setActionBindings(scheme, item.id, next));
-                          }}
-                        >
-                          ×
-                        </button>
-                      )}
-                    </span>
-                  ))}
+                  {shortcuts.map((shortcut, index) => {
+                    const label = formatShortcut(shortcut, displayPlatform);
+                    return (
+                      <span
+                        key={`${item.id}-${label}-${index}`}
+                        className="inline-flex items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 font-mono text-[11px]"
+                        title={conflicts.length
+                          ? `Also used by: ${conflicts.map((entry) => `${entry.title} (${entry.actionId})`).join(", ")}`
+                          : undefined}
+                        {...(mutable && !capturing
+                          ? {
+                              role: "button",
+                              tabIndex: 0,
+                              "aria-label": `Replace shortcut ${label} on ${item.title}`,
+                              "data-testid": `keymap-replace-${item.id}-${index}`,
+                              onClick: () => {
+                                setCapturedStrokes([]);
+                                setCapture({ actionId: item.id, replaceIndex: index });
+                              },
+                            }
+                          : {})}
+                      >
+                        {label}
+                        {conflicts.length ? (
+                          <span aria-label="conflict" className="text-amber-500">⚠</span>
+                        ) : null}
+                        {mutable && (
+                          <button
+                            type="button"
+                            aria-label={`Remove shortcut ${label} from ${item.title}`}
+                            data-testid={`keymap-remove-${item.id}-${index}`}
+                            className="opacity-60 hover:opacity-100"
+                            onClick={() => {
+                              const scheme = ensureMutableDraft();
+                              if (!scheme) return;
+                              const next = shortcuts.filter((_, i) => i !== index);
+                              setDraftSchemes((schemesNow) => upsertScheme(
+                                schemesNow,
+                                setActionBindings(scheme, item.id, next),
+                              ));
+                            }}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
                   {mutable && (
                     <button
                       type="button"
@@ -369,32 +507,22 @@ export function KeymapSettingsDialog({
                         setCapture({ actionId: item.id, replaceIndex: null });
                       }}
                     >
-                      {capturing ? (
-                        <>
-                          <span className="font-mono">
-                            {capturedStrokes.length > 0
-                              ? capturedStrokes.map((stroke) => formatShortcut({ kind: "keyboard", strokes: [stroke] })).join(" ")
-                              : "press keys…"}
-                          </span>
-                          <span className="opacity-60">
-                            {capturedStrokes.length > 0
-                              ? `[${capturedStrokes.map((stroke) => stroke.code).join(", ")}] ${layoutLabel()}`
-                              : "1–2 keys · Enter confirms · Esc cancels"}
-                          </span>
-                        </>
-                      ) : "+ Add"}
+                      {capturing ? "recording…" : "+ Add"}
                     </button>
                   )}
                   <label className="ml-1 flex items-center gap-1 text-[11px]">
                     <input
                       type="checkbox"
                       aria-label={`Action ${item.title} enabled`}
-                      checked={!info?.disabled}
+                      checked={!disabled}
                       disabled={!mutable}
                       onChange={(event) => {
-                        const scheme = ensureMutableScheme();
+                        const scheme = ensureMutableDraft();
                         if (!scheme) return;
-                        onApplyScheme(setActionDisabled(scheme, item.id, !event.target.checked));
+                        setDraftSchemes((schemesNow) => upsertScheme(
+                          schemesNow,
+                          setActionDisabled(scheme, item.id, !event.target.checked),
+                        ));
                       }}
                     />
                     on
@@ -407,32 +535,141 @@ export function KeymapSettingsDialog({
             <div className="py-6 text-center text-xs opacity-60">No matching actions.</div>
           )}
         </div>
+
+        {/*
+          ED-PARITY-004 DEC-02: the recorder is inline and always present while
+          recording (never a separate modal). The warning is ADVISORY — the OK
+          button stays enabled — and lists EVERY action holding the stroke.
+        */}
+        {capture && (
+          <div
+            data-testid="keymap-recorder"
+            className="shrink-0 border-t border-[var(--taomni-code-border)] px-3 py-2"
+          >
+            <div className="flex items-center gap-2 text-[11px]">
+              <span data-testid="keymap-recorder-strokes" className="font-mono">
+                {capturedStrokes.length > 0
+                  ? `[${capturedStrokes.map((stroke) => stroke.code).join(", ")}]`
+                  : "press keys…"}
+              </span>
+              <span className="opacity-60">
+                {capturedStrokes.length > 0
+                  ? `${capturedStrokes.map((stroke) => formatShortcut(toShortcut([stroke]), displayPlatform)).join(" ")} · ${layoutLabel()}`
+                  : "1–2 keys · Enter confirms · Esc cancels"}
+              </span>
+              <span className="ml-auto flex items-center gap-1">
+                <button
+                  type="button"
+                  data-testid="keymap-recorder-ok"
+                  className="rounded border border-[var(--taomni-code-border)] px-2 py-0.5 hover:bg-[var(--taomni-code-hover)]"
+                  onClick={() => {
+                    if (capturedStrokes.length === 0) return;
+                    const target = capture;
+                    const shortcut = toShortcut(capturedStrokes);
+                    const scheme = ensureMutableDraft();
+                    if (!scheme) return;
+                    const displaced = displaceStroke(scheme, baseBindings, target.actionId, shortcut);
+                    const current = [...(displaced.bindings[target.actionId] ?? [])];
+                    const next: readonly Shortcut[] = target.replaceIndex !== null
+                      ? current.map((binding, index) => (index === target.replaceIndex ? shortcut : binding))
+                      : [...current, shortcut];
+                    setDraftSchemes((schemesNow) => upsertScheme(
+                      schemesNow,
+                      setActionBindings(displaced, target.actionId, next),
+                    ));
+                    closeRecorder();
+                  }}
+                >
+                  OK
+                </button>
+                <button
+                  type="button"
+                  data-testid="keymap-recorder-cancel"
+                  className="rounded border border-[var(--taomni-code-border)] px-2 py-0.5 hover:bg-[var(--taomni-code-hover)]"
+                  onClick={closeRecorder}
+                >
+                  Cancel
+                </button>
+              </span>
+            </div>
+            <div
+              data-testid="keymap-capture-conflicts"
+              className="mt-1.5 max-h-24 min-h-0 overflow-y-auto rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-500"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex items-center gap-1 font-medium">
+                <span aria-hidden="true">⚠</span>
+                <span>Already assigned to:</span>
+              </div>
+              {captureConflicts.length === 0 ? (
+                <div data-testid="keymap-capture-conflict-empty" className="opacity-70">
+                  No other action uses this shortcut.
+                </div>
+              ) : (
+                <ul className="mt-0.5 list-disc pl-4">
+                  {captureConflicts.map((holder) => (
+                    <li key={holder.actionId} data-testid={`keymap-capture-conflict-${holder.actionId}`}>
+                      {holder.title} <span className="opacity-70">({holder.actionId})</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* DEC-03: Apply/OK is the only commit edge; both discard-free closes do nothing. */}
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
+          <button
+            type="button"
+            data-testid="keymap-settings-ok"
+            className="rounded border border-[var(--taomni-code-border)] px-3 py-1 text-xs hover:bg-[var(--taomni-code-hover)]"
+            onClick={() => applyDraft(true)}
+          >
+            OK
+          </button>
+          <button
+            type="button"
+            data-testid="keymap-settings-cancel"
+            className="rounded border border-[var(--taomni-code-border)] px-3 py-1 text-xs hover:bg-[var(--taomni-code-hover)]"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            data-testid="keymap-settings-apply"
+            className="rounded border border-[var(--taomni-code-accent, #4b9edd)] px-3 py-1 text-xs hover:bg-[var(--taomni-code-hover)] disabled:opacity-40"
+            disabled={!dirty}
+            onClick={() => applyDraft(false)}
+          >
+            Apply
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-/** Snapshot display strings back into Shortcut values for delta editing. */
-function parseDisplayBindings(item: ActionSnapshotItem): readonly Shortcut[] {
-  const out: Shortcut[] = [];
-  for (const binding of item.keybindings ?? []) {
-    const parts = binding.split(" ");
-    const strokes = parts.map((part) => {
-      const segments = part.split("+").map((segment) => segment.trim()).filter(Boolean);
-      const key = segments[segments.length - 1] ?? "";
-      const modifiers = new Set(segments.slice(0, -1).map((segment) => segment.toLowerCase()));
-      return {
-        code: key.length === 1 ? `Key${key.toUpperCase()}` : key,
-        key,
-        ctrl: modifiers.has("ctrl"),
-        alt: modifiers.has("alt"),
-        shift: modifiers.has("shift"),
-        meta: modifiers.has("meta"),
-      };
-    });
-    out.push({ kind: "keyboard", strokes: strokes as [typeof strokes[number]] });
-  }
-  return out;
+/** Draft identity: value equality over the persisted shape, order-sensitive. */
+function sameSchemes(
+  a: readonly KeymapSchemeV3[],
+  b: readonly KeymapSchemeV3[],
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((left, index) => {
+    const right = b[index];
+    return right
+      && left.id === right.id
+      && left.name === right.name
+      && left.base === right.base
+      && left.readOnly === right.readOnly
+      && left.updatedAt === right.updatedAt
+      && JSON.stringify(left.bindings) === JSON.stringify(right.bindings)
+      && JSON.stringify(left.disabledActionIds) === JSON.stringify(right.disabledActionIds);
+  });
 }
 
 function guessBase(): KeymapBaseSchemeId {

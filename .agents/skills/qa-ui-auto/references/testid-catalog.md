@@ -151,7 +151,8 @@
 - `[data-testid^="keymap-category-"]` — interactive [optional] — F25.3.keymap-category
 - `[data-testid^="keymap-item-"]` — display [optional] — F25.3.keymap-item
   ↳ `[data-testid="keymap-item-workspace.renameSymbol"]` — alias
-- `[data-testid="keymap-cheatsheet-footer-close"]` — interactive [optional] — F25.3.keymap-cheatsheet-footer-close
+- `[data-testid="keymap-cheatsheet-footer-close"]` — interactive — F25.3.keymap-cheatsheet-footer-close
+- `[data-testid="keymap-cheatsheet-close"]` — interactive [optional] — F25.3.keymap-cheatsheet-close
 - `[data-testid="editor-context-cut"]` — interactive [optional] — F25.3.context-cut
 - `[data-testid="editor-context-copy"]` — interactive [optional] — F25.3.context-copy
 - `[data-testid="editor-context-paste"]` — interactive [optional] — F25.3.context-paste
@@ -276,8 +277,25 @@
 - `[data-testid="keymap-scheme-select"]` — interactive [optional] — F25.5.keymap-scheme-select
 - `[data-testid="keymap-action-filter"]` — interactive [optional] — F25.5.keymap-action-filter
 - `[data-testid="keymap-row-editor.replace"]` — display [optional] — F25.5.keymap-row-editor-replace
+- `[data-testid="keymap-row-editor.find"]` — display [optional] — F25.5.keymap-row-editor-find
+- `[data-testid="keymap-row-editor.find"] input[type="checkbox"]` — interactive [optional] — F25.5.keymap-row-enable-toggle
 - `[data-testid="keymap-add-editor.replace"]` — interactive [optional] — F25.5.keymap-add-editor-replace
 - `[data-testid="keymap-replace-editor.replace-0"]` — display [optional] — F25.5.keymap-replace-slot
+- `[data-testid="keymap-scheme-copy"]` — interactive [optional] — F25.5.keymap-scheme-copy
+- `[data-testid="keymap-scheme-rename"]` — interactive [optional] — F25.5.keymap-scheme-rename
+- `[data-testid="keymap-scheme-reset"]` — interactive [optional] — F25.5.keymap-scheme-reset
+- `[data-testid="keymap-scheme-delete"]` — interactive [optional] — F25.5.keymap-scheme-delete
+- `[data-testid="keymap-remove-editor.replace-0"]` — interactive [optional] — F25.5.keymap-remove-binding
+- `[data-testid="keymap-no-shortcut-editor.find"]` — display [optional] — F25.5.keymap-no-shortcut
+- `[data-testid="keymap-recorder"]` — display [optional] — F25.5.keymap-recorder
+- `[data-testid="keymap-recorder-strokes"]` — display [optional] — F25.5.keymap-recorder-strokes
+- `[data-testid="keymap-recorder-ok"]` — interactive [optional] — F25.5.keymap-recorder-ok
+- `[data-testid="keymap-recorder-cancel"]` — interactive [optional] — F25.5.keymap-recorder-cancel
+- `[data-testid="keymap-capture-conflicts"]` — display [optional] — F25.5.keymap-capture-conflicts
+- `[data-testid="keymap-capture-conflict-editor.find"]` — display [optional] — F25.5.keymap-capture-conflict-entry
+- `[data-testid="keymap-settings-ok"]` — interactive [optional] — F25.5.keymap-settings-ok
+- `[data-testid="keymap-settings-cancel"]` — interactive [optional] — F25.5.keymap-settings-cancel
+- `[data-testid="keymap-settings-apply"]` — interactive [optional] — F25.5.keymap-settings-apply
 - `[data-testid="code-workspace-parameter-info"]` — display [optional] — F25.5.parameter-info-tooltip
 - `[data-testid="code-workspace-quick-doc"]` — display [optional] — F25.5.quick-doc-popup
 - `[data-testid="code-workspace-editor-banners"]` — display [optional] — F25.5.editor-banners

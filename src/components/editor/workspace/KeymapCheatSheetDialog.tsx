@@ -51,12 +51,18 @@ export function KeymapCheatSheetDialog({
         category: entry.category,
         keybinding: entry.keybinding,
         keybindings: entry.keybindings,
+        // ED-PARITY-004 DEC-05/§8: conflict ownership must be visible on the
+        // main display surface, and an action that just LOST a reassigned
+        // chord keeps its row instead of silently dropping out of the list.
+        bindingConflicts: entry.bindingConflicts,
         keywords: entry.keywords,
         provenance: entry.state.source,
         enabled: entry.state.availability === "available",
         evaluation: entry.evaluation,
       }))
-      .filter((command) => !!command.keybinding || (command.keybindings?.length ?? 0) > 0),
+      .filter((command) => !!command.keybinding
+        || (command.keybindings?.length ?? 0) > 0
+        || (command.bindingConflicts?.length ?? 0) > 0),
     [actionSnapshots],
   );
 
@@ -222,6 +228,22 @@ export function KeymapCheatSheetDialog({
                           </div>
                         );
                       })}
+                      {bindings.length === 0 && (
+                        <span className="text-[10px] text-[var(--taomni-code-muted)] opacity-70">no shortcut</span>
+                      )}
+                      {bindings.length > 1 && (
+                        <span className="text-[10px] text-[var(--taomni-code-muted)] mx-0.5">or</span>
+                      )}
+                      {(command.bindingConflicts?.length ?? 0) > 0 && (
+                        <span
+                          data-testid={`keymap-conflict-${command.id}`}
+                          aria-label="conflict"
+                          title={`Also used by: ${command.bindingConflicts!.map((entry) => entry.actionIds.join(", ")).join("; ")}`}
+                          className="text-amber-500"
+                        >
+                          ⚠
+                        </span>
+                      )}
                     </div>
 
                     {onExecuteCommand && enabled && (

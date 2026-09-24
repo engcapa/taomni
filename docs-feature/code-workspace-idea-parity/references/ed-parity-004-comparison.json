@@ -1,0 +1,517 @@
+{
+  "schemaVersion": 1,
+  "taskId": "ED-PARITY-004",
+  "acceptance": [
+    "ED-PARITY-004-A1",
+    "ED-PARITY-004-A2",
+    "ED-PARITY-004-A3"
+  ],
+  "scenarioId": "CW-SET-002",
+  "fixture": {
+    "files": [
+      {
+        "path": ".agents/skills/qa-ui-auto/scripts/qa_ui_auto/fixtures/workspace_root.py",
+        "sha256": "357d6107c86cafd2570e561001ae0e9ee53db141b13daa62e2f1c70a1fb366ba"
+      }
+    ],
+    "contentSource": "browser in-memory virtual filesystem default README (TC-IDE-C1-01, -004-01, -004-02, -004-03) and the disposable qa-ui-auto workspace_root fixture (TC-IDE-PARITY-004-04, whose notes.txt content comes from that same generator). No provider is involved in the keymap sequence.",
+    "rootAlias": "F0-equivalent plain-text workspace; no Java project, no LSP.",
+    "initialState": {
+      "dirty": false,
+      "onDisk": true
+    }
+  },
+  "settings": {
+    "keymap": {
+      "name": "IDEA-side: Windows (built-in, never modified). Taomni-side: no user scheme, base idea-windows-linux.",
+      "bindings": [
+        {
+          "actionName": "Replace in File",
+          "keys": [
+            "Ctrl+R"
+          ]
+        },
+        {
+          "actionName": "Find in File",
+          "keys": [
+            "Ctrl+F"
+          ]
+        }
+      ]
+    },
+    "editor": {
+      "ideaTheme": "New UI 2026.2 dark",
+      "taomniTheme": "app default light (data-app-theme=light)",
+      "taomniCodeFont": "JetBrains Mono 13px"
+    },
+    "language": "plain text / no language server",
+    "locale": "en-US",
+    "plugins": []
+  },
+  "steps": [
+    {
+      "stepId": "S0",
+      "actionName": "Open Keymap settings",
+      "keys": [
+        "mouse"
+      ],
+      "input": null,
+      "preState": "No user keymap has been edited in this app profile",
+      "observedFields": [
+        "focus",
+        "results"
+      ]
+    },
+    {
+      "stepId": "S1",
+      "actionName": "Copy the current scheme into a new user scheme",
+      "keys": [
+        "mouse"
+      ],
+      "input": null,
+      "preState": "S0 complete; default scheme active",
+      "observedFields": [
+        "results"
+      ]
+    },
+    {
+      "stepId": "S2",
+      "actionName": "Record Alt+Shift+R for editor.replace",
+      "keys": [
+        "Alt+Shift+R"
+      ],
+      "input": null,
+      "preState": "S1 complete; editor.replace shows Ctrl+R",
+      "observedFields": [
+        "results",
+        "focus"
+      ]
+    },
+    {
+      "stepId": "S3",
+      "actionName": "Apply the draft",
+      "keys": [
+        "mouse"
+      ],
+      "input": null,
+      "preState": "S2 complete; draft differs from committed",
+      "observedFields": [
+        "results",
+        "history"
+      ]
+    },
+    {
+      "stepId": "S4a",
+      "actionName": "Record the already-held Ctrl+F, observe the warning, cancel",
+      "keys": [
+        "Control+F"
+      ],
+      "input": null,
+      "preState": "S3 complete; editor.find holds Ctrl+F",
+      "observedFields": [
+        "results",
+        "focus"
+      ]
+    },
+    {
+      "stepId": "S4b",
+      "actionName": "Confirm the same Ctrl+F and Apply it",
+      "keys": [
+        "Control+F"
+      ],
+      "input": null,
+      "preState": "S4a cancelled; draft back to S3",
+      "observedFields": [
+        "results",
+        "history"
+      ]
+    },
+    {
+      "stepId": "S5",
+      "actionName": "Edit then close without Apply",
+      "keys": [
+        "mouse"
+      ],
+      "input": null,
+      "preState": "S4b complete; settings open",
+      "observedFields": [
+        "results",
+        "history"
+      ]
+    },
+    {
+      "stepId": "S8",
+      "actionName": "Reset the scheme, then Delete the user scheme",
+      "keys": [
+        "mouse"
+      ],
+      "input": null,
+      "preState": "S5 complete; a user scheme is active",
+      "observedFields": [
+        "results",
+        "focus"
+      ]
+    }
+  ],
+  "idea": {
+    "version": "2026.2.3",
+    "buildNumber": "IU-262.10968.63",
+    "edition": "Ultimate",
+    "os": "Windows 11 (win32)",
+    "sampledAt": "2026-09-24T18:07+08:00",
+    "operator": "user-authorised desktop sampling on the running instance; Cancel only, no keymap*.xml ever written",
+    "settingsSnapshot": {
+      "keymap": "Windows",
+      "theme": "dark (New UI 2026.2)",
+      "customKeymapFile": "none"
+    },
+    "artifacts": [
+      {
+        "path": "qa-ui-auto-report/idea-reference/ed-parity-004/20260924/04-keymap-page.png",
+        "sha256": "a2d74c1ca29642116eef4055c5d28929b0afca62da5757973ab684f4f7839537",
+        "type": "screenshot",
+        "acquisition": "2026-09-24 IDEA 2026.2.3 desktop sampling, real keybd_event/mouse_event input"
+      },
+      {
+        "path": "qa-ui-auto-report/idea-reference/ed-parity-004/20260924/09-shortcut-recorder-open.png",
+        "sha256": "a8dcfbf585da0d08165ace145a20b85458b2c7f0134d9e08caf629ccc90397a0",
+        "type": "screenshot",
+        "acquisition": "2026-09-24 IDEA 2026.2.3 desktop sampling"
+      },
+      {
+        "path": "qa-ui-auto-report/idea-reference/ed-parity-004/20260924/10-conflict-ctrl-f.png",
+        "sha256": "db91f5e93bb914849166626c994091b31af1b5267a0f5426e2ba87a0329c732e",
+        "type": "screenshot",
+        "acquisition": "2026-09-24 IDEA 2026.2.3 desktop sampling, Ctrl+F during recording"
+      },
+      {
+        "path": "qa-ui-auto-report/idea-reference/ed-parity-004/20260924/11-recorder-cancelled.png",
+        "sha256": "7916fe1f5fd36011171ed47ad32a5a20131ea1e45252bbf950ed55b7155eb1c9",
+        "type": "screenshot",
+        "acquisition": "2026-09-24 IDEA 2026.2.3 desktop sampling, recorder Cancel"
+      },
+      {
+        "path": "qa-ui-auto-report/idea-reference/ed-parity-004/20260924/12-settings-cancelled.png",
+        "sha256": "4124b439ffc7b69f6c62f4fdc507815cbbade3efe827444aefea108fa7324959",
+        "type": "screenshot",
+        "acquisition": "2026-09-24 IDEA 2026.2.3 desktop sampling, Settings Cancel"
+      }
+    ],
+    "observations": [
+      {
+        "stepId": "S0",
+        "status": "observed"
+      },
+      {
+        "stepId": "S1",
+        "status": "not-run",
+        "reason": "IDEA 2026-09-24 sampling only ever used the built-in Windows keymap and never pressed Copy; scheme-management labels were not observed."
+      },
+      {
+        "stepId": "S2",
+        "status": "observed"
+      },
+      {
+        "stepId": "S3",
+        "status": "not-run",
+        "reason": "Reference section 5: the sampling was protection-first (Cancel only), so the post-Apply state of the real user keymap was never written or observed."
+      },
+      {
+        "stepId": "S4a",
+        "status": "observed"
+      },
+      {
+        "stepId": "S4b",
+        "status": "not-run",
+        "reason": "Reference section 5: the sampling was protection-first (Cancel only), so the post-Apply state of the real user keymap was never written or observed."
+      },
+      {
+        "stepId": "S5",
+        "status": "observed"
+      },
+      {
+        "stepId": "S8",
+        "status": "not-run",
+        "reason": "Reference section 5: gear-menu Reset/Delete labels and default-scheme deletability were never sampled."
+      }
+    ]
+  },
+  "taomni": {
+    "head": "352ddc61a9f23fe11489111d3ba7d520f91f7d68",
+    "sourceIdentity": {
+      "sourceTreeHash": "a4f935c414ca897dea4b8e7069b401e92621e67cceb46a1786c1225e52739754",
+      "sourceDirty": true
+    },
+    "qaBuildIdentity": "com.taomni.app.qa debug binary sha256:4cb3dc9e8d6176ea970f7c06b418cca07c9052fe2c1961754afb77ebddef58b2 (native_build.py 341.2s, reusable)",
+    "os": "Windows 11 Pro 10.0.26200",
+    "webview": "WebView2 (browser) and WebView2 (native)",
+    "provider": {
+      "id": "none",
+      "version": null
+    },
+    "mode": "browser (5 cases) + native (1 case)",
+    "summary": {
+      "path": "qa-ui-auto-report/ed-parity-004/final/run-20260924-225702-962488200/summary.json",
+      "sha256": "109af87ddfcc91a899b8d6f1de1494910b7486ab44ca58b635db35e1fd203007"
+    },
+    "receipt": {
+      "path": "qa-ui-auto-report/ed-parity-004/final/run-20260924-225702-962488200/runner_receipt.json",
+      "sha256": "0b80b7c4779bc13c16672054ad662c31701d2b45b06df97d0106704321a5edb3"
+    },
+    "observations": [
+      {
+        "stepId": "S0",
+        "status": "observed"
+      },
+      {
+        "stepId": "S1",
+        "status": "observed"
+      },
+      {
+        "stepId": "S2",
+        "status": "observed"
+      },
+      {
+        "stepId": "S3",
+        "status": "observed"
+      },
+      {
+        "stepId": "S4a",
+        "status": "observed"
+      },
+      {
+        "stepId": "S4b",
+        "status": "observed"
+      },
+      {
+        "stepId": "S5",
+        "status": "observed"
+      },
+      {
+        "stepId": "S8",
+        "status": "observed"
+      }
+    ]
+  },
+  "observations": [
+    {
+      "stepId": "S0",
+      "status": "different",
+      "idea": "Grouped action tree (Editor Actions / Main Menu / ...) with a gear for scheme management and a 'Get more keymaps in Settings | Plugins' link; footer OK | Cancel | Apply with Apply disabled when clean.",
+      "taomni": "Flat filterable action list (text filter) with a scheme select + Copy/Rename/Reset/Delete; footer OK | Cancel | Apply with Apply disabled when the draft is clean.",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2"
+      ]
+    },
+    {
+      "stepId": "S1",
+      "status": "taomni-only",
+      "idea": null,
+      "taomni": "Copy forks the active scheme into a new editable user scheme without changing any binding.",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2"
+      ]
+    },
+    {
+      "stepId": "S2",
+      "status": "different",
+      "idea": "Modal sub-dialog 'Keyboard Shortcut' with the action's full menu path, a first-stroke field plus '+', an independent 'Second stroke:' checkbox/field, and an always-present warning area.",
+      "taomni": "Inline recorder docked at the bottom of the Keymap dialog: recorded stroke chips, a live conflict area and OK/Cancel; up to two strokes in one field with Backspace to step back.",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2"
+      ]
+    },
+    {
+      "stepId": "S3",
+      "status": "taomni-only",
+      "idea": null,
+      "taomni": "Apply is the only commit edge: the draft is written to per-profile localStorage and pushed to the live host; the new chord executes Replace and the old Ctrl+R stops matching.",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2",
+        "ED-PARITY-004-A1"
+      ]
+    },
+    {
+      "stepId": "S4a",
+      "status": "matched",
+      "idea": "Inline advisory warning inside the recorder: warning glyph plus 'Already assigned to:' listing every holder with its menu path, scrollable; OK stays enabled; Cancel discards with no change.",
+      "taomni": "Inline advisory warning inside the recorder: warning glyph plus 'Already assigned to:' listing every holder as 'Title (action-id)' in a scrollable area; OK stays enabled; Cancel discards the capture, the draft and live binding are unchanged and Ctrl+F still runs Find.",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2",
+        "ED-PARITY-004-A1"
+      ]
+    },
+    {
+      "stepId": "S4b",
+      "status": "taomni-only",
+      "idea": null,
+      "taomni": "Confirming the contested chord and applying leaves exactly one owner: editor.replace keeps Ctrl+F, editor.find visibly loses it, and the live dispatcher runs Replace on Ctrl+F.",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2",
+        "ED-PARITY-004-A1"
+      ]
+    },
+    {
+      "stepId": "S5",
+      "status": "matched",
+      "idea": "Settings Cancel closes the dialog and returns to the baseline; no keymap file is written.",
+      "taomni": "Cancel / Esc / overlay / X all discard the draft: the live effective binding and the stored bytes are unchanged and the previously applied chord still runs.",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2",
+        "ED-PARITY-004-A1"
+      ]
+    },
+    {
+      "stepId": "S8",
+      "status": "taomni-only",
+      "idea": null,
+      "taomni": "Reset restores base inheritance and applies; Delete removes the user scheme, the select returns to the default entry, and editing is possible again.",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2",
+        "ED-PARITY-004-A3"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "field": "keymap.listPresentation",
+      "ideaValue": "grouped action tree with per-group headers and a scheme gear",
+      "taomniValue": "flat list with a text filter and a scheme select",
+      "classification": "confirmed-gap",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2"
+      ],
+      "explanation": "IDEA groups actions and offers scheme management through a gear. Taomni keeps a single filterable list; the group hierarchy is not modelled.",
+      "disposition": "accepted-difference: the grouped tree is a wider capability than this card's rebind/conflict/cancel/apply sequence; not built."
+    },
+    {
+      "field": "keymap.recorder.shape",
+      "ideaValue": "modal sub-dialog with an independent 'Second stroke' field",
+      "taomniValue": "inline recorder with up to two strokes in one field",
+      "classification": "confirmed-gap",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2"
+      ],
+      "explanation": "IDEA makes the second chord stroke a separate first-class field; Taomni records both strokes in one capture and uses Backspace to step back.",
+      "disposition": "accepted-difference: functionally equivalent for one- and two-stroke chords; a second independent field was not built."
+    },
+    {
+      "field": "keymap.conflict.holderIdentity",
+      "ideaValue": "holder action plus its menu path, e.g. 'in Plugins | Markdown'",
+      "taomniValue": "holder title plus its action id, e.g. 'Find in File (editor.find)'",
+      "classification": "environment",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2"
+      ],
+      "explanation": "Taomni's action catalog has no menu-path hierarchy, so the id carries the locating role the menu path plays in IDEA.",
+      "disposition": "accepted-difference: structural, follows from the action model rather than from the conflict logic."
+    },
+    {
+      "field": "keymap.bindingChips",
+      "ideaValue": "multiple right-aligned keycap chips per binding, multiple bindings joined by 'or', empty when unbound",
+      "taomniValue": "one monospace pill per binding, 'no shortcut' when unbound",
+      "classification": "confirmed-gap",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2"
+      ],
+      "explanation": "IDEA renders Ctrl and R as separate keycaps and right-aligns them; Taomni renders a single pill adjacent to the title and shows an explicit placeholder.",
+      "disposition": "accepted-difference: recorded as a presentation gap; the card's functional contract of which chord owns what is unaffected."
+    },
+    {
+      "field": "keymap.applyAfterState",
+      "ideaValue": "not observed",
+      "taomniValue": "observed: one owner per chord, previous holder visibly loses it",
+      "classification": "environment",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2",
+        "ED-PARITY-004-A1"
+      ],
+      "explanation": "The 2026-09-24 IDEA sampling was protection-first (Cancel only), so the post-Apply side of the target has no observed anchor. The Taomni side is proven by TC-IDE-PARITY-004-02 and -04.",
+      "disposition": "gap-registered: re-sample on an isolated IDEA config instance per reference 6.1/6.2 before claiming a two-sided match."
+    },
+    {
+      "field": "keymap.schemeNames",
+      "ideaValue": "real scheme name 'Windows'",
+      "taomniValue": "fixed label 'IDEA defaults (default)'",
+      "classification": "confirmed-gap",
+      "linkedAcceptance": [
+        "ED-PARITY-004-A2"
+      ],
+      "explanation": "P0 already recorded that the Taomni label is not a real scheme name.",
+      "disposition": "out-of-scope-carried: pre-existing, not introduced or worsened by this card."
+    }
+  ],
+  "verdict": {
+    "state": "unverified",
+    "reason": "The 2026-09-24 IDEA sampling was protection-first (Cancel only), so S1/S3/S4b/S8 were never run on the IDEA side and the two-sided comparison is incomplete; compare_idea.py therefore computes 'unverified' rather than 'different' or 'matched'. Within the steps that WERE observed on both sides, the functional conflict/cancel contract (S4a) and the no-persistence-on-cancel contract (S5) match, while the Keymap page and recorder presentations genuinely differ (flat filtered list vs grouped tree; inline recorder vs modal sub-dialog; single pill vs keycap chips) and are recorded in deltas. The Taomni side of every step, including the unobserved IDEA ones, is proven by TC-IDE-C1-01, TC-IDE-PARITY-004-01..04 and the unit suite."
+  },
+  "ceiling": {
+    "capability": "Keymap rebind to conflict warning to cancel/apply to reopen for a single existing action, plus the retained reset/delete/input-protection behaviour",
+    "fixture": "F0-equivalent plain-text workspace, no provider",
+    "provider": "none",
+    "platform": "Windows 11 / WebView2 (browser + native). macOS and Linux unverified.",
+    "level": "L2"
+  },
+  "artifacts": [
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-004/20260924/04-keymap-page.png",
+      "sha256": "a2d74c1ca29642116eef4055c5d28929b0afca62da5757973ab684f4f7839537",
+      "type": "screenshot",
+      "acquisition": "2026-09-24 IDEA 2026.2.3 desktop sampling, real keybd_event/mouse_event input"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-004/20260924/09-shortcut-recorder-open.png",
+      "sha256": "a8dcfbf585da0d08165ace145a20b85458b2c7f0134d9e08caf629ccc90397a0",
+      "type": "screenshot",
+      "acquisition": "2026-09-24 IDEA 2026.2.3 desktop sampling"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-004/20260924/10-conflict-ctrl-f.png",
+      "sha256": "db91f5e93bb914849166626c994091b31af1b5267a0f5426e2ba87a0329c732e",
+      "type": "screenshot",
+      "acquisition": "2026-09-24 IDEA 2026.2.3 desktop sampling, Ctrl+F during recording"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-004/20260924/11-recorder-cancelled.png",
+      "sha256": "7916fe1f5fd36011171ed47ad32a5a20131ea1e45252bbf950ed55b7155eb1c9",
+      "type": "screenshot",
+      "acquisition": "2026-09-24 IDEA 2026.2.3 desktop sampling, recorder Cancel"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/ed-parity-004/20260924/12-settings-cancelled.png",
+      "sha256": "4124b439ffc7b69f6c62f4fdc507815cbbade3efe827444aefea108fa7324959",
+      "type": "screenshot",
+      "acquisition": "2026-09-24 IDEA 2026.2.3 desktop sampling, Settings Cancel"
+    },
+    {
+      "path": "qa-ui-auto-report/ed-parity-004/final/run-20260924-225702-962488200/TC-IDE-C1-01/tc-ide-c1-recorded.png",
+      "sha256": "9283622a0126fa4819e6e727ddfab9ef216b7336b8234b7197b4b39661e81874",
+      "type": "screenshot",
+      "acquisition": "qa-ui-auto browser runner, TC-IDE-C1-01 step 37"
+    },
+    {
+      "path": "qa-ui-auto-report/ed-parity-004/final/run-20260924-225702-962488200/TC-IDE-PARITY-004-02/tc-ide-parity-004-02-conflict.png",
+      "sha256": "100e77141b354d622ab847098293293900625546eb8f0ffa197edfd267586656",
+      "type": "screenshot",
+      "acquisition": "qa-ui-auto browser runner, TC-IDE-PARITY-004-02 step 53"
+    },
+    {
+      "path": "qa-ui-auto-report/ed-parity-004/final/run-20260924-225702-962488200/TC-IDE-PARITY-004-02/tc-ide-parity-004-02-reassigned.png",
+      "sha256": "01f230c31890feac5532686f646a6156a8b2983ef2ab12892f679eddfb963c47",
+      "type": "screenshot",
+      "acquisition": "qa-ui-auto browser runner, TC-IDE-PARITY-004-02 step 91"
+    },
+    {
+      "path": "qa-ui-auto-report/ed-parity-004/native/run-20260924-225629-154181200/TC-IDE-PARITY-004-04/tc-ide-parity-004-04-after-restart.png",
+      "sha256": "cf404663bd620b05b566f1da5de3474427145a2b5f7814a59d67424e25de6fa2",
+      "type": "screenshot",
+      "acquisition": "qa-ui-auto native runner (packaged com.taomni.app.qa), after reload_window"
+    }
+  ],
+  "notes": [
+    "The comparison is two-sided only for S0/S2/S4a/S5; S1/S3/S4b/S8 are taomni-only because the 2026-09-24 IDEA sampling was protection-first and never pressed OK/Apply/Copy/Delete.",
+    "Visual and interaction conclusions for A2.2/A2.3 are carried in the deltas array; the per-step status is the functional comparison.",
+    "Pixel/font/DPI comparability is explicitly not claimed: the IDEA capture is a scaled screenshot and Taomni ran in a light-theme browser context.",
+    "Re-sampling the post-Apply and scheme-management states on an isolated IDEA config instance (reference 6.1/6.2) is required before any 'matched' verdict is issued."
+  ]
+}
