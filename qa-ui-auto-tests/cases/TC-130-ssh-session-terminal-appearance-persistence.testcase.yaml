@@ -64,6 +64,7 @@ steps:
     name: value
     equals: '15'
 - click: 'button[aria-label="Increase text size"]'
+- wait: 0.5
 - assert_attribute:
     selector: 'input[aria-label="Terminal font size"]'
     name: value
@@ -191,22 +192,22 @@ verification:
     - 21
     - 23
     - 26
-    - 28
-    - 30
+    - 29
     - 31
-    - 33
-    - 35
-    - 37
+    - 32
+    - 34
+    - 36
     - 38
-    - 41
+    - 39
     - 42
-    - 44
-    - 46
+    - 43
+    - 45
     - 47
-    - 49
+    - 48
     - 50
-    - 52
+    - 51
     - 53
+    - 54
     checkpoints:
     - step: 12
       expectation: '{"assert_visible": "[data-testid=\"terminal-appearance-settings\"]"}'
@@ -222,43 +223,43 @@ verification:
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
     - step: 25
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "15"}}'
-    - step: 27
+    - step: 28
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
-    - step: 29
+    - step: 30
       expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
-    - step: 32
+    - step: 33
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "12000"}}'
-    - step: 34
+    - step: 35
       expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (steady)"}}'
-    - step: 36
+    - step: 37
       expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Paste clipboard"}}'
-    - step: 39
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
     - step: 40
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
-    - step: 43
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "2500"}}'
-    - step: 48
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-terminal-appearance\"]"}'
-    - step: 51
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 53
-      expectation: '{"wait_for": "[data-testid=\"terminal-settings\"]"}'
-    - step: 54
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
-    - step: 55
-      expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
-    - step: 56
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "12000"}}'
-    - step: 57
-      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (steady)"}}'
-    - step: 58
-      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Paste clipboard"}}'
-    - step: 59
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
-    - step: 60
+    - step: 41
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
+    - step: 44
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "2500"}}'
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-terminal-appearance\"]"}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"terminal-settings\"]"}'
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
+    - step: 56
+      expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "12000"}}'
+    - step: 58
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (steady)"}}'
+    - step: 59
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Paste clipboard"}}'
+    - step: 60
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
     - step: 61
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
+    - step: 62
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "2500"}}'
     results:
     - 12
@@ -268,17 +269,16 @@ verification:
     - 19
     - 22
     - 25
-    - 27
-    - 29
-    - 32
-    - 34
-    - 36
-    - 39
+    - 28
+    - 30
+    - 33
+    - 35
+    - 37
     - 40
-    - 43
-    - 48
-    - 51
-    - 53
+    - 41
+    - 44
+    - 49
+    - 52
     - 54
     - 55
     - 56
@@ -287,6 +287,7 @@ verification:
     - 59
     - 60
     - 61
+    - 62
   visual:
   - check: The embedded terminal appearance controls and preview remain readable without clipping or overlap.
     method: manual
