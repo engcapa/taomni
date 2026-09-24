@@ -1,0 +1,224 @@
+id: TC-137
+title: SSH proxy kind validation and system proxy state hide manual fields correctly
+covers:
+- F6.3
+- F6.2
+tags:
+- ssh
+- session
+- settings
+- proxy
+- validation
+- persistence
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-ssh"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh-proxy-kind-state.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '2222'
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa-proxy-kind-state
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: http
+- assert_visible: 'input[aria-label="Proxy host"]'
+- click: '[data-testid="session-save-as-proxy-session"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: Proxy host is required
+- fill:
+    selector: 'input[aria-label="Proxy host"]'
+    value: proxy-validation.example.test
+- fill:
+    selector: 'input[aria-label="Proxy port"]'
+    value: '3128'
+- click: '[data-testid="session-save-as-proxy-session"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: Proxy session saved
+- wait_for: '[data-testid="session-tree-item"][data-session-name="HTTP proxy-validation.example.test:3128"]'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: system
+- assert_attribute:
+    selector: '[data-testid="session-proxy-kind"]'
+    name: value
+    equals: system
+- assert_not_visible: 'input[aria-label="Proxy host"]'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: none
+- assert_attribute:
+    selector: '[data-testid="session-proxy-kind"]'
+    name: value
+    equals: none
+- assert_not_visible: 'input[aria-label="Proxy host"]'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: socks5
+- assert_visible: 'input[aria-label="Proxy host"]'
+- fill:
+    selector: 'input[aria-label="Proxy host"]'
+    value: socks5-validation.example.test
+- fill:
+    selector: 'input[aria-label="Proxy port"]'
+    value: '1080'
+- assert_attribute:
+    selector: 'input[aria-label="Proxy host"]'
+    name: value
+    equals: socks5-validation.example.test
+- assert_attribute:
+    selector: 'input[aria-label="Proxy port"]'
+    name: value
+    equals: '1080'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: system
+- assert_not_visible: 'input[aria-label="Proxy host"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-ssh-system-proxy-state
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-system-proxy-state"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-system-proxy-state"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- assert_attribute:
+    selector: '[data-testid="session-proxy-kind"]'
+    name: value
+    equals: system
+- assert_not_visible: 'input[aria-label="Proxy host"]'
+- click: '[data-testid="session-cancel"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+- screenshot: 137-ssh-proxy-kind-state.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SSH proxy save reports a required-host validation error, saves a valid reusable proxy session, and switching HTTP/SOCKS5/system/none exposes or hides the matching manual fields; the system choice persists after reopen.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 14
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 24
+    - 27
+    - 29
+    - 30
+    - 33
+    - 35
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 43
+    - 45
+    - 47
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Proxy host is required"}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Proxy session saved"}}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"HTTP proxy-validation.example.test:3128\"]"}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "system"}}'
+    - step: 23
+      expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "none"}}'
+    - step: 26
+      expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 28
+      expectation: '{"assert_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "socks5-validation.example.test"}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy port\"]", "name": "value", "equals": "1080"}}'
+    - step: 34
+      expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-system-proxy-state\"]"}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "system"}}'
+    - step: 46
+      expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 48
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 13
+    - 15
+    - 19
+    - 20
+    - 22
+    - 23
+    - 25
+    - 26
+    - 28
+    - 31
+    - 32
+    - 34
+    - 39
+    - 42
+    - 44
+    - 45
+    - 46
+    - 48
+  visual:
+  - check: Proxy kind transitions and validation feedback remain readable without clipping.
+    method: manual
+    reason: Functional assertions do not assess layout.
+  native:
+  - check: Proxy transport is outside this renderer state case; no external proxy connection is claimed.
+    method: external
+    reason: The case verifies UI validation, state transitions, and persistence only.
