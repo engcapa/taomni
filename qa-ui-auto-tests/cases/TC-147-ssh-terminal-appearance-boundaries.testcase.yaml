@@ -42,53 +42,27 @@ steps:
 - fill:
     selector: 'input[aria-label="Terminal font size"]'
     value: '4'
-- press:
-    selector: 'input[aria-label="Terminal font size"]'
-    key: Tab
-- assert_attribute:
-    selector: 'input[aria-label="Terminal font size"]'
-    name: value
-    equals: '8'
+- click: '[data-testid="terminal-preview"]'
+- wait_for: 'input[aria-label="Terminal font size"][value="8"]'
 - fill:
     selector: 'input[aria-label="Terminal font size"]'
     value: '40'
-- press:
-    selector: 'input[aria-label="Terminal font size"]'
-    key: Tab
-- assert_attribute:
-    selector: 'input[aria-label="Terminal font size"]'
-    name: value
-    equals: '32'
+- click: '[data-testid="terminal-preview"]'
+- wait_for: 'input[aria-label="Terminal font size"][value="32"]'
 - click: 'button[aria-label="Decrease text size"]'
-- assert_attribute:
-    selector: 'input[aria-label="Terminal font size"]'
-    name: value
-    equals: '31'
+- wait_for: 'input[aria-label="Terminal font size"][value="31"]'
 - click: 'button[aria-label="Increase text size"]'
-- assert_attribute:
-    selector: 'input[aria-label="Terminal font size"]'
-    name: value
-    equals: '32'
+- wait_for: 'input[aria-label="Terminal font size"][value="32"]'
 - fill:
     selector: 'input[aria-label="Scrollback lines"]'
     value: '99'
-- press:
-    selector: 'input[aria-label="Scrollback lines"]'
-    key: Tab
-- assert_attribute:
-    selector: 'input[aria-label="Scrollback lines"]'
-    name: value
-    equals: '100'
+- click: '[data-testid="terminal-preview"]'
+- wait_for: 'input[aria-label="Scrollback lines"][value="100"]'
 - fill:
     selector: 'input[aria-label="Scrollback lines"]'
     value: '200001'
-- press:
-    selector: 'input[aria-label="Scrollback lines"]'
-    key: Tab
-- assert_attribute:
-    selector: 'input[aria-label="Scrollback lines"]'
-    name: value
-    equals: '200000'
+- click: '[data-testid="terminal-preview"]'
+- wait_for: 'input[aria-label="Scrollback lines"][value="200000"]'
 - select_option:
     selector: 'select[aria-label="Terminal cursor"]'
     label: Block (blink)
@@ -235,17 +209,17 @@ verification:
     - step: 13
       expectation: '{"assert_visible": "[data-testid=\"terminal-preview\"]"}'
     - step: 16
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "8"}}'
+      expectation: '{"wait_for": "input[aria-label=\"Terminal font size\"][value=\"8\"]"}'
     - step: 19
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "32"}}'
+      expectation: '{"wait_for": "input[aria-label=\"Terminal font size\"][value=\"32\"]"}'
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "31"}}'
+      expectation: '{"wait_for": "input[aria-label=\"Terminal font size\"][value=\"31\"]"}'
     - step: 23
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "32"}}'
+      expectation: '{"wait_for": "input[aria-label=\"Terminal font size\"][value=\"32\"]"}'
     - step: 26
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "100"}}'
+      expectation: '{"wait_for": "input[aria-label=\"Scrollback lines\"][value=\"100\"]"}'
     - step: 29
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "200000"}}'
+      expectation: '{"wait_for": "input[aria-label=\"Scrollback lines\"][value=\"200000\"]"}'
     - step: 31
       expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Block (blink)"}}'
     - step: 33
