@@ -45,9 +45,7 @@ steps:
     value: qa-ui-auto-ssh-attached-sftp
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-attached-sftp"]'
-- open_session:
-    name: qa-ui-auto-ssh-attached-sftp
-    double_click: true
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-attached-sftp"]'
 - auth: ${env.QA_SSH_PASSWORD}
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
