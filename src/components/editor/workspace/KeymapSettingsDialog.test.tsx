@@ -323,6 +323,23 @@ describe("ED-PARITY-004 DEC-02/03/04 draft, conflict warning and Apply boundary"
     expect((screen.getByTestId("keymap-settings-apply") as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("IDEA interaction: Apply commits while keeping Settings open; OK closes it", () => {
+    const scheme = createKeymapScheme({ id: "s1", name: "User", base: "idea-windows-linux", now: 1 });
+    const { onApplyScheme, onClose } = renderDialog(keymapFixture(scheme), scheme);
+
+    fireEvent.click(screen.getByTestId("keymap-add-editor.replace"));
+    key("r", { altKey: true, shiftKey: true });
+    key("Enter");
+    fireEvent.click(screen.getByTestId("keymap-settings-apply"));
+
+    expect(onApplyScheme).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId("workspace-keymap-settings-dialog")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("keymap-settings-ok"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("A1.2: Esc, the overlay and the X button are all zero-write Cancel paths", () => {
     const scheme = createKeymapScheme({ id: "s1", name: "User", base: "idea-windows-linux", now: 1 });
     const { onApplyScheme, onSchemesChange, onActiveSchemeChange, onClose } = renderDialog(keymapFixture(scheme), scheme);
