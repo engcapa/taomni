@@ -1,0 +1,156 @@
+id: TC-145
+title: SSH attached SFTP toggles closed and reopened without losing the live terminal
+covers:
+- F3.1
+- F7.1
+- F7.2
+- F7.4
+- F2.2
+tags:
+- ssh
+- sftp
+- attached
+- terminal
+- lifecycle
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+- sftp_required
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- wait_for:
+    selector: '[data-testid="sftp-remote-list"] tbody tr'
+    timeout_sec: 30
+- assert_visible: '[data-testid="sftp-remote-pane"]'
+- assert_visible: '[data-testid="sftp-local-pane"]'
+- assert_visible: '[data-testid="sftp-transfer-queue"]'
+- assert_attribute:
+    selector: '[data-testid="terminal-pane"]'
+    name: data-terminal-ready
+    equals: 'true'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for:
+    selector: '[data-testid="sftp-browser"]'
+    state: detached
+- assert_attribute:
+    selector: '[data-testid="terminal-pane"]'
+    name: data-terminal-ready
+    equals: 'true'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf 'qa-ssh-after-sftp-close\n'
+    submit: true
+- wait: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-ssh\-after\-sftp\-close\r?$
+    timeout_sec: 20
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- wait_for:
+    selector: '[data-testid="sftp-remote-list"] tbody tr'
+    timeout_sec: 30
+- assert_attribute:
+    selector: '[data-testid="terminal-pane"]'
+    name: data-terminal-ready
+    equals: 'true'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for:
+    selector: '[data-testid="sftp-browser"]'
+    state: detached
+- screenshot: 145-ssh-attached-sftp-toggle.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: An authenticated SSH terminal opens its attached SFTP browser, exposes both panes and the transfer queue, closes the browser without disconnecting, accepts a command while closed, and reopens and closes the browser again with the terminal still ready.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 9
+    - 11
+    - 18
+    - 21
+    - 24
+    - 28
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 10
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 13
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
+    - step: 19
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
+    - step: 23
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-sftp\\-close\\r?$", "timeout_sec": 20}}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 26
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
+    - step: 27
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
+    results:
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 19
+    - 20
+    - 23
+    - 25
+    - 27
+    - 29
+  visual:
+  - check: Attached SFTP panes, transfer queue, and terminal remain readable across open/close transitions.
+    method: manual
+    reason: DOM assertions do not establish split-pane sizing or visual continuity.
+  native:
+  - check: Native runs verify the packaged SSH terminal remains connected while the attached SFTP panel is mounted and unmounted.
+    method: automated
+    reason: Browser VFS behavior cannot prove native SSH/SFTP lifecycle wiring.

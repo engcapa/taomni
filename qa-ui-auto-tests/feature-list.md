@@ -808,6 +808,10 @@ controls:
     selector: 'text="Read-only terminal"'
     kind: interactive
     optional: true
+  - id: read-only-state
+    selector: '[data-testid="terminal-read-only"]'
+    kind: display
+    optional: true
   - id: scrollbar-toggle
     selector: 'text="Toggle terminal scrollbar"'
     kind: interactive

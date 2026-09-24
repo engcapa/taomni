@@ -1,0 +1,245 @@
+id: TC-143
+title: SSH terminal display actions change input, layout, and event-log state
+covers:
+- F3.1
+- F4.2
+- F4.7
+- F2.2
+tags:
+- ssh
+- terminal
+- display
+- event-log
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf 'qa-ssh-display-before\n'
+    submit: true
+- wait: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-ssh\-display\-before\r?$
+    timeout_sec: 15
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- hover: text="Terminal display"
+- click: text="Read-only terminal"
+- wait_for: '[data-testid="terminal-read-only"]'
+- click: '[data-testid="terminal-pane"]'
+- type: qa-ssh-read-only-blocked
+- wait: 1
+- assert_attribute:
+    selector: '[data-testid="terminal-pane"]'
+    name: data-terminal-text
+    matches: '(?s)(?!.*qa-ssh-read-only-blocked).*'
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- hover: text="Terminal display"
+- click: text="Read-only terminal"
+- wait_for:
+    selector: '[data-testid="terminal-read-only"]'
+    state: detached
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf 'qa-ssh-display-after-read-only\n'
+    submit: true
+- wait: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-ssh\-display\-after\-read\-only\r?$
+    timeout_sec: 15
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- hover: text="Terminal display"
+- click: text="Toggle terminal scrollbar"
+- assert_attribute:
+    selector: '[data-testid="terminal-pane"]'
+    name: class
+    matches: '.*terminal-hide-scrollbar.*'
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- hover: text="Terminal display"
+- click: text="Toggle terminal scrollbar"
+- assert_attribute:
+    selector: '[data-testid="terminal-pane"]'
+    name: class
+    matches: '(?!.*terminal-hide-scrollbar).*'
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- hover: text="Terminal display"
+- click: text="Fullscreen terminal"
+- assert_attribute:
+    selector: '[data-testid="terminal-pane"]'
+    name: class
+    matches: '.*fixed.*inset-0.*'
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- hover: text="Terminal display"
+- click: text="Fullscreen terminal"
+- assert_attribute:
+    selector: '[data-testid="terminal-pane"]'
+    name: class
+    matches: '(?!.*fixed.*inset-0).*'
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+    position:
+      x: 24
+      y: 24
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="context-menu-item-event-log"]'
+- wait_for: text="Event Log"
+- assert_visible: '[data-testid="terminal-pane"] >> text="connection"'
+- assert_visible: '[data-testid="terminal-pane"] >> text="auth"'
+- click: '[data-testid="terminal-pane"] button:has-text("Close")'
+- wait_for:
+    selector: '[data-testid="terminal-pane"] >> text="Event Log"'
+    state: detached
+- screenshot: 143-ssh-terminal-display-event-log.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 'SSH terminal display actions produce observable state changes: read-only blocks input and can be reversed, scrollbar and fullscreen classes toggle in both directions, and the event log exposes connection/auth records and closes.'
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 9
+    - 12
+    - 15
+    - 17
+    - 18
+    - 20
+    - 21
+    - 24
+    - 26
+    - 27
+    - 29
+    - 32
+    - 34
+    - 35
+    - 37
+    - 39
+    - 40
+    - 42
+    - 44
+    - 45
+    - 47
+    - 49
+    - 50
+    - 52
+    - 54
+    - 58
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 14
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-before\\r?$", "timeout_sec": 15}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"terminal-read-only\"]"}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-text", "matches": "(?s)(?!.*qa-ssh-read-only-blocked).*"}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-read-only\"]", "state": "detached"}}'
+    - step: 31
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-after\\-read\\-only\\r?$", "timeout_sec": 15}}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "class", "matches": ".*terminal-hide-scrollbar.*"}}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "class", "matches": "(?!.*terminal-hide-scrollbar).*"}}'
+    - step: 46
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "class", "matches": ".*fixed.*inset-0.*"}}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "class", "matches": "(?!.*fixed.*inset-0).*"}}'
+    - step: 55
+      expectation: '{"wait_for": "text=\"Event Log\""}'
+    - step: 56
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"] >> text=\"connection\""}'
+    - step: 57
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"] >> text=\"auth\""}'
+    - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"] >> text=\"Event Log\"", "state": "detached"}}'
+    results:
+    - 14
+    - 19
+    - 23
+    - 28
+    - 31
+    - 36
+    - 41
+    - 46
+    - 51
+    - 55
+    - 56
+    - 57
+    - 59
+  visual:
+  - check: SSH terminal display menu, badges, fullscreen state, and event-log contents remain readable without clipping.
+    method: manual
+    reason: DOM state assertions do not establish menu placement or visual density.
+  native:
+  - check: Native runs use the hosted SSH service and exercise the packaged terminal input and WebView menu wiring.
+    method: automated
+    reason: Browser stubs cannot establish native SSH terminal and input behavior.

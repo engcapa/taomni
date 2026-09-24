@@ -1478,6 +1478,7 @@
 - `[data-testid="context-menu-item-appearance"]` — interactive [optional] — F4.2.appearance
 - `text="Terminal display"` — interactive [optional] — F4.2.terminal-display
 - `text="Read-only terminal"` — interactive [optional] — F4.2.read-only-toggle
+- `[data-testid="terminal-read-only"]` — display [optional] — F4.2.read-only-state
 - `text="Toggle terminal scrollbar"` — interactive [optional] — F4.2.scrollbar-toggle
 - `text="Fullscreen terminal"` — interactive [optional] — F4.2.fullscreen-toggle
 
