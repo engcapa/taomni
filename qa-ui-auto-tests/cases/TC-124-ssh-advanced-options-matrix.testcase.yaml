@@ -79,24 +79,24 @@ steps:
     selector: 'input[aria-label="Execute command"]'
     value: printf 'qa-advanced-command\n'
 - set_check:
-    selector: 'label:has-text("Do not exit after command ends") input[type="checkbox"]'
+    selector: '[data-testid="session-do-not-exit"]'
     checked: false
 - assert_attribute:
-    selector: 'label:has-text("Do not exit after command ends") input[type="checkbox"]'
+    selector: '[data-testid="session-do-not-exit"]'
     name: data-checked
     equals: 'false'
-- click: 'label:has-text("Use private key") input[type="radio"]'
+- click: '[data-testid="session-auth-privatekey"]'
 - assert_enabled: 'input[aria-label="Private key path"]'
 - fill:
     selector: 'input[aria-label="Private key path"]'
     value: /home/qauser/.ssh/id_ed25519
-- click: 'label:has-text("ssh-agent / Pageant") input[type="radio"]'
+- click: '[data-testid="session-auth-agent"]'
 - assert_disabled: 'input[aria-label="Private key path"]'
-- click: 'label:has-text("GSSAPI (Kerberos)") input[type="radio"]'
+- click: '[data-testid="session-auth-gssapi"]'
 - assert_count:
-    selector: 'label:has-text("GSSAPI (Kerberos)") input[type="radio"]:checked'
+    selector: '[data-testid="session-auth-gssapi"]:checked'
     equal: 1
-- click: 'label:has-text("Password / keyboard-interactive") input[type="radio"]'
+- click: '[data-testid="session-auth-password"]'
 - assert_attribute:
     selector: 'input[aria-label="SSH password"]'
     name: type
@@ -104,9 +104,9 @@ steps:
 - set_check:
     selector: '[data-testid="session-save-in-vault"]'
     checked: false
-- click: 'label:has-text("Use private key") input[type="radio"]'
+- click: '[data-testid="session-auth-privatekey"]'
 - set_check:
-    selector: 'label:has-text("Do not exit after command ends") input[type="checkbox"]'
+    selector: '[data-testid="session-do-not-exit"]'
     checked: false
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
@@ -133,11 +133,11 @@ steps:
     name: value
     equals: printf 'qa-advanced-command\n'
 - assert_attribute:
-    selector: 'label:has-text("Do not exit after command ends") input[type="checkbox"]'
+    selector: '[data-testid="session-do-not-exit"]'
     name: data-checked
     equals: 'false'
 - assert_count:
-    selector: 'label:has-text("Use private key") input[type="radio"]:checked'
+    selector: '[data-testid="session-auth-privatekey"]:checked'
     equal: 1
 - assert_attribute:
     selector: 'input[aria-label="Private key path"]'
@@ -210,9 +210,9 @@ verification:
     - step: 52
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-advanced-command\\n''"}}'
     - step: 53
-      expectation: '{"assert_attribute": {"selector": "label:has-text(\"Do not exit after command ends\") input[type=\"checkbox\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
     - step: 54
-      expectation: '{"assert_count": {"selector": "label:has-text(\"Use private key\") input[type=\"radio\"]:checked", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked", "equal": 1}}'
     - step: 55
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/id_ed25519"}}'
     results:

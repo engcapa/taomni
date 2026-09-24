@@ -105,7 +105,7 @@ steps:
 - set_check:
     selector: '[data-testid="session-proxy-save-auth"]'
     checked: false
-- click: 'button:has-text("Save as Proxy Session")'
+- click: '[data-testid="session-save-as-proxy-session"]'
 - assert_text:
     selector: '[data-testid="session-test-result-summary"]'
     contains: Proxy session saved
@@ -144,17 +144,17 @@ steps:
 - select_option:
     selector: '[data-testid="network-settings"] > div:nth-of-type(8) select'
     value: PrivateKey
-- assert_visible: 'input[aria-label="Jump key path"]'
-- assert_not_visible: 'input[aria-label="Jump password"]'
+- assert_visible: '[data-testid="session-jump-key"]'
+- assert_not_visible: '[data-testid="session-jump-password"]'
 - fill:
-    selector: 'input[aria-label="Jump key path"]'
+    selector: '[data-testid="session-jump-key"]'
     value: /home/qauser/.ssh/jump_ed25519
 - select_option:
     selector: '[data-testid="network-settings"] > div:nth-of-type(8) select'
     value: Password
-- assert_visible: 'input[aria-label="Jump password"]'
+- assert_visible: '[data-testid="session-jump-password"]'
 - fill:
-    selector: 'input[aria-label="Jump password"]'
+    selector: '[data-testid="session-jump-password"]'
     value: jump-secret-not-for-storage
 - set_check:
     selector: '[data-testid="session-proxy-save-auth"]'
@@ -187,7 +187,7 @@ steps:
     selector: 'input[aria-label="Jump user"]'
     name: value
     equals: manual-jump-user
-- assert_visible: 'input[aria-label="Jump password"]'
+- assert_visible: '[data-testid="session-jump-password"]'
 - screenshot: 125-ssh-proxy-jump-source-switching.png
 verification:
   review: reviewed
@@ -259,9 +259,9 @@ verification:
     - step: 48
       expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
     - step: 63
-      expectation: '{"assert_visible": "input[aria-label=\"Jump key path\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-key\"]"}'
     - step: 66
-      expectation: '{"assert_visible": "input[aria-label=\"Jump password\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
     - step: 73
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-proxy-jump-switching\"]"}'
     - step: 80
@@ -269,7 +269,7 @@ verification:
     - step: 81
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "manual-jump.example.test"}}'
     - step: 83
-      expectation: '{"assert_visible": "input[aria-label=\"Jump password\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
     results:
     - 38
     - 46

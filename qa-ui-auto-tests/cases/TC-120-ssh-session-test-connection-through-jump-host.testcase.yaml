@@ -45,7 +45,7 @@ steps:
 - wait_for: 'input[aria-label="Jump host"]'
 - assert_visible: 'input[aria-label="Jump port"]'
 - assert_visible: 'input[aria-label="Jump user"]'
-- assert_visible: 'input[aria-label="Jump password"]'
+- assert_visible: '[data-testid="session-jump-password"]'
 - fill:
     selector: 'input[aria-label="Jump host"]'
     value: ${cfg.ssh.host}
@@ -56,7 +56,7 @@ steps:
     selector: 'input[aria-label="Jump user"]'
     value: ${cfg.ssh.user}
 - fill:
-    selector: 'input[aria-label="Jump password"]'
+    selector: '[data-testid="session-jump-password"]'
     value: ${env.QA_SSH_PASSWORD}
 - click: '[data-testid="session-test-connection"]'
 - wait_for: '[data-testid="alert-dialog"]'

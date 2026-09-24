@@ -1119,23 +1119,16 @@
 - `input[aria-label="SSH password"]` — interactive [optional] — F6.3.advanced-ssh-password
 - `[data-testid="session-save-in-vault"]` — interactive [optional] — F6.3.save-in-vault
 - `input[aria-label="Private key path"]` — interactive [optional] — F6.3.advanced-private-key
-- `label:has-text("Do not exit after command ends") input[type="checkbox"]` — interactive — F6.3.advanced-do-not-exit
-- `[data-testid="session-do-not-exit"]` — interactive — F6.3.advanced-do-not-exit-testid
-- `label:has-text("Password / keyboard-interactive") input[type="radio"]` — interactive — F6.3.advanced-auth-password
-- `label:has-text("Use private key") input[type="radio"]` — interactive — F6.3.advanced-auth-private-key
-- `label:has-text("ssh-agent / Pageant") input[type="radio"]` — interactive — F6.3.advanced-auth-agent
-- `label:has-text("GSSAPI (Kerberos)") input[type="radio"]` — interactive — F6.3.advanced-auth-gssapi
-- `label:has-text("Use private key") input[type="radio"]:checked` — display — F6.3.advanced-auth-private-key-checked
-- `label:has-text("GSSAPI (Kerberos)") input[type="radio"]:checked` — display — F6.3.advanced-auth-gssapi-checked
-- `[data-testid="session-auth-password"]` — interactive — F6.3.advanced-auth-password-testid
-- `[data-testid="session-auth-privatekey"]` — interactive — F6.3.advanced-auth-private-key-testid
-- `[data-testid="session-auth-agent"]` — interactive — F6.3.advanced-auth-agent-testid
-- `[data-testid="session-auth-gssapi"]` — interactive — F6.3.advanced-auth-gssapi-testid
+- `[data-testid="session-do-not-exit"]` — interactive — F6.3.advanced-do-not-exit
+- `[data-testid="session-auth-password"]` — interactive — F6.3.advanced-auth-password
+- `[data-testid="session-auth-privatekey"]` — interactive — F6.3.advanced-auth-private-key
+- `[data-testid="session-auth-agent"]` — interactive — F6.3.advanced-auth-agent
+- `[data-testid="session-auth-gssapi"]` — interactive — F6.3.advanced-auth-gssapi
 - `input[aria-label="Jump host"]` — interactive [optional] — F6.3.advanced-jump-host
 - `input[aria-label="Jump user"]` — interactive [optional] — F6.3.advanced-jump-user
 - `input[aria-label="Jump port"]` — interactive [optional] — F6.3.advanced-jump-port
-- `input[aria-label="Jump password"]` — interactive [optional] — F6.3.network-jump-password
-- `input[aria-label="Jump key path"]` — interactive [optional] — F6.3.network-jump-key
+- `[data-testid="session-jump-password"]` — interactive [optional] — F6.3.network-jump-password
+- `[data-testid="session-jump-key"]` — interactive [optional] — F6.3.network-jump-key
 - `[data-testid="session-jump-source"]` — interactive [optional] — F6.3.network-jump-source
 - `[data-testid="session-jump-auth"]` — interactive [optional] — F6.3.network-jump-auth
 - `[data-testid="session-proxy-kind"]` — interactive [optional] — F6.3.network-proxy-kind
@@ -1173,7 +1166,7 @@
 - `[data-testid="session-test-connection"]` — interactive — F6.3.test-connection
 - `[data-testid="session-test-result-summary"]` — display — F6.3.test-result-summary
 - `[data-testid="session-save"]` — interactive — F6.3.save
-- `button:has-text("Save as Proxy Session")` — interactive [optional] — F6.3.save-as-proxy-session
+- `[data-testid="session-save-as-proxy-session"]` — interactive [optional] — F6.3.save-as-proxy-session
 - `button:has-text("Save as template")` — interactive — F6.3.save-as-template
 - `button:has-text("Reset")` — interactive — F6.3.reset
 - `button:has-text("Delete")` — interactive — F6.3.delete

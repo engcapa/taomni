@@ -823,6 +823,7 @@ function ProxyJumpFields({
                   <input
                     className="taomni-input w-64"
                     type="password"
+                    data-testid="session-jump-password"
                     placeholder={t("sessionEditor2.jumpPasswordPlaceholder")}
                     value={value.jumpPassword}
                     aria-label={t("sessionEditor2.jumpPasswordAria")}
@@ -836,6 +837,7 @@ function ProxyJumpFields({
                 <Field label={t("sessionEditor2.fieldJumpKey")}>
                   <input
                     className="taomni-input w-72"
+                    data-testid="session-jump-key"
                     placeholder={t("sessionEditor2.jumpKeyPlaceholder")}
                     value={value.jumpKeyPath}
                     aria-label={t("sessionEditor2.jumpKeyAria")}
@@ -911,6 +913,7 @@ function ProxyJumpFields({
               {onSaveAsProxySession && (
                 <Field label="">
                   <button
+                    data-testid="session-save-as-proxy-session"
                     className="taomni-btn flex items-center gap-1.5"
                     type="button"
                     onClick={onSaveAsProxySession}

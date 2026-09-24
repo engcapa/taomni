@@ -1579,7 +1579,7 @@ controls:
   - id: bookmark-body
     selector: '[data-testid="bookmark-settings"]'
     kind: display
-  # Advanced SSH inputs (aria-label fallback — selectors will fail when label text changes; promote to testids later)
+  # Advanced SSH inputs
   - id: advanced-execute-command
     selector: 'input[aria-label="Execute command"]'
     kind: interactive
@@ -1602,39 +1602,18 @@ controls:
     kind: interactive
     optional: true        # only when authMethod=PrivateKey
   - id: advanced-do-not-exit
-    selector: 'label:has-text("Do not exit after command ends") input[type="checkbox"]'
-    kind: interactive
-  - id: advanced-do-not-exit-testid
     selector: '[data-testid="session-do-not-exit"]'
     kind: interactive
   - id: advanced-auth-password
-    selector: 'label:has-text("Password / keyboard-interactive") input[type="radio"]'
-    kind: interactive
-  - id: advanced-auth-private-key
-    selector: 'label:has-text("Use private key") input[type="radio"]'
-    kind: interactive
-  - id: advanced-auth-agent
-    selector: 'label:has-text("ssh-agent / Pageant") input[type="radio"]'
-    kind: interactive
-  - id: advanced-auth-gssapi
-    selector: 'label:has-text("GSSAPI (Kerberos)") input[type="radio"]'
-    kind: interactive
-  - id: advanced-auth-private-key-checked
-    selector: 'label:has-text("Use private key") input[type="radio"]:checked'
-    kind: display
-  - id: advanced-auth-gssapi-checked
-    selector: 'label:has-text("GSSAPI (Kerberos)") input[type="radio"]:checked'
-    kind: display
-  - id: advanced-auth-password-testid
     selector: '[data-testid="session-auth-password"]'
     kind: interactive
-  - id: advanced-auth-private-key-testid
+  - id: advanced-auth-private-key
     selector: '[data-testid="session-auth-privatekey"]'
     kind: interactive
-  - id: advanced-auth-agent-testid
+  - id: advanced-auth-agent
     selector: '[data-testid="session-auth-agent"]'
     kind: interactive
-  - id: advanced-auth-gssapi-testid
+  - id: advanced-auth-gssapi
     selector: '[data-testid="session-auth-gssapi"]'
     kind: interactive
   - id: advanced-jump-host
@@ -1650,11 +1629,11 @@ controls:
     kind: interactive
     optional: true
   - id: network-jump-password
-    selector: 'input[aria-label="Jump password"]'
+    selector: '[data-testid="session-jump-password"]'
     kind: interactive
     optional: true
   - id: network-jump-key
-    selector: 'input[aria-label="Jump key path"]'
+    selector: '[data-testid="session-jump-key"]'
     kind: interactive
     optional: true
   - id: network-jump-source
@@ -1779,7 +1758,7 @@ controls:
     selector: '[data-testid="session-save"]'
     kind: interactive
   - id: save-as-proxy-session
-    selector: 'button:has-text("Save as Proxy Session")'
+    selector: '[data-testid="session-save-as-proxy-session"]'
     kind: interactive
     optional: true
   - id: save-as-template

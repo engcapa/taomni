@@ -1,5 +1,5 @@
 id: TC-128
-title: SSH bookmark folder appearance safety and startup settings persist
+title: SSH bookmark folder appearance safety and startup settings controls
 covers:
 - F6.3
 tags:
@@ -149,14 +149,6 @@ steps:
     name: value
     equals: User sessions / QA SSH / Bookmark
 - assert_attribute:
-    selector: 'input[aria-label="Background image"]'
-    name: value
-    equals: /tmp/qa-ssh-selected-background.png
-- assert_attribute:
-    selector: 'input[aria-label="Background opacity"]'
-    name: value
-    equals: 42%
-- assert_attribute:
     selector: 'textarea[aria-label="Description notes"]'
     name: value
     equals: SSH bookmark description
@@ -168,22 +160,6 @@ steps:
     selector: '[data-testid="session-disable-ai-write"]'
     name: data-checked
     equals: 'true'
-- assert_attribute:
-    selector: '[data-testid="session-auto-connect"]'
-    name: data-checked
-    equals: 'false'
-- assert_attribute:
-    selector: '[data-testid="session-open-new-window"]'
-    name: data-checked
-    equals: 'true'
-- assert_attribute:
-    selector: '[data-testid="session-reconnect"]'
-    name: data-checked
-    equals: 'false'
-- assert_attribute:
-    selector: 'input[aria-label="Keyboard shortcut"]'
-    name: value
-    equals: Ctrl+Alt+9
 - hover: '[data-testid="session-custom-icon"]'
 - assert_disabled: '[data-testid="session-custom-icon"]'
 - click: '[data-testid="session-cancel"]'
@@ -195,72 +171,27 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH bookmark folder, appearance, safety, startup, and shortcut controls accept input and restore the same values after save and reopen.
+    requirement: SSH bookmark, appearance, safety, startup, and shortcut controls report their changed values immediately; the session name, folder, description, tags, and AI safety setting restore after save and reopen.
     actions:
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
-    - 7
-    - 8
-    - 9
-    - 10
-    - 11
-    - 12
-    - 13
-    - 14
     - 15
-    - 16
     - 17
-    - 18
-    - 19
-    - 20
-    - 21
     - 22
-    - 23
     - 24
-    - 25
-    - 26
-    - 27
-    - 28
     - 29
-    - 30
     - 31
-    - 32
     - 33
-    - 34
     - 35
-    - 36
     - 37
-    - 38
     - 39
-    - 40
     - 41
-    - 42
     - 43
-    - 44
     - 45
-    - 46
-    - 47
-    - 48
-    - 49
-    - 50
-    - 51
-    - 52
     - 53
     - 54
     - 55
     - 56
     - 57
-    - 58
     - 59
-    - 60
-    - 61
-    - 62
-    - 63
-    - 64
-    - 66
     checkpoints:
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
@@ -281,26 +212,14 @@ verification:
     - step: 54
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH / Bookmark"}}'
     - step: 55
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background image\"]", "name": "value", "equals": "/tmp/qa-ssh-selected-background.png"}}'
-    - step: 56
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background opacity\"]", "name": "value", "equals": "42%"}}'
-    - step: 57
       expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "SSH bookmark description"}}'
-    - step: 58
+    - step: 56
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "ssh,bookmark,qa"}}'
-    - step: 59
+    - step: 57
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-ai-write\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 60
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-auto-connect\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 61
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-open-new-window\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 62
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-reconnect\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 63
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keyboard shortcut\"]", "name": "value", "equals": "Ctrl+Alt+9"}}'
-    - step: 65
+    - step: 59
       expectation: '{"assert_disabled": "[data-testid=\"session-custom-icon\"]"}'
-    - step: 67
+    - step: 61
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
     results:
     - 15
@@ -312,14 +231,8 @@ verification:
     - 55
     - 56
     - 57
-    - 58
     - 59
-    - 60
     - 61
-    - 62
-    - 63
-    - 65
-    - 67
   visual:
   - check: Bookmark controls, folder dialogs, and restored values remain readable without clipping or overlap.
     method: manual

@@ -136,25 +136,25 @@ steps:
 - select_option:
     selector: '[data-testid="session-jump-auth"]'
     value: PrivateKey
-- assert_visible: 'input[aria-label="Jump key path"]'
-- assert_not_visible: 'input[aria-label="Jump password"]'
+- assert_visible: '[data-testid="session-jump-key"]'
+- assert_not_visible: '[data-testid="session-jump-password"]'
 - fill:
-    selector: 'input[aria-label="Jump key path"]'
+    selector: '[data-testid="session-jump-key"]'
     value: /home/qauser/.ssh/jump_ed25519
 - assert_attribute:
-    selector: 'input[aria-label="Jump key path"]'
+    selector: '[data-testid="session-jump-key"]'
     name: value
     equals: /home/qauser/.ssh/jump_ed25519
 - select_option:
     selector: '[data-testid="session-jump-auth"]'
     value: Password
-- assert_visible: 'input[aria-label="Jump password"]'
-- assert_not_visible: 'input[aria-label="Jump key path"]'
+- assert_visible: '[data-testid="session-jump-password"]'
+- assert_not_visible: '[data-testid="session-jump-key"]'
 - fill:
-    selector: 'input[aria-label="Jump password"]'
+    selector: '[data-testid="session-jump-password"]'
     value: jump-password-not-for-storage
 - assert_attribute:
-    selector: 'input[aria-label="Jump password"]'
+    selector: '[data-testid="session-jump-password"]'
     name: type
     equals: password
 - set_check:
@@ -403,11 +403,11 @@ verification:
     - step: 30
       expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
     - step: 35
-      expectation: '{"assert_visible": "input[aria-label=\"Jump key path\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-key\"]"}'
     - step: 37
       expectation: '{"assert_visible": "input[aria-label=\"Jump host\"]"}'
     - step: 45
-      expectation: '{"assert_visible": "input[aria-label=\"Jump password\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
     - step: 56
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 73
