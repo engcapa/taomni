@@ -46,16 +46,27 @@
 
 ## ED-PARITY-004 Keymap 改键冲突、取消与重开
 
-- 来源：REQ-10 / CW-SET-002；[P0 需求](overall-audit-plan-20260913.md#req-10)、[历史只读材料](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)。
-- 已知依据：P0 打开过 Keymap，但未实测改键与冲突；Shell 后续已调整快捷键，不能从旧表推断当前冲突。
-- 本包边界：一个已有动作的改键→冲突提示→取消/应用→重开序列；不同时改版完整 Code Style 或 EditorConfig。
-- 生产 owner 候选（待核）：KeymapSettingsDialog.tsx、workspaceKeymapScheme.ts、WorkspaceActionHost/registry 与所选动作 caller。
-- IDEA/fixture（待核）：隔离 scheme，读取当前 IDEA keymap 和平台修饰键；所选动作由 P1 结合生产 caller 确定。
-- ED-PARITY-004-A1：冲突可见；Cancel 不改变有效绑定；Apply 后真实按键派发到正确动作，重开可读到生效配置。
-- ED-PARITY-004-A2：同 fixture 的 IDEA/Taomni 功能、视觉、交互分别有结论和准确证据身份；缺侧或不支持明确标记，不能声称 matched。
-- ED-PARITY-004-A3：默认 scheme/迁移、Ctrl/Cmd 与 IME 边界、多 workspace owner，保留 Shell 已交付快捷键。
-- 验证起点：V1→A1，V2→A2，V3→A3；所需种类为 `code-audit`、`unit`、`typecheck`、`browser`、`native`、`idea-comparison`。具体 case/命令、环境和可复用证据由 P1 核对后写入；本次均未执行。
-- ready 前置：核对当前生产及后续交付是否已覆盖目标；确认参考和运行环境；给每个 AC 可观察的正常/错误/取消/恢复断言及消费者回归；依赖只引用本板实际必要的卡。当前无已确认的跨卡依赖，`depends_on=[]` 不代表外部环境已经就绪。
+2026-09-24 P1 已细化至[本卡完整设计](keymap-rebind-conflict-plan.md#ed-parity-004)，来源仍为 REQ-10 / CW-SET-002。
+
+- 范围：一个已有动作的改键→冲突提示→取消/应用→重开序列；不同时改版完整 Code Style 或 EditorConfig。
+- **已证实缺陷（非缺证据）**：D1 冲突按显示字符串比对，`Ctrl+F`/`Ctrl+f` 大小写分叉使徽标不出现而派发层仍判冲突——无警告死键；
+  D2 无 Apply/Cancel，改键即时落盘且不可撤销（同族 appearance/intelligence 已有草稿契约，Keymap 是唯一例外）；
+  D3 `conflict` 在三个派发入口行为不一致，editor allowlist 分支静默吞键。
+  R1（Apply 恰在动作执行中）、R2（隐式 fork 孤儿）为**待运行归因风险**，未写成已复现缺陷。
+- 决定与验收：独立 ED-PARITY-004-DEC-01..09、A1..A3、V1..V5、S0..S8 与生产文件/符号责任见设计。
+- 完整用例设计在设计的 [`test-cases` 锚点](keymap-rebind-conflict-plan.md#test-cases)，含覆盖维度矩阵、
+  精确 test/case 路径、已有/拟新增标记与 P2 实现责任。
+- [IDEA 参照包（**`partially-observed`**，六组状态已实测）](references/ed-parity-004-reference.md)；
+  [完整 P2 交接](handoff-p2-ed-parity-004.md)。
+- 目标 build 经用户 2026-09-24 裁决为 **IDEA 2026.2.3 / IU-262.10968.63** Ultimate（取代 P0 初固定的 2026.2.2 build；
+  observed 须标注 2026.2.3，不反向改钉其他卡）。实测据此**修正 DEC-02/03/04**：真实 IDEA 冲突形态是
+  **录制器内就地实时警告**（`Already assigned to:`，列出全部冲突含菜单路径、可滚动，`OK` 不阻断），
+  而非提交后弹模态 + 重新指派/取消两按钮；底栏为 OK/Cancel/Apply 且未改动时 Apply 禁用。
+- Required evidence 保持 `code-audit`、`unit`、`typecheck`、`browser`、`native`、`idea-comparison`；本轮所有产品验证未执行。
+- **卡已转 `ready` + `planning_required=false`**（2026-09-24），可交 P2 正式领取。
+  剩余未观测（Apply 之后状态、Reset/删除标签、chip 几何、macOS/Linux、干净 IME）属**执行期证据**，
+  由 P2 在**隔离 config 实例**上补齐（参照包 §5/§6），不阻塞领取。
+  状态只看[唯一板](backlog.md)，无规划 owner/status，无开发 owner/claimed_at/baseline/evidence。
 
 <a id="ed-parity-005"></a>
 

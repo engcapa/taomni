@@ -893,6 +893,23 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **差异性质：** 纯证据缺口。缺证据本身不是产品bug；没有真实双侧支持的目标差异保留待验证。
 - **需求 / 影响 / 方向：** [REQ-10](overall-audit-plan-20260913.md#req-10)，P1：共享动作与样式是布局/编辑重构的基础，三端keymap风险明确。用目标scheme/EditorConfig样例定义作用域、冲突、reset/cancel与持久化；允许统一设置入口。进入条件/依赖：IDEA keymap/style真实设置；F4/F5；WorkspaceActionHost唯一执行owner。
 - **必须保留：** K0；一个WorkspaceActionHost执行真相；旧scheme迁移、AltGr/IME与多workspace ownership。后续验收必须观察这些结果，不能只写“保持原功能”。
+
+**2026-09-24 REQ-10 / ED-PARITY-004 P1 增量（规划完成但阻塞，三维结论不变）：** 生产源码复核把本场景从「纯证据缺口」细化为
+**三个已证实产品缺陷 + 两个待归因风险**——D1 设置界面按显示字符串建冲突表，`Ctrl+F`（定义默认经 `toUpperCase`）与 `Ctrl+f`
+（用户录制保留原始 `event.key`）不匹配，冲突徽标不出现，而 `prepareBinding` 按物理 `code` 归一化仍判 `resolution:"conflict"`，
+形成**无警告死键**；D2 无 Apply/Cancel 草稿，改键即时写 localStorage 并作用于 live host，同族 appearance/intelligence 对话框
+均已有 `applyDraft`+Cancel+Apply 契约，Keymap 是唯一例外；D3 `conflict` 在 `dispatchKeydown`/`dispatchKeydownV2`/
+`createCodeMirrorActionKeymap` 三处消费语义不一致，editor allowlist 分支 `preventDefault()+return true` 静默吞键。
+R1（Apply 恰在动作执行中）、R2（隐式 fork 孤儿）按 [regression-protection](../../.agents/skills/qa-ui-auto/references/regression-protection.md)
+归为待运行风险，**未**写成已复现缺陷。目标 build 经用户裁决为 **IDEA 2026.2.3 / IU-262.10968.63** Ultimate。
+[设计 DEC/AC/V/S0..S8](keymap-rebind-conflict-plan.md#ed-parity-004) 与 [完整 `test-cases` 用例设计](keymap-rebind-conflict-plan.md#test-cases) 已落盘；
+[IDEA 参照 `partially-observed`](references/ed-parity-004-reference.md)：2026-09-24 用户授权后在运行实例完成真实桌面采样
+（13 张原件；Keymap 页底栏实测为 OK/Cancel/Apply 且未改动时 Apply 禁用；冲突实测为**录制器内就地实时警告**
+`Already assigned to:`，列出全部冲突含菜单路径、可滚动、`OK` 不阻断；行右键含 Add Keyboard/Mouse/Abbreviation
+且默认绑定 `Remove` 禁用；绑定渲染为多个独立键帽 chip 右对齐）。实测据此修正了 DEC-02/03/04。
+采样全程只 Cancel、从未 OK/Apply，**用户真实 keymap 未被改写**。卡已转 `ready`+`planning_required=false`，可交 P2 领取；
+剩余未观测（Apply 之后状态、Reset/删除标签、chip 几何、macOS/Linux、干净 IME）属执行期证据，由 P2 在隔离实例补齐。**本行「差异性质」由「纯证据缺口」修订为「已证实缺陷（功能）+ 证据缺口（视觉/交互）」，
+但功能/视觉/交互三维结论仍为待验证，差距未关闭，未签发任何 matched。**
 - **规格与任务来源：** [editor-experience.md](../../claudedocs/code-workspace-idea-specs/editor-experience.md)；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-STYLE-001`（原记录 2026-09-04T00:14:45Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-STYLE-002`（原记录 2026-09-05T05:22:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-IMPORT-001`（原记录 2026-09-05T05:32:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-GATE-002`（原记录 2026-09-02T08:56:15Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
 
