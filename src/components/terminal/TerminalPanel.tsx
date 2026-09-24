@@ -2005,18 +2005,27 @@ export function TerminalPanel({
       },
       {
         label: "Terminal display",
+        testId: "context-menu-item-terminal-display",
         children: [
           { label: "Reset terminal output", onClick: resetOutput },
           { label: "Clear terminal scrollback", onClick: clearScrollback },
           { label: "Set terminal title", onClick: renameTerminal, disabled: !tabId },
           {
             label: "Toggle terminal scrollbar",
+            testId: "context-menu-item-toggle-terminal-scrollbar",
             checked: showScrollbar,
             onClick: () => commitTerminalProfilePatch({ showScrollbar: !showScrollbar }),
           },
-          { label: "Fullscreen terminal", shortcut: "F11", checked: fullscreen, onClick: () => setFullscreen((v) => !v) },
+          {
+            label: "Fullscreen terminal",
+            testId: "context-menu-item-fullscreen-terminal",
+            shortcut: "F11",
+            checked: fullscreen,
+            onClick: () => setFullscreen((v) => !v),
+          },
           {
             label: "Read-only terminal",
+            testId: "context-menu-item-read-only-terminal",
             checked: readOnly,
             onClick: () => commitTerminalProfilePatch({ readOnly: !readOnly }),
           },
@@ -2061,7 +2070,7 @@ export function TerminalPanel({
           { label: "IGNORE message", disabled: true },
         ],
       },
-      { label: "Event Log", onClick: () => setEventLogOpen(true) },
+      { label: "Event Log", testId: "context-menu-item-event-log", onClick: () => setEventLogOpen(true) },
       { label: "", separator: true },
       {
         label: "AI: 解释最近的终端输出",
@@ -4031,6 +4040,7 @@ export function TerminalPanel({
 
       {eventLogOpen && (
         <div
+          data-testid="terminal-event-log"
           className="absolute right-4 bottom-4 z-50 w-[520px] max-w-[calc(100%-2rem)] max-h-[360px] rounded border border-slate-500 bg-white shadow-xl text-[12px] overflow-hidden"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
@@ -4038,7 +4048,12 @@ export function TerminalPanel({
         >
           <div className="h-8 flex items-center px-3 border-b bg-slate-100">
             <span className="font-semibold">{t("terminal.eventLogTitle")}</span>
-            <button className="taomni-btn ml-auto h-6 px-2" type="button" onClick={() => setEventLogOpen(false)}>
+            <button
+              data-testid="terminal-event-log-close"
+              className="taomni-btn ml-auto h-6 px-2"
+              type="button"
+              onClick={() => setEventLogOpen(false)}
+            >
               {t("terminal.eventLogClose")}
             </button>
           </div>

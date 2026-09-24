@@ -804,8 +804,16 @@ controls:
     selector: 'text="Terminal display"'
     kind: interactive
     optional: true
+  - id: terminal-display-menu-item
+    selector: '[data-testid="context-menu-item-terminal-display"]'
+    kind: interactive
+    optional: true
   - id: read-only-toggle
     selector: 'text="Read-only terminal"'
+    kind: interactive
+    optional: true
+  - id: read-only-menu-item
+    selector: '[data-testid="context-menu-item-read-only-terminal"]'
     kind: interactive
     optional: true
   - id: read-only-state
@@ -816,8 +824,16 @@ controls:
     selector: 'text="Toggle terminal scrollbar"'
     kind: interactive
     optional: true
+  - id: scrollbar-menu-item
+    selector: '[data-testid="context-menu-item-toggle-terminal-scrollbar"]'
+    kind: interactive
+    optional: true
   - id: fullscreen-toggle
     selector: 'text="Fullscreen terminal"'
+    kind: interactive
+    optional: true
+  - id: fullscreen-menu-item
+    selector: '[data-testid="context-menu-item-fullscreen-terminal"]'
     kind: interactive
     optional: true
 -->
@@ -931,6 +947,14 @@ controls:
     optional: true
     aliases:
       - 'text="Event Log"'
+  - id: event-log-panel
+    selector: '[data-testid="terminal-event-log"]'
+    kind: display
+    optional: true
+  - id: event-log-close
+    selector: '[data-testid="terminal-event-log-close"]'
+    kind: interactive
+    optional: true
 -->
 
 - 已记录：connect / auth / resize / disconnect / error / 导出 / 日志 / 宏 / 信号

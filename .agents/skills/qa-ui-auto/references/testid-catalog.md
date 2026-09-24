@@ -1477,10 +1477,14 @@
 - `text="Reset zoom"` — interactive [optional] — F4.2.zoom-reset
 - `[data-testid="context-menu-item-appearance"]` — interactive [optional] — F4.2.appearance
 - `text="Terminal display"` — interactive [optional] — F4.2.terminal-display
+- `[data-testid="context-menu-item-terminal-display"]` — interactive [optional] — F4.2.terminal-display-menu-item
 - `text="Read-only terminal"` — interactive [optional] — F4.2.read-only-toggle
+- `[data-testid="context-menu-item-read-only-terminal"]` — interactive [optional] — F4.2.read-only-menu-item
 - `[data-testid="terminal-read-only"]` — display [optional] — F4.2.read-only-state
 - `text="Toggle terminal scrollbar"` — interactive [optional] — F4.2.scrollbar-toggle
+- `[data-testid="context-menu-item-toggle-terminal-scrollbar"]` — interactive [optional] — F4.2.scrollbar-menu-item
 - `text="Fullscreen terminal"` — interactive [optional] — F4.2.fullscreen-toggle
+- `[data-testid="context-menu-item-fullscreen-terminal"]` — interactive [optional] — F4.2.fullscreen-menu-item
 
 ## terminal/right-menu (F4.3)
 
@@ -1507,6 +1511,8 @@
 
 - `[data-testid="context-menu-item-event-log"]` — interactive [optional] — F4.7.event-log-menu-item
   ↳ `text="Event Log"` — alias
+- `[data-testid="terminal-event-log"]` — display [optional] — F4.7.event-log-panel
+- `[data-testid="terminal-event-log-close"]` — interactive [optional] — F4.7.event-log-close
 
 ## terminal/split (F-Split-1)
 

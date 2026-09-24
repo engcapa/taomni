@@ -50,8 +50,8 @@ steps:
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
-- hover: text="Terminal display"
-- click: text="Read-only terminal"
+- hover: '[data-testid="context-menu-item-terminal-display"]'
+- click: '[data-testid="context-menu-item-read-only-terminal"]'
 - wait_for: '[data-testid="terminal-read-only"]'
 - click: '[data-testid="terminal-pane"]'
 - type: qa-ssh-read-only-blocked
@@ -63,8 +63,8 @@ steps:
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
-- hover: text="Terminal display"
-- click: text="Read-only terminal"
+- hover: '[data-testid="context-menu-item-terminal-display"]'
+- click: '[data-testid="context-menu-item-read-only-terminal"]'
 - wait_for:
     selector: '[data-testid="terminal-read-only"]'
     state: detached
@@ -80,8 +80,8 @@ steps:
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
-- hover: text="Terminal display"
-- click: text="Toggle terminal scrollbar"
+- hover: '[data-testid="context-menu-item-terminal-display"]'
+- click: '[data-testid="context-menu-item-toggle-terminal-scrollbar"]'
 - assert_attribute:
     selector: '[data-testid="terminal-pane"]'
     name: class
@@ -89,8 +89,8 @@ steps:
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
-- hover: text="Terminal display"
-- click: text="Toggle terminal scrollbar"
+- hover: '[data-testid="context-menu-item-terminal-display"]'
+- click: '[data-testid="context-menu-item-toggle-terminal-scrollbar"]'
 - assert_attribute:
     selector: '[data-testid="terminal-pane"]'
     name: class
@@ -98,8 +98,8 @@ steps:
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
-- hover: text="Terminal display"
-- click: text="Fullscreen terminal"
+- hover: '[data-testid="context-menu-item-terminal-display"]'
+- click: '[data-testid="context-menu-item-fullscreen-terminal"]'
 - assert_attribute:
     selector: '[data-testid="terminal-pane"]'
     name: class
@@ -107,8 +107,8 @@ steps:
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
-- hover: text="Terminal display"
-- click: text="Fullscreen terminal"
+- hover: '[data-testid="context-menu-item-terminal-display"]'
+- click: '[data-testid="context-menu-item-fullscreen-terminal"]'
 - assert_attribute:
     selector: '[data-testid="terminal-pane"]'
     name: class
@@ -117,12 +117,16 @@ steps:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
 - click: '[data-testid="context-menu-item-event-log"]'
-- wait_for: text="Event Log"
-- assert_visible: '[data-testid="terminal-pane"] >> text="connection"'
-- assert_visible: '[data-testid="terminal-pane"] >> text="auth"'
-- click: '[data-testid="terminal-pane"] button:has-text("Close")'
+- wait_for: '[data-testid="terminal-event-log"]'
+- assert_text:
+    selector: '[data-testid="terminal-event-log"]'
+    contains: connection
+- assert_text:
+    selector: '[data-testid="terminal-event-log"]'
+    contains: auth
+- click: '[data-testid="terminal-event-log-close"]'
 - wait_for:
-    selector: '[data-testid="terminal-pane"] >> text="Event Log"'
+    selector: '[data-testid="terminal-event-log"]'
     state: detached
 - screenshot: 143-ssh-terminal-display-event-log.png
 verification:
@@ -193,13 +197,13 @@ verification:
     - step: 51
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "class", "matches": "(?!.*fixed.*inset-0).*"}}'
     - step: 55
-      expectation: '{"wait_for": "text=\"Event Log\""}'
+      expectation: '{"wait_for": "[data-testid=\"terminal-event-log\"]"}'
     - step: 56
-      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"] >> text=\"connection\""}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "connection"}}'
     - step: 57
-      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"] >> text=\"auth\""}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "auth"}}'
     - step: 59
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"] >> text=\"Event Log\"", "state": "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-event-log\"]", "state": "detached"}}'
     results:
     - 14
     - 19
