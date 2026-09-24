@@ -1,0 +1,244 @@
+id: TC-132
+title: SSH session protocol switching updates visible controls and retains shared draft state
+covers:
+- F6.3
+tags:
+- ssh
+- session
+- settings
+- protocol
+- state
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-ssh"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh-protocol-switch.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '2222'
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa-protocol-switch
+- assert_attribute:
+    selector: '[data-testid="session-proto-ssh"]'
+    name: data-active
+    equals: 'true'
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- fill:
+    selector: 'input[aria-label="Execute command"]'
+    value: printf 'qa-protocol-switch\n'
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: socks5
+- fill:
+    selector: 'input[aria-label="Proxy host"]'
+    value: protocol-proxy.example.test
+- fill:
+    selector: 'input[aria-label="Proxy port"]'
+    value: '1080'
+- assert_attribute:
+    selector: '[data-testid="session-proxy-kind"]'
+    name: value
+    equals: socks5
+- click: '[data-testid="session-proto-sftp"]'
+- assert_attribute:
+    selector: '[data-testid="session-proto-sftp"]'
+    name: data-active
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="session-host"]'
+    name: value
+    equals: ssh-protocol-switch.example.test
+- assert_visible: '[data-testid="session-section-mappings"]'
+- click: '[data-testid="session-section-mappings"]'
+- wait_for: '[data-testid="session-sftp-mappings-section"]'
+- assert_visible: '[data-testid="session-sftp-mappings-section"]'
+- click: '[data-testid="session-proto-serial"]'
+- assert_attribute:
+    selector: '[data-testid="session-proto-serial"]'
+    name: data-active
+    equals: 'true'
+- assert_visible: '[data-testid="session-serial-section"]'
+- assert_not_visible: '[data-testid="session-host"]'
+- fill:
+    selector: '[data-testid="session-serial-device"]'
+    value: /dev/ttyUSB0
+- fill:
+    selector: '[data-testid="session-serial-baud"]'
+    value: '115200'
+- assert_attribute:
+    selector: '[data-testid="session-serial-device"]'
+    name: value
+    equals: /dev/ttyUSB0
+- assert_attribute:
+    selector: '[data-testid="session-serial-baud"]'
+    name: value
+    equals: '115200'
+- click: '[data-testid="session-proto-ssh"]'
+- assert_attribute:
+    selector: '[data-testid="session-proto-ssh"]'
+    name: data-active
+    equals: 'true'
+- assert_visible: '[data-testid="session-host"]'
+- assert_attribute:
+    selector: '[data-testid="session-host"]'
+    name: value
+    equals: ssh-protocol-switch.example.test
+- assert_attribute:
+    selector: '[data-testid="session-user"]'
+    name: value
+    equals: qa-protocol-switch
+- assert_attribute:
+    selector: '[data-testid="session-port"]'
+    name: value
+    equals: '22'
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- assert_attribute:
+    selector: 'input[aria-label="Execute command"]'
+    name: value
+    equals: printf 'qa-protocol-switch\n'
+- click: '[data-testid="session-section-network"]'
+- wait_for: '[data-testid="network-settings"]'
+- assert_attribute:
+    selector: '[data-testid="session-proxy-kind"]'
+    name: value
+    equals: socks5
+- assert_attribute:
+    selector: 'input[aria-label="Proxy host"]'
+    name: value
+    equals: protocol-proxy.example.test
+- click: '[data-testid="session-cancel"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+- screenshot: 132-ssh-session-protocol-switch.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Switching SSH to SFTP and Serial changes the visible protocol-specific controls while retaining shared SSH draft values when switching back.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 13
+    - 14
+    - 16
+    - 17
+    - 18
+    - 20
+    - 24
+    - 27
+    - 31
+    - 32
+    - 35
+    - 41
+    - 44
+    - 48
+    checkpoints:
+    - step: 10
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-ssh\"]", "name": "data-active", "equals": "true"}}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-sftp\"]", "name": "data-active", "equals": "true"}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-protocol-switch.example.test"}}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"session-section-mappings\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"session-sftp-mappings-section\"]"}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"session-sftp-mappings-section\"]"}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-serial\"]", "name": "data-active", "equals": "true"}}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"session-serial-section\"]"}'
+    - step: 30
+      expectation: '{"assert_not_visible": "[data-testid=\"session-host\"]"}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-serial-device\"]", "name": "value", "equals": "/dev/ttyUSB0"}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-serial-baud\"]", "name": "value", "equals": "115200"}}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-ssh\"]", "name": "data-active", "equals": "true"}}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-protocol-switch.example.test"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "qa-protocol-switch"}}'
+    - step: 40
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "22"}}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-protocol-switch\\n''"}}'
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 46
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "protocol-proxy.example.test"}}'
+    - step: 49
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 10
+    - 12
+    - 15
+    - 19
+    - 21
+    - 22
+    - 23
+    - 25
+    - 26
+    - 28
+    - 29
+    - 30
+    - 33
+    - 34
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 42
+    - 43
+    - 45
+    - 46
+    - 47
+    - 49
+  visual:
+  - check: Protocol-specific sections appear without overlap when the editor switches between SSH, SFTP, and Serial.
+    method: manual
+    reason: Visibility and value assertions do not assess responsive layout.
+  native:
+  - check: No native protocol client is launched; this case proves editor state transitions only.
+    method: not-applicable
+    reason: The asserted behavior is renderer-local protocol selection and draft state.

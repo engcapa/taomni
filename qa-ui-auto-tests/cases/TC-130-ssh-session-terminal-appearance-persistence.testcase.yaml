@@ -1,0 +1,296 @@
+id: TC-130
+title: SSH session terminal appearance controls persist after save and reopen
+covers:
+- F6.3
+- F5.2
+tags:
+- ssh
+- session
+- settings
+- terminal
+- appearance
+- persistence
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-ssh"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh-terminal-appearance.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '2222'
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa-terminal-appearance
+- click: '[data-testid="session-section-terminal"]'
+- wait_for: '[data-testid="terminal-settings"]'
+- assert_visible: '[data-testid="terminal-appearance-settings"]'
+- assert_visible: '[data-testid="terminal-preview"]'
+- assert_visible: '[data-testid="terminal-preview-cursor"]'
+- click: '[data-testid="terminal-theme-select"]'
+- wait_for: '[data-testid="terminal-theme-option-kanagawa-wave"]'
+- click: '[data-testid="terminal-theme-option-kanagawa-wave"]'
+- click: '[data-testid="terminal-theme-select"]'
+- assert_attribute:
+    selector: '[data-testid="terminal-theme-option-kanagawa-wave"]'
+    name: aria-selected
+    equals: 'true'
+- fill:
+    selector: 'input[aria-label="Terminal font size"]'
+    value: '16'
+- press:
+    selector: 'input[aria-label="Terminal font size"]'
+    key: Tab
+- assert_attribute:
+    selector: 'input[aria-label="Terminal font size"]'
+    name: value
+    equals: '16'
+- click: 'button[aria-label="Decrease text size"]'
+- assert_attribute:
+    selector: 'input[aria-label="Terminal font size"]'
+    name: value
+    equals: '15'
+- click: 'button[aria-label="Increase text size"]'
+- assert_attribute:
+    selector: 'input[aria-label="Terminal font size"]'
+    name: value
+    equals: '16'
+- set_check:
+    selector: 'input[aria-label="Enable font ligatures"]'
+    checked: true
+- assert_count:
+    selector: 'input[aria-label="Enable font ligatures"]:checked'
+    equal: 1
+- fill:
+    selector: 'input[aria-label="Scrollback lines"]'
+    value: '12000'
+- press:
+    selector: 'input[aria-label="Scrollback lines"]'
+    key: Tab
+- assert_attribute:
+    selector: 'input[aria-label="Scrollback lines"]'
+    name: value
+    equals: '12000'
+- select_option:
+    selector: 'select[aria-label="Terminal cursor"]'
+    label: Vertical bar (steady)
+- assert_attribute:
+    selector: 'select[aria-label="Terminal cursor"]'
+    name: value
+    equals: Vertical bar (steady)
+- select_option:
+    selector: 'select[aria-label="Right click behavior"]'
+    label: Paste clipboard
+- assert_attribute:
+    selector: 'select[aria-label="Right click behavior"]'
+    name: value
+    equals: Paste clipboard
+- fill:
+    selector: 'input[aria-label="Terminal background hex"]'
+    value: '#112233'
+- fill:
+    selector: 'input[aria-label="Terminal foreground hex"]'
+    value: '#ddeeff'
+- assert_attribute:
+    selector: 'input[aria-label="Terminal background hex"]'
+    name: value
+    equals: '#112233'
+- assert_attribute:
+    selector: 'input[aria-label="Terminal foreground hex"]'
+    name: value
+    equals: '#ddeeff'
+- fill:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    value: '2500'
+- press:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    key: Tab
+- assert_attribute:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    name: value
+    equals: '2500'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-ssh-terminal-appearance
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-terminal-appearance"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-terminal-appearance"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-terminal"]'
+- wait_for: '[data-testid="terminal-settings"]'
+- assert_attribute:
+    selector: 'input[aria-label="Terminal font size"]'
+    name: value
+    equals: '16'
+- assert_count:
+    selector: 'input[aria-label="Enable font ligatures"]:checked'
+    equal: 1
+- assert_attribute:
+    selector: 'input[aria-label="Scrollback lines"]'
+    name: value
+    equals: '12000'
+- assert_attribute:
+    selector: 'select[aria-label="Terminal cursor"]'
+    name: value
+    equals: Vertical bar (steady)
+- assert_attribute:
+    selector: 'select[aria-label="Right click behavior"]'
+    name: value
+    equals: Paste clipboard
+- assert_attribute:
+    selector: 'input[aria-label="Terminal background hex"]'
+    name: value
+    equals: '#112233'
+- assert_attribute:
+    selector: 'input[aria-label="Terminal foreground hex"]'
+    name: value
+    equals: '#ddeeff'
+- assert_attribute:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    name: value
+    equals: '2500'
+- click: '[data-testid="session-cancel"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+- screenshot: 130-ssh-session-terminal-appearance.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SSH session terminal appearance controls change their visible values immediately and restore the saved profile after the session is reopened.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 15
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 25
+    - 27
+    - 29
+    - 30
+    - 32
+    - 34
+    - 36
+    - 37
+    - 40
+    - 41
+    - 43
+    - 45
+    - 46
+    - 48
+    - 49
+    - 51
+    - 52
+    checkpoints:
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"terminal-appearance-settings\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"terminal-preview\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"terminal-preview-cursor\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"terminal-theme-option-kanagawa-wave\"]"}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-theme-option-kanagawa-wave\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "15"}}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "12000"}}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (steady)"}}'
+    - step: 35
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Paste clipboard"}}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
+    - step: 42
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "2500"}}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-terminal-appearance\"]"}'
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"terminal-settings\"]"}'
+    - step: 53
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
+    - step: 54
+      expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "12000"}}'
+    - step: 56
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (steady)"}}'
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Paste clipboard"}}'
+    - step: 58
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
+    - step: 59
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
+    - step: 60
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "2500"}}'
+    results:
+    - 12
+    - 13
+    - 14
+    - 16
+    - 19
+    - 22
+    - 24
+    - 26
+    - 28
+    - 31
+    - 33
+    - 35
+    - 38
+    - 39
+    - 42
+    - 47
+    - 50
+    - 52
+    - 53
+    - 54
+    - 55
+    - 56
+    - 57
+    - 58
+    - 59
+    - 60
+  visual:
+  - check: The embedded terminal appearance controls and preview remain readable without clipping or overlap.
+    method: manual
+    reason: Functional value assertions do not assess the visual layout of the shared appearance panel.
+  native:
+  - check: Native terminal rendering and packaged WebView appearance are not claimed by this browser persistence case.
+    method: external
+    reason: The case targets renderer state and browser storage; native rendering is covered separately by terminal cases.

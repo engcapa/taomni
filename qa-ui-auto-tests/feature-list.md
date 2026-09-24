@@ -1541,6 +1541,10 @@ controls:
     selector: '[data-testid="session-section-terminal"]'
     kind: interactive
     optional: true        # absent for Mail and RDP
+  - id: section-mappings
+    selector: '[data-testid="session-section-mappings"]'
+    kind: interactive
+    optional: true        # only present for SFTP sessions
   - id: section-appearance
     selector: '[data-testid="session-section-appearance"]'
     kind: interactive
@@ -1556,6 +1560,10 @@ controls:
     selector: '[data-testid="session-hbase-section"]'
     kind: display
     optional: true        # only present for HBaseShell; body owned by F-DB-3
+  - id: sftp-mappings-body
+    selector: '[data-testid="session-sftp-mappings-section"]'
+    kind: display
+    optional: true        # only present for the SFTP mappings section
   # Section bodies
   - id: advanced-body
     selector: '[data-testid="advanced-ssh-settings"]'
@@ -1664,6 +1672,10 @@ controls:
   - id: network-proxy-save-auth
     selector: '[data-testid="session-proxy-save-auth"]'
     kind: interactive
+  - id: network-proxy-source
+    selector: '[data-testid="session-proxy-source"]'
+    kind: interactive
+    optional: true        # only when a saved Proxy session is available
   - id: network-keepalive
     selector: 'input[aria-label="Keep-alive interval"]'
     kind: interactive
@@ -1762,19 +1774,19 @@ controls:
     kind: interactive
     optional: true
   - id: save-as-template
-    selector: 'button:has-text("Save as template")'
+    selector: '[data-testid="session-save-template"]'
     kind: interactive
   - id: reset
-    selector: 'button:has-text("Reset")'
+    selector: '[data-testid="session-reset"]'
     kind: interactive
   - id: delete
-    selector: 'button:has-text("Delete")'
+    selector: '[data-testid="session-delete-editor"]'
     kind: interactive
   - id: cancel
     selector: 'button[aria-label="Cancel"]'
     kind: interactive
   - id: new-folder
-    selector: 'button:has-text("New folder")'
+    selector: '[data-testid="session-new-folder"]'
     kind: interactive
   - id: cancel-testid
     selector: '[data-testid="session-cancel"]'
@@ -3636,6 +3648,9 @@ controls:
     optional: true
   - id: text-input-dialog-confirm
     selector: '[data-testid="text-input-dialog-confirm"]'
+    kind: interactive
+  - id: text-input-dialog-cancel
+    selector: '[data-testid="text-input-dialog-cancel"]'
     kind: interactive
     optional: true
   - id: confirm-dialog-message

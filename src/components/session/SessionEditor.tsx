@@ -1213,7 +1213,7 @@ function BookmarkSettings({
           options={folderOptions}
           onChange={(value) => setGroupPath(value === "User sessions" ? "" : value)}
         />
-        <button className="taomni-btn ml-2 flex items-center gap-1" type="button" onClick={onNewFolder}>
+        <button data-testid="session-new-folder" className="taomni-btn ml-2 flex items-center gap-1" type="button" onClick={onNewFolder}>
           <FolderPlus className="w-3 h-3" /> {t("sessionEditor2.newFolderBtn")}
         </button>
       </Field>

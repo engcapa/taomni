@@ -96,7 +96,7 @@ steps:
 - set_check:
     selector: 'label:has-text("Reconnect on disconnection") input[type="checkbox"]'
     checked: false
-- click: 'button:has-text("New folder")'
+- click: '[data-testid="session-new-folder"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'
@@ -113,7 +113,7 @@ steps:
 - fill:
     selector: '[data-testid="session-host"]'
     value: changed-before-reset.example.test
-- click: 'button:has-text("Reset")'
+- click: '[data-testid="session-reset"]'
 - assert_attribute:
     selector: '[data-testid="session-host"]'
     name: value
@@ -154,7 +154,7 @@ steps:
 - fill:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-template-source
-- click: 'button:has-text("Save as template")'
+- click: '[data-testid="session-save-template"]'
 - assert_text:
     selector: '[data-testid="session-test-result-summary"]'
     contains: Template saved
@@ -165,14 +165,14 @@ steps:
 - click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-lifecycle"]'
 - click: '[data-testid="session-edit"]'
 - wait_for: '[data-testid="session-editor"]'
-- click: 'button:has-text("Delete")'
+- click: '[data-testid="session-delete-editor"]'
 - wait_for: '[data-testid="confirm-dialog"]'
 - assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-lifecycle"]'
 - click: '[data-testid="confirm-dialog-cancel"]'
 - wait_for:
     selector: '[data-testid="confirm-dialog"]'
     state: detached
-- click: 'button:has-text("Delete")'
+- click: '[data-testid="session-delete-editor"]'
 - wait_for: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for:

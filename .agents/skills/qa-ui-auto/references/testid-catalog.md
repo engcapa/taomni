@@ -1102,10 +1102,12 @@
 - `[data-testid="session-section-bookmark"]` — interactive — F6.3.section-bookmark
 - `[data-testid="session-section-advanced"]` — interactive — F6.3.section-advanced
 - `[data-testid="session-section-terminal"]` — interactive [optional] — F6.3.section-terminal
+- `[data-testid="session-section-mappings"]` — interactive [optional] — F6.3.section-mappings
 - `[data-testid="session-section-appearance"]` — interactive [optional] — F6.3.section-appearance
 - `[data-testid="session-section-network"]` — interactive — F6.3.section-network
 - `[data-testid="session-section-database"]` — interactive [optional] — F6.3.section-database
 - `[data-testid="session-hbase-section"]` — display [optional] — F6.3.hbase-section
+- `[data-testid="session-sftp-mappings-section"]` — display [optional] — F6.3.sftp-mappings-body
 - `[data-testid="advanced-ssh-settings"]` — display — F6.3.advanced-body
 - `[data-testid="session-x11-forwarding-toggle"]` — interactive — F6.3.advanced-x11-forwarding
 - `[data-testid="session-x11-trusted-toggle"]` — interactive — F6.3.advanced-x11-trusted
@@ -1137,6 +1139,7 @@
 - `input[aria-label="Proxy username"]` — interactive — F6.3.network-proxy-user
 - `input[aria-label="Proxy password"]` — interactive — F6.3.network-proxy-password
 - `[data-testid="session-proxy-save-auth"]` — interactive — F6.3.network-proxy-save-auth
+- `[data-testid="session-proxy-source"]` — interactive [optional] — F6.3.network-proxy-source
 - `input[aria-label="Keep-alive interval"]` — interactive — F6.3.network-keepalive
 - `[data-testid="session-keepalive-toggle"]` — interactive — F6.3.network-keepalive-toggle
 - `[data-testid="session-tcp-nodelay-toggle"]` — interactive — F6.3.network-tcp-nodelay
@@ -1167,11 +1170,11 @@
 - `[data-testid="session-test-result-summary"]` — display — F6.3.test-result-summary
 - `[data-testid="session-save"]` — interactive — F6.3.save
 - `[data-testid="session-save-as-proxy-session"]` — interactive [optional] — F6.3.save-as-proxy-session
-- `button:has-text("Save as template")` — interactive — F6.3.save-as-template
-- `button:has-text("Reset")` — interactive — F6.3.reset
-- `button:has-text("Delete")` — interactive — F6.3.delete
+- `[data-testid="session-save-template"]` — interactive — F6.3.save-as-template
+- `[data-testid="session-reset"]` — interactive — F6.3.reset
+- `[data-testid="session-delete-editor"]` — interactive — F6.3.delete
 - `button[aria-label="Cancel"]` — interactive — F6.3.cancel
-- `button:has-text("New folder")` — interactive — F6.3.new-folder
+- `[data-testid="session-new-folder"]` — interactive — F6.3.new-folder
 - `[data-testid="session-cancel"]` — interactive — F6.3.cancel-testid
 - `[data-testid="session-help"]` — interactive — F6.3.editor-help
 - `[data-testid="session-close"]` — interactive — F6.3.editor-close
@@ -1586,7 +1589,8 @@
 - `[data-testid="confirm-dialog"]` — display [optional] — F-Confirm-1.confirm-dialog
 - `[data-testid="text-input-dialog"]` — display [optional] — F-Confirm-1.text-input-dialog
 - `[data-testid="text-input-dialog-input"]` — interactive [optional] — F-Confirm-1.text-input-dialog-input
-- `[data-testid="text-input-dialog-confirm"]` — interactive [optional] — F-Confirm-1.text-input-dialog-confirm
+- `[data-testid="text-input-dialog-confirm"]` — interactive — F-Confirm-1.text-input-dialog-confirm
+- `[data-testid="text-input-dialog-cancel"]` — interactive [optional] — F-Confirm-1.text-input-dialog-cancel
 - `[data-testid="confirm-dialog-message"]` — display [optional] — F-Confirm-1.confirm-dialog-message
 - `[data-testid="confirm-dialog-cancel"]` — interactive [optional] — F-Confirm-1.confirm-dialog-cancel
 - `[data-testid="confirm-dialog-confirm"]` — interactive [optional] — F-Confirm-1.confirm-dialog-confirm

@@ -50,7 +50,7 @@ steps:
     selector: '[data-testid="session-folder-select"]'
     name: value
     equals: User sessions / Development
-- click: 'button:has-text("New folder")'
+- click: '[data-testid="session-new-folder"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'

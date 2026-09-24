@@ -46,37 +46,77 @@ steps:
 - select_option:
     selector: '[data-testid="network-settings"] select'
     value: http
+- assert_attribute:
+    selector: '[data-testid="session-proxy-kind"]'
+    name: value
+    equals: http
 - fill:
     selector: input[aria-label="Proxy host"]
     value: proxy.example.test
+- assert_attribute:
+    selector: input[aria-label="Proxy host"]
+    name: value
+    equals: proxy.example.test
 - fill:
     selector: input[aria-label="Proxy port"]
     value: '3128'
+- assert_attribute:
+    selector: input[aria-label="Proxy port"]
+    name: value
+    equals: '3128'
 - fill:
     selector: input[aria-label="Proxy username"]
     value: qa-user
+- assert_attribute:
+    selector: input[aria-label="Proxy username"]
+    name: value
+    equals: qa-user
 - fill:
     selector: input[aria-label="Proxy password"]
     value: qa-pass
+- assert_attribute:
+    selector: input[aria-label="Proxy password"]
+    name: type
+    equals: password
 - fill:
     selector: input[aria-label="Keep-alive interval"]
     value: '30'
+- assert_attribute:
+    selector: input[aria-label="Keep-alive interval"]
+    name: value
+    equals: '30'
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
 - fill:
     selector: input[aria-label="Background image"]
     value: /tmp/bg.png
+- assert_attribute:
+    selector: input[aria-label="Background image"]
+    name: value
+    equals: /tmp/bg.png
 - fill:
     selector: input[aria-label="Background opacity"]
     value: '0.6'
+- assert_attribute:
+    selector: input[aria-label="Background opacity"]
+    name: value
+    equals: '0.6'
 - fill:
     selector: input[aria-label="Keyboard shortcut"]
     value: Ctrl+Alt+S
+- assert_attribute:
+    selector: input[aria-label="Keyboard shortcut"]
+    name: value
+    equals: Ctrl+Alt+S
 - click: '[data-testid="session-proto-file"]'
 - wait_for: input[aria-label="Additional parameters"]
 - fill:
     selector: input[aria-label="Additional parameters"]
     value: --verbose
+- assert_attribute:
+    selector: input[aria-label="Additional parameters"]
+    name: value
+    equals: --verbose
 - press: Escape
 - wait_for:
     selector: '[data-testid="session-editor"]'
@@ -96,18 +136,18 @@ verification:
     - 9
     - 12
     - 14
-    - 15
     - 16
-    - 17
     - 18
-    - 19
     - 20
     - 22
-    - 23
     - 24
-    - 25
-    - 27
+    - 26
     - 28
+    - 30
+    - 32
+    - 34
+    - 36
+    - 38
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
@@ -123,15 +163,50 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"terminal-settings\"]"}'
     - step: 13
       expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "http"}}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "proxy.example.test"}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy port\"]", "name": "value", "equals": "3128"}}'
     - step: 21
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy username\"]", "name": "value", "equals": "qa-user"}}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy password\"]", "name": "type", "equals": "password"}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "30"}}'
+    - step: 27
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 26
-      expectation: '{"wait_for": "input[aria-label=\"Additional parameters\"]"}'
     - step: 29
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec":
-        5}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background image\"]", "name": "value", "equals": "/tmp/bg.png"}}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background opacity\"]", "name": "value", "equals": "0.6"}}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keyboard shortcut\"]", "name": "value", "equals": "Ctrl+Alt+S"}}'
+    - step: 35
+      expectation: '{"wait_for": "input[aria-label=\"Additional parameters\"]"}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Additional parameters\"]", "name": "value", "equals": "--verbose"}}'
+    - step: 39
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec": 5}}'
     results:
+    - 8
+    - 10
+    - 11
+    - 13
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
+    - 25
+    - 27
     - 29
+    - 31
+    - 33
+    - 35
+    - 37
+    - 39
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
