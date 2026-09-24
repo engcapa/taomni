@@ -23,7 +23,6 @@ tags:
 - p1
 - sessions
 - session-editor
-- needs-review
 modes:
 - browser
 fixtures:
