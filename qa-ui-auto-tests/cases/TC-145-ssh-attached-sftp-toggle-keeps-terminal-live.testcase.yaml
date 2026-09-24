@@ -23,10 +23,9 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
-- seed_storage:
-    key: taomni.quickConnectVisible
-    value: 'true'
-- reload_window: null
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
 - wait_for: '[data-testid="qc-input"]'
 - fill:
     selector: '[data-testid="qc-input"]'
@@ -92,60 +91,64 @@ verification:
     - 1
     - 2
     - 3
-    - 5
     - 6
-    - 8
+    - 7
     - 9
-    - 11
-    - 18
-    - 21
-    - 24
-    - 28
+    - 10
+    - 12
+    - 19
+    - 22
+    - 25
+    - 29
     checkpoints:
-    - step: 4
+    - step: 5
       expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
-    - step: 7
+    - step: 8
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 10
+    - step: 11
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
     - step: 13
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
-    - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
-    - step: 15
-      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
-    - step: 16
-      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
-    - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
-    - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
-    - step: 20
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
-    - step: 23
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-sftp\\-close\\r?$", "timeout_sec": 20}}'
-    - step: 25
       expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
-    - step: 26
+    - step: 14
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
-    - step: 27
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
+    - step: 18
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
-    - step: 29
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
+    - step: 24
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-sftp\\-close\\r?$", "timeout_sec": 20}}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
+    - step: 30
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
     results:
+    - 5
+    - 8
+    - 11
     - 13
     - 14
     - 15
     - 16
     - 17
-    - 19
     - 20
-    - 23
-    - 25
+    - 21
+    - 24
+    - 26
     - 27
-    - 29
+    - 28
+    - 30
   visual:
   - check: Attached SFTP panes, transfer queue, and terminal remain readable across open/close transitions.
     method: manual

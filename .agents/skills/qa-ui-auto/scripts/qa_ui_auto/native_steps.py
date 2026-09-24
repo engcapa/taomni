@@ -295,6 +295,8 @@ def _hover(ctx: NativeStepContext, args: Any) -> str:
             ]
         },
     )
+    # Allow React submenu state to mount before the next native step queries it.
+    time.sleep(0.35)
     return f"hovered {selector}"
 
 
