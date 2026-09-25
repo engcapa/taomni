@@ -1,0 +1,151 @@
+id: TC-119
+title: Saved SSH session runs its startup command and keeps an interactive shell
+covers:
+- F3.1
+- F6.2
+- F6.3
+tags:
+- ssh
+- session
+- settings
+- terminal
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- fill:
+    selector: input[aria-label="Execute command"]
+    value: printf 'qa-ssh-startup-command-ran\n'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-startup-command
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-startup-command"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-startup-command"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- assert_attribute:
+    selector: input[aria-label="Execute command"]
+    name: value
+    equals: printf 'qa-ssh-startup-command-ran\n'
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-startup-command"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-startup-command"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 40
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-ssh\-startup\-command\-ran\r?$
+    timeout_sec: 20
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf 'qa-ssh-startup-interactive-ready\n'
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-ssh\-startup\-interactive\-ready\r?$
+    timeout_sec: 15
+- screenshot: 119-ssh-startup-command.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The SSH Execute command survives saving and reopening the session editor.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 22
+      expectation: >-
+        {"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf 'qa-ssh-startup-command-ran\\n'"}}
+    results:
+    - 16
+    - 22
+  - id: R2
+    requirement: The saved startup command runs after authentication and leaves the remote shell available for interactive commands.
+    actions:
+    - 23
+    - 25
+    - 27
+    - 28
+    - 31
+    checkpoints:
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
+    - step: 30
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec": 20}}'
+    - step: 32
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-interactive\\-ready\\r?$", "timeout_sec": 15}}'
+    results:
+    - 24
+    - 30
+    - 32
+  visual:
+  - check: The startup command output and the following interactive command output are visible as separate readable terminal lines.
+    method: manual
+    reason: Functional output assertions do not establish text clipping or terminal layout.
+  native:
+  - check: The packaged SSH backend runs the configured startup command and accepts subsequent input after authentication.
+    method: automated
+    reason: Browser bridge and native russh execution are separate SSH implementations.

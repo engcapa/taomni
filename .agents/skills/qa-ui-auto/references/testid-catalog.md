@@ -89,6 +89,7 @@
 - `input[name="inlineSuggestionsSource"][value="history+path+ai"]` — interactive — F-AI-2.2.inline-suggestions-history-path-ai
 - `[data-testid="ai-command-rewrite-toggle"]` — interactive — F-AI-2.2.ai-command-rewrite-toggle
 - `input[aria-label="AI command rewrite shortcut"]` — interactive — F-AI-2.2.ai-command-rewrite-shortcut
+- `[data-testid="terminal-ai-inline-qq-toggle"] input[type="checkbox"]` — interactive — F-AI-2.2.ai-inline-question-render
 
 ## ai/voice (F-AI-2.3)
 
@@ -1059,6 +1060,7 @@
 - `[data-testid="session-search"]` — interactive — F6.2.session-search
 - `[data-testid="session-new"]` — interactive — F6.2.session-new
 - `[data-testid="session-edit"]` — interactive — F6.2.session-edit
+- `[data-testid="context-menu-item-edit"]` — interactive [optional] — F6.2.context-edit
 - `[data-testid="session-duplicate"]` — interactive — F6.2.session-duplicate
 - `[data-testid="session-delete"]` — interactive — F6.2.session-delete
 - `[data-testid="context-menu-item-set-terminal-theme"]` — interactive [optional] — F6.2.context-set-terminal-theme
@@ -1089,6 +1091,7 @@
 - `[data-testid="session-proto-serial"]` — interactive — F6.3.proto-serial
 - `[data-testid="session-proto-browser"]` — interactive — F6.3.proto-browser
 - `[data-testid="session-proto-shell"]` — interactive — F6.3.proto-shell
+- `[data-testid="session-proto-proxy"]` — interactive — F6.3.proto-proxy
 - `[data-testid="session-proto-file"]` — interactive [optional] — F6.3.proto-file
 - `[data-testid="session-proto-wsl"]` — interactive [optional] — F6.3.proto-wsl
 - `[data-testid="session-proto-mysql"]` — interactive [optional] — F6.3.proto-mysql
@@ -1104,6 +1107,7 @@
 - `input[aria-label="Mail password or app password token"]` — interactive [optional] — F6.3.mail-password
 - `[data-testid="session-host"]` — interactive — F6.3.host
 - `[data-testid="session-user"]` — interactive — F6.3.user
+- `[data-testid="session-specify-username"]` — interactive — F6.3.specify-username
 - `[data-testid="session-port"]` — interactive — F6.3.port
 - `[data-testid="session-name"]` — interactive — F6.3.name
 - `[data-testid="session-file-target"]` — interactive [optional] — F6.3.file-target
@@ -1117,37 +1121,90 @@
 - `[data-testid="session-section-bookmark"]` — interactive — F6.3.section-bookmark
 - `[data-testid="session-section-advanced"]` — interactive — F6.3.section-advanced
 - `[data-testid="session-section-terminal"]` — interactive [optional] — F6.3.section-terminal
+- `[data-testid="session-section-mappings"]` — interactive [optional] — F6.3.section-mappings
 - `[data-testid="session-section-appearance"]` — interactive [optional] — F6.3.section-appearance
 - `[data-testid="session-section-network"]` — interactive — F6.3.section-network
 - `[data-testid="session-section-database"]` — interactive [optional] — F6.3.section-database
 - `[data-testid="session-hbase-section"]` — display [optional] — F6.3.hbase-section
+- `[data-testid="session-sftp-mappings-section"]` — display [optional] — F6.3.sftp-mappings-body
 - `[data-testid="advanced-ssh-settings"]` — display — F6.3.advanced-body
+- `[data-testid="session-x11-forwarding-toggle"]` — interactive — F6.3.advanced-x11-forwarding
+- `[data-testid="session-x11-trusted-toggle"]` — interactive — F6.3.advanced-x11-trusted
+- `[data-testid="session-compression-toggle"]` — interactive — F6.3.advanced-compression
 - `[data-testid="terminal-settings"]` — display [optional] — F6.3.terminal-body
 - `[data-testid="network-settings"]` — display — F6.3.network-body
 - `[data-testid="bookmark-settings"]` — display — F6.3.bookmark-body
 - `input[aria-label="Execute command"]` — interactive — F6.3.advanced-execute-command
+- `[data-testid="session-remote-environment"]` — interactive — F6.3.advanced-remote-environment
+- `[data-testid="session-ssh-browser-type"]` — interactive — F6.3.advanced-ssh-browser-type
 - `input[aria-label="SSH password"]` — interactive [optional] — F6.3.advanced-ssh-password
 - `[data-testid="session-save-in-vault"]` — interactive [optional] — F6.3.save-in-vault
 - `input[aria-label="Private key path"]` — interactive [optional] — F6.3.advanced-private-key
+- `[data-testid="session-do-not-exit"]` — interactive — F6.3.advanced-do-not-exit
+- `[data-testid="session-auth-password"]` — interactive — F6.3.advanced-auth-password
+- `[data-testid="session-auth-privatekey"]` — interactive — F6.3.advanced-auth-private-key
+- `[data-testid="session-auth-agent"]` — interactive — F6.3.advanced-auth-agent
+- `[data-testid="session-auth-gssapi"]` — interactive — F6.3.advanced-auth-gssapi
 - `input[aria-label="Jump host"]` — interactive [optional] — F6.3.advanced-jump-host
 - `input[aria-label="Jump user"]` — interactive [optional] — F6.3.advanced-jump-user
 - `input[aria-label="Jump port"]` — interactive [optional] — F6.3.advanced-jump-port
+- `[data-testid="session-jump-password"]` — interactive [optional] — F6.3.network-jump-password
+- `[data-testid="session-jump-key"]` — interactive [optional] — F6.3.network-jump-key
+- `[data-testid="session-jump-source"]` — interactive [optional] — F6.3.network-jump-source
+- `[data-testid="session-jump-auth"]` — interactive [optional] — F6.3.network-jump-auth
 - `[data-testid="session-proxy-kind"]` — interactive [optional] — F6.3.network-proxy-kind
 - `input[aria-label="Proxy host"]` — interactive — F6.3.network-proxy-host
 - `input[aria-label="Proxy port"]` — interactive — F6.3.network-proxy-port
 - `input[aria-label="Proxy username"]` — interactive — F6.3.network-proxy-user
 - `input[aria-label="Proxy password"]` — interactive — F6.3.network-proxy-password
+- `[data-testid="session-proxy-save-auth"]` — interactive — F6.3.network-proxy-save-auth
+- `[data-testid="session-proxy-source"]` — interactive [optional] — F6.3.network-proxy-source
 - `input[aria-label="Keep-alive interval"]` — interactive — F6.3.network-keepalive
+- `[data-testid="session-keepalive-toggle"]` — interactive — F6.3.network-keepalive-toggle
+- `[data-testid="session-tcp-nodelay-toggle"]` — interactive — F6.3.network-tcp-nodelay
+- `[data-testid="session-disable-nagle-toggle"]` — interactive — F6.3.network-disable-nagle
+- `[data-testid="session-ip-version"]` — interactive — F6.3.network-ip-version
 - `input[aria-label="New forward local address"]` — interactive — F6.3.network-new-forward-local
 - `input[aria-label="New forward remote address"]` — interactive — F6.3.network-new-forward-remote
 - `input[aria-label="New forward description"]` — interactive — F6.3.network-new-forward-desc
+- `[data-testid="session-forward-add"]` — interactive — F6.3.network-add-forward
+- `input[aria-label="Forward local address"]` — interactive [optional] — F6.3.network-forward-local
+- `input[aria-label="Forward remote address"]` — interactive [optional] — F6.3.network-forward-remote
+- `input[aria-label="Forward description"]` — interactive [optional] — F6.3.network-forward-desc
+- `[data-testid^="session-forward-remove-"]` — interactive [optional] — F6.3.network-remove-forward
 - `input[aria-label="Background image"]` — interactive — F6.3.bookmark-background
+- `[data-testid="session-background-browse"]` — interactive — F6.3.bookmark-background-browse
 - `input[aria-label="Background opacity"]` — interactive — F6.3.bookmark-bg-opacity
 - `textarea[aria-label="Description notes"]` — interactive — F6.3.bookmark-description
 - `input[aria-label="Tags"]` — interactive — F6.3.bookmark-tags
 - `input[aria-label="Additional parameters"]` — interactive — F6.3.bookmark-extra-params
 - `input[aria-label="Keyboard shortcut"]` — interactive — F6.3.bookmark-shortcut
+- `[data-testid="session-folder-select"]` — interactive — F6.3.bookmark-folder
+- `[data-testid="session-custom-icon"]` — interactive — F6.3.bookmark-custom-icon
+- `[data-testid="session-disable-ai-write"]` — interactive — F6.3.bookmark-disable-ai-write
+- `[data-testid="session-auto-connect"]` — interactive — F6.3.startup-auto-connect-testid
+- `[data-testid="session-open-new-window"]` — interactive — F6.3.startup-open-new-window-testid
+- `[data-testid="session-reconnect"]` — interactive — F6.3.startup-reconnect-testid
+- `[data-testid="session-test-connection"]` — interactive — F6.3.test-connection
+- `[data-testid="session-test-result-summary"]` — display — F6.3.test-result-summary
 - `[data-testid="session-save"]` — interactive — F6.3.save
+- `[data-testid="session-save-as-proxy-session"]` — interactive [optional] — F6.3.save-as-proxy-session
+- `[data-testid="session-save-template"]` — interactive — F6.3.save-as-template
+- `[data-testid="session-reset"]` — interactive — F6.3.reset
+- `[data-testid="session-delete-editor"]` — interactive — F6.3.delete
+- `button[aria-label="Cancel"]` — interactive — F6.3.cancel
+- `[data-testid="session-new-folder"]` — interactive — F6.3.new-folder
+- `[data-testid="session-cancel"]` — interactive — F6.3.cancel-testid
+- `[data-testid="session-help"]` — interactive — F6.3.editor-help
+- `[data-testid="session-close"]` — interactive — F6.3.editor-close
+- `[data-testid="session-host-lookup"]` — interactive — F6.3.host-lookup
+- `[data-testid="session-private-key-toggle"]` — interactive — F6.3.private-key-toggle
+- `[data-testid="session-private-key-browse"]` — interactive — F6.3.private-key-browse
+- `[data-testid="session-private-key-generate"]` — interactive — F6.3.private-key-generate
+- `[data-testid="session-expert-settings"]` — interactive — F6.3.expert-settings
+- `label:has-text("Auto-connect when Taomni starts") input[type="checkbox"]` — interactive — F6.3.startup-auto-connect
+- `label:has-text("Open in new window") input[type="checkbox"]` — interactive — F6.3.startup-open-new-window
+- `label:has-text("Reconnect on disconnection") input[type="checkbox"]` — interactive — F6.3.startup-reconnect
 
 ## sessions (F6.4)
 
@@ -1167,6 +1224,7 @@
 - `[data-testid="auth-submit"]` — interactive — F6.5.submit
 - `[data-testid="auth-cancel"]` — interactive — F6.5.cancel
 - `[data-testid="auth-close"]` — interactive — F6.5.close
+- `[data-testid="auth-save-to-vault"]` — interactive [optional] — F6.5.save-to-vault
 
 ## sessions/folder (F-FolderName-1)
 
@@ -1375,6 +1433,8 @@
 - `[data-testid="terminal-theme-select"]` — interactive — F5.2.theme-select
 - `[data-testid^="terminal-theme-option-"]` — interactive [optional] — F5.2.theme-options
   ↳ `[data-testid="terminal-theme-option-kanagawa-wave"]` — alias
+  ↳ `[data-testid="terminal-context-theme-option-kanagawa-wave"]` — alias
+- `[data-testid="terminal-theme-select-menu"]` — display [optional] — F5.2.theme-select-menu
 - `[data-testid="terminal-context-set-local-default-theme"]` — interactive [optional] — F5.2.local-default-theme
 - `[data-testid^="terminal-context-theme-option-"]` — interactive [optional] — F5.2.context-theme-options
 - `[data-testid="terminal-preview"]` — display — F5.2.preview
@@ -1385,8 +1445,29 @@
 - `button[aria-label="Decrease text size"]` — interactive — F5.2.font-size-decrease
 - `button[aria-label="Increase text size"]` — interactive — F5.2.font-size-increase
 - `input[aria-label="Enable font ligatures"]` — interactive — F5.2.font-ligatures-toggle
+  ↳ `label:has-text("Enable font ligatures") input[type="checkbox"]` — alias
+  ↳ `label:has-text("Enable font ligatures") input[type="checkbox"]:checked` — alias
 - `input[aria-label="Scrollback lines"]` — interactive — F5.2.scrollback
 - `input[aria-label="Maximum command history entries per host"]` — interactive — F5.2.inline-suggestions-max
+- `[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]` — interactive — F5.2.show-scrollbar
+- `[data-testid="terminal-copy-on-select-toggle"] input[type="checkbox"]` — interactive — F5.2.copy-on-select
+- `[data-testid="terminal-osc52-clipboard-toggle"] input[type="checkbox"]` — interactive — F5.2.allow-osc52
+- `[data-testid="terminal-read-only-toggle"] input[type="checkbox"]` — interactive — F5.2.read-only
+- `[data-testid="terminal-bracketed-paste-toggle"] input[type="checkbox"]` — interactive — F5.2.bracketed-paste
+- `[data-testid="terminal-multiline-paste-confirm-toggle"] input[type="checkbox"]` — interactive — F5.2.multiline-paste-confirm
+- `[data-testid="terminal-keyword-highlighting-toggle"] input[type="checkbox"]` — interactive — F5.2.keyword-highlighting
+- `[data-testid="terminal-save-scrollback-on-disconnect-toggle"] input[type="checkbox"]` — interactive — F5.2.save-scrollback-on-disconnect
+- `[data-testid="terminal-inline-suggestions-toggle"] input[type="checkbox"]` — interactive — F5.2.inline-suggestions-toggle
+- `text="Clear all history"` — interactive — F5.2.clear-all-history
+- `input[aria-label="Command 1"]` — interactive — F5.2.common-command
+- `input[aria-label="Description 1"]` — interactive — F5.2.common-command-description
+- `[aria-label="Remove command 1"]` — interactive — F5.2.common-command-remove
+- `text="Add entry"` — interactive — F5.2.common-command-add
+- `[data-testid="terminal-context-set-local-default-profile"]` — interactive [optional] — F5.2.context-set-profile-default
+- `[data-testid="terminal-context-change-settings"]` — interactive [optional] — F5.2.context-change-settings
+- `[data-testid="terminal-current-settings-dialog"]` — display [optional] — F5.2.current-settings-dialog
+- `[data-testid="terminal-current-settings-save-default"]` — interactive [optional] — F5.2.current-settings-save-default
+- `[data-testid="terminal-current-settings-footer-close"]` — interactive [optional] — F5.2.current-settings-footer-close
 - `select[aria-label="Terminal cursor"]` — interactive — F5.2.cursor-style
 - `select[aria-label="Right click behavior"]` — interactive — F5.2.right-click-behavior
 - `input[aria-label="Terminal background hex"]` — interactive — F5.2.background-hex
@@ -1439,9 +1520,14 @@
 - `text="Reset zoom"` — interactive [optional] — F4.2.zoom-reset
 - `[data-testid="context-menu-item-appearance"]` — interactive [optional] — F4.2.appearance
 - `text="Terminal display"` — interactive [optional] — F4.2.terminal-display
+- `[data-testid="context-menu-item-terminal-display"]` — interactive [optional] — F4.2.terminal-display-menu-item
 - `text="Read-only terminal"` — interactive [optional] — F4.2.read-only-toggle
+- `[data-testid="context-menu-item-read-only-terminal"]` — interactive [optional] — F4.2.read-only-menu-item
+- `[data-testid="terminal-read-only"]` — display [optional] — F4.2.read-only-state
 - `text="Toggle terminal scrollbar"` — interactive [optional] — F4.2.scrollbar-toggle
+- `[data-testid="context-menu-item-toggle-terminal-scrollbar"]` — interactive [optional] — F4.2.scrollbar-menu-item
 - `text="Fullscreen terminal"` — interactive [optional] — F4.2.fullscreen-toggle
+- `[data-testid="context-menu-item-fullscreen-terminal"]` — interactive [optional] — F4.2.fullscreen-menu-item
 
 ## terminal/right-menu (F4.3)
 
@@ -1468,6 +1554,8 @@
 
 - `[data-testid="context-menu-item-event-log"]` — interactive [optional] — F4.7.event-log-menu-item
   ↳ `text="Event Log"` — alias
+- `[data-testid="terminal-event-log"]` — display [optional] — F4.7.event-log-panel
+- `[data-testid="terminal-event-log-close"]` — interactive [optional] — F4.7.event-log-close
 
 ## terminal/split (F-Split-1)
 
@@ -1551,10 +1639,14 @@
 - `[data-testid="confirm-dialog"]` — display [optional] — F-Confirm-1.confirm-dialog
 - `[data-testid="text-input-dialog"]` — display [optional] — F-Confirm-1.text-input-dialog
 - `[data-testid="text-input-dialog-input"]` — interactive [optional] — F-Confirm-1.text-input-dialog-input
-- `[data-testid="text-input-dialog-confirm"]` — interactive [optional] — F-Confirm-1.text-input-dialog-confirm
+- `[data-testid="text-input-dialog-confirm"]` — interactive — F-Confirm-1.text-input-dialog-confirm
+- `[data-testid="text-input-dialog-cancel"]` — interactive [optional] — F-Confirm-1.text-input-dialog-cancel
 - `[data-testid="confirm-dialog-message"]` — display [optional] — F-Confirm-1.confirm-dialog-message
 - `[data-testid="confirm-dialog-cancel"]` — interactive [optional] — F-Confirm-1.confirm-dialog-cancel
 - `[data-testid="confirm-dialog-confirm"]` — interactive [optional] — F-Confirm-1.confirm-dialog-confirm
+- `[data-testid="alert-dialog"]` — display [optional] — F-Confirm-1.alert-dialog
+- `[data-testid="alert-dialog-message"]` — display [optional] — F-Confirm-1.alert-dialog-message
+- `[data-testid="alert-dialog-ok"]` — interactive [optional] — F-Confirm-1.alert-dialog-ok
 
 ## ui/i18n (F-I18n-1)
 

@@ -1,0 +1,209 @@
+id: TC-150
+title: SSH terminal current settings and default actions keep the connection live
+covers:
+- F3.1
+- F4.2
+- F5.2
+- F6.5
+tags:
+- ssh
+- terminal
+- appearance
+- settings
+- recovery
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-ssh-current-settings
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-current-settings"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-current-settings"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo qa-ssh-current-settings
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa-ssh-current-settings\r?$
+    timeout_sec: 20
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="terminal-context-change-settings"]'
+- click: '[data-testid="terminal-context-change-settings"]'
+- wait_for: '[data-testid="terminal-current-settings-dialog"]'
+- assert_visible: '[data-testid="terminal-current-settings-dialog"] [data-testid="terminal-appearance-settings"]'
+- assert_visible: '[data-testid="terminal-current-settings-dialog"] [data-testid="terminal-preview"]'
+- fill:
+    selector: '[data-testid="terminal-current-settings-dialog"] input[aria-label="Terminal font size"]'
+    value: '19'
+- click: '[data-testid="terminal-current-settings-dialog"] [data-testid="terminal-preview"]'
+- wait_for: '[data-testid="terminal-current-settings-dialog"] input[aria-label="Terminal font size"][value="19"]'
+- click: '[data-testid="terminal-current-settings-save-default"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Save this terminal's appearance
+- click: '[data-testid="confirm-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="confirm-dialog"]'
+    state: detached
+- click: '[data-testid="terminal-current-settings-footer-close"]'
+- wait_for:
+    selector: '[data-testid="terminal-current-settings-dialog"]'
+    state: detached
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+- wait_for: '[data-testid="context-menu"]'
+- hover: '[data-testid="context-menu-item-appearance"]'
+- click: '[data-testid="terminal-context-theme-option-kanagawa-wave"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 20
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo qa-ssh-after-current-settings
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa-ssh-after-current-settings\r?$
+    timeout_sec: 20
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="terminal-context-set-local-default-theme"]'
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: Default appearance for new terminals updated
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="terminal-context-set-local-default-profile"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Save this terminal's appearance
+- click: '[data-testid="confirm-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="confirm-dialog"]'
+    state: detached
+- assert_attribute:
+    selector: '[data-testid="terminal-pane"]'
+    name: data-terminal-ready
+    equals: 'true'
+- screenshot: 150-ssh-current-settings-defaults.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A connected SSH terminal opens current appearance settings, applies a live font/theme change, exposes both default actions with their status or confirmation feedback, and remains ready for subsequent command input.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 13
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
+    - 25
+    - 27
+    - 29
+    - 31
+    - 33
+    - 35
+    - 37
+    - 39
+    - 41
+    - 43
+    - 45
+    - 47
+    - 49
+    - 51
+    - 53
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 20
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-current-settings\\r?$", "timeout_sec": 20}}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"terminal-current-settings-dialog\"]"}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"terminal-current-settings-dialog\"] [data-testid=\"terminal-appearance-settings\"]"}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"terminal-current-settings-dialog\"] input[aria-label=\"Terminal font size\"][value=\"19\"]"}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Save this terminal\u0027s appearance"}}'
+    - step: 34
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 36
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-current-settings-dialog\"]", "state": "detached"}}'
+    - step: 43
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-after-current-settings\\r?$", "timeout_sec": 20}}'
+    - step: 47
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Default appearance for new terminals updated"}}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 54
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
+    results:
+    - 18
+    - 20
+    - 25
+    - 26
+    - 30
+    - 32
+    - 34
+    - 36
+    - 43
+    - 47
+    - 51
+    - 54
+    - 55
+  visual:
+  - check: Inspect the SSH terminal settings and live terminal screenshot for dialog layout, status feedback, and no overlap.
+    method: manual
+    reason: Screenshot review is required for cross-WebView terminal overlays.
+  native:
+  - check: Execute the connected SSH settings actions in the declared native modes; browser evidence does not certify Tauri WebViews.
+    method: external
+    reason: Native execution is collected by the platform workflow.

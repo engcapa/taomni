@@ -1,0 +1,404 @@
+id: TC-149
+title: SSH terminal profile controls update, validate, and persist
+covers:
+- F5.2
+- F6.3
+tags:
+- ssh
+- session
+- settings
+- terminal
+- appearance
+- ai
+- persistence
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-ssh"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh-terminal-profile.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '2222'
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa-terminal-profile
+- click: '[data-testid="session-section-terminal"]'
+- wait_for: '[data-testid="terminal-settings"]'
+- assert_visible: '[data-testid="terminal-appearance-settings"]'
+- assert_visible: '[data-testid="terminal-preview"]'
+- click: '[data-testid="terminal-theme-select"]'
+- wait_for: '[data-testid="terminal-theme-select-menu"]'
+- click: '[data-testid="terminal-theme-option-kanagawa-wave"]'
+- assert_attribute:
+    selector: '[data-testid="terminal-theme-select"]'
+    name: aria-expanded
+    equals: 'false'
+- set_check:
+    selector: 'input[aria-label="Enable font ligatures"]'
+    checked: true
+- assert_count:
+    selector: 'input[aria-label="Enable font ligatures"]:checked'
+    equal: 1
+- set_check:
+    selector: '[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]'
+    checked: false
+- assert_count:
+    selector: '[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]:checked'
+    equal: 0
+- set_check:
+    selector: '[data-testid="terminal-copy-on-select-toggle"] input[type="checkbox"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="terminal-osc52-clipboard-toggle"] input[type="checkbox"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="terminal-read-only-toggle"] input[type="checkbox"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="terminal-bracketed-paste-toggle"] input[type="checkbox"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="terminal-multiline-paste-confirm-toggle"] input[type="checkbox"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="terminal-keyword-highlighting-toggle"] input[type="checkbox"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="terminal-save-scrollback-on-disconnect-toggle"] input[type="checkbox"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="terminal-inline-suggestions-toggle"] input[type="checkbox"]'
+    checked: false
+- assert_disabled: 'input[aria-label="Maximum command history entries per host"]'
+- set_check:
+    selector: '[data-testid="terminal-inline-suggestions-toggle"] input[type="checkbox"]'
+    checked: true
+- assert_enabled: 'input[aria-label="Maximum command history entries per host"]'
+- fill:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    value: '99'
+- click: text="Clear all history"
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Clear all command history
+- click: '[data-testid="confirm-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="confirm-dialog"]'
+    state: detached
+- assert_attribute:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    name: value
+    equals: '100'
+- fill:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    value: '50001'
+- click: 'input[name="inlineSuggestionsSource"][value="history+path"]'
+- wait_for: 'input[aria-label="Maximum command history entries per host"][value="50000"]'
+- assert_attribute:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    name: value
+    equals: '50000'
+- assert_count:
+    selector: 'input[name="inlineSuggestionsSource"][value="history+path"]:checked'
+    equal: 1
+- assert_enabled: 'input[aria-label="Maximum command history entries per host"]'
+- set_check:
+    selector: '[data-testid="ai-command-rewrite-toggle"] input[type="checkbox"]'
+    checked: true
+- assert_count:
+    selector: '[data-testid="ai-command-rewrite-toggle"] input[type="checkbox"]:checked'
+    equal: 1
+- assert_enabled: 'input[aria-label="AI command rewrite shortcut"]'
+- fill:
+    selector: 'input[aria-label="AI command rewrite shortcut"]'
+    value: Ctrl+Alt+K
+- assert_attribute:
+    selector: 'input[aria-label="AI command rewrite shortcut"]'
+    name: value
+    equals: Ctrl+Alt+K
+- set_check:
+    selector: '[data-testid="ai-command-rewrite-toggle"] input[type="checkbox"]'
+    checked: false
+- assert_disabled: 'input[aria-label="AI command rewrite shortcut"]'
+- set_check:
+    selector: '[data-testid="terminal-ai-inline-qq-toggle"] input[type="checkbox"]'
+    checked: true
+- assert_count:
+    selector: '[data-testid="terminal-ai-inline-qq-toggle"] input[type="checkbox"]:checked'
+    equal: 1
+- click: text="Add entry"
+- wait_for: 'input[aria-label="Command 1"]'
+- fill:
+    selector: 'input[aria-label="Command 1"]'
+    value: printf qa-custom-ssh-command
+- fill:
+    selector: 'input[aria-label="Description 1"]'
+    value: SSH profile command
+- assert_attribute:
+    selector: 'input[aria-label="Command 1"]'
+    name: value
+    equals: printf qa-custom-ssh-command
+- assert_attribute:
+    selector: 'input[aria-label="Description 1"]'
+    name: value
+    equals: SSH profile command
+- click: '[aria-label="Remove command 1"]'
+- assert_not_visible: 'input[aria-label="Command 1"]'
+- click: text="Add entry"
+- fill:
+    selector: 'input[aria-label="Command 1"]'
+    value: printf qa-custom-ssh-command
+- fill:
+    selector: 'input[aria-label="Description 1"]'
+    value: SSH profile command
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-ssh-terminal-profile
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-terminal-profile"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-terminal-profile"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-terminal"]'
+- wait_for: '[data-testid="terminal-settings"]'
+- assert_text:
+    selector: '[data-testid="terminal-theme-select"]'
+    contains: Kanagawa Wave
+- assert_count:
+    selector: 'input[aria-label="Enable font ligatures"]:checked'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]:checked'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="terminal-copy-on-select-toggle"] input[type="checkbox"]:checked'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="terminal-osc52-clipboard-toggle"] input[type="checkbox"]:checked'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="terminal-read-only-toggle"] input[type="checkbox"]:checked'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="terminal-bracketed-paste-toggle"] input[type="checkbox"]:checked'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="terminal-multiline-paste-confirm-toggle"] input[type="checkbox"]:checked'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="terminal-keyword-highlighting-toggle"] input[type="checkbox"]:checked'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="terminal-save-scrollback-on-disconnect-toggle"] input[type="checkbox"]:checked'
+    equal: 1
+- assert_attribute:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    name: value
+    equals: '50000'
+- assert_count:
+    selector: 'input[name="inlineSuggestionsSource"][value="history+path"]:checked'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="ai-command-rewrite-toggle"] input[type="checkbox"]:checked'
+    equal: 0
+- assert_attribute:
+    selector: 'input[aria-label="AI command rewrite shortcut"]'
+    name: value
+    equals: Ctrl+Alt+K
+- assert_count:
+    selector: '[data-testid="terminal-ai-inline-qq-toggle"] input[type="checkbox"]:checked'
+    equal: 1
+- assert_attribute:
+    selector: 'input[aria-label="Command 1"]'
+    name: value
+    equals: printf qa-custom-ssh-command
+- assert_attribute:
+    selector: 'input[aria-label="Description 1"]'
+    name: value
+    equals: SSH profile command
+- click: '[data-testid="session-cancel"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+- screenshot: 149-ssh-terminal-profile-controls.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SSH terminal profile controls expose selected theme, behavior toggles, suggestion limits, AI controls, history cancellation, and custom command editing with observable persistence after reopen.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+    - 50
+    - 51
+    - 52
+    - 53
+    - 54
+    - 55
+    - 56
+    - 57
+    - 58
+    - 59
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 69
+    - 70
+    - 71
+    - 72
+    - 73
+    - 74
+    - 75
+    - 76
+    - 77
+    - 78
+    - 79
+    - 80
+    - 81
+    - 82
+    - 83
+    - 84
+    - 85
+    - 86
+    - 87
+    - 88
+    - 89
+    - 90
+    - 91
+    - 92
+    - 93
+    checkpoints:
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"terminal-appearance-settings\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-theme-select\"]", "name": "aria-expanded", "equals": "false"}}'
+    - step: 19
+      expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
+    - step: 32
+      expectation: '{"assert_enabled": "input[aria-label=\"Maximum command history entries per host\"]"}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Clear all command history"}}'
+    - step: 38
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "100"}}'
+    - step: 42
+      expectation: '{"wait_for": "input[aria-label=\"Maximum command history entries per host\"][value=\"50000\"]"}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "50000"}}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "input[name=\"inlineSuggestionsSource\"][value=\"history+path\"]:checked", "equal": 1}}'
+    - step: 45
+      expectation: '{"assert_enabled": "input[aria-label=\"Maximum command history entries per host\"]"}'
+    - step: 59
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Command 1\"]", "name": "value", "equals": "printf qa-custom-ssh-command"}}'
+    - step: 70
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-terminal-profile\"]"}'
+    - step: 76
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-theme-select\"]", "contains": "Kanagawa Wave"}}'
+    - step: 86
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "50000"}}'
+    - step: 91
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Command 1\"]", "name": "value", "equals": "printf qa-custom-ssh-command"}}'
+    - step: 94
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 12
+    - 17
+    - 19
+    - 32
+    - 35
+    - 36
+    - 38
+    - 39
+    - 42
+    - 43
+    - 44
+    - 45
+    - 59
+    - 70
+    - 76
+    - 86
+    - 91
+    - 94
+  visual:
+  - check: Inspect the terminal profile screenshot for readable sections, selected controls, and no clipped labels.
+    method: manual
+    reason: Screenshot review is required for cross-WebView settings layout.
+  native:
+  - check: Execute the profile editor in the declared native modes; browser evidence does not certify Tauri WebViews.
+    method: external
+    reason: Native execution is collected by the platform workflow.

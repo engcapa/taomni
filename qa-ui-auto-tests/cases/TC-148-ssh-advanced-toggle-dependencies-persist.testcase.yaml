@@ -1,0 +1,240 @@
+id: TC-148
+title: SSH advanced toggles enforce dependencies and persist after reopen
+covers:
+- F3.2
+- F6.3
+tags:
+- ssh
+- session
+- settings
+- advanced
+- persistence
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-ssh"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ssh-advanced-dependencies.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '2222'
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: qa-advanced-dependencies
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- assert_attribute:
+    selector: '[data-testid="session-x11-forwarding-toggle"]'
+    name: data-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="session-x11-trusted-toggle"]'
+    name: data-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="session-compression-toggle"]'
+    name: data-checked
+    equals: 'false'
+- set_check:
+    selector: '[data-testid="session-x11-forwarding-toggle"]'
+    checked: false
+- assert_attribute:
+    selector: '[data-testid="session-x11-forwarding-toggle"]'
+    name: data-checked
+    equals: 'false'
+- assert_disabled: '[data-testid="session-x11-trusted-toggle"]'
+- set_check:
+    selector: '[data-testid="session-x11-forwarding-toggle"]'
+    checked: true
+- assert_enabled: '[data-testid="session-x11-trusted-toggle"]'
+- set_check:
+    selector: '[data-testid="session-x11-trusted-toggle"]'
+    checked: false
+- assert_attribute:
+    selector: '[data-testid="session-x11-trusted-toggle"]'
+    name: data-checked
+    equals: 'false'
+- set_check:
+    selector: '[data-testid="session-compression-toggle"]'
+    checked: true
+- assert_attribute:
+    selector: '[data-testid="session-compression-toggle"]'
+    name: data-checked
+    equals: 'true'
+- select_option:
+    selector: '[data-testid="session-remote-environment"]'
+    label: Custom command…
+- assert_attribute:
+    selector: '[data-testid="session-remote-environment"]'
+    name: value
+    equals: Custom command…
+- fill:
+    selector: 'input[aria-label="Execute command"]'
+    value: printf qa-ssh-advanced-toggle
+- set_check:
+    selector: '[data-testid="session-do-not-exit"]'
+    checked: false
+- assert_attribute:
+    selector: '[data-testid="session-do-not-exit"]'
+    name: data-checked
+    equals: 'false'
+- select_option:
+    selector: '[data-testid="session-ssh-browser-type"]'
+    label: Disabled
+- assert_attribute:
+    selector: '[data-testid="session-ssh-browser-type"]'
+    name: value
+    equals: Disabled
+- click: '[data-testid="session-auth-privatekey"]'
+- assert_attribute:
+    selector: '[data-testid="session-private-key-toggle"]'
+    name: data-checked
+    equals: 'true'
+- assert_enabled: 'input[aria-label="Private key path"]'
+- fill:
+    selector: 'input[aria-label="Private key path"]'
+    value: /tmp/qa-ssh-advanced-toggle-key
+- click: '[data-testid="session-auth-password"]'
+- assert_count:
+    selector: '[data-testid="session-auth-password"]:checked'
+    equal: 1
+- assert_disabled: 'input[aria-label="Private key path"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-ssh-advanced-dependencies
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-advanced-dependencies"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-advanced-dependencies"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-advanced"]'
+- wait_for: '[data-testid="advanced-ssh-settings"]'
+- assert_attribute:
+    selector: '[data-testid="session-x11-forwarding-toggle"]'
+    name: data-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="session-x11-trusted-toggle"]'
+    name: data-checked
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="session-compression-toggle"]'
+    name: data-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="session-remote-environment"]'
+    name: value
+    equals: Custom command…
+- assert_attribute:
+    selector: 'input[aria-label="Execute command"]'
+    name: value
+    equals: printf qa-ssh-advanced-toggle
+- assert_attribute:
+    selector: '[data-testid="session-do-not-exit"]'
+    name: data-checked
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="session-ssh-browser-type"]'
+    name: value
+    equals: Disabled
+- assert_count:
+    selector: '[data-testid="session-auth-password"]:checked'
+    equal: 1
+- click: '[data-testid="session-cancel"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    state: detached
+- screenshot: 148-ssh-advanced-toggle-dependencies.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SSH advanced X11, compression, remote environment, startup, browser mode, and authentication controls change their visible state and persist after saving and reopening.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 15
+    - 18
+    - 20
+    - 22
+    - 24
+    - 26
+    - 27
+    - 29
+    - 31
+    - 34
+    - 35
+    - 38
+    - 40
+    - 41
+    - 43
+    - 44
+    - 46
+    checkpoints:
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 17
+      expectation: '{"assert_disabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "Custom command…"}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "Disabled"}}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-dependencies\"]"}'
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 50
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "Custom command…"}}'
+    - step: 52
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf qa-ssh-advanced-toggle"}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "Disabled"}}'
+    - step: 55
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
+    results:
+    - 12
+    - 17
+    - 23
+    - 25
+    - 30
+    - 42
+    - 49
+    - 50
+    - 51
+    - 52
+    - 54
+    - 55
+  visual:
+  - check: Inspect the advanced SSH form screenshot for visible dependency state, aligned controls, and no clipped labels.
+    method: manual
+    reason: Screenshot review is required for cross-WebView form layout.
+  native:
+  - check: Execute the same editor interactions in the declared native modes; browser evidence does not certify Tauri WebViews.
+    method: external
+    reason: Native execution is collected by the platform workflow.

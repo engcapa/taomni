@@ -277,9 +277,11 @@ def _eval_readonly(ctx: NativeStepContext, args: Any) -> str:
 def _hover(ctx: NativeStepContext, args: Any) -> str:
     selector, _ = _selector_args(args)
     element = ctx.session.find(selector, interactive=True)
-    rect = ctx.session.request("GET", ctx.session.element_path(element, "/rect"))
-    x = int(rect.get("x", 0) + rect.get("width", 0) / 2)
-    y = int(rect.get("y", 0) + rect.get("height", 0) / 2)
+    # Use the WebDriver element origin instead of converting the element's
+    # CSS rect to viewport coordinates. WKWebView can report CSS pixels while
+    # its input endpoint consumes backing-screen coordinates (notably on
+    # Retina macOS), which can move the pointer beside a portal submenu.
+    origin = {"element-6066-11e4-a52e-4f735466cecf": element}
     ctx.session.request(
         "POST",
         ctx.session.endpoint("/actions"),
@@ -289,12 +291,14 @@ def _hover(ctx: NativeStepContext, args: Any) -> str:
                     "type": "pointer",
                     "id": "mouse",
                     "parameters": {"pointerType": "mouse"},
-                    "actions": [{"type": "pointerMove", "duration": 100, "x": x, "y": y,
-                                 "origin": "viewport"}],
+                    "actions": [{"type": "pointerMove", "duration": 150, "x": 0, "y": 0,
+                                 "origin": origin}],
                 }
             ]
         },
     )
+    # Allow React submenu state to mount before the next native step queries it.
+    time.sleep(0.35)
     return f"hovered {selector}"
 
 

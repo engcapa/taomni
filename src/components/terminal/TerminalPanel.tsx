@@ -2005,18 +2005,27 @@ export function TerminalPanel({
       },
       {
         label: "Terminal display",
+        testId: "context-menu-item-terminal-display",
         children: [
           { label: "Reset terminal output", onClick: resetOutput },
           { label: "Clear terminal scrollback", onClick: clearScrollback },
           { label: "Set terminal title", onClick: renameTerminal, disabled: !tabId },
           {
             label: "Toggle terminal scrollbar",
+            testId: "context-menu-item-toggle-terminal-scrollbar",
             checked: showScrollbar,
             onClick: () => commitTerminalProfilePatch({ showScrollbar: !showScrollbar }),
           },
-          { label: "Fullscreen terminal", shortcut: "F11", checked: fullscreen, onClick: () => setFullscreen((v) => !v) },
+          {
+            label: "Fullscreen terminal",
+            testId: "context-menu-item-fullscreen-terminal",
+            shortcut: "F11",
+            checked: fullscreen,
+            onClick: () => setFullscreen((v) => !v),
+          },
           {
             label: "Read-only terminal",
+            testId: "context-menu-item-read-only-terminal",
             checked: readOnly,
             onClick: () => commitTerminalProfilePatch({ readOnly: !readOnly }),
           },
@@ -2061,7 +2070,7 @@ export function TerminalPanel({
           { label: "IGNORE message", disabled: true },
         ],
       },
-      { label: "Event Log", onClick: () => setEventLogOpen(true) },
+      { label: "Event Log", testId: "context-menu-item-event-log", onClick: () => setEventLogOpen(true) },
       { label: "", separator: true },
       {
         label: "AI: 解释最近的终端输出",
@@ -2739,6 +2748,7 @@ export function TerminalPanel({
           } else {
             term.write(filtered, () => {
               syncAutomationState();
+              installSshCwdIntegrationRef.current?.();
               if (activityPromptTimer) clearTimeout(activityPromptTimer);
               activityPromptTimer = setTimeout(() => {
                 if (
@@ -2927,6 +2937,7 @@ export function TerminalPanel({
     const handleConnected = async (
       { sessionId: connectedSid, shellId, directoryUseWarning, taskEnvironment }: ConnectResult,
       mode: ConnectMode,
+      startupCommand?: string,
     ) => {
       if (destroyed) {
         const detachPending = tabId ? consumeTerminalDetachPending(tabId) : false;
@@ -2979,10 +2990,22 @@ export function TerminalPanel({
       // retain an event-driven installer that runs when output later settles at
       // an idle prompt. The terminal is usable immediately; this only defers the
       // background hook. Shared by the SSH remote shell and the local macOS zsh.
-      const scheduleCwdIntegrationInstall = (targetSid: string, integrationCommand: string) => {
+      const scheduleCwdIntegrationInstall = (
+        targetSid: string,
+        integrationCommand: string | null,
+        pendingStartupCommand?: string,
+      ) => {
+        if (!integrationCommand && !pendingStartupCommand) return;
         if (ssh && !adopted) automationInputSettlingRef.current = true;
         let integrationAttempts = 0;
         let integrationInstalling = false;
+        let startupCommandSent = false;
+        let startupCommandOutputObserved = false;
+        let startupCommandPromptSnapshot: string | null = null;
+        const snapshotPromptBuffer = (liveTerm: Terminal) => {
+          const buffer = liveTerm.buffer.active;
+          return `${buffer.baseY + buffer.cursorY}:${buffer.cursorX}\n${getLastBufferLines(liveTerm, 5)}`;
+        };
         const MAX_INTEGRATION_ATTEMPTS = 12; // ~6s of polling for a slow login
         const installCwdIntegration = (): boolean => {
           if (destroyed || sessionIdRef.current !== targetSid) {
@@ -2993,7 +3016,29 @@ export function TerminalPanel({
           }
           if (integrationInstalling) return true;
           const liveTerm = termRef.current;
-          if (!liveTerm || !terminalAtIdlePrompt(liveTerm)) return false;
+          if (!liveTerm) return false;
+          if (pendingStartupCommand && !startupCommandSent) {
+            if (!terminalAtIdlePrompt(liveTerm)) return false;
+            startupCommandSent = true;
+            startupCommandPromptSnapshot = snapshotPromptBuffer(liveTerm);
+            writeTerminal(targetSid, encodeBase64(`${pendingStartupCommand}\r`)).catch((err) => {
+              appendEvent("error", `Failed to send SSH startup command: ${String(err)}`);
+            });
+            return false;
+          }
+          if (pendingStartupCommand && !startupCommandOutputObserved) {
+            if (snapshotPromptBuffer(liveTerm) === startupCommandPromptSnapshot) return false;
+            startupCommandOutputObserved = true;
+            automationInputSettlingRef.current = false;
+            syncAutomationState();
+          }
+          if (!terminalAtIdlePrompt(liveTerm)) return false;
+          if (!integrationCommand) {
+            installSshCwdIntegrationRef.current = null;
+            automationInputSettlingRef.current = false;
+            syncAutomationState();
+            return true;
+          }
           integrationInstalling = true;
           const integrationTimeoutMs = /\bMINGW(?:32|64)\b/.test(getLastBufferLines(liveTerm, 3)) ? 30_000 : 4_000;
           if (installSshCwdIntegrationRef.current === installCwdIntegration) {
@@ -3004,6 +3049,7 @@ export function TerminalPanel({
           // it's just network latency, not shell startup). Bounded so a
           // non-POSIX shell — which never emits the OSC 7 — isn't blacked out
           // for too long before output resumes.
+          automationInputSettlingRef.current = true;
           const suppressor = createOsc7BlankingSuppressor(integrationTimeoutMs);
           injectedInputEchoSuppressorRef.current = suppressor;
           window.setTimeout(() => {
@@ -3034,6 +3080,8 @@ export function TerminalPanel({
           if (integrationAttempts < MAX_INTEGRATION_ATTEMPTS) {
             integrationAttempts += 1;
             window.setTimeout(pollForCwdIntegration, 500);
+          } else if (pendingStartupCommand && !startupCommandSent) {
+            // Keep the event-driven probe alive until a slow login exposes its prompt.
           } else if (installSshCwdIntegrationRef.current === installCwdIntegration) {
             // A shell that never exposes a prompt (or a non-POSIX prompt that
             // cannot accept the integration command) must not block normal
@@ -3071,7 +3119,9 @@ export function TerminalPanel({
           !isTauriRuntime() && getAppPlatform() === "windows";
         if (skipBrowserWindowsSshIntegration) {
           if (initialCwd) {
-            scheduleCwdIntegrationInstall(connectedSid, buildSshInitialCwdProbe(initialCwd));
+            scheduleCwdIntegrationInstall(connectedSid, buildSshInitialCwdProbe(initialCwd), startupCommand);
+          } else if (startupCommand) {
+            scheduleCwdIntegrationInstall(connectedSid, null, startupCommand);
           } else {
             automationInputSettlingRef.current = false;
             installSshCwdIntegrationRef.current = null;
@@ -3079,7 +3129,7 @@ export function TerminalPanel({
             syncAutomationState();
           }
         } else {
-          scheduleCwdIntegrationInstall(connectedSid, buildSshCwdIntegration(initialCwd));
+          scheduleCwdIntegrationInstall(connectedSid, buildSshCwdIntegration(initialCwd), startupCommand);
         }
       } else if (
         !commandTerminal &&
@@ -3188,6 +3238,8 @@ export function TerminalPanel({
       const ns = getSessionNetworkSettings(ssh.optionsJson);
       const opts = parseSessionOptions(ssh.optionsJson);
       const startupCommand = typeof opts.startupCmd === "string" ? opts.startupCmd.trim() : "";
+      const keepStartupCommandOpen = startupCommand.length > 0 && opts.doNotExit !== false;
+      const backendStartupCommand = startupCommand && !keepStartupCommandOpen ? startupCommand : null;
       createSshTerminal(
         targetSid,
         ssh.host,
@@ -3204,10 +3256,14 @@ export function TerminalPanel({
         // explicitly opts into untrusted.
         opts.x11 !== false,
         opts.x11Trusted !== false,
-        startupCommand || null,
-        startupCommand ? opts.doNotExit !== false : false,
+        backendStartupCommand,
+        keepStartupCommandOpen,
       )
-        .then((sessionId) => handleConnected({ sessionId, shellId: null }, mode))
+        .then((sessionId) => handleConnected(
+          { sessionId, shellId: null },
+          mode,
+          keepStartupCommandOpen ? startupCommand : undefined,
+        ))
         .catch((err) => handleConnectFailure(err, mode));
     };
 
@@ -3984,6 +4040,7 @@ export function TerminalPanel({
 
       {eventLogOpen && (
         <div
+          data-testid="terminal-event-log"
           className="absolute right-4 bottom-4 z-50 w-[520px] max-w-[calc(100%-2rem)] max-h-[360px] rounded border border-slate-500 bg-white shadow-xl text-[12px] overflow-hidden"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
@@ -3991,7 +4048,12 @@ export function TerminalPanel({
         >
           <div className="h-8 flex items-center px-3 border-b bg-slate-100">
             <span className="font-semibold">{t("terminal.eventLogTitle")}</span>
-            <button className="taomni-btn ml-auto h-6 px-2" type="button" onClick={() => setEventLogOpen(false)}>
+            <button
+              data-testid="terminal-event-log-close"
+              className="taomni-btn ml-auto h-6 px-2"
+              type="button"
+              onClick={() => setEventLogOpen(false)}
+            >
               {t("terminal.eventLogClose")}
             </button>
           </div>
@@ -4204,11 +4266,17 @@ function CurrentTerminalSettingsDialog({
           <button
             type="button"
             className="taomni-btn h-8 px-3"
+            data-testid="terminal-current-settings-save-default"
             onClick={onSaveAsDefault}
           >
             {t("terminal.currentSettingsSaveAsDefault")}
           </button>
-          <button type="button" className="taomni-btn h-8 px-3" onClick={onClose}>
+          <button
+            type="button"
+            className="taomni-btn h-8 px-3"
+            data-testid="terminal-current-settings-footer-close"
+            onClick={onClose}
+          >
             {t("terminal.currentSettingsClose")}
           </button>
         </div>

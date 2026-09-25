@@ -1,0 +1,176 @@
+id: TC-144
+title: SSH terminal reconnects after the remote shell exits and accepts commands again
+covers:
+- F3.1
+- F2.2
+- F4.7
+tags:
+- ssh
+- terminal
+- reconnect
+- recovery
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_required
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-ssh-reconnect
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-reconnect"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-reconnect"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf 'qa-ssh-before-exit\n'
+    submit: true
+- wait: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-ssh\-before\-exit\r?$
+    timeout_sec: 15
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: exit
+    submit: true
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-text*="SSH disconnected"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="terminal-pane"]'
+    contains: SSH disconnected
+- press:
+    key: Enter
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf 'qa-ssh-after-reconnect\n'
+    submit: true
+- wait: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^qa\-ssh\-after\-reconnect\r?$
+    timeout_sec: 20
+- right_click:
+    selector: '[data-testid="terminal-pane"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="context-menu-item-event-log"]'
+- wait_for: '[data-testid="terminal-event-log"]'
+- assert_text:
+    selector: '[data-testid="terminal-event-log"]'
+    contains: Reconnected
+- click: '[data-testid="terminal-event-log-close"]'
+- wait_for:
+    selector: '[data-testid="terminal-event-log"]'
+    state: detached
+- screenshot: 144-ssh-terminal-reconnect.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Exiting the remote shell exposes the SSH disconnected recovery prompt; pressing Enter creates a ready connection, a post-reconnect command produces an exact output line, and the event log records the reconnect.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 16
+    - 17
+    - 19
+    - 22
+    - 25
+    - 27
+    - 30
+    - 32
+    - 35
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-reconnect\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 21
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-before\\-exit\\r?$", "timeout_sec": 15}}'
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-text*=\"SSH disconnected\"]", "timeout_sec": 30}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "SSH disconnected"}}'
+    - step: 26
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 29
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-reconnect\\r?$", "timeout_sec": 20}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"terminal-event-log\"]"}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "Reconnected"}}'
+    - step: 36
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-event-log\"]", "state": "detached"}}'
+    results:
+    - 4
+    - 10
+    - 13
+    - 15
+    - 18
+    - 21
+    - 23
+    - 24
+    - 26
+    - 29
+    - 31
+    - 33
+    - 34
+    - 36
+  visual:
+  - check: Disconnect and reconnect status text, terminal output, and event-log rows remain readable.
+    method: manual
+    reason: DOM assertions do not establish status placement or terminal rendering fidelity.
+  native:
+  - check: Native runs verify the packaged SSH exit event, keyboard retry path, and fresh PTY channel.
+    method: automated
+    reason: Browser bridge output cannot prove native reconnect behavior.

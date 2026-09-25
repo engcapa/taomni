@@ -1762,7 +1762,7 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
-  it("passes saved SSH startup command options to the backend", async () => {
+  it("waits for an idle SSH shell before sending the saved startup command", async () => {
     render(
       <TerminalPanel
         visible
@@ -1792,9 +1792,116 @@ describe("TerminalPanel focus behavior", () => {
       expect.any(Function),
       true,
       true,
-      "tmux new -A -s main",
+      null,
       true,
     );
+
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 600));
+    });
+    expect(ipcMocks.writeTerminal).not.toHaveBeenCalled();
+
+    const prompt = "user@host:~$ ";
+    term.buffer.active = {
+      type: "normal",
+      length: 1,
+      baseY: 0,
+      cursorY: 0,
+      cursorX: prompt.length,
+      viewportY: 0,
+      getLine: vi.fn(() => ({ isWrapped: false, translateToString: () => prompt })),
+    };
+
+    await waitFor(() => {
+      expect(ipcMocks.writeTerminal).toHaveBeenCalledWith(
+        "terminal-session",
+        btoa("tmux new -A -s main\r"),
+      );
+    });
+  });
+
+  it("waits for the startup command to return before installing SSH cwd reporting", async () => {
+    const originalPlatform = window.navigator.platform;
+    Object.defineProperty(window.navigator, "platform", { configurable: true, value: "Win32" });
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
+    const startupCommand = "printf 'qa-startup-marker\\n'";
+    let onOutput: ((data: Uint8Array) => void) | undefined;
+    const onSessionReady = vi.fn();
+    ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
+      onOutput = args[9] as (data: Uint8Array) => void;
+      return "terminal-session";
+    });
+
+    try {
+      render(
+        <TerminalPanel
+          visible
+          onSessionReady={onSessionReady}
+          ssh={{ ...sshInfo, optionsJson: JSON.stringify({ startupCmd: startupCommand }) }}
+        />,
+      );
+      await waitFor(() => {
+        expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+        expect(onOutput).toBeTypeOf("function");
+      });
+
+      const term = terminalMocks.terminalCtor.mock.results[0].value;
+      const promptRows = ["user@host MINGW64 ~", "$ "];
+      const setBufferRows = (rows: string[]) => {
+        term.buffer.active = {
+          type: "normal",
+          length: rows.length,
+          baseY: 0,
+          cursorY: rows.length - 1,
+          cursorX: rows[rows.length - 1].length,
+          viewportY: 0,
+          getLine: vi.fn((row: number) => ({
+            isWrapped: false,
+            translateToString: () => rows[row] ?? "",
+          })),
+        };
+      };
+      term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());
+      ipcMocks.writeTerminal.mockClear();
+      setBufferRows(promptRows);
+      await act(async () => {
+        onOutput?.(new TextEncoder().encode("user@host MINGW64 ~\r\n$ "));
+      });
+
+      await waitFor(() => {
+        expect(ipcMocks.writeTerminal).toHaveBeenCalledTimes(1);
+      });
+      const firstWrite = (ipcMocks.writeTerminal.mock.calls as unknown[][])[0];
+      expect(atob(firstWrite[1] as string)).toBe(`${startupCommand}\r`);
+      await act(async () => {
+        await new Promise((resolve) => window.setTimeout(resolve, 650));
+      });
+      expect(ipcMocks.writeTerminal).toHaveBeenCalledTimes(1);
+
+      vi.useFakeTimers();
+      setBufferRows([
+        promptRows[0],
+        "$ printf 'qa-startup-marker\\n'",
+        "qa-startup-marker",
+        ...promptRows,
+      ]);
+      await act(async () => {
+        onOutput?.(new TextEncoder().encode("qa-startup-marker\r\nuser@host MINGW64 ~\r\n$ "));
+      });
+
+      const writes = (ipcMocks.writeTerminal.mock.calls as unknown[][]).map(([, encoded]) =>
+        typeof encoded === "string" ? atob(encoded) : "",
+      );
+      expect(writes[0]).toBe(`${startupCommand}\r`);
+      expect(writes[1]).toContain("__taomni_osc7");
+    } finally {
+      vi.useRealTimers();
+      Object.defineProperty(window.navigator, "platform", {
+        configurable: true,
+        value: originalPlatform,
+      });
+    }
   });
 
   it("uses the latest measured terminal size when reconnecting SSH", async () => {
