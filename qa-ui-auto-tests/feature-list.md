@@ -1173,6 +1173,11 @@ controls:
     optional: true       # only visible while the preview dropdown is open
     aliases:
       - '[data-testid="terminal-theme-option-kanagawa-wave"]'
+      - '[data-testid="terminal-context-theme-option-kanagawa-wave"]'
+  - id: theme-select-menu
+    selector: '[data-testid="terminal-theme-select-menu"]'
+    kind: display
+    optional: true       # only visible while the preview dropdown is open
   - id: local-default-theme
     selector: '[data-testid="terminal-context-set-local-default-theme"]'
     kind: interactive
@@ -1207,12 +1212,69 @@ controls:
   - id: font-ligatures-toggle
     selector: 'input[aria-label="Enable font ligatures"]'
     kind: interactive
+    aliases:
+      - 'label:has-text("Enable font ligatures") input[type="checkbox"]'
+      - 'label:has-text("Enable font ligatures") input[type="checkbox"]:checked'
   - id: scrollback
     selector: 'input[aria-label="Scrollback lines"]'
     kind: interactive
   - id: inline-suggestions-max
     selector: 'input[aria-label="Maximum command history entries per host"]'
     kind: interactive
+  - id: show-scrollbar
+    selector: 'label:has-text("Show terminal scrollbar") input[type="checkbox"]'
+    kind: interactive
+  - id: copy-on-select
+    selector: 'label:has-text("Copy on select") input[type="checkbox"]'
+    kind: interactive
+  - id: allow-osc52
+    selector: 'label:has-text("Allow SSH OSC 52 clipboard") input[type="checkbox"]'
+    kind: interactive
+  - id: read-only
+    selector: 'label:has-text("Read-only terminal") input[type="checkbox"]'
+    kind: interactive
+  - id: bracketed-paste
+    selector: 'label:has-text("Bracketed paste") input[type="checkbox"]'
+    kind: interactive
+  - id: multiline-paste-confirm
+    selector: 'label:has-text("Confirm multiline paste") input[type="checkbox"]'
+    kind: interactive
+  - id: keyword-highlighting
+    selector: 'label:has-text("Enable keyword highlighting") input[type="checkbox"]'
+    kind: interactive
+  - id: save-scrollback-on-disconnect
+    selector: 'label:has-text("Save scrollback to log file on disconnect") input[type="checkbox"]'
+    kind: interactive
+  - id: inline-suggestions-toggle
+    selector: 'label:has-text("Show ghost-text suggestions from command history") input[type="checkbox"]'
+    kind: interactive
+  - id: clear-all-history
+    selector: 'text="Clear all history"'
+    kind: interactive
+  - id: common-command
+    selector: 'input[aria-label="Command 1"]'
+    kind: interactive
+  - id: common-command-description
+    selector: 'input[aria-label="Description 1"]'
+    kind: interactive
+  - id: common-command-remove
+    selector: '[aria-label="Remove command 1"]'
+    kind: interactive
+  - id: common-command-add
+    selector: 'text="Add entry"'
+    kind: interactive
+  - id: context-set-profile-default
+    selector: '[data-testid="terminal-context-set-local-default-profile"]'
+    kind: interactive
+    optional: true       # only visible in the terminal context menu
+  - id: context-change-settings
+    selector: '[data-testid="terminal-context-change-settings"]'
+    kind: interactive
+    optional: true       # only visible in the terminal context menu
+  - id: current-settings-dialog
+    selector: '[data-testid="terminal-current-settings-dialog"]'
+    kind: display
+    optional: true       # only visible after choosing Change settings
   - id: cursor-style
     selector: 'select[aria-label="Terminal cursor"]'
     kind: interactive
@@ -1927,6 +1989,10 @@ controls:
   - id: close
     selector: '[data-testid="auth-close"]'
     kind: interactive
+  - id: save-to-vault
+    selector: '[data-testid="auth-save-to-vault"]'
+    kind: interactive
+    optional: true        # only when the vault is available for the prompt
 -->
 
 - 密码输入弹窗
@@ -3239,6 +3305,9 @@ controls:
     kind: interactive
   - id: ai-command-rewrite-shortcut
     selector: 'input[aria-label="AI command rewrite shortcut"]'
+    kind: interactive
+  - id: ai-inline-question-render
+    selector: 'label:has-text("Render `?? <question>` answers inline") input[type="checkbox"]'
     kind: interactive
 -->
 
