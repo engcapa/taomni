@@ -32,6 +32,7 @@ import type {
 } from "../../../lib/editor/lsp";
 import type {
   LspCompletionItem,
+  LspCompletionResolveResult,
   LspCompletionResult,
 } from "../../../lib/editor/lsp";
 import type { ParameterPopupView } from "./referenceInfoSession";
@@ -53,6 +54,7 @@ import {
   mergeCompletionTriggers,
   LspCompletionController,
   type CompletionAcceptanceDiagnostic,
+  type CompletionInvocationRequest,
   type CompletionRequestIdentity,
   type CompletionRequestToken,
 } from "./lspCompletion";
@@ -224,12 +226,13 @@ interface EditorGroupProps {
     position: LspPosition,
     trigger: string | null,
     token: CompletionRequestToken,
+    invocation?: CompletionInvocationRequest,
   ) => Promise<LspCompletionResult | null>;
   onCompleteResolve: (
     file: OpenFileViewModel,
     raw: unknown,
     token: CompletionRequestToken,
-  ) => Promise<LspCompletionItem | null>;
+  ) => Promise<LspCompletionResolveResult | LspCompletionItem | null>;
   /** Live completion request identity per file (§8.16.2). */
   onCompletionIdentity: (file: OpenFileViewModel) => CompletionRequestIdentity | null;
   onCompletionDiagnostic: (
@@ -931,7 +934,7 @@ export function EditorGroup({
                         onPinHoverDoc={onPinHoverDoc}
                         onDefinition={(position) => onDefinition(activeFile, position)}
                         onReferences={(position) => onReferences(activeFile, position)}
-                        onComplete={(position, trigger, token) => onComplete(activeFile, position, trigger, token)}
+                        onComplete={(position, trigger, token, invocation) => onComplete(activeFile, position, trigger, token, invocation)}
                         onCompleteResolve={(raw, token) => onCompleteResolve(activeFile, raw, token)}
                         getCompletionIdentity={() => onCompletionIdentity(activeFile)}
                         onCompletionDiagnostic={onCompletionDiagnostic}
@@ -1020,7 +1023,7 @@ export function EditorGroup({
                       onPinHoverDoc={onPinHoverDoc}
                       onDefinition={(position) => onDefinition(activeFile, position)}
                       onReferences={(position) => onReferences(activeFile, position)}
-                      onComplete={(position, trigger, token) => onComplete(activeFile, position, trigger, token)}
+                      onComplete={(position, trigger, token, invocation) => onComplete(activeFile, position, trigger, token, invocation)}
                       onCompleteResolve={(raw, token) => onCompleteResolve(activeFile, raw, token)}
                       getCompletionIdentity={() => onCompletionIdentity(activeFile)}
                       onCompletionDiagnostic={onCompletionDiagnostic}

@@ -207,3 +207,28 @@ P1 不执行本节命令。P2先落实V1–V6及fixture/controlled-provider/obse
 P2维护 `qa-ui-auto-tests/feature-list.md`、covers/controls，controls变化时重生成testid目录，case批次后 `audit --gate`；检查summary/receipt和selected/pass/fail/skip。回填本节AC→V→实际文件/ID→断言/报告/平台；保留失败chronology。所有原件放忽略目录，入库只交摘要与身份。
 
 **P1门槛结论（2026-09-25）**：G1版本与G2必要参照、snippet差异决定已完成；DEC-08/09、V2/V5/V6期望和设施责任已落盘。同卡author为ready/planning_required=false，无开发owner。完整[可复制P2提示词](handoff-p2-ed-parity-005.md)使用固定板/ID；所有产品验证仍未执行。D1/D2有真实剩余实现工作，P1不是产品done或双侧matched。其他平台验证及原生provider能力缺口不得借ready状态免除。
+
+## 8. P2 当前端实现与自检（2026-09-25）
+
+本节仅记录 ED-PARITY-005 的 P2 结果；上节 P1 当时的未执行结论保持其历史含义。工作树基于 HEAD `25921fd774dfaa7e5832bdaec00caa187f7f4a0e`，最终产品/用例源码身份 `7437cfd8b4bf49259bae3b63368a3e6ff6bb8aa7586f4fc5345185bf736d2292`，runner 身份 `23e9521d80f10ef395b9a50a6821dd59ece69519ebf0b5cdfcd57fb01ca5ba0b`。验证时尚未提交或推送；之后的提交状态以 Git 历史为准。
+
+生产入口为 editor Basic Completion 快捷键/Action/候选点击，经 `CodeMirrorHost` 的唯一 completion controller 和 `CodeWorkspaceTab` 的 live-buffer、scope/session 检查到 Rust `lsp_completion`/`lsp_completion_resolve` 与真实 JDT LS；typed resolve 结果进入 gate 或一次 primary+additional edits 事务，再由共享文档 owner 撤销/重做。D1 的 null/error/timeout 保留为不同失败状态，不再回退原 item 假装 resolved；D2 保存 completion 专属 insert/replace 双范围，在接受会话冻结 Enter/鼠标 insert、Tab replace 意图。facts 变代、切文件/工作区、Esc/关闭和迟到结果不提交。原始 provider snippet 默认值、模板导航、Find/输入框保护、分屏共享 history、Java/non-Java 保存与 watcher 合同保留。
+
+| AC / V | 实际测试及决定性断言 | 本轮结果 |
+|---|---|---|
+| A1/A3 · V1 | `TC-IDE-PARITY-005-01`：Basic 两绑定、Action 多入口、焦点/冲突/readonly/composition、重复调用和恢复 | browser Windows `run-20260925-222716-397551900`，1 pass / 0 fail / 0 skip |
+| A1/A3 · V2 | `TC-IDE-PARITY-005-02`：候选 raw 身份/非首项 import、Enter/Tab/鼠标词中接受、snippet 导航/一次 Undo、窄窗/分屏共享 Undo | browser Windows `run-20260925-222842-979155200`，1/0/0 |
+| A1/A3 · V3 | `TC-IDE-PARITY-005-03`：ready/fallback 原因、文件/会话/facts/policy 失效与迟到隔离、显式重试 | browser Windows `run-20260925-222139-731901600`，1/0/0 |
+| A1/A3 · V4 | `TC-IDE-PARITY-005-04`：null/error/timeout gate、Retry/primary-only/Dismiss、非法 edits 零提交及恢复；Rust `completion_resolve_does_not_fallback_on_null_or_error` | browser Windows `run-20260925-223101-310968400`，1/0/0；Rust 1/1 |
+| A1/A3 · V5 | `TC-IDE-PARITY-005-05`：真实 Commons Lang item/resolve/import、`append(String str)` snippet、保存后两轮继续补全、隔离 Rust null/error fault、Tmid 三入口及各一次 Undo、host 字节 | native Windows/WebView2 `run-20260925-224242-622936200`，1/0/0，223/223 步通过；Rust 双范围测试 1/1 |
+| A2 · V6 | 本轮 005-02/05 截图及结果与 `REF-PARITY-005-WIN-20260925` 已存 IDEA 原件只读对照；功能/视觉/交互分别判断 | 对照审阅完成；功能关键转移符合，视觉未判 matched，见下文上限 |
+
+报告均在 `qa-ui-auto-report/ed-parity-005/<mode>/<run>/`，各有 `summary.json` 和 `runner_receipt.json`；`qa_ui_auto status` 当前选中 5 例、browser 4 pass、native 1 pass、0 gaps。10 个定向 Vitest 文件 168/168 通过（`qa-ui-auto-report/_local/parity005-unit-current.log`）；scoped typecheck 退出 0，范围内/外错误均 0（`parity005-typecheck-final.log`）；两个 Rust 定向测试分别 1/1；`audit --gate` 为 270 case、0 error、0 orphan、catalog 最新，`contracts --gate` 为 270/270 reviewed、0 gap。
+
+当前 native QA binary 仅一次最终重建，标识 `com.taomni.app.qa`、SHA-256 `4cebaeb181f6ba8be450727d350251d64f0efb55f48c0c5b2a1a2ce090f0b25b`，构建 256.484 秒；本轮 005-05 运行 85.416 秒。隔离工程 `pom.xml` 初始 SHA-256 `5cc644178baef8d68433acdfcb39cb82674273559ec6daa2fdec1be5502a7632`，`Main.java` 初始 SHA-256 `18c39b515afa53ccca7dd127f5ad92350c060d59aa436c6dfeecef24c982de53`。JDT LS 工作区 `.metadata/.log` 记录 core 启动及实际 Java 22.0.1 Azul；安装 core jar 为 `org.eclipse.jdt.ls.core_1.61.0.202607142124.jar`（SHA-256 `6d5a198c3778b77052ec9ae9fce3a5136711da6b9b16234cf97023389a0a2f7`）；Commons Lang 3.12.0 jar SHA-256 `d919d904486c037f8d193412da0c92e22a9fa24230b9d67a57855c5c31c7e94e`。真实 type resolve 返回 Commons Lang `StringUtils` 和单个 import edit；真实 method resolve 为 snippet format 2、`append(${1:null})`，符合 DEC-08 的原样保留。Tmid resolve 的 insert `[27,36)`、replace `[27,42)` 为同一行的两个真实范围。
+
+失败记录未删除：Vitest 首轮 167/168，原挂载测试在 CodeMirror 75ms 接受保护期内合成 Enter，调整测试等待至 90ms 后当前源码 168/168；005-03 首次 browser 报告 `run-20260925-221719-481808200` 在 Vite 页面 `domcontentloaded` 超时，服务恢复 HTTP 200 后重跑通过。此前 native 成功报告 `run-20260925-212140-243406300` 绑定旧 binary，只作历史定位；005-05 dry-run 只验证设施，不计行为证据。
+
+V6 自检复用原件 manifest 的 IDEA Ultimate 2026.2.3 / IU-262.10968.63、Islands Dark/Dark、Source Code Pro 16、100%/DPI 96；`17-mid.png` 与 `29-method-list.png` 的实际哈希符合 manifest。Taomni `tc-ide-parity-005-05-matched-profile-list.png` 来自本轮真实 WebView2/JDT LS。功能上，Tmid Enter/双击保留后缀、Tab 替换后缀、每次一份 import 与一次 Undo 同 IDEA；Esc 和选中候选的交互结论亦一致。`append(null)` 对 IDEA `append()` 是用户已接受的 provider 差异。视觉上当前 Taomni 工具栏/侧栏密度、候选行高/图标及列表内容仍不同，真实 provider 本轮返回 2 个 `StringUtils` 项，IDEA 存档显示 3 项；截图窗口尺寸也未完全相同。故只签当前 Windows 功能与交互自检，不签逐像素或整体 UI matched。用户本轮明确允许 native 当前端通过后声明卡 done，且不要求重新操作 IDEA 真机；此自检是对已存原件的只读比较，非独立验收。
+
+macOS/WKWebView、Linux/WebKitGTK 未运行。后续在各自隔离 QA app 中以相同 F2-COMP-005 工程、对应 JDT LS/JDK/classpath 身份执行 V1-V5，核对报文、host bytes、三入口/Undo 与截图；macOS 直接 Cargo 前先执行 `bash scripts/bundle-krb5-macos.sh stage`。WebDriver 证明本轮 WebView 输入与 DOM 焦点，不外推物理 OS 快捷键拦截。P0 矩阵 `REQ-05 / CW-LANG-001、CW-LANG-002`：Windows 功能与交互目标差距已关闭；视觉高度一致及其他平台仍未证明，不把本卡 done 换算为整体对齐。

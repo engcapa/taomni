@@ -1266,10 +1266,13 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
   border-radius: 4px;
   box-shadow: var(--taomni-shadow-lg);
   padding: 0 !important;
-  font-family: var(--taomni-code-font-family);
-  font-size: var(--taomni-code-font-size);
+  font-family: inherit;
+  font-size: inherit;
   line-height: 1.5;
   overflow: hidden;
+}
+.cm-tooltip-autocomplete {
+  max-width: min(540px, calc(100vw - 12px));
 }
 .cm-tooltip-autocomplete > ul,
 [data-taomni-context-menu][data-appearance="code-candidates"] {
@@ -1300,6 +1303,15 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
 [data-taomni-context-menu][data-appearance="code-candidates"] button[data-active="true"]:enabled span {
   color: inherit !important;
   opacity: 1 !important;
+}
+.cm-tooltip-autocomplete > ul > li[aria-selected="true"][role="option"] {
+  background: color-mix(in srgb, var(--taomni-code-text) 10%, var(--taomni-code-tooltip-bg)) !important;
+  color: var(--taomni-code-text) !important;
+  box-shadow: none !important;
+}
+.cm-tooltip-autocomplete .cm-completionDetail {
+  color: var(--taomni-code-muted);
+  font-style: normal;
 }
 [data-taomni-context-menu][data-appearance="code-candidates"] button:disabled {
   cursor: default !important;

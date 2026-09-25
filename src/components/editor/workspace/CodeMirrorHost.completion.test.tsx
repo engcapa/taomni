@@ -84,7 +84,11 @@ describe("CodeMirrorHost LSP completion acceptance", () => {
     expect(document.querySelector('.cm-tooltip-autocomplete [aria-selected="true"]')).toHaveTextContent("print");
 
     if (acceptWith === "mouse") {
-      fireEvent.mouseDown(document.querySelectorAll(".cm-tooltip-autocomplete li")[1], { button: 0 });
+      const row = document.querySelectorAll(".cm-tooltip-autocomplete li")[1];
+      fireEvent.mouseDown(row, { button: 0 });
+      expect(view.state.doc.toString()).toBe("System.out.pri");
+      expect(row).toHaveAttribute("aria-selected", "true");
+      fireEvent.doubleClick(row, { button: 0 });
     } else {
       fireEvent.keyDown(content, { key: "ArrowDown" });
       fireEvent.keyDown(content, { key: acceptWith });

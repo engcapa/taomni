@@ -1,0 +1,326 @@
+id: TC-IDE-PARITY-005-03
+title: Completion session cancellation and fresh request
+description: B-005 controlled provider through real editor request, accept, undo and deferred responses.
+covers: [F25.5]
+tags: [code-workspace, completion, parity005, lifecycle, p1]
+modes: [browser]
+fixtures: [reset_db, parity005_completion]
+timeout_sec: 240
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Files"]'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+      value: Mid.java
+  - click: '[data-testid="code-workspace-search-everywhere"] button:has-text("Mid.java")'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: End
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 5, Col 18
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - wait: 0.12
+  - press: Tab
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import org.apache.commons.lang3.StringUtils;', '', 'public class Main {', '    void sample() {', '        StringUtils;', '    }', '}', '']
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 5, Col 18
+  - parity005_trace: {fetch: 1, resolve: 1, pending: 0}
+  - wait: 0.5
+  - press: Control+Space
+  - parity005_trace: {pending: 0}
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - press: Escape
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete'
+      state: hidden
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - parity005_set_mode: fetch-hold
+  - press: Control+Space
+  - parity005_wait_pending: fetch
+  - press: Escape
+  - parity005_release: fetch
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete'
+      state: hidden
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - parity005_set_mode: normal
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - parity005_set_mode: resolve-hold
+  - wait: 0.12
+  - press: Enter
+  - parity005_wait_pending: resolve
+  - press: Escape
+  - parity005_release: resolve
+  - assert_not_visible: '[data-testid="completion-resolve-gate"]'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - parity005_set_mode: normal
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - wait: 0.12
+  - press: Enter
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import org.apache.commons.lang3.StringUtils;', '', 'public class Main {', '    void sample() {', '        StringUtilsSuffix;', '    }', '}', '']
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - parity005_set_mode: resolve-hold
+  - wait: 0.5
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - wait: 0.12
+  - press: Enter
+  - parity005_wait_pending: resolve
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Files"]'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+      value: Main.java
+  - click: '[data-testid="code-workspace-search-everywhere"] button:has-text("Main.java")'
+  - parity005_release: resolve
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Files"]'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+      value: Mid.java
+  - click: '[data-testid="code-workspace-search-everywhere"] button:has-text("Mid.java")'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - press:
+      key: End
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: 'Ln 5, Col 18'
+  - parity005_set_mode: empty
+  - press: Control+Space
+  - parity005_trace: {fetch: 7}
+  - assert_not_visible: '.cm-lsp-provider-option'
+  - assert_not_visible: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - press: Escape
+  - parity005_set_mode: normal
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - parity005_trace: {fetch: 8}
+  - press: Escape
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - parity005_set_facts: loading
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - eval_readonly:
+      expression: window.__taomniQaParity005.observe().invocations.at(-1).projectScope.status === 'scope-facts-missing' && window.__taomniQaParity005.observe().invocations.at(-1).projectScope.reason.includes('loading')
+      expect_truthy: true
+  - press: Escape
+  - parity005_set_facts: degraded
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - eval_readonly:
+      expression: window.__taomniQaParity005.observe().invocations.at(-1).projectScope.status === 'scope-facts-missing' && window.__taomniQaParity005.observe().invocations.at(-1).projectScope.reason.includes('degraded')
+      expect_truthy: true
+  - press: Escape
+  - parity005_set_facts: failed
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - eval_readonly:
+      expression: window.__taomniQaParity005.observe().invocations.at(-1).projectScope.status === 'scope-facts-missing' && window.__taomniQaParity005.observe().invocations.at(-1).projectScope.reason.includes('failed')
+      expect_truthy: true
+  - press: Escape
+  - parity005_set_facts: stale
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - eval_readonly:
+      expression: window.__taomniQaParity005.observe().invocations.at(-1).projectScope.status === 'scope-facts-missing' && window.__taomniQaParity005.observe().invocations.at(-1).projectScope.reason.includes('stale')
+      expect_truthy: true
+  - press: Escape
+  - parity005_set_facts: ready
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - eval_readonly:
+      expression: window.__taomniQaParity005.observe().invocations.at(-1).projectScope.status === 'ready' && window.__taomniQaParity005.observe().invocations.at(-1).projectScope.scope === 'module'
+      expect_truthy: true
+  - press: Escape
+  - parity005_set_mode: resolve-hold
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - wait: 0.12
+  - press: Enter
+  - parity005_wait_pending: resolve
+  - parity005_set_facts: stale
+  - parity005_release: resolve
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - assert_not_visible: '[data-testid="completion-resolve-gate"]'
+  - parity005_set_facts: ready
+  - parity005_set_mode: normal
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - wait: 0.12
+  - press: Enter
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import org.apache.commons.lang3.StringUtils;', '', 'public class Main {', '    void sample() {', '        StringUtilsSuffix;', '    }', '}', '']
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+verification:
+  review: reviewed
+  requirements:
+    - id: ED-PARITY-005-V3-fresh-after-undo
+      requirement: Undo restores the word-middle caret and a fresh Basic request returns the provider candidate without editing M0.
+      actions: [27, 30, 32, 37, 40]
+      checkpoints:
+        - step: 31
+          expectation: The combined replace acceptance lands one import and no suffix.
+        - step: 33
+          expectation: One Undo restores exact M0.
+        - step: 34
+          expectation: The caret returns to the original word-middle position.
+        - step: 39
+          expectation: A fresh provider candidate is visible.
+        - step: 42
+          expectation: Escape leaves exact M0 unchanged.
+      results: [31, 33, 34, 39, 42]
+    - id: ED-PARITY-005-V3-fetch-cancel
+      requirement: Escape during a held fetch prevents a late provider candidate and preserves M0.
+      actions: [43, 44, 46, 47]
+      checkpoints:
+        - step: 45
+          expectation: The real renderer request is pending at the controlled provider.
+        - step: 48
+          expectation: Escape keeps the popup closed after release.
+        - step: 49
+          expectation: No document edit occurred.
+      results: [45, 48, 49]
+    - id: ED-PARITY-005-V3-resolve-cancel
+      requirement: Escape during a held resolve blocks delayed acceptance and a fresh request succeeds.
+      actions: [51, 53, 55, 57, 58, 62, 65, 67]
+      checkpoints:
+        - step: 56
+          expectation: The selected candidate entered pending resolve.
+        - step: 59
+          expectation: Release does not revive a gate.
+        - step: 60
+          expectation: Escape left exact M0.
+        - step: 66
+          expectation: Fresh acceptance lands the import and identifier.
+        - step: 68
+          expectation: One Undo restores exact M0.
+      results: [56, 59, 60, 66, 68]
+    - id: ED-PARITY-005-V3-switch
+      requirement: Switching to Main.java during Mid.java resolve prevents late writes in either buffer.
+      actions: [69, 71, 74, 76, 80, 81, 83, 87]
+      checkpoints:
+        - step: 75
+          expectation: The Mid.java resolve is pending before the file switch.
+        - step: 82
+          expectation: Main.java remains at exact B1 after the old response.
+        - step: 88
+          expectation: Mid.java also remains at exact M0 on return.
+      results: [75, 82, 88]
+    - id: ED-PARITY-005-V3-empty
+      requirement: A real empty provider response shows no forged provider item and normal mode recovers.
+      actions: [89, 98, 99, 103, 104, 105, 108]
+      checkpoints:
+        - step: 97
+          expectation: The active editor caret was restored to the exact M0 word-middle position.
+        - step: 100
+          expectation: The controlled empty provider request completed.
+        - step: 101
+          expectation: No provider row was invented after the empty response.
+        - step: 102
+          expectation: No StringUtils provider item was invented.
+        - step: 107
+          expectation: A new provider request restores StringUtils.
+        - step: 109
+          expectation: Escape preserves exact M0.
+      results: [97, 100, 101, 102, 107, 109]
+    - id: ED-PARITY-005-V3-facts-fallback
+      requirement: Each isolated unready facts state is recorded as a reasoned document fallback; ready restores the module scope.
+      actions: [110, 111, 115, 116, 120, 121, 125, 126, 130, 131]
+      checkpoints:
+        - step: 113
+          expectation: Loading facts produce scope-facts-missing with the loading reason.
+        - step: 118
+          expectation: Degraded facts produce scope-facts-missing with the degraded reason.
+        - step: 123
+          expectation: Failed facts produce scope-facts-missing with the failed reason.
+        - step: 128
+          expectation: Stale facts produce scope-facts-missing with the stale reason.
+        - step: 133
+          expectation: A fresh request after restoring ready facts records module scope.
+      results: [113, 118, 123, 128, 133]
+    - id: ED-PARITY-005-V3-facts-invalidation
+      requirement: A facts generation change during pending resolve blocks late acceptance, then a fresh request accepts and one Undo restores M0.
+      actions: [135, 136, 139, 141, 142, 145, 146, 147, 150, 152]
+      checkpoints:
+        - step: 140
+          expectation: The real editor acceptance reached a held resolve request.
+        - step: 143
+          expectation: Releasing the old resolve did not edit M0.
+        - step: 144
+          expectation: The old response did not present a new gate.
+        - step: 151
+          expectation: Fresh ready facts permit the complete import and identifier acceptance.
+        - step: 153
+          expectation: One Undo restores exact M0.
+      results: [140, 143, 144, 151, 153]
+  visual:
+    - check: Candidate popup and selected row remain accessible after Undo.
+      method: manual
+      reason: Screenshots and geometry need separate visual comparison.
+  native:
+    - check: Real JDT LS and host disk state after the same sequence.
+      method: external
+      reason: Browser controlled provider cannot prove native boundaries; case 005-05 owns them.

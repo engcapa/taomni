@@ -1,5 +1,22 @@
 import { invoke } from "@tauri-apps/api/core";
 
+type QaCompletionEvent = Record<string, unknown>;
+const qaCompletionEvents: QaCompletionEvent[] = [];
+
+function recordQaCompletion(event: QaCompletionEvent): void {
+  if (!__TAOMNI_QA_COMPLETION_OBSERVATION__) return;
+  qaCompletionEvents.push(event);
+  if (qaCompletionEvents.length > 80) qaCompletionEvents.shift();
+}
+
+if (__TAOMNI_QA_COMPLETION_OBSERVATION__ && typeof window !== "undefined") {
+  (window as Window & {
+    __taomniQaCompletionObservation?: { observe: () => { events: QaCompletionEvent[] } };
+  }).__taomniQaCompletionObservation = {
+    observe: () => ({ events: JSON.parse(JSON.stringify(qaCompletionEvents)) as QaCompletionEvent[] }),
+  };
+}
+
 let lspRequestSequence = 0;
 
 /**
@@ -208,6 +225,12 @@ export interface LspTextEdit {
   annotationId?: string;
 }
 
+export interface LspInsertReplaceEdit {
+  newText: string;
+  insert: LspRange;
+  replace: LspRange;
+}
+
 export interface LspCompletionItem {
   label: string;
   kind: number | null;
@@ -219,6 +242,8 @@ export interface LspCompletionItem {
   filterText: string | null;
   sortText: string | null;
   textEdit: LspTextEdit | null;
+  /** Completion-only dual range; other TextEdit consumers keep `textEdit`. */
+  insertReplaceEdit?: LspInsertReplaceEdit | null;
   additionalTextEdits: LspTextEdit[];
   /** Original server item, passed back verbatim to completionItem/resolve. */
   raw: unknown;
@@ -231,6 +256,12 @@ export interface LspCompletionResult {
   /** Backend truncated the item list at its hard cap (200). */
   truncated?: boolean | null;
 }
+
+export type LspCompletionResolveResult =
+  | { kind: "resolved"; item: LspCompletionItem }
+  | { kind: "unavailable"; reason: string }
+  | { kind: "timeout" }
+  | { kind: "failed"; message: string };
 
 export interface LspSignatureParameter {
   label: string;
@@ -589,13 +620,13 @@ export interface LspCompletionInvocation {
   requestedScope: "default" | "expanded";
 }
 
-export function lspCompletion(
+export async function lspCompletion(
   descriptor: LspDocumentDescriptor,
   position: LspPosition,
   triggerCharacter?: string | null,
   invocation?: LspCompletionInvocation,
 ): Promise<LspCompletionResult> {
-  return invoke<LspCompletionResult>("lsp_completion", {
+  const result = await invoke<LspCompletionResult>("lsp_completion", {
     ...documentArgs(descriptor),
     line: position.line,
     character: position.character,
@@ -607,16 +638,39 @@ export function lspCompletion(
         }
       : {}),
   });
+  recordQaCompletion({
+    phase: "fetch",
+    workspaceId: descriptor.workspaceId,
+    filePath: descriptor.filePath,
+    position,
+    invocation: invocation ?? null,
+    active: result.status.active,
+    itemCount: result.items.length,
+    items: result.items.filter((item) => /StringUtils|append/i.test(item.label)).slice(0, 40)
+      .map((item) => ({ label: item.label, detail: item.detail, raw: item.raw, insertTextFormat: item.insertTextFormat })),
+  });
+  return result;
 }
 
-export function lspCompletionResolve(
+export async function lspCompletionResolve(
   descriptor: LspDocumentDescriptor,
   item: unknown,
-): Promise<LspCompletionItem | null> {
-  return invoke<LspCompletionItem | null>("lsp_completion_resolve", {
+): Promise<LspCompletionResolveResult> {
+  const result = await invoke<LspCompletionResolveResult>("lsp_completion_resolve", {
     ...documentArgs(descriptor),
     item,
+  }).catch((error: unknown) => ({
+    kind: "failed" as const,
+    message: error instanceof Error ? error.message : String(error),
+  }));
+  recordQaCompletion({
+    phase: "resolve",
+    workspaceId: descriptor.workspaceId,
+    filePath: descriptor.filePath,
+    requestedRaw: item,
+    result,
   });
+  return result;
 }
 
 export interface LspReferenceRequestOptions {

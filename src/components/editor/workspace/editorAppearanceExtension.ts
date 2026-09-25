@@ -57,6 +57,7 @@ export function editorAppearanceExtension(
   const colors = resolveEditorAppearanceColors(profile);
   const root: Record<string, string> = {
     fontSize: `${profile.fontSizePx}px`,
+    fontFamily: profile.fontFamily,
   };
   const scroller: Record<string, string> = {
     fontFamily: profile.fontFamily,

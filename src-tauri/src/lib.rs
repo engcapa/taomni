@@ -681,6 +681,7 @@ pub fn run() {
             lsp::lsp_document_symbols,
             lsp::lsp_completion,
             lsp::lsp_completion_resolve,
+            lsp::qa_set_completion_resolve_fault,
             lsp::lsp_formatting,
             lsp::lsp_range_formatting,
             lsp::lsp_code_actions,

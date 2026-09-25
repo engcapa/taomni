@@ -55,6 +55,7 @@ class NativeStepContext:
         self.session = session
         self.case_dir = case_dir
         self.cfg = cfg
+        self._parity005_trace_positions: dict[tuple[str, str, str], int] = {}
         self._permission_restores: dict[Path, int] = {}
         # External X11 CLIPBOARD owner started by native_clipboard_owner, plus
         # the host selection value captured before the case touched it.
@@ -2278,6 +2279,105 @@ def _do_save_race_trace(ctx: NativeStepContext, args: Any) -> str:
 @_verb("save_race_note")
 def _do_save_race_note(ctx: NativeStepContext, args: Any) -> str:
     return save_race.note(ctx, args)
+
+
+@_verb("parity005_native_fault")
+def _do_parity005_native_fault(ctx: NativeStepContext, args: Any) -> str:
+    mode = str(args)
+    if mode not in {"normal", "null", "error"}:
+        raise StepError(f"parity005_native_fault: invalid mode {mode!r}")
+    script = (
+        "const done = arguments[arguments.length - 1];"
+        "window.__TAURI__.core.invoke('qa_set_completion_resolve_fault',"
+        f"{{mode: {json.dumps(mode)}}})"
+        ".then(() => done({ok: true}), error => done({error: String(error)}));"
+    )
+    result = ctx.session.request("POST", ctx.session.endpoint("/execute/async"), {"script": script, "args": []})
+    if result != {"ok": True}:
+        raise StepError(f"parity005_native_fault: QA app rejected mode: {result!r}")
+    return f"QA Rust resolve fault mode: {mode}"
+
+
+@_verb("parity005_native_trace")
+def _do_parity005_native_trace(ctx: NativeStepContext, args: Any) -> str:
+    if not isinstance(args, dict) or args.get("phase") not in {"fetch", "resolve"}:
+        raise StepError("parity005_native_trace: phase must be fetch or resolve")
+    phase = args["phase"]
+    label = str(args.get("label_contains", ""))
+    detail = str(args.get("detail_contains", ""))
+    expected_kind = args.get("kind")
+    trace_key = (phase, label, detail)
+    previous_index = ctx._parity005_trace_positions.get(trace_key, -1)
+    deadline = time.time() + float(args.get("timeout_sec", 10))
+    selected: dict[str, Any] | None = None
+    matched_item: dict[str, Any] | None = None
+    selected_index = -1
+    state: dict[str, Any] | None = None
+    while time.time() < deadline:
+        state = ctx.session.execute("return window.__taomniQaCompletionObservation?.observe() ?? null;")
+        if not isinstance(state, dict):
+            raise StepError("parity005_native_trace: QA-only observation is unavailable")
+        events = state.get("events", [])
+        for index in range(len(events) - 1, previous_index, -1):
+            event = events[index]
+            if event.get("phase") != phase:
+                continue
+            candidates = [item for item in event.get("items", [])
+                          if (not label or label in str(item.get("label", "")))
+                          and (not detail or detail in str(item.get("detail", "")))]
+            requested = event.get("requestedRaw") or {}
+            requested_label = str(requested.get("label", "")) if isinstance(requested, dict) else ""
+            requested_detail = str(requested.get("detail", "")) if isinstance(requested, dict) else ""
+            if not candidates and (label and label not in requested_label
+                                   or detail and detail not in requested_detail):
+                continue
+            if expected_kind and (event.get("result") or {}).get("kind") != expected_kind:
+                continue
+            selected = event
+            matched_item = candidates[0] if candidates else None
+            selected_index = index
+            break
+        if selected is not None:
+            break
+        time.sleep(0.2)
+    if selected is None or state is None:
+        raise StepError(f"parity005_native_trace: missing {phase} {label!r} {expected_kind!r}; state={state!r}")
+    ctx._parity005_trace_positions[trace_key] = selected_index
+    if phase == "fetch" and label:
+        if matched_item is None or not isinstance(matched_item.get("raw"), dict):
+            raise StepError("parity005_native_trace: selected candidate lacks original provider item")
+    result = selected.get("result") or {}
+    if args.get("require_import"):
+        edits = (result.get("item") or {}).get("additionalTextEdits") or []
+        if not any("import org.apache.commons.lang3.StringUtils;" in edit.get("newText", "") for edit in edits):
+            raise StepError(f"parity005_native_trace: resolved item lacks the required import: {selected!r}")
+    if args.get("require_snippet") and (result.get("item") or {}).get("insertTextFormat") != 2:
+        raise StepError(f"parity005_native_trace: provider did not return snippet format: {selected!r}")
+    expected_range = args.get("expect_raw_range")
+    if expected_range:
+        raw = matched_item.get("raw") if phase == "fetch" and matched_item else selected.get("requestedRaw")
+        edit = (raw or {}).get("textEdit") or {}
+        insert = edit.get("insert") or {}
+        replace = edit.get("replace") or {}
+        actual = {
+            "line": (insert.get("start") or {}).get("line"),
+            "start": (insert.get("start") or {}).get("character"),
+            "insert_end": (insert.get("end") or {}).get("character"),
+            "replace_end": (replace.get("end") or {}).get("character"),
+        }
+        same_line = (insert.get("end") or {}).get("line") == actual["line"] \
+            and (replace.get("start") or {}).get("line") == actual["line"] \
+            and (replace.get("end") or {}).get("line") == actual["line"]
+        same_start = (replace.get("start") or {}).get("character") == actual["start"]
+        if not same_line or not same_start or actual != expected_range:
+            raise StepError(f"parity005_native_trace: raw insert/replace range {actual!r}, expected {expected_range!r}")
+        if phase == "resolve" and result.get("kind") == "resolved":
+            resolved_edit = (result.get("item") or {}).get("insertReplaceEdit") or {}
+            if resolved_edit.get("insert") != insert or resolved_edit.get("replace") != replace:
+                raise StepError("parity005_native_trace: resolved item lost the raw insert/replace ranges")
+    artifact = ctx.case_dir / str(args.get("artifact", f"parity005-native-{phase}.json"))
+    artifact.write_text(json.dumps({"selected": selected, "matched_item": matched_item, "event_index": selected_index, "events": state["events"]}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return f"native {phase} raw response observed: {artifact.name}"
 
 
 @_verb("vault_first_run")

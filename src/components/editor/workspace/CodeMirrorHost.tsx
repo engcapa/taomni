@@ -8,6 +8,7 @@ import {
   useState,
   type MutableRefObject,
 } from "react";
+import { TriangleAlert, X } from "lucide-react";
 import {
   ChangeSet,
   Compartment,
@@ -58,6 +59,7 @@ import {
 import type { KeyBinding } from "@codemirror/view";
 import {
   acceptCompletion,
+  setSelectedCompletion,
   autocompletion,
   closeBrackets,
   closeCompletion,
@@ -97,6 +99,7 @@ import { getAppPlatform, isTauriRuntime } from "../../../lib/runtime";
 import type { EffectiveCodeStyle } from "./codeStyleModel";
 import type {
   LspCompletionItem,
+  LspCompletionResolveResult,
   LspCompletionResult,
   LspDiagnostic,
   LspDocumentHighlight,
@@ -133,6 +136,7 @@ import {
   LspCompletionController,
   lspSnippetSessionInvalidator,
   resetBasicCompletionSession,
+  withCompletionAcceptIntent,
   type CompletionAcceptanceDiagnostic,
   type CompletionInvocationRequest,
   type CompletionRequestIdentity,
@@ -466,7 +470,7 @@ interface CodeMirrorHostProps {
   onCompleteResolve?: (
     raw: unknown,
     token: CompletionRequestToken,
-  ) => Promise<LspCompletionItem | null>;
+  ) => Promise<LspCompletionResolveResult | LspCompletionItem | null>;
   /** Live completion request identity (§8.16.2); null = typed unavailable. */
   getCompletionIdentity: () => CompletionRequestIdentity | null;
   onCompletionDiagnostic: (kind: CompletionAcceptanceDiagnostic, detail?: string) => void;
@@ -2175,7 +2179,13 @@ function applySharedTransactionToView(view: EditorView, transaction: DocumentTra
   }
   view.dispatch({
     changes,
-    selection: view.state.selection.map(changeSet),
+    selection: transaction.restoreSelection
+      && transaction.restoreSelection.anchor >= 0
+      && transaction.restoreSelection.head >= 0
+      && transaction.restoreSelection.anchor <= changeSet.newLength
+      && transaction.restoreSelection.head <= changeSet.newLength
+      ? transaction.restoreSelection
+      : view.state.selection.map(changeSet),
     scrollIntoView: false,
     annotations: [
       remoteTransactionAnnotation.of(true),
@@ -2351,6 +2361,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const completionCompartment = useRef(new Compartment());
   const renderedDocCompartment = useRef(new Compartment());
   const presentResolveGateRef = useRef<((request: CompletionResolveGateRequest) => void) | null>(null);
+  const pendingCompletionAcceptanceRef = useRef<(() => void) | null>(null);
+  const resolveGateSequenceRef = useRef(0);
 
   interface ActiveProviderTemplateState {
     workspaceId: string;
@@ -2455,9 +2467,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         maxRenderedOptions: maxVisibleItems,
         interactionDelay: COMPLETION_INTERACTION_DELAY_MS,
         positionInfo: positionCompletionInfo,
-        optionClass: (completion) => (
-          completion.type ? `cm-completion-type-${completion.type}` : ""
-        ),
+        optionClass: (completion) => [
+          completion.type ? `cm-completion-type-${completion.type}` : "",
+          (completion as Completion & { isLspProvider?: boolean }).isLspProvider ? "cm-lsp-provider-option" : "",
+        ].filter(Boolean).join(" "),
         override: [localSource, lspSource],
       });
     },
@@ -2592,6 +2605,17 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       reportDiagnostic: (kind, detail) => onCompletionDiagnosticRef.current(kind, detail),
       onScopeFallback: (state) => onScopeFallbackRef.current?.(state),
       onResolveGate: (request) => presentResolveGateRef.current?.(request),
+      onAcceptancePending: (cancel) => {
+        pendingCompletionAcceptanceRef.current?.();
+        pendingCompletionAcceptanceRef.current = cancel;
+        resolveGateSequenceRef.current += 1;
+        setResolveGateUi(null);
+      },
+      onAcceptanceSettled: (cancel) => {
+        if (pendingCompletionAcceptanceRef.current === cancel) {
+          pendingCompletionAcceptanceRef.current = null;
+        }
+      },
       controller: completionControllerRef.current,
       getView: () => viewRef.current,
       consumeTriggerOrigin: (pos, docLength) => {
@@ -2787,6 +2811,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   // §8.19.4 resolve gate banner state; the closures inside the request guard
   // staleness themselves, this only drives presentation.
   const [resolveGateUi, setResolveGateUi] = useState<{
+    id: number;
     label: string;
     message: string;
     failed: boolean;
@@ -2936,18 +2961,30 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       const view = viewRef.current;
       const coords = view?.coordsAtPos(request.range.from);
       const container = hostRef.current?.getBoundingClientRect();
+      if (view && completionStatus(view.state) !== null) closeCompletion(view);
+      const id = ++resolveGateSequenceRef.current;
+      const gateWidth = Math.min(460, Math.max(0, (container?.width ?? 476) - 16));
+      const left = coords && container
+        ? Math.max(8, Math.min(coords.left - container.left, container.width - gateWidth - 8))
+        : 8;
+      const below = coords && container ? coords.bottom - container.top + 4 : 28;
+      const top = container && below + 88 > container.height && coords
+        ? Math.max(8, coords.top - container.top - 88)
+        : below;
       setResolveGateUi({
+        id,
         label: request.item.label,
         message: request.message,
         failed: false,
         retrying: false,
-        top: coords && container ? Math.max(0, coords.bottom - container.top + 4) : 28,
-        left: coords && container ? Math.max(0, coords.left - container.left) : 12,
+        top,
+        left,
         retry: request.retry,
         insertWithoutImport: request.insertWithoutImport,
         dismiss: () => {
           request.dismiss();
-          setResolveGateUi(null);
+          setResolveGateUi((gate) => gate?.id === id ? null : gate);
+          viewRef.current?.focus();
         },
       });
     };
@@ -3229,13 +3266,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             run: (view) => {
               // ED-AUDIT-011: Tab during IME composition selects the candidate.
               if (view.composing || view.state.readOnly) return false;
-              if (acceptCompletion(view)) return true;
+              if (withCompletionAcceptIntent(view, "replace", () => acceptCompletion(view))) return true;
               const language = liveTemplateLanguageForPath(pathRef.current);
               const providerCandidate = getValidActiveProviderCandidate(view, language);
               if (providerCandidate) {
                 const { completion, from, to } = providerCandidate;
                 if (typeof completion.apply === "function") {
-                  completion.apply(view, completion, from, to);
+                  const apply = completion.apply;
+                  withCompletionAcceptIntent(view, "replace", () => apply(view, completion, from, to));
                 } else if (typeof completion.apply === "string") {
                   view.dispatch({
                     changes: { from, to, insert: completion.apply },
@@ -3431,12 +3469,25 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                     || update.view.composing
                     || compositionTransaction;
                   const sessionId = isSessionComposing ? currentSession?.id : undefined;
+                  const isCompletionEdit = update.transactions.some((tr) => tr.isUserEvent("input.complete"));
                   const sharedTransaction = transactionOwnerRef.current.dispatchTransaction(
                     fileKeyRef.current,
                     viewIdRef.current,
                     deltas,
-                    composingInput ? "composition" : "user-input",
+                    composingInput ? "composition" : isCompletionEdit ? "completion" : "user-input",
                     sessionId,
+                    isCompletionEdit && !composingInput
+                      ? {
+                          before: {
+                            anchor: update.startState.selection.main.anchor,
+                            head: update.startState.selection.main.head,
+                          },
+                          after: {
+                            anchor: update.state.selection.main.anchor,
+                            head: update.state.selection.main.head,
+                          },
+                        }
+                      : undefined,
                   );
                   if (!sharedTransaction) {
                     const rejectedView = update.view;
@@ -3560,6 +3611,33 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     const view = new EditorView({ state, parent: hostRef.current });
     editorLanguageByView.set(view, liveTemplateLanguageForPath(pathRef.current));
     viewRef.current = view;
+    const providerRowForEvent = (event: MouseEvent): { row: HTMLLIElement; index: number } | null => {
+      if (!pathRef.current.toLowerCase().endsWith(".java") || viewRef.current !== view) return null;
+      const row = (event.target as HTMLElement).closest<HTMLLIElement>(
+        ".cm-tooltip-autocomplete li.cm-lsp-provider-option[role='option']",
+      );
+      const list = row?.closest<HTMLUListElement>("ul[role='listbox']");
+      if (!row || !list || list.id !== view.contentDOM.getAttribute("aria-controls")) return null;
+      const index = [...list.querySelectorAll<HTMLLIElement>("li[role='option']")].indexOf(row);
+      return index < 0 ? null : { row, index };
+    };
+    const selectProviderRow = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      const target = providerRowForEvent(event);
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      view.dispatch({ effects: setSelectedCompletion(target.index) });
+      view.focus();
+    };
+    const acceptProviderRow = (event: MouseEvent) => {
+      if (!providerRowForEvent(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      acceptCompletion(view);
+    };
+    document.addEventListener("mousedown", selectProviderRow, true);
+    document.addEventListener("dblclick", acceptProviderRow, true);
     // ED-IMPROVE-007: one-shot restore of this leaf/file's own caret,
     // selection, scroll and folds. Applied before any user input and never
     // re-applied on prop changes, so late updates cannot overwrite typing.
@@ -3697,6 +3775,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         // the two halves of the toggle.
         startBasicCompletion: () => {
           if (!viewRef.current) return false;
+          pendingCompletionAcceptanceRef.current?.();
+          setResolveGateUi(null);
           if (completionStatus(view.state) === null) {
             startCompletion(view);
             return true;
@@ -3766,6 +3846,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     }
 
     return () => {
+      document.removeEventListener("mousedown", selectProviderRow, true);
+      document.removeEventListener("dblclick", acceptProviderRow, true);
       legacyBridgeRegistration?.dispose();
       bridgeRegistration?.dispose();
       unregisterEditorActions?.();
@@ -3809,6 +3891,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       view.contentDOM.removeEventListener("compositionend", compositionEndGuard, true);
       view.contentDOM.removeEventListener("blur", compositionBlurGuard, true);
       view.contentDOM.removeEventListener("focusout", clipboardFocusOutGuard, true);
+      pendingCompletionAcceptanceRef.current?.();
+      pendingCompletionAcceptanceRef.current = null;
       view.destroy();
       viewRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
@@ -3867,6 +3951,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   useEffect(() => {
     const view = viewRef.current;
     if (view && (!visible || active === false)) bumpClipboardOwnerGeneration(view);
+  }, [visible, active]);
+
+  useEffect(() => {
+    if (visible && active !== false) return;
+    pendingCompletionAcceptanceRef.current?.();
+    setResolveGateUi(null);
   }, [visible, active]);
 
   useEffect(() => {
@@ -4340,17 +4430,31 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       data-soft-wrap={softWrap || undefined}
       data-column-selection={columnSelectionMode || undefined}
       className="relative h-full w-full"
+      onKeyDownCapture={(event) => {
+        if (event.key !== "Escape") return;
+        if (resolveGateUi) {
+          event.preventDefault();
+          event.stopPropagation();
+          resolveGateUi.dismiss();
+        } else if (pendingCompletionAcceptanceRef.current) {
+          event.preventDefault();
+          event.stopPropagation();
+          pendingCompletionAcceptanceRef.current();
+          viewRef.current?.focus();
+        }
+      }}
     >
       {resolveGateUi && (
         <div
           data-testid="completion-resolve-gate"
-          className="cm-lsp-resolve-gate absolute z-50 flex max-w-md items-center gap-2 rounded border border-dashed border-amber-500/70 bg-[var(--taomni-bg-elevated,#1f2228)] px-2 py-1.5 text-xs shadow-lg"
-          style={{ top: resolveGateUi.top, left: resolveGateUi.left }}
+          role="alert"
+          className="cm-lsp-resolve-gate absolute z-50 flex max-w-[calc(100%-16px)] flex-wrap items-center gap-2 rounded border border-amber-500/70 bg-[var(--taomni-bg-elevated,#1f2228)] px-2 py-1.5 text-xs shadow-lg"
+          style={{ top: resolveGateUi.top, left: resolveGateUi.left, width: "min(460px, calc(100% - 16px))" }}
         >
-          <span className="text-amber-400">⚠</span>
-          <span className="min-w-0 truncate" title={`${resolveGateUi.label} — ${resolveGateUi.message}`}>
+          <TriangleAlert aria-hidden="true" size={14} className="shrink-0 text-amber-400" />
+          <span className="min-w-0 flex-1 break-words" title={`${resolveGateUi.label} - ${resolveGateUi.message}`}>
             <strong className="font-medium">{resolveGateUi.label}</strong>
-            {" — "}
+            {" - "}
             {resolveGateUi.message}
           </span>
           <button
@@ -4359,14 +4463,16 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             disabled={resolveGateUi.retrying}
             className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
-              setResolveGateUi((gate) => gate ? { ...gate, retrying: true, failed: false } : gate);
+              const id = resolveGateUi.id;
+              setResolveGateUi((gate) => gate?.id === id ? { ...gate, retrying: true, failed: false } : gate);
               void resolveGateUi.retry().then((outcome) => {
                 if (outcome === "committed") {
-                  setResolveGateUi(null);
+                  setResolveGateUi((gate) => gate?.id === id ? null : gate);
+                  viewRef.current?.focus();
                   return;
                 }
                 // Retry also failed: keep the item visible with its choices.
-                setResolveGateUi((gate) => gate ? { ...gate, retrying: false, failed: true } : gate);
+                setResolveGateUi((gate) => gate?.id === id ? { ...gate, retrying: false, failed: true } : gate);
               });
             }}
           >
@@ -4379,7 +4485,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
               const inserted = resolveGateUi.insertWithoutImport();
-              if (inserted) setResolveGateUi(null);
+              if (inserted) {
+                const id = resolveGateUi.id;
+                setResolveGateUi((gate) => gate?.id === id ? null : gate);
+                viewRef.current?.focus();
+              }
             }}
           >
             Insert without import
@@ -4387,11 +4497,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           <button
             type="button"
             aria-label="Dismiss"
+            title="Dismiss"
             data-testid="completion-resolve-gate-dismiss"
             className="shrink-0 px-1 text-[var(--taomni-text-secondary,#9aa0aa)] hover:text-[var(--taomni-text,#e6e6e6)]"
             onClick={resolveGateUi.dismiss}
           >
-            ✕
+            <X aria-hidden="true" size={14} />
           </button>
           {resolveGateUi.failed && (
             <span className="shrink-0 text-red-400" data-testid="completion-resolve-gate-failed-note">

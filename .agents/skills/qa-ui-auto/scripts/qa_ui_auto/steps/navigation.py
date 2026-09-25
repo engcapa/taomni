@@ -81,3 +81,14 @@ def step_screenshot(ctx: StepContext, args: Any) -> None:
         loc.first.screenshot(path=str(target))  # type: ignore[attr-defined]
     else:
         ctx.page.screenshot(path=str(target), full_page=full_page)
+
+
+@verb("set_viewport")
+def step_set_viewport(ctx: StepContext, args: Any) -> None:
+    if not isinstance(args, dict) or set(args) != {"width", "height"}:
+        raise StepError("set_viewport: expected {width, height}")
+    if ctx.dry_run:
+        return
+    if not hasattr(ctx.page, "set_viewport_size"):
+        raise StepError("set_viewport: this runner does not support viewport changes")
+    ctx.page.set_viewport_size(args)  # type: ignore[attr-defined]

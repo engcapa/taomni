@@ -129,7 +129,7 @@ import {
   nextLspRequestSequence,
   type LspCodeAction,
   type JavaTestItem,
-  type LspCompletionItem,
+  type LspCompletionResolveResult,
   type LspCompletionResult,
   type LspDiagnostic,
   type LspDocumentDescriptor,
@@ -186,6 +186,7 @@ import type {
 } from "./workspace/lspCompletion";
 import {
   resolveCompletionScopeFacts,
+  sameCompletionScopeFacts,
   type CompletionScopeFactsState,
 } from "./workspace/completionScopeAdapter";
 import {
@@ -16115,7 +16116,8 @@ export function CodeWorkspaceTab({
         && identity.uri === token.uri
         && identity.languageId === token.languageId
         && identity.documentRevision === token.documentRevision
-        && identity.lspSessionGeneration === token.lspSessionGeneration;
+        && identity.lspSessionGeneration === token.lspSessionGeneration
+        && sameCompletionScopeFacts(identity.projectScope, token.projectScope);
     },
     [completionIdentityForFile, workspaceInstanceId],
   );
@@ -16205,16 +16207,12 @@ export function CodeWorkspaceTab({
       file: OpenFileState,
       raw: unknown,
       token: CompletionRequestToken,
-    ): Promise<LspCompletionItem | null> => {
+    ): Promise<LspCompletionResolveResult> => {
       const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return null;
-      if (!isCompletionTokenCurrent(token)) return null;
-      try {
-        const resolved = await lspCompletionResolve(descriptor, raw);
-        return isCompletionTokenCurrent(token) ? resolved : null;
-      } catch {
-        return null;
-      }
+      if (!descriptor) return { kind: "unavailable", reason: "no-document-descriptor" };
+      if (!isCompletionTokenCurrent(token)) return { kind: "unavailable", reason: "stale-request" };
+      const resolved = await lspCompletionResolve(descriptor, raw);
+      return isCompletionTokenCurrent(token) ? resolved : { kind: "unavailable", reason: "stale-request" };
     },
     [isCompletionTokenCurrent, lspDescriptorForFile],
   );

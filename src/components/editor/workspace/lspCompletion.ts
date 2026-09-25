@@ -19,13 +19,14 @@ import { EditorView } from "@codemirror/view";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import type {
   LspCompletionItem,
+  LspCompletionResolveResult,
   LspCompletionResult,
   LspPosition,
   LspTextEdit,
 } from "../../../lib/editor/lsp";
 import { lspPositionFromOffset, offsetFromLspPosition } from "./lspPositions";
 import { isInsideStringOrComment } from "./syntaxContext";
-import type { CompletionScopeFactsState } from "./completionScopeAdapter";
+import { sameCompletionScopeFacts, type CompletionScopeFactsState } from "./completionScopeAdapter";
 import {
   type BasicCompletionPolicyV2,
   type CompletionCaseMatching,
@@ -62,6 +63,23 @@ export interface CompletionRequestToken {
 /** Live identity captured at request start; requestId is minted per request. */
 export type CompletionRequestIdentity = Omit<CompletionRequestToken, "requestId">;
 
+export type CompletionAcceptIntent = "insert" | "replace";
+const completionAcceptIntent = new WeakMap<EditorView, CompletionAcceptIntent>();
+
+/** The key handler owns this intent only for CodeMirror's synchronous apply call. */
+export function withCompletionAcceptIntent<T>(
+  view: EditorView,
+  intent: CompletionAcceptIntent,
+  action: () => T,
+): T {
+  completionAcceptIntent.set(view, intent);
+  try {
+    return action();
+  } finally {
+    completionAcceptIntent.delete(view);
+  }
+}
+
 export type CompletionAcceptanceDiagnostic =
   | "truncated"
   | "invalid-additional-edits"
@@ -80,7 +98,7 @@ export interface LspCompletionHooks {
     /** Repeated-call facts (§8.19.4); ordinal ≥ 2 requests expanded scope. */
     invocation?: CompletionInvocationRequest,
   ) => Promise<LspCompletionResult | null>;
-  resolve?: (raw: unknown, token: CompletionRequestToken) => Promise<LspCompletionItem | null>;
+  resolve?: (raw: unknown, token: CompletionRequestToken) => Promise<LspCompletionResolveResult | LspCompletionItem | null>;
   triggerCharacters: () => string[];
   getDocumentRevision: () => number;
   /**
@@ -105,6 +123,8 @@ export interface LspCompletionHooks {
    * inserted and the diagnostic reports the unavailable import.
    */
   onResolveGate?: (request: CompletionResolveGateRequest) => void;
+  onAcceptancePending?: (cancel: () => void) => void;
+  onAcceptanceSettled?: (cancel: () => void) => void;
   controller?: LspCompletionController;
   getView?: () => EditorView | null;
   consumeTriggerOrigin?: (pos: number, docLength: number) => string | null;
@@ -436,7 +456,7 @@ export function classifyCompletionResolveOutcome(
 
 export interface ExecuteCompletionResolveOptions {
   item: LspCompletionItem;
-  resolve?: (raw: unknown) => Promise<LspCompletionItem | null>;
+  resolve?: (raw: unknown) => Promise<LspCompletionResolveResult | LspCompletionItem | null>;
   token: CompletionRequestToken;
   isStillCurrent: (token: CompletionRequestToken) => boolean;
   timeoutMs?: number;
@@ -485,9 +505,11 @@ export async function executeCompletionResolve(
     timeoutId = window.setTimeout(() => res({ timeout: true }), timeoutMs);
   });
 
+  let abortListener: (() => void) | null = null;
   const abortPromise = signal
     ? new Promise<{ aborted: true }>((res) => {
-        signal.addEventListener("abort", () => res({ aborted: true }), { once: true });
+        abortListener = () => res({ aborted: true });
+        signal.addEventListener("abort", abortListener, { once: true });
       })
     : null;
 
@@ -528,7 +550,13 @@ export async function executeCompletionResolve(
       });
     }
 
-    const resolved = raceResult as LspCompletionItem | null;
+    const response = raceResult as LspCompletionResolveResult | LspCompletionItem | null;
+    if (response && typeof response.kind === "string") {
+      if (response.kind === "unavailable") return { kind: "unavailable", reason: response.reason, item };
+      if (response.kind === "timeout") return classifyCompletionResolveOutcome({ item, hasResolver: true, timedOut: true });
+      if (response.kind === "failed") return { kind: "failed", error: response.message, item };
+    }
+    const resolved = response && typeof response.kind === "string" ? response.item : response;
     if (!resolved) {
       return classifyCompletionResolveOutcome({ item, hasResolver: true, resolvedItem: null });
     }
@@ -545,7 +573,6 @@ export async function executeCompletionResolve(
       resolvedItem: mergedItem,
     });
   } catch (err) {
-    if (timeoutId !== null) window.clearTimeout(timeoutId);
     if (!isStillCurrent(token)) {
       return classifyCompletionResolveOutcome({
         item,
@@ -556,6 +583,9 @@ export async function executeCompletionResolve(
       });
     }
     return classifyCompletionResolveOutcome({ item, hasResolver: true, error: err });
+  } finally {
+    if (timeoutId !== null) window.clearTimeout(timeoutId);
+    if (signal && abortListener) signal.removeEventListener("abort", abortListener);
   }
 }
 
@@ -732,7 +762,8 @@ function sameCompletionIdentity(
     && a.uri === b.uri
     && a.languageId === b.languageId
     && a.documentRevision === b.documentRevision
-    && a.lspSessionGeneration === b.lspSessionGeneration;
+    && a.lspSessionGeneration === b.lspSessionGeneration
+    && sameCompletionScopeFacts(a.projectScope, b.projectScope);
 }
 
 /** LSP CompletionItemKind → CodeMirror completion `type` (built-in icons). */
@@ -1510,6 +1541,7 @@ export function commitLspCompletion(
   isStillCurrent: (token: CompletionRequestToken) => boolean,
   reportDiagnostic?: ((kind: CompletionAcceptanceDiagnostic, detail?: string) => void) | undefined,
   excludedSymbols?: readonly SymbolPatternRule[],
+  intent: CompletionAcceptIntent = "insert",
 ): boolean {
   if (view.state.readOnly) {
     return false;
@@ -1549,20 +1581,12 @@ export function commitLspCompletion(
     }
   }
 
-  let replaceFrom = from;
-  let replaceTo = to;
-  if (item.textEdit) {
-    const strictFrom = strictOffsetFromLspPosition(view.state.doc, item.textEdit.range.start);
-    const strictTo = strictOffsetFromLspPosition(view.state.doc, item.textEdit.range.end);
-    if (strictFrom === null || strictTo === null || strictFrom > strictTo) {
-      reportDiagnostic?.("invalid-additional-edits", "primary-range");
-      return false;
-    }
-    replaceFrom = strictFrom;
-    replaceTo = strictTo;
+  const primary = completionPrimaryEdit(view, item, from, to, token, intent);
+  if (!primary) {
+    reportDiagnostic?.("invalid-additional-edits", "primary-range");
+    return false;
   }
-
-  const rawInsert = item.textEdit?.newText ?? item.insertText ?? item.label;
+  const { replaceFrom, replaceTo, rawInsert } = primary;
   const additionalEdits = item.additionalTextEdits ?? [];
   const isSnippet = item.insertTextFormat === 2;
 
@@ -1619,9 +1643,76 @@ export function commitLspCompletion(
   return true;
 }
 
+function isJavaIdentifierCharacter(value: string): boolean {
+  return /^[\p{ID_Continue}_$]$/u.test(value);
+}
+
+function safeJavaSuffixEnd(
+  view: EditorView,
+  from: number,
+  to: number,
+  token: CompletionRequestToken,
+): number | null {
+  if (token.languageId !== "java" || !view.state.selection.main.empty
+    || view.state.selection.main.head !== to || isInsideStringOrComment(view.state, to)) return null;
+  const line = view.state.doc.lineAt(to);
+  if (from < line.from || from >= to || from > line.to) return null;
+  const prefix = view.state.doc.sliceString(from, to);
+  if (!/^[\p{ID_Start}_$][\p{ID_Continue}_$]*$/u.test(prefix)) return null;
+  if (from > line.from && isJavaIdentifierCharacter(view.state.doc.sliceString(from - 1, from))) return null;
+  let end = to;
+  while (end < line.to && isJavaIdentifierCharacter(view.state.doc.sliceString(end, end + 1))) end += 1;
+  return end;
+}
+
+function completionPrimaryEdit(
+  view: EditorView,
+  item: LspCompletionItem,
+  from: number,
+  to: number,
+  token: CompletionRequestToken,
+  intent: CompletionAcceptIntent,
+): { replaceFrom: number; replaceTo: number; rawInsert: string } | null {
+  const doc = view.state.doc;
+  const dual = item.insertReplaceEdit;
+  if (dual) {
+    const insertFrom = strictOffsetFromLspPosition(doc, dual.insert.start);
+    const insertTo = strictOffsetFromLspPosition(doc, dual.insert.end);
+    const replaceFrom = strictOffsetFromLspPosition(doc, dual.replace.start);
+    const replaceTo = strictOffsetFromLspPosition(doc, dual.replace.end);
+    if (insertFrom === null || insertTo === null || replaceFrom === null || replaceTo === null
+      || insertFrom !== replaceFrom || insertFrom > insertTo || insertTo > replaceTo) return null;
+    if (item.textEdit) {
+      const oldFrom = strictOffsetFromLspPosition(doc, item.textEdit.range.start);
+      const oldTo = strictOffsetFromLspPosition(doc, item.textEdit.range.end);
+      if (oldFrom !== insertFrom || oldTo !== insertTo || item.textEdit.newText !== dual.newText) return null;
+    }
+    return {
+      replaceFrom: insertFrom,
+      replaceTo: intent === "replace" ? replaceTo : insertTo,
+      rawInsert: dual.newText,
+    };
+  }
+
+  let replaceFrom = from;
+  let replaceTo = to;
+  if (item.textEdit) {
+    const strictFrom = strictOffsetFromLspPosition(doc, item.textEdit.range.start);
+    const strictTo = strictOffsetFromLspPosition(doc, item.textEdit.range.end);
+    if (strictFrom === null || strictTo === null || strictFrom > strictTo) return null;
+    replaceFrom = strictFrom;
+    replaceTo = strictTo;
+  }
+  if (intent === "replace") {
+    const suffixEnd = safeJavaSuffixEnd(view, replaceFrom, replaceTo, token);
+    if (suffixEnd !== null) replaceTo = suffixEnd;
+  }
+  return { replaceFrom, replaceTo, rawInsert: item.textEdit?.newText ?? item.insertText ?? item.label };
+}
+
 const RESOLVE_ADDITIONAL_EDIT_TIMEOUT_MS = 3000;
 
-type CompletionItemResolver = () => Promise<LspCompletionItem | null>;
+type CompletionItemResolver = () => Promise<LspCompletionResolveResult | LspCompletionItem | null>;
 
 function applyLspCompletion(
   view: EditorView,
@@ -1635,17 +1726,34 @@ function applyLspCompletion(
   reportDiagnostic: ((kind: CompletionAcceptanceDiagnostic, detail?: string) => void) | undefined,
   onResolveGate?: ((request: CompletionResolveGateRequest) => void) | undefined,
   excludedSymbols?: readonly SymbolPatternRule[],
+  intent: CompletionAcceptIntent = "insert",
+  onAcceptancePending?: (cancel: () => void) => void,
+  onAcceptanceSettled?: (cancel: () => void) => void,
 ): void {
   if (view.state.readOnly) {
     return;
   }
   if (item.additionalTextEdits?.length) {
-    commitLspCompletion(view, item, from, to, token, isStillCurrent, reportDiagnostic, excludedSymbols);
+    commitLspCompletion(view, item, from, to, token, isStillCurrent, reportDiagnostic, excludedSymbols, intent);
     return;
   }
 
   const revisionAtAccept = getDocumentRevision?.();
   const docAtAccept = view.state.doc;
+  const controller = new AbortController();
+  let retryInFlight = false;
+
+  let settled = false;
+  const settle = (): boolean => {
+    if (settled) return false;
+    settled = true;
+    onAcceptanceSettled?.(cancel);
+    return true;
+  };
+  const cancel = (): void => {
+    if (settle()) controller.abort();
+  };
+  onAcceptancePending?.(cancel);
 
   const runResolve = (resolver: CompletionItemResolver | undefined): Promise<CompletionResolveOutcome> => (
     executeCompletionResolve({
@@ -1655,13 +1763,13 @@ function applyLspCompletion(
       isStillCurrent,
       timeoutMs: RESOLVE_ADDITIONAL_EDIT_TIMEOUT_MS,
       getDocumentRevision,
+      signal: controller.signal,
     })
   );
 
   // §8.19.4 resolve gate: a timeout/failure keeps the chosen item visible and
   // waits for an explicit Retry or Insert-without-import choice. Nothing is
   // inserted until the user picks; stale/overlap blocks stay hard no-ops.
-  let settled = false;
   const guardCurrent = (): boolean => {
     if (!isStillCurrent(token)) {
       reportDiagnostic?.("identity-mismatch", "resolve-gate");
@@ -1677,8 +1785,8 @@ function applyLspCompletion(
     return true;
   };
   const insertWithoutImport = (): boolean => {
-    if (settled) return false;
-    settled = true;
+    if (retryInFlight) return false;
+    if (!settle()) return false;
     if (!guardCurrent()) return false;
     return commitLspCompletion(
       view,
@@ -1689,27 +1797,30 @@ function applyLspCompletion(
       isStillCurrent,
       reportDiagnostic,
       excludedSymbols,
+      intent,
     );
   };
   const retryResolve = async (): Promise<"committed" | "unavailable"> => {
-    if (settled) return "unavailable";
+    if (settled || retryInFlight) return "unavailable";
     if (!guardCurrent()) {
-      settled = true;
+      settle();
       return "unavailable";
     }
+    retryInFlight = true;
     const outcome = await runResolve(resolve);
+    retryInFlight = false;
     if (settled) return "unavailable";
     if (outcome.kind === "stale" || outcome.kind === "cancelled") {
       reportDiagnostic?.("identity-mismatch", `resolve-retry-${outcome.kind}`);
-      settled = true;
+      settle();
       return "unavailable";
     }
     if (outcome.kind !== "resolved" && outcome.kind !== "not-required") return "unavailable";
     if (!guardCurrent()) {
-      settled = true;
+      settle();
       return "unavailable";
     }
-    settled = true;
+    settle();
     const committed = commitLspCompletion(
       view,
       outcome.item,
@@ -1719,6 +1830,7 @@ function applyLspCompletion(
       isStillCurrent,
       reportDiagnostic,
       excludedSymbols,
+      intent,
     );
     return committed ? "committed" : "unavailable";
   };
@@ -1731,6 +1843,7 @@ function applyLspCompletion(
     if (!onResolveGate) {
       // No gate surface wired (isolated embedder): blocking beats silently
       // inserting an acceptance that lost its import edits.
+      settle();
       return;
     }
     onResolveGate({
@@ -1745,7 +1858,7 @@ function applyLspCompletion(
       retry: retryResolve,
       insertWithoutImport,
       dismiss: () => {
-        settled = true;
+        cancel();
       },
     });
   };
@@ -1755,7 +1868,7 @@ function applyLspCompletion(
       if (settled) return;
       if (outcome.kind === "stale" || outcome.kind === "cancelled") {
         reportDiagnostic?.("identity-mismatch", `resolve-${outcome.kind}`);
-        settled = true;
+        settle();
         return;
       }
       if (outcome.kind === "timeout") {
@@ -1772,10 +1885,10 @@ function applyLspCompletion(
       }
       if (outcome.kind !== "resolved" && outcome.kind !== "not-required") return;
       if (!guardCurrent()) {
-        settled = true;
+        settle();
         return;
       }
-      settled = true;
+      settle();
       commitLspCompletion(
         view,
         outcome.item,
@@ -1785,12 +1898,13 @@ function applyLspCompletion(
         isStillCurrent,
         reportDiagnostic,
         excludedSymbols,
+        intent,
       );
     })
     .catch(() => {
       if (settled) return;
       if (!guardCurrent()) {
-        settled = true;
+        settle();
         return;
       }
       presentGate("failed", "resolve-failed");
@@ -1814,8 +1928,11 @@ async function completionInfo(
         if (!detail) return null;
         documentation = null;
       } else {
-        const resolved = await resolve();
+        const response = await resolve();
         if (!isStillCurrent(token)) return null;
+        const resolved = response && typeof response.kind === "string"
+          ? response.kind === "resolved" ? response.item : null
+          : response;
         documentation = resolved?.documentation ?? null;
         detail = detail ?? resolved?.detail ?? null;
       }
@@ -2077,13 +2194,30 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
         boost = (boost ?? 0) + 500;
       }
 
-      const displayLabel = filterText && filterText !== item.label ? item.label : undefined;
+      const qualifiedTypeSuffix = item.kind === 7 && filterText && item.detail?.endsWith(`.${filterText}`)
+        ? item.detail.slice(0, -filterText.length - 1)
+        : null;
+      const isDuplicatedJavaTypeLabel = qualifiedTypeSuffix !== null
+        && item.label === `${filterText} - ${qualifiedTypeSuffix}`;
+      const javaMethodSeparator = token.languageId === "java"
+        && item.kind === 2
+        && item.detail?.endsWith(item.label)
+        ? item.label.lastIndexOf(" : ")
+        : -1;
+      const displayLabel = javaMethodSeparator > 0
+        ? item.label.slice(0, javaMethodSeparator)
+        : isDuplicatedJavaTypeLabel
+          ? undefined
+          : filterText && filterText !== item.label ? item.label : undefined;
+      const presentationDetail = javaMethodSeparator > 0
+        ? item.label.slice(javaMethodSeparator + 3)
+        : isDuplicatedJavaTypeLabel ? qualifiedTypeSuffix : item.detail;
       const truncatedDetail = result.truncated && i === 0
-        ? `${item.detail ?? ""}${item.detail ? " · " : ""}list truncated — keep typing to refine`.trim()
+        ? `${presentationDetail ?? ""}${presentationDetail ? " · " : ""}list truncated — keep typing to refine`.trim()
         : isPrioritized
-          ? `${item.detail ?? ""}${item.detail ? " · " : ""}(prioritized)`.trim()
-          : item.detail ?? undefined;
-      let resolvedItemPromise: Promise<LspCompletionItem | null> | null = null;
+          ? `${presentationDetail ?? ""}${presentationDetail ? " · " : ""}(prioritized)`.trim()
+          : presentationDetail ?? undefined;
+      let resolvedItemPromise: Promise<LspCompletionResolveResult | LspCompletionItem | null> | null = null;
       const resolveItem: CompletionItemResolver | undefined = hooks.resolve
         ? () => {
             if (!resolvedItemPromise) {
@@ -2097,19 +2231,23 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
       const resolveFresh: CompletionItemResolver | undefined = hooks.resolve
         ? () => {
             if (!resolvedItemPromise) return hooks.resolve!(item.raw, token);
-            return resolvedItemPromise.then((resolved) =>
-              resolved ? resolved : hooks.resolve!(item.raw, token)
-            );
+            return resolvedItemPromise.then((response) => {
+              const resolved = response && typeof response.kind === "string"
+                ? response.kind === "resolved" ? response.item : null
+                : response;
+              return resolved ? response : hooks.resolve!(item.raw, token);
+            });
           }
         : undefined;
       const showDoc = policy.documentation.enabled;
-      const completion: Completion = {
+      const completion: Completion & { isLspProvider: true } = {
         label,
         displayLabel,
         sortText: item.sortText ?? undefined,
         boost,
         type: completionKindToType(item.kind),
         rawKind: item.kind,
+        isLspProvider: true,
         isTemplateSnippet: item.kind === 15 || item.insertTextFormat === 2,
         detail: truncatedDetail,
         info: showDoc && (item.documentation || resolveItem)
@@ -2128,6 +2266,9 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
             hooks.reportDiagnostic,
             hooks.onResolveGate,
             policy.excludedSymbols,
+            completionAcceptIntent.get(view) ?? "insert",
+            hooks.onAcceptancePending,
+            hooks.onAcceptanceSettled,
           ),
       };
 
@@ -2185,19 +2326,18 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
       if (targetView) {
         const singleItem = mappedItems[0];
         const isSnippet = singleItem.insertTextFormat === 2;
-        const rawText = singleItem.textEdit?.newText ?? singleItem.insertText ?? singleItem.label;
+        const rawText = singleItem.insertReplaceEdit?.newText
+          ?? singleItem.textEdit?.newText ?? singleItem.insertText ?? singleItem.label;
         const parsedSnippet = isSnippet ? parseLspSnippet(rawText) : null;
         const hasAmbiguousChoices = parsedSnippet && parsedSnippet.placeholders.some((p) => (p.choices?.length ?? 0) > 1);
         if (!hasAmbiguousChoices) {
           let itemToCommit: LspCompletionItem | null = singleItem;
           if (hooks.resolve) {
             try {
-              const resolved = await hooks.resolve(singleItem, token);
-              if (resolved) {
-                itemToCommit = resolved;
-              } else {
-                itemToCommit = null;
-              }
+              const response = await hooks.resolve(singleItem.raw ?? singleItem, token);
+              itemToCommit = response && typeof response.kind === "string"
+                ? response.kind === "resolved" ? response.item : null
+                : response;
             } catch {
               itemToCommit = null;
             }
