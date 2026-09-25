@@ -1059,9 +1059,110 @@ function stubLspPresetForPath(path: string) {
   return STUB_LSP_PRESETS.find((preset) => preset.fileExtensions.includes(ext)) ?? null;
 }
 
+/**
+ * QA-only scripted completion provider for browser cases (ED-PARITY-005).
+ * A testcase fixture installs the payload in localStorage; the preview stub
+ * then answers lsp_completion / lsp_completion_resolve through the real
+ * renderer path. It is a controlled provider, never a claim about real Java
+ * semantics, and the release build does not load this stub.
+ */
+interface StubQaCompletionResolveConfig {
+  mode?: "resolved" | "unavailable" | "timeout" | "failed" | "delay-resolved" | "hold";
+  delayMs?: number;
+  /** Fault override only: hold the completion request itself this long. */
+  fetchDelayMs?: number;
+  reason?: string;
+  message?: string;
+  additionalTextEdits?: Array<Record<string, unknown>>;
+  /** Per-label import edits so a decoy candidate never borrows the target's import. */
+  additionalTextEditsByLabel?: Record<string, Array<Record<string, unknown>>>;
+}
+
+interface StubQaCompletionVariant {
+  files?: string[];
+  fileSuffix?: string;
+  displayName?: string;
+  fetchDelayMs?: number;
+  items?: Array<Record<string, unknown>>;
+  resolve?: StubQaCompletionResolveConfig;
+}
+
+interface StubQaCompletionProvider extends StubQaCompletionVariant {
+  variants?: StubQaCompletionVariant[];
+}
+
+const QA_COMPLETION_PROVIDER_KEY = "taomni.qa.completionProvider.v1";
+/** Per-case fault override merged over the variant's own resolve config. */
+const QA_COMPLETION_FAULT_KEY = "taomni.qa.completionProvider.fault.v1";
+
+function stubQaCompletionProvider(): StubQaCompletionProvider | null {
+  try {
+    const raw = window.localStorage.getItem(QA_COMPLETION_PROVIDER_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as StubQaCompletionProvider;
+  } catch {
+    return null;
+  }
+}
+
+function stubQaCompletionApplies(variant: StubQaCompletionVariant, filePath: string): boolean {
+  const normalized = (filePath ?? "").replace(/\\/g, "/").toLowerCase();
+  if (!normalized) return false;
+  const suffixes = variant.files?.length ? variant.files : [variant.fileSuffix ?? ".java"];
+  // Workspace IPC sometimes carries a root-relative path ("Main.java") and
+  // sometimes an absolute one; compare on the path boundary either way.
+  return suffixes.some((suffix) => {
+    const needle = suffix.toLowerCase().replace(/\\/g, "/").replace(/^\/+/, "");
+    return normalized === needle || normalized.endsWith(`/${needle}`);
+  });
+}
+
+function stubQaCompletionVariant(filePath: string): StubQaCompletionVariant | null {
+  const provider = stubQaCompletionProvider();
+  if (!provider) return null;
+  const variants = provider.variants?.length
+    ? provider.variants
+    : (Array.isArray(provider.items) ? [provider as StubQaCompletionVariant] : []);
+  for (const variant of variants) {
+    if (stubQaCompletionApplies(variant, filePath)) return variant;
+  }
+  return null;
+}
+
+function stubQaCompletionFaultOverride(): Partial<StubQaCompletionResolveConfig> | null {
+  try {
+    const raw = window.localStorage.getItem(QA_COMPLETION_FAULT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as Partial<StubQaCompletionResolveConfig>;
+  } catch {
+    return null;
+  }
+}
+
+function stubQaCompletionResolveConfig(variant: StubQaCompletionVariant): StubQaCompletionResolveConfig {
+  return { ...(variant.resolve ?? {}), ...(stubQaCompletionFaultOverride() ?? {}) };
+}
+
 function stubLspDocumentStatus(args?: InvokeArgs) {
   const filePath = (args?.filePath as string | undefined) ?? "";
   const preset = stubLspPresetForPath(filePath);
+  const qaVariant = stubQaCompletionVariant(filePath);
+  if (qaVariant && preset) {
+    return {
+      path: filePath,
+      uri: filePath ? `file://${filePath}` : "",
+      presetId: preset.id,
+      languageId: preset.documentLanguageIds[0] ?? null,
+      displayName: qaVariant.displayName ?? `${preset.displayName} (QA provider)`,
+      available: true,
+      active: true,
+      semanticReady: true,
+      selectedCommandId: "qa-completion-provider",
+      selectedCommand: "qa-completion-provider",
+      installHint: null,
+      error: null,
+    };
+  }
   return {
     path: filePath,
     uri: filePath ? `file://${filePath}` : "",
@@ -2269,6 +2370,68 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_save_document":
     case "lsp_close_document": {
       return stubLspDocumentStatus(args as InvokeArgs) as T;
+    }
+    case "lsp_completion": {
+      const filePath = (args?.filePath as string | undefined) ?? "";
+      const qaVariant = stubQaCompletionVariant(filePath);
+      if (!qaVariant) {
+        return {
+          status: stubLspDocumentStatus(args as InvokeArgs),
+          isIncomplete: false,
+          items: [],
+          truncated: false,
+        } as T;
+      }
+      const fetchDelayMs = stubQaCompletionFaultOverride()?.fetchDelayMs ?? qaVariant.fetchDelayMs ?? 0;
+      if (fetchDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, fetchDelayMs));
+      }
+      // `raw` mirrors the Rust parser: completionItem/resolve receives the
+      // provider's own item back verbatim.
+      const items = (qaVariant.items ?? []).map((item) => ({ ...item, raw: item }));
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        isIncomplete: false,
+        items,
+        truncated: false,
+      } as T;
+    }
+    case "lsp_completion_resolve": {
+      const filePath = (args?.filePath as string | undefined) ?? "";
+      const qaVariant = stubQaCompletionVariant(filePath);
+      if (!qaVariant) {
+        return { kind: "unavailable", reason: "no-active-provider" } as T;
+      }
+      const resolveConfig = stubQaCompletionResolveConfig(qaVariant);
+      const mode = resolveConfig.mode ?? "resolved";
+      if (mode === "hold") {
+        // Never settles: the renderer's own resolve budget produces the gate.
+        return await new Promise<never>(() => {}) as T;
+      }
+      if (resolveConfig.delayMs && resolveConfig.delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, resolveConfig.delayMs));
+      }
+      if (mode === "unavailable") {
+        return { kind: "unavailable", reason: resolveConfig.reason ?? "qa-unavailable" } as T;
+      }
+      if (mode === "timeout") {
+        return { kind: "timeout" } as T;
+      }
+      if (mode === "failed") {
+        return { kind: "failed", message: resolveConfig.message ?? "qa-resolve-failed" } as T;
+      }
+      const rawItem = (args?.item ?? {}) as Record<string, unknown>;
+      const label = typeof rawItem.label === "string" ? rawItem.label : "";
+      // A per-case fault override must be able to REPLACE the variant's own
+      // import edits (that is how the overlap-rejection path is exercised).
+      const additionalEdits = stubQaCompletionFaultOverride()?.additionalTextEdits
+        ?? resolveConfig.additionalTextEditsByLabel?.[label]
+        ?? resolveConfig.additionalTextEdits
+        ?? (Array.isArray(rawItem.additionalTextEdits) ? rawItem.additionalTextEdits : []);
+      return {
+        kind: "resolved",
+        item: { ...rawItem, additionalTextEdits: additionalEdits },
+      } as T;
     }
     case "lsp_stop_workspace": {
       return 0 as T;

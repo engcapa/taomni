@@ -129,7 +129,6 @@ import {
   nextLspRequestSequence,
   type LspCodeAction,
   type JavaTestItem,
-  type LspCompletionItem,
   type LspCompletionResult,
   type LspDiagnostic,
   type LspDocumentDescriptor,
@@ -178,11 +177,14 @@ import {
   type SaveTransactionV2,
   type WorkspaceStyleController,
 } from "./workspace/workspaceStyleController";
-import type {
-  CompletionAcceptanceDiagnostic,
-  CompletionInvocationRequest,
-  CompletionRequestIdentity,
-  CompletionRequestToken,
+import {
+  completionResolveProviderResultFromWire,
+  sameCompletionScopeFacts,
+  type CompletionAcceptanceDiagnostic,
+  type CompletionInvocationRequest,
+  type CompletionRequestIdentity,
+  type CompletionRequestToken,
+  type CompletionResolveProviderResult,
 } from "./workspace/lspCompletion";
 import {
   resolveCompletionScopeFacts,
@@ -16115,7 +16117,11 @@ export function CodeWorkspaceTab({
         && identity.uri === token.uri
         && identity.languageId === token.languageId
         && identity.documentRevision === token.documentRevision
-        && identity.lspSessionGeneration === token.lspSessionGeneration;
+        && identity.lspSessionGeneration === token.lspSessionGeneration
+        // ED-PARITY-005 DEC-03/R1: a refreshed project facts generation must
+        // stale the candidate even when file, revision and provider session are
+        // unchanged — accepting it would commit against an unverified scope.
+        && sameCompletionScopeFacts(identity.projectScope, token.projectScope);
     },
     [completionIdentityForFile, workspaceInstanceId],
   );
@@ -16205,15 +16211,25 @@ export function CodeWorkspaceTab({
       file: OpenFileState,
       raw: unknown,
       token: CompletionRequestToken,
-    ): Promise<LspCompletionItem | null> => {
+    ): Promise<CompletionResolveProviderResult> => {
       const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return null;
-      if (!isCompletionTokenCurrent(token)) return null;
+      if (!descriptor) return { kind: "unavailable", reason: "no-provider-descriptor" };
+      if (!isCompletionTokenCurrent(token)) return { kind: "unavailable", reason: "stale-identity" };
       try {
+        // ED-PARITY-005 D1: the backend now reports resolved/unavailable/
+        // timeout/failed; the adapter keeps that identity instead of flattening
+        // every non-result into null (which the old contract read as "no
+        // additional edits" and committed as a fake success).
         const resolved = await lspCompletionResolve(descriptor, raw);
-        return isCompletionTokenCurrent(token) ? resolved : null;
-      } catch {
-        return null;
+        if (!isCompletionTokenCurrent(token)) {
+          return { kind: "unavailable", reason: "stale-identity" };
+        }
+        return completionResolveProviderResultFromWire(resolved);
+      } catch (error) {
+        return {
+          kind: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        };
       }
     },
     [isCompletionTokenCurrent, lspDescriptorForFile],

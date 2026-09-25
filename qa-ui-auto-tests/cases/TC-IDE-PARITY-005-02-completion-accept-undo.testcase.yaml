@@ -1,0 +1,673 @@
+id: TC-IDE-PARITY-005-02
+title: Java Basic Completion accept, snippet navigation, atomic import and single undo
+description: 'ED-PARITY-005 V2 (A1/A2/A3) browser case against fixture B-005 / M0. Every round resets to the same preimage and asserts the complete document through the real editor: Enter and Tab accept the same candidate with different provider range intent (insert keeps the word suffix, replace rewrites it), the mouse accepts a second candidate exactly once, primary + import land in one dispatch with dirty=true and no duplicated newline/indent, and ONE undo restores the exact preimage (redo returns the postimage). Snippet tabstops are pure navigation and add no history. The empty placeholder variant proves the caret exits after '')''. Narrow-window/caret-at-edge layout is recorded as a manual visual check because the runner has no viewport-resize verb.'
+covers:
+- F25.5
+tags:
+- code-workspace
+- completion
+- ed-parity-005
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: ${fixture.parity005_root}
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Main.java"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Main.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-lsp-status-pill"]'
+    contains: controlled parity provider
+    timeout_sec: 20
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 5, Col 13
+    timeout_sec: 10
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- wait: 0.4
+- assert_text:
+    selector: .cm-tooltip-autocomplete [aria-selected="true"]
+    contains: StringBuilder
+- press: Enter
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: &id001
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder("x", 1);'
+    - '    }'
+    - '}'
+    - ''
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor-tab-strip"]'
+    regex: Main\.java\*
+- assert_attribute:
+    selector: '[data-testid="completion-session-observation"]'
+    name: data-range-source
+    equals: provider-text-edit
+- assert_attribute:
+    selector: '[data-testid="completion-session-observation"]'
+    name: data-accept-intent
+    equals: insert
+- screenshot: tc-ide-parity-005-02-accepted.png
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: &id002
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Shift+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id001
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id002
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 5, Col 13
+    timeout_sec: 10
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- wait: 0.4
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id001
+- assert_attribute:
+    selector: '[data-testid="completion-session-observation"]'
+    name: data-accept-intent
+    equals: replace
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id002
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 5, Col 13
+    timeout_sec: 10
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- wait: 0.4
+- click: .cm-tooltip-autocomplete li:nth-of-type(2)
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuffer;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id002
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 5, Col 13
+    timeout_sec: 10
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- wait: 0.4
+- press: Enter
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id001
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id001
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id001
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id002
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="EmptySnippet.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 5, Col 13
+    timeout_sec: 10
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- wait: 0.4
+- press: Enter
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: &id003
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder();'
+    - '    }'
+    - '}'
+    - ''
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id003
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id002
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="MidWord.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 5, Col 18
+    timeout_sec: 10
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- wait: 0.4
+- press: Enter
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: &id005
+    - package parity005;
+    - import org.apache.commons.lang3.StringUtils;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtilsSuffix;'
+    - '    }'
+    - '}'
+    - ''
+- assert_attribute:
+    selector: '[data-testid="completion-session-observation"]'
+    name: data-accept-intent
+    equals: insert
+- assert_attribute:
+    selector: '[data-testid="completion-session-observation"]'
+    name: data-range-source
+    equals: insert-replace-insert
+- screenshot: tc-ide-parity-005-02-mid-enter.png
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: &id004
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtiSuffix;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 5, Col 18
+    timeout_sec: 10
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- wait: 0.4
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import org.apache.commons.lang3.StringUtils;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtils;'
+    - '    }'
+    - '}'
+    - ''
+- assert_attribute:
+    selector: '[data-testid="completion-session-observation"]'
+    name: data-accept-intent
+    equals: replace
+- assert_attribute:
+    selector: '[data-testid="completion-session-observation"]'
+    name: data-range-source
+    equals: insert-replace-replace
+- screenshot: tc-ide-parity-005-02-mid-tab.png
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id004
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 5, Col 18
+    timeout_sec: 10
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- wait: 0.4
+- click: .cm-tooltip-autocomplete li:nth-of-type(1)
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id005
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id004
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: Enter
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 5
+    timeout_sec: 10
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id004
+- press: Tab
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals: *id004
+- screenshot: tc-ide-parity-005-02-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Enter/Tab/mouse accept the selected candidate with the provider range their intent selects, primary plus import land as one dirty transaction, snippet tabstops add no history, and ONE undo restores the exact preimage.
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 10
+    - 12
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 24
+    - 26
+    - 28
+    - 33
+    - 34
+    - 36
+    - 38
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+    - 49
+    - 51
+    - 52
+    - 55
+    - 57
+    - 58
+    - 59
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 66
+    - 68
+    - 69
+    - 71
+    - 73
+    - 74
+    - 75
+    - 76
+    - 77
+    - 78
+    - 79
+    - 80
+    - 82
+    - 84
+    - 85
+    - 87
+    - 89
+    - 91
+    - 93
+    - 95
+    - 96
+    - 97
+    - 98
+    - 99
+    - 100
+    - 101
+    - 102
+    - 104
+    - 106
+    - 107
+    - 109
+    - 111
+    - 113
+    - 115
+    - 116
+    - 117
+    - 118
+    - 119
+    - 120
+    - 121
+    - 122
+    - 123
+    - 124
+    - 125
+    - 126
+    - 127
+    - 128
+    - 130
+    - 132
+    - 133
+    - 137
+    - 138
+    - 140
+    - 141
+    - 142
+    - 143
+    - 144
+    - 145
+    - 146
+    - 147
+    - 148
+    - 149
+    - 150
+    - 151
+    - 152
+    - 153
+    - 155
+    - 157
+    - 158
+    - 162
+    - 163
+    - 165
+    - 166
+    - 167
+    - 168
+    - 169
+    - 170
+    - 171
+    - 172
+    - 173
+    - 174
+    - 175
+    - 176
+    - 177
+    - 178
+    - 180
+    - 182
+    - 183
+    - 185
+    - 187
+    - 188
+    - 189
+    - 190
+    - 191
+    - 192
+    - 193
+    - 195
+    - 197
+    - 198
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"Main.java\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 14
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains": "controlled parity provider", "timeout_sec": 20}}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln 5, Col 13", "timeout_sec": 10}}'
+    - step: 25
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 15}}'
+    - step: 27
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete [aria-selected=\"true\"]", "contains": "StringBuilder"}}'
+    - step: 29
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 30
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]", "regex": "Main\\.java\\*"}}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"completion-session-observation\"]", "name": "data-range-source", "equals": "provider-text-edit"}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"completion-session-observation\"]", "name": "data-accept-intent", "equals": "insert"}}'
+    - step: 35
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        Stri;", "    }", "}", ""]}}'
+    - step: 37
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 39
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        Stri;", "    }", "}", ""]}}'
+    - step: 48
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln 5, Col 13", "timeout_sec": 10}}'
+    - step: 50
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 15}}'
+    - step: 53
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"completion-session-observation\"]", "name": "data-accept-intent", "equals": "replace"}}'
+    - step: 56
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        Stri;", "    }", "}", ""]}}'
+    - step: 65
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln 5, Col 13", "timeout_sec": 10}}'
+    - step: 67
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 15}}'
+    - step: 70
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        StringBuffer;", "    }", "}", ""]}}'
+    - step: 72
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        Stri;", "    }", "}", ""]}}'
+    - step: 81
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln 5, Col 13", "timeout_sec": 10}}'
+    - step: 83
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 15}}'
+    - step: 86
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 88
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 90
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 92
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        Stri;", "    }", "}", ""]}}'
+    - step: 94
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 103
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln 5, Col 13", "timeout_sec": 10}}'
+    - step: 105
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 15}}'
+    - step: 108
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class Main {", "    void sample() {", "        StringBuilder();", "    }", "}", ""]}}'
+    - step: 110
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class Main {", "    void sample() {", "        StringBuilder();", "    }", "}", ""]}}'
+    - step: 112
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        Stri;", "    }", "}", ""]}}'
+    - step: 114
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 129
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln 5, Col 18", "timeout_sec": 10}}'
+    - step: 131
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 15}}'
+    - step: 134
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import org.apache.commons.lang3.StringUtils;", "", "public class Main {", "    void sample() {", "        StringUtilsSuffix;", "    }", "}", ""]}}'
+    - step: 135
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"completion-session-observation\"]", "name": "data-accept-intent", "equals": "insert"}}'
+    - step: 136
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"completion-session-observation\"]", "name": "data-range-source", "equals": "insert-replace-insert"}}'
+    - step: 139
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        StringUtiSuffix;", "    }", "}", ""]}}'
+    - step: 154
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln 5, Col 18", "timeout_sec": 10}}'
+    - step: 156
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 15}}'
+    - step: 159
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import org.apache.commons.lang3.StringUtils;", "", "public class Main {", "    void sample() {", "        StringUtils;", "    }", "}", ""]}}'
+    - step: 160
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"completion-session-observation\"]", "name": "data-accept-intent", "equals": "replace"}}'
+    - step: 161
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"completion-session-observation\"]", "name": "data-range-source", "equals": "insert-replace-replace"}}'
+    - step: 164
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        StringUtiSuffix;", "    }", "}", ""]}}'
+    - step: 179
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln 5, Col 18", "timeout_sec": 10}}'
+    - step: 181
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li", "timeout_sec": 15}}'
+    - step: 184
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "import org.apache.commons.lang3.StringUtils;", "", "public class Main {", "    void sample() {", "        StringUtilsSuffix;", "    }", "}", ""]}}'
+    - step: 186
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        StringUtiSuffix;", "    }", "}", ""]}}'
+    - step: 194
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln 5", "timeout_sec": 10}}'
+    - step: 196
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        StringUtiSuffix;", "    }", "}", ""]}}'
+    - step: 199
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {", "        StringUtiSuffix;", "    }", "}", ""]}}'
+    results:
+    - 194
+    - 196
+    - 199
+  visual:
+  - check: Review the captured screenshots for candidate list, selected row, gate banner and long-text layout; the runner has no viewport-resize verb, so narrow-window and caret-at-edge geometry is unverified here and is recorded in the card report.
+    method: manual
+    reason: Pixel/geometry review cannot be asserted from the DOM.
+  native:
+  - check: Only the declared mode is executed; browser evidence never substitutes for the native/provider run and Linux results do not extend to Windows/macOS.
+    method: external
+    reason: Records the execution boundary and unverified platforms.

@@ -579,6 +579,18 @@ pub struct LspTextEdit {
     pub new_text: String,
 }
 
+/// ED-PARITY-005 D2: an LSP `InsertReplaceEdit` keeps BOTH provider ranges.
+/// The client freezes one accept intent (Enter/mouse = insert, Tab = replace)
+/// and selects the matching range; collapsing this to a single edit at parse
+/// time silently rewrote the user's word instead of honouring the provider.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspInsertReplaceEdit {
+    pub new_text: String,
+    pub insert: LspRange,
+    pub replace: LspRange,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LspCompletionItem {
@@ -592,6 +604,11 @@ pub struct LspCompletionItem {
     pub filter_text: Option<String>,
     pub sort_text: Option<String>,
     pub text_edit: Option<LspTextEdit>,
+    /// ED-PARITY-005 D2: present only for a valid provider InsertReplaceEdit.
+    /// `text_edit` keeps carrying the insert range so plain-TextEdit consumers
+    /// (and older fixtures) stay compatible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub insert_replace_edit: Option<LspInsertReplaceEdit>,
     pub additional_text_edits: Vec<LspTextEdit>,
     /// Original server item, echoed back verbatim for `completionItem/resolve`.
     pub raw: Value,
@@ -606,6 +623,26 @@ pub struct LspCompletionResult {
     /// True when the server list was locally truncated at the hard cap.
     #[serde(default)]
     pub truncated: bool,
+}
+
+/// ED-PARITY-005 D1: typed `completionItem/resolve` outcome.
+///
+/// The previous contract returned `Option<LspCompletionItem>` and fell back to
+/// the ORIGINAL item whenever the provider errored, returned null or produced
+/// unparsable JSON. Callers could not tell "provider resolved this item and it
+/// genuinely has no additional edits" from "resolve failed", so a failed
+/// auto-import looked like a successful primary-only acceptance.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum LspCompletionResolveResult {
+    /// A well-formed provider item was parsed.
+    Resolved { item: LspCompletionItem },
+    /// No active session, no resolve capability or the provider returned null.
+    Unavailable { reason: String },
+    /// The language server did not answer within the request budget.
+    Timeout,
+    /// Transport/protocol failure; the message is preserved for the gate UI.
+    Failed { message: String },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -6507,7 +6544,7 @@ pub async fn lsp_completion_resolve(
     language_id: Option<String>,
     server_command_id: Option<String>,
     custom_server_command: Option<LspCustomServerCommand>,
-) -> Result<Option<LspCompletionItem>, String> {
+) -> Result<LspCompletionResolveResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let Some(session) = state
         .lsp
@@ -6518,15 +6555,35 @@ pub async fn lsp_completion_resolve(
         )
         .await
     else {
-        return Ok(None);
+        return Ok(LspCompletionResolveResult::Unavailable {
+            reason: "no-active-provider".to_string(),
+        });
     };
-    let resolved = session
-        .request("completionItem/resolve", item.clone())
-        .await
-        .unwrap_or(Value::Null);
-    // Servers without resolve support may error or return null; fall back to
-    // the original item so callers always get something applicable.
-    Ok(parse_completion_item(&resolved).or_else(|| parse_completion_item(&item)))
+    // ED-PARITY-005 D1: report the real outcome. A provider error, timeout or
+    // JSON null is NOT a resolved item and must never be reported as one — the
+    // caller needs to tell "no additional edits" from "auto-import unavailable"
+    // before it commits anything to the document.
+    Ok(classify_completion_resolve_response(
+        session.request("completionItem/resolve", item).await,
+    ))
+}
+
+/// ED-PARITY-005 D1 classifier: the provider response alone decides the typed
+/// outcome. The original item is deliberately NOT a parameter, so no failure
+/// path can silently fall back to it and masquerade as a successful resolve.
+fn classify_completion_resolve_response(
+    result: Result<Value, String>,
+) -> LspCompletionResolveResult {
+    match result {
+        Ok(resolved) => match parse_completion_item(&resolved) {
+            Some(item) => LspCompletionResolveResult::Resolved { item },
+            None => LspCompletionResolveResult::Unavailable {
+                reason: "provider-returned-null".to_string(),
+            },
+        },
+        Err(message) if message.contains("timed out") => LspCompletionResolveResult::Timeout,
+        Err(message) => LspCompletionResolveResult::Failed { message },
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -10268,6 +10325,29 @@ fn parse_text_edit(value: &Value) -> Option<LspTextEdit> {
     Some(LspTextEdit { range, new_text })
 }
 
+/// ED-PARITY-005 D2: parse a provider InsertReplaceEdit without dropping
+/// either range. A plain TextEdit (`range`) is not an InsertReplaceEdit, and
+/// contradictory ranges (different starts, replace narrower than insert) are
+/// rejected here so the client can never guess which intent the provider meant.
+fn parse_insert_replace_edit(value: &Value) -> Option<LspInsertReplaceEdit> {
+    let new_text = value.get("newText")?.as_str()?.to_string();
+    let insert = value.get("insert").and_then(parse_range)?;
+    let replace = value.get("replace").and_then(parse_range)?;
+    if insert.start != replace.start {
+        return None;
+    }
+    let replace_covers_insert = replace.end.line > insert.end.line
+        || (replace.end.line == insert.end.line && replace.end.character >= insert.end.character);
+    if !replace_covers_insert {
+        return None;
+    }
+    Some(LspInsertReplaceEdit {
+        new_text,
+        insert,
+        replace,
+    })
+}
+
 fn parse_text_edits(value: &Value) -> Vec<LspTextEdit> {
     value
         .as_array()
@@ -10631,6 +10711,7 @@ fn parse_completion_item(value: &Value) -> Option<LspCompletionItem> {
             .and_then(Value::as_str)
             .map(ToString::to_string),
         text_edit: value.get("textEdit").and_then(parse_text_edit),
+        insert_replace_edit: value.get("textEdit").and_then(parse_insert_replace_edit),
         additional_text_edits: value
             .get("additionalTextEdits")
             .and_then(Value::as_array)
@@ -13757,6 +13838,114 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         assert!(truncated_flag, "local truncation must be observable");
         assert_eq!(items.len(), MAX_COMPLETION_ITEMS);
         assert_eq!(items.last().unwrap().label, "candidate-199");
+    }
+
+    #[test]
+    fn completion_item_preserves_insert_replace_ranges() {
+        // ED-PARITY-005 D2: a provider InsertReplaceEdit keeps both ranges so
+        // the client can honour Enter (insert) and Tab (replace) separately.
+        let (_, items, _) = parse_completion_response(&json!({
+            "items": [{
+                "label": "StringUtils",
+                "kind": 7,
+                "textEdit": {
+                    "newText": "StringUtils",
+                    "insert": { "start": { "line": 4, "character": 8 }, "end": { "line": 4, "character": 17 } },
+                    "replace": { "start": { "line": 4, "character": 8 }, "end": { "line": 4, "character": 23 } }
+                }
+            }]
+        }));
+        let item = &items[0];
+        // Legacy single-range consumers still see the insert range.
+        assert_eq!(item.text_edit.as_ref().unwrap().range.end.character, 17);
+        let dual = item
+            .insert_replace_edit
+            .as_ref()
+            .expect("valid InsertReplaceEdit must be preserved");
+        assert_eq!(dual.new_text, "StringUtils");
+        assert_eq!(dual.insert.end.character, 17);
+        assert_eq!(dual.replace.end.character, 23);
+
+        // Plain TextEdit keeps the old shape and never invents a dual range.
+        let (_, plain, _) = parse_completion_response(&json!([{
+            "label": "plain",
+            "textEdit": {
+                "newText": "plain",
+                "range": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 3 } }
+            }
+        }]));
+        assert!(plain[0].insert_replace_edit.is_none());
+        assert_eq!(plain[0].text_edit.as_ref().unwrap().range.end.character, 3);
+
+        // Contradictory provider ranges are refused instead of guessed.
+        let (_, invalid, _) = parse_completion_response(&json!([{
+            "label": "bad-start",
+            "textEdit": {
+                "newText": "bad",
+                "insert": { "start": { "line": 1, "character": 4 }, "end": { "line": 1, "character": 8 } },
+                "replace": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 8 } }
+            }
+        }, {
+            "label": "narrower-replace",
+            "textEdit": {
+                "newText": "bad",
+                "insert": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 8 } },
+                "replace": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 5 } }
+            }
+        }]));
+        assert!(invalid.iter().all(|item| item.insert_replace_edit.is_none()));
+    }
+
+    #[test]
+    fn completion_resolve_does_not_fallback_on_null_or_error() {
+        // ED-PARITY-005 D1: the resolve boundary must never turn a provider
+        // failure into a "resolved original item" success.
+        let resolved = classify_completion_resolve_response(Ok(json!({
+            "label": "asList",
+            "additionalTextEdits": [{
+                "newText": "import java.util.Arrays;\n",
+                "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } }
+            }]
+        })));
+        match resolved {
+            LspCompletionResolveResult::Resolved { item } => {
+                assert_eq!(item.label, "asList");
+                assert_eq!(item.additional_text_edits.len(), 1);
+            }
+            other => panic!("expected resolved, got {other:?}"),
+        }
+
+        match classify_completion_resolve_response(Ok(Value::Null)) {
+            LspCompletionResolveResult::Unavailable { reason } => {
+                assert_eq!(reason, "provider-returned-null");
+            }
+            other => panic!("null must not resolve, got {other:?}"),
+        }
+
+        match classify_completion_resolve_response(Err(
+            "language server request timed out: completionItem/resolve".to_string(),
+        )) {
+            LspCompletionResolveResult::Timeout => {}
+            other => panic!("expected timeout, got {other:?}"),
+        }
+
+        match classify_completion_resolve_response(Err(
+            "language server closed request completionItem/resolve".to_string(),
+        )) {
+            LspCompletionResolveResult::Failed { message } => {
+                assert!(message.contains("closed request"));
+            }
+            other => panic!("expected failed, got {other:?}"),
+        }
+
+        // A provider that answers with something unparsable is unavailable, not
+        // a resolved item carrying the caller's original edit.
+        match classify_completion_resolve_response(Ok(json!({ "noLabel": true }))) {
+            LspCompletionResolveResult::Unavailable { reason } => {
+                assert_eq!(reason, "provider-returned-null");
+            }
+            other => panic!("unparsable resolve must not resolve, got {other:?}"),
+        }
     }
 
     #[test]

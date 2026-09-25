@@ -79,7 +79,8 @@
      "java_rename_deleted_fixtures",
      "view_state_fixtures",
      "editor_save_race",
-     "project_tree"
+     "project_tree",
+     "parity005_completion"
     ]
    },
    "uniqueItems": true

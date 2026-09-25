@@ -23,6 +23,16 @@ interface VfsRecord {
 const VIRTUAL_ROOT = "/preview";
 const SEED_DIRS = [`${VIRTUAL_ROOT}`, `${VIRTUAL_ROOT}/uploads`, `${VIRTUAL_ROOT}/downloads`];
 
+/**
+ * QA-only workspace seed (browser preview). A testcase fixture installs
+ * `{"files": {"parity005/Main.java": "<exact bytes>"}}` before the first
+ * navigation; the preview VFS materializes it under the virtual root so a
+ * browser case can open deterministic workspace content through the real tree
+ * and editor instead of typing it. The release build never loads this stub.
+ */
+const QA_WORKSPACE_SEED_KEY = "taomni.qa.workspaceSeed.v1";
+let appliedQaSeedRaw: string | null = null;
+
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
@@ -42,6 +52,11 @@ function openDb(): Promise<IDBDatabase> {
         await ensureSeed(db);
       } catch (err) {
         console.warn("[localVfs] seed failed:", err);
+      }
+      try {
+        await ensureQaWorkspaceSeed(db);
+      } catch (err) {
+        console.warn("[localVfs] QA workspace seed failed:", err);
       }
       resolve(db);
     };
@@ -120,6 +135,63 @@ async function ensureSeed(db: IDBDatabase): Promise<void> {
       size: text.byteLength,
       mtime: Math.floor(Date.now() / 1000),
       data: text.buffer,
+    });
+  }
+}
+
+interface QaWorkspaceSeed {
+  files?: Record<string, string>;
+}
+
+function readQaWorkspaceSeed(): QaWorkspaceSeed | null {
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(QA_WORKSPACE_SEED_KEY);
+  } catch {
+    return null;
+  }
+  if (!raw || raw === appliedQaSeedRaw) return null;
+  appliedQaSeedRaw = raw;
+  try {
+    return JSON.parse(raw) as QaWorkspaceSeed;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureQaWorkspaceSeed(db: IDBDatabase): Promise<void> {
+  const seed = readQaWorkspaceSeed();
+  if (!seed?.files) return;
+  const store = db.transaction(STORE, "readwrite").objectStore(STORE);
+  const now = Math.floor(Date.now() / 1000);
+  for (const [relative, text] of Object.entries(seed.files)) {
+    if (typeof text !== "string") continue;
+    const target = normalize(relative.startsWith("/") ? relative : `${VIRTUAL_ROOT}/${relative}`);
+    const dirs: string[] = [];
+    for (let parent = parentOf(target); parent && parent !== VIRTUAL_ROOT; parent = parentOf(parent)) {
+      dirs.unshift(parent);
+    }
+    for (const dir of dirs) {
+      if (!(await get(store, dir))) {
+        await put(store, {
+          path: dir,
+          parent: parentOf(dir),
+          name: basenameOf(dir),
+          type: "dir",
+          size: 0,
+          mtime: now,
+        });
+      }
+    }
+    const bytes = new TextEncoder().encode(text);
+    await put(store, {
+      path: target,
+      parent: parentOf(target),
+      name: basenameOf(target),
+      type: "file",
+      size: bytes.byteLength,
+      mtime: now,
+      data: bytes.buffer,
     });
   }
 }

@@ -152,6 +152,9 @@
 - `[data-testid^="keymap-category-"]` — interactive [optional] — F25.3.keymap-category
 - `[data-testid^="keymap-item-"]` — display [optional] — F25.3.keymap-item
   ↳ `[data-testid="keymap-item-workspace.renameSymbol"]` — alias
+  ↳ `[data-testid="keymap-item-editor.basicCompletion"]` — alias
+- `[data-testid^="keymap-run-"]` — interactive [optional] — F25.3.keymap-run
+  ↳ `[data-testid="keymap-run-editor.basicCompletion"]` — alias
 - `[data-testid="keymap-cheatsheet-footer-close"]` — interactive — F25.3.keymap-cheatsheet-footer-close
 - `[data-testid="keymap-cheatsheet-close"]` — interactive [optional] — F25.3.keymap-cheatsheet-close
 - `[data-testid="editor-context-cut"]` — interactive [optional] — F25.3.context-cut
@@ -202,7 +205,13 @@
 - `[data-editor-group-id="secondary"] [data-testid="code-workspace-editor-tab-strip"]` — interactive [optional] — F25.5.editor-leaf-secondary-tab-strip
 - `[data-testid="code-workspace-editor"] .cm-content` — interactive [optional] — F25.5.editor-content
 - `.cm-tooltip-autocomplete` — display [optional] — F25.5.editor-completion-popup
-- `xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel') and normalize-space(.)='String - java.lang']` — interactive [optional] — F25.5.editor-completion-string-candidate
+- `xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel') and normalize-space(.)='String - java.lang']` — interactive — F25.5.editor-completion-string-candidate
+- `[data-testid="completion-resolve-gate"]` — display [optional] — F25.5.completion-resolve-gate
+- `[data-testid="completion-resolve-gate-retry"]` — interactive [optional] — F25.5.completion-resolve-gate-retry
+- `[data-testid="completion-resolve-gate-insert-without-import"]` — interactive [optional] — F25.5.completion-resolve-gate-insert-without-import
+- `[data-testid="completion-resolve-gate-dismiss"]` — interactive [optional] — F25.5.completion-resolve-gate-dismiss
+- `[data-testid="completion-resolve-gate-failed-note"]` — display [optional] — F25.5.completion-resolve-gate-failed-note
+- `[data-testid="completion-session-observation"]` — display [optional] — F25.5.completion-session-observation
 - `[data-testid="code-workspace-lightbulb"]` — interactive [optional] — F25.5.editor-lightbulb
 - `[data-testid="code-workspace-file-status"]` — display [optional] — F25.5.file-status
 - `[data-testid="code-workspace-save-observation"]` — display [optional] — F25.5.save-observation

@@ -208,6 +208,18 @@ export interface LspTextEdit {
   annotationId?: string;
 }
 
+/**
+ * ED-PARITY-005 D2: an LSP `InsertReplaceEdit` keeps BOTH provider ranges.
+ * Enter/mouse accept applies `insert` (the suffix stays); Tab applies
+ * `replace` (the whole identifier is rewritten). Only present when the
+ * provider sent a valid, non-contradictory pair.
+ */
+export interface LspInsertReplaceEdit {
+  newText: string;
+  insert: LspRange;
+  replace: LspRange;
+}
+
 export interface LspCompletionItem {
   label: string;
   kind: number | null;
@@ -219,10 +231,23 @@ export interface LspCompletionItem {
   filterText: string | null;
   sortText: string | null;
   textEdit: LspTextEdit | null;
+  /** ED-PARITY-005 D2; absent for plain TextEdit responses. */
+  insertReplaceEdit?: LspInsertReplaceEdit | null;
   additionalTextEdits: LspTextEdit[];
   /** Original server item, passed back verbatim to completionItem/resolve. */
   raw: unknown;
 }
+
+/**
+ * ED-PARITY-005 D1: typed `completionItem/resolve` outcome. A provider error,
+ * timeout or null answer is reported as such and never as a resolved item, so
+ * the client can tell "no additional edits" from "auto-import unavailable".
+ */
+export type LspCompletionResolveResult =
+  | { kind: "resolved"; item: LspCompletionItem }
+  | { kind: "unavailable"; reason: string }
+  | { kind: "timeout" }
+  | { kind: "failed"; message: string };
 
 export interface LspCompletionResult {
   status: LspDocumentStatus;
@@ -612,8 +637,8 @@ export function lspCompletion(
 export function lspCompletionResolve(
   descriptor: LspDocumentDescriptor,
   item: unknown,
-): Promise<LspCompletionItem | null> {
-  return invoke<LspCompletionItem | null>("lsp_completion_resolve", {
+): Promise<LspCompletionResolveResult> {
+  return invoke<LspCompletionResolveResult>("lsp_completion_resolve", {
     ...documentArgs(descriptor),
     item,
   });

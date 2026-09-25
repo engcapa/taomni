@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { CompletionContext } from "@codemirror/autocomplete";
+import { java } from "@codemirror/lang-java";
 import { history, undo } from "@codemirror/commands";
 import type { LspCompletionResult, LspDocumentStatus } from "../../../lib/editor/lsp";
 import {
@@ -28,10 +29,19 @@ import {
   symbolIdentityFromItem,
   MAX_COMPLETION_OPTIONS,
   mergeCompletionTriggers,
+  cancelPendingCompletionAcceptance,
+  clearCompletionAcceptIntent,
+  completionResolveProviderResultFromWire,
+  hasPendingCompletionAcceptance,
+  resolveCompletionAcceptRange,
+  sameCompletionScopeFacts,
+  setCompletionAcceptIntent,
   type CompletionCandidateIdentity,
   type CompletionCandidatePair,
+  type CompletionObservationEvent,
   type CompletionRequestIdentity,
 } from "./lspCompletion";
+import type { LspCompletionItem } from "../../../lib/editor/lsp";
 
 function status(active: boolean): LspDocumentStatus {
   return {
@@ -1907,6 +1917,275 @@ describe("ED-COMP-004: effective project scope recording", () => {
         expect.anything(),
         expect.anything(),
       );
+    });
+  });
+
+  describe("ED-PARITY-005 D1/D2 completion accept contract", () => {
+    const MID_WORD_DOC = "        StringUtiSuffix;";
+    const MID_WORD_CARET = 17;
+    const IMPORT_EDIT = {
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      newText: "import org.apache.commons.lang3.StringUtils;\n",
+    };
+    const JAVA_IDENTITY: CompletionRequestIdentity = {
+      workspaceId: "ws-005",
+      fileKey: "Main.java",
+      filePath: "/parity005/Main.java",
+      uri: "file:///parity005/Main.java",
+      languageId: "java",
+      documentRevision: 1,
+      lspSessionGeneration: 1,
+    };
+
+    /** Mid-word M0 item: provider InsertReplaceEdit + resolve-supplied import. */
+    function midWordItem(overrides: Partial<LspCompletionItem> = {}): LspCompletionItem {
+      return {
+        label: "StringUtils",
+        kind: 7,
+        detail: "org.apache.commons.lang3.StringUtils",
+        documentation: null,
+        insertText: "StringUtils",
+        insertTextFormat: 1,
+        filterText: null,
+        sortText: "0001",
+        textEdit: {
+          range: { start: { line: 0, character: 8 }, end: { line: 0, character: 17 } },
+          newText: "StringUtils",
+        },
+        insertReplaceEdit: {
+          newText: "StringUtils",
+          insert: { start: { line: 0, character: 8 }, end: { line: 0, character: 17 } },
+          replace: { start: { line: 0, character: 8 }, end: { line: 0, character: 23 } },
+        },
+        additionalTextEdits: [],
+        raw: { label: "StringUtils" },
+        ...overrides,
+      };
+    }
+
+    async function acceptMidWord(input: {
+      intent: "insert" | "replace";
+      item?: LspCompletionItem;
+      doc?: string;
+      caret?: number;
+    }): Promise<{ view: EditorView; doc: string; observations: CompletionObservationEvent[] }> {
+      const { EditorView } = await import("@codemirror/view");
+      const item = input.item ?? midWordItem();
+      const observations: CompletionObservationEvent[] = [];
+      const source = createLspCompletionSource({
+        identity: () => ({ ...JAVA_IDENTITY }),
+        fetch: async () => ({ status: status(true), isIncomplete: false, items: [item] }),
+        // Import arrives only through resolve, so the frozen intent has to
+        // survive the asynchronous round-trip.
+        resolve: async () => ({ ...item, additionalTextEdits: [IMPORT_EDIT] }),
+        triggerCharacters: () => [],
+        getDocumentRevision: () => JAVA_IDENTITY.documentRevision,
+        reportDiagnostic: vi.fn(),
+        onCompletionObservation: (event) => observations.push(event),
+      });
+      const doc = input.doc ?? MID_WORD_DOC;
+      const caret = input.caret ?? MID_WORD_CARET;
+      const view = new EditorView({
+        // The caret sits at the prefix end, the same live state the real accept
+        // sees (the safe-widening guard reads the live selection).
+        state: EditorState.create({
+          doc,
+          selection: { anchor: caret },
+          // Real Java parsing so the string/comment guard runs against a tree
+          // instead of an empty document node.
+          extensions: [history(), java()],
+        }),
+      });
+      const result = await source(new CompletionContext(view.state, caret, true));
+      expect(result?.options.length).toBe(1);
+      const option = result!.options[0];
+      setCompletionAcceptIntent(view, input.intent);
+      try {
+        if (typeof option.apply !== "function") throw new Error("expected an apply function");
+        option.apply(view, option, 8, caret);
+      } finally {
+        clearCompletionAcceptIntent(view);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return { view, doc: view.state.doc.toString(), observations };
+    }
+
+    it("ED-PARITY-005 preserves insert replace intent through resolve and undo", async () => {
+      // Enter/mouse (insert): the provider insert range keeps the suffix.
+      const inserted = await acceptMidWord({ intent: "insert" });
+      expect(inserted.doc).toBe(
+        "import org.apache.commons.lang3.StringUtils;\n        StringUtilsSuffix;",
+      );
+      const insertCommit = inserted.observations.find((event) => event.kind === "commit");
+      expect(insertCommit).toMatchObject({
+        kind: "commit",
+        intent: "insert",
+        rangeSource: "insert-replace-insert",
+        rangeExtended: false,
+      });
+      // One undo restores the exact preimage (primary + import together).
+      const { undo } = await import("@codemirror/commands");
+      undo(inserted.view);
+      expect(inserted.view.state.doc.toString()).toBe(MID_WORD_DOC);
+      inserted.view.destroy();
+
+      // Tab (replace): the provider replace range removes the suffix.
+      const replaced = await acceptMidWord({ intent: "replace" });
+      expect(replaced.doc).toBe(
+        "import org.apache.commons.lang3.StringUtils;\n        StringUtils;",
+      );
+      const replaceCommit = replaced.observations.find((event) => event.kind === "commit");
+      expect(replaceCommit).toMatchObject({
+        kind: "commit",
+        intent: "replace",
+        rangeSource: "insert-replace-replace",
+        rangeExtended: false,
+      });
+      undo(replaced.view);
+      expect(replaced.view.state.doc.toString()).toBe(MID_WORD_DOC);
+      replaced.view.destroy();
+    });
+
+    /** Plain TextEdit item whose provider range is exactly [from, to). */
+    function plainRangeItem(from: number, to: number): LspCompletionItem {
+      return midWordItem({
+        insertReplaceEdit: null,
+        textEdit: {
+          range: { start: { line: 0, character: from }, end: { line: 0, character: to } },
+          newText: "StringUtils",
+        },
+      });
+    }
+
+    it("ED-PARITY-005 widens a plain provider range to the Java word end only for Tab", async () => {
+      const plainItem = plainRangeItem(8, 17);
+
+      // Enter keeps the provider range and therefore the suffix.
+      const insert = await acceptMidWord({ intent: "insert", item: plainItem });
+      expect(insert.doc).toContain("StringUtilsSuffix;");
+
+      // Tab safely widens to the current word end for the simple Java case.
+      const replace = await acceptMidWord({ intent: "replace", item: plainItem });
+      expect(replace.doc).toContain("        StringUtils;");
+      expect(replace.observations.find((event) => event.kind === "commit")).toMatchObject({
+        intent: "replace",
+        rangeSource: "provider-text-edit",
+        rangeExtended: true,
+      });
+
+      // Empty suffix: both entries agree because there is nothing to widen.
+      const emptyDoc = "        StringUti;";
+      const emptyInsert = await acceptMidWord({ intent: "insert", item: plainItem, doc: emptyDoc, caret: 17 });
+      const emptyReplace = await acceptMidWord({ intent: "replace", item: plainItem, doc: emptyDoc, caret: 17 });
+      expect(emptyInsert.doc).toContain("        StringUtils;");
+      expect(emptyReplace.doc).toContain("        StringUtils;");
+      expect(emptyReplace.observations.find((event) => event.kind === "commit")).toMatchObject({
+        rangeExtended: false,
+      });
+
+      // Inside a string literal the client never guesses a range.
+      const stringDoc = '        String s = "StringUtiSuffix";';
+      const stringPrefixFrom = stringDoc.indexOf("StringUti");
+      const inString = await acceptMidWord({
+        intent: "replace",
+        item: plainRangeItem(stringPrefixFrom, stringPrefixFrom + "StringUti".length),
+        doc: stringDoc,
+        caret: stringPrefixFrom + "StringUti".length,
+      });
+      expect(inString.doc).toContain('"StringUtilsSuffix"');
+      expect(inString.observations.find((event) => event.kind === "commit")).toMatchObject({
+        rangeExtended: false,
+      });
+    });
+
+    it("ED-PARITY-005 rejects contradictory dual ranges without partial writes", async () => {
+      const contradictory = midWordItem({
+        insertReplaceEdit: {
+          newText: "StringUtils",
+          insert: { start: { line: 0, character: 8 }, end: { line: 0, character: 17 } },
+          replace: { start: { line: 0, character: 6 }, end: { line: 0, character: 23 } },
+        },
+      });
+      const outcome = await acceptMidWord({ intent: "replace", item: contradictory });
+      expect(outcome.doc).toBe(MID_WORD_DOC);
+      expect(outcome.observations.some((event) => event.kind === "blocked")).toBe(true);
+      expect(outcome.observations.some((event) => event.kind === "commit")).toBe(false);
+    });
+
+    it("ED-PARITY-005 maps typed resolve failures into distinct outcomes", async () => {
+      expect(completionResolveProviderResultFromWire({ kind: "resolved", item: midWordItem() }))
+        .toMatchObject({ label: "StringUtils" });
+      expect(completionResolveProviderResultFromWire({ kind: "unavailable", reason: "no-active-provider" }))
+        .toEqual({ kind: "unavailable", reason: "no-active-provider" });
+      expect(completionResolveProviderResultFromWire({ kind: "timeout" })).toEqual({ kind: "timeout" });
+      expect(completionResolveProviderResultFromWire({ kind: "failed", message: "server closed" }))
+        .toEqual({ kind: "failed", message: "server closed" });
+    });
+
+    it("ED-PARITY-005 treats a changed project facts generation as stale identity", () => {
+      const ready = {
+        status: "ready" as const,
+        scope: "module" as const,
+        moduleId: "parity005",
+        sourceKind: "main" as const,
+        dependencies: [],
+        classpathFingerprint: null,
+        generation: 4,
+      };
+      expect(sameCompletionScopeFacts(ready, { ...ready })).toBe(true);
+      expect(sameCompletionScopeFacts(ready, { ...ready, generation: 5 })).toBe(false);
+      expect(sameCompletionScopeFacts(undefined, undefined)).toBe(true);
+      expect(sameCompletionScopeFacts(ready, undefined)).toBe(false);
+    });
+
+    it("ED-PARITY-005 cancels a pending acceptance without a late commit", async () => {
+      const { EditorView } = await import("@codemirror/view");
+      const item = midWordItem();
+      let releaseResolve: (value: LspCompletionItem) => void = () => {};
+      const pending = new Promise<LspCompletionItem>((resolve) => { releaseResolve = resolve; });
+      const observations: CompletionObservationEvent[] = [];
+      const source = createLspCompletionSource({
+        identity: () => ({ ...JAVA_IDENTITY }),
+        fetch: async () => ({ status: status(true), isIncomplete: false, items: [item] }),
+        resolve: () => pending,
+        triggerCharacters: () => [],
+        getDocumentRevision: () => JAVA_IDENTITY.documentRevision,
+        reportDiagnostic: vi.fn(),
+        onCompletionObservation: (event) => observations.push(event),
+      });
+      const view = new EditorView({
+        state: EditorState.create({ doc: MID_WORD_DOC, extensions: [history()] }),
+      });
+      const result = await source(new CompletionContext(view.state, MID_WORD_CARET, true));
+      const option = result!.options[0];
+      if (typeof option.apply !== "function") throw new Error("expected an apply function");
+      option.apply(view, option, 8, MID_WORD_CARET);
+      expect(hasPendingCompletionAcceptance(view)).toBe(true);
+      // Esc (host) / session cancellation: the late provider answer is dropped.
+      expect(cancelPendingCompletionAcceptance(view)).toBe(true);
+      releaseResolve({ ...item, additionalTextEdits: [IMPORT_EDIT] });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(view.state.doc.toString()).toBe(MID_WORD_DOC);
+      expect(observations.some((event) => event.kind === "commit")).toBe(false);
+      expect(observations.some((event) => event.kind === "cancelled")).toBe(true);
+      view.destroy();
+    });
+
+    it("ED-PARITY-005 selects dual ranges without a provider textEdit copy", async () => {
+      const { EditorView } = await import("@codemirror/view");
+      const view = new EditorView({
+        state: EditorState.create({ doc: MID_WORD_DOC }),
+      });
+      const resolved = resolveCompletionAcceptRange({
+        view,
+        item: midWordItem({ textEdit: null }),
+        from: 8,
+        to: MID_WORD_CARET,
+        intent: "replace",
+        languageId: "java",
+      });
+      expect(resolved).toEqual({ from: 8, to: 23, source: "insert-replace-replace", extended: false });
+      view.destroy();
     });
   });
 });

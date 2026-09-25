@@ -207,3 +207,28 @@ P1 不执行本节命令。P2先落实V1–V6及fixture/controlled-provider/obse
 P2维护 `qa-ui-auto-tests/feature-list.md`、covers/controls，controls变化时重生成testid目录，case批次后 `audit --gate`；检查summary/receipt和selected/pass/fail/skip。回填本节AC→V→实际文件/ID→断言/报告/平台；保留失败chronology。所有原件放忽略目录，入库只交摘要与身份。
 
 **P1门槛结论（2026-09-25）**：G1版本与G2必要参照、snippet差异决定已完成；DEC-08/09、V2/V5/V6期望和设施责任已落盘。同卡author为ready/planning_required=false，无开发owner。完整[可复制P2提示词](handoff-p2-ed-parity-005.md)使用固定板/ID；所有产品验证仍未执行。D1/D2有真实剩余实现工作，P1不是产品done或双侧matched。其他平台验证及原生provider能力缺口不得借ready状态免除。
+
+## 8. P2 执行回填（2026-09-26，Linux 当前端）
+
+实现（分支 docs/code-workspace-idea-audit-20260913，基线 HEAD `25921fd774dfaa7e5832bdaec00caa187f7f4a0e`，未提交；source hash `4d3b7ca943b040fe05490a2e16ac42a700dd832ad5310624302f7dc17ea9bc23`）：
+
+- **D1 修复**：`src-tauri/src/lsp.rs` 的 `lsp_completion_resolve` 改为 typed `LspCompletionResolveResult`（resolved/unavailable/timeout/failed），删除 `.or_else(parse(original))` 成功伪装；`src/lib/editor/lsp.ts` + `CodeWorkspaceTab.resolveLspCompletion` + `lspCompletion.ts`（`completionResolveProviderResultFromWire`、`executeCompletionResolve`）保留 wire 状态到 gate 原因。
+- **D2 修复**：Rust completion 协议新增可选 `insertReplaceEdit {newText, insert, replace}`（`parse_insert_replace_edit`，非法/矛盾范围拒绝，`text_edit` 仍保留 insert range，未改共享 `parse_text_edit`）；`lspCompletion.ts` 新增 `resolveCompletionAcceptRange` + 每 view `WeakMap` 接受意图（Tab=replace，Enter/鼠标=insert，读后即消），Tab 只对 Java 简单 identifier 安全扩展到词末；`CodeMirrorHost` 的 Tab 绑定写入意图。
+- **生命周期**：每个 view 一个 pending acceptance session（新接受替换旧的、Esc 取消且迟到不复活）；`closeCompletion` 在接受开始时关闭候选列表（否则 Esc 只关列表、gate 的 Tab 不可达）；gate banner 带 session id，旧 Retry 回调不能改新 gate；`completionIdentityForFile/isCompletionTokenCurrent/sameCompletionIdentity` 纳入 project facts generation（R1 关闭）。
+- **观测面**：只读 `[data-testid="completion-session-observation"]`（phase/ordinal/scope/facts generation/item count/intent/range source/commit count），不是状态 owner。
+- **QA 设施**：browser 专用受控 provider（`taomni.qa.completionProvider.v1` + 故障覆盖 `...fault.v1`，`src/stubs/tauri-core.ts`）与 QA workspace seed（`taomni.qa.workspaceSeed.v1`，`src/stubs/localVfs.ts`），fixture `parity005_completion`；两者只在 Vite stub（浏览器）构建加载。
+
+| AC / V | 实际 test / case | 结果（Linux 当前端） |
+|---|---|---|
+| A1/A3 V1 | TC-IDE-PARITY-005-01（86 步，browser） | passed：Ctrl+Space、Alt+/（ordinal 2/expanded/providerScope unchanged）、Search Everywhere Actions、Keymap 速查执行、Esc 重开 ordinal 1、Find 输入保护、零编辑 |
+| A1/A2/A3 V2 | TC-IDE-PARITY-005-02（204 步，browser） | passed：Enter/Tab/鼠标三种意图与 range source、primary+import 单次 dispatch、dirty、一次 Undo/Redo、snippet 导航无 history、空占位符、M0 词中 Enter/Tab/鼠标 |
+| A1/A3 V3 | TC-IDE-PARITY-005-03（112 步，browser） | passed：fetch/accept pending Esc 零提交不复活、gate Esc 关闭、scope fallback 原因、未覆盖 provider 文件无受控候选、跨文件无泄漏 |
+| A1/A3 V4 | TC-IDE-PARITY-005-04（181 步，browser） | passed：unavailable/failed/timeout/hold 四类故障经真实 Enter 进 gate 且零提交（D1 反例）、Retry 飞行中 disabled、失败→成功一次提交、primary-only 显式降级、重叠 edits 整笔拒绝 |
+| A1/A3 V5 | TC-IDE-PARITY-005-05（204 步，native/provider，Linux） | passed：真实 JDT LS 1.61.0.202607102111；lang3 类型候选（非 com.sun 同名项）接受→import+正文一次事务、显式 Save 后 host 字节含 import、一次 Ctrl+Z+Save 回到 fixture 原始 SHA-256 `d1a95976…`；append(String str) 接受、Tab、一次 Undo 回 `appen` 并保存回原始 hash；保存后补全仍可用（asList） |
+| A2 V6 | REF-PARITY-005-WIN-20260925 记录对照（行为层，scoped ceiling） | 已执行但**不签 matched**：本机无 IDEA 原件（跨机需原包），故只按 P1 记录的 IU-262.10968.63 观察逐项对照类型接受/一次 Undo/词中三入口/字体缩放差异；snippet 默认值差异按 DEC-08 接受；像素/选区比较未做 |
+
+单测 / 静态：`lspCompletion.test.ts`（68 passed，含 ED-PARITY-005 preserves insert replace intent through resolve and undo 等 7 个新用例）、`CodeMirrorHost.parity005.test.tsx`（4 passed：Enter/Tab/mouse 意图、facts generation 失效、Esc 取消不复活、旧 gate 回调不替换新 gate）、`lspCompletionResolveGate.test.ts`（20 passed）、`CodeMirrorHost.completion.test.tsx`（5 passed）、`src/lib/editor/lsp.completionResolve.test.ts`（1 passed，resolved/unavailable/timeout/failed 跨 IPC）；`src/components/editor/workspace/` 全目录 2311 passed / 1 failed — 失败项 `CodeMirrorHost.completion-undo.test.tsx` 在改前基线（stash + 复跑）以同一断言同样失败，属既有 flake（75ms interactionDelay 与立即 Enter 竞争），非本卡引入。Rust：`cargo test --lib completion_` 3 passed（含新增 `completion_item_preserves_insert_replace_ranges`、`completion_resolve_does_not_fallback_on_null_or_error`）。typecheck：`typecheck_scope.py` 覆盖本卡 9 个路径 0 error（全仓 0 error）。QA：`audit --gate` OK（orphans 0，2 项改善）、`contracts --gate` 270/270 reviewed。
+
+证据原件（未入库）：browser `qa-ui-auto-report/ed-parity-005/browser/run-20260926-000509-155658760`、`…/run-20260926-000621-754611890`；native `…/native/run-20260926-000755-187193019`（QA binary `2a836b79…`，source `4d3b7ca9…`）。
+
+**未验证 / 边界**：Windows/WebView2 与 macOS/WKWebView 未运行（步骤同 V5，native_platforms=[Linux]）；IDEA 原件级比较未做（无原包）；真实 JDT LS 在 `StringUtiSuffix` 词中 caret 不返回候选（仅本地模板），故 DEC-09 的词中 Enter/Tab 语义由受控 provider 的 005-02 与单测证明，真实 provider 侧记为能力边界；窄窗/底缘布局无 runner resize verb，仅截图人工评审；IDEA live template 结束格式化、Smart/Full Line 不属本卡。

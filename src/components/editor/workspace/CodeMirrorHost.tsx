@@ -96,7 +96,6 @@ import { codeViewExtensions } from "../../../lib/codeViewTheme";
 import { getAppPlatform, isTauriRuntime } from "../../../lib/runtime";
 import type { EffectiveCodeStyle } from "./codeStyleModel";
 import type {
-  LspCompletionItem,
   LspCompletionResult,
   LspDiagnostic,
   LspDocumentHighlight,
@@ -133,9 +132,14 @@ import {
   LspCompletionController,
   lspSnippetSessionInvalidator,
   resetBasicCompletionSession,
+  cancelPendingCompletionAcceptance,
+  clearCompletionAcceptIntent,
+  setCompletionAcceptIntent,
   type CompletionAcceptanceDiagnostic,
   type CompletionInvocationRequest,
+  type CompletionObservationEvent,
   type CompletionRequestIdentity,
+  type CompletionResolveProviderResult,
   type CompletionRequestToken,
   type CompletionResolveGateRequest,
 } from "./lspCompletion";
@@ -466,7 +470,7 @@ interface CodeMirrorHostProps {
   onCompleteResolve?: (
     raw: unknown,
     token: CompletionRequestToken,
-  ) => Promise<LspCompletionItem | null>;
+  ) => Promise<CompletionResolveProviderResult>;
   /** Live completion request identity (§8.16.2); null = typed unavailable. */
   getCompletionIdentity: () => CompletionRequestIdentity | null;
   onCompletionDiagnostic: (kind: CompletionAcceptanceDiagnostic, detail?: string) => void;
@@ -2351,6 +2355,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const completionCompartment = useRef(new Compartment());
   const renderedDocCompartment = useRef(new Compartment());
   const presentResolveGateRef = useRef<((request: CompletionResolveGateRequest) => void) | null>(null);
+  // ED-PARITY-005: read-only completion observation sink + the one truly active
+  // resolve-gate banner (its session id makes older callbacks inert).
+  const completionObservationRef = useRef<((event: CompletionObservationEvent) => void) | null>(null);
+  const gateSessionRef = useRef(0);
+  const activeGateRef = useRef<{ gateId: number; dismiss: () => void } | null>(null);
+  const dismissActiveResolveGateRef = useRef<(() => boolean) | null>(null);
 
   interface ActiveProviderTemplateState {
     workspaceId: string;
@@ -2592,6 +2602,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       reportDiagnostic: (kind, detail) => onCompletionDiagnosticRef.current(kind, detail),
       onScopeFallback: (state) => onScopeFallbackRef.current?.(state),
       onResolveGate: (request) => presentResolveGateRef.current?.(request),
+      onCompletionObservation: (event) => completionObservationRef.current?.(event),
       controller: completionControllerRef.current,
       getView: () => viewRef.current,
       consumeTriggerOrigin: (pos, docLength) => {
@@ -2786,7 +2797,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const basicCompletionReopenRef = useRef(false);
   // §8.19.4 resolve gate banner state; the closures inside the request guard
   // staleness themselves, this only drives presentation.
+  //
+  // ED-PARITY-005 lifecycle: every banner carries the id of the acceptance
+  // session that raised it. A late Retry/commit callback from an older session
+  // can therefore never clear, re-enable or replace a newer gate's UI.
   const [resolveGateUi, setResolveGateUi] = useState<{
+    gateId: number;
     label: string;
     message: string;
     failed: boolean;
@@ -2797,6 +2813,37 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     insertWithoutImport: () => boolean;
     dismiss: () => void;
   } | null>(null);
+  // Read-only acceptance observation for status/QA surfaces. It mirrors the
+  // completion engine's own events and never drives completion state.
+  const [completionObservationUi, setCompletionObservationUi] = useState<{
+    phase: "idle" | "request" | "accept" | "commit" | "gate" | "blocked" | "cancelled";
+    requestId: string | null;
+    itemId: string | null;
+    intent: string | null;
+    rangeSource: string | null;
+    rangeExtended: boolean | null;
+    reason: string | null;
+    ordinal: number | null;
+    requestedScope: string | null;
+    providerScope: string | null;
+    factsGeneration: number | null;
+    itemCount: number | null;
+    commitCount: number;
+  }>({
+    phase: "idle",
+    requestId: null,
+    itemId: null,
+    intent: null,
+    rangeSource: null,
+    rangeExtended: null,
+    reason: null,
+    ordinal: null,
+    requestedScope: null,
+    providerScope: null,
+    factsGeneration: null,
+    itemCount: null,
+    commitCount: 0,
+  });
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
   onHoverRef.current = onHover;
@@ -2936,7 +2983,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       const view = viewRef.current;
       const coords = view?.coordsAtPos(request.range.from);
       const container = hostRef.current?.getBoundingClientRect();
+      const gateId = ++gateSessionRef.current;
+      activeGateRef.current = { gateId, dismiss: request.dismiss };
       setResolveGateUi({
+        gateId,
         label: request.item.label,
         message: request.message,
         failed: false,
@@ -2947,11 +2997,99 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         insertWithoutImport: request.insertWithoutImport,
         dismiss: () => {
           request.dismiss();
-          setResolveGateUi(null);
+          setResolveGateUi((gate) => (gate?.gateId === gateId ? null : gate));
         },
       });
     };
     presentResolveGateRef.current = presentResolveGate;
+    // Esc slot (DEC-06): a visible gate is dismissed and its acceptance session
+    // cancelled; the pending resolve can no longer commit anything.
+    const dismissActiveResolveGate = (): boolean => {
+      const active = activeGateRef.current;
+      if (!active) return false;
+      activeGateRef.current = null;
+      active.dismiss();
+      setResolveGateUi((gate) => (gate?.gateId === active.gateId ? null : gate));
+      return true;
+    };
+    const handleCompletionObservation = (event: CompletionObservationEvent): void => {
+      if (
+        event.kind === "accept"
+        || event.kind === "commit"
+        || event.kind === "blocked"
+        || event.kind === "cancelled"
+      ) {
+        // A new acceptance supersedes any banner; a settled/cancelled session
+        // never leaves a stale gate behind.
+        activeGateRef.current = null;
+        setResolveGateUi(null);
+      }
+      setCompletionObservationUi((previous) => {
+        switch (event.kind) {
+          case "request":
+            return {
+              ...previous,
+              phase: "request",
+              requestId: event.requestId,
+              ordinal: event.invocationOrdinal,
+              requestedScope: event.requestedScope,
+              providerScope: event.providerScope,
+              factsGeneration: event.factsGeneration,
+              itemCount: event.itemCount,
+            };
+          case "accept":
+            return {
+              ...previous,
+              phase: "accept",
+              requestId: event.requestId,
+              itemId: event.itemId,
+              intent: event.intent,
+              rangeSource: null,
+              rangeExtended: null,
+              reason: null,
+            };
+          case "commit":
+            return {
+              ...previous,
+              phase: "commit",
+              requestId: event.requestId,
+              itemId: event.itemId,
+              intent: event.intent,
+              rangeSource: event.rangeSource,
+              rangeExtended: event.rangeExtended,
+              reason: null,
+              commitCount: previous.commitCount + 1,
+            };
+          case "gate":
+            return {
+              ...previous,
+              phase: "gate",
+              requestId: event.requestId,
+              itemId: event.itemId,
+              reason: event.reason,
+            };
+          case "blocked":
+            return {
+              ...previous,
+              phase: "blocked",
+              requestId: event.requestId,
+              itemId: event.itemId,
+              reason: event.reason,
+            };
+          case "cancelled":
+            return {
+              ...previous,
+              phase: "cancelled",
+              requestId: event.requestId,
+              itemId: event.itemId,
+            };
+          default:
+            return previous;
+        }
+      });
+    };
+    completionObservationRef.current = handleCompletionObservation;
+    dismissActiveResolveGateRef.current = dismissActiveResolveGate;
     const clearPendingSelectionEmit = () => {
       if (selectionEmitTimerRef.current === null) return;
       window.clearTimeout(selectionEmitTimerRef.current);
@@ -3229,13 +3367,27 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             run: (view) => {
               // ED-AUDIT-011: Tab during IME composition selects the candidate.
               if (view.composing || view.state.readOnly) return false;
-              if (acceptCompletion(view)) return true;
+              // ED-PARITY-005 D2: Tab is the replace-accept entry. The intent is
+              // frozen for this one acceptance and consumed by the LSP apply
+              // path; a failed accept clears it so a later Enter/mouse accept
+              // can never inherit it.
+              setCompletionAcceptIntent(view, "replace");
+              try {
+                if (acceptCompletion(view)) return true;
+              } finally {
+                clearCompletionAcceptIntent(view);
+              }
               const language = liveTemplateLanguageForPath(pathRef.current);
               const providerCandidate = getValidActiveProviderCandidate(view, language);
               if (providerCandidate) {
                 const { completion, from, to } = providerCandidate;
                 if (typeof completion.apply === "function") {
-                  completion.apply(view, completion, from, to);
+                  setCompletionAcceptIntent(view, "replace");
+                  try {
+                    completion.apply(view, completion, from, to);
+                  } finally {
+                    clearCompletionAcceptIntent(view);
+                  }
                 } else if (typeof completion.apply === "string") {
                   view.dispatch({
                     changes: { from, to, insert: completion.apply },
@@ -3282,6 +3434,18 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                 // ED-AUDIT-011: Escape during IME composition cancels the
                 // candidate window; workspace snippet/selection/parameter
                 // owners must not consume it (callee guards also return false).
+                //
+                // ED-PARITY-005 DEC-06: a visible resolve gate is dismissed
+                // first, then any in-flight acceptance is cancelled. Both are
+                // zero-commit: the late provider result can never revive.
+                {
+                  key: "Escape",
+                  run: (view: EditorView) => {
+                    if (view.composing) return false;
+                    if (dismissActiveResolveGateRef.current?.()) return true;
+                    return cancelPendingCompletionAcceptance(view);
+                  },
+                },
                 { key: "Escape", run: (view: EditorView) => cancelLspSnippetSession(view) },
                 { key: "Escape", run: escapeEditorSelections },
                 {
@@ -4359,14 +4523,23 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             disabled={resolveGateUi.retrying}
             className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
-              setResolveGateUi((gate) => gate ? { ...gate, retrying: true, failed: false } : gate);
-              void resolveGateUi.retry().then((outcome) => {
+              // The gate this click belongs to; every later state update is
+              // ignored once a newer gate replaced it (ED-PARITY-005 lifecycle).
+              const gate = resolveGateUi;
+              setResolveGateUi((current) => (
+                current?.gateId === gate.gateId ? { ...current, retrying: true, failed: false } : current
+              ));
+              void gate.retry().then((outcome) => {
                 if (outcome === "committed") {
-                  setResolveGateUi(null);
+                  setResolveGateUi((current) => (current?.gateId === gate.gateId ? null : current));
+                  activeGateRef.current = null;
+                  viewRef.current?.focus();
                   return;
                 }
                 // Retry also failed: keep the item visible with its choices.
-                setResolveGateUi((gate) => gate ? { ...gate, retrying: false, failed: true } : gate);
+                setResolveGateUi((current) => (
+                  current?.gateId === gate.gateId ? { ...current, retrying: false, failed: true } : current
+                ));
               });
             }}
           >
@@ -4378,8 +4551,13 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             disabled={resolveGateUi.retrying}
             className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
-              const inserted = resolveGateUi.insertWithoutImport();
-              if (inserted) setResolveGateUi(null);
+              const gate = resolveGateUi;
+              const inserted = gate.insertWithoutImport();
+              if (inserted) {
+                setResolveGateUi((current) => (current?.gateId === gate.gateId ? null : current));
+                activeGateRef.current = null;
+                viewRef.current?.focus();
+              }
             }}
           >
             Insert without import
@@ -4400,6 +4578,23 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           )}
         </div>
       )}
+      <div
+        data-testid="completion-session-observation"
+        data-phase={completionObservationUi.phase}
+        data-request-id={completionObservationUi.requestId ?? ""}
+        data-item-id={completionObservationUi.itemId ?? ""}
+        data-accept-intent={completionObservationUi.intent ?? ""}
+        data-range-source={completionObservationUi.rangeSource ?? ""}
+        data-range-extended={completionObservationUi.rangeExtended === null ? "" : String(completionObservationUi.rangeExtended)}
+        data-reason={completionObservationUi.reason ?? ""}
+        data-request-ordinal={completionObservationUi.ordinal ?? ""}
+        data-requested-scope={completionObservationUi.requestedScope ?? ""}
+        data-provider-scope={completionObservationUi.providerScope ?? ""}
+        data-facts-generation={completionObservationUi.factsGeneration ?? ""}
+        data-item-count={completionObservationUi.itemCount ?? ""}
+        data-commit-count={completionObservationUi.commitCount}
+        className="hidden"
+      />
     </div>
   );
 }, areCodeMirrorHostPropsEqual);

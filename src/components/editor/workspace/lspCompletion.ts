@@ -1,4 +1,5 @@
 import {
+  closeCompletion,
   completeAnyWord,
   type Completion,
   type CompletionContext,
@@ -19,6 +20,7 @@ import { EditorView } from "@codemirror/view";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import type {
   LspCompletionItem,
+  LspCompletionResolveResult,
   LspCompletionResult,
   LspPosition,
   LspTextEdit,
@@ -70,6 +72,48 @@ export type CompletionAcceptanceDiagnostic =
   | "excluded-symbol-blocked"
   | "auto-inserted-single";
 
+/**
+ * ED-PARITY-005 D1: what an item resolver may report. A plain
+ * `LspCompletionItem` stays the legacy success shape; the typed failures carry
+ * the wire outcome so the gate can name timeout/failure/unavailable instead of
+ * collapsing every non-result into "resolver returned null".
+ */
+export type CompletionResolveProviderResult =
+  | LspCompletionItem
+  | { kind: "unavailable"; reason: string }
+  | { kind: "timeout" }
+  | { kind: "failed"; message: string }
+  | null;
+
+/** True for the typed failure shapes (an item's own `kind` is a number). */
+export function isCompletionResolveFailure(
+  value: CompletionResolveProviderResult,
+): value is Exclude<CompletionResolveProviderResult, LspCompletionItem | null> {
+  return typeof (value as { kind?: unknown } | null)?.kind === "string";
+}
+
+/**
+ * ED-PARITY-005 D1: adapt the typed IPC result into the provider-result shape
+ * the resolver contract accepts. An IPC rejection becomes a typed failure, not
+ * a silent null.
+ */
+export function completionResolveProviderResultFromWire(
+  wire: LspCompletionResolveResult,
+): Exclude<CompletionResolveProviderResult, null> | null {
+  switch (wire?.kind) {
+    case "resolved":
+      return wire.item ?? null;
+    case "unavailable":
+      return { kind: "unavailable", reason: wire.reason || "provider-unavailable" };
+    case "timeout":
+      return { kind: "timeout" };
+    case "failed":
+      return { kind: "failed", message: wire.message || "resolve failed" };
+    default:
+      return { kind: "failed", message: "unrecognized resolve result" };
+  }
+}
+
 export interface LspCompletionHooks {
   /** Live file/session identity; null means "no provable identity". */
   identity: () => CompletionRequestIdentity | null;
@@ -80,7 +124,12 @@ export interface LspCompletionHooks {
     /** Repeated-call facts (§8.19.4); ordinal ≥ 2 requests expanded scope. */
     invocation?: CompletionInvocationRequest,
   ) => Promise<LspCompletionResult | null>;
-  resolve?: (raw: unknown, token: CompletionRequestToken) => Promise<LspCompletionItem | null>;
+  resolve?: (raw: unknown, token: CompletionRequestToken) => Promise<CompletionResolveProviderResult>;
+  /**
+   * ED-PARITY-005: read-only acceptance observation for status/QA surfaces.
+   * Never an owner of completion state — it only mirrors what already happened.
+   */
+  onCompletionObservation?: (event: CompletionObservationEvent) => void;
   triggerCharacters: () => string[];
   getDocumentRevision: () => number;
   /**
@@ -118,7 +167,7 @@ export interface LspCompletionHooks {
 export interface FixtureCompletionHooks {
   fetch: (position: LspPosition, triggerCharacter: string | null)
     => Promise<LspCompletionResult | null>;
-  resolve?: (raw: unknown) => Promise<LspCompletionItem | null>;
+  resolve?: (raw: unknown) => Promise<CompletionResolveProviderResult>;
   triggerCharacters?: () => string[];
   getDocumentRevision?: () => number;
   reportDiagnostic?: (kind: CompletionAcceptanceDiagnostic, detail?: string) => void;
@@ -389,6 +438,8 @@ export interface ClassifyCompletionResolveInput {
   isStale?: boolean;
   tokenRevision?: number;
   currentRevision?: number;
+  /** ED-PARITY-005 D1: provider-side reason when the wire said "unavailable". */
+  unavailableReason?: string;
 }
 
 /**
@@ -431,12 +482,16 @@ export function classifyCompletionResolveOutcome(
     // ED-COMP-001: resolver 缺失不推导 not-required
     return { kind: "unavailable", reason: "missing-resolver", item };
   }
-  return { kind: "unavailable", reason: "resolver-returned-null", item };
+  return {
+    kind: "unavailable",
+    reason: input.unavailableReason ?? "resolver-returned-null",
+    item,
+  };
 }
 
 export interface ExecuteCompletionResolveOptions {
   item: LspCompletionItem;
-  resolve?: (raw: unknown) => Promise<LspCompletionItem | null>;
+  resolve?: (raw: unknown) => Promise<CompletionResolveProviderResult>;
   token: CompletionRequestToken;
   isStillCurrent: (token: CompletionRequestToken) => boolean;
   timeoutMs?: number;
@@ -528,7 +583,27 @@ export async function executeCompletionResolve(
       });
     }
 
-    const resolved = raceResult as LspCompletionItem | null;
+    const resolved = raceResult as CompletionResolveProviderResult;
+    // ED-PARITY-005 D1: typed provider failures keep their identity instead of
+    // collapsing into "resolver returned null".
+    if (isCompletionResolveFailure(resolved)) {
+      if (resolved.kind === "timeout") {
+        return classifyCompletionResolveOutcome({ item, hasResolver: true, timedOut: true });
+      }
+      if (resolved.kind === "failed") {
+        return classifyCompletionResolveOutcome({
+          item,
+          hasResolver: true,
+          error: new Error(resolved.message),
+        });
+      }
+      return classifyCompletionResolveOutcome({
+        item,
+        hasResolver: true,
+        resolvedItem: null,
+        unavailableReason: resolved.reason,
+      });
+    }
     if (!resolved) {
       return classifyCompletionResolveOutcome({ item, hasResolver: true, resolvedItem: null });
     }
@@ -536,6 +611,9 @@ export async function executeCompletionResolve(
     const mergedItem: LspCompletionItem = {
       ...item,
       ...resolved,
+      // ED-PARITY-005 D2: a resolve response that omits InsertReplaceEdit must
+      // not erase the dual range the request already received.
+      insertReplaceEdit: resolved.insertReplaceEdit ?? item.insertReplaceEdit ?? null,
       additionalTextEdits: resolved.additionalTextEdits ?? item.additionalTextEdits,
     };
 
@@ -563,6 +641,196 @@ export async function executeCompletionResolve(
 export function completionItemId(item: LspCompletionItem): string {
   return [item.label, item.kind ?? "", item.sortText ?? ""].join("#");
 }
+
+// ---------------------------------------------------------------------------
+// ED-PARITY-005 D2 accept intent + provider InsertReplaceEdit ranges
+// ---------------------------------------------------------------------------
+
+export type CompletionAcceptIntent = "insert" | "replace";
+
+export type CompletionAcceptRangeSource =
+  | "insert-replace-insert"
+  | "insert-replace-replace"
+  | "provider-text-edit"
+  | "word-range";
+
+export interface CompletionAcceptRange {
+  from: number;
+  to: number;
+  source: CompletionAcceptRangeSource;
+  /** True when Tab safely widened a plain provider range to the word end. */
+  extended: boolean;
+}
+
+/** Language identity is part of the D2 decision (Java-only widening). */
+function isJavaLanguageId(languageId: string | undefined): boolean {
+  return (languageId ?? "").toLowerCase() === "java";
+}
+
+/**
+ * ED-PARITY-005 D2: the single place that decides which provider range an
+ * accept applies. `insert` (Enter/mouse) honours the provider insert range and
+ * keeps the rest of the word; `replace` (Tab) honours the replace range. With a
+ * plain TextEdit, Tab may widen the end to the current word end — but ONLY for
+ * the simple Java identifier case (same word start, range end at the caret,
+ * single line, empty selection, identifier-only suffix, outside
+ * string/comment). Anything else keeps the provider range untouched, so a
+ * provider edit that deliberately spans tokens is never trimmed. Illegal or
+ * contradictory coordinates return null: the whole acceptance (including
+ * imports) is rejected instead of half-applied.
+ */
+export function resolveCompletionAcceptRange(input: {
+  view: EditorView;
+  item: LspCompletionItem;
+  from: number;
+  to: number;
+  intent: CompletionAcceptIntent;
+  languageId?: string;
+}): CompletionAcceptRange | null {
+  const { view, item } = input;
+  const dual = item.insertReplaceEdit ?? null;
+  if (dual) {
+    const insertFrom = strictOffsetFromLspPosition(view.state.doc, dual.insert.start);
+    const insertTo = strictOffsetFromLspPosition(view.state.doc, dual.insert.end);
+    const replaceFrom = strictOffsetFromLspPosition(view.state.doc, dual.replace.start);
+    const replaceTo = strictOffsetFromLspPosition(view.state.doc, dual.replace.end);
+    if (
+      insertFrom === null || insertTo === null || replaceFrom === null || replaceTo === null
+      || insertFrom > insertTo || replaceFrom > replaceTo
+      || insertFrom !== replaceFrom || replaceTo < insertTo
+    ) {
+      return null;
+    }
+    return input.intent === "replace"
+      ? { from: replaceFrom, to: replaceTo, source: "insert-replace-replace", extended: false }
+      : { from: insertFrom, to: insertTo, source: "insert-replace-insert", extended: false };
+  }
+
+  let baseFrom = input.from;
+  let baseTo = input.to;
+  let source: CompletionAcceptRangeSource = "word-range";
+  if (item.textEdit) {
+    const editFrom = strictOffsetFromLspPosition(view.state.doc, item.textEdit.range.start);
+    const editTo = strictOffsetFromLspPosition(view.state.doc, item.textEdit.range.end);
+    if (editFrom === null || editTo === null || editFrom > editTo) return null;
+    baseFrom = editFrom;
+    baseTo = editTo;
+    source = "provider-text-edit";
+  } else if (
+    !Number.isInteger(baseFrom) || !Number.isInteger(baseTo)
+    || baseFrom < 0 || baseTo < baseFrom || baseTo > view.state.doc.length
+  ) {
+    return null;
+  }
+
+  if (input.intent !== "replace") {
+    return { from: baseFrom, to: baseTo, source, extended: false };
+  }
+  const wordEnd = safeWordEndForReplace(view, baseFrom, baseTo, input.languageId);
+  if (wordEnd === null) return { from: baseFrom, to: baseTo, source, extended: false };
+  return { from: baseFrom, to: wordEnd, source, extended: true };
+}
+
+/** Word-end widening guard for Tab; null means "use the provider range as-is". */
+function safeWordEndForReplace(
+  view: EditorView,
+  from: number,
+  to: number,
+  languageId: string | undefined,
+): number | null {
+  if (!isJavaLanguageId(languageId)) return null;
+  const state = view.state;
+  const selection = state.selection.main;
+  if (!selection.empty || selection.head !== to) return null;
+  if (state.doc.lineAt(from).number !== state.doc.lineAt(to).number) return null;
+  const word = state.wordAt(to);
+  if (!word || word.from !== from || word.to <= to) return null;
+  if (state.doc.lineAt(word.to).number !== state.doc.lineAt(from).number) return null;
+  const suffix = state.sliceDoc(to, word.to);
+  if (!/^[A-Za-z0-9_$]+$/.test(suffix)) return null;
+  if (isInsideStringOrComment(state, to)) return null;
+  return word.to;
+}
+
+/**
+ * Per-view accept intent, read when an acceptance session starts. A WeakMap
+ * (never a module-global) keeps two views on one shared document independent,
+ * and the intent is consumed on read so a stale Tab intent cannot leak into a
+ * later Enter/mouse accept.
+ */
+const pendingCompletionAcceptIntents = new WeakMap<EditorView, CompletionAcceptIntent>();
+
+export function setCompletionAcceptIntent(view: EditorView, intent: CompletionAcceptIntent): void {
+  pendingCompletionAcceptIntents.set(view, intent);
+}
+
+export function clearCompletionAcceptIntent(view: EditorView): void {
+  pendingCompletionAcceptIntents.delete(view);
+}
+
+/** Consume the frozen intent for this accept; defaults to Enter/mouse insert. */
+export function takeCompletionAcceptIntent(view: EditorView): CompletionAcceptIntent {
+  const intent = pendingCompletionAcceptIntents.get(view);
+  pendingCompletionAcceptIntents.delete(view);
+  return intent ?? "insert";
+}
+
+interface PendingCompletionAcceptance {
+  cancel(): void;
+}
+
+const pendingCompletionAcceptances = new WeakMap<EditorView, PendingCompletionAcceptance>();
+
+/** True while an accept is waiting for its resolve/import decision. */
+export function hasPendingCompletionAcceptance(view: EditorView): boolean {
+  return pendingCompletionAcceptances.has(view);
+}
+
+/**
+ * ED-PARITY-005 DEC-06: Esc (or a superseding acceptance in the same view) ends
+ * the current acceptance session. Its late provider result is dropped and never
+ * revived; the user must invoke completion again.
+ */
+export function cancelPendingCompletionAcceptance(view: EditorView): boolean {
+  const pending = pendingCompletionAcceptances.get(view);
+  if (!pending) return false;
+  pendingCompletionAcceptances.delete(view);
+  pending.cancel();
+  return true;
+}
+
+/**
+ * Read-only acceptance observation (status/QA surfaces). It mirrors decisions
+ * that already happened and is never consulted by completion state.
+ */
+export type CompletionObservationEvent =
+  | {
+      kind: "request";
+      requestId: string;
+      invocationOrdinal: number;
+      requestedScope: "default" | "expanded";
+      providerScope: "expanded" | "unchanged" | "unknown";
+      itemCount: number;
+      factsGeneration: number | null;
+      policyRevision: number;
+    }
+  | {
+      kind: "accept";
+      requestId: string;
+      itemId: string;
+      intent: CompletionAcceptIntent;
+    }
+  | {
+      kind: "commit";
+      requestId: string;
+      itemId: string;
+      intent: CompletionAcceptIntent;
+      rangeSource: CompletionAcceptRangeSource;
+      rangeExtended: boolean;
+    }
+  | { kind: "gate"; requestId: string; itemId: string; reason: CompletionResolveGateReason }
+  | { kind: "blocked"; requestId: string; itemId: string; reason: string }
+  | { kind: "cancelled"; requestId: string; itemId: string };
 
 export interface CompletionAcceptancePlanV2 {
   identity: CompletionRequestIdentity;
@@ -722,6 +990,34 @@ export function toCompletionProviderResult(input: {
   };
 }
 
+/**
+ * ED-PARITY-005 DEC-03 / R1: project scope facts are part of the request
+ * identity. A refreshed facts generation (same file, same provider session)
+ * must stale the old candidates instead of letting them commit against a scope
+ * nobody verified.
+ */
+export function sameCompletionScopeFacts(
+  a: CompletionScopeFactsState | undefined,
+  b: CompletionScopeFactsState | undefined,
+): boolean {
+  if (!a || !b) return a === b;
+  if (a.status !== b.status || a.generation !== b.generation) return false;
+  if (a.status === "scope-facts-missing" && b.status === "scope-facts-missing") {
+    return a.requestedScope === b.requestedScope
+      && a.reason === b.reason
+      && a.fallbackScope === b.fallbackScope;
+  }
+  if (a.status === "ready" && b.status === "ready") {
+    return a.scope === b.scope
+      && a.moduleId === b.moduleId
+      && a.sourceKind === b.sourceKind
+      && a.classpathFingerprint === b.classpathFingerprint
+      && a.dependencies.length === b.dependencies.length
+      && a.dependencies.every((dependency, index) => dependency === b.dependencies[index]);
+  }
+  return false;
+}
+
 function sameCompletionIdentity(
   a: CompletionRequestIdentity,
   b: CompletionRequestIdentity,
@@ -732,7 +1028,8 @@ function sameCompletionIdentity(
     && a.uri === b.uri
     && a.languageId === b.languageId
     && a.documentRevision === b.documentRevision
-    && a.lspSessionGeneration === b.lspSessionGeneration;
+    && a.lspSessionGeneration === b.lspSessionGeneration
+    && sameCompletionScopeFacts(a.projectScope, b.projectScope);
 }
 
 /** LSP CompletionItemKind → CodeMirror completion `type` (built-in icons). */
@@ -1510,13 +1807,26 @@ export function commitLspCompletion(
   isStillCurrent: (token: CompletionRequestToken) => boolean,
   reportDiagnostic?: ((kind: CompletionAcceptanceDiagnostic, detail?: string) => void) | undefined,
   excludedSymbols?: readonly SymbolPatternRule[],
+  /** ED-PARITY-005 D2 frozen accept intent; Enter/mouse default to insert. */
+  intent: CompletionAcceptIntent = "insert",
+  onObservation?: ((event: CompletionObservationEvent) => void) | undefined,
 ): boolean {
+  const observeBlocked = (reason: string): void => {
+    onObservation?.({
+      kind: "blocked",
+      requestId: token.requestId,
+      itemId: completionItemId(item),
+      reason,
+    });
+  };
   if (view.state.readOnly) {
+    observeBlocked("readonly");
     return false;
   }
   if (!isStillCurrent(token)) {
     reportDiagnostic?.("identity-mismatch", "accept");
     recordCompletionTelemetry(token, "stale", { reason: "accept" });
+    observeBlocked("identity-mismatch");
     return false;
   }
   if (
@@ -1527,6 +1837,7 @@ export function commitLspCompletion(
     || to > view.state.doc.length
   ) {
     reportDiagnostic?.("invalid-additional-edits", "primary-range");
+    observeBlocked("invalid-range");
     return false;
   }
 
@@ -1549,18 +1860,24 @@ export function commitLspCompletion(
     }
   }
 
-  let replaceFrom = from;
-  let replaceTo = to;
-  if (item.textEdit) {
-    const strictFrom = strictOffsetFromLspPosition(view.state.doc, item.textEdit.range.start);
-    const strictTo = strictOffsetFromLspPosition(view.state.doc, item.textEdit.range.end);
-    if (strictFrom === null || strictTo === null || strictFrom > strictTo) {
-      reportDiagnostic?.("invalid-additional-edits", "primary-range");
-      return false;
-    }
-    replaceFrom = strictFrom;
-    replaceTo = strictTo;
+  // ED-PARITY-005 D2: the provider's InsertReplaceEdit/TextEdit range selected
+  // by the frozen accept intent. Invalid or contradictory coordinates reject the
+  // whole acceptance (never a partial primary without its import).
+  const acceptRange = resolveCompletionAcceptRange({
+    view,
+    item,
+    from,
+    to,
+    intent,
+    languageId: token.languageId,
+  });
+  if (!acceptRange) {
+    reportDiagnostic?.("invalid-additional-edits", "primary-range");
+    observeBlocked("invalid-range");
+    return false;
   }
+  const replaceFrom = acceptRange.from;
+  const replaceTo = acceptRange.to;
 
   const rawInsert = item.textEdit?.newText ?? item.insertText ?? item.label;
   const additionalEdits = item.additionalTextEdits ?? [];
@@ -1604,6 +1921,14 @@ export function commitLspCompletion(
     userEvent: "input.complete",
   });
   recordCompletionTelemetry(token, "applied");
+  onObservation?.({
+    kind: "commit",
+    requestId: token.requestId,
+    itemId: completionItemId(item),
+    intent,
+    rangeSource: acceptRange.source,
+    rangeExtended: acceptRange.extended,
+  });
 
   // Registered AFTER the acceptance dispatch so the doc-change invalidator
   // never consumes the acceptance itself; Tab now cycles the spans and any
@@ -1621,7 +1946,7 @@ export function commitLspCompletion(
 
 const RESOLVE_ADDITIONAL_EDIT_TIMEOUT_MS = 3000;
 
-type CompletionItemResolver = () => Promise<LspCompletionItem | null>;
+type CompletionItemResolver = () => Promise<CompletionResolveProviderResult>;
 
 function applyLspCompletion(
   view: EditorView,
@@ -1635,12 +1960,42 @@ function applyLspCompletion(
   reportDiagnostic: ((kind: CompletionAcceptanceDiagnostic, detail?: string) => void) | undefined,
   onResolveGate?: ((request: CompletionResolveGateRequest) => void) | undefined,
   excludedSymbols?: readonly SymbolPatternRule[],
+  intent: CompletionAcceptIntent = "insert",
+  onObservation?: ((event: CompletionObservationEvent) => void) | undefined,
 ): void {
   if (view.state.readOnly) {
+    onObservation?.({
+      kind: "blocked",
+      requestId: token.requestId,
+      itemId: completionItemId(item),
+      reason: "readonly",
+    });
     return;
   }
+  // ED-PARITY-005: choosing an item ends the candidate list. Without this the
+  // popup stayed open for the whole async resolve, so Esc only closed the list
+  // instead of cancelling the pending acceptance, and Tab could not reach the
+  // resolve gate's own controls.
+  closeCompletion(view);
   if (item.additionalTextEdits?.length) {
-    commitLspCompletion(view, item, from, to, token, isStillCurrent, reportDiagnostic, excludedSymbols);
+    onObservation?.({
+      kind: "accept",
+      requestId: token.requestId,
+      itemId: completionItemId(item),
+      intent,
+    });
+    commitLspCompletion(
+      view,
+      item,
+      from,
+      to,
+      token,
+      isStillCurrent,
+      reportDiagnostic,
+      excludedSymbols,
+      intent,
+      onObservation,
+    );
     return;
   }
 
@@ -1661,7 +2016,37 @@ function applyLspCompletion(
   // §8.19.4 resolve gate: a timeout/failure keeps the chosen item visible and
   // waits for an explicit Retry or Insert-without-import choice. Nothing is
   // inserted until the user picks; stale/overlap blocks stay hard no-ops.
+  //
+  // ED-PARITY-005 lifecycle: one pending acceptance per view. Starting a new
+  // acceptance supersedes the previous one (its late retry/result can no longer
+  // commit or rewrite a newer gate), and Esc cancels the pending session with
+  // zero late effect (DEC-06).
   let settled = false;
+  const finish = (): void => {
+    settled = true;
+    if (pendingCompletionAcceptances.get(view) === session) {
+      pendingCompletionAcceptances.delete(view);
+    }
+  };
+  const session: PendingCompletionAcceptance = {
+    cancel: () => {
+      if (settled) return;
+      finish();
+      onObservation?.({
+        kind: "cancelled",
+        requestId: token.requestId,
+        itemId: completionItemId(item),
+      });
+    },
+  };
+  cancelPendingCompletionAcceptance(view);
+  pendingCompletionAcceptances.set(view, session);
+  onObservation?.({
+    kind: "accept",
+    requestId: token.requestId,
+    itemId: completionItemId(item),
+    intent,
+  });
   const guardCurrent = (): boolean => {
     if (!isStillCurrent(token)) {
       reportDiagnostic?.("identity-mismatch", "resolve-gate");
@@ -1678,7 +2063,7 @@ function applyLspCompletion(
   };
   const insertWithoutImport = (): boolean => {
     if (settled) return false;
-    settled = true;
+    finish();
     if (!guardCurrent()) return false;
     return commitLspCompletion(
       view,
@@ -1689,27 +2074,29 @@ function applyLspCompletion(
       isStillCurrent,
       reportDiagnostic,
       excludedSymbols,
+      intent,
+      onObservation,
     );
   };
   const retryResolve = async (): Promise<"committed" | "unavailable"> => {
     if (settled) return "unavailable";
     if (!guardCurrent()) {
-      settled = true;
+      finish();
       return "unavailable";
     }
     const outcome = await runResolve(resolve);
     if (settled) return "unavailable";
     if (outcome.kind === "stale" || outcome.kind === "cancelled") {
       reportDiagnostic?.("identity-mismatch", `resolve-retry-${outcome.kind}`);
-      settled = true;
+      finish();
       return "unavailable";
     }
     if (outcome.kind !== "resolved" && outcome.kind !== "not-required") return "unavailable";
     if (!guardCurrent()) {
-      settled = true;
+      finish();
       return "unavailable";
     }
-    settled = true;
+    finish();
     const committed = commitLspCompletion(
       view,
       outcome.item,
@@ -1719,6 +2106,8 @@ function applyLspCompletion(
       isStillCurrent,
       reportDiagnostic,
       excludedSymbols,
+      intent,
+      onObservation,
     );
     return committed ? "committed" : "unavailable";
   };
@@ -1727,6 +2116,12 @@ function applyLspCompletion(
     detail: string,
   ): void => {
     if (settled) return;
+    onObservation?.({
+      kind: "gate",
+      requestId: token.requestId,
+      itemId: completionItemId(item),
+      reason,
+    });
     reportDiagnostic?.("additional-edit-unavailable", detail);
     if (!onResolveGate) {
       // No gate surface wired (isolated embedder): blocking beats silently
@@ -1745,7 +2140,13 @@ function applyLspCompletion(
       retry: retryResolve,
       insertWithoutImport,
       dismiss: () => {
-        settled = true;
+        if (settled) return;
+        finish();
+        onObservation?.({
+          kind: "cancelled",
+          requestId: token.requestId,
+          itemId: completionItemId(item),
+        });
       },
     });
   };
@@ -1755,7 +2156,7 @@ function applyLspCompletion(
       if (settled) return;
       if (outcome.kind === "stale" || outcome.kind === "cancelled") {
         reportDiagnostic?.("identity-mismatch", `resolve-${outcome.kind}`);
-        settled = true;
+        finish();
         return;
       }
       if (outcome.kind === "timeout") {
@@ -1772,10 +2173,10 @@ function applyLspCompletion(
       }
       if (outcome.kind !== "resolved" && outcome.kind !== "not-required") return;
       if (!guardCurrent()) {
-        settled = true;
+        finish();
         return;
       }
-      settled = true;
+      finish();
       commitLspCompletion(
         view,
         outcome.item,
@@ -1785,12 +2186,14 @@ function applyLspCompletion(
         isStillCurrent,
         reportDiagnostic,
         excludedSymbols,
+        intent,
+        onObservation,
       );
     })
     .catch(() => {
       if (settled) return;
       if (!guardCurrent()) {
-        settled = true;
+        finish();
         return;
       }
       presentGate("failed", "resolve-failed");
@@ -1816,8 +2219,10 @@ async function completionInfo(
       } else {
         const resolved = await resolve();
         if (!isStillCurrent(token)) return null;
-        documentation = resolved?.documentation ?? null;
-        detail = detail ?? resolved?.detail ?? null;
+        // Typed provider failures carry no documentation; keep what we have.
+        const resolvedItem = resolved && !isCompletionResolveFailure(resolved) ? resolved : null;
+        documentation = resolvedItem?.documentation ?? null;
+        detail = detail ?? resolvedItem?.detail ?? null;
       }
     } catch {
       // Keep whatever we already have.
@@ -2016,6 +2421,19 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
       isIncomplete: result.isIncomplete === true,
       at: Date.now(),
     });
+    hooks.onCompletionObservation?.({
+      kind: "request",
+      requestId: token.requestId,
+      invocationOrdinal,
+      requestedScope,
+      providerScope: providerScopeFor(
+        requestedScope,
+        hooks.advertisesScopeExpansion?.() ?? false,
+      ),
+      itemCount: result.items.length,
+      factsGeneration: token.projectScope?.generation ?? null,
+      policyRevision: policyRevisionAtStart,
+    });
 
     if (result.items.length === 0) {
       recordCompletionTelemetry(token, "popup", { itemCount: 0 });
@@ -2083,7 +2501,7 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
         : isPrioritized
           ? `${item.detail ?? ""}${item.detail ? " · " : ""}(prioritized)`.trim()
           : item.detail ?? undefined;
-      let resolvedItemPromise: Promise<LspCompletionItem | null> | null = null;
+      let resolvedItemPromise: Promise<CompletionResolveProviderResult> | null = null;
       const resolveItem: CompletionItemResolver | undefined = hooks.resolve
         ? () => {
             if (!resolvedItemPromise) {
@@ -2097,9 +2515,11 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
       const resolveFresh: CompletionItemResolver | undefined = hooks.resolve
         ? () => {
             if (!resolvedItemPromise) return hooks.resolve!(item.raw, token);
-            return resolvedItemPromise.then((resolved) =>
-              resolved ? resolved : hooks.resolve!(item.raw, token)
-            );
+            return resolvedItemPromise.then((resolved) => (
+              resolved && !isCompletionResolveFailure(resolved)
+                ? resolved
+                : hooks.resolve!(item.raw, token)
+            ));
           }
         : undefined;
       const showDoc = policy.documentation.enabled;
@@ -2128,6 +2548,10 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
             hooks.reportDiagnostic,
             hooks.onResolveGate,
             policy.excludedSymbols,
+            // ED-PARITY-005 D2: the intent frozen by the physical entry key
+            // (Tab = replace, Enter/mouse = insert) for this acceptance.
+            takeCompletionAcceptIntent(view),
+            hooks.onCompletionObservation,
           ),
       };
 
@@ -2193,7 +2617,7 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
           if (hooks.resolve) {
             try {
               const resolved = await hooks.resolve(singleItem, token);
-              if (resolved) {
+              if (resolved && !isCompletionResolveFailure(resolved)) {
                 itemToCommit = resolved;
               } else {
                 itemToCommit = null;
@@ -2214,6 +2638,8 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
               isCandidateStillCurrent,
               hooks.reportDiagnostic,
               policy.excludedSymbols,
+              "insert",
+              hooks.onCompletionObservation,
             );
             if (applied) {
               return null;

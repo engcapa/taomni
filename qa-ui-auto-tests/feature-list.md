@@ -6183,6 +6183,9 @@ area: code-workspace/editor-shell
 components: [CodeWorkspaceTab, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog, RefactorRecoveryReviewDialog]
 files:
   - src/components/editor/workspace/CodeMirrorHost.tsx
+  - src/components/editor/workspace/lspCompletion.ts
+  - src/components/editor/workspace/completionScopeAdapter.ts
+  - src/lib/editor/lsp.ts
   - src/components/editor/workspace/liveTemplates.ts
   - src/components/editor/workspace/editorSearchPanel.ts
   - src/components/editor/workspace/lspHyperlink.ts
@@ -6369,6 +6372,31 @@ controls:
   - id: editor-completion-string-candidate
     selector: "xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel') and normalize-space(.)='String - java.lang']"
     kind: interactive
+  # ED-PARITY-005: completion resolve gate + read-only acceptance observation.
+  - id: completion-resolve-gate
+    selector: '[data-testid="completion-resolve-gate"]'
+    kind: display
+    optional: true       # shown only when the auto-import resolve fails/times out
+  - id: completion-resolve-gate-retry
+    selector: '[data-testid="completion-resolve-gate-retry"]'
+    kind: interactive
+    optional: true
+  - id: completion-resolve-gate-insert-without-import
+    selector: '[data-testid="completion-resolve-gate-insert-without-import"]'
+    kind: interactive
+    optional: true
+  - id: completion-resolve-gate-dismiss
+    selector: '[data-testid="completion-resolve-gate-dismiss"]'
+    kind: interactive
+    optional: true
+  - id: completion-resolve-gate-failed-note
+    selector: '[data-testid="completion-resolve-gate-failed-note"]'
+    kind: display
+    optional: true
+  - id: completion-session-observation
+    selector: '[data-testid="completion-session-observation"]'
+    kind: display
+    optional: true       # read-only request/accept/commit observation (ED-PARITY-005)
     optional: true       # Java provider candidate; position varies with provider ranking
   - id: editor-lightbulb               # gutter quick-fix button for the diagnostic line
     selector: '[data-testid="code-workspace-lightbulb"]'
@@ -7312,6 +7340,13 @@ controls:
     optional: true
     aliases:
       - '[data-testid="keymap-item-workspace.renameSymbol"]'
+      - '[data-testid="keymap-item-editor.basicCompletion"]'  # ED-PARITY-005 cheat-sheet execution entry
+  - id: keymap-run                # per-action run button inside a cheat-sheet row
+    selector: '[data-testid^="keymap-run-"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="keymap-run-editor.basicCompletion"]'   # ED-PARITY-005 executes Basic Completion from here
   - id: keymap-cheatsheet-footer-close
     selector: '[data-testid="keymap-cheatsheet-footer-close"]'
     kind: interactive
