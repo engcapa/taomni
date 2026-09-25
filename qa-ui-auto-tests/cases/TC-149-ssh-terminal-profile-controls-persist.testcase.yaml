@@ -92,12 +92,16 @@ steps:
 - fill:
     selector: 'input[aria-label="Maximum command history entries per host"]'
     value: '99'
-- click: '[data-testid="terminal-preview"]'
+- press:
+    key: Tab
+    selector: 'input[aria-label="Maximum command history entries per host"]'
 - wait_for: 'input[aria-label="Maximum command history entries per host"][value="100"]'
 - fill:
     selector: 'input[aria-label="Maximum command history entries per host"]'
     value: '50001'
-- click: '[data-testid="terminal-preview"]'
+- press:
+    key: Tab
+    selector: 'input[aria-label="Maximum command history entries per host"]'
 - wait_for: 'input[aria-label="Maximum command history entries per host"][value="50000"]'
 - click: 'input[name="inlineSuggestionsSource"][value="history+path"]'
 - assert_count:
