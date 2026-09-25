@@ -6214,6 +6214,8 @@ files:
   - src/components/editor/workspace/AutoImportCandidateDialog.tsx
   - src/components/editor/workspace/FileTemplateSettingsDialog.tsx
   - src/components/editor/workspace/NewJavaClassDialog.tsx
+  - src/lib/editor/lsp.ts
+  - src/components/editor/workspace/lspCompletion.ts
 controls:
   - id: editor-find-panel
     selector: '[data-testid="code-workspace-editor-search"]'

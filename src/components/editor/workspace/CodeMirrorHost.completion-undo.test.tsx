@@ -102,6 +102,10 @@ describe("CodeMirrorHost snippet accept then shared-owner undo", () => {
     }
     const selectedLi = document.querySelector('.cm-tooltip-autocomplete [aria-selected="true"]');
     expect(selectedLi?.textContent).toContain("append(double d)");
+    // Wait past the editor's completion interactionDelay: CodeMirror refuses to
+    // accept an option that appeared this recently, so an immediate Enter falls
+    // through to the plain newline binding instead of the acceptance under test.
+    await new Promise((resolve) => setTimeout(resolve, 150));
     fireEvent.keyDown(content, { key: "Enter" });
     await waitFor(() => expect(view.state.doc.toString()).toBe("        new StringBuilder().append(0)"));
     // The accept owns a tabstop session with the placeholder selected.

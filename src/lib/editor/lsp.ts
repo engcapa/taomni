@@ -208,6 +208,19 @@ export interface LspTextEdit {
   annotationId?: string;
 }
 
+/**
+ * LSP `InsertReplaceEdit` (ED-PARITY-005 D2). A provider that received
+ * `insertReplaceSupport` answers one `newText` with two ranges: `insert` keeps
+ * whatever follows the caret, `replace` consumes the rest of the word. Both are
+ * carried so the acceptance intent — Enter/mouse insert, Tab replace — selects
+ * the provider's own range rather than a client-side guess.
+ */
+export interface LspInsertReplaceEdit {
+  newText: string;
+  insert: LspRange;
+  replace: LspRange;
+}
+
 export interface LspCompletionItem {
   label: string;
   kind: number | null;
@@ -219,10 +232,24 @@ export interface LspCompletionItem {
   filterText: string | null;
   sortText: string | null;
   textEdit: LspTextEdit | null;
+  /** Both provider ranges when the server sent an InsertReplaceEdit. */
+  insertReplaceEdit?: LspInsertReplaceEdit | null;
   additionalTextEdits: LspTextEdit[];
   /** Original server item, passed back verbatim to completionItem/resolve. */
   raw: unknown;
 }
+
+/**
+ * Tagged outcome of one `completionItem/resolve` round-trip (ED-PARITY-005 D1).
+ * Replaces the previous `LspCompletionItem | null`, which could not distinguish
+ * "the provider resolved nothing" from "the provider failed" and so let a
+ * transport error travel as a successful resolve.
+ */
+export type LspCompletionResolveResult =
+  | { kind: "resolved"; item: LspCompletionItem }
+  | { kind: "unavailable"; reason: string }
+  | { kind: "timeout" }
+  | { kind: "failed"; message: string };
 
 export interface LspCompletionResult {
   status: LspDocumentStatus;
@@ -612,8 +639,8 @@ export function lspCompletion(
 export function lspCompletionResolve(
   descriptor: LspDocumentDescriptor,
   item: unknown,
-): Promise<LspCompletionItem | null> {
-  return invoke<LspCompletionItem | null>("lsp_completion_resolve", {
+): Promise<LspCompletionResolveResult> {
+  return invoke<LspCompletionResolveResult>("lsp_completion_resolve", {
     ...documentArgs(descriptor),
     item,
   });

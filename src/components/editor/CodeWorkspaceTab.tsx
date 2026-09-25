@@ -129,7 +129,7 @@ import {
   nextLspRequestSequence,
   type LspCodeAction,
   type JavaTestItem,
-  type LspCompletionItem,
+  type LspCompletionResolveResult,
   type LspCompletionResult,
   type LspDiagnostic,
   type LspDocumentDescriptor,
@@ -16205,15 +16205,25 @@ export function CodeWorkspaceTab({
       file: OpenFileState,
       raw: unknown,
       token: CompletionRequestToken,
-    ): Promise<LspCompletionItem | null> => {
+    ): Promise<LspCompletionResolveResult> => {
       const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return null;
-      if (!isCompletionTokenCurrent(token)) return null;
+      if (!descriptor) return { kind: "unavailable", reason: "no-descriptor" };
+      if (!isCompletionTokenCurrent(token)) {
+        return { kind: "unavailable", reason: "stale-token" };
+      }
       try {
+        // ED-PARITY-005 D1: the backend answers with a typed result, so a
+        // provider that failed, timed out or returned null stays distinguishable
+        // from one that genuinely resolved the item.
         const resolved = await lspCompletionResolve(descriptor, raw);
-        return isCompletionTokenCurrent(token) ? resolved : null;
-      } catch {
-        return null;
+        return isCompletionTokenCurrent(token)
+          ? resolved
+          : { kind: "unavailable", reason: "stale-token" };
+      } catch (error) {
+        return {
+          kind: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        };
       }
     },
     [isCompletionTokenCurrent, lspDescriptorForFile],

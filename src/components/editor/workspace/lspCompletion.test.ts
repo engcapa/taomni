@@ -1,18 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
-import type { EditorView } from "@codemirror/view";
-import { CompletionContext } from "@codemirror/autocomplete";
+import { EditorView } from "@codemirror/view";
+import { CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { history, undo } from "@codemirror/commands";
-import type { LspCompletionResult, LspDocumentStatus } from "../../../lib/editor/lsp";
+import type {
+  LspCompletionItem,
+  LspCompletionResult,
+  LspDocumentStatus,
+} from "../../../lib/editor/lsp";
 import {
   activeLspSnippetSession,
   advanceLspSnippetTabstop,
   cancelLspSnippetSession,
+  clearCompletionAcceptIntent,
+  commitLspCompletion,
   lspSnippetSessionInvalidator,
+  markCompletionAcceptIntent,
   parseLspSnippet,
   recentCompletionInvocations,
   recentCompletionTelemetry,
   resetCompletionTelemetry,
+  resolveCompletionPrimaryRange,
   boostFromSortText,
   boostFromTypedPrefix,
   completionKindToType,
@@ -31,6 +39,7 @@ import {
   type CompletionCandidateIdentity,
   type CompletionCandidatePair,
   type CompletionRequestIdentity,
+  type LspCompletionHooks,
 } from "./lspCompletion";
 
 function status(active: boolean): LspDocumentStatus {
@@ -1908,5 +1917,314 @@ describe("ED-COMP-004: effective project scope recording", () => {
         expect.anything(),
       );
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ED-PARITY-005: Basic-Completion acceptance intent and provider ranges
+// ---------------------------------------------------------------------------
+
+const PARITY005_DOC = [
+  "package parity005;",
+  "",
+  "public class Main {",
+  "    void sample() {",
+  "        StringUtiSuffix;",
+  "    }",
+  "}",
+  "",
+].join("\n");
+
+const PARITY005_IMPORT = "import org.apache.commons.lang3.StringUtils;\n";
+
+const PARITY005_IDENTITY: CompletionRequestIdentity = {
+  workspaceId: "ws-parity005",
+  fileKey: "parity005/Main.java",
+  filePath: "parity005/Main.java",
+  uri: "file:///parity005/Main.java",
+  languageId: "java",
+  documentRevision: 0,
+  lspSessionGeneration: 1,
+};
+
+function javaStatus(): LspDocumentStatus {
+  return {
+    path: "parity005/Main.java",
+    uri: "file:///parity005/Main.java",
+    presetId: "java",
+    languageId: "java",
+    displayName: "Java",
+    available: true,
+    active: true,
+    selectedCommandId: null,
+    selectedCommand: null,
+    installHint: null,
+    error: null,
+  };
+}
+
+/** M0: caret sits after `StringUti`, the word continues into `Suffix`. */
+const PARITY005_CARET = PARITY005_DOC.indexOf("StringUtiSuffix") + "StringUti".length;
+/** Offset of the whole `StringUtiSuffix` word in M0. */
+const PARITY005_WORD_START = PARITY005_DOC.indexOf("StringUtiSuffix");
+
+function parity005Item(withImport: boolean): LspCompletionItem {
+  const textEdit = {
+    range: {
+      start: { line: 4, character: 8 },
+      end: { line: 4, character: 17 },
+    },
+    newText: "StringUtils",
+  };
+  return {
+    label: "StringUtils",
+    kind: 7,
+    detail: "org.apache.commons.lang3.StringUtils",
+    documentation: null,
+    insertText: "StringUtils",
+    insertTextFormat: 1,
+    filterText: null,
+    sortText: "0001",
+    textEdit,
+    insertReplaceEdit: {
+      newText: "StringUtils",
+      insert: textEdit.range,
+      replace: {
+        start: { line: 4, character: 8 },
+        end: { line: 4, character: 23 },
+      },
+    },
+    additionalTextEdits: withImport
+      ? [{
+        range: {
+          start: { line: 1, character: 0 },
+          end: { line: 1, character: 0 },
+        },
+        newText: PARITY005_IMPORT,
+      }]
+      : [],
+    raw: { label: "StringUtils" },
+  };
+}
+
+function mountParity005View(docText = PARITY005_DOC): EditorView {
+  const state = EditorState.create({
+    doc: docText,
+    selection: { anchor: PARITY005_CARET },
+    extensions: [history()],
+  });
+  return new EditorView({ state, parent: document.body });
+}
+
+function parity005Hooks(): LspCompletionHooks {
+  return {
+    identity: () => ({ ...PARITY005_IDENTITY }),
+    fetch: async () => ({
+      status: javaStatus(),
+      isIncomplete: false,
+      items: [parity005Item(false)],
+    }),
+    // The import only arrives through resolve, so the intent has to survive it.
+    resolve: async () => ({ kind: "resolved", item: parity005Item(true) }),
+    triggerCharacters: () => [],
+    getDocumentRevision: () => PARITY005_IDENTITY.documentRevision,
+    reportDiagnostic: vi.fn(),
+  };
+}
+
+async function acceptParity005(
+  view: EditorView,
+  intent: "insert" | "replace" | null,
+): Promise<void> {
+  const source = createLspCompletionSource(parity005Hooks());
+  const result = await source(new CompletionContext(view.state, PARITY005_CARET, true));
+  expect(result).not.toBeNull();
+  const option = (result as CompletionResult).options[0];
+  if (intent) markCompletionAcceptIntent(view, intent);
+  expect(typeof option.apply).toBe("function");
+  (option.apply as (v: EditorView, o: unknown, f: number, t: number) => void)(
+    view, option, PARITY005_WORD_START, PARITY005_CARET,
+  );
+  // The acceptance settles after the resolve round-trip.
+  await new Promise((resolve) => setTimeout(resolve, 30));
+}
+
+describe("ED-PARITY-005 completion acceptance intent", () => {
+  it("preserves insert replace intent through resolve and undo", async () => {
+    // Enter and mouse leave the intent unset: keep the word's suffix.
+    const enterView = mountParity005View();
+    await acceptParity005(enterView, null);
+    expect(enterView.state.doc.toString()).toBe([
+      "package parity005;",
+      PARITY005_IMPORT.trimEnd(),
+      "",
+      "public class Main {",
+      "    void sample() {",
+      "        StringUtilsSuffix;",
+      "    }",
+      "}",
+      "",
+    ].join("\n"));
+    // One acceptance, one undo: the import and the primary edit revert together.
+    undo(enterView);
+    expect(enterView.state.doc.toString()).toBe(PARITY005_DOC);
+    expect(enterView.state.selection.main.head).toBe(PARITY005_CARET);
+    enterView.destroy();
+
+    // Tab consumes the whole identifier through the provider's replace range.
+    const tabView = mountParity005View();
+    await acceptParity005(tabView, "replace");
+    expect(tabView.state.doc.toString()).toBe([
+      "package parity005;",
+      PARITY005_IMPORT.trimEnd(),
+      "",
+      "public class Main {",
+      "    void sample() {",
+      "        StringUtils;",
+      "    }",
+      "}",
+      "",
+    ].join("\n"));
+    undo(tabView);
+    expect(tabView.state.doc.toString()).toBe(PARITY005_DOC);
+    expect(tabView.state.selection.main.head).toBe(PARITY005_CARET);
+    tabView.destroy();
+  });
+
+  it("never invents a range and rejects contradictory provider ranges", () => {
+    const view = mountParity005View();
+
+    // Both provider ranges are honoured verbatim per intent.
+    const dual = parity005Item(true);
+    expect(resolveCompletionPrimaryRange({
+      view, item: dual, from: PARITY005_WORD_START, to: PARITY005_CARET, intent: "insert",
+    })).toMatchObject({ from: PARITY005_WORD_START, to: PARITY005_CARET });
+    expect(resolveCompletionPrimaryRange({
+      view, item: dual, from: PARITY005_WORD_START, to: PARITY005_CARET, intent: "replace",
+    })).toMatchObject({
+      from: PARITY005_WORD_START,
+      to: PARITY005_WORD_START + "StringUtiSuffix".length,
+    });
+
+    // A plain TextEdit is the single provider range: a cross-token edit is not
+    // truncated for either intent.
+    const crossToken: LspCompletionItem = {
+      ...dual,
+      insertReplaceEdit: null,
+      textEdit: {
+        range: {
+          start: { line: 4, character: 8 },
+          end: { line: 4, character: 23 },
+        },
+        newText: "StringUtils",
+      },
+    };
+    const wordEnd = PARITY005_WORD_START + "StringUtiSuffix".length;
+    expect(resolveCompletionPrimaryRange({
+      view, item: crossToken, from: PARITY005_WORD_START, to: PARITY005_CARET, intent: "insert",
+    })).toMatchObject({ to: wordEnd });
+    expect(resolveCompletionPrimaryRange({
+      view, item: crossToken, from: PARITY005_WORD_START, to: PARITY005_CARET, intent: "replace",
+    })).toMatchObject({ to: wordEnd, reason: "provider-text-edit-range" });
+
+    // Out-of-document coordinates reject the acceptance instead of half-writing
+    // it together with its import.
+    const outOfRange: LspCompletionItem = {
+      ...dual,
+      insertReplaceEdit: null,
+      textEdit: {
+        range: { start: { line: 99, character: 0 }, end: { line: 99, character: 4 } },
+        newText: "StringUtils",
+      },
+    };
+    expect(resolveCompletionPrimaryRange({
+      view, item: outOfRange, from: PARITY005_WORD_START, to: PARITY005_CARET, intent: "insert",
+    })).toBeNull();
+    expect(commitLspCompletion(
+      view,
+      outOfRange,
+      PARITY005_WORD_START,
+      PARITY005_CARET,
+      { ...PARITY005_IDENTITY, requestId: 1, positionKey: "4:17", providerGeneration: 1 } as never,
+      () => true,
+      vi.fn(),
+      [],
+      "insert",
+    )).toBe(false);
+    expect(view.state.doc.toString()).toBe(PARITY005_DOC);
+    view.destroy();
+  });
+
+  it("extends a plain TextEdit to the identifier end only for a safe Java prefix", () => {
+    const view = mountParity005View();
+    const wordEnd = PARITY005_WORD_START + "StringUtiSuffix".length;
+    const plain: LspCompletionItem = {
+      ...parity005Item(false),
+      insertReplaceEdit: null,
+      textEdit: {
+        range: {
+          start: { line: 4, character: 8 },
+          end: { line: 4, character: 17 },
+        },
+        newText: "StringUtils",
+      },
+      additionalTextEdits: [],
+    };
+    // Tab: start == word start, end == caret, suffix all identifier characters.
+    expect(resolveCompletionPrimaryRange({
+      view, item: plain, from: PARITY005_WORD_START, to: PARITY005_CARET, intent: "replace",
+    })).toMatchObject({
+      from: PARITY005_WORD_START,
+      to: wordEnd,
+      reason: "java-suffix-extension",
+    });
+
+    // A multi-line provider range is never widened by the extension rule.
+    const multiLine: LspCompletionItem = {
+      ...plain,
+      textEdit: {
+        range: {
+          start: { line: 3, character: 0 },
+          end: { line: 4, character: 17 },
+        },
+        newText: "StringUtils",
+      },
+    };
+    expect(resolveCompletionPrimaryRange({
+      view, item: multiLine, from: PARITY005_WORD_START, to: PARITY005_CARET, intent: "replace",
+    })).not.toMatchObject({ reason: "java-suffix-extension" });
+
+    // A selection is never silently replaced by a widened range.
+    const selected = mountParity005View();
+    selected.dispatch({
+      selection: { anchor: PARITY005_WORD_START, head: PARITY005_CARET },
+    });
+    expect(resolveCompletionPrimaryRange({
+      view: selected,
+      item: plain,
+      from: PARITY005_WORD_START,
+      to: PARITY005_CARET,
+      intent: "replace",
+    })).not.toMatchObject({ reason: "java-suffix-extension" });
+    selected.destroy();
+
+    view.destroy();
+  });
+
+  it("keeps an unaccepted Tab from re-ranging the next acceptance", () => {
+    const view = mountParity005View();
+    const plain: LspCompletionItem = {
+      ...parity005Item(false),
+      insertReplaceEdit: null,
+      additionalTextEdits: [],
+    };
+    // A Tab that opened but never accepted leaves no trace, so the following
+    // Enter still keeps the word's suffix.
+    markCompletionAcceptIntent(view, "replace");
+    clearCompletionAcceptIntent(view);
+    expect(resolveCompletionPrimaryRange({
+      view, item: plain, from: PARITY005_WORD_START, to: PARITY005_CARET, intent: "insert",
+    })).toMatchObject({ to: PARITY005_CARET });
+    view.destroy();
   });
 });

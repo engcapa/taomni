@@ -31,7 +31,7 @@ import type {
   LspSemanticToken,
 } from "../../../lib/editor/lsp";
 import type {
-  LspCompletionItem,
+  LspCompletionResolveResult,
   LspCompletionResult,
 } from "../../../lib/editor/lsp";
 import type { ParameterPopupView } from "./referenceInfoSession";
@@ -229,7 +229,7 @@ interface EditorGroupProps {
     file: OpenFileViewModel,
     raw: unknown,
     token: CompletionRequestToken,
-  ) => Promise<LspCompletionItem | null>;
+  ) => Promise<LspCompletionResolveResult>;
   /** Live completion request identity per file (§8.16.2). */
   onCompletionIdentity: (file: OpenFileViewModel) => CompletionRequestIdentity | null;
   onCompletionDiagnostic: (

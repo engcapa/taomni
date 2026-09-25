@@ -96,7 +96,6 @@ import { codeViewExtensions } from "../../../lib/codeViewTheme";
 import { getAppPlatform, isTauriRuntime } from "../../../lib/runtime";
 import type { EffectiveCodeStyle } from "./codeStyleModel";
 import type {
-  LspCompletionItem,
   LspCompletionResult,
   LspDiagnostic,
   LspDocumentHighlight,
@@ -127,7 +126,10 @@ import {
   activeLspSnippetChoices,
   advanceLspSnippetTabstop,
   cancelLspSnippetSession,
+  cancelPendingLspAcceptance,
+  clearCompletionAcceptIntent,
   cycleLspSnippetChoice,
+  markCompletionAcceptIntent,
   retreatLspSnippetTabstop,
   createLspCompletionSource,
   LspCompletionController,
@@ -138,6 +140,7 @@ import {
   type CompletionRequestIdentity,
   type CompletionRequestToken,
   type CompletionResolveGateRequest,
+  type CompletionResolveReply,
 } from "./lspCompletion";
 import type { CompletionScopeFactsState } from "./completionScopeAdapter";
 import { createDiagnosticChrome } from "./lspDiagnosticChrome";
@@ -463,10 +466,15 @@ interface CodeMirrorHostProps {
     /** Repeated-call facts (§8.19.4); ordinal ≥ 2 requests expanded scope. */
     invocation?: CompletionInvocationRequest,
   ) => Promise<LspCompletionResult | null>;
+  /**
+   * ED-PARITY-005 D1: the host answers with the tagged resolve result so a
+   * provider failure/timeout/null cannot travel as a successful resolve. The
+   * legacy "item or null" reply is still accepted at the source boundary.
+   */
   onCompleteResolve?: (
     raw: unknown,
     token: CompletionRequestToken,
-  ) => Promise<LspCompletionItem | null>;
+  ) => Promise<CompletionResolveReply>;
   /** Live completion request identity (§8.16.2); null = typed unavailable. */
   getCompletionIdentity: () => CompletionRequestIdentity | null;
   onCompletionDiagnostic: (kind: CompletionAcceptanceDiagnostic, detail?: string) => void;
@@ -3223,13 +3231,39 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         // 4) Else fall through to indentWithTab. The final tabstop exits
         //    with a caret-only move (never an undoable indent), and
         //    Shift-Tab walks back through the stops while the session lives.
+        // ED-PARITY-005 DEC-06: Escape ends an in-flight completion acceptance,
+        // so a provider answer arriving afterwards has zero effect instead of
+        // committing or reopening a gate the user already dismissed. This is a
+        // pure observer — it never consumes the stroke, so the popup still
+        // closes and the rest of the Escape stack still runs. Deliberately
+        // Escape-only: a popup close caused by focus moving to the resolve
+        // gate's own buttons is not a dismissal.
+        Prec.highest(EditorView.domEventHandlers({
+          keydown: (event, view) => {
+            if (event.key === "Escape" && !event.isComposing) {
+              cancelPendingLspAcceptance(view);
+            }
+            return false;
+          },
+        })),
         Prec.high(keymap.of([
           {
             key: "Tab",
             run: (view) => {
               // ED-AUDIT-011: Tab during IME composition selects the candidate.
               if (view.composing || view.state.readOnly) return false;
-              if (acceptCompletion(view)) return true;
+              // ED-PARITY-005 D2: Tab consumes the whole identifier, so it
+              // accepts through the provider's replace range. The intent is
+              // cleared again when this Tab did not accept anything, so it can
+              // never re-range a later Enter or mouse acceptance.
+              markCompletionAcceptIntent(view, "replace");
+              let accepted = false;
+              try {
+                accepted = acceptCompletion(view);
+              } finally {
+                clearCompletionAcceptIntent(view);
+              }
+              if (accepted) return true;
               const language = liveTemplateLanguageForPath(pathRef.current);
               const providerCandidate = getValidActiveProviderCandidate(view, language);
               if (providerCandidate) {
@@ -3282,6 +3316,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                 // ED-AUDIT-011: Escape during IME composition cancels the
                 // candidate window; workspace snippet/selection/parameter
                 // owners must not consume it (callee guards also return false).
+                // ED-PARITY-005 DEC-06: an in-flight acceptance ends on Escape,
+                // so a provider answer arriving afterwards has zero effect.
+                { key: "Escape", run: (view: EditorView) => cancelPendingLspAcceptance(view) },
                 { key: "Escape", run: (view: EditorView) => cancelLspSnippetSession(view) },
                 { key: "Escape", run: escapeEditorSelections },
                 {
@@ -3711,7 +3748,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           return true;
         },
         escapeStack: () =>
-          cancelLspSnippetSession(view)
+          cancelPendingLspAcceptance(view)
+          || cancelLspSnippetSession(view)
           || escapeEditorSelections(view)
           || (onParameterEscapeRef.current?.() ?? false),
         isEditorGeometryReady: () => isEditorGeometryReady(view),

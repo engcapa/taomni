@@ -103,7 +103,7 @@ function props(overrides: Partial<ComponentProps<typeof EditorGroup>> = {}): Com
     onReferences: vi.fn(async () => {}),
     onEditorContextMenu: vi.fn(),
     onComplete: vi.fn(async () => null),
-    onCompleteResolve: vi.fn(async () => null),
+    onCompleteResolve: vi.fn(async () => ({ kind: "unavailable" as const, reason: "test" })),
     onCompletionIdentity: vi.fn(() => null),
     onCompletionDiagnostic: vi.fn(),
     onParameterTrigger: vi.fn(),

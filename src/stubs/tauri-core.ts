@@ -1062,6 +1062,12 @@ function stubLspPresetForPath(path: string) {
 function stubLspDocumentStatus(args?: InvokeArgs) {
   const filePath = (args?.filePath as string | undefined) ?? "";
   const preset = stubLspPresetForPath(filePath);
+  // ED-PARITY-005: the QA completion harness arms an active session for its
+  // fixture file. Every LSP shape embeds this status, so arming it here keeps
+  // diagnostics/hover/project-model responses from overwriting the session
+  // with the plain "no language server in browser preview" answer.
+  const armed = stubParity005Status();
+  if (armed) return { ...armed, path: filePath, uri: `file://${filePath}`, presetId: preset?.id ?? null, languageId: preset?.documentLanguageIds[0] ?? null, displayName: preset?.displayName ?? null };
   return {
     path: filePath,
     uri: filePath ? `file://${filePath}` : "",
@@ -1078,22 +1084,113 @@ function stubLspDocumentStatus(args?: InvokeArgs) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// ED-PARITY-005 QA completion harness (browser only)
+//
+// The browser preview has no language server, so `CodeWorkspaceTab` never
+// reaches `lsp_completion` and the acceptance chain (source -> intent -> range
+// -> dispatch -> history) cannot be exercised. When a QA run arms the key
+// below, this module serves one deterministic provider answer instead. It is
+// inert for ordinary `pnpm dev` use and never present in a native build, so no
+// fault-injection surface ships in the product.
+// ---------------------------------------------------------------------------
+
+const PARITY005_STORAGE_KEY = "taomni.qa.parity005Completion.v1";
+
+interface StubParity005Config {
+  filePath: string;
+  /** Item served by `lsp_completion`; carries both provider ranges. */
+  item: Record<string, unknown>;
+  /**
+   * Reply for `lsp_completion_resolve`:
+   * `resolved` | `item-without-import` | `null` | `failed` | `timeout` | `held`.
+   * The key is re-read per call, so a case can flip the mode without reloading.
+   */
+  resolveMode: string;
+  /** Payload the `resolved` mode answers with. */
+  resolvedItem?: Record<string, unknown>;
+}
+
+function stubParity005Config(): StubParity005Config | null {
+  try {
+    const raw = window.localStorage.getItem(PARITY005_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StubParity005Config;
+    return parsed && typeof parsed.filePath === "string" && parsed.item ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function stubParity005Matches(filePath: unknown, config: StubParity005Config): boolean {
+  const requested = typeof filePath === "string" ? filePath : "";
+  return requested.endsWith(config.filePath) || requested === config.filePath;
+}
+
+function stubParity005Status(): StubParity005Config | null {
+  return stubParity005Config();
+}
+
+function stubParity005Completion(args?: InvokeArgs) {
+  const config = stubParity005Config();
+  if (!config || !stubParity005Matches(args?.filePath, config)) return null;
+  return {
+    status: stubLspDocumentStatus(args),
+    isIncomplete: false,
+    items: [config.item],
+  };
+}
+
+function stubParity005Resolve(args?: InvokeArgs) {
+  const config = stubParity005Config();
+  if (!config || !stubParity005Matches(args?.filePath, config)) return null;
+  switch (config.resolveMode) {
+    case "resolved":
+      return { kind: "resolved", item: config.resolvedItem ?? config.item };
+    case "item-without-import":
+      return { kind: "resolved", item: config.item };
+    case "null":
+      // Mirrors the backend's typed `unavailable` for a provider JSON null.
+      return { kind: "unavailable", reason: "provider-returned-null" };
+    case "failed":
+      return { kind: "failed", message: "Method not found" };
+    case "timeout":
+    case "held":
+      // Never answers: `timeout` exercises the host's own resolve deadline.
+      return new Promise<never>(() => {});
+    default:
+      return { kind: "unavailable", reason: `unknown-qa-resolve-mode:${config.resolveMode}` };
+  }
+}
+
 function stubLspServerStatuses() {
-  return STUB_LSP_PRESETS.map((preset) => ({
-    presetId: preset.id,
-    displayName: preset.displayName,
-    documentLanguageIds: preset.documentLanguageIds,
-    available: false,
-    active: false,
-    selectedCommandId: null,
-    selectedCommand: null,
-    installHint: preset.commands[0]?.installHint ?? "",
-    error: "Language servers are not available in browser preview",
-    runtimeStatus: preset.id === "java"
-      ? "Java not probed in browser preview — need JDK 21+ for jdtls"
-      : null,
-    commands: preset.commands.map((command) => ({ ...command, available: false })),
-  }));
+  // ED-PARITY-005: an armed QA completion harness needs the workspace to treat
+  // the fixture's language as served, otherwise the probe gate stops before any
+  // document is opened and `lsp_completion` is never reached. Only the fixture's
+  // language is reported available; every other preset keeps the honest
+  // "not available in browser preview" answer.
+  const armed = stubParity005Status();
+  const armedPresetId = armed ? stubLspPresetForPath(armed.filePath)?.id : null;
+  return STUB_LSP_PRESETS.map((preset) => {
+    const ready = preset.id === armedPresetId;
+    return {
+      presetId: preset.id,
+      displayName: preset.displayName,
+      documentLanguageIds: preset.documentLanguageIds,
+      available: ready,
+      active: ready,
+      selectedCommandId: ready ? preset.commands[0]?.id ?? preset.id : null,
+      selectedCommand: ready ? preset.commands[0]?.command ?? preset.id : null,
+      installHint: preset.commands[0]?.installHint ?? "",
+      error: ready ? null : "Language servers are not available in browser preview",
+      runtimeStatus: ready
+        ? "QA completion harness"
+        : preset.id === "java"
+          ? "Java not probed in browser preview — need JDK 21+ for jdtls"
+          : null,
+      commands: preset.commands.map((command) => ({ ...command, available: ready })),
+    };
+  });
 }
 
 async function sha256Hex(text: string): Promise<string> {
@@ -2270,6 +2367,20 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_close_document": {
       return stubLspDocumentStatus(args as InvokeArgs) as T;
     }
+    case "lsp_completion": {
+      const parity005 = stubParity005Completion(args as InvokeArgs);
+      if (parity005) return parity005 as T;
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        isIncomplete: false,
+        items: [],
+      } as T;
+    }
+    case "lsp_completion_resolve": {
+      const parity005 = stubParity005Resolve(args as InvokeArgs);
+      if (parity005) return parity005 as T;
+      return { kind: "unavailable", reason: "no-active-session" } as T;
+    }
     case "lsp_stop_workspace": {
       return 0 as T;
     }
@@ -2303,6 +2414,24 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_java_project_model": {
       // §8.20.3 W2: lifecycle-only facts in browser mode — no provider, so
       // phase derivation degrades honestly instead of pretending readiness.
+      // The ED-PARITY-005 harness is the one case that does have a provider.
+      const parity005Model = stubParity005Status();
+      const parity005File = String((args as InvokeArgs)?.filePath ?? "");
+      if (parity005Model && stubParity005Matches(parity005File, parity005Model)) {
+        return {
+          status: stubLspDocumentStatus(args as InvokeArgs),
+          active: true,
+          processId: 1,
+          serverName: "QA parity005 completion harness",
+          serverVersion: null,
+          registeredCommands: [],
+          buildFiles: [],
+          javaHomeUsed: null,
+          javaProjects: [],
+          classpathProbe: null,
+          probeReason: null,
+        } as T;
+      }
       return {
         status: stubLspDocumentStatus(args as InvokeArgs),
         active: false,
