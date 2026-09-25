@@ -74,8 +74,12 @@ steps:
 - wait_for: '[data-testid="terminal-current-settings-dialog"] input[aria-label="Terminal font size"][value="19"]'
 - click: '[data-testid="terminal-current-settings-dialog"] button:has-text("Save as terminal default")'
 - assert_text:
-    selector: '[data-testid="status-bar"]'
-    contains: Default appearance for new terminals updated
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Save this terminal's appearance
+- click: '[data-testid="confirm-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="confirm-dialog"]'
+    state: detached
 - click: '[data-testid="terminal-current-settings-dialog"] button:has-text("Close")'
 - wait_for:
     selector: '[data-testid="terminal-current-settings-dialog"]'
@@ -164,18 +168,20 @@ verification:
     - step: 30
       expectation: '{"wait_for": "[data-testid=\"terminal-current-settings-dialog\"] input[aria-label=\"Terminal font size\"][value=\"19\"]"}'
     - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Default appearance for new terminals updated"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Save this terminal\u0027s appearance"}}'
     - step: 34
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-current-settings-dialog\"]", "state": "detached"}}'
-    - step: 41
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-after-current-settings\\r?$", "timeout_sec": 20}}'
-    - step: 45
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Default appearance for new terminals updated"}}'
-    - step: 49
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 52
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
-    - step: 53
+    - step: 36
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-current-settings-dialog\"]", "state": "detached"}}'
+    - step: 43
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-after-current-settings\\r?$", "timeout_sec": 20}}'
+    - step: 47
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Default appearance for new terminals updated"}}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 54
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 55
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
     results:
     - 18
@@ -185,11 +191,12 @@ verification:
     - 30
     - 32
     - 34
-    - 41
-    - 45
-    - 49
-    - 52
-    - 53
+    - 36
+    - 43
+    - 47
+    - 51
+    - 54
+    - 55
   visual:
   - check: Inspect the SSH terminal settings and live terminal screenshot for dialog layout, status feedback, and no overlap.
     method: manual
