@@ -4,7 +4,11 @@
 
 首次 P0 基线：`audit/plan` 整体 Code Workspace，起始分支 `main`、HEAD `27f99b6116f4f6aae906d324cb84e8359695e17a`。首次评估已经完成，之后已有多轮 P1–P3；后续无需重新执行首次 P0。
 
-## 当前任务入口（2026-09-24）
+## 当前 P1 接续（2026-09-25）
+
+本轮按唯一板选定 **ED-PARITY-005**，来源 REQ-05 / CW-LANG-001、CW-LANG-002；[本卡设计及 DEC/AC/V](java-basic-completion-plan.md#ed-parity-005)、[完整用例设计](java-basic-completion-plan.md#test-cases)、[参照/fixture](references/ed-parity-005-reference.md#followup-observed)、[完整 P2 提示词](handoff-p2-ed-parity-005.md)、[静态记录](evidence/ed-parity-005-p1-static.md)。IDEA Ultimate 2026.2.3 / IU-262.10968.63已由用户确定，两时段实采补齐必要目标；用户明确保留provider snippet默认值差异。设计保留既有scope/同步/原子接受/保存修复，处理D1 resolve失败回退与D2词中insert/replace意图丢失。**P1规划完成，ready / planning_required=false，无开发owner**，可由P2正式领取。不是功能/UI/交互已对齐；所有产品验证未执行，当前状态只看[唯一板](backlog.md)。
+
+## 历史任务入口（2026-09-24）
 
 **2026-09-24 P1 完成：** [ED-PARITY-004](keymap-rebind-conflict-plan.md#ed-parity-004)，来源 REQ-10 / CW-SET-002；[IDEA 参照包（`partially-observed`）](references/ed-parity-004-reference.md)、[完整 P2 提示词](handoff-p2-ed-parity-004.md)。生产源码复核已确认三个缺陷：冲突按显示字符串比对致 `Ctrl+F`/`Ctrl+f` 分叉无警告死键（D1）、无 Apply/Cancel 且改键即时落盘不可撤销（D2）、`conflict` 在三个派发入口语义不一致并静默吞键（D3）；R1/R2 为待运行归因风险而非已复现缺陷。DEC-01..09、A1..A3、V1..V5、S0..S8 与完整 `test-cases` 用例设计已落盘；目标 build 经用户裁决为 **IDEA 2026.2.3 / IU-262.10968.63**。用户授权后在运行实例上完成真实桌面采样（13 张原件，Keymap 页布局/动作行呈现/右键菜单/录制器与 Ctrl+F 冲突提示/两级 Cancel），实测据此**修正 DEC-02/03/04**：真实 IDEA 冲突是录制器内就地实时警告（`Already assigned to:`，列出全部冲突含菜单路径、可滚动，`OK` 不阻断），非提交后弹模态。采样全程只 Cancel、从未 OK/Apply，**用户真实 keymap 未被改写**。**卡已转 `ready` + `planning_required=false`**，无开发 owner，可交 P2 正式领取。剩余未观测项属执行期证据，由 P2 在隔离 config 实例补齐。仅 P1 规划就绪，**不是 Taomni 功能/UI/交互已对齐**；产品测试/构建/启动/领取/实现均未执行。实时状态继续以 backlog.md 为准。
 

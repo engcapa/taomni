@@ -36,6 +36,8 @@ line three
 <a id="f2"></a>
 ## F2：Java 工程与真实语义 / Build / Debug（待准备）
 
+2026-09-25 ED-PARITY-005 的局部规格：[F2-COMP-005 与 B-005](ed-parity-005-reference.md#fixture)。F2-COMP-005 是先以完整语法导入、再受控编辑成 prefix 的两文件最小工程；B-005 为 browser 原子接受的可控协议fixture，不是真实Java语义参照。F2本轮已创建IDEA显式module/缓存库变体并局部实采（未执行Maven导入），B-005仍未创建/执行；目标build已确认2026.2.3；第二时段已补词中Enter/Tab/双击、live template导航、字体/缩放及边缘参照，用户接受provider snippet差异，详见[最终参照合同](ed-parity-005-reference.md#followup-observed)。P1就绪，产品结果未执行；不改变本节历史环境记录。
+
 先复用现有可重建 fixture 源：`src/components/editor/workspace/__fixtures__/jdtls/projects/` 下的 `maven-single`、`maven-multi-module`、`gradle-single`、`gradle-multi-module`、`maven-broken-classpath`。每次运行复制到报告目录，核对当前源码与依赖后写一份实际 manifest；不直接操作工程中的测试 seed。此前 App.java 语法问题的历史记录不是本次编译事实。
 
 首个语义最小样例可以先用离线两类工程：`Main.java` 引用 `Helper.greet()`，Helper 返回确定字符串；新增只在注释/字符串中的同名词，另有一个编译错误用于 Quick Fix。扩展场景加同名类跨 module、外部库只读源码、泛型/重载、被引用方法、存在副作用表达式；每次扩展记录 hash 与 ID 修订。进入条件：

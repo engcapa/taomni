@@ -72,6 +72,8 @@
 
 ## ED-PARITY-005 Java 工程就绪后 Basic Completion 接受与撤销
 
+2026-09-25 P1 已补[本卡设计](java-basic-completion-plan.md#ed-parity-005)、[完整用例设计](java-basic-completion-plan.md#test-cases)及[参照/fixture/准确补采步骤](references/ed-parity-005-reference.md)。下方保留 P0 原始起点；生产文件/符号、独立 DEC-01..09、A1..A3、V1..V6、用例/设施责任以新设计为准。G1/G2已解除：2026.2.3必要类型/词中接受、模板导航、字体/缩放/边缘已实采，用户接受provider snippet默认值差异；ready/planning_required=false，无开发owner，[完整P2交接](handoff-p2-ed-parity-005.md)已保存。增加 browser evidence 以覆盖应用内入口，其余原要求保留。所有产品验证未执行，没有继承历史PASS。
+
 - 来源：REQ-05 / CW-LANG-001、CW-LANG-002；[P0 需求](overall-audit-plan-20260913.md#req-05)、[历史只读材料](../../claudedocs/code-workspace-idea-parity-backlog.md)。
 - 已知依据：P0 没有本轮真实 provider 观测，已有历史生产接线和测试不能替代当前语义结果。
 - 本包边界：F2 单个 Java 文件从 provider ready→Basic Completion→接受带 import/snippet 候选→undo；其他导航、层级和语言另由 P0 分包。
