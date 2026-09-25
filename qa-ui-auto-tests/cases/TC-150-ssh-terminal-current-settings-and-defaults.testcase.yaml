@@ -57,7 +57,7 @@ steps:
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
-    regex: '(?m)^qa\\-ssh\\-current\\-settings\\r?$'
+    regex: (?m)^qa-ssh-current-settings\r?$
     timeout_sec: 20
 - right_click:
     selector: '[data-testid="terminal-pane"]'
@@ -94,7 +94,7 @@ steps:
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
-    regex: '(?m)^qa\\-ssh\\-after\\-current\\-settings\\r?$'
+    regex: (?m)^qa-ssh-after-current-settings\r?$
     timeout_sec: 20
 - right_click:
     selector: '[data-testid="terminal-pane"]'
@@ -156,7 +156,7 @@ verification:
     - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 20
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\\\-ssh\\\\-current\\\\-settings\\\\r?$", "timeout_sec": 20}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-current-settings\\r?$", "timeout_sec": 20}}'
     - step: 25
       expectation: '{"wait_for": "[data-testid=\"terminal-current-settings-dialog\"]"}'
     - step: 26
@@ -168,7 +168,7 @@ verification:
     - step: 34
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-current-settings-dialog\"]", "state": "detached"}}'
     - step: 41
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\\\-ssh\\\\-after\\\\-current\\\\-settings\\\\r?$", "timeout_sec": 20}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-after-current-settings\\r?$", "timeout_sec": 20}}'
     - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Default appearance for new terminals updated"}}'
     - step: 49
