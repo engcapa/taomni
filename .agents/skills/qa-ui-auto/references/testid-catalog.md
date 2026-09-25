@@ -89,7 +89,7 @@
 - `input[name="inlineSuggestionsSource"][value="history+path+ai"]` — interactive — F-AI-2.2.inline-suggestions-history-path-ai
 - `[data-testid="ai-command-rewrite-toggle"]` — interactive — F-AI-2.2.ai-command-rewrite-toggle
 - `input[aria-label="AI command rewrite shortcut"]` — interactive — F-AI-2.2.ai-command-rewrite-shortcut
-- `label:has-text("Render `?? <question>` answers inline") input[type="checkbox"]` — interactive — F-AI-2.2.ai-inline-question-render
+- `[data-testid="terminal-ai-inline-qq-toggle"] input[type="checkbox"]` — interactive — F-AI-2.2.ai-inline-question-render
 
 ## ai/voice (F-AI-2.3)
 
@@ -1431,15 +1431,15 @@
   ↳ `label:has-text("Enable font ligatures") input[type="checkbox"]:checked` — alias
 - `input[aria-label="Scrollback lines"]` — interactive — F5.2.scrollback
 - `input[aria-label="Maximum command history entries per host"]` — interactive — F5.2.inline-suggestions-max
-- `label:has-text("Show terminal scrollbar") input[type="checkbox"]` — interactive — F5.2.show-scrollbar
-- `label:has-text("Copy on select") input[type="checkbox"]` — interactive — F5.2.copy-on-select
-- `label:has-text("Allow SSH OSC 52 clipboard") input[type="checkbox"]` — interactive — F5.2.allow-osc52
-- `label:has-text("Read-only terminal") input[type="checkbox"]` — interactive — F5.2.read-only
-- `label:has-text("Bracketed paste") input[type="checkbox"]` — interactive — F5.2.bracketed-paste
-- `label:has-text("Confirm multiline paste") input[type="checkbox"]` — interactive — F5.2.multiline-paste-confirm
-- `label:has-text("Enable keyword highlighting") input[type="checkbox"]` — interactive — F5.2.keyword-highlighting
-- `label:has-text("Save scrollback to log file on disconnect") input[type="checkbox"]` — interactive — F5.2.save-scrollback-on-disconnect
-- `label:has-text("Show ghost-text suggestions from command history") input[type="checkbox"]` — interactive — F5.2.inline-suggestions-toggle
+- `[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]` — interactive — F5.2.show-scrollbar
+- `[data-testid="terminal-copy-on-select-toggle"] input[type="checkbox"]` — interactive — F5.2.copy-on-select
+- `[data-testid="terminal-osc52-clipboard-toggle"] input[type="checkbox"]` — interactive — F5.2.allow-osc52
+- `[data-testid="terminal-read-only-toggle"] input[type="checkbox"]` — interactive — F5.2.read-only
+- `[data-testid="terminal-bracketed-paste-toggle"] input[type="checkbox"]` — interactive — F5.2.bracketed-paste
+- `[data-testid="terminal-multiline-paste-confirm-toggle"] input[type="checkbox"]` — interactive — F5.2.multiline-paste-confirm
+- `[data-testid="terminal-keyword-highlighting-toggle"] input[type="checkbox"]` — interactive — F5.2.keyword-highlighting
+- `[data-testid="terminal-save-scrollback-on-disconnect-toggle"] input[type="checkbox"]` — interactive — F5.2.save-scrollback-on-disconnect
+- `[data-testid="terminal-inline-suggestions-toggle"] input[type="checkbox"]` — interactive — F5.2.inline-suggestions-toggle
 - `text="Clear all history"` — interactive — F5.2.clear-all-history
 - `input[aria-label="Command 1"]` — interactive — F5.2.common-command
 - `input[aria-label="Description 1"]` — interactive — F5.2.common-command-description
@@ -1448,6 +1448,8 @@
 - `[data-testid="terminal-context-set-local-default-profile"]` — interactive [optional] — F5.2.context-set-profile-default
 - `[data-testid="terminal-context-change-settings"]` — interactive [optional] — F5.2.context-change-settings
 - `[data-testid="terminal-current-settings-dialog"]` — display [optional] — F5.2.current-settings-dialog
+- `[data-testid="terminal-current-settings-save-default"]` — interactive [optional] — F5.2.current-settings-save-default
+- `[data-testid="terminal-current-settings-footer-close"]` — interactive [optional] — F5.2.current-settings-footer-close
 - `select[aria-label="Terminal cursor"]` — interactive — F5.2.cursor-style
 - `select[aria-label="Right click behavior"]` — interactive — F5.2.right-click-behavior
 - `input[aria-label="Terminal background hex"]` — interactive — F5.2.background-hex

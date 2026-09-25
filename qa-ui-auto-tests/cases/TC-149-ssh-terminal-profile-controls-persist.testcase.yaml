@@ -55,38 +55,38 @@ steps:
     selector: 'input[aria-label="Enable font ligatures"]:checked'
     equal: 1
 - set_check:
-    selector: 'label:has-text("Show terminal scrollbar") input[type="checkbox"]'
+    selector: '[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]'
     checked: false
 - assert_count:
-    selector: 'label:has-text("Show terminal scrollbar") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]:checked'
     equal: 0
 - set_check:
-    selector: 'label:has-text("Copy on select") input[type="checkbox"]'
+    selector: '[data-testid="terminal-copy-on-select-toggle"] input[type="checkbox"]'
     checked: true
 - set_check:
-    selector: 'label:has-text("Allow SSH OSC 52 clipboard") input[type="checkbox"]'
+    selector: '[data-testid="terminal-osc52-clipboard-toggle"] input[type="checkbox"]'
     checked: true
 - set_check:
-    selector: 'label:has-text("Read-only terminal") input[type="checkbox"]'
+    selector: '[data-testid="terminal-read-only-toggle"] input[type="checkbox"]'
     checked: true
 - set_check:
-    selector: 'label:has-text("Bracketed paste") input[type="checkbox"]'
+    selector: '[data-testid="terminal-bracketed-paste-toggle"] input[type="checkbox"]'
     checked: false
 - set_check:
-    selector: 'label:has-text("Confirm multiline paste") input[type="checkbox"]'
+    selector: '[data-testid="terminal-multiline-paste-confirm-toggle"] input[type="checkbox"]'
     checked: false
 - set_check:
-    selector: 'label:has-text("Enable keyword highlighting") input[type="checkbox"]'
+    selector: '[data-testid="terminal-keyword-highlighting-toggle"] input[type="checkbox"]'
     checked: true
 - set_check:
-    selector: 'label:has-text("Save scrollback to log file on disconnect") input[type="checkbox"]'
+    selector: '[data-testid="terminal-save-scrollback-on-disconnect-toggle"] input[type="checkbox"]'
     checked: true
 - set_check:
-    selector: 'label:has-text("Show ghost-text suggestions from command history") input[type="checkbox"]'
+    selector: '[data-testid="terminal-inline-suggestions-toggle"] input[type="checkbox"]'
     checked: false
 - assert_disabled: 'input[aria-label="Maximum command history entries per host"]'
 - set_check:
-    selector: 'label:has-text("Show ghost-text suggestions from command history") input[type="checkbox"]'
+    selector: '[data-testid="terminal-inline-suggestions-toggle"] input[type="checkbox"]'
     checked: true
 - assert_enabled: 'input[aria-label="Maximum command history entries per host"]'
 - fill:
@@ -131,10 +131,10 @@ steps:
     checked: false
 - assert_disabled: 'input[aria-label="AI command rewrite shortcut"]'
 - set_check:
-    selector: 'label:has-text("Render `?? <question>` answers inline") input[type="checkbox"]'
+    selector: '[data-testid="terminal-ai-inline-qq-toggle"] input[type="checkbox"]'
     checked: true
 - assert_count:
-    selector: 'label:has-text("Render `?? <question>` answers inline") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-ai-inline-qq-toggle"] input[type="checkbox"]:checked'
     equal: 1
 - click: text="Add entry"
 - wait_for: 'input[aria-label="Command 1"]'
@@ -180,28 +180,28 @@ steps:
     selector: 'input[aria-label="Enable font ligatures"]:checked'
     equal: 1
 - assert_count:
-    selector: 'label:has-text("Show terminal scrollbar") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]:checked'
     equal: 0
 - assert_count:
-    selector: 'label:has-text("Copy on select") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-copy-on-select-toggle"] input[type="checkbox"]:checked'
     equal: 1
 - assert_count:
-    selector: 'label:has-text("Allow SSH OSC 52 clipboard") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-osc52-clipboard-toggle"] input[type="checkbox"]:checked'
     equal: 1
 - assert_count:
-    selector: 'label:has-text("Read-only terminal") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-read-only-toggle"] input[type="checkbox"]:checked'
     equal: 1
 - assert_count:
-    selector: 'label:has-text("Bracketed paste") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-bracketed-paste-toggle"] input[type="checkbox"]:checked'
     equal: 0
 - assert_count:
-    selector: 'label:has-text("Confirm multiline paste") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-multiline-paste-confirm-toggle"] input[type="checkbox"]:checked'
     equal: 0
 - assert_count:
-    selector: 'label:has-text("Enable keyword highlighting") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-keyword-highlighting-toggle"] input[type="checkbox"]:checked'
     equal: 1
 - assert_count:
-    selector: 'label:has-text("Save scrollback to log file on disconnect") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-save-scrollback-on-disconnect-toggle"] input[type="checkbox"]:checked'
     equal: 1
 - assert_attribute:
     selector: 'input[aria-label="Maximum command history entries per host"]'
@@ -218,7 +218,7 @@ steps:
     name: value
     equals: Ctrl+Alt+K
 - assert_count:
-    selector: 'label:has-text("Render `?? <question>` answers inline") input[type="checkbox"]:checked'
+    selector: '[data-testid="terminal-ai-inline-qq-toggle"] input[type="checkbox"]:checked'
     equal: 1
 - assert_attribute:
     selector: 'input[aria-label="Command 1"]'

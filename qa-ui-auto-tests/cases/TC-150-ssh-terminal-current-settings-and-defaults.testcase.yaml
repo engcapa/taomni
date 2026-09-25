@@ -3,6 +3,7 @@ title: SSH terminal current settings and default actions keep the connection liv
 covers:
 - F3.1
 - F4.2
+- F5.2
 - F6.5
 tags:
 - ssh
@@ -72,7 +73,7 @@ steps:
     value: '19'
 - click: '[data-testid="terminal-current-settings-dialog"] [data-testid="terminal-preview"]'
 - wait_for: '[data-testid="terminal-current-settings-dialog"] input[aria-label="Terminal font size"][value="19"]'
-- click: '[data-testid="terminal-current-settings-dialog"] button:has-text("Save as terminal default")'
+- click: '[data-testid="terminal-current-settings-save-default"]'
 - assert_text:
     selector: '[data-testid="confirm-dialog-message"]'
     contains: Save this terminal's appearance
@@ -80,7 +81,7 @@ steps:
 - wait_for:
     selector: '[data-testid="confirm-dialog"]'
     state: detached
-- click: '[data-testid="terminal-current-settings-dialog"] button:has-text("Close")'
+- click: '[data-testid="terminal-current-settings-footer-close"]'
 - wait_for:
     selector: '[data-testid="terminal-current-settings-dialog"]'
     state: detached

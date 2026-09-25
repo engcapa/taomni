@@ -1222,31 +1222,31 @@ controls:
     selector: 'input[aria-label="Maximum command history entries per host"]'
     kind: interactive
   - id: show-scrollbar
-    selector: 'label:has-text("Show terminal scrollbar") input[type="checkbox"]'
+    selector: '[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]'
     kind: interactive
   - id: copy-on-select
-    selector: 'label:has-text("Copy on select") input[type="checkbox"]'
+    selector: '[data-testid="terminal-copy-on-select-toggle"] input[type="checkbox"]'
     kind: interactive
   - id: allow-osc52
-    selector: 'label:has-text("Allow SSH OSC 52 clipboard") input[type="checkbox"]'
+    selector: '[data-testid="terminal-osc52-clipboard-toggle"] input[type="checkbox"]'
     kind: interactive
   - id: read-only
-    selector: 'label:has-text("Read-only terminal") input[type="checkbox"]'
+    selector: '[data-testid="terminal-read-only-toggle"] input[type="checkbox"]'
     kind: interactive
   - id: bracketed-paste
-    selector: 'label:has-text("Bracketed paste") input[type="checkbox"]'
+    selector: '[data-testid="terminal-bracketed-paste-toggle"] input[type="checkbox"]'
     kind: interactive
   - id: multiline-paste-confirm
-    selector: 'label:has-text("Confirm multiline paste") input[type="checkbox"]'
+    selector: '[data-testid="terminal-multiline-paste-confirm-toggle"] input[type="checkbox"]'
     kind: interactive
   - id: keyword-highlighting
-    selector: 'label:has-text("Enable keyword highlighting") input[type="checkbox"]'
+    selector: '[data-testid="terminal-keyword-highlighting-toggle"] input[type="checkbox"]'
     kind: interactive
   - id: save-scrollback-on-disconnect
-    selector: 'label:has-text("Save scrollback to log file on disconnect") input[type="checkbox"]'
+    selector: '[data-testid="terminal-save-scrollback-on-disconnect-toggle"] input[type="checkbox"]'
     kind: interactive
   - id: inline-suggestions-toggle
-    selector: 'label:has-text("Show ghost-text suggestions from command history") input[type="checkbox"]'
+    selector: '[data-testid="terminal-inline-suggestions-toggle"] input[type="checkbox"]'
     kind: interactive
   - id: clear-all-history
     selector: 'text="Clear all history"'
@@ -1275,6 +1275,14 @@ controls:
     selector: '[data-testid="terminal-current-settings-dialog"]'
     kind: display
     optional: true       # only visible after choosing Change settings
+  - id: current-settings-save-default
+    selector: '[data-testid="terminal-current-settings-save-default"]'
+    kind: interactive
+    optional: true       # only visible while current settings are open
+  - id: current-settings-footer-close
+    selector: '[data-testid="terminal-current-settings-footer-close"]'
+    kind: interactive
+    optional: true       # only visible while current settings are open
   - id: cursor-style
     selector: 'select[aria-label="Terminal cursor"]'
     kind: interactive
@@ -3307,7 +3315,7 @@ controls:
     selector: 'input[aria-label="AI command rewrite shortcut"]'
     kind: interactive
   - id: ai-inline-question-render
-    selector: 'label:has-text("Render `?? <question>` answers inline") input[type="checkbox"]'
+    selector: '[data-testid="terminal-ai-inline-qq-toggle"] input[type="checkbox"]'
     kind: interactive
 -->
 
