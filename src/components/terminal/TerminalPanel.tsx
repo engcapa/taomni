@@ -4266,11 +4266,17 @@ function CurrentTerminalSettingsDialog({
           <button
             type="button"
             className="taomni-btn h-8 px-3"
+            data-testid="terminal-current-settings-save-default"
             onClick={onSaveAsDefault}
           >
             {t("terminal.currentSettingsSaveAsDefault")}
           </button>
-          <button type="button" className="taomni-btn h-8 px-3" onClick={onClose}>
+          <button
+            type="button"
+            className="taomni-btn h-8 px-3"
+            data-testid="terminal-current-settings-footer-close"
+            onClick={onClose}
+          >
             {t("terminal.currentSettingsClose")}
           </button>
         </div>

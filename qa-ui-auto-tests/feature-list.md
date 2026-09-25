@@ -1173,6 +1173,11 @@ controls:
     optional: true       # only visible while the preview dropdown is open
     aliases:
       - '[data-testid="terminal-theme-option-kanagawa-wave"]'
+      - '[data-testid="terminal-context-theme-option-kanagawa-wave"]'
+  - id: theme-select-menu
+    selector: '[data-testid="terminal-theme-select-menu"]'
+    kind: display
+    optional: true       # only visible while the preview dropdown is open
   - id: local-default-theme
     selector: '[data-testid="terminal-context-set-local-default-theme"]'
     kind: interactive
@@ -1207,12 +1212,77 @@ controls:
   - id: font-ligatures-toggle
     selector: 'input[aria-label="Enable font ligatures"]'
     kind: interactive
+    aliases:
+      - 'label:has-text("Enable font ligatures") input[type="checkbox"]'
+      - 'label:has-text("Enable font ligatures") input[type="checkbox"]:checked'
   - id: scrollback
     selector: 'input[aria-label="Scrollback lines"]'
     kind: interactive
   - id: inline-suggestions-max
     selector: 'input[aria-label="Maximum command history entries per host"]'
     kind: interactive
+  - id: show-scrollbar
+    selector: '[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]'
+    kind: interactive
+  - id: copy-on-select
+    selector: '[data-testid="terminal-copy-on-select-toggle"] input[type="checkbox"]'
+    kind: interactive
+  - id: allow-osc52
+    selector: '[data-testid="terminal-osc52-clipboard-toggle"] input[type="checkbox"]'
+    kind: interactive
+  - id: read-only
+    selector: '[data-testid="terminal-read-only-toggle"] input[type="checkbox"]'
+    kind: interactive
+  - id: bracketed-paste
+    selector: '[data-testid="terminal-bracketed-paste-toggle"] input[type="checkbox"]'
+    kind: interactive
+  - id: multiline-paste-confirm
+    selector: '[data-testid="terminal-multiline-paste-confirm-toggle"] input[type="checkbox"]'
+    kind: interactive
+  - id: keyword-highlighting
+    selector: '[data-testid="terminal-keyword-highlighting-toggle"] input[type="checkbox"]'
+    kind: interactive
+  - id: save-scrollback-on-disconnect
+    selector: '[data-testid="terminal-save-scrollback-on-disconnect-toggle"] input[type="checkbox"]'
+    kind: interactive
+  - id: inline-suggestions-toggle
+    selector: '[data-testid="terminal-inline-suggestions-toggle"] input[type="checkbox"]'
+    kind: interactive
+  - id: clear-all-history
+    selector: 'text="Clear all history"'
+    kind: interactive
+  - id: common-command
+    selector: 'input[aria-label="Command 1"]'
+    kind: interactive
+  - id: common-command-description
+    selector: 'input[aria-label="Description 1"]'
+    kind: interactive
+  - id: common-command-remove
+    selector: '[aria-label="Remove command 1"]'
+    kind: interactive
+  - id: common-command-add
+    selector: 'text="Add entry"'
+    kind: interactive
+  - id: context-set-profile-default
+    selector: '[data-testid="terminal-context-set-local-default-profile"]'
+    kind: interactive
+    optional: true       # only visible in the terminal context menu
+  - id: context-change-settings
+    selector: '[data-testid="terminal-context-change-settings"]'
+    kind: interactive
+    optional: true       # only visible in the terminal context menu
+  - id: current-settings-dialog
+    selector: '[data-testid="terminal-current-settings-dialog"]'
+    kind: display
+    optional: true       # only visible after choosing Change settings
+  - id: current-settings-save-default
+    selector: '[data-testid="terminal-current-settings-save-default"]'
+    kind: interactive
+    optional: true       # only visible while current settings are open
+  - id: current-settings-footer-close
+    selector: '[data-testid="terminal-current-settings-footer-close"]'
+    kind: interactive
+    optional: true       # only visible while current settings are open
   - id: cursor-style
     selector: 'select[aria-label="Terminal cursor"]'
     kind: interactive
@@ -1927,6 +1997,10 @@ controls:
   - id: close
     selector: '[data-testid="auth-close"]'
     kind: interactive
+  - id: save-to-vault
+    selector: '[data-testid="auth-save-to-vault"]'
+    kind: interactive
+    optional: true        # only when the vault is available for the prompt
 -->
 
 - 密码输入弹窗
@@ -3239,6 +3313,9 @@ controls:
     kind: interactive
   - id: ai-command-rewrite-shortcut
     selector: 'input[aria-label="AI command rewrite shortcut"]'
+    kind: interactive
+  - id: ai-inline-question-render
+    selector: '[data-testid="terminal-ai-inline-qq-toggle"] input[type="checkbox"]'
     kind: interactive
 -->
 

@@ -404,6 +404,7 @@ function TerminalAppearanceSettingsContent({
 
           <div className="col-span-12 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
             <CheckControl
+              testId="terminal-show-scrollbar-toggle"
               label={t("terminalAppearance.showScrollbar")}
               checked={profile.showScrollbar}
               onChange={(checked) => updateProfile({ showScrollbar: checked })}
@@ -416,36 +417,43 @@ function TerminalAppearanceSettingsContent({
               />
             )}
             <CheckControl
+              testId="terminal-copy-on-select-toggle"
               label={t("terminalAppearance.copyOnSelect")}
               checked={profile.copyOnSelect}
               onChange={(checked) => updateProfile({ copyOnSelect: checked })}
             />
             <CheckControl
+              testId="terminal-osc52-clipboard-toggle"
               label={t("terminalAppearance.allowOsc52")}
               checked={profile.allowRemoteOsc52Clipboard}
               onChange={(checked) => updateProfile({ allowRemoteOsc52Clipboard: checked })}
             />
             <CheckControl
+              testId="terminal-read-only-toggle"
               label={t("terminalAppearance.readOnly")}
               checked={profile.readOnly}
               onChange={(checked) => updateProfile({ readOnly: checked })}
             />
             <CheckControl
+              testId="terminal-bracketed-paste-toggle"
               label={t("terminalAppearance.bracketedPaste")}
               checked={profile.bracketedPaste}
               onChange={(checked) => updateProfile({ bracketedPaste: checked })}
             />
             <CheckControl
+              testId="terminal-multiline-paste-confirm-toggle"
               label={t("terminalAppearance.multilinePasteConfirm")}
               checked={profile.multilinePasteConfirm}
               onChange={(checked) => updateProfile({ multilinePasteConfirm: checked })}
             />
             <CheckControl
+              testId="terminal-keyword-highlighting-toggle"
               label={t("terminalAppearance.keywordHighlighting")}
               checked={profile.syntaxMode === "keywords"}
               onChange={(checked) => updateProfile({ syntaxMode: checked ? "keywords" : "default" })}
             />
             <CheckControl
+              testId="terminal-save-scrollback-on-disconnect-toggle"
               label={t("terminalAppearance.saveScrollbackOnDisconnect")}
               checked={profile.loggingEnabled}
               onChange={(checked) => updateProfile({ loggingEnabled: checked })}
@@ -471,6 +479,7 @@ function TerminalAppearanceSettingsContent({
         <div className="grid grid-cols-12 gap-x-3 gap-y-3 text-[12px] items-end">
           <div className="col-span-12 md:col-span-7">
             <CheckControl
+              testId="terminal-inline-suggestions-toggle"
               label={t("terminalAppearance.inlineSuggestionsToggle")}
               checked={profile.inlineSuggestions}
               onChange={(checked) => updateProfile({ inlineSuggestions: checked })}
@@ -597,6 +606,7 @@ function TerminalAppearanceSettingsContent({
 
           <div className="pt-2 border-t border-[var(--taomni-divider)]">
             <CheckControl
+              testId="terminal-ai-inline-qq-toggle"
               label={t("terminalAppearance.aiInlineQqLabel")}
               checked={profile.aiInlineQqRender}
               onChange={(checked) => updateProfile({ aiInlineQqRender: checked })}
