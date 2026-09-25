@@ -6217,6 +6217,26 @@ files:
   - src/lib/editor/lsp.ts
   - src/components/editor/workspace/lspCompletion.ts
 controls:
+  - id: completion-resolve-gate
+    selector: '[data-testid="completion-resolve-gate"]'
+    kind: display
+    optional: true       # only while an acceptance waits on completionItem/resolve
+  - id: completion-resolve-gate-retry
+    selector: '[data-testid="completion-resolve-gate-retry"]'
+    kind: interactive
+    optional: true
+  - id: completion-resolve-gate-insert-without-import
+    selector: '[data-testid="completion-resolve-gate-insert-without-import"]'
+    kind: interactive
+    optional: true
+  - id: completion-resolve-gate-dismiss
+    selector: '[data-testid="completion-resolve-gate-dismiss"]'
+    kind: interactive
+    optional: true
+  - id: completion-resolve-gate-failed-note
+    selector: '[data-testid="completion-resolve-gate-failed-note"]'
+    kind: display
+    optional: true
   - id: editor-find-panel
     selector: '[data-testid="code-workspace-editor-search"]'
     kind: display

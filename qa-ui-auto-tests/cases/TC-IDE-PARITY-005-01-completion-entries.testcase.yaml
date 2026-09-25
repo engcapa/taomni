@@ -1,0 +1,364 @@
+id: TC-IDE-PARITY-005-01-completion-entries
+title: Basic Completion entries, cancel and focus protection
+description: 'ED-PARITY-005 V1. Every exposed Basic Completion entry - the Ctrl+Space
+
+  primary binding, the Alt+/ secondary binding and the Search Everywhere Action -
+
+  must run the same request through the same editor source, must never commit
+
+  twice and must leave the document untouched while the user is only looking.
+
+  Escape closes the list and returns focus to the editor, and a keystroke aimed
+
+  at another input must not reach the editor at all.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- parity005
+- completion
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="parity005"]'
+    timeout_sec: 30
+- dblclick: '[data-testid="code-workspace-tree-dir"][data-path="parity005"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="parity005/Main.java"]'
+    timeout_sec: 30
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="parity005/Main.java"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+End
+- type: '        StringUtiSuffix;'
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+# R1 - the primary binding opens the provider list.
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 30
+# The editor refuses to accept an option that appeared less than its
+# interactionDelay (75 ms) ago, so pause before the accepting stroke.
+- wait: 0.2
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- screenshot: parity005-01-ctrl-space.png
+# Escape closes the list, restores editor focus and writes nothing.
+- press: Escape
+- wait: 1
+- assert_not_visible: .cm-tooltip-autocomplete
+- eval_readonly:
+    expression: "document.activeElement.className.includes('cm-content')"
+    expect_truthy: true
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- eval_readonly:
+    expression: "!document.querySelector('.cm-content').innerText.includes('import org.apache.commons.lang3.StringUtils;')"
+    expect_truthy: true
+- screenshot: parity005-01-escape.png
+# R2 - the secondary binding opens the same list.
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 30
+# The editor refuses to accept an option that appeared less than its
+# interactionDelay (75 ms) ago, so pause before the accepting stroke.
+- wait: 0.2
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- screenshot: parity005-01-alt-slash.png
+- press: Escape
+- wait: 1
+- assert_not_visible: .cm-tooltip-autocomplete
+- eval_readonly:
+    expression: "document.activeElement.className.includes('cm-content')"
+    expect_truthy: true
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- eval_readonly:
+    expression: "!document.querySelector('.cm-content').innerText.includes('import org.apache.commons.lang3.StringUtils;')"
+    expect_truthy: true
+# R3 - a repeated invocation at the same caret stays a single list.
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 30
+# The editor refuses to accept an option that appeared less than its
+# interactionDelay (75 ms) ago, so pause before the accepting stroke.
+- wait: 0.2
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- press: Control+Space
+- wait: 1
+- assert_count:
+    selector: .cm-tooltip-autocomplete
+    equal: 1
+- assert_count:
+    selector: .cm-tooltip-autocomplete li[aria-selected="true"]
+    equal: 1
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 30
+# The editor refuses to accept an option that appeared less than its
+# interactionDelay (75 ms) ago, so pause before the accepting stroke.
+- wait: 0.2
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- eval_readonly:
+    expression: "!document.querySelector('.cm-content').innerText.includes('import org.apache.commons.lang3.StringUtils;')"
+    expect_truthy: true
+- screenshot: parity005-01-repeat.png
+- press: Escape
+# R4 - the Search Everywhere Action entry runs the same request.
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+- click: '[data-testid="code-workspace-search-everywhere"] input[type="search"]'
+- type: Basic Completion
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    contains: Basic Completion
+- press: Enter
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 30
+# The editor refuses to accept an option that appeared less than its
+# interactionDelay (75 ms) ago, so pause before the accepting stroke.
+- wait: 0.2
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- screenshot: parity005-01-action.png
+- press: Escape
+- wait: 1
+- assert_not_visible: .cm-tooltip-autocomplete
+- eval_readonly:
+    expression: "document.activeElement.className.includes('cm-content')"
+    expect_truthy: true
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- eval_readonly:
+    expression: "!document.querySelector('.cm-content').innerText.includes('import org.apache.commons.lang3.StringUtils;')"
+    expect_truthy: true
+# R5 - the same chord aimed at another input does not reach the editor.
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+# The overlay remembers the tab it was last left on, so target the input by
+# type rather than by its mode-specific aria-label.
+- click: '[data-testid="code-workspace-search-everywhere"] input[type="search"]'
+- press: Control+Space
+- wait: 1
+- assert_not_visible: .cm-tooltip-autocomplete
+- assert_visible: '[data-testid="code-workspace-search-everywhere"]'
+- screenshot: parity005-01-input-protection.png
+- press: Escape
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- eval_readonly:
+    expression: "!document.querySelector('.cm-content').innerText.includes('import org.apache.commons.lang3.StringUtils;')"
+    expect_truthy: true
+
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Ctrl+Space、Alt+/ 与 Search Everywhere 的 Basic Completion 动作走同一请求，重复触发不双提交，Esc 关闭且零编辑，其它输入框上的同一按键不触发编辑器请求。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 13
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 32
+    - 34
+    - 36
+    - 37
+    - 38
+    - 43
+    - 44
+    - 46
+    - 48
+    - 49
+    - 50
+    - 55
+    - 57
+    - 59
+    - 60
+    - 64
+    - 68
+    - 69
+    - 70
+    - 72
+    - 73
+    - 74
+    - 75
+    - 77
+    - 79
+    - 81
+    - 82
+    - 83
+    - 88
+    - 90
+    - 91
+    - 92
+    - 95
+    - 96
+    checkpoints:
+    - step: 31
+      expectation: 正文为Tmid preimage（StringUtiSuffix;）
+    - step: 35
+      expectation: 候选列表含provider候选StringUtils
+    - step: 39
+      expectation: 候选列表已关闭
+    - step: 40
+      expectation: 焦点回到编辑器
+    - step: 41
+      expectation: 正文为Tmid preimage（StringUtiSuffix;）
+    - step: 42
+      expectation: 无import落地
+    - step: 47
+      expectation: 候选列表含provider候选StringUtils
+    - step: 51
+      expectation: 候选列表已关闭
+    - step: 52
+      expectation: 焦点回到编辑器
+    - step: 53
+      expectation: 正文为Tmid preimage（StringUtiSuffix;）
+    - step: 54
+      expectation: 无import落地
+    - step: 58
+      expectation: 候选列表含provider候选StringUtils
+    - step: 61
+      expectation: 候选列表数量断言
+    - step: 62
+      expectation: 候选列表数量断言
+    - step: 65
+      expectation: 候选列表含provider候选StringUtils
+    - step: 66
+      expectation: 正文为Tmid preimage（StringUtiSuffix;）
+    - step: 67
+      expectation: 无import落地
+    - step: 76
+      expectation: Actions页可检索到Basic Completion动作
+    - step: 80
+      expectation: 候选列表含provider候选StringUtils
+    - step: 84
+      expectation: 候选列表已关闭
+    - step: 85
+      expectation: 焦点回到编辑器
+    - step: 86
+      expectation: 正文为Tmid preimage（StringUtiSuffix;）
+    - step: 87
+      expectation: 无import落地
+    - step: 93
+      expectation: 候选列表已关闭
+    - step: 94
+      expectation: Search Everywhere仍打开
+    - step: 97
+      expectation: 正文为Tmid preimage（StringUtiSuffix;）
+    - step: 98
+      expectation: 无import落地
+    results:
+    - 31
+    - 35
+    - 39
+    - 40
+    - 41
+    - 42
+    - 47
+    - 51
+    - 52
+    - 53
+    - 54
+    - 58
+    - 61
+    - 62
+    - 65
+    - 66
+    - 67
+    - 76
+    - 80
+    - 84
+    - 85
+    - 86
+    - 87
+    - 93
+    - 94
+    - 97
+    - 98
+  visual:
+  - check: 候选列表、选中行与docs的矩形互不遮挡；截图供人工评审。
+    method: manual
+    reason: 像素密度与真实IDEA选区不能由DOM断言代替。
+  native:
+  - check: 物理OS快捷键拦截（如平台占用Ctrl+Space/Alt+/）与应用外输入由native层单独采集；本轮browser结果不外推。
+    method: external
+    reason: 浏览器renderer不能证明OS级快捷键拦截。

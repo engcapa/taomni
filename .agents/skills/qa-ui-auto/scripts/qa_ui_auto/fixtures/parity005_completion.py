@@ -27,6 +27,9 @@ from typing import Any
 
 #: localStorage key the dev stub reads. Absent => no QA surface at all.
 CONFIG_KEY = "taomni.qa.parity005Completion.v1"
+#: Short override a case writes with `seed_storage` to walk the resolve fault
+#: modes (null / failed / timeout / resolved) without reloading the page.
+MODE_KEY = "taomni.qa.parity005CompletionMode.v1"
 
 #: Provider item path relative to the fixture root.
 FIXTURE_FILE = "parity005/Main.java"
@@ -138,7 +141,7 @@ def _seed_browser(ctx: Any) -> None:
     if base_url and not current.startswith(base_url):
         page.goto(base_url, wait_until="domcontentloaded")
     page.evaluate(
-        """async ([filePath, document, key, config]) => {
+        """async ([filePath, document, key, config, modeKey]) => {
           // Directory chain first: the VFS refuses a file whose parent is missing.
           const db = await new Promise((resolve, reject) => {
             const req = indexedDB.open("taomni-vfs", 1);
@@ -168,16 +171,18 @@ def _seed_browser(ctx: Any) -> None:
                       name: "Main.java", type: "file", size: encoded.length,
                       mtime: now, data: encoded.buffer });
           localStorage.setItem(key, JSON.stringify(config));
+          localStorage.removeItem(modeKey);
         }""",
-        [FIXTURE_FILE, DOCUMENT, CONFIG_KEY, _config("resolved")],
+        [FIXTURE_FILE, DOCUMENT, CONFIG_KEY, _config("resolved"), MODE_KEY],
     )
 
 
 def _cleanup_browser(ctx: Any) -> None:
     try:
         ctx.page.evaluate(
-            """async ([filePath, key]) => {
+            """async ([filePath, key, modeKey]) => {
               localStorage.removeItem(key);
+              localStorage.removeItem(modeKey);
               const db = await new Promise((resolve, reject) => {
                 const req = indexedDB.open("taomni-vfs", 1);
                 req.onsuccess = () => resolve(req.result);
@@ -194,7 +199,7 @@ def _cleanup_browser(ctx: Any) -> None:
                 });
               }
             }""",
-            [FIXTURE_FILE, CONFIG_KEY],
+            [FIXTURE_FILE, CONFIG_KEY, MODE_KEY],
         )
     except Exception as exc:  # noqa: BLE001 - cleanup must never mask the case result
         print(f"[parity005_completion] browser cleanup skipped: {exc}")

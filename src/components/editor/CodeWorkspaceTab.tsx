@@ -15991,14 +15991,35 @@ export function CodeWorkspaceTab({
     };
   }, [dispatchWorkspaceKeydownV2, isEditorSurfaceKeyEvent, isSurfaceOwnedKeyEvent, onCommandsChange, openFile, visible]);
 
+  /**
+   * ED-PARITY-005: the Search Everywhere overlay owns DOM focus while it is
+   * open, so unmounting it drops focus on `<body>`. An editor action then runs
+   * with the caret outside the editor: the completion list it opens cannot even
+   * be dismissed with Escape, because the keystroke never reaches the editor.
+   * Only when nothing else claimed focus — an action that opens its own dialog
+   * for itself has already taken it, and must keep it.
+   */
+  const restoreEditorFocusIfUnclaimed = useCallback(() => {
+    if (document.activeElement !== document.body) return;
+    editorPaneRef.current?.querySelector<HTMLElement>(".cm-content")?.focus();
+  }, []);
+
   const runSearchEverywhereCommand = useCallback((commandId: string) => {
     setSearchEverywhereOpen(false);
     // §8.17.3: run the SAME frozen evaluation the list rendered — a stale or
     // disabled entry must not re-evaluate itself into a fresh context.
     const entry = actionsController.snapshot.find((item) => item.id === commandId);
     if (!entry) return;
-    void actionsController.host.executePrepared(entry.evaluation);
-  }, [actionsController]);
+    // `editor.*` is the namespace buildEditorHostActions registers for actions
+    // whose whole effect is an editor transaction; every one of them declares
+    // requiresEditor, so focus belongs back in the editor afterwards.
+    const editorScoped = commandId.startsWith("editor.");
+    const settle = () => {
+      if (editorScoped) restoreEditorFocusIfUnclaimed();
+    };
+    void Promise.resolve(actionsController.host.executePrepared(entry.evaluation))
+      .then(settle, settle);
+  }, [actionsController, restoreEditorFocusIfUnclaimed]);
 
   const commandRegistration = actionsController.commandRegistration;
 

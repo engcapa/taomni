@@ -1,4 +1,5 @@
 import {
+  closeCompletion,
   completeAnyWord,
   type Completion,
   type CompletionContext,
@@ -2364,7 +2365,12 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
         info: showDoc && (item.documentation || resolveItem)
           ? () => completionInfo(item, resolveItem, token, isStillCurrent)
           : undefined,
-        apply: (view, _completion, from, to) =>
+        apply: (view, _completion, from, to) => {
+          // Choosing a candidate ends the list. A completion that waits on
+          // completionItem/resolve writes nothing yet, so leaving the list up
+          // would park the candidate rows on top of the resolve gate and the
+          // pointer could never reach its Retry / Dismiss controls.
+          closeCompletion(view);
           applyLspCompletion(
             view,
             item,
@@ -2377,7 +2383,8 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
             hooks.reportDiagnostic,
             hooks.onResolveGate,
             policy.excludedSymbols,
-          ),
+          );
+        },
       };
 
       const match = matchCompletionQuery(label, query);

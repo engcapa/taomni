@@ -1067,7 +1067,22 @@ function stubLspDocumentStatus(args?: InvokeArgs) {
   // diagnostics/hover/project-model responses from overwriting the session
   // with the plain "no language server in browser preview" answer.
   const armed = stubParity005Status();
-  if (armed) return { ...armed, path: filePath, uri: `file://${filePath}`, presetId: preset?.id ?? null, languageId: preset?.documentLanguageIds[0] ?? null, displayName: preset?.displayName ?? null };
+  if (armed) {
+    return {
+      path: filePath,
+      uri: `file://${filePath}`,
+      presetId: preset?.id ?? null,
+      languageId: preset?.documentLanguageIds[0] ?? null,
+      displayName: preset?.displayName ?? null,
+      available: true,
+      active: true,
+      semanticReady: true,
+      selectedCommandId: preset?.commands[0]?.id ?? preset?.id ?? null,
+      selectedCommand: preset?.commands[0]?.command ?? null,
+      installHint: null,
+      error: null,
+    };
+  }
   return {
     path: filePath,
     uri: filePath ? `file://${filePath}` : "",
@@ -1096,6 +1111,12 @@ function stubLspDocumentStatus(args?: InvokeArgs) {
 // ---------------------------------------------------------------------------
 
 const PARITY005_STORAGE_KEY = "taomni.qa.parity005Completion.v1";
+/**
+ * Fault switch for the resolve round-trip, written by a QA case with
+ * `seed_storage` (so the payload stays a short JSON string). Lets one case walk
+ * the null / error / timeout / recovery path without reloading the page.
+ */
+const PARITY005_MODE_KEY = "taomni.qa.parity005CompletionMode.v1";
 
 interface StubParity005Config {
   filePath: string;
@@ -1116,7 +1137,17 @@ function stubParity005Config(): StubParity005Config | null {
     const raw = window.localStorage.getItem(PARITY005_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StubParity005Config;
-    return parsed && typeof parsed.filePath === "string" && parsed.item ? parsed : null;
+    if (!parsed || typeof parsed.filePath !== "string" || !parsed.item) return null;
+    const override = window.localStorage.getItem(PARITY005_MODE_KEY);
+    if (override !== null) {
+      try {
+        const mode = JSON.parse(override);
+        if (typeof mode === "string" && mode) return { ...parsed, resolveMode: mode };
+      } catch {
+        // A malformed override must not silently change the fixture's mode.
+      }
+    }
+    return parsed;
   } catch {
     return null;
   }

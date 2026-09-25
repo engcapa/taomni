@@ -14,14 +14,19 @@
       "command": "cd src-tauri && cargo test --lib completion_resolve_does_not_fallback_on_null_or_error",
       "result": "passed",
       "summary": "1 passed. JSON null stays Unavailable{provider-returned-null}, transport error stays Failed, the session deadline stays Timeout, and only a parseable item resolves.",
-      "acceptance": ["ED-PARITY-005-A1"]
+      "acceptance": [
+        "ED-PARITY-005-A1"
+      ]
     },
     {
       "kind": "unit",
       "command": "cd src-tauri && cargo test --lib completion_item_preserves_insert_replace_ranges",
       "result": "passed",
       "summary": "1 passed. Both InsertReplaceEdit ranges survive parsing, the legacy insert-preferred textEdit field is unchanged, a plain TextEdit fabricates no second range, and contradictory pairs are rejected.",
-      "acceptance": ["ED-PARITY-005-A1", "ED-PARITY-005-A3"]
+      "acceptance": [
+        "ED-PARITY-005-A1",
+        "ED-PARITY-005-A3"
+      ]
     },
     {
       "kind": "unit",
@@ -42,14 +47,19 @@
       "command": "pnpm exec vitest run (same twelve files) after repairing that pre-existing test-timing defect with a documented wait past interactionDelay",
       "result": "passed",
       "summary": "12 files, 169 tests passed, including the new ED-PARITY-005 names: 'preserves insert replace intent through resolve and undo', 'never invents a range and rejects contradictory provider ranges', 'extends a plain TextEdit to the identifier end only for a safe Java prefix', 'keeps an unaccepted Tab from re-ranging the next acceptance', 'Enter Tab and mouse route distinct range intent', 'invalidates acceptance when project facts change', 'escape cancels pending acceptance without revival', 'old gate callbacks cannot replace a new gate', 'preserves resolved unavailable timeout failed across IPC'.",
-      "acceptance": ["ED-PARITY-005-A1", "ED-PARITY-005-A3"]
+      "acceptance": [
+        "ED-PARITY-005-A1",
+        "ED-PARITY-005-A3"
+      ]
     },
     {
       "kind": "unit",
       "command": "pnpm exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx src/components/editor/workspace/CodeMirrorHost.test.tsx src/components/editor/workspace/EditorGroup.test.tsx src/components/editor/workspace/SearchEverywhere.test.tsx src/components/editor/workspace/KeymapCheatSheetDialog.test.tsx src/components/editor/workspace/workspaceKeymapRuntime.test.ts src/components/editor/workspace/workspaceActionHostKeymap.test.ts src/components/editor/workspace/useWorkspaceActionsController.test.tsx src/components/editor/workspace/lspTextEdits.test.ts src/components/editor/workspace/lspCompletionChoice.test.ts src/components/editor/workspace/lspCompletionChoiceSession.test.ts src/components/editor/workspace/lspSyncGate.test.ts",
       "result": "passed",
       "summary": "12 files, 375 tests passed. Retained consumers of the shared TextEdit parsing and of the completion accept path (Action host, keymap, Search Everywhere, cheat sheet, split view) show no regression.",
-      "acceptance": ["ED-PARITY-005-A3"]
+      "acceptance": [
+        "ED-PARITY-005-A3"
+      ]
     },
     {
       "kind": "typecheck",
@@ -67,9 +77,35 @@
     },
     {
       "kind": "browser",
-      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode browser --filter TC-IDE-PARITY-005-02-completion-accept-undo --config .claude/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml",
+      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode browser --filter TC-IDE-PARITY-005-04-completion-resolve-gate --config .claude/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml",
       "result": "failed",
-      "summary": "0 passed, 1 failed in 23 s. Steps 1-26 pass (workspace tree, virtual Java file, Tmid preimage typed, Ctrl+Space opens the candidate list), step 27 fails: '.cm-tooltip-autocomplete text does not contain StringUtils'. The list holds only local Java templates and CodeMirror word completions, and lsp_completion is never invoked, so the browser dev stub cannot yet present a ready Java LSP session for this fixture. Report: qa-ui-auto-report/browser/run-20260925-195405-955760835.",
+      "summary": "0 passed, 1 failed. Steps 1-103 pass (null gate with the accurate unavailable reason, dismissal with zero writes, failed retry reported, retry recovery committing StringUtilsSuffix; plus the single import). Step 104 fails: the undo after a SUCCESSFUL Retry restores 'StringUti' -> 'Sx;' with the import still present, and a second undo returns the postimage. Isolated standalone: after clicking Retry the gate unmounts and DOM focus falls to <body>; the corruption reproduces with editor focus restored too, so it is the recorded history entry, not key routing. The unit-level equivalent (lspCompletionResolveGate.test.ts, shared owner absent) passes, so the defect is in the CodeWorkspaceTab shared document-owner integration of this commit path. Report: qa-ui-auto-report/browser/run-20260925-213403-222140582.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode browser --filter TC-IDE-PARITY-005-02-completion-accept-undo --config .claude/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml",
+      "result": "passed",
+      "summary": "1 passed, 0 failed, 100 steps in 30 s (stable over two consecutive runs). Enter and the mouse keep the trailing suffix through the provider insert range, Tab consumes the whole identifier through the provider replace range, each acceptance lands exactly one lang3 import, and one undo returns the exact Tmid preimage in all three rounds.",
+      "acceptance": [
+        "ED-PARITY-005-A1",
+        "ED-PARITY-005-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode browser --filter TC-IDE-PARITY-005-01-completion-entries --config .claude/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml",
+      "result": "passed",
+      "summary": "1 passed, 0 failed, 98 steps in 24 s (stable over two consecutive runs). Ctrl+Space, Alt+/ and the Search Everywhere Basic Completion action all open the same provider candidate; a repeated invocation at one caret stays a single list with one selected row and zero writes; Escape closes the list, returns editor focus and edits nothing; and the same chord aimed at the Search Everywhere input never reaches the editor.",
+      "acceptance": [
+        "ED-PARITY-005-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm exec vitest run on the completion and consumer sets after the two focus fixes",
+      "result": "passed",
+      "summary": "7 completion files 119 passed and 5 Action-dispatch consumer files 247 passed, so the Search Everywhere focus restore and the close-list-on-accept change regress nothing.",
       "acceptance": []
     }
   ],
@@ -86,6 +122,9 @@
     "Pre-existing defect found and repaired within this card's path: CodeMirrorHost.completion-undo.test.tsx had been deterministically failing since commit 33865870 (2026-09-21), which introduced COMPLETION_INTERACTION_DELAY_MS = 75. The assertion was already correct; the repair only waits past the editor's documented interaction delay, matching the idiom already used in CodeMirrorHost.live-template-interaction.test.tsx.",
     "Not implemented on purpose: the card's DEC-08 items (provider snippet defaults, no Java parameter clearing) are preserved as-is; no IDEA live-template end-formatting was introduced.",
     "A browser QA completion harness was added under src/stubs/tauri-core.ts (armed only by the taomni.qa.parity005Completion.v1 localStorage key, inert otherwise) plus the parity005_completion fixture, because the preview previously had no path to lsp_completion at all. It is a partial facility: lsp_detect_servers and lsp_open_document now report the fixture language as ready, but the completion request is still not reached.",
-    "No commit, push or board status beyond this card was performed."
+    "No commit, push or board status beyond this card was performed.",
+    "Two further product defects were found and fixed while making the V1 entry case run, both in this card's path: (1) running an editor action from Search Everywhere unmounted the overlay and left DOM focus on <body>, so the completion list the action opened could not be dismissed with Escape and the caret was outside the editor - CodeWorkspaceTab.runSearchEverywhereCommand now restores editor focus for editor.* actions when nothing else claimed it; (2) accepting a candidate left the completion list open, and because a gaited acceptance writes nothing yet, the candidate rows sat on top of the resolve gate and swallowed the pointer for Retry / Insert-without-import / Dismiss - the LSP completion apply now closes the list on acceptance.",
+    "The browser QA harness is now functional: the dev stub serves a ready Java session for the fixture file, so all three browser cases reach the real CodeWorkspaceTab -> source -> intent -> range -> dispatch -> history chain.",
+    "Open defect (not fixed this round): the record-owner must be reconciled with the view before a gaited acceptance commits; the corruption is in the shared WorkspaceDocumentTransactionOwner integration, not in commitLspCompletion."
   ]
 }
