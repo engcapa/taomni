@@ -156,6 +156,7 @@ verification:
     - 47
     - 49
     - 51
+    - 53
     checkpoints:
     - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
