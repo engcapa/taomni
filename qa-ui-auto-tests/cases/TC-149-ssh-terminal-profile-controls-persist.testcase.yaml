@@ -92,21 +92,6 @@ steps:
 - fill:
     selector: 'input[aria-label="Maximum command history entries per host"]'
     value: '99'
-- press:
-    key: Tab
-    selector: 'input[aria-label="Maximum command history entries per host"]'
-- wait_for: 'input[aria-label="Maximum command history entries per host"][value="100"]'
-- fill:
-    selector: 'input[aria-label="Maximum command history entries per host"]'
-    value: '50001'
-- press:
-    key: Tab
-    selector: 'input[aria-label="Maximum command history entries per host"]'
-- wait_for: 'input[aria-label="Maximum command history entries per host"][value="50000"]'
-- click: 'input[name="inlineSuggestionsSource"][value="history+path"]'
-- assert_count:
-    selector: 'input[name="inlineSuggestionsSource"][value="history+path"]:checked'
-    equal: 1
 - click: text="Clear all history"
 - wait_for: '[data-testid="confirm-dialog"]'
 - assert_text:
@@ -116,6 +101,23 @@ steps:
 - wait_for:
     selector: '[data-testid="confirm-dialog"]'
     state: detached
+- assert_attribute:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    name: value
+    equals: '100'
+- fill:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    value: '50001'
+- click: 'input[name="inlineSuggestionsSource"][value="history+path"]'
+- wait_for: 'input[aria-label="Maximum command history entries per host"][value="50000"]'
+- assert_attribute:
+    selector: 'input[aria-label="Maximum command history entries per host"]'
+    name: value
+    equals: '50000'
+- assert_count:
+    selector: 'input[name="inlineSuggestionsSource"][value="history+path"]:checked'
+    equal: 1
+- assert_enabled: 'input[aria-label="Maximum command history entries per host"]'
 - set_check:
     selector: '[data-testid="ai-command-rewrite-toggle"] input[type="checkbox"]'
     checked: true
@@ -346,11 +348,21 @@ verification:
     - step: 32
       expectation: '{"assert_enabled": "input[aria-label=\"Maximum command history entries per host\"]"}'
     - step: 35
-      expectation: '{"wait_for": "input[aria-label=\"Maximum command history entries per host\"][value=\"100\"]"}'
-    - step: 42
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 45
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Clear all command history"}}'
+    - step: 38
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "100"}}'
+    - step: 42
+      expectation: '{"wait_for": "input[aria-label=\"Maximum command history entries per host\"][value=\"50000\"]"}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "50000"}}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "input[name=\"inlineSuggestionsSource\"][value=\"history+path\"]:checked", "equal": 1}}'
+    - step: 45
+      expectation: '{"assert_enabled": "input[aria-label=\"Maximum command history entries per host\"]"}'
     - step: 59
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Command 1\"]", "name": "value", "equals": "printf qa-custom-ssh-command"}}'
     - step: 70
@@ -369,7 +381,12 @@ verification:
     - 19
     - 32
     - 35
+    - 36
+    - 38
+    - 39
     - 42
+    - 43
+    - 44
     - 45
     - 59
     - 70
