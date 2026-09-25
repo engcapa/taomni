@@ -1,0 +1,172 @@
+id: TC-IDE-PARITY-005-03
+title: Completion lifecycle cancel stale scope and reopen (browser)
+description: 'ED-PARITY-005 V3 (A1/A3) browser gate case. Covers the browser-reachable lifecycle slice
+  on real UI: popup Escape is zero-effect with focus back in the editor, typing while the popup is open
+  re-queries without committing stale candidates, switching to a second file and back preserves both buffers,
+  and a fresh explicit call after cancel succeeds. Deferred-provider two-phase holds, facts-generation
+  gating and cross-view old-gate isolation are unit-proven (CodeMirrorHost.parity005: facts-bump, escape-cancel,
+  old-gate tests) and stay out of this browser slice. Highest green claim: L1 browser cancel/stale/ reopen
+  wiring.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-005
+- completion
+- lifecycle
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: App.java
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- type: sout
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- press: Escape
+- assert_count:
+    selector: .cm-tooltip-autocomplete li
+    equal: 0
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent === 'sout'
+    expect_truthy: true
+- screenshot: tc-ide-parity-005-03-esc-clean.png
+- type: v
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent === 'soutv'
+    expect_truthy: true
+- press: Escape
+- assert_count:
+    selector: .cm-tooltip-autocomplete li
+    equal: 0
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: Other.java
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- type: sout
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- press: Escape
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="App.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent === 'soutv'
+    expect_truthy: true
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: End
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- screenshot: tc-ide-parity-005-03-reopen.png
+- press: Escape
+- assert_count:
+    selector: .cm-tooltip-autocomplete li
+    equal: 0
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent === 'soutv'
+    expect_truthy: true
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 弹窗 Escape 零提交，焦点回编辑器，前缀保留。
+    actions:
+    - 16
+    - 18
+    checkpoints:
+    - step: 17
+      expectation: 输入 sout 后出现候选弹窗。
+    - step: 19
+      expectation: Escape 后弹窗关闭。
+    - step: 20
+      expectation: 正文精确为 sout，无提交。
+    results:
+    - 19
+    - 20
+  - id: R2
+    requirement: 弹窗打开后继续输入重新查询而不提交旧候选。
+    actions:
+    - 22
+    - 25
+    checkpoints:
+    - step: 23
+      expectation: 追加输入后弹窗仍可用。
+    - step: 24
+      expectation: 正文为 soutv，无自动提交。
+    - step: 26
+      expectation: Escape 后弹窗关闭。
+    results:
+    - 24
+    - 26
+  - id: R3
+    requirement: 切文件再返回保留双方输入；取消后显式调用可成功。
+    actions:
+    - 27
+    - 30
+    - 32
+    - 33
+    - 35
+    - 36
+    - 40
+    - 41
+    - 44
+    checkpoints:
+    - step: 28
+      expectation: 新建文件对话框出现。
+    - step: 31
+      expectation: 新文件编辑器就绪。
+    - step: 34
+      expectation: 新文件弹窗可用。
+    - step: 37
+      expectation: 返回后编辑器就绪。
+    - step: 38
+      expectation: 返回 App.java 后输入 soutv 保留。
+    - step: 42
+      expectation: 重开弹窗成功。
+    - step: 45
+      expectation: 再次 Escape 后弹窗关闭。
+    - step: 46
+      expectation: 输入仍为 soutv。
+    results:
+    - 38
+    - 42
+    - 46
+  visual:
+  - check: 取消前后焦点与弹窗状态可辨；截图需人工评审。
+    method: manual
+    reason: 像素边界不能由 DOM 断言代替。
+  native:
+  - check: 真实 session 重启与 facts 刷新隔离仅在用例声明模式中采集；browser 切文件只证 buffer 隔离。
+    method: external
+    reason: provider 身份隔离归单测与 005-05。

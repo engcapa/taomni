@@ -97,6 +97,7 @@ import { getAppPlatform, isTauriRuntime } from "../../../lib/runtime";
 import type { EffectiveCodeStyle } from "./codeStyleModel";
 import type {
   LspCompletionItem,
+  LspCompletionResolveResult,
   LspCompletionResult,
   LspDiagnostic,
   LspDocumentHighlight,
@@ -127,12 +128,15 @@ import {
   activeLspSnippetChoices,
   advanceLspSnippetTabstop,
   cancelLspSnippetSession,
+  cancelPendingCompletionAcceptance,
+  consumePendingCompletionAcceptIntent,
   cycleLspSnippetChoice,
   retreatLspSnippetTabstop,
   createLspCompletionSource,
   LspCompletionController,
   lspSnippetSessionInvalidator,
   resetBasicCompletionSession,
+  setPendingCompletionAcceptIntent,
   type CompletionAcceptanceDiagnostic,
   type CompletionInvocationRequest,
   type CompletionRequestIdentity,
@@ -466,7 +470,7 @@ interface CodeMirrorHostProps {
   onCompleteResolve?: (
     raw: unknown,
     token: CompletionRequestToken,
-  ) => Promise<LspCompletionItem | null>;
+  ) => Promise<LspCompletionResolveResult | LspCompletionItem | null>;
   /** Live completion request identity (§8.16.2); null = typed unavailable. */
   getCompletionIdentity: () => CompletionRequestIdentity | null;
   onCompletionDiagnostic: (kind: CompletionAcceptanceDiagnostic, detail?: string) => void;
@@ -2351,6 +2355,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const completionCompartment = useRef(new Compartment());
   const renderedDocCompartment = useRef(new Compartment());
   const presentResolveGateRef = useRef<((request: CompletionResolveGateRequest) => void) | null>(null);
+  // ED-PARITY-005 R2: current gate dismiss for Escape handling; set on present,
+  // cleared on dismiss/unmount so Esc never touches a stale banner.
+  const resolveGateDismissRef = useRef<(() => void) | null>(null);
 
   interface ActiveProviderTemplateState {
     workspaceId: string;
@@ -2936,6 +2943,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       const view = viewRef.current;
       const coords = view?.coordsAtPos(request.range.from);
       const container = hostRef.current?.getBoundingClientRect();
+      const dismissGate = () => {
+        request.dismiss();
+        resolveGateDismissRef.current = null;
+        setResolveGateUi(null);
+      };
+      resolveGateDismissRef.current = dismissGate;
       setResolveGateUi({
         label: request.item.label,
         message: request.message,
@@ -2945,10 +2958,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         left: coords && container ? Math.max(0, coords.left - container.left) : 12,
         retry: request.retry,
         insertWithoutImport: request.insertWithoutImport,
-        dismiss: () => {
-          request.dismiss();
-          setResolveGateUi(null);
-        },
+        dismiss: dismissGate,
       });
     };
     presentResolveGateRef.current = presentResolveGate;
@@ -3213,8 +3223,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         LSP_EDITOR_STYLE,
         WORKSPACE_SEARCH_STYLE,
         RENDERED_DOC_THEME,
-        // IDEA-style Tab:
-        // 1) Accept the active completion (often a live template).
+        // IDEA-style Tab + Enter accept intents (ED-PARITY-005 DEC-09):
+        // 1) Accept the active completion with a frozen intent — Enter/mouse
+        //    preserve the identifier suffix (insert), Tab consumes it
+        //    (replace). The intent is consumed once by the completion apply.
         // 2) Else expand an exact live/postfix template under the caret
         //    even when the popup is closed (sout + Tab without waiting).
         // 3) Else cycle a choice placeholder's options (§8.18.3 interactive
@@ -3225,11 +3237,31 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         //    Shift-Tab walks back through the stops while the session lives.
         Prec.high(keymap.of([
           {
+            key: "Enter",
+            run: (view) => {
+              if (view.composing || view.state.readOnly) return false;
+              if (completionStatus(view.state) === null) return false;
+              setPendingCompletionAcceptIntent(view, "insert");
+              const accepted = acceptCompletion(view);
+              if (!accepted) {
+                // No completion consumed the intent; drop it so a later Tab
+                // does not inherit a stale replace/insert decision.
+                consumePendingCompletionAcceptIntent(view);
+              }
+              return accepted;
+            },
+          },
+          {
             key: "Tab",
             run: (view) => {
               // ED-AUDIT-011: Tab during IME composition selects the candidate.
               if (view.composing || view.state.readOnly) return false;
-              if (acceptCompletion(view)) return true;
+              if (completionStatus(view.state) !== null) {
+                setPendingCompletionAcceptIntent(view, "replace");
+                const accepted = acceptCompletion(view);
+                if (accepted) return true;
+                consumePendingCompletionAcceptIntent(view);
+              }
               const language = liveTemplateLanguageForPath(pathRef.current);
               const providerCandidate = getValidActiveProviderCandidate(view, language);
               if (providerCandidate) {
@@ -3274,14 +3306,31 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           ...(workspaceActionHost
             ? [
                 // Esc stays an editor-local primitive stack: completion's own
-                // high-precedence binding closes the popup FIRST, then snippet
-                // cancel → selection collapse → §8.20.2 parameter kind. The
-                // last slot consults the session via ref and returns false
-                // when nothing of this kind is open, so Esc never claims a
-                // keystroke it did not consume.
+                // high-precedence binding closes the popup FIRST, then pending
+                // resolve acceptance / gate → snippet cancel → selection
+                // collapse → §8.20.2 parameter kind. The last slot consults
+                // the session via ref and returns false when nothing of this
+                // kind is open, so Esc never claims a keystroke it did not
+                // consume.
                 // ED-AUDIT-011: Escape during IME composition cancels the
                 // candidate window; workspace snippet/selection/parameter
                 // owners must not consume it (callee guards also return false).
+                // ED-PARITY-005 R2/DEC-06: Esc during resolve waiting or while
+                // the gate is open aborts the acceptance (zero doc/disk
+                // mutation); late results never revive the popup or gate.
+                {
+                  key: "Escape",
+                  run: (view: EditorView) => {
+                    if (view.composing) return false;
+                    const dismissGate = resolveGateDismissRef.current;
+                    if (dismissGate) {
+                      dismissGate();
+                      return true;
+                    }
+                    if (cancelPendingCompletionAcceptance(view)) return true;
+                    return false;
+                  },
+                },
                 { key: "Escape", run: (view: EditorView) => cancelLspSnippetSession(view) },
                 { key: "Escape", run: escapeEditorSelections },
                 {
@@ -3710,10 +3759,18 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           }
           return true;
         },
-        escapeStack: () =>
-          cancelLspSnippetSession(view)
-          || escapeEditorSelections(view)
-          || (onParameterEscapeRef.current?.() ?? false),
+        escapeStack: () => {
+          if (view.composing) return false;
+          const dismissGate = resolveGateDismissRef.current;
+          if (dismissGate) {
+            dismissGate();
+            return true;
+          }
+          return cancelPendingCompletionAcceptance(view)
+            || cancelLspSnippetSession(view)
+            || escapeEditorSelections(view)
+            || (onParameterEscapeRef.current?.() ?? false);
+        },
         isEditorGeometryReady: () => isEditorGeometryReady(view),
         runEditorCommand: (command) => command(view),
         undo: () => {
@@ -3809,6 +3866,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       view.contentDOM.removeEventListener("compositionend", compositionEndGuard, true);
       view.contentDOM.removeEventListener("blur", compositionBlurGuard, true);
       view.contentDOM.removeEventListener("focusout", clipboardFocusOutGuard, true);
+      // ED-PARITY-005 R2: unmount aborts a pending acceptance so a late
+      // resolve never writes to a destroyed view or a reused gate banner.
+      try {
+        cancelPendingCompletionAcceptance(view);
+      } catch {
+        // Teardown must never throw.
+      }
+      resolveGateDismissRef.current = null;
       view.destroy();
       viewRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);

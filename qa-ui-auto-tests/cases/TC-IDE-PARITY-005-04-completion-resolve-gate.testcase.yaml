@@ -1,0 +1,130 @@
+id: TC-IDE-PARITY-005-04
+title: Completion resolve gate honesty and no-spurious-gate (browser)
+description: 'ED-PARITY-005 V4 (A1/A3) browser gate case. In the browser harness no real JDT LS resolve
+  runs, so this case proves the honest browser-reachable slice: local live-template acceptances commit
+  without ever opening a resolve gate (no spurious gate, no failed note), and the gate surface stays absent
+  across accept/undo cycles. The fault-injected gate paths (null / error / timeout resolve, Retry success/failure,
+  Insert-without-import, Dismiss and stale-gate isolation) are proven at the production source layer by
+  lspCompletionResolveGate tests plus the ED-PARITY-005 Rust classifier tests, and end to end against
+  real JDT LS by TC-IDE-PARITY-005-05 (native). Highest green claim: L1 browser no-spurious-gate on local
+  accepts.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-005
+- completion
+- resolve-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: App.java
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- type: sout
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: System.out.println();
+    timeout_sec: 15
+- assert_count:
+    selector: '[data-testid="completion-resolve-gate"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="completion-resolve-gate-failed-note"]'
+    equal: 0
+- screenshot: tc-ide-parity-005-04-no-gate.png
+- press: Control+z
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent === 'sout'
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="completion-resolve-gate"]'
+    equal: 0
+- press: End
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- press: Escape
+- assert_count:
+    selector: '[data-testid="completion-resolve-gate"]'
+    equal: 0
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent === 'sout'
+    expect_truthy: true
+- screenshot: tc-ide-parity-005-04-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 本地接受全程无虚假 gate，失败注记不出现。
+    actions:
+    - 16
+    - 18
+    - 23
+    checkpoints:
+    - step: 17
+      expectation: 输入 sout 后出现候选弹窗。
+    - step: 19
+      expectation: 接受后正文含完整展开。
+    - step: 20
+      expectation: 无 resolve gate。
+    - step: 21
+      expectation: 无失败注记。
+    - step: 24
+      expectation: Undo 后回到 sout。
+    - step: 25
+      expectation: Undo 后仍无 gate。
+    results:
+    - 20
+    - 21
+    - 25
+  - id: R2
+    requirement: 取消路径同样无 gate 残留。
+    actions:
+    - 26
+    - 27
+    - 29
+    checkpoints:
+    - step: 28
+      expectation: 弹窗重开。
+    - step: 30
+      expectation: 取消后无 gate。
+    - step: 31
+      expectation: 正文仍为 sout。
+    results:
+    - 30
+    - 31
+  visual:
+  - check: gate 缺席即正确状态；截图需人工评审确认无横幅闪现。
+    method: manual
+    reason: 视觉缺席需人工确认截图。
+  native:
+  - check: null/error/timeout 下 gate 开启、Retry 与降级仅在单测与 005-05 证明；browser 不伪造。
+    method: external
+    reason: 故障注入路径由单测与 native 覆盖。

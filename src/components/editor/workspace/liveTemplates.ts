@@ -6,6 +6,8 @@
  * next editable field — the same muscle memory as IntelliJ.
  */
 import {
+  hasNextSnippetField,
+  hasPrevSnippetField,
   snippet,
   type Completion,
   type CompletionContext,
@@ -22,6 +24,7 @@ import {
   type LiveTemplatePreferences,
 } from "../../../lib/liveTemplatePreferences";
 import { isInsideStringOrComment } from "./syntaxContext";
+import { seedLspSingleFieldSession } from "./lspCompletion";
 
 export type { LiveTemplateLanguage };
 
@@ -1261,7 +1264,65 @@ export function applyLiveTemplate(
     label: match.template.abbreviation,
     type: "keyword",
   };
-  snippet(body)(view, completion, match.from, match.to);
+  snippet(numberSnippetFields(body))(view, completion, match.from, match.to);
+  // ED-PARITY-005 V2: when CM did not activate its own tabstop session
+  // (single-field bodies parse as CM field 0), keep one exit stop in the
+  // shared snippet-session map so Tab exits caret-only instead of indenting
+  // and consuming undo history. Multi-field bodies are CM-owned (skip);
+  // empty selections keep today's indent behavior.
+  const sel = view.state.selection.main;
+  if (
+    !sel.empty
+    && !hasNextSnippetField(view.state)
+    && !hasPrevSnippetField(view.state)
+  ) {
+    seedLspSingleFieldSession(view, sel.from, sel.to);
+  }
+}
+
+/**
+ * ED-PARITY-005 V2: number CodeMirror snippet tabstops at apply time.
+ *
+ * Catalog bodies use bare `${name}`/`${}`, which CM parses as field 0. CM
+ * only activates tabstop navigation when some range has field > 0, so
+ * without numbering Tab falls through to indentation: it edits the document
+ * and consumes undo steps, breaking the one-undo contract after snippet
+ * navigation. Numbering assigns sequential tabstops in textual order (same
+ * name shares one linked stop, each empty `${}` gets its own) while
+ * preserving explicit numbers (`${0}` stays the final stop) and leaving
+ * display/preview bodies untouched.
+ */
+export function numberSnippetFields(body: string): string {
+  const used = new Set<number>();
+  for (const m of body.matchAll(/(?<!\\)\$\{(\d+)(?::[^{}]*|\})/g)) {
+    const n = Number(m[1]);
+    if (Number.isInteger(n)) used.add(n);
+  }
+  let next = 1;
+  const take = (): number => {
+    while (used.has(next)) next += 1;
+    used.add(next);
+    return next++;
+  };
+  const named = new Map<string, number>();
+  return body.replace(
+    /(?<!\\)\$\{(?:(\d+):)?([^{}]*)\}/g,
+    (whole, num: string | undefined, name: string) => {
+      if (num !== undefined) return whole;
+      // A bare `${n}` is already an explicit stop (e.g. `${0}` final caret);
+      // keep it verbatim — its number was collected into `used` above.
+      if (/^\d+$/.test(name)) return whole;
+      if (name) {
+        let n = named.get(name);
+        if (n === undefined) {
+          n = take();
+          named.set(name, n);
+        }
+        return `\${${n}:${name}}`;
+      }
+      return `\${${take()}}`;
+    },
+  );
 }
 
 /**

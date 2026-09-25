@@ -581,6 +581,14 @@ pub struct LspTextEdit {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LspInsertReplaceEdit {
+    pub new_text: String,
+    pub insert: LspRange,
+    pub replace: LspRange,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LspCompletionItem {
     pub label: String,
     pub kind: Option<u32>,
@@ -592,9 +600,26 @@ pub struct LspCompletionItem {
     pub filter_text: Option<String>,
     pub sort_text: Option<String>,
     pub text_edit: Option<LspTextEdit>,
+    /// ED-PARITY-005 D2: provider InsertReplaceEdit dual range preserved
+    /// alongside `text_edit` (insert range) for completion-only accept intent.
+    /// `None` for plain TextEdit / legacy items. Shared formatting/rename /
+    /// codeAction paths keep using `parse_text_edit` unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub insert_replace_edit: Option<LspInsertReplaceEdit>,
     pub additional_text_edits: Vec<LspTextEdit>,
     /// Original server item, echoed back verbatim for `completionItem/resolve`.
     pub raw: Value,
+}
+
+/// ED-PARITY-005 D1: typed completionItem/resolve result. Fail-closed:
+/// null / transport errors never fall back to the original item as success.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub enum LspCompletionResolveResult {
+    Resolved { item: LspCompletionItem },
+    Unavailable { reason: String },
+    Timeout { message: String },
+    Failed { message: String },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -6507,7 +6532,7 @@ pub async fn lsp_completion_resolve(
     language_id: Option<String>,
     server_command_id: Option<String>,
     custom_server_command: Option<LspCustomServerCommand>,
-) -> Result<Option<LspCompletionItem>, String> {
+) -> Result<LspCompletionResolveResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let Some(session) = state
         .lsp
@@ -6518,15 +6543,14 @@ pub async fn lsp_completion_resolve(
         )
         .await
     else {
-        return Ok(None);
+        return Ok(LspCompletionResolveResult::Unavailable {
+            reason: "no-active-session".to_string(),
+        });
     };
-    let resolved = session
+    let result = session
         .request("completionItem/resolve", item.clone())
-        .await
-        .unwrap_or(Value::Null);
-    // Servers without resolve support may error or return null; fall back to
-    // the original item so callers always get something applicable.
-    Ok(parse_completion_item(&resolved).or_else(|| parse_completion_item(&item)))
+        .await;
+    Ok(classify_completion_resolve_result(result))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -10260,12 +10284,37 @@ fn parse_text_edit(value: &Value) -> Option<LspTextEdit> {
     let new_text = value.get("newText")?.as_str()?.to_string();
     // Plain TextEdit carries `range`; InsertReplaceEdit carries
     // `insert`/`replace` ranges — prefer the insert range.
+    // ED-PARITY-005 DEC-09: shared formatting/rename/codeAction consumers keep
+    // this exact behavior; completion-only dual ranges live in
+    // `parse_insert_replace_edit` and never change this function.
     let range = value
         .get("range")
         .or_else(|| value.get("insert"))
         .or_else(|| value.get("replace"))
         .and_then(parse_range)?;
     Some(LspTextEdit { range, new_text })
+}
+
+/// ED-PARITY-005 D2: completion-only InsertReplaceEdit parser. Returns `Some`
+/// whenever the wire `textEdit` carries both `insert` and `replace` ranges,
+/// preserving both even when they look contradictory — acceptance validates
+/// start equality / containment and rejects the whole item on contradiction.
+/// Plain TextEdit (`range`) returns `None`. Never used by formatting/rename/
+/// codeAction paths.
+fn parse_insert_replace_edit(value: &Value) -> Option<LspInsertReplaceEdit> {
+    let new_text = value.get("newText")?.as_str()?.to_string();
+    // Plain TextEdit must not produce a dual range, even if it happens to sit
+    // next to unrelated keys. Only an explicit insert+replace shape qualifies.
+    if value.get("range").is_some() {
+        return None;
+    }
+    let insert = value.get("insert").and_then(parse_range)?;
+    let replace = value.get("replace").and_then(parse_range)?;
+    Some(LspInsertReplaceEdit {
+        new_text,
+        insert,
+        replace,
+    })
 }
 
 fn parse_text_edits(value: &Value) -> Vec<LspTextEdit> {
@@ -10601,6 +10650,48 @@ fn parse_workspace_symbols(value: &Value) -> Vec<LspWorkspaceSymbol> {
         .unwrap_or_default()
 }
 
+/// ED-PARITY-005 D1: pure classifier for `completionItem/resolve` wire
+/// results. `Ok(value)` is the provider JSON result, `Err(message)` the
+/// transport/protocol error. Never falls back to the original item: null or
+/// unparsable payloads are `Unavailable`, timeouts are `Timeout`, other
+/// errors are `Failed` (or `Unavailable` when the server reports no resolve
+/// capability). Only a legally parsed item becomes `Resolved`.
+fn classify_completion_resolve_result(
+    request_result: Result<Value, String>,
+) -> LspCompletionResolveResult {
+    match request_result {
+        Ok(resolved) => {
+            if resolved.is_null() {
+                return LspCompletionResolveResult::Unavailable {
+                    reason: "resolver-returned-null".to_string(),
+                };
+            }
+            match parse_completion_item(&resolved) {
+                Some(item) => LspCompletionResolveResult::Resolved { item },
+                None => LspCompletionResolveResult::Unavailable {
+                    reason: "invalid-resolve-payload".to_string(),
+                },
+            }
+        }
+        Err(message) => {
+            let lower = message.to_lowercase();
+            if lower.contains("timed out") || lower.contains("timeout") {
+                return LspCompletionResolveResult::Timeout { message };
+            }
+            if lower.contains("method not found")
+                || lower.contains("-32601")
+                || lower.contains("not supported")
+                || lower.contains("no resolve")
+            {
+                return LspCompletionResolveResult::Unavailable {
+                    reason: format!("no-resolve-capability: {message}"),
+                };
+            }
+            LspCompletionResolveResult::Failed { message }
+        }
+    }
+}
+
 fn parse_completion_item(value: &Value) -> Option<LspCompletionItem> {
     let label = value.get("label")?.as_str()?.to_string();
     Some(LspCompletionItem {
@@ -10631,6 +10722,9 @@ fn parse_completion_item(value: &Value) -> Option<LspCompletionItem> {
             .and_then(Value::as_str)
             .map(ToString::to_string),
         text_edit: value.get("textEdit").and_then(parse_text_edit),
+        insert_replace_edit: value
+            .get("textEdit")
+            .and_then(parse_insert_replace_edit),
         additional_text_edits: value
             .get("additionalTextEdits")
             .and_then(Value::as_array)
@@ -13757,6 +13851,101 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         assert!(truncated_flag, "local truncation must be observable");
         assert_eq!(items.len(), MAX_COMPLETION_ITEMS);
         assert_eq!(items.last().unwrap().label, "candidate-199");
+    }
+
+    #[test]
+    fn completion_resolve_does_not_fallback_on_null_or_error() {
+        // ED-PARITY-005 D1: null / error / timeout must stay typed failures,
+        // never masquerade as a successful resolve of the original item.
+        match classify_completion_resolve_result(Ok(Value::Null)) {
+            LspCompletionResolveResult::Unavailable { reason } => {
+                assert!(reason.contains("null"), "unexpected reason: {reason}");
+            }
+            other => panic!("null must be Unavailable, got {other:?}"),
+        }
+        match classify_completion_resolve_result(Err(
+            "language server request timed out: completionItem/resolve".to_string(),
+        )) {
+            LspCompletionResolveResult::Timeout { .. } => {}
+            other => panic!("timeout must stay Timeout, got {other:?}"),
+        }
+        match classify_completion_resolve_result(Err("Method not found (-32601)".to_string())) {
+            LspCompletionResolveResult::Unavailable { reason } => {
+                assert!(reason.contains("no-resolve-capability"), "unexpected reason: {reason}");
+            }
+            other => panic!("missing capability must be Unavailable, got {other:?}"),
+        }
+        match classify_completion_resolve_result(Err("write LSP body: broken pipe".to_string())) {
+            LspCompletionResolveResult::Failed { .. } => {}
+            other => panic!("transport error must stay Failed, got {other:?}"),
+        }
+        // A legally parsed item resolves; an unparsable payload does not
+        // fall back to success.
+        match classify_completion_resolve_result(Ok(json!({
+            "label": "StringUtils",
+            "additionalTextEdits": [
+                { "newText": "import x;\n", "range": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 0 } } }
+            ]
+        }))) {
+            LspCompletionResolveResult::Resolved { item } => {
+                assert_eq!(item.label, "StringUtils");
+                assert_eq!(item.additional_text_edits.len(), 1);
+            }
+            other => panic!("valid payload must resolve, got {other:?}"),
+        }
+        match classify_completion_resolve_result(Ok(json!({ "noLabel": true }))) {
+            LspCompletionResolveResult::Unavailable { .. } => {}
+            other => panic!("invalid payload must be Unavailable, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn completion_item_preserves_insert_replace_ranges() {
+        // ED-PARITY-005 D2: InsertReplaceEdit keeps both ranges; plain
+        // TextEdit keeps none; shared parse_text_edit still prefers insert.
+        let item = parse_completion_item(&json!({
+            "label": "StringUtils",
+            "textEdit": {
+                "newText": "StringUtils",
+                "insert": { "start": { "line": 4, "character": 8 }, "end": { "line": 4, "character": 17 } },
+                "replace": { "start": { "line": 4, "character": 8 }, "end": { "line": 4, "character": 23 } }
+            }
+        }))
+        .expect("dual range item must parse");
+        let dual = item
+            .insert_replace_edit
+            .as_ref()
+            .expect("dual range must be preserved");
+        assert_eq!(dual.insert.start.character, 8);
+        assert_eq!(dual.insert.end.character, 17);
+        assert_eq!(dual.replace.start.character, 8);
+        assert_eq!(dual.replace.end.character, 23);
+        // Compatibility: text_edit still exposes the insert range.
+        assert_eq!(item.text_edit.as_ref().unwrap().range.end.character, 17);
+
+        let plain = parse_completion_item(&json!({
+            "label": "plain",
+            "textEdit": {
+                "newText": "plain",
+                "range": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 3 } }
+            }
+        }))
+        .expect("plain item must parse");
+        assert!(plain.insert_replace_edit.is_none());
+        assert_eq!(plain.text_edit.as_ref().unwrap().range.end.character, 3);
+
+        // Contradictory starts are still preserved for acceptance-time reject;
+        // the parser must not silently coerce them to insert-only success.
+        let conflicted = parse_completion_item(&json!({
+            "label": "conflict",
+            "textEdit": {
+                "newText": "conflict",
+                "insert": { "start": { "line": 4, "character": 8 }, "end": { "line": 4, "character": 17 } },
+                "replace": { "start": { "line": 4, "character": 9 }, "end": { "line": 4, "character": 23 } }
+            }
+        }))
+        .expect("conflicted shape must still parse");
+        assert!(conflicted.insert_replace_edit.is_some());
     }
 
     #[test]

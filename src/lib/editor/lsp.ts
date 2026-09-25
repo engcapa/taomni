@@ -208,6 +208,12 @@ export interface LspTextEdit {
   annotationId?: string;
 }
 
+export interface LspInsertReplaceEdit {
+  newText: string;
+  insert: LspRange;
+  replace: LspRange;
+}
+
 export interface LspCompletionItem {
   label: string;
   kind: number | null;
@@ -219,10 +225,23 @@ export interface LspCompletionItem {
   filterText: string | null;
   sortText: string | null;
   textEdit: LspTextEdit | null;
+  /** ED-PARITY-005 D2: provider InsertReplaceEdit dual range (insert/replace). */
+  insertReplaceEdit?: LspInsertReplaceEdit | null;
   additionalTextEdits: LspTextEdit[];
   /** Original server item, passed back verbatim to completionItem/resolve. */
   raw: unknown;
 }
+
+/**
+ * ED-PARITY-005 D1: typed completionItem/resolve wire result (Rust
+ * `LspCompletionResolveResult`, serde tag="kind" camelCase). Fail-closed:
+ * `unavailable`/`timeout`/`failed` never fall back to the original item.
+ */
+export type LspCompletionResolveResult =
+  | { kind: "resolved"; item: LspCompletionItem }
+  | { kind: "unavailable"; reason: string }
+  | { kind: "timeout"; message: string }
+  | { kind: "failed"; message: string };
 
 export interface LspCompletionResult {
   status: LspDocumentStatus;
@@ -612,11 +631,36 @@ export function lspCompletion(
 export function lspCompletionResolve(
   descriptor: LspDocumentDescriptor,
   item: unknown,
-): Promise<LspCompletionItem | null> {
-  return invoke<LspCompletionItem | null>("lsp_completion_resolve", {
-    ...documentArgs(descriptor),
-    item,
-  });
+): Promise<LspCompletionResolveResult> {
+  return invoke<LspCompletionResolveResult | LspCompletionItem | null>(
+    "lsp_completion_resolve",
+    {
+      ...documentArgs(descriptor),
+      item,
+    },
+  ).then((wire) => normalizeCompletionResolveWire(wire));
+}
+
+/**
+ * Normalize the resolve wire for mixed binaries: the current backend returns
+ * the typed `{kind}` envelope; an older binary may still return a bare
+ * `LspCompletionItem | null`. The legacy shape maps to `resolved` /
+ * `unavailable` without inventing import edits.
+ */
+export function normalizeCompletionResolveWire(
+  wire: LspCompletionResolveResult | LspCompletionItem | null | undefined,
+): LspCompletionResolveResult {
+  if (!wire || typeof wire !== "object") {
+    return { kind: "unavailable", reason: "resolver-returned-null" };
+  }
+  const kind = (wire as { kind?: unknown }).kind;
+  if (kind === "resolved" || kind === "unavailable" || kind === "timeout" || kind === "failed") {
+    return wire as LspCompletionResolveResult;
+  }
+  if (typeof (wire as LspCompletionItem).label === "string") {
+    return { kind: "resolved", item: wire as LspCompletionItem };
+  }
+  return { kind: "unavailable", reason: "resolver-returned-null" };
 }
 
 export interface LspReferenceRequestOptions {

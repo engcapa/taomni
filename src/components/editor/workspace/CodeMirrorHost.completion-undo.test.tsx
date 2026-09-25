@@ -102,6 +102,12 @@ describe("CodeMirrorHost snippet accept then shared-owner undo", () => {
     }
     const selectedLi = document.querySelector('.cm-tooltip-autocomplete [aria-selected="true"]');
     expect(selectedLi?.textContent).toContain("append(double d)");
+    // Honor the production interactionDelay (75ms): CodeMirror rejects an
+    // accept that lands within the delay after the popup/selection changed.
+    // Browser/Playwright pacing always exceeds it; jsdom needs an explicit
+    // wait or Enter falls through to newline. This waits; it never weakens
+    // the acceptance assertion below.
+    await new Promise((resolve) => setTimeout(resolve, 120));
     fireEvent.keyDown(content, { key: "Enter" });
     await waitFor(() => expect(view.state.doc.toString()).toBe("        new StringBuilder().append(0)"));
     // The accept owns a tabstop session with the placeholder selected.
@@ -139,4 +145,97 @@ describe("CodeMirrorHost snippet accept then shared-owner undo", () => {
     expect((result as { kind?: string }).kind).toBe("executed");
     view.destroy();
   });
+
+  // ED-PARITY-005 V2 regression: local live-template snippet accepts must
+  // keep pure Tab/Shift-Tab navigation free of document edits and history
+  // entries so one workspace Undo reverts the whole acceptance.
+  // Baseline failure mode: single-field bodies (`${expr}`) parse as CM field
+  // 0, for which CM never activates tabstop navigation — Tab fell through to
+  // indentation, consumed an undo step, and the acceptance became unreachable
+  // in one Undo.
+  it.each([
+    { abbreviation: "soutv", expanded: 'System.out.println("expr = " + expr);' },
+    { abbreviation: "fori", expanded: "for (int i = 0;" },
+  ])(
+    "local $abbreviation accept keeps Tab navigation history-free with single undo",
+    async ({ abbreviation, expanded }) => {
+      const owner = new WorkspaceDocumentTransactionOwner();
+      const actionHost = createWorkspaceActionHost({
+        workspaceId: "local-snippet-nav",
+        getContext: () => ({ focus: "editor" }),
+        getDefaultContext: () => ({ focus: "editor" }),
+        getDefaultFocus: () => "editor",
+      });
+      const rendered = render(<CodeMirrorHost
+        path="App.java"
+        fileKey="App.java"
+        viewId="view-1"
+        doc={abbreviation}
+        visible
+        diagnostics={[]}
+        reveal={null}
+        onChange={vi.fn()}
+        onSave={vi.fn()}
+        onHover={async () => null}
+        onDefinition={async () => false}
+        onReferences={async () => undefined}
+        onComplete={async () => ({
+          status: {
+            path: "App.java", uri: "file:///App.java", presetId: "java", languageId: "java",
+            displayName: "Java", available: true, active: true, selectedCommandId: null,
+            selectedCommand: null, installHint: null, error: null,
+          },
+          isIncomplete: false,
+          items: [],
+        })}
+        onCompleteResolve={async () => null}
+        completionTriggers={[]}
+        hoverDocumentationDelayMs={0}
+        transactionOwner={owner}
+        workspaceActionHost={actionHost}
+        getCompletionIdentity={() => ({
+          workspaceId: "local-snippet-nav", fileKey: "App.java", filePath: "App.java",
+          uri: "file:///App.java", languageId: "java", documentRevision: 0,
+          lspSessionGeneration: 1,
+        })}
+        onCompletionDiagnostic={vi.fn()}
+      />);
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+      const view = EditorView.findFromDOM(content)!;
+      await waitFor(() => expect(content).toHaveAttribute("data-language", "java"));
+
+      // Tab with no popup expands the exact abbreviation (production entry).
+      act(() => {
+        view.focus();
+        view.dispatch({ selection: { anchor: view.state.doc.length } });
+      });
+      fireEvent.keyDown(content, { key: "Tab" });
+      await waitFor(() => expect(view.state.doc.toString()).toContain(expanded));
+      expect(owner.getHistoryState("App.java").undoDepth).toBe(1);
+
+      // Pure navigation: no document change, no new history entry.
+      fireEvent.keyDown(content, { key: "Tab" });
+      expect(view.state.doc.toString()).toContain(expanded);
+      expect(owner.getHistoryState("App.java").undoDepth).toBe(1);
+      fireEvent.keyDown(content, { key: "Tab", shiftKey: true });
+      expect(view.state.doc.toString()).toContain(expanded);
+      expect(owner.getHistoryState("App.java").undoDepth).toBe(1);
+
+      // One workspace Undo reverts the whole acceptance.
+      const event = new KeyboardEvent("keydown", {
+        key: "z", code: "KeyZ", ctrlKey: true, bubbles: true, cancelable: true,
+      });
+      act(() => {
+        actionHost.dispatchKeydownV2({
+          event,
+          workspaceId: "local-snippet-nav",
+          targetViewId: "view-1",
+          composing: false,
+        });
+      });
+      await waitFor(() => expect(view.state.doc.toString()).toBe(abbreviation));
+      expect(owner.getHistoryState("App.java").undoDepth).toBe(0);
+      view.destroy();
+    },
+  );
 });

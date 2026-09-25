@@ -203,6 +203,11 @@
 - `[data-testid="code-workspace-editor"] .cm-content` — interactive [optional] — F25.5.editor-content
 - `.cm-tooltip-autocomplete` — display [optional] — F25.5.editor-completion-popup
 - `xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel') and normalize-space(.)='String - java.lang']` — interactive [optional] — F25.5.editor-completion-string-candidate
+- `[data-testid="completion-resolve-gate"]` — display [optional] — F25.5.completion-resolve-gate
+- `[data-testid="completion-resolve-gate-retry"]` — interactive [optional] — F25.5.completion-resolve-gate-retry
+- `[data-testid="completion-resolve-gate-insert-without-import"]` — interactive [optional] — F25.5.completion-resolve-gate-insert-without-import
+- `[data-testid="completion-resolve-gate-dismiss"]` — interactive [optional] — F25.5.completion-resolve-gate-dismiss
+- `[data-testid="completion-resolve-gate-failed-note"]` — display [optional] — F25.5.completion-resolve-gate-failed-note
 - `[data-testid="code-workspace-lightbulb"]` — interactive [optional] — F25.5.editor-lightbulb
 - `[data-testid="code-workspace-file-status"]` — display [optional] — F25.5.file-status
 - `[data-testid="code-workspace-save-observation"]` — display [optional] — F25.5.save-observation

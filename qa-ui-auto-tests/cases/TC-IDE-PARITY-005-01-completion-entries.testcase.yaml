@@ -1,0 +1,207 @@
+id: TC-IDE-PARITY-005-01
+title: Basic Completion entries, keybindings, repeat and input protection (browser)
+description: 'ED-PARITY-005 V1 (A1/A3) browser gate case (REQ-05 / CW-LANG-001, CW-LANG-002). Proves the
+  Basic Completion entries through real UI: Ctrl+Space and Alt+/ each open exactly one candidate popup
+  with zero edits, Escape returns focus with the prefix intact, a repeated Ctrl+Space with the popup open
+  restarts without a second commit, the Search Everywhere Actions entry dispatches the same popup, and
+  Ctrl+Space inside the Find input never steals the editor popup or focus. Highest green claim: L1 browser-wired
+  entries and input protection. Ordinal/scope facts, policy-disabled paths and the keymap cheatsheet entry
+  are unit-covered (lspCompletionResolveGate, workspace keymap tests); real JDT LS candidates are TC-IDE-PARITY-005-05
+  (native).
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-005
+- completion
+- entries
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: App.java
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- type: sout
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- screenshot: tc-ide-parity-005-01-typing-popup.png
+- press: Escape
+- assert_count:
+    selector: .cm-tooltip-autocomplete li
+    equal: 0
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent.includes('sout')
+    expect_truthy: true
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- screenshot: tc-ide-parity-005-01-ctrlspace.png
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent.includes('sout')
+    expect_truthy: true
+- press: Escape
+- assert_count:
+    selector: .cm-tooltip-autocomplete li
+    equal: 0
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- screenshot: tc-ide-parity-005-01-alt-slash.png
+- press: Escape
+- assert_count:
+    selector: .cm-tooltip-autocomplete li
+    equal: 0
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Basic Completion
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Basic Completion'
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- screenshot: tc-ide-parity-005-01-action-entry.png
+- press:
+    key: Escape
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_count:
+    selector: .cm-tooltip-autocomplete li
+    equal: 0
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+f
+- wait_for: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+- press: Control+Space
+- assert_count:
+    selector: .cm-tooltip-autocomplete li
+    equal: 0
+- assert_visible: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent.includes('sout')
+    expect_truthy: true
+- screenshot: tc-ide-parity-005-01-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Ctrl+Space 与 Alt+/ 各打开唯一候选弹窗且零编辑，Escape 后前缀与焦点保留。
+    actions:
+    - 16
+    - 19
+    - 22
+    - 25
+    - 28
+    - 30
+    - 33
+    checkpoints:
+    - step: 17
+      expectation: 输入 sout 后出现候选弹窗。
+    - step: 20
+      expectation: Escape 后弹窗关闭。
+    - step: 21
+      expectation: 关闭后正文仍含 sout，无接受。
+    - step: 23
+      expectation: Ctrl+Space 重新打开弹窗。
+    - step: 27
+      expectation: 重复调用后正文仍为 sout 前缀，无提交。
+    - step: 29
+      expectation: Escape 后弹窗关闭。
+    - step: 31
+      expectation: Alt+/ 打开同一弹窗。
+    - step: 34
+      expectation: Escape 后弹窗关闭。
+    results:
+    - 27
+    - 34
+  - id: R2
+    requirement: 重复 Ctrl+Space 不双提交；Search Everywhere Actions 入口走同一弹窗。
+    actions:
+    - 25
+    - 35
+    - 36
+    - 38
+    - 39
+    - 40
+    - 41
+    - 44
+    checkpoints:
+    - step: 26
+      expectation: 重复调用后弹窗仍可用。
+    - step: 27
+      expectation: 重复调用后正文仍为 sout 前缀。
+    - step: 37
+      expectation: Search Everywhere 面板打开。
+    - step: 42
+      expectation: Actions 入口打开候选弹窗。
+    - step: 45
+      expectation: Escape 后弹窗关闭且无提交。
+    results:
+    - 27
+    - 45
+  - id: R3
+    requirement: Find 输入框内 Ctrl+Space 不抢占编辑器补全，焦点与输入保留。
+    actions:
+    - 46
+    - 47
+    - 49
+    - 52
+    checkpoints:
+    - step: 48
+      expectation: Find 输入框出现。
+    - step: 50
+      expectation: Find 内无编辑器候选弹窗。
+    - step: 51
+      expectation: Find 输入仍可见。
+    - step: 53
+      expectation: Escape 后 Find 面板隐藏。
+    - step: 54
+      expectation: 正文仍为 sout 前缀。
+    results:
+    - 50
+    - 54
+  visual:
+  - check: 候选弹窗锚定 caret，不遮挡接受入口；选中行可辨。
+    method: manual
+    reason: 截图需人工评审确认布局与状态。
+  - check: 窄窗口与边缘翻转的像素级 IDEA 对照。
+    method: manual
+    reason: 逐像素对照归 V6 双侧比较。
+  native:
+  - check: 真实 JDT LS 候选、Rust 边界与磁盘字节仅在用例声明模式中采集；browser 证据不替代 native。
+    method: external
+    reason: provider 断言归 005-05 native。

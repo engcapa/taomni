@@ -1,0 +1,187 @@
+id: TC-IDE-PARITY-005-02
+title: Completion accept via Enter Tab mouse, snippet navigation and single undo (browser)
+description: 'ED-PARITY-005 V2 (A1/A2/A3) browser gate case. Drives real live-template completions through
+  three accept paths on the same prefix: Enter accepts, Tab accepts, mouse click accepts; each lands exactly
+  once and one Ctrl+Z restores the exact prefix. A snippet placeholder template (soutv) proves pure Tab/Shift+Tab
+  navigation with zero document change before the final Undo. Mid-word Enter/Tab dual-range semantics
+  are unit-proven (CodeMirrorHost.parity005 + lspCompletion ED-PARITY-005 tests); the browser live-template
+  path has no InsertReplaceEdit provider range, so both keys accept the same text here and the test asserts
+  that honestly instead of faking an IDEA suffix split. Highest green claim: L1 browser accept/undo wiring
+  on all three entries.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-005
+- completion
+- accept-undo
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: App.java
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- type: sout
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: System.out.println();
+    timeout_sec: 15
+- screenshot: tc-ide-parity-005-02-enter-accepted.png
+- press: Control+z
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent === 'sout'
+    expect_truthy: true
+- press: End
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- press: Tab
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: System.out.println(
+    timeout_sec: 15
+- press: Control+z
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent === 'sout'
+    expect_truthy: true
+- press: End
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- click: .cm-tooltip-autocomplete li:nth-of-type(2)
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: System.out.println(
+    timeout_sec: 15
+- press: Control+z
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent === 'sout'
+    expect_truthy: true
+- press: Control+a
+- type: soutv
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 15
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: System.out.println(
+    timeout_sec: 15
+- screenshot: tc-ide-parity-005-02-snippet.png
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent.includes('System.out.println(')
+    expect_truthy: true
+- press: Tab
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent.includes('System.out.println(')
+    expect_truthy: true
+- press: Shift+Tab
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent.includes('System.out.println(')
+    expect_truthy: true
+- press: Control+z
+- eval_readonly:
+    expression: document.querySelector('.cm-content').textContent === 'soutv'
+    expect_truthy: true
+- screenshot: tc-ide-parity-005-02-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Enter/Tab/鼠标三入口各接受一次，一次 Undo 恢复精确前缀。
+    actions:
+    - 16
+    - 18
+    - 21
+    - 23
+    - 24
+    - 26
+    - 28
+    - 30
+    - 31
+    - 33
+    - 35
+    checkpoints:
+    - step: 17
+      expectation: 输入 sout 后出现候选弹窗。
+    - step: 19
+      expectation: Enter 后正文含完整展开。
+    - step: 22
+      expectation: Undo 后正文精确回到 sout。
+    - step: 25
+      expectation: Ctrl+Space 后弹窗重开。
+    - step: 27
+      expectation: Tab 接受后正文含展开。
+    - step: 29
+      expectation: Tab 轮 Undo 回到 sout。
+    - step: 32
+      expectation: 弹窗重开。
+    - step: 34
+      expectation: 鼠标点击接受后正文含展开。
+    - step: 36
+      expectation: 鼠标轮 Undo 回到 sout。
+    results:
+    - 22
+    - 29
+    - 36
+  - id: R2
+    requirement: Snippet 占位符纯 Tab/Shift+Tab 导航零正文变化，最终 Undo 一次恢复。
+    actions:
+    - 37
+    - 38
+    - 40
+    - 44
+    - 46
+    - 48
+    checkpoints:
+    - step: 39
+      expectation: 输入 soutv 后出现候选弹窗。
+    - step: 41
+      expectation: soutv 接受后正文含 println。
+    - step: 43
+      expectation: 接受后正文稳定。
+    - step: 45
+      expectation: Tab 导航后正文不变。
+    - step: 47
+      expectation: Shift+Tab 后正文不变。
+    - step: 49
+      expectation: Undo 后精确回到 soutv。
+    results:
+    - 45
+    - 47
+    - 49
+  visual:
+  - check: 接受前后 caret 与选中行状态可辨，docs 不遮挡候选；截图需人工评审。
+    method: manual
+    reason: 像素/DPI 边界不能由 DOM 断言代替。
+  native:
+  - check: 真实 snippet 原始报文展开与占位符选区仅在用例声明模式中采集；browser 证据不替代 native。
+    method: external
+    reason: 真实 provider 报文归 005-05 native。

@@ -1910,3 +1910,114 @@ describe("ED-COMP-004: effective project scope recording", () => {
     });
   });
 });
+
+describe("ED-PARITY-005 preserves insert replace intent through resolve and undo", () => {
+  it("routes insert vs replace intent to provider ranges and keeps typed resolve data", async () => {
+    const { EditorView } = await import("@codemirror/view");
+    const { commitLspCompletion, resolvePrimaryRangeForIntent, executeCompletionResolve } =
+      await import("./lspCompletion");
+    const dualItem = {
+      label: "StringUtils",
+      kind: 7,
+      detail: "org.apache.commons.lang3.StringUtils",
+      documentation: null,
+      insertText: null,
+      insertTextFormat: 1,
+      filterText: null,
+      sortText: "0001",
+      textEdit: {
+        range: { start: { line: 4, character: 8 }, end: { line: 4, character: 17 } },
+        newText: "StringUtils",
+      },
+      insertReplaceEdit: {
+        newText: "StringUtils",
+        insert: { start: { line: 4, character: 8 }, end: { line: 4, character: 17 } },
+        replace: { start: { line: 4, character: 8 }, end: { line: 4, character: 23 } },
+      },
+      additionalTextEdits: [
+        {
+          range: { start: { line: 1, character: 0 }, end: { line: 1, character: 0 } },
+          newText: "import org.apache.commons.lang3.StringUtils;\n",
+        },
+      ],
+      raw: { label: "StringUtils" },
+    };
+    // M0 variant: `        StringUtiSuffix;` caret after StringUti (offset 17 on line 4).
+    const lines = ["package parity005;", "", "public class Main {", "    void sample() {", "        StringUtiSuffix;", "    }", "} "];
+    // Build doc with real newlines; line 4 is index 4 (0-based).
+    const docText = "package parity005;\n\npublic class Main {\n    void sample() {\n        StringUtiSuffix;\n    }\n}";
+    const tokenBase = {
+      workspaceId: "ws-005",
+      fileKey: "Main.java",
+      filePath: "/repo/Main.java",
+      uri: "file:///repo/Main.java",
+      languageId: "java",
+      documentRevision: 3,
+      lspSessionGeneration: 1,
+      requestId: "req-005",
+    };
+    const mountAt = (text: string) => {
+      const state = EditorState.create({ doc: text, extensions: [history()] });
+      return new EditorView({ state });
+    };
+    // Intent routing without committing: insert keeps suffix, replace consumes it.
+    const probeView = mountAt(docText);
+    const caretLine = probeView.state.doc.line(5);
+    const caretOffset = caretLine.from + 17;
+    expect(caretOffset).toBeGreaterThan(0);
+    const insertSpan = resolvePrimaryRangeForIntent(
+      probeView, dualItem as never, caretOffset - 9, caretOffset, tokenBase, "insert",
+    );
+    const replaceSpan = resolvePrimaryRangeForIntent(
+      probeView, dualItem as never, caretOffset - 9, caretOffset, tokenBase, "replace",
+    );
+    expect(insertSpan).not.toBeNull();
+    expect(replaceSpan).not.toBeNull();
+    // Insert end stays at caret (17), replace end extends to suffix end (23).
+    expect(insertSpan!.to - insertSpan!.from).toBe(9);
+    expect(replaceSpan!.to - replaceSpan!.from).toBe(15);
+    probeView.destroy();
+
+    // Typed resolve preserves the dual range through merge.
+    const outcome = await executeCompletionResolve({
+      item: { ...dualItem, additionalTextEdits: [] } as never,
+      resolve: async () => ({ kind: "resolved", item: dualItem }) as never,
+      token: tokenBase,
+      isStillCurrent: () => true,
+      timeoutMs: 1000,
+    });
+    expect(outcome.kind).toBe("resolved");
+    if (outcome.kind === "resolved") {
+      expect(outcome.item.insertReplaceEdit).toBeDefined();
+    }
+
+    // Full commit with insert intent keeps `Suffix`, replace intent drops it; each is one undo.
+    const viewInsert = mountAt(docText);
+    const line = viewInsert.state.doc.line(5);
+    const from = line.from + 8;
+    const to = line.from + 17;
+    const okInsert = commitLspCompletion(
+      viewInsert, dualItem as never, from, to, tokenBase, () => true, () => {}, [], "insert",
+    );
+    expect(okInsert).toBe(true);
+    expect(viewInsert.state.doc.toString()).toContain("StringUtilsSuffix");
+    expect(viewInsert.state.doc.toString()).toContain("import org.apache.commons.lang3.StringUtils;");
+    undo(viewInsert);
+    expect(viewInsert.state.doc.toString()).toBe(docText);
+    viewInsert.destroy();
+
+    const viewReplace = mountAt(docText);
+    const lineR = viewReplace.state.doc.line(5);
+    const okReplace = commitLspCompletion(
+      viewReplace, dualItem as never, lineR.from + 8, lineR.from + 17,
+      tokenBase, () => true, () => {}, [], "replace",
+    );
+    expect(okReplace).toBe(true);
+    expect(viewReplace.state.doc.toString()).toContain("StringUtils;");
+    expect(viewReplace.state.doc.toString()).not.toContain("StringUtilsSuffix");
+    undo(viewReplace);
+    expect(viewReplace.state.doc.toString()).toBe(docText);
+    viewReplace.destroy();
+    expect(lines.length).toBe(7);
+  });
+});

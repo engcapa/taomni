@@ -333,3 +333,24 @@ describe("preferences", () => {
     )).toBe(false);
   });
 });
+
+describe("ED-PARITY-005 numberSnippetFields", () => {
+  it("numbers bare placeholders so CM activates tabstop navigation", async () => {
+    const { numberSnippetFields } = await import("./liveTemplates");
+    // Same name shares one linked stop; empty names each get their own.
+    expect(numberSnippetFields('System.out.println("${expr} = " + ${expr});')).toBe(
+      'System.out.println("${1:expr} = " + ${1:expr});',
+    );
+    expect(numberSnippetFields("for (int ${i} = 0; ${i} < ${}; ${i}++) {\n\t${}\n}")).toBe(
+      "for (int ${1:i} = 0; ${1:i} < ${2}; ${1:i}++) {\n\t${3}\n}",
+    );
+    // Explicit stops keep their numbers and reserve them.
+    expect(numberSnippetFields("public static final int ${NAME} = ${0};")).toBe(
+      "public static final int ${1:NAME} = ${0};",
+    );
+    expect(numberSnippetFields("${2:x} ${y}")).toBe("${2:x} ${1:y}");
+    // Escaped markers and brace-free variables stay untouched.
+    expect(numberSnippetFields("a \\${x} b $EXPR$ c")).toBe("a \\${x} b $EXPR$ c");
+    expect(numberSnippetFields("plain text")).toBe("plain text");
+  });
+});

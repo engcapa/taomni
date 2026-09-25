@@ -1,0 +1,486 @@
+id: TC-IDE-PARITY-005-05
+title: Java completion native provider accept undo save-continue and mid-word entries (native)
+description: 'ED-PARITY-005 V5 (A1/A3) native+provider case (REQ-05 / CW-LANG-001, CW-LANG-002). Proves
+  the production chain against a real JDT LS session on the maven-single sample through the packaged app
+  UI: type-probe Enter lands identifier plus the single lang3 import in one dispatch (disk bytes asserted
+  by re-read), one Ctrl+Z plus save restores the exact prefix bytes; mid-word Tmid keeps the suffix on
+  Enter and consumes it on Tab with one Undo each; the snippet probe accepts the provider raw snippet
+  as-is (DEC-08, no parameter clearing) with pure Tab navigation and one Undo; after saves a member probe
+  still completes from the live buffer. Highest green claim: L2 provider-backed on the executed platform.
+  Fault-injected null/error resolve has no isolated native facility in this round and stays unit-covered
+  (Rust classifier + lspCompletionResolveGate); Windows/macOS runs remain explicitly unverified.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-005
+- completion
+- provider
+- native-gate
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- parity005_completion
+- java_sample_projects
+- jdtls_required
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-parity-005","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: completionTargets
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-lsp-status-pill"]'
+    contains: Java
+    timeout_sec: 60
+- screenshot: tc-ide-parity-005-05-ready.png
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 11,
+    timeout_sec: 10
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 21,
+    timeout_sec: 10
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - End
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 30, Col 22
+    timeout_sec: 10
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 90
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+- eval_readonly:
+    expression: document.querySelector('.cm-tooltip-autocomplete li[aria-selected]').textContent.includes('org.apache.commons.lang3')
+    expect_truthy: true
+- screenshot: tc-ide-parity-005-05-type-popup.png
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Enter
+- wait: 3
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringUtils') && !document.querySelector('.cm-content').innerText.includes('StringUti\n')
+    expect_truthy: true
+- screenshot: tc-ide-parity-005-05-type-accepted.png
+- press: Control+s
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    contains: StringUtils
+    timeout_sec: 30
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+z
+- wait: 0.5
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringUti') && !document.querySelector('.cm-content').innerText.includes('StringUtils')
+    expect_truthy: true
+- press: Control+s
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    contains: StringUti
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 11,
+    timeout_sec: 10
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+- wait: 0.5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 21,
+    timeout_sec: 10
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - End
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 30, Col 22
+    timeout_sec: 10
+- type: Suffix
+- wait: 0.5
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 90
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+- &id001
+  eval_readonly:
+    expression: document.querySelector('.cm-tooltip-autocomplete li[aria-selected]').textContent.includes('org.apache.commons.lang3')
+    expect_truthy: true
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Enter
+- wait: 3
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringUtilsSuffix')
+    expect_truthy: true
+- screenshot: tc-ide-parity-005-05-mid-enter.png
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+z
+- wait: 0.5
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringUtiSuffix') && !document.querySelector('.cm-content').innerText.includes('StringUtilsSuffix')
+    expect_truthy: true
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 90
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+- *id001
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Tab
+- wait: 3
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringUtils') && !document.querySelector('.cm-content').innerText.includes('StringUtilsSuffix')
+    expect_truthy: true
+- screenshot: tc-ide-parity-005-05-mid-tab.png
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+z
+- wait: 0.5
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringUtiSuffix')
+    expect_truthy: true
+- press: Control+s
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+- wait: 0.5
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+- wait: 0.5
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - End
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 27, Col 38
+    timeout_sec: 10
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 90
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: append(
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Enter
+- wait: 3
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringBuilder().append(')
+    expect_truthy: true
+- screenshot: tc-ide-parity-005-05-snippet.png
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Tab
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringBuilder().append(')
+    expect_truthy: true
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Control+z
+- wait: 0.5
+- eval_readonly:
+    expression: document.querySelector('.cm-content').innerText.includes('StringBuilder().appen')
+    expect_truthy: true
+- press: Control+s
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    contains: StringBuilder().appen
+    timeout_sec: 30
+- screenshot: tc-ide-parity-005-05-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 真实 JDT LS 类型接受落 identifier+单 import，一次 Undo 恢复前缀，存盘字节一致。
+    actions:
+    - 13
+    - 14
+    - 20
+    - 22
+    - 25
+    - 28
+    - 32
+    - 34
+    - 37
+    checkpoints:
+    - step: 16
+      expectation: 导航到 Ln 11 探针行。
+    - step: 19
+      expectation: 导航到 Ln 21。
+    - step: 21
+      expectation: caret 到 Ln 30 Col 22 探针。
+    - step: 23
+      expectation: 弹窗出现。
+    - step: 24
+      expectation: 弹窗含 StringUtils（含 JDK 双胞胎与 lang3 两行）。
+    - step: 26
+      expectation: 下选后选中项为 lang3 包。
+    - step: 30
+      expectation: 接受后正文含 StringUtils 且无残留。
+    - step: 33
+      expectation: 存盘后 host 文件含 StringUtils。
+    - step: 36
+      expectation: 一次 Undo 后回到 StringUti 前缀。
+    - step: 38
+      expectation: 再次存盘后 host 文件回到前缀。
+    results:
+    - 26
+    - 30
+    - 33
+    - 36
+    - 38
+  - id: R2
+    requirement: Ln30 探针改成 Tmid 后，词中 Enter 保留后缀、Tab 替换后缀，各一次 Undo 恢复。
+    actions:
+    - 39
+    - 40
+    - 43
+    - 46
+    - 49
+    - 50
+    - 51
+    - 54
+    - 56
+    - 60
+    - 63
+    - 65
+    - 67
+    - 71
+    checkpoints:
+    - step: 42
+      expectation: 导航到 Ln 11。
+    - step: 45
+      expectation: 导航到 Ln 21。
+    - step: 47
+      expectation: caret 到 Ln 30 Col 22 探针。
+    - step: 52
+      expectation: 词中弹窗出现。
+    - step: 53
+      expectation: 弹窗含 StringUtils。
+    - step: 55
+      expectation: 下选后选中项为 lang3 包。
+    - step: 58
+      expectation: Enter 后为 StringUtilsSuffix。
+    - step: 62
+      expectation: Undo 后回到 StringUtiSuffix。
+    - step: 64
+      expectation: 弹窗重开。
+    - step: 66
+      expectation: 下选后选中项为 lang3 包。
+    - step: 69
+      expectation: Tab 后为 StringUtils 且无 Suffix。
+    - step: 73
+      expectation: Undo 后回到 StringUtiSuffix。
+    results:
+    - 55
+    - 58
+    - 62
+    - 66
+    - 69
+    - 73
+  - id: R3
+    requirement: 方法 snippet 按 provider 原样接受，纯 Tab 导航无编辑，一次 Undo 恢复。
+    actions:
+    - 75
+    - 76
+    - 78
+    - 80
+    - 82
+    - 89
+    - 91
+    - 94
+    checkpoints:
+    - step: 81
+      expectation: caret 到 Ln 27 Col 38 探针。
+    - step: 83
+      expectation: 弹窗出现。
+    - step: 84
+      expectation: 弹窗含 append(。
+    - step: 87
+      expectation: 接受后含 append( 调用。
+    - step: 90
+      expectation: Tab 后正文不变。
+    - step: 93
+      expectation: Undo 后回到 appen 前缀。
+    - step: 95
+      expectation: 存盘后 host 文件回到前缀。
+    results:
+    - 87
+    - 90
+    - 93
+    - 95
+  visual:
+  - check: 候选弹窗、选中行与接受后 caret 状态；截图需人工评审。
+    method: manual
+    reason: 像素/DPI 边界不能由 DOM 断言代替。
+  native:
+  - check: 真实 JDT LS 报文、Rust 边界、host 磁盘字节与 provider 版本随运行报告记录。
+    method: external
+    reason: 本例即 native/provider 证据；报告保留身份与报文摘要。

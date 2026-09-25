@@ -6370,6 +6370,26 @@ controls:
     selector: "xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel') and normalize-space(.)='String - java.lang']"
     kind: interactive
     optional: true       # Java provider candidate; position varies with provider ranking
+  - id: completion-resolve-gate
+    selector: '[data-testid="completion-resolve-gate"]'
+    kind: display
+    optional: true       # resolve gate banner while provider import edits are unavailable (ED-PARITY-005)
+  - id: completion-resolve-gate-retry
+    selector: '[data-testid="completion-resolve-gate-retry"]'
+    kind: interactive
+    optional: true       # fresh resolve attempt from the gate
+  - id: completion-resolve-gate-insert-without-import
+    selector: '[data-testid="completion-resolve-gate-insert-without-import"]'
+    kind: interactive
+    optional: true       # explicit primary-only insertion without import edits
+  - id: completion-resolve-gate-dismiss
+    selector: '[data-testid="completion-resolve-gate-dismiss"]'
+    kind: interactive
+    optional: true       # dismiss the gate with zero document edits
+  - id: completion-resolve-gate-failed-note
+    selector: '[data-testid="completion-resolve-gate-failed-note"]'
+    kind: display
+    optional: true       # retry-failure note inside the gate
   - id: editor-lightbulb               # gutter quick-fix button for the diagnostic line
     selector: '[data-testid="code-workspace-lightbulb"]'
     kind: interactive

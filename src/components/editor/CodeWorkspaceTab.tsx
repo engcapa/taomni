@@ -129,7 +129,7 @@ import {
   nextLspRequestSequence,
   type LspCodeAction,
   type JavaTestItem,
-  type LspCompletionItem,
+  type LspCompletionResolveResult,
   type LspCompletionResult,
   type LspDiagnostic,
   type LspDocumentDescriptor,
@@ -16108,14 +16108,37 @@ export function CodeWorkspaceTab({
       const live = openFilesRef.current[token.fileKey];
       if (!live) return false;
       const identity = completionIdentityForFile(live);
-      return !!identity
-        && identity.workspaceId === token.workspaceId
-        && identity.fileKey === token.fileKey
-        && identity.filePath === token.filePath
-        && identity.uri === token.uri
-        && identity.languageId === token.languageId
-        && identity.documentRevision === token.documentRevision
-        && identity.lspSessionGeneration === token.lspSessionGeneration;
+      if (
+        !identity
+        || identity.workspaceId !== token.workspaceId
+        || identity.fileKey !== token.fileKey
+        || identity.filePath !== token.filePath
+        || identity.uri !== token.uri
+        || identity.languageId !== token.languageId
+        || identity.documentRevision !== token.documentRevision
+        || identity.lspSessionGeneration !== token.lspSessionGeneration
+      ) {
+        return false;
+      }
+      // ED-PARITY-005 R1: project facts generation is part of the scope
+      // identity. A facts refresh that leaves file/session untouched still
+      // invalidates candidates minted under the older generation.
+      const liveScope = identity.projectScope;
+      const tokenScope = token.projectScope;
+      if (!liveScope && !tokenScope) return true;
+      if (!liveScope || !tokenScope) return false;
+      if (liveScope.status !== tokenScope.status) return false;
+      if (liveScope.generation !== tokenScope.generation) return false;
+      if (liveScope.status === "ready" && tokenScope.status === "ready") {
+        return liveScope.moduleId === tokenScope.moduleId && liveScope.scope === tokenScope.scope;
+      }
+      if (liveScope.status === "scope-facts-missing" && tokenScope.status === "scope-facts-missing") {
+        return (
+          liveScope.requestedScope === tokenScope.requestedScope
+          && liveScope.reason === tokenScope.reason
+        );
+      }
+      return true;
     },
     [completionIdentityForFile, workspaceInstanceId],
   );
@@ -16205,15 +16228,25 @@ export function CodeWorkspaceTab({
       file: OpenFileState,
       raw: unknown,
       token: CompletionRequestToken,
-    ): Promise<LspCompletionItem | null> => {
+    ): Promise<LspCompletionResolveResult> => {
       const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return null;
-      if (!isCompletionTokenCurrent(token)) return null;
+      if (!descriptor) {
+        return { kind: "unavailable", reason: "missing-resolver" };
+      }
+      if (!isCompletionTokenCurrent(token)) {
+        // Token gate stays fail-closed, but the typed wire keeps the reason
+        // distinct from a provider null so callers never invent imports.
+        return { kind: "unavailable", reason: "stale-token" };
+      }
       try {
-        const resolved = await lspCompletionResolve(descriptor, raw);
-        return isCompletionTokenCurrent(token) ? resolved : null;
-      } catch {
-        return null;
+        const wired = await lspCompletionResolve(descriptor, raw);
+        if (!isCompletionTokenCurrent(token)) {
+          return { kind: "unavailable", reason: "stale-token" };
+        }
+        return wired;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { kind: "failed", message };
       }
     },
     [isCompletionTokenCurrent, lspDescriptorForFile],
