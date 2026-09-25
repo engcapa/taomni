@@ -4401,6 +4401,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
               void resolveGateUi.retry().then((outcome) => {
                 if (outcome === "committed") {
                   setResolveGateUi(null);
+                  // ED-PARITY-005: the button that was clicked unmounts with the
+                  // gate, which would drop DOM focus on <body> and send the next
+                  // keystroke (including the undo of this very acceptance) to the
+                  // shell instead of the editor.
+                  viewRef.current?.focus();
                   return;
                 }
                 // Retry also failed: keep the item visible with its choices.
@@ -4417,7 +4422,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
               const inserted = resolveGateUi.insertWithoutImport();
-              if (inserted) setResolveGateUi(null);
+              if (inserted) {
+                setResolveGateUi(null);
+                // Same focus hand-off as Retry: the explicit degradation writes
+                // to the document, so the caret belongs back in the editor.
+                viewRef.current?.focus();
+              }
             }}
           >
             Insert without import
@@ -4427,7 +4437,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             aria-label="Dismiss"
             data-testid="completion-resolve-gate-dismiss"
             className="shrink-0 px-1 text-[var(--taomni-text-secondary,#9aa0aa)] hover:text-[var(--taomni-text,#e6e6e6)]"
-            onClick={resolveGateUi.dismiss}
+            onClick={() => {
+              resolveGateUi.dismiss();
+              // Dismissing writes nothing, but the user is back in the editor.
+              viewRef.current?.focus();
+            }}
           >
             ✕
           </button>

@@ -1,0 +1,316 @@
+id: TC-IDE-PARITY-005-05-java-completion-native
+title: Basic Completion against real JDT LS - mid-word ranges, import and one undo
+description: 'ED-PARITY-005 V5. The real JDT LS answers Basic Completion in a real Maven
+
+  project, so this is where the provider contract is actually proven: the mid-word
+
+  candidate yields a StringUtils type completion, Enter keeps the trailing suffix
+
+  while Tab consumes the whole identifier, the lang3 import arrives through
+
+  completionItem/resolve, one undo restores the exact preimage, and the saved
+
+  bytes on disk follow both. Browser stub evidence cannot establish any of this.
+
+  The trigger is the Alt+/ secondary binding rather than Ctrl+Space, because the
+
+  platform chord did not reach the editor under WebKitGTK; the Ctrl+Space binding
+
+  and its routing are proven by TC-IDE-PARITY-005-01. Linux/WebKitGTK is the
+
+  platform for this run; Windows/WebView2 and macOS/WKWebView stay unverified.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- parity005
+- completion
+- provider
+- native-gate
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- java_sample_projects
+- jdtls_required
+- parity005_completion
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-parity005-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-parity005","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1788566400000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 120
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 120
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+# R1 - real JDT LS: mid-word Enter keeps the trailing suffix.
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Mod+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - Shift+End
+- type: '            StringUtiSuffix;'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 120
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- screenshot: parity005-05-provider-list.png
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Enter
+- wait: 2
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtilsSuffix;
+- screenshot: parity005-05-enter-accepted.png
+- press: Control+s
+- wait: 2
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    contains: StringUtilsSuffix;
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    contains: org.apache.commons.lang3.StringUtils
+# One acceptance is one undo, and the saved bytes follow the buffer.
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Control+z
+- wait: 2
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- screenshot: parity005-05-enter-undone.png
+- press: Control+s
+- wait: 2
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    contains: StringUtiSuffix;
+# R2 - real JDT LS: mid-word Tab consumes the whole identifier.
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Mod+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - Shift+End
+- type: '            StringUtiSuffix;'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+    - ArrowLeft
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 120
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Tab
+- wait: 2
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtils;
+- screenshot: parity005-05-tab-accepted.png
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Control+z
+- wait: 2
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 真实JDT LS下，词中Enter保留后缀、Tab消耗整个identifier，各只落一次lang3 import，一次Undo恢复preimage，保存后磁盘字节跟随buffer。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 10
+    - 11
+    - 12
+    - 13
+    - 15
+    - 18
+    - 19
+    - 20
+    - 22
+    - 23
+    - 24
+    - 27
+    - 28
+    - 30
+    - 31
+    - 32
+    - 34
+    - 35
+    - 36
+    - 37
+    - 39
+    - 42
+    - 43
+    - 45
+    - 46
+    - 47
+    checkpoints:
+    - step: 8
+      expectation: 编辑器就绪
+    - step: 9
+      expectation: 真实JDT LS语义就绪
+    - step: 14
+      expectation: 正文为preimage StringUtiSuffix;
+    - step: 17
+      expectation: provider候选列表包含StringUtils
+    - step: 21
+      expectation: 正文为StringUtilsSuffix;（Enter保留后缀）
+    - step: 25
+      expectation: 磁盘为接受后postimage
+    - step: 26
+      expectation: 磁盘包含lang3 import（resolve生效）
+    - step: 29
+      expectation: 正文为preimage StringUtiSuffix;
+    - step: 33
+      expectation: 磁盘回到preimage
+    - step: 38
+      expectation: 正文为preimage StringUtiSuffix;
+    - step: 41
+      expectation: provider候选列表包含StringUtils
+    - step: 44
+      expectation: 正文为StringUtils;（Tab消耗identifier）
+    - step: 48
+      expectation: 正文为preimage StringUtiSuffix;
+    results:
+    - 8
+    - 9
+    - 14
+    - 17
+    - 21
+    - 25
+    - 26
+    - 29
+    - 33
+    - 38
+    - 41
+    - 44
+    - 48
+  visual:
+  - check: 真实JDT LS候选列表、选中行与docs的几何关系，长包名可读；截图供人工评审。
+    method: manual
+    reason: 像素密度与IDEA选区不能由DOM断言代替。
+  native:
+  - check: 本用例自身即native/provider执行：真实Tauri运行时、真实JDT LS、真实磁盘字节；Linux/WebKitGTK本轮执行，Windows/WebView2与macOS/WKWebView保留未验证。
+    method: automated
+    reason: browser stub不能证明真实provider语义与落盘效果。

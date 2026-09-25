@@ -163,6 +163,11 @@
 
 ## code-workspace/editor-shell (F25.5)
 
+- `[data-testid="completion-resolve-gate"]` — display [optional] — F25.5.completion-resolve-gate
+- `[data-testid="completion-resolve-gate-retry"]` — interactive [optional] — F25.5.completion-resolve-gate-retry
+- `[data-testid="completion-resolve-gate-insert-without-import"]` — interactive [optional] — F25.5.completion-resolve-gate-insert-without-import
+- `[data-testid="completion-resolve-gate-dismiss"]` — interactive [optional] — F25.5.completion-resolve-gate-dismiss
+- `[data-testid="completion-resolve-gate-failed-note"]` — display [optional] — F25.5.completion-resolve-gate-failed-note
 - `[data-testid="code-workspace-editor-search"]` — display — F25.5.editor-find-panel
 - `[data-testid="code-workspace-editor-search"] input[name="search"]` — interactive — F25.5.editor-find-input
 - `[data-testid="code-workspace-editor-search"] input[name="replace"]` — interactive — F25.5.editor-replace-input

@@ -34,6 +34,19 @@ MODE_KEY = "taomni.qa.parity005CompletionMode.v1"
 #: Provider item path relative to the fixture root.
 FIXTURE_FILE = "parity005/Main.java"
 
+#: Second file for the identity round: switching away and back must not leak a
+#: candidate, a gate or a document between the two buffers.
+OTHER_FILE = "parity005/Other.java"
+OTHER_DOCUMENT = (
+    "package parity005;\n"
+    "\n"
+    "public class Other {\n"
+    "    void sample() {\n"
+    "        int marker = 1;\n"
+    "    }\n"
+    "}\n"
+)
+
 #: B0/M0 body. The caret belongs after ``StringUti``, at line 4 character 17.
 DOCUMENT = (
     "package parity005;\n"
@@ -141,7 +154,7 @@ def _seed_browser(ctx: Any) -> None:
     if base_url and not current.startswith(base_url):
         page.goto(base_url, wait_until="domcontentloaded")
     page.evaluate(
-        """async ([filePath, document, key, config, modeKey]) => {
+        """async ([filePath, document, key, config, modeKey, otherPath, otherDocument]) => {
           // Directory chain first: the VFS refuses a file whose parent is missing.
           const db = await new Promise((resolve, reject) => {
             const req = indexedDB.open("taomni-vfs", 1);
@@ -170,17 +183,22 @@ def _seed_browser(ctx: Any) -> None:
           await put({ path: `/preview/${filePath}`, parent: "/preview/parity005",
                       name: "Main.java", type: "file", size: encoded.length,
                       mtime: now, data: encoded.buffer });
+          const other = new TextEncoder().encode(otherDocument);
+          await put({ path: `/preview/${otherPath}`, parent: "/preview/parity005",
+                      name: "Other.java", type: "file", size: other.length,
+                      mtime: now, data: other.buffer });
           localStorage.setItem(key, JSON.stringify(config));
           localStorage.removeItem(modeKey);
         }""",
-        [FIXTURE_FILE, DOCUMENT, CONFIG_KEY, _config("resolved"), MODE_KEY],
+        [FIXTURE_FILE, DOCUMENT, CONFIG_KEY, _config("resolved"), MODE_KEY,
+         OTHER_FILE, OTHER_DOCUMENT],
     )
 
 
 def _cleanup_browser(ctx: Any) -> None:
     try:
         ctx.page.evaluate(
-            """async ([filePath, key, modeKey]) => {
+            """async ([filePath, key, modeKey, otherPath]) => {
               localStorage.removeItem(key);
               localStorage.removeItem(modeKey);
               const db = await new Promise((resolve, reject) => {
@@ -191,7 +209,7 @@ def _cleanup_browser(ctx: Any) -> None:
               if (!db.objectStoreNames.contains("files")) return;
               const tx = db.transaction("files", "readwrite");
               const store = tx.objectStore("files");
-              for (const path of [`/preview/${filePath}`, "/preview/parity005"]) {
+              for (const path of [`/preview/${filePath}`, `/preview/${otherPath}`, "/preview/parity005"]) {
                 await new Promise((resolve) => {
                   const req = store.delete(path);
                   req.onsuccess = () => resolve(undefined);
@@ -199,7 +217,7 @@ def _cleanup_browser(ctx: Any) -> None:
                 });
               }
             }""",
-            [FIXTURE_FILE, CONFIG_KEY, MODE_KEY],
+            [FIXTURE_FILE, CONFIG_KEY, MODE_KEY, OTHER_FILE],
         )
     except Exception as exc:  # noqa: BLE001 - cleanup must never mask the case result
         print(f"[parity005_completion] browser cleanup skipped: {exc}")

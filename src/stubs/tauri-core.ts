@@ -1142,6 +1142,9 @@ function stubParity005Config(): StubParity005Config | null {
     if (override !== null) {
       try {
         const mode = JSON.parse(override);
+        // "off" disarms the harness entirely, so a case can prove the honest
+        // provider-unavailable fallback and then re-arm for recovery.
+        if (mode === "off") return null;
         if (typeof mode === "string" && mode) return { ...parsed, resolveMode: mode };
       } catch {
         // A malformed override must not silently change the fixture's mode.

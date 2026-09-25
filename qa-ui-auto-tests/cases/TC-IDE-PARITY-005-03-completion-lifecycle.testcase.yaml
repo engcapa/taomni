@@ -1,0 +1,414 @@
+id: TC-IDE-PARITY-005-03-completion-lifecycle
+title: Basic Completion lifecycle - unavailable provider, cancel and file identity
+description: 'ED-PARITY-005 V3. A completion that cannot be served honestly must say so
+
+  instead of inventing a provider answer: with the harness disarmed the editor
+
+  falls back to its own sources and never claims a language-server candidate, and
+
+  arming it again restores the provider list. Cancelling an acceptance that is
+
+  still waiting for its resolve must write nothing and must not be revived by the
+
+  late answer. Switching to another file and back must not leak a candidate, a
+
+  gate or a document between the two buffers.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- parity005
+- completion
+- lifecycle
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="parity005"]'
+    timeout_sec: 30
+- dblclick: '[data-testid="code-workspace-tree-dir"][data-path="parity005"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="parity005/Main.java"]'
+    timeout_sec: 30
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="parity005/Main.java"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+# R1 - harness disarmed: no provider answer may be claimed.
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- seed_storage:
+    key: taomni.qa.parity005CompletionMode.v1
+    value: '"off"'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+End
+- type: '        StringUtiSuffix;'
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: Control+Space
+- wait: 2
+# No language-server candidate and no semantic-ready claim.
+- assert_not_visible: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+- eval_readonly:
+    expression: "!document.querySelector('.cm-tooltip-autocomplete') || !document.querySelector('.cm-tooltip-autocomplete').textContent.includes('org.apache.commons.lang3.StringUtils')"
+    expect_truthy: true
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- eval_readonly:
+    expression: "!document.querySelector('.cm-content').innerText.includes('import org.apache.commons.lang3.StringUtils;')"
+    expect_truthy: true
+- screenshot: parity005-03-provider-unavailable.png
+# Re-arming restores the provider list, so the fallback is a state and not a dead end.
+- press: Escape
+- seed_storage:
+    key: taomni.qa.parity005CompletionMode.v1
+    value: '"resolved"'
+# The provider session is probed at boot, so recovery is the user restating the
+# workspace after the language server became available again.
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="parity005"]'
+    timeout_sec: 30
+- dblclick: '[data-testid="code-workspace-tree-dir"][data-path="parity005"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="parity005/Main.java"]'
+    timeout_sec: 30
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="parity005/Main.java"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+# Park the caret at the probe again before asking for the list.
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+End
+- type: '        StringUtiSuffix;'
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 30
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+- screenshot: parity005-03-provider-recovered.png
+- press: Escape
+# R2 - Escape ends an acceptance still waiting on resolve.
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- seed_storage:
+    key: taomni.qa.parity005CompletionMode.v1
+    value: '"held"'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+End
+- type: '        StringUtiSuffix;'
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 30
+- wait: 0.2
+- press: Enter
+- wait: 0.5
+- press: Escape
+# Past the resolve deadline: nothing may commit and no gate may appear.
+- wait: 4
+- assert_not_visible: '[data-testid="completion-resolve-gate"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- eval_readonly:
+    expression: "!document.querySelector('.cm-content').innerText.includes('import org.apache.commons.lang3.StringUtils;')"
+    expect_truthy: true
+- screenshot: parity005-03-cancelled.png
+# R3 - identity: A -> B -> A keeps both documents and both requests separate.
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- seed_storage:
+    key: taomni.qa.parity005CompletionMode.v1
+    value: '"resolved"'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+End
+- type: '        StringUtiSuffix;'
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 30
+# Switching away closes the popup instead of leaving it over the new file.
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="parity005/Other.java"]'
+- wait: 1
+- assert_not_visible: .cm-tooltip-autocomplete
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: int marker
+- screenshot: parity005-03-switched-away.png
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="parity005/Main.java"]'
+- wait: 1
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtiSuffix;
+- eval_readonly:
+    expression: "!document.querySelector('.cm-content').innerText.includes('import org.apache.commons.lang3.StringUtils;')"
+    expect_truthy: true
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+# Park the caret at the probe again before asking the restored buffer for a list.
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+End
+- type: '        StringUtiSuffix;'
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: Control+Space
+- wait_for:
+    selector: .cm-tooltip-autocomplete li
+    timeout_sec: 30
+- screenshot: parity005-03-back-to-a.png
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: provider不可用时如实回落；恢复后重新可得；等待中Esc取消零提交且不被迟到响应复活；切换文件不串候选/gate/文档。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    - 11
+    - 13
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 39
+    - 40
+    - 41
+    - 42
+    - 44
+    - 46
+    - 48
+    - 50
+    - 52
+    - 54
+    - 57
+    - 58
+    - 59
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 69
+    - 70
+    - 71
+    - 72
+    - 75
+    - 76
+    - 77
+    - 78
+    - 79
+    - 80
+    - 81
+    - 82
+    - 83
+    - 84
+    - 85
+    - 86
+    - 87
+    - 88
+    - 89
+    - 90
+    - 91
+    - 92
+    - 93
+    - 95
+    - 96
+    - 97
+    - 98
+    - 99
+    - 103
+    - 104
+    - 105
+    - 106
+    - 107
+    - 108
+    - 109
+    - 110
+    - 111
+    - 112
+    - 113
+    - 114
+    - 115
+    - 116
+    - 117
+    - 118
+    - 119
+    - 120
+    - 122
+    - 123
+    - 126
+    - 127
+    - 128
+    - 131
+    - 132
+    - 133
+    - 134
+    - 135
+    - 136
+    - 137
+    - 138
+    - 139
+    - 140
+    - 141
+    - 142
+    - 143
+    - 144
+    - 145
+    - 146
+    - 148
+    checkpoints:
+    - step: 35
+      expectation: 解除武装后不再声称语义就绪
+    - step: 36
+      expectation: 未冒充LSP provider候选
+    - step: 37
+      expectation: 正文为preimage且未被改动
+    - step: 38
+      expectation: 零提交：正文未出现lang3 import
+    - step: 74
+      expectation: 候选列表含provider候选StringUtils
+    - step: 100
+      expectation: 取消后没有gate复活
+    - step: 101
+      expectation: 正文为preimage且未被改动
+    - step: 102
+      expectation: 零提交：正文未出现lang3 import
+    - step: 124
+      expectation: 切换文件后候选列表已关闭
+    - step: 125
+      expectation: 切换到B后编辑器显示B的正文
+    - step: 129
+      expectation: 正文为preimage且未被改动
+    - step: 130
+      expectation: 零提交：正文未出现lang3 import
+    - step: 149
+      expectation: 候选列表含provider候选StringUtils
+    results:
+    - 35
+    - 36
+    - 37
+    - 38
+    - 74
+    - 100
+    - 101
+    - 102
+    - 124
+    - 125
+    - 129
+    - 130
+    - 149
+  visual:
+  - check: 回落态与恢复态的候选面板差异可见；截图供人工评审。
+    method: manual
+    reason: 颜色与状态差异不能仅由DOM断言代替。
+  native:
+  - check: 真实provider生命周期由TC-IDE-PARITY-005-05在native/provider模式覆盖；browser结果不外推。
+    method: external
+    reason: 浏览器stub不能证明真实provider生命周期。
