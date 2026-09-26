@@ -41,6 +41,7 @@ import {
   type ReplacePreviewSnapshot,
 } from "../replaceInFilesModel";
 import { ReplacePreviewDialog } from "./ReplacePreviewDialog";
+import { ContextMenu, type MenuItem } from "../../../ContextMenu";
 import {
   useProjectFactsStore,
   type WorkspaceProjectFactsEntry,
@@ -68,6 +69,8 @@ interface FindInFilesPanelProps {
   ) => Promise<readonly ReplaceFilePreimage[]>;
   /** Bump to move focus into the query input (Ctrl+Shift+F). */
   focusNonce?: number;
+  /** When opening from Replace in Files, prefer the replacement field when query is present. */
+  focusTarget?: "query" | "replace";
   /** Bump the nonce to overwrite the include globs ("Find in Directory..."). */
   includePreset?: { value: string; nonce: number };
   /** Bump the nonce to seed the query field (Search Everywhere Text tab). */
@@ -225,6 +228,7 @@ export function FindInFilesPanel({
   onReplaceMatches,
   onPrepareReplacePreimages,
   focusNonce = 0,
+  focusTarget = "query",
   includePreset,
   queryPreset,
   workspaceInstanceId,
@@ -238,6 +242,10 @@ export function FindInFilesPanel({
   const [excludeGlobs, setExcludeGlobs] = useState("");
   const [status, setStatus] = useState<SearchStatus>("idle");
   const [groups, setGroups] = useState<MatchGroup[]>([]);
+  const [excludedMatchKeys, setExcludedMatchKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const [focusedMatchKey, setFocusedMatchKey] = useState<string | null>(null);
+  const [replaceNotice, setReplaceNotice] = useState<{ appliedCount: number; fileCount: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; matchKey: string } | null>(null);
   const [summary, setSummary] = useState<SearchSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** ED-FIND-004/005: frozen replace preview (plan + source edit + matches +
@@ -248,6 +256,7 @@ export function FindInFilesPanel({
     matches: WorkspaceSearchMatch[];
     usageToMatchKey: ReadonlyMap<string, string>;
     stableToUsageId: ReadonlyMap<string, string>;
+    initialExcludedKeys: ReadonlySet<string>;
     replacement: string;
     snapshot: ReplacePreviewSnapshot;
   } | null>(null);
@@ -327,6 +336,10 @@ export function FindInFilesPanel({
   ));
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const replacementInputRef = useRef<HTMLInputElement>(null);
+  const replaceAllButtonRef = useRef<HTMLButtonElement>(null);
+  const matchRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const pendingMatchFocusRef = useRef<string | null>(null);
   const searchIdRef = useRef<string | null>(null);
   const unlistenRef = useRef<(() => void) | null>(null);
   const groupsRef = useRef<Map<string, MatchGroup>>(new Map());
@@ -334,9 +347,12 @@ export function FindInFilesPanel({
 
   useEffect(() => {
     if (!focusNonce) return;
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  }, [focusNonce]);
+    const target = focusTarget === "replace" && query.trim()
+      ? replacementInputRef.current
+      : inputRef.current;
+    target?.focus();
+    target?.select();
+  }, [focusNonce, focusTarget]);
 
   const appliedPresetNonceRef = useRef(0);
   useEffect(() => {
@@ -367,6 +383,11 @@ export function FindInFilesPanel({
     // so a stale plan can never commit.
     setReplacePreview(null);
     setReplaceCommitError(null);
+    setExcludedMatchKeys(new Set());
+    setReplaceNotice(null);
+    setContextMenu(null);
+    setFocusedMatchKey(null);
+    pendingMatchFocusRef.current = null;
     if (active) void workspaceSearchCancel(active).catch(() => {});
   }, []);
 
@@ -385,6 +406,10 @@ export function FindInFilesPanel({
     teardownSearch();
     groupsRef.current = new Map();
     setGroups([]);
+    setExcludedMatchKeys(new Set());
+    setReplaceNotice(null);
+    setContextMenu(null);
+    setFocusedMatchKey(null);
     setSummary(null);
     setError(null);
     setFileExpand({});
@@ -512,6 +537,21 @@ export function FindInFilesPanel({
     [groups],
   );
 
+  const includedMatches = useMemo(
+    () => allMatches.filter((match) => !excludedMatchKeys.has(workspaceSearchMatchKey(match))),
+    [allMatches, excludedMatchKeys],
+  );
+
+  useEffect(() => {
+    const pending = pendingMatchFocusRef.current;
+    if (!pending) return;
+    const element = matchRefs.current.get(pending);
+    if (element) {
+      element.focus();
+      pendingMatchFocusRef.current = null;
+    }
+  }, [groups, excludedMatchKeys]);
+
   // ED-REPAIR-005: invalidate any in-flight prepare request when inputs, matches, or workspace changes
   useEffect(() => {
     invalidateReplacePrepare();
@@ -538,6 +578,47 @@ export function FindInFilesPanel({
     if (typeof expand === "number") return Math.min(total, expand);
     return Math.min(total, DEFAULT_MATCHES_PER_FILE);
   }, [fileExpand]);
+
+  const visibleMatchKeys = useMemo(
+    () => groups.flatMap((group) => {
+      if (collapsedFiles[group.key]) return [];
+      const limit = visibleLimitFor(group.key, group.matches.length);
+      return group.matches.slice(0, limit).map(workspaceSearchMatchKey);
+    }),
+    [collapsedFiles, groups, visibleLimitFor],
+  );
+
+  const toggleMatchExclusion = useCallback((matchKey: string) => {
+    setExcludedMatchKeys((current) => {
+      const next = new Set(current);
+      if (next.has(matchKey)) next.delete(matchKey);
+      else next.add(matchKey);
+      return next;
+    });
+  }, []);
+
+  const toggleFileExclusion = useCallback((matches: readonly WorkspaceSearchMatch[]) => {
+    const keys = matches.map(workspaceSearchMatchKey);
+    setExcludedMatchKeys((current) => {
+      const next = new Set(current);
+      const allExcluded = keys.length > 0 && keys.every((key) => next.has(key));
+      for (const key of keys) {
+        if (allExcluded) next.delete(key);
+        else next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const moveMatchFocus = useCallback((matchKey: string, delta: number) => {
+    const index = visibleMatchKeys.indexOf(matchKey);
+    if (index < 0 || visibleMatchKeys.length === 0) return;
+    const targetIndex = Math.max(0, Math.min(visibleMatchKeys.length - 1, index + delta));
+    const targetKey = visibleMatchKeys[targetIndex];
+    if (!targetKey) return;
+    pendingMatchFocusRef.current = targetKey;
+    requestAnimationFrame(() => matchRefs.current.get(targetKey)?.focus());
+  }, [visibleMatchKeys]);
 
   const toggleFileCollapsed = useCallback((key: string) => {
     setCollapsedFiles((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -637,7 +718,7 @@ export function FindInFilesPanel({
   }, [languagesByPath]);
 
   const replaceAll = useCallback(async () => {
-    if (!onReplaceMatches || allMatches.length === 0 || replacePreview || replacePreparingRef.current) return;
+    if (!onReplaceMatches || includedMatches.length === 0 || replacePreview || replacePreparingRef.current) return;
     // ED-REPAIR-005: synchronously claim preparing state to prevent duplicate calls in the same event loop
     replacePreparingRef.current = true;
     setReplacePreparing(true);
@@ -748,14 +829,21 @@ export function FindInFilesPanel({
       matches: frozenMatches,
       usageToMatchKey,
       stableToUsageId,
+      initialExcludedKeys: new Set(
+        frozenMatches
+          .filter((match) => excludedMatchKeys.has(workspaceSearchMatchKey(match)))
+          .map(usageJoinKeyForMatch),
+      ),
       replacement: frozenReplacement,
       snapshot,
     });
   }, [
     allMatches,
     caseSensitive,
+    excludedMatchKeys,
     excludeGlobs,
     includeGlobs,
+    includedMatches.length,
     onPrepareReplacePreimages,
     onReplaceMatches,
     query,
@@ -812,14 +900,56 @@ export function FindInFilesPanel({
         preview.snapshot,
       );
       if (result.ok) {
+        const committedKeys = new Set(filteredMatches.map(workspaceSearchMatchKey));
+        const remainingMatches = allMatches.filter((match) => !committedKeys.has(workspaceSearchMatchKey(match)));
+        const remainingFirstKey = remainingMatches[0] ? workspaceSearchMatchKey(remainingMatches[0]) : null;
+        setGroups((current) => current
+          .map((group) => ({
+            ...group,
+            matches: group.matches.filter((match) => !committedKeys.has(workspaceSearchMatchKey(match))),
+          }))
+          .filter((group) => group.matches.length > 0));
+        setExcludedMatchKeys((current) => new Set(
+          [...current].filter((key) => !committedKeys.has(key)),
+        ));
+        setSummary((current) => current ? {
+          ...current,
+          totalMatches: remainingMatches.length,
+        } : current);
+        setReplaceNotice({
+          appliedCount: result.appliedCount ?? filteredMatches.length,
+          fileCount: result.fileCount ?? new Set(filteredMatches.map((match) => replaceMatchAbsolutePath(match))).size,
+        });
         setReplacePreview(null);
+        setReplaceCommitError(null);
+        if (remainingFirstKey) {
+          pendingMatchFocusRef.current = remainingFirstKey;
+        } else {
+          requestAnimationFrame(() => inputRef.current?.focus());
+        }
       } else {
         setReplaceCommitError(result.message ?? "Replace blocked");
       }
     } finally {
       setReplaceCommitting(false);
     }
-  }, [onReplaceMatches, replacePreview, replacement]);
+  }, [allMatches, onReplaceMatches, replacePreview]);
+
+  const contextMenuMatch = contextMenu
+    ? allMatches.find((match) => workspaceSearchMatchKey(match) === contextMenu.matchKey) ?? null
+    : null;
+  const contextMenuItems: MenuItem[] = contextMenuMatch
+    ? [{
+      label: excludedMatchKeys.has(workspaceSearchMatchKey(contextMenuMatch)) ? "Restore" : "Exclude",
+      testId: excludedMatchKeys.has(workspaceSearchMatchKey(contextMenuMatch))
+        ? "code-workspace-find-row-restore"
+        : "code-workspace-find-row-exclude",
+      onClick: () => {
+        toggleMatchExclusion(workspaceSearchMatchKey(contextMenuMatch));
+        setContextMenu(null);
+      },
+    }]
+    : [];
 
   const toggles = [
     { label: "Match case", icon: <CaseSensitive className="h-3.5 w-3.5" />, value: caseSensitive, set: setCaseSensitive },
@@ -937,6 +1067,7 @@ export function FindInFilesPanel({
         </label>
         <label className="inline-flex h-6 w-36 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5">
           <input
+            ref={replacementInputRef}
             value={replacement}
             placeholder="Replace with"
             aria-label="Replace text"
@@ -973,7 +1104,8 @@ export function FindInFilesPanel({
               type="button"
               aria-label="Preview replace all matches"
               data-testid="code-workspace-find-replace-all"
-              disabled={allMatches.length === 0 || replaceCommitting || replacePreparing || status === "searching"}
+              ref={replaceAllButtonRef}
+              disabled={includedMatches.length === 0 || replaceCommitting || replacePreparing || status === "searching"}
               className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
               onClick={() => void replaceAll()}
             >
@@ -1018,6 +1150,14 @@ export function FindInFilesPanel({
           {replaceCommitError}
         </div>
       ) : null}
+      {replaceNotice && (
+        <div
+          data-testid="code-workspace-find-replaced-notice"
+          className="shrink-0 border-b border-[var(--taomni-code-border)] px-2 py-1 text-[10px] text-[var(--taomni-code-muted)]"
+        >
+          Replaced {replaceNotice.appliedCount} occurrence{replaceNotice.appliedCount === 1 ? "" : "s"} in {replaceNotice.fileCount} file{replaceNotice.fileCount === 1 ? "" : "s"}
+        </div>
+      )}
       {(summary?.truncated || summary?.cancelled) && (
         <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-500">
           {summary.cancelled ? "Search cancelled — results are partial." : `Match limit reached (${MAX_TOTAL_MATCHES}) — refine the query to see everything.`}
@@ -1062,6 +1202,11 @@ export function FindInFilesPanel({
                 aria-expanded={!collapsed}
                 aria-label={collapsed ? `Expand ${group.title}` : `Collapse ${group.title}`}
                 onClick={() => toggleFileCollapsed(group.key)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Delete") return;
+                  event.preventDefault();
+                  toggleFileExclusion(group.matches);
+                }}
               >
                 <Chevron className="h-3.5 w-3.5 shrink-0" />
                 <File className="h-3.5 w-3.5 shrink-0" />
@@ -1074,12 +1219,43 @@ export function FindInFilesPanel({
               </button>
               {visibleMatches.map((match, index) => {
                 const segments = matchSegments(match);
+                const matchKey = workspaceSearchMatchKey(match);
+                const excluded = excludedMatchKeys.has(matchKey);
                 return (
                   <button
-                    key={`${match.lineNumber}:${match.column}:${index}`}
+                    key={matchKey || `${match.lineNumber}:${match.column}:${index}`}
                     type="button"
-                    className="h-6 w-full min-w-0 flex items-center gap-2 px-4 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
+                    ref={(element) => {
+                      if (element) matchRefs.current.set(matchKey, element);
+                      else matchRefs.current.delete(matchKey);
+                    }}
+                    data-testid="code-workspace-find-match-row"
+                    data-match-key={matchKey}
+                    data-excluded={excluded ? "true" : "false"}
+                    aria-selected={focusedMatchKey === matchKey}
+                    tabIndex={0}
+                    className={`h-6 w-full min-w-0 flex items-center gap-2 px-4 text-left hover:bg-[var(--taomni-code-active-line-bg)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--taomni-accent)] ${excluded ? "text-[var(--taomni-code-muted)] line-through" : ""}`}
                     title={`${group.title}:${match.lineNumber}:${match.column}`}
+                    onFocus={() => setFocusedMatchKey(matchKey)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setFocusedMatchKey(matchKey);
+                      setContextMenu({ x: event.clientX, y: event.clientY, matchKey });
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Delete") {
+                        event.preventDefault();
+                        toggleMatchExclusion(matchKey);
+                        const indexInVisible = visibleMatchKeys.indexOf(matchKey);
+                        moveMatchFocus(matchKey, indexInVisible >= 0 && indexInVisible < visibleMatchKeys.length - 1 ? 1 : -1);
+                      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                        event.preventDefault();
+                        moveMatchFocus(matchKey, event.key === "ArrowDown" ? 1 : -1);
+                      } else if (event.key === "Enter") {
+                        event.preventDefault();
+                        onOpenMatch(match, { preview: false });
+                      }
+                    }}
                     onClick={() => onOpenMatch(match, { preview: true })}
                     onDoubleClick={() => onOpenMatch(match, { preview: false })}
                   >
@@ -1119,20 +1295,32 @@ export function FindInFilesPanel({
         })}
       </div>
       {replacePreview && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4">
           <ReplacePreviewDialog
             edit={replacePreview.edit}
             replacement={replacePreview.replacement}
             scopeLabel={replaceScopeLabel(replacePreview.snapshot)}
+            query={replacePreview.snapshot.query.query}
+            initialExcludedKeys={replacePreview.initialExcludedKeys}
             committing={replaceCommitting}
             commitError={replaceCommitError}
             onCommit={(excluded) => void commitReplacePreview(excluded)}
             onCancel={() => {
               setReplacePreview(null);
               setReplaceCommitError(null);
+              requestAnimationFrame(() => replaceAllButtonRef.current?.focus());
             }}
           />
         </div>
+      )}
+      {contextMenu && contextMenuMatch && contextMenuItems.length > 0 && (
+        <ContextMenu
+          items={contextMenuItems}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          appearance="code-candidates"
+          onClose={() => setContextMenu(null)}
+        />
       )}
     </div>
   );

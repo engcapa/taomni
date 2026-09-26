@@ -1458,6 +1458,10 @@ export function CodeWorkspaceTab({
     writeCodeStyleSchemeStore(next);
   }, []);
   const [codeStyleSettingsOpen, setCodeStyleSettingsOpen] = useState(false);
+  const [searchFocusTarget, setSearchFocusTarget] = useState<"query" | "replace">("query");
+  const [workspaceUndoConfirmOpen, setWorkspaceUndoConfirmOpen] = useState(false);
+  const undoConfirmTriggerRef = useRef<HTMLElement | null>(null);
+  const undoConfirmOkRef = useRef<HTMLButtonElement | null>(null);
   const ensureWorkspaceUi = useCodeWorkspaceStore((s) => s.ensureInstance);
   const disposeWorkspaceUi = useCodeWorkspaceStore((s) => s.disposeInstance);
   const patchWorkspaceUi = useCodeWorkspaceStore((s) => s.patchInstance);
@@ -3666,9 +3670,10 @@ export function CodeWorkspaceTab({
     pendingEditorCaretByFileRef.current.clear();
   };
 
-  const openFindInFiles = useCallback(() => {
+  const openFindInFiles = useCallback((focusTarget: "query" | "replace" = "query") => {
     setBottomDockOpen(true);
     setBottomDockTab("search");
+    setSearchFocusTarget(focusTarget);
     setSearchFocusNonce((nonce) => nonce + 1);
   }, []);
 
@@ -8792,17 +8797,29 @@ export function CodeWorkspaceTab({
 
   const openSearchMatch = useCallback(
     (match: WorkspaceSearchMatch, options: { preview: boolean }) => {
-      const ref: CodeWorkspaceFileRef = { kind: "root", rootId: match.rootId, path: match.path };
+      const absolute = replaceMatchAbsolutePath(match);
+      const root = rootsRef.current.find((candidate) => candidate.id === match.rootId)
+        ?? rootsRef.current.find((candidate) => relativePathWithinRoot(candidate.path, absolute) !== null);
+      const path = root ? relativePathWithinRoot(root.path, absolute) : null;
+      if (!root || path === null) {
+        setStatusMessage(`Cannot open search result outside the workspace: ${absolute}`);
+        return;
+      }
+      const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path };
       // Backend line numbers are 1-based; reveal targets follow LSP 0-based.
       // ED-IMPROVE-004: backend offsets are code points, reveal ranges are UTF-16.
       const line = Math.max(0, match.lineNumber - 1);
-      revealEditorLocation(fileKey(ref), {
-        start: { line, character: codePointOffsetToUtf16Offset(match.lineText, match.matchStart) },
-        end: { line, character: codePointOffsetToUtf16Offset(match.lineText, match.matchEnd) },
+      revealNonceRef.current += 1;
+      setRevealTarget({
+        key: fileKey(ref),
+        line,
+        character: codePointOffsetToUtf16Offset(match.lineText, match.matchStart),
+        nonce: revealNonceRef.current,
+        focus: !options.preview,
       });
       void openFile(ref, { preview: options.preview });
     },
-    [openFile, revealEditorLocation],
+    [openFile, setStatusMessage],
   );
 
   // ED-MAIN-005 / ED-REPAIR-005: read the frozen per-file preimage before the replace preview
@@ -10877,6 +10894,23 @@ export function CodeWorkspaceTab({
       setWorkspaceEditHistoryRevision((revision) => revision + 1);
     }
   }, [setStatusMessage, workspaceEditHistory]);
+
+  const requestWorkspaceUndoConfirmation = useCallback(() => {
+    undoConfirmTriggerRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    setWorkspaceUndoConfirmOpen(true);
+  }, []);
+
+  const closeWorkspaceUndoConfirmation = useCallback(() => {
+    setWorkspaceUndoConfirmOpen(false);
+    requestAnimationFrame(() => undoConfirmTriggerRef.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceUndoConfirmOpen) return;
+    requestAnimationFrame(() => undoConfirmOkRef.current?.focus());
+  }, [workspaceUndoConfirmOpen]);
 
   const redoWorkspaceEdit = useCallback(async () => {
     try {
@@ -14233,7 +14267,7 @@ export function CodeWorkspaceTab({
       category: "Search",
       keybinding: "Ctrl+Shift+F",
       keywords: ["text", "content", "grep"],
-      run: openFindInFiles,
+      run: () => openFindInFiles(),
     },
     {
       id: "workspace.replaceInFiles",
@@ -14242,8 +14276,7 @@ export function CodeWorkspaceTab({
       keybinding: "Ctrl+Shift+R",
       keywords: ["bulk replace"],
       run: () => {
-        openFindInFiles();
-        setStatusMessage("Enter a replace string and use Replace All in Find in Files");
+        openFindInFiles("replace");
       },
     },
     {
@@ -15080,14 +15113,14 @@ export function CodeWorkspaceTab({
       keywords: ["undo", "workspace edit", "refactor"],
       // ED-AUDIT-008: inside the editor surface the shared document undo
       // (workspace.undo) owns Ctrl+Z and claims the journal through
-      // claimWorkspaceHistory; this action only serves non-editor focus so
-      // the two never compete for the same stroke.
+      // claimWorkspaceHistory. The Actions popup owns its keys and can offer
+      // workspace Undo even when its default snapshot points at that editor.
       when: (context) => context.focus !== "tree"
         && context.focus !== "terminal"
-        && context.focus !== "editor"
+        && (context.focus !== "editor" || searchEverywhereOpen)
         && workspaceEditHistoryState.canUndo
         && !workspaceEditHistoryState.busy,
-      run: () => void undoWorkspaceEdit(),
+      run: () => requestWorkspaceUndoConfirmation(),
     },
     {
       id: "workspace.redoWorkspaceEdit",
@@ -15096,7 +15129,7 @@ export function CodeWorkspaceTab({
         : "Redo Workspace Edit",
       category: "Edit",
       keybinding: "Ctrl+Shift+Z",
-      keybindings: ["Cmd+Shift+Z"],
+      keybindings: ["Cmd+Shift+Z", "Ctrl+Y", "Cmd+Y"],
       keywords: ["redo", "workspace edit", "refactor"],
       when: (context) => context.focus !== "tree"
         && context.focus !== "terminal"
@@ -15535,6 +15568,8 @@ export function CodeWorkspaceTab({
     refreshTree,
     reloadFile,
     requestGenerateCandidates,
+    requestWorkspaceUndoConfirmation,
+    searchEverywhereOpen,
     revealEditorTabInTree,
     revealRenderedDocSource,
     readerModeByFile,
@@ -15600,8 +15635,17 @@ export function CodeWorkspaceTab({
       // Ctrl+F as text instead of the workspace dispatcher opening the editor
       // find panel behind the dialog. The Keymap recorder keeps working
       // because it listens on window capture independently of this guard.
-      + ', [data-testid="workspace-keymap-settings-dialog"], [data-testid="keymap-cheatsheet-dialog"]',
+      + ', [data-testid="workspace-keymap-settings-dialog"], [data-testid="keymap-cheatsheet-dialog"], [data-testid="code-workspace-undo-confirm"]',
     ));
+  }, []);
+
+  const isNativeTextInputTarget = useCallback((target: EventTarget | null): boolean => {
+    const node = target instanceof Node ? target : null;
+    const element = node instanceof Element ? node : node?.parentElement;
+    return Boolean(
+      (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)
+      && !element.closest(".cm-editor"),
+    );
   }, []);
 
   const isEditorSurfaceKeyEvent = useCallback((target: EventTarget | null): boolean => {
@@ -15885,6 +15929,21 @@ export function CodeWorkspaceTab({
       // must not turn Home/arrows/Enter/Escape into editor actions first.
       if (isSurfaceOwnedKeyEvent(event.target)) return;
       const logicalKey = eventLogicalKey(event);
+      const targetElement = event.target instanceof Element ? event.target : null;
+      if (
+        !event.ctrlKey && !event.metaKey && !event.altKey
+        && targetElement?.closest('[data-testid="code-workspace-find-file-group"]')
+        && ["delete", "arrowup", "arrowdown", "enter"].includes(logicalKey)
+      ) return;
+      // Native text controls own their character history. A workspace journal
+      // must never consume Ctrl/Cmd+Z, redo, or Ctrl/Cmd+Y while an input is
+      // focused, otherwise replacing files would be undone from the query box.
+      if (
+        isNativeTextInputTarget(event.target)
+        && (event.ctrlKey || event.metaKey)
+        && !event.altKey
+        && ["z", "y"].includes(logicalKey)
+      ) return;
       const switcherModifier = event.ctrlKey || event.metaKey;
       if (logicalKey === "tab" && switcherModifier && !event.altKey) {
         event.preventDefault();
@@ -15990,7 +16049,7 @@ export function CodeWorkspaceTab({
       window.removeEventListener("keydown", handleWorkspaceCommand, true);
       window.removeEventListener("keyup", release, true);
     };
-  }, [dispatchWorkspaceKeydownV2, isEditorSurfaceKeyEvent, isSurfaceOwnedKeyEvent, onCommandsChange, openFile, visible]);
+  }, [dispatchWorkspaceKeydownV2, isEditorSurfaceKeyEvent, isNativeTextInputTarget, isSurfaceOwnedKeyEvent, onCommandsChange, openFile, visible]);
 
   const runSearchEverywhereCommand = useCallback((commandId: string) => {
     setSearchEverywhereOpen(false);
@@ -20220,6 +20279,7 @@ export function CodeWorkspaceTab({
                 roots={roots}
                 workspaceInstanceId={workspaceInstanceId}
                 focusNonce={searchFocusNonce}
+                focusTarget={searchFocusTarget}
                 includePreset={searchIncludePreset}
                 queryPreset={searchQueryPreset}
                 onOpenMatch={openSearchMatch}
@@ -21271,6 +21331,55 @@ export function CodeWorkspaceTab({
           onSelect={autoImportCandidatePrompt.onSelect}
           onClose={autoImportCandidatePrompt.onClose}
         />
+      )}
+      {workspaceUndoConfirmOpen && (
+        <div
+          data-testid="code-workspace-undo-confirm"
+          role="dialog"
+          aria-label="Undo"
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              closeWorkspaceUndoConfirmation();
+            } else if (event.key === "Enter" && event.target === event.currentTarget) {
+              event.preventDefault();
+              event.stopPropagation();
+              setWorkspaceUndoConfirmOpen(false);
+              void undoWorkspaceEdit();
+            }
+          }}
+        >
+          <div className="w-[360px] max-w-[90vw] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-4 text-[12px] text-[var(--taomni-code-text)] shadow-xl">
+            <div className="font-medium">Undo</div>
+            <div className="mt-2 text-[11px] text-[var(--taomni-code-muted)]">
+              Undo {workspaceEditHistoryState.undoLabel ?? "workspace edit"}?
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                data-testid="code-workspace-undo-confirm-cancel"
+                className="h-7 rounded px-3 hover:bg-[var(--taomni-code-active-line-bg)]"
+                onClick={closeWorkspaceUndoConfirmation}
+              >
+                Cancel
+              </button>
+              <button
+                ref={undoConfirmOkRef}
+                type="button"
+                data-testid="code-workspace-undo-confirm-ok"
+                className="h-7 rounded bg-[var(--taomni-accent)] px-3 font-medium text-white"
+                onClick={() => {
+                  setWorkspaceUndoConfirmOpen(false);
+                  void undoWorkspaceEdit();
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       </WorkspaceObservationBoundary>
     </WorkspaceClipboardSessionContext.Provider>

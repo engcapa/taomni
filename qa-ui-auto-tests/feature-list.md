@@ -6590,10 +6590,26 @@ controls:
     selector: '[data-testid="code-workspace-find-match-hit"]'
     kind: display
     optional: true       # highlighted hit inside a match row
+  - id: find-match-row
+    selector: '[data-testid="code-workspace-find-match-row"]'
+    kind: interactive
+    optional: false      # required result workflow; Delete/Arrow/Enter and context menu
+  - id: find-row-exclude
+    selector: '[data-testid="code-workspace-find-row-exclude"]'
+    kind: interactive
+    optional: false      # required exclusion workflow
+  - id: find-row-restore
+    selector: '[data-testid="code-workspace-find-row-restore"]'
+    kind: interactive
+    optional: false      # required restore workflow
   - id: replace-preview
     selector: '[data-testid="code-workspace-replace-preview"]'
     kind: display
     optional: true       # structured replace preview dialog; ED-FIND-004
+  - id: replace-summary
+    selector: '[data-testid="code-workspace-replace-summary"]'
+    kind: display
+    optional: false      # required included occurrence/file summary; ED-PARITY-006
   - id: replace-counts
     selector: '[data-testid="code-workspace-replace-counts"]'
     kind: display
@@ -6618,6 +6634,22 @@ controls:
     selector: '[data-testid="code-workspace-replace-commit-error"]'
     kind: display
     optional: true       # precondition conflicts; ED-FIND-004 fail-closed
+  - id: find-replaced-notice
+    selector: '[data-testid="code-workspace-find-replaced-notice"]'
+    kind: display
+    optional: false      # required successful commit pruning notice; ED-PARITY-006
+  - id: workspace-undo-confirm
+    selector: '[data-testid="code-workspace-undo-confirm"]'
+    kind: display
+    optional: false      # required non-editor workspace edit undo confirmation
+  - id: workspace-undo-confirm-cancel
+    selector: '[data-testid="code-workspace-undo-confirm-cancel"]'
+    kind: interactive
+    optional: false
+  - id: workspace-undo-confirm-ok
+    selector: '[data-testid="code-workspace-undo-confirm-ok"]'
+    kind: interactive
+    optional: false
   - id: bottom-dock-terminal-tab       # dock tab ids are shared with F25.1/F25.2 panels; this owns the terminal tab id
     selector: '[data-testid="code-workspace-bottom-tab-terminal"]'
     kind: interactive

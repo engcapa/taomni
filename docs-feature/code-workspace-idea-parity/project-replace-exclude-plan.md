@@ -9,7 +9,7 @@
 - IDEA 目标：用户确定 **2026.2.3 / IU-262.10968.63**（仅本卡）。用户授权 15 分钟桌面，已在隔离工程实采 R1–R8，见[参照包](references/ed-parity-006-reference.md#observed)。
 - 用户结果：隔离两文件 fixture → Directory=`src` + mask `*.txt` 搜索 `token` 得 3 条 → 在**结果列表**排除 1 条 → Replace All 打开确认预览（计数已扣除排除项）→ Esc/Cancel 零写入 → 再次确认提交 2 处 → 结果只剩排除行 → 在非编辑器焦点 Ctrl+Z 弹确认 → OK 一次撤销两文件。冲突负路径限定为“预览后外部修改一个文件”和“目标文件在编辑器 dirty”两种，均零写入。
 - 不纳入：搜索引擎/ripgrep 重构、regex 捕获组替换、Find 工具窗 tab 历史/pin、结构搜索（ED-PARITY-009）、编辑器内 Ctrl+Z 的确认语义（IDEA 未采，保持现状）。
-- **P1 规划就绪，产品验证全部未执行。** 用户已决定撤销语义对齐 IDEA（DEC-06）。
+- **P1 于 2026-09-26 规划就绪，当时产品验证未执行。** 用户已决定撤销语义对齐 IDEA（DEC-06）；P2 本轮实现与实际证据见第 8 节。
 
 ## 2. 当前生产事实与差距分类
 
@@ -75,14 +75,14 @@ UI 规格：结果行高度 24px 不变；排除态只改 `text-decoration: line
 ## 5. 本卡 AC 与 V
 
 - **ED-PARITY-006-A1**（目标）：S1–S6、S10–S11 — scope/mask 集合准确；结果列表 Delete/右键排除与恢复、焦点移动；Replace All 预览计数/summary 扣除排除项；Esc/Cancel 零写入；提交集合与字节准确、提交后列表修剪；外部修改与 dirty 两类冲突零写入并可恢复。→ V1、V3、V4。
-- **ED-PARITY-006-A2**（比较）：同 F1-REPL-006 的 IDEA R1–R8 与 Taomni 对应状态分别给功能/UI/交互结论与证据身份；DEC-03/07 为已接受差异，C1–C5 未采项标 unverified；不签 matched。→ V5。
+- **ED-PARITY-006-A2**（比较）：同 F1-REPL-006 的 IDEA R1–R8 与 Taomni 对应状态分别给功能/UI/交互结论与证据身份；DEC-03/07 为已接受差异，C1–C5 未采项标 unverified；不签 matched。→ V5。**P2 最新用户范围修订**：本机 native 通过即可，不要求 IDEA 真机比较；本轮 A2 交付三维自检、参照差异/未验证边界登记及 comparison record 校验，双侧比较不作为 done 门槛。
 - **ED-PARITY-006-A3**（保留与撤销）：S7–S9 — 输入框 Ctrl+Z 不触碰磁盘；非编辑器焦点撤销有确认、Cancel 零效果、OK 一次恢复两文件；冻结 preimage/迟到丢弃/workspace 实例校验保留；编辑器内 Rename 撤销、AUDIT-003 ledger、本地 Find、Find in Directory/Search Everywhere 预置入口不退化。→ V2、V4、V6。
 
 验证种类（与 metadata 一致）：`code-audit`（生产链逐步复核）、`unit`（V1/V2/V6 单测，含 G1–G3 改前失败）、`typecheck`（owned paths 一次 scoped）、`browser`（V3/V4 前半）、`native`（V4，Windows 当前端）、`idea-comparison`（V5）。
 
 <a id="test-cases"></a>
 
-## 6. 完整测试用例设计（P2 待实现/执行）
+## 6. 完整测试用例设计（P1 原交付，实际执行见第 8 节）
 
 所有“拟新增”路径当前不存在，均为 **P2 待实现**，状态 unrun；现有用例状态以 2026-09-26 只读 `status` 为准（D2-01 browser stale、D2-02 native stale、AUDIT-003 Windows unverified：`native_click requires Linux/X11`）。全部 `covers: [F25.5]`。
 
@@ -203,8 +203,69 @@ N/A：拖拽、滚动性能、IME（本卡不改文本输入路径，Delete/Ctrl
 5. native：`native_build.py --check` → 构建/复用一次 → `run --mode native --filter TC-IDE-PARITY-006-03,TC-IDE-D2-02-replace-commit-undo-native,TC-IDE-AUDIT-003-replace-conflict-ledger-native --require-pass`。
 6. 用例/目录变更后一次 `python -m qa_ui_auto audit --gate` 与 `contracts --gate`；V5 比较记录。
 
-完成上限：Windows/WebView2 当前端功能与交互；UI 视觉不签 matched；Linux/macOS 未验证并给出同序列步骤。
+P1 原计划上限：Windows/WebView2 当前端功能与交互。P2 实际主机为 Linux，按用户最新“本机 native 必须通过、其他端不必验证、无需 IDEA 真机比较”执行；本轮上限改为 Linux/WebKitGTK，Windows/macOS 未验证；UI 不签 matched。
 
+## 8. P2 实现与验证回填（2026-09-27）
 
+任务身份：`backlog.md::ED-PARITY-006`，owner `codex-20260926T144632Z-6720c542`，领取与验证基线 HEAD `6720c54290d98a51c5d0049aa276b9119bde29d1`。本轮不提交、不推送、不委派。下表是本轮实际状态，第 6 节的 `unrun` 是 P1 交付时状态。
 
+### 8.1 生产效果链与范围
+
+`workspace.findInFiles` / `workspace.replaceInFiles` → 生产 `FindInFilesPanel` → 原 scope/mask 计划与搜索 IPC → 结果行/组 Delete、Arrow/Enter、右键 Exclude/Restore → exclusion owner → 原冻结 preimage/选择校验 → `ReplacePreviewDialog` 播种排除、摘要、Esc/Enter/Tab → 原全量 preflight/freshness 与 `applyLspWorkspaceEdit(kind=replace)` → 真实 ledger/recovery → 成功时修剪已提交结果 → 非编辑器 workspace Undo 确认 → 原一次多文件 history undo。
+
+- G1/G2/G3/G4/G5 已实现：结果排除、提交修剪、原生输入框 undo/redo 豁免、workspace undo 确认、预览摘要/键盘/焦点；范围与数据契约未重做。
+- browser 实测发现 bare Delete 被 shell capture 抢占，局部让结果组的 Delete/Arrow/Enter 交给行控件；Ctrl+Z 仍走 workspace owner。R1 的 native 归因：提交时主按钮 disabled 导致 WebKit 失焦，失败后未恢复焦点，Esc 未关闭旧预览，随后 Enter 落入编辑器。修复为提交中聚焦 dialog、失败后同步恢复主按钮；新增红→绿回归和 native Esc 关闭/重开主按钮焦点断言。modal target 的 host context 已拒绝编辑器命令，不需要扩展 preview surface guard。
+- Directory 结果 rootId 为 `scope-0`，此前直接打开无法定位工作区文件；现在用绝对路径和既有大小写路径 helper 映射真实 root/ref。单击预览 `focus=false` 保持结果焦点，双击/Enter 仍聚焦编辑器；共享 reveal 默认行为保留。
+- Actions 初测因默认 editor snapshot 隐藏 workspace Undo；现在仅在 Actions popup 打开时允许 workspace Undo 的既有非编辑器入口，使用同一个 host 冻结 evaluation，未修改共享 registry/history/model。
+- R2 运行归因：`token token\n` 的前一处替换成短一字符的 `coin` 后，保留后一处的旧坐标会失配；新增 model 回归确认 freshness 以 `changed since search` 阻断。符合 DEC-05：剩余行只作展示，需要重新搜索后再替换。
+- native 长错误原先受 dock 高度裁切；预览遮罩改为全窗口 fixed，宽度与冻结 checkbox 保留。同步初始 autofocus 修复即时 Enter 的窗口，提交中 Esc/Enter/Tab 保持惰性。
+
+### 8.2 AC → V → 实际测试与报告
+
+证据根：`qa-ui-auto-report/ed-parity-006/`（不入库）。
+
+| AC / V | 实际测试 / 决定性断言 | 本轮结果与原件 |
+|---|---|---|
+| A1 / V1 | `FindInFilesPanel.test.tsx` parity describe；`ReplacePreviewDialog.test.tsx` parity describe；排除播种、提交集合/修剪、失败不修剪、冻结/迟到、summary、checkbox/Cancel/Enter/Tab、提交中/失败后焦点恢复 | unit 130/130（含下列保留 suites），`unit-recovery.log`，10.08 s |
+| A3 / V2 | `CodeWorkspaceTab.test.tsx` parity describe + ED-REPAIR-002 + ED-AUDIT-008 + tree context menu/Search Everywhere；输入豁免、确认 Cancel/Esc/OK、editor claim、Replace 聚焦、Actions Undo | mounted 13/13，201 个非选中测试，`mounted-recovery.log`，43.47 s |
+| A1 / V3 | `TC-IDE-PARITY-006-01`；真实控件、Delete/右键、组操作、scope/mask、Tab/Shift+Tab、Esc、Enter、Cancel、计数/摘要/结果修剪与全排除 disabled | browser passed，`browser/run-20260927-012911-519728892/` |
+| A3 / V4 browser | `TC-IDE-PARITY-006-02`；输入 Ctrl+Z/redo、结果 Ctrl+Z、Cancel/Esc、Actions Undo→确认 OK、本地编辑 undo、Replace 入口焦点 | browser passed，同批 summary/receipt |
+| A1/A3 / V4 native | `TC-IDE-PARITY-006-03`；真实搜索/Tauri 写盘、四文件 SHA-256、外部修改零写入/恢复、dirty 零写入/Save/重开主按钮焦点/Enter、提交收尾修剪、一次两文件 undo | Linux/WebKitGTK passed，94/94 步、19.875 s；`native/run-20260927-013506-678365023/` |
+| A3 / V6 | `TC-IDE-D2-01`、`TC-IDE-D1-01`、`TC-IDE-FINDFOCUS-01`；前者保留预览排除/Cancel，后两者保留 scope/focus；Keymap/buildReplaceEdits/replaceInFilesModel suites | browser 三项 passed；与 V3/V4 合批共 5/5，0 fail/0 skip，77.888 s；unit 130/130 |
+| A3 / V6 native | 必改 `TC-IDE-D2-02-replace-commit-undo-native`、`TC-IDE-AUDIT-003-replace-conflict-ledger-native`；结果行 Undo→OK、UTF-16 两文件字节、真实 ledger/失败恢复 | Linux passed；`native/run-20260927-013238-810396421/` 共 3/3、61.887 s；D2-02 78 步、AUDIT-003 67 步。该批 006-03 后补 UI 收尾断言，仅重跑该项；AUDIT-003 权限 fault 仍限 Linux |
+| A1/A3 / typecheck | 本卡六个原 owned paths + `EditorGroup.tsx`、`CodeMirrorHost.tsx`、`replaceInFilesModel.test.ts` | `typecheck-final.json`：9 paths，scoped/external errors 均 0；复用 `native-build-recovery.log` 成功 frontend hook |
+| A2 / V5 | 生产截图自检 + IDEA 参照差异/上限登记；comparison record schema/hash 校验 | `qa-ui-auto-report/idea-comparison/ED-PARITY-006/run-20260927-local/record.json` 校验 exit 0；computed verdict **unverified**，无双侧 matched 主张；C1–C5 未采保持 unverified |
+
+实际 unit 命令：`pnpm exec vitest run src/components/editor/workspace/panels/FindInFilesPanel.test.tsx src/components/editor/workspace/panels/ReplacePreviewDialog.test.tsx src/components/editor/workspace/replaceInFilesModel.test.ts src/components/editor/workspace/buildReplaceEdits.test.ts src/components/editor/workspace/KeymapSettingsDialog.test.tsx --maxWorkers=1`。mounted 命令：`pnpm exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx -t 'ED-PARITY-006|ED-REPAIR-002|ED-AUDIT-008|tree context menu|Search Everywhere' --maxWorkers=1`。
+
+browser 命令与第 7 节同一五 ID 集合，配置改为 `qa-ui-auto-report/ed-parity-006/current.config.yaml`，URL `http://127.0.0.1:5001`、workers=2。final source `26652deb092d7c6d3eb71ba6f4a978e93c2c78e64efdd4b7890a9b3cad508a51`，runner `af6ec20f6d2f2f83772d53a3dbb053411f4def8d51cbd00307e85e3d7f94533d`，browser/native 均 `identity_stable=true`，summary 与匹配 receipt 保留。
+
+native 命令：`PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode native --config qa-ui-auto-report/ed-parity-006/current.config.yaml --filter TC-IDE-PARITY-006-03,TC-IDE-D2-02-replace-commit-undo-native,TC-IDE-AUDIT-003-replace-conflict-ledger-native --report-dir qa-ui-auto-report/ed-parity-006/native --require-pass`；最后仅 `--filter TC-IDE-PARITY-006-03` 复跑增强后的收尾断言，复用 binary，无新构建。
+
+QA binary：`src-tauri/target/qa-ui-auto/debug/taomni`，`com.taomni.app.qa`，Rust debug / production renderer，SHA-256 `0608a948c6f8e01550f8b11e21b9579a28e116b5363157ab7013f49d063a92b5`。本轮累计 4 次成功构建：295.865 / 164.538 / 188.162 / 190.634 s；一次中间构建因真实 rootId 修正主动停止，未充当证据。最终 `native_build.py --check` inputs match。源码改变引发构建，case-only 探针/最终单项复跑复用匹配 binary；未为每个场景单独构建。
+
+### 8.3 失败、stale 与静态门槛
+
+- baseline `v6-unit-before.txt` 96/96；`v1-g1-g2-red.txt` 2 个预期失败（Delete/播种与修剪）；`v2-g3-red.txt` 1 个预期失败（输入框撤销触碰 workspace history）。两个 `*-before.txt` 名称过滤未选中，不算失败复现或通过。
+- `browser/run-20260927-005451-276169747/`：2 pass/3 fail，暴露 capture Delete 与 D1 旧提示；保留原报告。D1 期望按生产 browser provider 明确提示 `No Maven tooling in browser preview` 修正，没有修改 scope 生产逻辑。
+- `run-20260927-005806-163352683/`：2 pass/1 fail 且 inputs unstable，新增 R2 单测发生于运行期间；不作当前通过证据。
+- `run-20260927-005957-743948884/`：4 pass/1 fail，Actions Undo 不可用；截图与新增 mounted regression 定位默认 editor snapshot，修复后最终五项全通过。
+- native `run-20260927-010946-947345168` 为 1 pass/2 locator fail；修正真实 CSS selector 后 `011142-086560411` 与 `012107-564084056` 均暴露 dirty 恢复时 Enter 编辑了编辑器。`012634-584797621` 聚焦探针在 Enter 前直接失败，截图仍是旧 dirty 错误预览；不是磁盘 hash 期望错误。
+- 初始 deferred autofocus 的 `preview-focus-red.log` 1 fail；最终失焦生命周期的 `preview-blocked-focus-red.log` 1 fail。修复后 130 个单测与上述 native 实际运行通过。`013238-810396421` 三项通过，但最后恢复截图仍在 Replacing；新增关闭/notice/修剪断言后只跑 006-03，`013506-678365023` 94 步全通过，最终截图已收尾。
+- 旧输入身份的 pass、inputs unstable、dry-run、未选中测试均不计最终 PASS。`audit --gate`、`contracts --gate`、`git diff --check` exit 0；contracts 273/273 reviewed、0 gaps；报告 `audit-completion.log` / `contracts-completion.log`。8 个明确 ID 的 `status --gate --platform Linux` 为 `ok=true, gaps=[]`（`status-final.json`），006-03 采用单项最终报告，另两 native 采用匹配源码的三项批次。
+- 静态 `audit --gate` 的控制清单另列 `find-row-exclude`/`find-row-restore` 两个 required testid 为 untouched：006-01 通过真实 `right_click → click_menu Restore/Exclude` 按可见文字操作同一 ContextMenu 控件并断言排除态；审计器不把 label verb 归为 testid 触达。此项是静态选择器归属限制，不是菜单行为未运行；保留该警告与原始报告，不把 audit exit 0 描述为零静态 gap。
+
+### 8.4 三维自检与平台边界
+
+| 维度 | 本轮结论 | 边界 / 已接受差异 |
+|---|---|---|
+| 功能 | browser 主序列、输入路由与保留场景通过；native 真实 scope/mask、字节、两类冲突/恢复、一次两文件 Undo 和 ledger 通过 | 不以 VFS 证明磁盘；IDEA C1/C2 外部/dirty 未采 |
+| UI | 已读最终 browser preview/final 与 native dirty/final 截图：摘要、2 of 3、excluded 删除线、notice、disabled 主命令可读，长错误换行完整，未见本卡控件重叠 | browser 1440×900、native 1280×832，未签窄窗/缩放；dock 入口、冻结逐处 checkbox 为 DEC-03 已接受差异；IDEA 原件不在本机，主题/字体/窗口不匹配，不签视觉 matched |
+| 交互 | Delete 焦点移动、右键等价入口、Tab 循环、Esc/Enter、Undo 确认与 Actions、输入与编辑器路由均有真实控件断言 | DEC-07 Undo 直接落盘为已接受差异；IDEA C3 编辑器 Undo/C4 redo/C5 右键文字仍 unverified |
+
+Windows/WebView2 未验证：在匹配源码构建隔离 QA binary，运行上述三个 native ID；AUDIT-003 的权限 fault 需 Windows 等价 fixture 支持。macOS/WKWebView 未验证：同 fixture，Ctrl/Mod 映射改为 Cmd，支持权限 fault 后运行同序列；direct Cargo 前 stage krb5。未自动解锁、未操作 IDEA 或个人工程；native 使用隔离 QA WebDriver，报告内临时目录。
+
+P0 增量输入：REQ-08 / **CW-SEARCH-002** 在本卡 F1-REPL-006 与 Linux/WebKitGTK 范围内 G1–G5 功能/交互差距关闭；依据为 V1/V2、browser 006-01/02、native 006-03 的字节/取消/冲突/恢复/Undo 与 UI 收尾断言，以及 V6 保留回归。R1/R2 已归因并有持久回归。其他平台、IDEA C1–C5 与 UI 高保真仍未验证，不将本卡 done 外推为 REQ-08 全能力或整体 IDEA matched。
+
+变更文件组：9 个生产/测试 TypeScript paths；新增 006-01/02/03，更新 D2-02/AUDIT-003 及 D1-01 browser provider 提示；新增 parity006 fixture 与 registry/schema；feature controls 与 testid catalog；本设计和本卡任务板。共享 `workspaceEditHistory.ts`、`replaceInFilesModel.ts`、`workspaceActionRegistry.ts` 生产文件未修改。原件与辅助 evidence/comparison 脚本均在 ignored `qa-ui-auto-report/`，不入库。未提交、推送、合并、发布或启动其他 agent/P3。
 

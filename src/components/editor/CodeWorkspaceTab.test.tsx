@@ -21,7 +21,7 @@ import type { ProjectDescriptorDiscoveryState } from "../../hooks/useProjectDesc
 import type { StructuredTestResults, WorkspaceEntry, WorkspaceFile, WorkspaceWriteAck } from "../../lib/editor/workspace";
 import type { LocalHistoryEntry } from "../../lib/localHistory";
 import { CodeWorkspaceTab, debugCurrentLineForFile, extractContextSnippet } from "./CodeWorkspaceTab";
-import { emit } from "@tauri-apps/api/event";
+import { emit, type UnlistenFn } from "@tauri-apps/api/event";
 import { WORKSPACE_RECOVERY_STORAGE_PREFIX, hasBlockingDiskEffectResolution, listDiskEffectLedgerEntries, resolveDiskEffectLedgerEntry } from "./workspace/workspaceRecovery";
 import type { WorkspaceCommandRegistration } from "./workspace/workspaceCommands";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
@@ -10303,6 +10303,232 @@ end_of_record
       ).toBe("const value = 2;\n"));
       expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("const value = 2;");
     });
+
+    it("ED-PARITY-006 Ctrl+Z in Search query does not undo the workspace edit", async () => {
+      const workspace = compareWorkspace("instance-parity-006-input-undo");
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const value = 1;\n"));
+      clipboardMocks.readTextResult.mockResolvedValue({ ok: true, text: "const value = 2;\n" });
+      const { registrationRef, onCommandsChange } = captureCommands();
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/main.ts");
+      await waitFor(() => expect(registrationRef.current).not.toBeNull());
+      await act(async () => {
+        await registrationRef.current!.executeAction("workspace.compareWithClipboard");
+      });
+      fireEvent.click(screen.getByTestId("compare-apply-left-to-right"));
+      await waitFor(() => expect(
+        selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspace.workspaceInstanceId!)
+          .openFiles["root:app:src/main.ts"]?.text,
+      ).toBe("const value = 2;\n"));
+
+      await act(async () => {
+        await registrationRef.current!.executeAction("workspace.findInFiles");
+      });
+      const query = await screen.findByLabelText("Search query");
+      query.focus();
+      fireEvent.keyDown(query, { key: "z", code: "KeyZ", ctrlKey: true });
+
+      expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspace.workspaceInstanceId!)
+        .openFiles["root:app:src/main.ts"]?.text).toBe("const value = 2;\n");
+    });
+  });
+
+  describe("ED-PARITY-006: workspace edit undo routing", () => {
+    function parityWorkspace(instanceId: string): CodeWorkspaceTabInfo {
+      return {
+        repoRoot: "/repo/app",
+        workspaceId: `ws-${instanceId}`,
+        workspaceInstanceId: instanceId,
+        name: "Parity 006",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/a.txt" },
+      };
+    }
+
+    async function mountReplaceHistoryAndSearch(instanceId: string) {
+      const disk: Record<string, string> = {
+        "src/a.txt": "alpha token\n",
+        "src/b.txt": "beta token\n",
+      };
+      const workspace = parityWorkspace(instanceId);
+      workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => (
+        path === "src"
+          ? Object.keys(disk).map((relative) => entry(relative.split("/").pop()!, relative))
+          : [entry("src", "src", "dir")]
+      ));
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => (
+        file(path, disk[path] ?? "", { hash: `hash-${disk[path] ?? ""}` })
+      ));
+      workspaceMocks.workspaceReadFileWithEncoding.mockImplementation(async (_root: string, path: string) => (
+        file(path, disk[path] ?? "", { hash: `hash-${disk[path] ?? ""}` })
+      ));
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      let searchHandler: ((event: workspaceSearchModule.WorkspaceSearchEvent) => void) | null = null;
+      vi.spyOn(workspaceSearchModule, "subscribeWorkspaceSearch").mockImplementation(async (_id, handler): Promise<UnlistenFn> => {
+        searchHandler = handler;
+        return () => undefined;
+      });
+      vi.spyOn(workspaceSearchModule, "workspaceSearchStart").mockResolvedValue("search-parity-006");
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/a.txt");
+      await act(async () => {
+        await emit("lsp://workspace-apply-edit", {
+          requestId: `parity-006-${instanceId}`,
+          workspaceId: workspace.workspaceInstanceId,
+          label: "Replace in files",
+          edit: {
+            documentEdits: [
+              {
+                uri: "file:///repo/app/src/a.txt",
+                path: "/repo/app/src/a.txt",
+                edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "coin" }],
+              },
+              {
+                uri: "file:///repo/app/src/b.txt",
+                path: "/repo/app/src/b.txt",
+                edits: [{ range: { start: { line: 0, character: 5 }, end: { line: 0, character: 10 } }, newText: "coin" }],
+              },
+            ],
+          },
+        });
+      });
+      const editPreview = await screen.findByTestId("refactoring-preview-dialog");
+      fireEvent.click(within(editPreview).getByTestId("refactoring-preview-apply"));
+      await waitFor(() => {
+        expect(disk["src/a.txt"]).toBe("alpha coin\n");
+        expect(disk["src/b.txt"]).toBe("beta coin\n");
+      });
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.findInFiles");
+      });
+      const query = await screen.findByLabelText("Search query");
+      fireEvent.change(query, { target: { value: "coin" } });
+      fireEvent.keyDown(query, { key: "Enter" });
+      await waitFor(() => expect(searchHandler).not.toBeNull());
+      await act(async () => {
+        searchHandler?.({
+          searchId: "search-parity-006",
+          kind: "batch",
+          matches: [{
+            rootId: "scope-0",
+            rootName: "src",
+            rootPath: "/repo/app/src",
+            path: "a.txt",
+            lineNumber: 1,
+            column: 7,
+            matchStart: 6,
+            matchEnd: 10,
+            lineText: "alpha coin",
+          }],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 1,
+          error: null,
+        });
+        searchHandler?.({
+          searchId: "search-parity-006",
+          kind: "done",
+          matches: [],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 1,
+          error: null,
+        });
+      });
+      return { disk, workspace, registrationRef };
+    }
+
+    it("ED-PARITY-006 Ctrl+Z on a result row asks before undoing", async () => {
+      const { disk } = await mountReplaceHistoryAndSearch("instance-parity-006-row-confirm");
+      const row = await screen.findByTestId("code-workspace-find-match-row");
+      row.focus();
+      fireEvent.keyDown(row, { key: "z", code: "KeyZ", ctrlKey: true });
+      const dialog = await screen.findByTestId("code-workspace-undo-confirm");
+      expect(dialog).toHaveTextContent("Undo Replace in files?");
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("code-workspace-undo-confirm-ok")));
+      expect(disk["src/a.txt"]).toBe("alpha coin\n");
+    });
+
+    it("ED-PARITY-006 Cancel and Escape leave history untouched, then OK undoes both files once", async () => {
+      const { disk } = await mountReplaceHistoryAndSearch("instance-parity-006-cancel-ok");
+      const row = await screen.findByTestId("code-workspace-find-match-row");
+      row.focus();
+      fireEvent.keyDown(row, { key: "z", ctrlKey: true });
+      fireEvent.click(await screen.findByTestId("code-workspace-undo-confirm-cancel"));
+      expect(disk["src/a.txt"]).toBe("alpha coin\n");
+
+      row.focus();
+      fireEvent.keyDown(row, { key: "z", ctrlKey: true });
+      const dialog = await screen.findByTestId("code-workspace-undo-confirm");
+      fireEvent.keyDown(dialog, { key: "Escape" });
+      expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument();
+      expect(disk["src/b.txt"]).toBe("beta coin\n");
+
+      row.focus();
+      fireEvent.keyDown(row, { key: "z", ctrlKey: true });
+      fireEvent.click(await screen.findByTestId("code-workspace-undo-confirm-ok"));
+      await waitFor(() => {
+        expect(disk["src/a.txt"]).toBe("alpha token\n");
+        expect(disk["src/b.txt"]).toBe("beta token\n");
+      });
+      expect(useAppStore.getState().statusMessage).toContain("Undid Replace in files (2 files)");
+    });
+
+    it("ED-PARITY-006 editor Ctrl+Z still claims the journal without a prompt", async () => {
+      const { disk } = await mountReplaceHistoryAndSearch("instance-parity-006-editor-undo");
+      const content = document.querySelector<HTMLElement>(".cm-content");
+      expect(content).not.toBeNull();
+      content!.focus();
+      fireEvent.keyDown(content!, { key: "z", code: "KeyZ", ctrlKey: true });
+      await waitFor(() => expect(disk["src/a.txt"]).toBe("alpha token\n"));
+      expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument();
+    });
+
+    it("ED-PARITY-006 Actions exposes workspace Undo with an active editor and asks for confirmation", async () => {
+      const { disk } = await mountReplaceHistoryAndSearch("instance-parity-006-actions-undo");
+      const row = await screen.findByTestId("code-workspace-find-match-row");
+      row.focus();
+      fireEvent.keyDown(row, { key: "n", code: "KeyN", ctrlKey: true, shiftKey: true });
+      const popup = await screen.findByTestId("code-workspace-search-everywhere");
+      fireEvent.click(within(popup).getByRole("tab", { name: "Actions" }));
+      fireEvent.change(within(popup).getByLabelText("Search actions"), { target: { value: "Undo Replace in files" } });
+      fireEvent.click(await within(popup).findByText("Undo Replace in files"));
+      expect(await screen.findByTestId("code-workspace-undo-confirm")).toHaveTextContent("Undo Replace in files?");
+      expect(disk["src/a.txt"]).toBe("alpha coin\n");
+      fireEvent.click(screen.getByTestId("code-workspace-undo-confirm-ok"));
+      await waitFor(() => {
+        expect(disk["src/a.txt"]).toBe("alpha token\n");
+        expect(disk["src/b.txt"]).toBe("beta token\n");
+      });
+    });
+
+    it("ED-PARITY-006 Replace in Files action focuses Replace text", async () => {
+      const { registrationRef } = await mountReplaceHistoryAndSearch("instance-parity-006-replace-focus");
+      await waitFor(() => expect(registrationRef.current).not.toBeNull());
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.replaceInFiles");
+      });
+      const replacement = screen.getByLabelText("Replace text");
+      await waitFor(() => expect(document.activeElement).toBe(replacement));
+      expect(document.activeElement).toBe(replacement);
+    });
   });
 
   describe("ED-AUDIT-014: refactor recovery journal", () => {
@@ -12889,6 +13115,7 @@ end_of_record
         expect(disk["src/b.ts"]).toBe("hello modified");
         await waitFor(() => expect(registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled).toBe(true));
         await act(async () => { await registrationRef.current?.executeAction("workspace.undoWorkspaceEdit"); });
+        fireEvent.click(await screen.findByTestId("code-workspace-undo-confirm-ok"));
         await waitFor(() => expect(disk["src/a.ts"]).toBe("hello needle"));
         expect(disk["src/b.ts"]).toBe("hello modified");
         return;

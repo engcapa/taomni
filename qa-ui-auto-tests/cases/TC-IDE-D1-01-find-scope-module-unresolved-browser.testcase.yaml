@@ -46,7 +46,7 @@ steps:
 - assert_visible: '[data-testid="code-workspace-find-scope-notice"]'
 - assert_text:
     selector: '[data-testid="code-workspace-find-scope-notice"]'
-    contains: build backend
+    contains: No Maven tooling in browser preview
     timeout_sec: 10
 - select_option:
     selector: '[data-testid="code-workspace-find-scope-select"]'
@@ -94,7 +94,7 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-find-scope-notice\"]"}'
     - step: 16
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-scope-notice\"]", "contains":
-        "build backend", "timeout_sec": 10}}'
+        "No Maven tooling in browser preview", "timeout_sec": 10}}'
     - step: 18
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-find-directory-input\"]"}'
     - step: 20

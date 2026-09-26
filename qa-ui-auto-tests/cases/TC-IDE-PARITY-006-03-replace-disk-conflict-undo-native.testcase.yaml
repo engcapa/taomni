@@ -1,0 +1,429 @@
+id: TC-IDE-PARITY-006-03
+title: Native replace disk conflict and one-step undo
+description: Current-platform native gate for real ripgrep scope and mask, host byte writes, external and dirty
+  conflict blocking, recovery commits, input undo protection, and one multi-file undo.
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-find
+- replace
+- undo
+- parity006
+- native-gate
+- p1
+modes:
+- native
+native_platforms:
+- Windows
+- Linux
+fixtures:
+- reset_db
+- parity006_replace
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-parity006-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-parity006-native","name":"parity006","roots":[{"id":"parity006","name":"parity006","path":"${fixture.parity006_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"parity006","path":"src/a.txt"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity006_root}"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- press: Control+Shift+F
+- wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
+- select_option:
+    selector: '[data-testid="code-workspace-find-scope-select"]'
+    value: directory
+- fill:
+    selector: '[data-testid="code-workspace-find-directory-input"]'
+    value: src
+- fill:
+    selector: '[aria-label="Include globs"]'
+    value: '*.txt'
+- fill:
+    selector: '[aria-label="Search query"]'
+    value: token
+- press: Enter
+- wait_for:
+    selector: '[data-testid="code-workspace-find-file-group"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-find-in-files-panel"]'
+    contains: 3 results · 2 files
+- click: '[data-testid="code-workspace-find-match-row"][title="src/a.txt:2:6"]'
+- press: Delete
+- fill:
+    selector: '[aria-label="Replace text"]'
+    value: coin
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- press: Escape
+- assert_file_sha256:
+    path: ${fixture.parity006_src_a_txt}
+    equals: 873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0
+- assert_file_sha256:
+    path: ${fixture.parity006_src_b_txt}
+    equals: f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b
+- assert_file_sha256:
+    path: ${fixture.parity006_src_c_md}
+    equals: 579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8
+- assert_file_sha256:
+    path: ${fixture.parity006_other_d_txt}
+    equals: f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- host_write_file:
+    path: ${fixture.parity006_src_b_txt}
+    text: 'gamma token changed
+
+      '
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-commit-error"]'
+    contains: changed
+- assert_file_sha256:
+    path: ${fixture.parity006_src_a_txt}
+    equals: 873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0
+- assert_file_sha256:
+    path: ${fixture.parity006_src_b_txt}
+    equals: 3fdbe20f333734fd1575f6f246a411df8694f78c4690381370a6f44884355951
+- assert_file_sha256:
+    path: ${fixture.parity006_src_c_md}
+    equals: 579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8
+- assert_file_sha256:
+    path: ${fixture.parity006_other_d_txt}
+    equals: f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6
+- host_write_file:
+    path: ${fixture.parity006_src_b_txt}
+    text: 'gamma token three
+
+      '
+- click: '[data-testid="code-workspace-replace-commit"]'
+- assert_file_sha256:
+    path: ${fixture.parity006_src_a_txt}
+    equals: 9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76
+- assert_file_sha256:
+    path: ${fixture.parity006_src_b_txt}
+    equals: 570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-find-match-row"]'
+    equal: 1
+- press:
+    key: Control+z
+    selector: '[aria-label="Search query"]'
+- press: Control+Shift+z
+- press: Control+y
+- assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
+- assert_file_sha256:
+    path: ${fixture.parity006_src_a_txt}
+    equals: 9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76
+- assert_file_sha256:
+    path: ${fixture.parity006_src_b_txt}
+    equals: 570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62
+- press:
+    key: Control+z
+    selector: '[data-testid="code-workspace-find-match-row"]'
+- wait_for: '[data-testid="code-workspace-undo-confirm"]'
+- click: '[data-testid="code-workspace-undo-confirm-cancel"]'
+- assert_file_sha256:
+    path: ${fixture.parity006_src_a_txt}
+    equals: 9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76
+- assert_file_sha256:
+    path: ${fixture.parity006_src_b_txt}
+    equals: 570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62
+- click: '[data-testid="code-workspace-find-match-row"]'
+- press: Control+z
+- wait_for: '[data-testid="code-workspace-undo-confirm"]'
+- click: '[data-testid="code-workspace-undo-confirm-ok"]'
+- assert_file_sha256:
+    path: ${fixture.parity006_src_a_txt}
+    equals: 873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0
+- assert_file_sha256:
+    path: ${fixture.parity006_src_b_txt}
+    equals: f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b
+- assert_file_sha256:
+    path: ${fixture.parity006_src_c_md}
+    equals: 579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8
+- assert_file_sha256:
+    path: ${fixture.parity006_other_d_txt}
+    equals: f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6
+- fill:
+    selector: '[aria-label="Search query"]'
+    value: token
+- press: Enter
+- wait_for:
+    selector: '[data-testid="code-workspace-find-match-row"][title="src/a.txt:2:6"]'
+    timeout_sec: 60
+- press:
+    key: Delete
+    selector: '[data-testid="code-workspace-find-match-row"][title="src/a.txt:2:6"]'
+- dblclick: '[data-testid="code-workspace-find-match-row"][title="src/a.txt:1:7"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+End
+- type: x
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-commit-error"]'
+    contains: unsaved modifications
+- assert_file_sha256:
+    path: ${fixture.parity006_src_a_txt}
+    equals: 873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0
+- assert_file_sha256:
+    path: ${fixture.parity006_src_b_txt}
+    equals: f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b
+- assert_file_sha256:
+    path: ${fixture.parity006_src_c_md}
+    equals: 579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8
+- assert_file_sha256:
+    path: ${fixture.parity006_other_d_txt}
+    equals: f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6
+- screenshot: tc-ide-parity-006-03-dirty-block.png
+- press: Escape
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
+- press:
+    key: Control+s
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
+- assert_file_sha256:
+    path: ${fixture.parity006_src_a_txt}
+    equals: 38986130adf821e9202cb38a7a57a5c636cc28b32d24f670be927d91d4dfc1a9
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-replace-commit'
+- press: Enter
+- assert_file_sha256:
+    path: ${fixture.parity006_src_a_txt}
+    equals: b8f0e3547c0d555985a666f837d17eb415b132de174cb642bcdb1ce4a1a4ce64
+- assert_file_sha256:
+    path: ${fixture.parity006_src_b_txt}
+    equals: 570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-find-replaced-notice"]'
+    contains: Replaced 2 occurrences in 2 files
+- assert_count:
+    selector: '[data-testid="code-workspace-find-match-row"]'
+    equal: 1
+- screenshot: tc-ide-parity-006-03-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-006-V4
+    requirement: Native preflight blocks external and dirty conflicts without writing, recovery commits succeed,
+      input undo and confirmation Cancel preserve disk bytes, and one confirmed undo restores both files.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 28
+    - 30
+    - 31
+    - 37
+    - 38
+    - 43
+    - 44
+    - 45
+    - 49
+    - 51
+    - 54
+    - 55
+    - 57
+    - 62
+    - 63
+    - 65
+    - 66
+    - 67
+    - 68
+    - 69
+    - 71
+    - 73
+    - 80
+    - 82
+    - 85
+    - 88
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-find-in-files-panel\"]"}'
+    - step: 16
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-find-file-group\"]", "timeout_sec":
+        60}}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
+        "3 results \u00b7 2 files"}}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 24
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0"}}'
+    - step: 25
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b"}}'
+    - step: 26
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8"}}'
+    - step: 27
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6"}}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains":
+        "changed"}}'
+    - step: 33
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0"}}'
+    - step: 34
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "3fdbe20f333734fd1575f6f246a411df8694f78c4690381370a6f44884355951"}}'
+    - step: 35
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8"}}'
+    - step: 36
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6"}}'
+    - step: 39
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76"}}'
+    - step: 40
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62"}}'
+    - step: 41
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 42
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-find-match-row\"]", "equal": 1}}'
+    - step: 46
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-undo-confirm\"]"}'
+    - step: 47
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76"}}'
+    - step: 48
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62"}}'
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-undo-confirm\"]"}'
+    - step: 52
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76"}}'
+    - step: 53
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62"}}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-undo-confirm\"]"}'
+    - step: 58
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0"}}'
+    - step: 59
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b"}}'
+    - step: 60
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8"}}'
+    - step: 61
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6"}}'
+    - step: 64
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-find-match-row\"][title=\"src/a.txt:2:6\"]",
+        "timeout_sec": 60}}'
+    - step: 70
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"true\"]"}'
+    - step: 72
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 74
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains":
+        "unsaved modifications"}}'
+    - step: 75
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0"}}'
+    - step: 76
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b"}}'
+    - step: 77
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8"}}'
+    - step: 78
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6"}}'
+    - step: 81
+      expectation: Escape closes the blocked preview before saving and reopening.
+    - step: 83
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"false\"]"}'
+    - step: 84
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "38986130adf821e9202cb38a7a57a5c636cc28b32d24f670be927d91d4dfc1a9"}}'
+    - step: 86
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 87
+      expectation: Primary replace button owns keyboard focus before recovery Enter.
+    - step: 89
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "b8f0e3547c0d555985a666f837d17eb415b132de174cb642bcdb1ce4a1a4ce64"}}'
+    - step: 90
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62"}}'
+    - step: 91
+      expectation: Recovery commit settles and closes the preview.
+    - step: 92
+      expectation: Recovery reports two replacements in two files.
+    - step: 93
+      expectation: Only the excluded result remains after recovery.
+    results:
+    - 3
+    - 8
+    - 10
+    - 16
+    - 17
+    - 22
+    - 24
+    - 25
+    - 26
+    - 27
+    - 29
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 39
+    - 40
+    - 41
+    - 42
+    - 46
+    - 47
+    - 48
+    - 50
+    - 52
+    - 53
+    - 56
+    - 58
+    - 59
+    - 60
+    - 61
+    - 64
+    - 70
+    - 72
+    - 74
+    - 75
+    - 76
+    - 77
+    - 78
+    - 81
+    - 83
+    - 84
+    - 86
+    - 87
+    - 89
+    - 90
+    - 91
+    - 92
+    - 93
+  visual:
+  - check: Native preview and undo confirmation are readable in WebView2.
+    method: manual
+    reason: Screenshot is retained for review; no pixel matched claim.
+  native:
+  - check: Real host bytes, external write, freshness hash, and WebView2 shortcut routing.
+    method: automated
+    reason: Browser VFS cannot prove these effects.

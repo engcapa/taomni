@@ -1,10 +1,15 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ReplacePreviewDialog } from "./ReplacePreviewDialog";
+import { ReplacePreviewDialog, stableUsageKey } from "./ReplacePreviewDialog";
 import {
   buildReplaceInFilesWorkspaceEdit,
   type ReplaceInFilesMatch,
 } from "../replaceInFilesModel";
+
+type CommitHandler = (excludedKeys: ReadonlySet<string>) => void;
+type CancelHandler = () => void;
+type CommitMock = ReturnType<typeof vi.fn<CommitHandler>>;
+type CancelMock = ReturnType<typeof vi.fn<CancelHandler>>;
 
 function sampleMatches(): ReplaceInFilesMatch[] {
   return [
@@ -14,7 +19,7 @@ function sampleMatches(): ReplaceInFilesMatch[] {
   ];
 }
 
-function renderDialog(onCommit = vi.fn(), onCancel = vi.fn()) {
+function renderDialog(onCommit: CommitMock = vi.fn<CommitHandler>(), onCancel: CancelMock = vi.fn<CancelHandler>()) {
   const edit = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches(), replacementText: "thread" });
   render(
     <ReplacePreviewDialog
@@ -69,5 +74,115 @@ describe("ED-FIND-004: ReplacePreviewDialog", () => {
     fireEvent.click(screen.getByLabelText("Include all matches in /ws/a.ts"));
     fireEvent.click(screen.getByLabelText("Include all matches in /ws/b.ts"));
     expect(screen.getByTestId("code-workspace-replace-commit")).toBeDisabled();
+  });
+});
+
+describe("ED-PARITY-006: seeded exclusion, summary and keyboard", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  function renderParityDialog(options: {
+    committing?: boolean;
+    onCommit?: CommitMock;
+    onCancel?: CancelMock;
+    initialExcludedKeys?: ReadonlySet<string>;
+  } = {}) {
+    const onCommit = options.onCommit ?? vi.fn<CommitHandler>();
+    const onCancel = options.onCancel ?? vi.fn<CancelHandler>();
+    const edit = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches(), replacementText: "coin" });
+    render(
+      <ReplacePreviewDialog
+        edit={edit}
+        replacement="coin"
+        query="token"
+        initialExcludedKeys={options.initialExcludedKeys}
+        committing={options.committing ?? false}
+        commitError={null}
+        onCommit={onCommit}
+        onCancel={onCancel}
+      />,
+    );
+    return { onCommit, onCancel };
+  }
+
+  it("keeps a seeded exclusion visible and reports the exact summary", () => {
+    const excludedKey = stableUsageKey("/ws/a.ts", 1, 0, 1, 6);
+    renderParityDialog({ initialExcludedKeys: new Set([excludedKey]) });
+
+    expect(screen.getByTestId("code-workspace-replace-summary")).toHaveTextContent(
+      "Replace 2 occurrences of 'token' across 2 files with 'coin'?",
+    );
+    expect(screen.getByTestId("code-workspace-replace-counts")).toHaveTextContent("2 of 3");
+    const usages = screen.getAllByTestId("code-workspace-replace-usage");
+    expect(usages).toHaveLength(3);
+    expect((usages[1] as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("cancels from Escape without committing", () => {
+    const { onCommit, onCancel } = renderParityDialog();
+    fireEvent.keyDown(screen.getByTestId("code-workspace-replace-preview"), { key: "Escape" });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("commits from Enter on the dialog but not from a checkbox", () => {
+    const { onCommit } = renderParityDialog();
+    const dialog = screen.getByTestId("code-workspace-replace-preview");
+    const checkbox = screen.getAllByTestId("code-workspace-replace-usage")[0]!;
+    fireEvent.keyDown(checkbox, { key: "Enter" });
+    expect(onCommit).not.toHaveBeenCalled();
+    fireEvent.keyDown(dialog, { key: "Enter" });
+    expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("focuses the primary action and loops Tab within all dialog controls", async () => {
+    renderParityDialog();
+    const commit = screen.getByTestId("code-workspace-replace-commit");
+    const first = screen.getAllByTestId("code-workspace-replace-file-toggle")[0]!;
+    await waitFor(() => expect(document.activeElement).toBe(commit));
+    fireEvent.keyDown(screen.getByTestId("code-workspace-replace-preview"), { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(screen.getByTestId("code-workspace-replace-preview"), { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(commit);
+  });
+
+  it("focuses the primary before another animation frame can route Enter to the editor", () => {
+    const frame = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(0);
+    try {
+      renderParityDialog();
+      expect(document.activeElement).toBe(screen.getByTestId("code-workspace-replace-commit"));
+    } finally {
+      frame.mockRestore();
+    }
+  });
+
+  it("keeps focus inside while committing and restores the primary after a blocked commit", () => {
+    const edit = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches(), replacementText: "coin" });
+    const props = { edit, replacement: "coin", commitError: null, onCommit: vi.fn(), onCancel: vi.fn() };
+    const rendered = render(<ReplacePreviewDialog {...props} committing={false} />);
+    rendered.rerender(<ReplacePreviewDialog {...props} committing />);
+    expect(document.activeElement).toBe(screen.getByTestId("code-workspace-replace-preview"));
+    rendered.rerender(<ReplacePreviewDialog {...props} committing={false} commitError="Replace blocked" />);
+    expect(document.activeElement).toBe(screen.getByTestId("code-workspace-replace-commit"));
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
+    expect(props.onCommit).not.toHaveBeenCalled();
+  });
+
+  it("Enter on Cancel cancels without committing", () => {
+    const { onCommit, onCancel } = renderParityDialog();
+    fireEvent.keyDown(screen.getByTestId("code-workspace-replace-cancel"), { key: "Enter" });
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("does not commit or cancel while committing", () => {
+    const { onCommit, onCancel } = renderParityDialog({ committing: true });
+    const dialog = screen.getByTestId("code-workspace-replace-preview");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    fireEvent.keyDown(dialog, { key: "Enter" });
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
   });
 });

@@ -371,6 +371,7 @@ export function applyPersistedEditorViewState(
 export interface EditorRevealTarget {
   line: number;
   character: number;
+  focus?: boolean;
 }
 
 export interface EditorSelectionRange {
@@ -4421,7 +4422,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       selection: { anchor: pos },
       effects: EditorView.scrollIntoView(pos, { y: "center" }),
     });
-    view.focus();
+    if (reveal.focus !== false) view.focus();
   }, [reveal]);
 
   return (

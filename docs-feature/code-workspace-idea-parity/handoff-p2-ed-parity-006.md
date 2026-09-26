@@ -102,3 +102,17 @@ stale、skip、未验证和外部条件；是否提交/推送。不要自动启�
 交付时附总需求矩阵对应的场景 ID、差距是否关闭及依据，供 P0 增量更新；任务完成不直接换算为整体对齐。
 需要后续角色时，返回用已知材料填好本文件对应模板的完整提示词，人工只需复制，未知条件明确写缺口。
 ```
+
+## P2 交付回填（2026-09-27）
+
+上方提示词是 P1 当时的交接快照；P2 已按本机 Linux/WebKitGTK 与用户最新范围完成同卡。任务状态与实际报告以[任务板 ED-PARITY-006](backlog.md)和[设计第 8 节](project-replace-exclude-plan.md#ed-parity-006)为准，不可据上方旧 `ready/Windows/unrun` 文字再次领取。
+
+| AC → V | 实际检查 / 报告 | 状态 |
+|---|---|---|
+| A1 → V1/V3/V4 | `FindInFilesPanel.test.tsx`、`ReplacePreviewDialog.test.tsx`（unit 130/130）；`TC-IDE-PARITY-006-01`（browser 5/5 批次）；`TC-IDE-PARITY-006-03`（native 94 步、四文件 SHA-256、外部/dirty 冲突零写入与恢复） | Linux 本机 pass；`qa-ui-auto-report/ed-parity-006/unit-recovery.log`、`browser/run-20260927-012911-519728892/`、`native/run-20260927-013506-678365023/` |
+| A3 → V2/V4/V6 | `CodeWorkspaceTab.test.tsx` 13/13 selected；`TC-IDE-PARITY-006-02`、D2-01、D1-01、FINDFOCUS-01 browser；D2-02、AUDIT-003 native | Linux 本机 pass；`mounted-recovery.log`、同上 browser 与 `native/run-20260927-013238-810396421/` |
+| A2 → V5 | Taomni 生产截图三维自检、差异/未采边界记录，`compare_idea.py` schema/hash 校验 | 记录有效，verdict `unverified`；用户免 IDEA 真机双侧比较。`qa-ui-auto-report/idea-comparison/ED-PARITY-006/run-20260927-local/record.json` |
+
+最终 source `26652deb092d7c6d3eb71ba6f4a978e93c2c78e64efdd4b7890a9b3cad508a51`，QA binary `com.taomni.app.qa` SHA-256 `0608a948c6f8e01550f8b11e21b9579a28e116b5363157ab7013f49d063a92b5`。8 个目标/保留 UI case 的 `status --gate --platform Linux` 为 `ok=true, gaps=[]`；`audit --gate`、`contracts --gate`、9-path typecheck 均通过。完整命令、失败归因、耗时与平台边界见设计第 8 节及 ignored `qa-ui-auto-report/ed-parity-006/evidence.json`。Windows/WebView2、macOS/WKWebView 和 IDEA C1–C5 均未验证；没有视觉 matched 结论，也没有提交或推送。
+
+静态 audit 仍报告右键 Exclude/Restore 两个 required testid 未按 selector 触达；006-01 已通过 `right_click` 和可见菜单文字 `click_menu` 实际点击两项并断言状态，故这是审计器的 testid 归属限制，详见设计第 8.3 节。`audit --gate` 通过，不等于零静态提示。
