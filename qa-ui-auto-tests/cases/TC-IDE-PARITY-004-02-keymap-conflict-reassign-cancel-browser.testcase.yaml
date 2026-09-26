@@ -150,9 +150,9 @@ steps:
     selector: '[data-testid="keymap-action-filter"]'
     value: Find in File
 - wait_for: '[data-testid="keymap-row-editor.find"]'
-- assert_text:
+- assert_pattern:
     selector: '[data-testid="keymap-row-editor.find"]'
-    contains: Meta+F
+    regex: '(Meta|Cmd)[+]F'
 - assert_count:
     selector: '[data-testid="workspace-keymap-settings-dialog"] [aria-label="conflict"]'
     equal: 0
@@ -207,7 +207,7 @@ verification:
     - step: 84
       expectation: "{\"wait_for\": \"[data-testid=\\\"keymap-row-editor.find\\\"]\"}"
     - step: 85
-      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.find\\\"]\", \"contains\": \"Meta+F\"}}"
+      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.find\\\"]\", \"regex\": \"(Meta|Cmd)[+]F\"}}"
     - step: 86
       expectation: "{\"assert_count\": {\"selector\": \"[data-testid=\\\"workspace-keymap-settings-dialog\\\"] [aria-label=\\\"conflict\\\"]\", \"equal\": 0}}"
     results: [86, 85]
