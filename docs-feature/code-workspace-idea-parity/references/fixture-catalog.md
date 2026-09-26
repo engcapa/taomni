@@ -23,6 +23,8 @@
 
 2026-09-16 局部实例：[F1-SAVE-002](ed-parity-002-reference.md#fixture)已为 ED-PARITY-002 在 Windows IDEA 实际采样保存/冲突/恢复；精确 B0/B1/B2/E1 字节与原件独立记录。仅此实例已采，F1 其余标签/三端与 Taomni native 均不因此通过。
 
+2026-09-26 局部实例：[F1-REPL-006](ed-parity-006-reference.md#fixture) 为 ED-PARITY-006 的四文件 scope/mask/替换 fixture，已在 Windows IDEA 2026.2.3 实采搜索集合、排除、确认、提交与撤销；Taomni 未执行。
+
 复制 F0 到新的隔离目录，新增 `edit.txt`（UTF-8/LF）：
 
 ```text
