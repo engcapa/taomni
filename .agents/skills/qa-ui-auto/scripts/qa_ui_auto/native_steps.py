@@ -1337,8 +1337,25 @@ def _do_type(ctx: NativeStepContext, args: Any) -> str:
 
 @_verb("terminal_input")
 def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
-    if not isinstance(args, dict) or set(args) - {"selector", "text", "submit"}:
-        raise StepError("terminal_input: expected {selector, text, submit?}")
+    selector, text, submit, verify = _terminal_input_args(args)
+    attempts = verify["attempts"] if verify else 1
+    for _ in range(attempts):
+        _dispatch_terminal_input(ctx, selector, text, submit)
+        if verify is None:
+            break
+        if _terminal_output_matches(ctx, verify):
+            break
+    else:
+        raise StepError(
+            f"terminal_input: {verify['selector']} did not match {verify['regex']!r} "
+            f"after {attempts} attempt(s)"
+        )
+    return f"sent {len(text)} chars to xterm input" + (" and submitted" if submit else "")
+
+
+def _terminal_input_args(args: Any) -> tuple[str, str, bool, dict[str, Any] | None]:
+    if not isinstance(args, dict) or set(args) - {"selector", "text", "submit", "verify"}:
+        raise StepError("terminal_input: expected {selector, text, submit?, verify?}")
     selector = args.get("selector")
     text = args.get("text")
     submit = args.get("submit", False)
@@ -1348,14 +1365,42 @@ def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
         raise StepError("terminal_input: text must be a string")
     if not isinstance(submit, bool):
         raise StepError("terminal_input: submit must be a boolean")
+    verify = args.get("verify")
+    parsed_verify = None if verify is None else _terminal_verify_args(verify)
+    return selector, text, submit, parsed_verify
+
+
+def _terminal_verify_args(verify: Any) -> dict[str, Any]:
+    if not isinstance(verify, dict) or set(verify) - {"selector", "regex", "timeout_sec", "attempts"}:
+        raise StepError("terminal_input: verify expects {selector, regex, timeout_sec?, attempts?}")
+    selector = verify.get("selector")
+    regex = verify.get("regex")
+    timeout = verify.get("timeout_sec", 10)
+    attempts = verify.get("attempts", 2)
+    if not isinstance(selector, str) or not selector:
+        raise StepError("terminal_input: verify selector must be a non-empty string")
+    if not isinstance(regex, str) or not regex:
+        raise StepError("terminal_input: verify regex must be a non-empty string")
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+        raise StepError("terminal_input: verify timeout_sec must be a positive number")
+    if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1:
+        raise StepError("terminal_input: verify attempts must be a positive integer")
+    return {
+        "selector": selector,
+        "regex": regex,
+        "timeout_sec": float(timeout),
+        "attempts": attempts,
+    }
+
+
+def _dispatch_terminal_input(ctx: NativeStepContext, selector: str, text: str, submit: bool) -> None:
     ctx.session.focus(selector)
     ctx.session.press_combo("Shift")
-    data = text
     result = ctx.session.execute(
         f"const element = document.querySelector({json.dumps(selector)});"
         "if (!element) return {found:false,focused:false};"
         "element.focus();"
-        f"const data = {json.dumps(data)};"
+        f"const data = {json.dumps(text)};"
         "element.dispatchEvent(new InputEvent('input',{"
         "data,inputType:'insertText',bubbles:true,composed:false}));"
         "return {found:true,focused:document.activeElement===element};"
@@ -1366,7 +1411,25 @@ def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
         raise StepError(f"terminal_input: target could not receive focus: {selector}")
     if submit:
         ctx.session.press_combo("Enter")
-    return f"sent {len(text)} chars to xterm input" + (" and submitted" if submit else "")
+
+
+def _terminal_output_matches(ctx: NativeStepContext, verify: dict[str, Any]) -> bool:
+    """Poll the pty buffer until the probe's own output shows up.
+
+    Windows OpenSSH/ConPTY intermittently drops part of a terminal write (a
+    missing leading byte, a truncated burst). An optional verify block lets the
+    probe be re-sent instead of failing the case on that transport hiccup; the
+    case's own assertion still decides what the run proves.
+    """
+    pattern = re.compile(verify["regex"])
+    deadline = time.monotonic() + verify["timeout_sec"]
+    while True:
+        text = ctx.session.text(verify["selector"])
+        if pattern.search(text or ""):
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.25)
 
 
 @_verb("press")
@@ -1432,6 +1495,29 @@ def _do_assert_items(ctx: NativeStepContext, args: Any) -> str:
 def _do_eval_readonly(ctx: NativeStepContext, args: Any) -> str:
     return _eval_readonly(ctx, args)
 
+
+@_verb("blur")
+def _do_blur(ctx: NativeStepContext, args: Any) -> str:
+    """Remove focus from a control the way leaving the field does.
+
+    A synthesized Tab does not move focus on the macOS in-process bridge, so a
+    blur-committed field (clamped number inputs, rename fields) never commits
+    there. HTMLElement.blur() dispatches the real blur/focusout events on every
+    platform.
+    """
+    if not isinstance(args, str) or not args:
+        raise StepError("blur: expected a non-empty selector string")
+    result = ctx.session.execute(
+        f"const element = document.querySelector({json.dumps(args)});"
+        "if (!element) return {found:false,blurred:false};"
+        "element.blur();"
+        "return {found:true,blurred:document.activeElement!==element};"
+    )
+    if not isinstance(result, dict) or result.get("found") is not True:
+        raise StepError(f"blur: target not found: {args}")
+    if result.get("blurred") is not True:
+        raise StepError(f"blur: element kept focus: {args}")
+    return f"blurred {args}"
 
 @_verb("hover")
 def _do_hover(ctx: NativeStepContext, args: Any) -> str:

@@ -77,6 +77,26 @@ class NativeAssertionsTest(TestCase):
         ctx.session.focus.assert_not_called()
         ctx.session.type_text.assert_not_called()
 
+    def test_blur_removes_focus_from_the_control(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = {"found": True, "blurred": True}
+        result = run_native_step(ctx, "blur", 'input[aria-label="Terminal font size"]')
+        script = ctx.session.execute.call_args.args[0]
+        self.assertIn("blur()", script)
+        self.assertEqual(result, 'blurred input[aria-label="Terminal font size"]')
+
+    def test_blur_reports_a_missing_target(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = {"found": False, "blurred": False}
+        with self.assertRaisesRegex(StepError, "target not found"):
+            run_native_step(ctx, "blur", "#missing")
+
+    def test_blur_rejects_a_malformed_selector(self):
+        ctx = Mock()
+        with self.assertRaisesRegex(StepError, "non-empty selector"):
+            run_native_step(ctx, "blur", "")
+        ctx.session.execute.assert_not_called()
+
     def test_terminal_input_dispatches_xterm_data_and_submit(self):
         ctx = Mock()
         ctx.session.execute.return_value = {"found": True, "focused": True}
@@ -106,3 +126,63 @@ class NativeAssertionsTest(TestCase):
                 "text": "echo ready",
             })
         self.assertNotIn("Enter", [c.args[0] for c in ctx.session.press_combo.call_args_list])
+
+    def test_terminal_input_retries_a_probe_until_its_output_appears(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = {"found": True, "focused": True}
+        # Nothing on screen until the probe has been dispatched twice.
+        ctx.session.text.side_effect = lambda _selector: (
+            "ready\n" if ctx.session.execute.call_count > 1 else ""
+        )
+        result = run_native_step(ctx, "terminal_input", {
+            "selector": ".xterm-helper-textarea",
+            "text": "echo ready",
+            "submit": True,
+            "verify": {
+                "selector": "[data-testid=\"terminal-pane\"]",
+                "regex": r"(?m)^ready\r?$",
+                "timeout_sec": 0.1,
+                "attempts": 2,
+            },
+        })
+        self.assertEqual(ctx.session.execute.call_count, 2)
+        self.assertEqual(
+            [c.args[0] for c in ctx.session.press_combo.call_args_list],
+            ["Shift", "Enter", "Shift", "Enter"],
+        )
+        self.assertEqual(result, "sent 10 chars to xterm input and submitted")
+
+    def test_terminal_input_reports_a_probe_that_never_appears(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = {"found": True, "focused": True}
+        ctx.session.text.return_value = ""
+        with self.assertRaisesRegex(StepError, "after 2 attempt"):
+            run_native_step(ctx, "terminal_input", {
+                "selector": ".xterm-helper-textarea",
+                "text": "echo ready",
+                "submit": True,
+                "verify": {
+                    "selector": "[data-testid=\"terminal-pane\"]",
+                    "regex": r"(?m)^ready\r?$",
+                    "timeout_sec": 0.2,
+                    "attempts": 2,
+                },
+            })
+        self.assertEqual(ctx.session.execute.call_count, 2)
+
+    def test_terminal_input_rejects_a_malformed_verify_block(self):
+        ctx = Mock()
+        with self.assertRaisesRegex(StepError, "verify expects"):
+            run_native_step(ctx, "terminal_input", {
+                "selector": ".xterm-helper-textarea",
+                "text": "echo ready",
+                "verify": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "^ready$", "bogus": 1},
+            })
+        with self.assertRaisesRegex(StepError, "verify regex"):
+            run_native_step(ctx, "terminal_input", {
+                "selector": ".xterm-helper-textarea",
+                "text": "echo ready",
+                "verify": {"selector": "[data-testid=\"terminal-pane\"]"},
+            })
+        ctx.session.execute.assert_not_called()
+

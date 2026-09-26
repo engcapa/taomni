@@ -565,26 +565,44 @@ class NativeSession:
         return self.pointer_button_click(selector, 2)
 
     def pointer_button_click(self, selector: str, button: int) -> str:
-        element = self.find(selector, interactive=True)
-        origin = {"element-6066-11e4-a52e-4f735466cecf": element}
-        # Scroll only; dispatch the actual context click through W3C input.
-        self.request("POST", self.endpoint("/execute/sync"), {
-            "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
-            "args": [origin],
-        })
-        try:
-            self.request("POST", self.endpoint("/actions"), {"actions": [{
-                "type": "pointer", "id": "context-mouse",
-                "parameters": {"pointerType": "mouse"},
-                "actions": [
-                    {"type": "pointerMove", "duration": 0, "origin": origin, "x": 0, "y": 0},
-                    {"type": "pointerDown", "button": button},
-                    {"type": "pointerUp", "button": button},
-                ],
-            }]})
-        finally:
-            self.request("DELETE", self.endpoint("/actions"))
-        return f"pointer button {button} clicked {selector}"
+        # The row can be re-rendered (React replaces the node) between the
+        # locator resolution below and the scroll/input dispatch — for example
+        # right after a save or when the context menu mounts. A stale element
+        # then fails the whole case with a raw driver error, so re-resolve and
+        # retry instead of propagating the first stale reference.
+        last_stale: WebDriverError | None = None
+        for attempt in range(3):
+            element = self.find(selector, interactive=True)
+            origin = {"element-6066-11e4-a52e-4f735466cecf": element}
+            # Scroll only; dispatch the actual context click through W3C input.
+            try:
+                self.request("POST", self.endpoint("/execute/sync"), {
+                    "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
+                    "args": [origin],
+                })
+                self.request("POST", self.endpoint("/actions"), {"actions": [{
+                    "type": "pointer", "id": "context-mouse",
+                    "parameters": {"pointerType": "mouse"},
+                    "actions": [
+                        {"type": "pointerMove", "duration": 0, "origin": origin, "x": 0, "y": 0},
+                        {"type": "pointerDown", "button": button},
+                        {"type": "pointerUp", "button": button},
+                    ],
+                }]})
+            except WebDriverError as exc:
+                if "stale element reference" in str(exc) and attempt < 2:
+                    last_stale = exc
+                    time.sleep(0.3)
+                    continue
+                raise
+            finally:
+                # Best-effort: a failed release must not mask the real error or
+                # abort a stale-element retry.
+                with suppress(WebDriverError):
+                    self.request("DELETE", self.endpoint("/actions"))
+            return f"pointer button {button} clicked {selector}"
+        raise last_stale if last_stale else WebDriverError(
+            f"pointer button {button} click failed: {selector}")
 
     def focus(self, selector: str) -> str:
         """Focus for locator-scoped keys without activating a button/tree row."""

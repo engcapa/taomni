@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
 import { TerminalDockPanel, type TerminalDockHandle } from "./TerminalDockPanel";
@@ -201,4 +201,51 @@ describe("TerminalDockPanel", () => {
       undefined,
     ));
   });
+
+  it("delivers a queued command after a late terminal registration without a ready callback", async () => {
+    const runTask = vi.fn();
+    const handle = createRef<TerminalDockHandle>();
+    render(
+      <TerminalDockPanel
+        ref={handle}
+        workspaceInstanceId="ws"
+        roots={roots}
+        defaultCwd="/repo/app"
+        active={false}
+      />,
+    );
+    handle.current?.runCommand("mvn compile", "/repo/app", "compile");
+    await screen.findByTestId("mock-terminal");
+    // macOS cold start: the terminal registers after the queued command was
+    // created and onSessionReady never fires for it.
+    registryMocks.getTerminal.mockReturnValue({ runTask });
+    await waitFor(() => expect(runTask).toHaveBeenCalledWith("mvn compile", undefined), { timeout: 3_000 });
+  });
+
+  it("fails a queued command instead of hanging when its terminal never registers", async () => {
+    vi.useFakeTimers();
+    try {
+      const onExit = vi.fn();
+      const handle = createRef<TerminalDockHandle>();
+      render(
+        <TerminalDockPanel
+          ref={handle}
+          workspaceInstanceId="ws"
+          roots={roots}
+          defaultCwd="/repo/app"
+          active={false}
+        />,
+      );
+      await act(async () => {
+        handle.current?.runCommand("mvn compile", "/repo/app", "compile", onExit);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(21_000);
+      });
+      expect(onExit).toHaveBeenCalledWith(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
+

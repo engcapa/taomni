@@ -365,6 +365,9 @@
     "press": {
      "$ref": "#/$defs/press_arg"
     },
+    "blur": {
+     "$ref": "#/$defs/selector"
+    },
     "select_option": {
      "$ref": "#/$defs/select_arg"
     },
@@ -890,6 +893,36 @@
     "submit": {
      "type": "boolean",
      "default": false
+    },
+    "verify": {
+     "$ref": "#/$defs/terminal_input_verify"
+    }
+   }
+  },
+  "terminal_input_verify": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "selector",
+    "regex"
+   ],
+   "properties": {
+    "selector": {
+     "$ref": "#/$defs/selector"
+    },
+    "regex": {
+     "type": "string",
+     "minLength": 1
+    },
+    "timeout_sec": {
+     "type": "number",
+     "exclusiveMinimum": 0,
+     "default": 10
+    },
+    "attempts": {
+     "type": "integer",
+     "minimum": 1,
+     "default": 2
     }
    }
   },
