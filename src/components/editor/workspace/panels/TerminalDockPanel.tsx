@@ -92,8 +92,13 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
     const pendingDeliveriesRef = useRef(new Set<string>());
     const mountedRef = useRef(true);
 
-    useEffect(() => () => {
-      mountedRef.current = false;
+    // Re-arm on mount: a StrictMode double-mount reuses the same refs, and a
+    // delivery started after the simulated unmount must still run.
+    useEffect(() => {
+      mountedRef.current = true;
+      return () => {
+        mountedRef.current = false;
+      };
     }, []);
     const rootById = useMemo(() => new Map(roots.map((root) => [root.id, root])), [roots]);
 
