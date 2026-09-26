@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import Mock
 
 from qa_ui_auto.steps import StepContext, StepError
-from qa_ui_auto.steps.keyboard import step_send_keys, step_terminal_input, step_type
+from qa_ui_auto.steps.keyboard import step_blur, step_send_keys, step_terminal_input, step_type
 
 
 class KeyboardStepsTest(TestCase):
@@ -44,6 +44,25 @@ class KeyboardStepsTest(TestCase):
         script, payload = locator.evaluate.call_args.args
         self.assertIn("new InputEvent", script)
         self.assertEqual(payload, {"text": "echo ready", "submit": True})
+
+    def test_blur_removes_focus_from_the_control(self):
+        ctx, _, locator = self.context()
+        locator.evaluate.return_value = True
+        step_blur(ctx, 'input[aria-label="Terminal font size"]')
+        script = locator.evaluate.call_args.args[0]
+        self.assertIn("blur()", script)
+
+    def test_blur_rejects_a_malformed_selector(self):
+        ctx, _, locator = self.context()
+        with self.assertRaisesRegex(StepError, "non-empty selector"):
+            step_blur(ctx, "")
+        locator.evaluate.assert_not_called()
+
+    def test_blur_reports_a_control_that_kept_focus(self):
+        ctx, _, locator = self.context()
+        locator.evaluate.return_value = False
+        with self.assertRaisesRegex(StepError, "kept focus"):
+            step_blur(ctx, "#locked")
 
     def test_terminal_input_rejects_non_boolean_submit(self):
         ctx, _, locator = self.context()

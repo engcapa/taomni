@@ -162,6 +162,27 @@ def _terminal_verify_args(verify: Any) -> dict[str, Any]:
     }
 
 
+@verb("blur")
+def step_blur(ctx: StepContext, args: Any) -> None:
+    """Remove focus from a control the way leaving the field does.
+
+    The platform drivers disagree about focus-moving keys: a W3C Tab moves
+    focus on Windows/Linux, while the macOS in-process bridge cannot perform
+    the browser default action for a synthesized Tab, so a blur-committed
+    field (clamped number inputs, rename fields) never commits. Calling
+    HTMLElement.blur() dispatches the real blur/focusout events on every
+    engine and keeps the case about the product behaviour.
+    """
+    if not isinstance(args, str) or not args:
+        raise StepError("blur: expected a non-empty selector string")
+    if ctx.dry_run:
+        return
+    blurred = ctx.page.locator(args).first.evaluate(  # type: ignore[attr-defined]
+        "(element) => { element.blur(); return document.activeElement !== element; }"
+    )
+    if blurred is not True:
+        raise StepError(f"blur: element kept focus: {args}")
+
 @verb("compose_text")
 def step_compose_text(ctx: StepContext, args: Any) -> None:
     """Drive one browser composition lifecycle through the focused control.

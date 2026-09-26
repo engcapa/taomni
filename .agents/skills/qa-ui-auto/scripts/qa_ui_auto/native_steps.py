@@ -1496,6 +1496,29 @@ def _do_eval_readonly(ctx: NativeStepContext, args: Any) -> str:
     return _eval_readonly(ctx, args)
 
 
+@_verb("blur")
+def _do_blur(ctx: NativeStepContext, args: Any) -> str:
+    """Remove focus from a control the way leaving the field does.
+
+    A synthesized Tab does not move focus on the macOS in-process bridge, so a
+    blur-committed field (clamped number inputs, rename fields) never commits
+    there. HTMLElement.blur() dispatches the real blur/focusout events on every
+    platform.
+    """
+    if not isinstance(args, str) or not args:
+        raise StepError("blur: expected a non-empty selector string")
+    result = ctx.session.execute(
+        f"const element = document.querySelector({json.dumps(args)});"
+        "if (!element) return {found:false,blurred:false};"
+        "element.blur();"
+        "return {found:true,blurred:document.activeElement!==element};"
+    )
+    if not isinstance(result, dict) or result.get("found") is not True:
+        raise StepError(f"blur: target not found: {args}")
+    if result.get("blurred") is not True:
+        raise StepError(f"blur: element kept focus: {args}")
+    return f"blurred {args}"
+
 @_verb("hover")
 def _do_hover(ctx: NativeStepContext, args: Any) -> str:
     return _hover(ctx, args)

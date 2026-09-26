@@ -365,6 +365,9 @@
     "press": {
      "$ref": "#/$defs/press_arg"
     },
+    "blur": {
+     "$ref": "#/$defs/selector"
+    },
     "select_option": {
      "$ref": "#/$defs/select_arg"
     },

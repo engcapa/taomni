@@ -77,6 +77,26 @@ class NativeAssertionsTest(TestCase):
         ctx.session.focus.assert_not_called()
         ctx.session.type_text.assert_not_called()
 
+    def test_blur_removes_focus_from_the_control(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = {"found": True, "blurred": True}
+        result = run_native_step(ctx, "blur", 'input[aria-label="Terminal font size"]')
+        script = ctx.session.execute.call_args.args[0]
+        self.assertIn("blur()", script)
+        self.assertEqual(result, 'blurred input[aria-label="Terminal font size"]')
+
+    def test_blur_reports_a_missing_target(self):
+        ctx = Mock()
+        ctx.session.execute.return_value = {"found": False, "blurred": False}
+        with self.assertRaisesRegex(StepError, "target not found"):
+            run_native_step(ctx, "blur", "#missing")
+
+    def test_blur_rejects_a_malformed_selector(self):
+        ctx = Mock()
+        with self.assertRaisesRegex(StepError, "non-empty selector"):
+            run_native_step(ctx, "blur", "")
+        ctx.session.execute.assert_not_called()
+
     def test_terminal_input_dispatches_xterm_data_and_submit(self):
         ctx = Mock()
         ctx.session.execute.return_value = {"found": True, "focused": True}
