@@ -31,6 +31,7 @@ class NativeSessionTransportTest(TestCase):
     def test_windows_driver_uses_the_apps_isolated_webview_profile(self):
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.request = Mock(return_value={"sessionId": "session-1"})
+        session.wait_for_app_ready = Mock()
         session.install_console_hook = Mock()
         with patch("tauri_webdriver.platform.system", return_value="Windows"), \
              patch.dict(os.environ, {"NEWMOB_DATA_DIR": "/qa/run/native-appdata"}):
@@ -113,19 +114,49 @@ class NativeSessionTransportTest(TestCase):
             server.server_close()
             thread.join()
 
-    def test_macos_session_waits_for_react_root_before_installing_hooks(self):
-        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
-        session.request = Mock(return_value={"sessionId": "session-1"})
-        session.execute = Mock(side_effect=[WebDriverError("WebView is still loading"), False, True])
-        session.install_console_hook = Mock()
+    def test_session_waits_for_react_root_before_installing_hooks(self):
+        # WebView2 sessions can start on about:blank, where localStorage
+        # access is denied; every platform must wait for the app document.
+        for system in ("Darwin", "Windows", "Linux"):
+            with self.subTest(system=system):
+                session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+                session.request = Mock(return_value={"sessionId": "session-1"})
+                session.execute = Mock(side_effect=[
+                    WebDriverError("Failed to read the 'localStorage' property"), False, True])
+                session.install_console_hook = Mock()
 
-        with patch("tauri_webdriver.platform.system", return_value="Darwin"):
-            session.start()
+                with patch("tauri_webdriver.platform.system", return_value=system), \
+                     patch.dict(os.environ, {"NEWMOB_DATA_DIR": "/qa/run/native-appdata"}):
+                    session.start()
 
-        self.assertEqual(session.session_id, "session-1")
-        self.assertEqual(session.execute.call_count, 3)
-        self.assertIn("document.readyState", session.execute.call_args_list[0].args[0])
-        session.install_console_hook.assert_called_once_with()
+                self.assertEqual(session.session_id, "session-1")
+                self.assertEqual(session.execute.call_count, 3)
+                self.assertIn("document.readyState", session.execute.call_args_list[0].args[0])
+                session.install_console_hook.assert_called_once_with()
+
+    def test_failed_session_readiness_deletes_session_so_app_exits(self):
+        # An undeleted session leaves the app running with the run-owned
+        # profile locked, so every later case's reset_db fails (WinError 32).
+        harness = NativeHarness({"app": {"tooling_java_home": "/jdk21"}}, Path("/qa/run"))
+        harness.driver = Mock()
+        with patch("tauri_webdriver.NativeSession") as factory:
+            session = factory.return_value
+            session.execute.side_effect = WebDriverError("Access is denied for this document")
+            with self.assertRaisesRegex(WebDriverError, "Access is denied"):
+                harness.create_session()
+        session.close.assert_called_once_with()
+        harness.driver.mark_session_closed.assert_called_once_with()
+
+    def test_failed_session_cleanup_preserves_original_error(self):
+        harness = NativeHarness({"app": {}}, Path("/qa/run"))
+        harness.driver = Mock()
+        with patch("tauri_webdriver.NativeSession") as factory:
+            session = factory.return_value
+            session.start.side_effect = WebDriverError("session not created")
+            session.close.side_effect = WebDriverError("no such session")
+            with self.assertRaisesRegex(WebDriverError, "session not created"):
+                harness.create_session()
+        harness.driver.mark_session_closed.assert_called_once_with()
 
 
 class NativeSessionFillTest(TestCase):
