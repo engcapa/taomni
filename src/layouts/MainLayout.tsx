@@ -4242,7 +4242,12 @@ export function MainLayout() {
                             const sid = terminalSessionIds.current[tab.id];
                             if (!sid) return;
                             const escaped = p.replace(/'/g, "'\\''");
-                            void writeTerminal(sid, encodeBase64(`cd '${escaped}'\r`));
+                            // The leading space is a sacrificial guard: Windows
+                            // OpenSSH/ConPTY intermittently drops the first byte of
+                            // a pty write (observed as "d '<path>'"), and bash
+                            // ignores the extra space. It also keeps the line out of
+                            // history for shells with ignorespace enabled.
+                            void writeTerminal(sid, encodeBase64(` cd '${escaped}'\r`));
                           }}
                           onDetach={() => {
                             setSftpDetachedTabs((prev) => ({ ...prev, [tab.id]: true }));

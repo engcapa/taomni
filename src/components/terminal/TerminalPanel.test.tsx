@@ -580,6 +580,64 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it("holds keystrokes while a hidden SSH setup line is still being installed", async () => {
+    let onOutput: ((data: Uint8Array) => void) | undefined;
+    ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
+      onOutput = args[9] as (data: Uint8Array) => void;
+      return "terminal-session";
+    });
+    render(<TerminalPanel tabId="held-ssh" visible ssh={sshInfo} />);
+    await waitFor(() => expect(onOutput).toBeTypeOf("function"));
+
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    const prompt = "user@example.test:/srv/project$ ";
+    term.buffer.active = {
+      type: "normal",
+      length: 1,
+      baseY: 0,
+      cursorY: 0,
+      cursorX: prompt.length,
+      getLine: vi.fn(() => ({
+        isWrapped: false,
+        translateToString: () => prompt,
+      })),
+    };
+    term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());
+
+    await act(async () => {
+      onOutput?.(new TextEncoder().encode(prompt));
+    });
+    await waitFor(() => {
+      const integrationWrite = (ipcMocks.writeTerminal.mock.calls as unknown[][]).find(
+        ([sessionId, encoded]) =>
+          sessionId === "terminal-session" &&
+          typeof encoded === "string" &&
+          atob(encoded).includes("__taomni_osc7"),
+      );
+      expect(integrationWrite).toBeTruthy();
+    });
+    ipcMocks.writeTerminal.mockClear();
+
+    // The injected line has not reported back yet: the keystrokes must wait
+    // instead of interleaving with it on the shared pty.
+    act(() => terminalMocks.state.onDataHandler?.("ls\r"));
+    expect((ipcMocks.writeTerminal.mock.calls as unknown[][]).some(([, encoded]) =>
+      typeof encoded === "string" && atob(encoded) === "ls\r",
+    )).toBe(false);
+
+    // The injected command's own OSC 7 output proves it landed, so the held
+    // keystrokes are delivered in order afterwards.
+    await act(async () => {
+      onOutput?.(new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${prompt}`));
+    });
+    await waitFor(() => {
+      expect((ipcMocks.writeTerminal.mock.calls as unknown[][]).some(([sessionId, encoded]) =>
+        sessionId === "terminal-session" &&
+        typeof encoded === "string" &&
+        atob(encoded) === "ls\r",
+      )).toBe(true);
+    });
+  });
   it("releases SSH readiness when a slow Windows shell never reports OSC 7", async () => {
     const originalPlatform = window.navigator.platform;
     Object.defineProperty(window.navigator, "platform", { configurable: true, value: "Win32" });
