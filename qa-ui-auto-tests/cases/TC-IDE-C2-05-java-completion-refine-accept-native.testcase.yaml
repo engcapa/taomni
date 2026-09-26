@@ -2,7 +2,7 @@ id: TC-IDE-C2-05-java-completion-refine-accept-native
 title: Java completion accepts refined candidates by Tab and mouse
 description: 'Opens the real JDT LS sample and edits a member prefix after its automatic
 
-  completion list appears. Tab and a click on the second candidate must insert
+  completion list appears. Tab and a double-click on a candidate must insert
 
   the selected method, and one undo must restore the refined prefix. The
 
@@ -99,7 +99,7 @@ steps:
     selector: .cm-tooltip-autocomplete li.cm-completion-type-method
     timeout_sec: 90
 - wait: 1
-- click: .cm-tooltip-autocomplete li.cm-completion-type-method:nth-child(1)
+- dblclick: .cm-tooltip-autocomplete li.cm-completion-type-method:nth-child(1)
 - assert_text:
     selector: '[data-testid="code-workspace-editor"]'
     contains: System.out.println(

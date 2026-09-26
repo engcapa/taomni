@@ -6367,9 +6367,9 @@ controls:
     kind: display
     optional: true       # CodeMirror-owned completion list while suggestions are active
   - id: editor-completion-string-candidate
-    selector: "xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel') and normalize-space(.)='String - java.lang']"
+    selector: "xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//li[.//span[contains(@class,'cm-completionLabel') and normalize-space(.)='String'] and .//span[contains(@class,'cm-completionDetail') and normalize-space(.)='java.lang']]"
     kind: interactive
-    optional: true       # Java provider candidate; position varies with provider ranking
+    optional: true       # Java provider candidate row (simple-name label + qualified-type detail after the ED-PARITY-005 label dedupe); position varies with provider ranking
   - id: editor-lightbulb               # gutter quick-fix button for the diagnostic line
     selector: '[data-testid="code-workspace-lightbulb"]'
     kind: interactive

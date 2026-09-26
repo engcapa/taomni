@@ -61,9 +61,9 @@ steps:
 - click: '[data-testid="keymap-add-editor.replace"]'
 - press: Alt+Shift+r
 - press: Enter
-- assert_text:
+- assert_pattern:
     selector: '[data-testid="keymap-replace-editor.replace-0"]'
-    contains: Alt+Shift+R
+    regex: '(Alt|Option)[+]Shift[+]R'
 - eval_readonly:
     expression: '!(localStorage.getItem("taomni.codeWorkspace.keymap.v3:index") || "[]").includes(''"key":"r","ctrl":false,"alt":true,"shift":true'')'
 - screenshot: tc-ide-parity-004-01-draft.png
@@ -141,9 +141,9 @@ steps:
     selector: '[data-testid="keymap-action-filter"]'
     value: Replace in File
 - wait_for: '[data-testid="keymap-row-editor.replace"]'
-- assert_text:
+- assert_pattern:
     selector: '[data-testid="keymap-replace-editor.replace-0"]'
-    contains: Alt+Shift+R
+    regex: '(Alt|Option)[+]Shift[+]R'
 - click: '[data-testid="keymap-add-editor.replace"]'
 - press: Control+Alt+t
 - press: Enter
@@ -170,7 +170,7 @@ verification:
     actions: [26, 27, 28]
     checkpoints:
     - step: 29
-      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Alt+Shift+R\"}}"
+      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
     - step: 30
       expectation: "{\"assert_localstorage\": {\"key\": \"taomni.codeWorkspace.keymap.v3:index\", \"exists\": false}}"
     - step: 36
@@ -196,7 +196,7 @@ verification:
     actions: [78]
     checkpoints:
     - step: 81
-      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Alt+Shift+R\"}}"
+      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
     results: [81]
   - id: R4
     requirement: "A1.2 S5：改键后不 Apply 直接 Esc 关闭，live 有效绑定仍按已生效的 Alt+Shift+R 工作。"

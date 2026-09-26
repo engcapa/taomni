@@ -75,9 +75,9 @@ steps:
 - press: Alt+Shift+r
 - press: Enter
 - assert_visible: '[data-testid="keymap-replace-editor.replace-0"]'
-- assert_text:
+- assert_pattern:
     selector: '[data-testid="keymap-replace-editor.replace-0"]'
-    contains: Alt+Shift+R
+    regex: '(Alt|Option)[+]Shift[+]R'
 - screenshot: tc-ide-c1-recorded.png
 - click: '[data-testid="keymap-settings-apply"]'
 - assert_disabled: '[data-testid="keymap-settings-apply"]'
@@ -153,8 +153,8 @@ verification:
     - step: 35
       expectation: '{"assert_visible": "[data-testid=\"keymap-replace-editor.replace-0\"]"}'
     - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-replace-editor.replace-0\"]", "contains":
-        "Alt+Shift+R"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"keymap-replace-editor.replace-0\"]", "regex":
+        "(Alt|Option)[+]Shift[+]R"}}'
     - step: 39
       expectation: '{"assert_disabled": "[data-testid=\"keymap-settings-apply\"]"}'
     - step: 41

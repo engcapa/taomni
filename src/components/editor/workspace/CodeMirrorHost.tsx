@@ -1946,15 +1946,21 @@ function lspNavigationExtensions(
       position: "fixed",
       parent: typeof document !== "undefined" ? document.body : undefined,
       tooltipSpace: (view) => {
-        if (typeof window === "undefined") {
-          return { top: 0, left: 0, bottom: 800, right: 1000 };
-        }
+        const viewportWidth = typeof window === "undefined" ? 1000 : window.innerWidth;
+        const viewportHeight = typeof window === "undefined" ? 800 : window.innerHeight;
         const rect = view.dom.getBoundingClientRect();
+        // CodeMirror aligns a tooltip that is wider than its space with
+        // space.left and lets it overrun space.right (TooltipPluginView
+        // writeMeasure). The completion list is capped against the viewport,
+        // not the editor pane, so keeping the horizontal space at the pane's
+        // rect pushed the popup past the window edge on narrow layouts. The
+        // horizontal space therefore spans the viewport; the vertical space
+        // keeps the editor bounds that flip hover tooltips above the dock.
         return {
           top: Math.max(0, rect.top),
-          left: Math.max(0, rect.left),
-          bottom: rect.bottom > 0 ? rect.bottom : window.innerHeight,
-          right: rect.right > 0 ? rect.right : window.innerWidth,
+          left: 0,
+          bottom: rect.bottom > 0 ? Math.min(rect.bottom, viewportHeight) : viewportHeight,
+          right: rect.right > 0 ? Math.min(rect.right, viewportWidth) : viewportWidth,
         };
       },
     }),

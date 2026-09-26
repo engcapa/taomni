@@ -191,9 +191,9 @@ steps:
 - press: Alt+Shift+r
 - press: Enter
 - click: '[data-testid="keymap-settings-apply"]'
-- assert_text:
+- assert_pattern:
     selector: '[data-testid="keymap-replace-editor.replace-0"]'
-    contains: Alt+Shift+R
+    regex: '(Alt|Option)[+]Shift[+]R'
 - click: '[data-testid="keymap-settings-close"]'
 - wait_for:
     selector: '[data-testid="workspace-keymap-settings-dialog"]'
@@ -270,7 +270,7 @@ verification:
     actions: [104]
     checkpoints:
     - step: 107
-      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Alt+Shift+R\"}}"
+      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
     - step: 112
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
     results: [107, 112]
