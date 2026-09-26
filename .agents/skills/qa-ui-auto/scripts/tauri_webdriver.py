@@ -449,16 +449,17 @@ class NativeSession:
         if not sid:
             raise WebDriverError(f"could not create WebDriver session: {value}")
         self.session_id = sid
-        if platform.system() == "Darwin":
-            # The in-process WKWebView bridge can bind before React has
-            # mounted its root.  Do not let the first native step race that
-            # mount; transient bridge/evaluation failures are retryable, but
-            # the case deadline remains authoritative.
-            self.wait_for_app_ready()
+        # The macOS in-process WKWebView bridge can bind before React has
+        # mounted its root, and EdgeDriver can return the WebView2 session
+        # while the document is still about:blank (localStorage access is
+        # denied there).  Do not let the first native step or storage seed
+        # race that navigation; transient evaluation failures are retryable,
+        # but the case deadline remains authoritative.
+        self.wait_for_app_ready()
         self.install_console_hook()
 
     def wait_for_app_ready(self, timeout: float = 20.0) -> None:
-        """Wait until the macOS QA WebView has a mounted application root."""
+        """Wait until the QA WebView has a mounted application root."""
         end = time.monotonic() + timeout
         last_error = ""
         while time.monotonic() < end:
@@ -1129,7 +1130,14 @@ class NativeHarness:
         except BaseException:
             # If readiness fails after the bridge has started, there is no
             # session object for the runner's normal finally block to close.
-            # Mark the process stale so the next case cannot reuse it.
+            # Delete the half-started session so the driver terminates the
+            # app; an orphaned app keeps the run-owned profile (SQLite,
+            # WebView2) locked and every later case's reset fails.  Then mark
+            # the process stale so the next case cannot reuse it.
+            try:
+                session.close()
+            except Exception:  # noqa: BLE001 - preserve the original failure
+                pass
             self.driver.mark_session_closed()
             raise
         return session
