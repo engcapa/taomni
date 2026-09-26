@@ -60,6 +60,64 @@ class KeyboardStepsTest(TestCase):
         step_terminal_input(ctx, {"selector": ".xterm-helper-textarea", "text": "draft"})
         locator.press.assert_called_once_with("Shift")
 
+    def test_terminal_input_retries_a_probe_until_its_output_appears(self):
+        ctx, page, locator = self.context()
+        pane = Mock()
+        pane.text_content.return_value = ""
+
+        def _attribute(name):
+            self.assertEqual(name, "data-terminal-text")
+            # Nothing on screen until the probe has been dispatched twice.
+            return "ready\n" if locator.evaluate.call_count > 1 else ""
+
+        pane.get_attribute.side_effect = _attribute
+        page.locator.side_effect = lambda selector: Mock(first=pane if selector == "#pane" else locator)
+        step_terminal_input(ctx, {
+            "selector": ".xterm-helper-textarea",
+            "text": "echo ready",
+            "submit": True,
+            "verify": {
+                "selector": "#pane",
+                "regex": r"(?m)^ready\r?$",
+                "timeout_sec": 0.1,
+                "attempts": 2,
+            },
+        })
+        self.assertEqual(locator.evaluate.call_count, 2)
+        self.assertEqual([c.args[0] for c in locator.press.call_args_list], ["Shift", "Enter", "Shift", "Enter"])
+
+    def test_terminal_input_reports_a_probe_that_never_appears(self):
+        ctx, page, locator = self.context()
+        pane = Mock()
+        pane.text_content.return_value = ""
+        pane.get_attribute.return_value = ""
+        page.locator.side_effect = lambda selector: Mock(first=pane if selector == "#pane" else locator)
+        with self.assertRaisesRegex(StepError, "after 2 attempt"):
+            step_terminal_input(ctx, {
+                "selector": ".xterm-helper-textarea",
+                "text": "echo ready",
+                "submit": True,
+                "verify": {
+                    "selector": "#pane",
+                    "regex": r"(?m)^ready\r?$",
+                    "timeout_sec": 0.2,
+                    "attempts": 2,
+                },
+            })
+        self.assertEqual(locator.evaluate.call_count, 2)
+
+    def test_terminal_input_rejects_a_malformed_verify_block(self):
+        ctx, _, locator = self.context()
+        with self.assertRaisesRegex(StepError, "verify expects"):
+            step_terminal_input(ctx, {
+                "selector": ".x",
+                "text": "t",
+                "verify": {"selector": "#pane", "regex": "^ready$", "bogus": 1},
+            })
+        with self.assertRaisesRegex(StepError, "verify regex"):
+            step_terminal_input(ctx, {"selector": ".x", "text": "t", "verify": {"selector": "#pane"}})
+        locator.evaluate.assert_not_called()
+
 
 if __name__ == "__main__":
     import unittest

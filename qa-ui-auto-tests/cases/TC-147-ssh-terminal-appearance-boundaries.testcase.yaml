@@ -42,12 +42,18 @@ steps:
 - fill:
     selector: 'input[aria-label="Terminal font size"]'
     value: '4'
-- click: '[data-testid="terminal-preview"]'
+# WebKit keeps focus when a non-focusable preview is clicked (Chrome blurs), so
+# commit the out-of-range value with a real keyboard focus move instead.
+- press:
+    selector: 'input[aria-label="Terminal font size"]'
+    key: Tab
 - wait_for: 'input[aria-label="Terminal font size"][value="8"]'
 - fill:
     selector: 'input[aria-label="Terminal font size"]'
     value: '40'
-- click: '[data-testid="terminal-preview"]'
+- press:
+    selector: 'input[aria-label="Terminal font size"]'
+    key: Tab
 - wait_for: 'input[aria-label="Terminal font size"][value="32"]'
 - click: 'button[aria-label="Decrease text size"]'
 - wait_for: 'input[aria-label="Terminal font size"][value="31"]'
@@ -56,12 +62,16 @@ steps:
 - fill:
     selector: 'input[aria-label="Scrollback lines"]'
     value: '99'
-- click: '[data-testid="terminal-preview"]'
+- press:
+    selector: 'input[aria-label="Scrollback lines"]'
+    key: Tab
 - wait_for: 'input[aria-label="Scrollback lines"][value="100"]'
 - fill:
     selector: 'input[aria-label="Scrollback lines"]'
     value: '200001'
-- click: '[data-testid="terminal-preview"]'
+- press:
+    selector: 'input[aria-label="Scrollback lines"]'
+    key: Tab
 - wait_for: 'input[aria-label="Scrollback lines"][value="200000"]'
 - select_option:
     selector: 'select[aria-label="Terminal cursor"]'
