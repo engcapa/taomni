@@ -6550,15 +6550,12 @@ pub async fn lsp_completion_resolve(
             reason: "no-active-session".into(),
         });
     };
-    let supports_resolve = session
-        .server_capabilities
-        .read()
-        .await
-        .get("completionProvider")
-        .and_then(|provider| provider.get("resolveProvider"))
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
-        || jdtls_completion_item_supports_resolve(&item);
+    let supports_resolve = {
+        let server_capabilities = session.server_capabilities.read().await;
+        let registrations = session.dynamic_capabilities.read().await;
+        completion_provider_supports_resolve(&server_capabilities, &registrations)
+            || jdtls_completion_item_supports_resolve(&item)
+    };
     if !supports_resolve {
         return Ok(LspCompletionResolveResult::Unavailable {
             reason: "resolve-capability-missing".into(),
@@ -6577,6 +6574,25 @@ pub async fn lsp_completion_resolve(
         None => response,
     };
     Ok(classify_completion_resolve_response(observed))
+}
+
+fn completion_provider_supports_resolve(
+    server_capabilities: &Value,
+    registrations: &HashMap<String, DynamicCapabilityRegistration>,
+) -> bool {
+    server_capabilities
+        .get("completionProvider")
+        .and_then(|provider| provider.get("resolveProvider"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || registrations.values().any(|registration| {
+            registration.method == "textDocument/completion"
+                && registration
+                    .register_options
+                    .get("resolveProvider")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+        })
 }
 
 /// JDT LS 1.61 does not advertise `completionProvider.resolveProvider`, but
@@ -13943,6 +13959,80 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
                 "language server request timed out: completionItem/resolve".into()
             )),
             LspCompletionResolveResult::Timeout
+        ));
+    }
+
+    #[test]
+    fn completion_resolve_supports_static_capability() {
+        let registrations = HashMap::new();
+        for options in [json!({}), json!({ "resolveProvider": false })] {
+            assert!(!completion_provider_supports_resolve(
+                &json!({ "completionProvider": options }),
+                &registrations
+            ));
+        }
+        assert!(completion_provider_supports_resolve(
+            &json!({ "completionProvider": { "resolveProvider": true } }),
+            &registrations
+        ));
+    }
+
+    #[test]
+    fn completion_resolve_tracks_dynamic_registration_and_unregistration() {
+        let params = json!({
+            "registrations": [
+                {
+                    "id": "completion-resolve",
+                    "method": "textDocument/completion",
+                    "registerOptions": { "resolveProvider": true }
+                },
+                {
+                    "id": "completion-no-resolve",
+                    "method": "textDocument/completion",
+                    "registerOptions": { "resolveProvider": false }
+                },
+                {
+                    "id": "symbols-resolve",
+                    "method": "workspace/symbol",
+                    "registerOptions": { "resolveProvider": true }
+                }
+            ]
+        });
+        let mut registrations = parse_dynamic_capability_registrations_checked(Some(&params))
+            .unwrap()
+            .into_iter()
+            .map(|registration| (registration.id.clone(), registration))
+            .collect::<HashMap<_, _>>();
+        assert!(completion_provider_supports_resolve(
+            &json!({}),
+            &registrations
+        ));
+        assert!(completion_provider_supports_resolve(
+            &json!({ "completionProvider": { "resolveProvider": false } }),
+            &registrations
+        ));
+
+        let unregister = json!({
+            "unregisterations": [{ "id": "completion-resolve", "method": "textDocument/completion" }]
+        });
+        for id in parse_dynamic_capability_unregistrations_checked(Some(&unregister)).unwrap() {
+            registrations.remove(&id);
+        }
+        assert!(!completion_provider_supports_resolve(
+            &json!({}),
+            &registrations
+        ));
+        assert!(completion_provider_supports_resolve(
+            &json!({ "completionProvider": { "resolveProvider": true } }),
+            &registrations
+        ));
+        registrations
+            .get_mut("completion-no-resolve")
+            .unwrap()
+            .register_options = json!({});
+        assert!(!completion_provider_supports_resolve(
+            &json!({}),
+            &registrations
         ));
     }
 

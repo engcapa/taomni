@@ -57,7 +57,6 @@ export function editorAppearanceExtension(
   const colors = resolveEditorAppearanceColors(profile);
   const root: Record<string, string> = {
     fontSize: `${profile.fontSizePx}px`,
-    fontFamily: profile.fontFamily,
   };
   const scroller: Record<string, string> = {
     fontFamily: profile.fontFamily,
@@ -74,6 +73,10 @@ export function editorAppearanceExtension(
     EditorView.theme({
       "&": root,
       ".cm-scroller": scroller,
+      ".cm-tooltip-autocomplete, .cm-completionInfo": {
+        fontFamily: profile.fontFamily,
+        fontSize: `${profile.fontSizePx}px`,
+      },
       ...(colors ? {
         ".cm-content, .cm-line": {
           color: colors["--taomni-code-text"],

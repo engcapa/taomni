@@ -232,3 +232,26 @@ P2维护 `qa-ui-auto-tests/feature-list.md`、covers/controls，controls变化�
 V6 自检复用原件 manifest 的 IDEA Ultimate 2026.2.3 / IU-262.10968.63、Islands Dark/Dark、Source Code Pro 16、100%/DPI 96；`17-mid.png` 与 `29-method-list.png` 的实际哈希符合 manifest。Taomni `tc-ide-parity-005-05-matched-profile-list.png` 来自本轮真实 WebView2/JDT LS。功能上，Tmid Enter/双击保留后缀、Tab 替换后缀、每次一份 import 与一次 Undo 同 IDEA；Esc 和选中候选的交互结论亦一致。`append(null)` 对 IDEA `append()` 是用户已接受的 provider 差异。视觉上当前 Taomni 工具栏/侧栏密度、候选行高/图标及列表内容仍不同，真实 provider 本轮返回 2 个 `StringUtils` 项，IDEA 存档显示 3 项；截图窗口尺寸也未完全相同。故只签当前 Windows 功能与交互自检，不签逐像素或整体 UI matched。用户本轮明确允许 native 当前端通过后声明卡 done，且不要求重新操作 IDEA 真机；此自检是对已存原件的只读比较，非独立验收。
 
 macOS/WKWebView、Linux/WebKitGTK 未运行。后续在各自隔离 QA app 中以相同 F2-COMP-005 工程、对应 JDT LS/JDK/classpath 身份执行 V1-V5，核对报文、host bytes、三入口/Undo 与截图；macOS 直接 Cargo 前先执行 `bash scripts/bundle-krb5-macos.sh stage`。WebDriver 证明本轮 WebView 输入与 DOM 焦点，不外推物理 OS 快捷键拦截。P0 矩阵 `REQ-05 / CW-LANG-001、CW-LANG-002`：Windows 功能与交互目标差距已关闭；视觉高度一致及其他平台仍未证明，不把本卡 done 换算为整体对齐。
+
+### 2026-09-26 Review 修复与补测
+
+基线为 `87874544`，开始时工作区干净。此前 168 项定向单测清单确实没有包含 `CodeMirrorHost.live-template-interaction.test.tsx`，不能据此声明该文件通过；清单本身不能证明遗漏的动机。本次实际运行旧 `mouse click accepts non-default candidate` 断言失败。
+
+- `lsp_completion_resolve` 只读取静态 capability 是 bug：现在同时读取当前 `textDocument/completion` 动态注册的 `resolveProvider`，注销立即移除支持，其他 method 的 resolver 不误计为补全能力。保留 JDT LS 1.61 的既有兼容适配；其真实接受路径另以原生用例验证。
+- Java provider 单击选中、双击接受符合本卡 V2 合同。旧测试改为实际选择非默认 `soutm`，检查单击零文档修改、焦点与选中状态，以及双击/Enter/Tab 各一次接受、一次 Undo 恢复文本和光标。关闭该测试夹具的文档预览，避免把预览 resolve 计为接受。
+- 共享字体变化与生产 QA 参数提前求值均确认：恢复 Quick Fix 的全局代码字体，仅为补全列表及文档面板应用工作区字体；QA 事件参数在编译开关内构造，关闭时不读取 completion payload。
+- 补测 `TC-IDE-C2-07` 发现其最后一个 Escape 在 Undo 已关闭 popup 后触发 CodeMirror 的临时 Tab 焦点退出模式。移除此多余按键并同步 verification 步骤映射，保留全部文本/Undo/Tab 展开断言；本地模板的单击接受仍有覆盖。
+
+| 检查 | 本次结果与证据 |
+|---|---|
+| 定向 Vitest | 10 文件、146/146，通过；包含此前遗漏文件的 21/21。日志 `qa-ui-auto-report/completion-review/unit-complete.log` |
+| Rust | Windows `cargo test --lib completion_resolve`，3/3，通过静态能力、动态注册/注销与 null/error 分类；日志 `completion-review/rust.log` |
+| Browser V2 | `TC-IDE-PARITY-005-02`，183/183 步通过；报告 `completion-review/browser/run-20260926-162905-438110600`。同批旧 C2-07 失败保留，不能把整批标为通过 |
+| Browser 模板保留行为 | 修正后的 `TC-IDE-C2-07-live-template-popup-input-browser`，38/38 步通过；报告 `completion-review/browser/run-20260926-164609-284556700` |
+| 字体实测 | 工作区 Courier New / 20px：正文、completion list/info 为 20px，editor root 保持 UI 字体；隔离挂载生产 ContextMenu 的 Quick Fix 保持全局代码字体 / 13px。截图 `completion-review/completion-font.png`、`quickfix-font.png`；不是实际 provider Quick Fix 操作证据 |
+| Windows native V5 | 一次隔离 QA 构建成功，含 TypeScript/Vite；`TC-IDE-PARITY-005-05` 在真实 WebView2/JDT LS 中 223/223 步通过、0 skip，报告 `completion-review/native/run-20260926-163247-809101000` |
+| 静态门禁 | `qa_ui_auto audit --gate`，270 case、0 error、0 orphan、catalog 最新，通过；`git diff --check` 通过 |
+
+所有运行报告相对根目录 `qa-ui-auto-report/`，保留 summary/receipt 和失败尝试。native 首次因 PATH 上的 JDK 11 被跳过，未计为通过；测试进程改用本机 JDK 21 后上述真实运行通过，未修改系统 Java 设置。当前 QA binary SHA-256 为 `045652eebbf7d7c4b7518ccfe8373447282d7ac89eb4dd6502c5b983721af0bf`，product source SHA-256 为 `da3ab3584e1d7a5c5a523b9300807ad974183700fed628a4dc19b667216cf2b1`。动态 capability 的决定性证据是 Rust 定向测试，JDT LS 原生用例证明兼容与接受链路，不外推为其他真实 server 的动态注册实采。
+
+macOS/WKWebView、Linux/WebKitGTK 本次仍未运行，沿用上述三端复测方案；没有改动平台相关实现。

@@ -1266,8 +1266,8 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
   border-radius: 4px;
   box-shadow: var(--taomni-shadow-lg);
   padding: 0 !important;
-  font-family: inherit;
-  font-size: inherit;
+  font-family: var(--taomni-code-font-family);
+  font-size: var(--taomni-code-font-size);
   line-height: 1.5;
   overflow: hidden;
 }

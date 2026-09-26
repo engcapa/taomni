@@ -638,17 +638,19 @@ export async function lspCompletion(
         }
       : {}),
   });
-  recordQaCompletion({
-    phase: "fetch",
-    workspaceId: descriptor.workspaceId,
-    filePath: descriptor.filePath,
-    position,
-    invocation: invocation ?? null,
-    active: result.status.active,
-    itemCount: result.items.length,
-    items: result.items.filter((item) => /StringUtils|append/i.test(item.label)).slice(0, 40)
-      .map((item) => ({ label: item.label, detail: item.detail, raw: item.raw, insertTextFormat: item.insertTextFormat })),
-  });
+  if (__TAOMNI_QA_COMPLETION_OBSERVATION__) {
+    recordQaCompletion({
+      phase: "fetch",
+      workspaceId: descriptor.workspaceId,
+      filePath: descriptor.filePath,
+      position,
+      invocation: invocation ?? null,
+      active: result.status.active,
+      itemCount: result.items.length,
+      items: result.items.filter((item) => /StringUtils|append/i.test(item.label)).slice(0, 40)
+        .map((item) => ({ label: item.label, detail: item.detail, raw: item.raw, insertTextFormat: item.insertTextFormat })),
+    });
+  }
   return result;
 }
 
@@ -663,13 +665,15 @@ export async function lspCompletionResolve(
     kind: "failed" as const,
     message: error instanceof Error ? error.message : String(error),
   }));
-  recordQaCompletion({
-    phase: "resolve",
-    workspaceId: descriptor.workspaceId,
-    filePath: descriptor.filePath,
-    requestedRaw: item,
-    result,
-  });
+  if (__TAOMNI_QA_COMPLETION_OBSERVATION__) {
+    recordQaCompletion({
+      phase: "resolve",
+      workspaceId: descriptor.workspaceId,
+      filePath: descriptor.filePath,
+      requestedRaw: item,
+      result,
+    });
+  }
   return result;
 }
 

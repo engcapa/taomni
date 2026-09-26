@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { lspCompletionResolve, type LspDocumentDescriptor } from "./lsp";
+import { lspCompletion, lspCompletionResolve, type LspDocumentDescriptor } from "./lsp";
 
 const coreMocks = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => coreMocks);
@@ -11,6 +11,23 @@ const descriptor: LspDocumentDescriptor = {
 
 describe("ED-PARITY-005 completion resolve IPC", () => {
   beforeEach(() => coreMocks.invoke.mockReset());
+
+  it("does not inspect completion payload for observations when QA is disabled", async () => {
+    const readObservationField = vi.fn();
+    const result = {
+      get status() {
+        readObservationField();
+        return { active: true };
+      },
+      get items() {
+        readObservationField();
+        return [];
+      },
+    };
+    coreMocks.invoke.mockResolvedValueOnce(result);
+    expect(await lspCompletion(descriptor, { line: 0, character: 4 })).toBe(result);
+    expect(readObservationField).not.toHaveBeenCalled();
+  });
 
   it.each([
     [{ kind: "unavailable", reason: "no-active-session" }, "unavailable"],
