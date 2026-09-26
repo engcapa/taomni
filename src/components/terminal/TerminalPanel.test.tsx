@@ -604,10 +604,14 @@ describe("TerminalPanel focus behavior", () => {
     };
     term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());
 
-    await act(async () => {
-      onOutput?.(new TextEncoder().encode(prompt));
-    });
-    await waitFor(() => {
+    // Fake timers keep the injected line's own TTL from expiring behind the
+    // test, so the hold/flush window is exactly the one under test.
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        onOutput?.(new TextEncoder().encode(prompt));
+        vi.advanceTimersByTime(120);
+      });
       const integrationWrite = (ipcMocks.writeTerminal.mock.calls as unknown[][]).find(
         ([sessionId, encoded]) =>
           sessionId === "terminal-session" &&
@@ -615,28 +619,29 @@ describe("TerminalPanel focus behavior", () => {
           atob(encoded).includes("__taomni_osc7"),
       );
       expect(integrationWrite).toBeTruthy();
-    });
-    ipcMocks.writeTerminal.mockClear();
+      ipcMocks.writeTerminal.mockClear();
 
-    // The injected line has not reported back yet: the keystrokes must wait
-    // instead of interleaving with it on the shared pty.
-    act(() => terminalMocks.state.onDataHandler?.("ls\r"));
-    expect((ipcMocks.writeTerminal.mock.calls as unknown[][]).some(([, encoded]) =>
-      typeof encoded === "string" && atob(encoded) === "ls\r",
-    )).toBe(false);
+      // The injected line has not reported back yet: the keystrokes must wait
+      // instead of interleaving with it on the shared pty.
+      act(() => terminalMocks.state.onDataHandler?.("ls\r"));
+      expect((ipcMocks.writeTerminal.mock.calls as unknown[][]).some(([, encoded]) =>
+        typeof encoded === "string" && atob(encoded) === "ls\r",
+      )).toBe(false);
 
-    // The injected command's own OSC 7 output proves it landed, so the held
-    // keystrokes are delivered in order afterwards.
-    await act(async () => {
-      onOutput?.(new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${prompt}`));
-    });
-    await waitFor(() => {
+      // The injected command's own OSC 7 output proves it landed, so the held
+      // keystrokes are delivered in order afterwards.
+      await act(async () => {
+        onOutput?.(new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${prompt}`));
+        vi.advanceTimersByTime(200);
+      });
       expect((ipcMocks.writeTerminal.mock.calls as unknown[][]).some(([sessionId, encoded]) =>
         sessionId === "terminal-session" &&
         typeof encoded === "string" &&
         atob(encoded) === "ls\r",
       )).toBe(true);
-    });
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it("releases SSH readiness when a slow Windows shell never reports OSC 7", async () => {
     const originalPlatform = window.navigator.platform;
