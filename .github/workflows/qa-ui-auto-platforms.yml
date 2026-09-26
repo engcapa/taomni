@@ -239,12 +239,15 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1
       - uses: actions/download-artifact@v4
+        if: needs.plan.result == 'success'
         with:
           pattern: qa-*-${{ needs.plan.outputs.artifact_key }}
           path: qa-downloads
       - name: Collect reports without altering runner receipts
+        if: needs.plan.result == 'success'
         run: python .agents/skills/qa-ui-auto/scripts/ci_collect.py qa-downloads qa-ui-auto-report
       - name: Verify results
+        if: needs.plan.result == 'success'
         run: python -m qa_ui_auto.ci report --selection qa-ui-auto-report/selection.json --reports qa-ui-auto-report
       - uses: actions/upload-artifact@v4
         if: always()
@@ -258,7 +261,7 @@ jobs:
 
   publish-issues:
     if: >-
-      always() && (inputs.publish_issues ||
+      always() && needs.plan.result == 'success' && (inputs.publish_issues ||
       (github.event_name == 'schedule' && vars.QA_UI_AUTO_PUBLISH_ISSUES == 'true')) &&
       github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
     needs: [plan, summarize]

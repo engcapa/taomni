@@ -1,0 +1,217 @@
+id: TC-IDE-PARITY-005-04
+title: Completion resolve failures require explicit recovery
+description: B-005 controlled resolve null, error and timeout through actual UI acceptance.
+covers: [F25.5]
+tags: [code-workspace, completion, parity005, resolve-gate, p1]
+modes: [browser]
+fixtures: [reset_db, parity005_completion]
+timeout_sec: 240
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: End
+  - press: ArrowLeft
+  - parity005_set_mode: resolve-null
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - wait: 0.12
+  - press: Enter
+  - wait_for: '[data-testid="completion-resolve-gate"]'
+  - assert_text:
+      selector: '[data-testid="completion-resolve-gate"]'
+      contains: provider resolve is unavailable
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - screenshot: tc-ide-parity-005-04-null-gate.png
+  - click: '[data-testid="completion-resolve-gate-retry"]'
+  - wait_for: '[data-testid="completion-resolve-gate-failed-note"]'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - parity005_set_mode: normal
+  - click: '[data-testid="completion-resolve-gate-retry"]'
+  - wait_for:
+      selector: '[data-testid="completion-resolve-gate"]'
+      state: hidden
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import java.lang.StringBuilder;', '', 'public class Main {', '    void sample() {', '        StringBuilder("x", 1);', '    }', '}', '']
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - parity005_set_mode: resolve-error
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - wait: 0.12
+  - press: Enter
+  - wait_for: '[data-testid="completion-resolve-gate"]'
+  - assert_text:
+      selector: '[data-testid="completion-resolve-gate"]'
+      contains: provider resolve failed
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - click: '[data-testid="completion-resolve-gate-insert-without-import"]'
+  - wait_for:
+      selector: '[data-testid="completion-resolve-gate"]'
+      state: hidden
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringBuilder("x", 1);', '    }', '}', '']
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - parity005_set_mode: resolve-timeout
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - wait: 0.12
+  - press: Enter
+  - wait_for: '[data-testid="completion-resolve-gate"]'
+  - assert_text:
+      selector: '[data-testid="completion-resolve-gate"]'
+      contains: provider resolve timed out
+  - click: '[data-testid="completion-resolve-gate-dismiss"]'
+  - wait_for:
+      selector: '[data-testid="completion-resolve-gate"]'
+      state: hidden
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - parity005_set_mode: normal
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - wait: 0.12
+  - press: Enter
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'StringBuilder("x", 1);'
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - screenshot: tc-ide-parity-005-04-recovered.png
+  - parity005_set_mode: resolve-overlap
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - wait: 0.12
+  - press: Enter
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: Stri;
+  - assert_not_visible: '[data-testid="completion-resolve-gate"]'
+  - parity005_set_mode: resolve-invalid
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - wait: 0.12
+  - press: Enter
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - parity005_set_mode: resolve-null
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - wait: 0.12
+  - press: Enter
+  - wait_for: '[data-testid="completion-resolve-gate"]'
+  - press: Escape
+  - assert_not_visible: '[data-testid="completion-resolve-gate"]'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+verification:
+  review: reviewed
+  requirements:
+    - id: ED-PARITY-005-V4-null-retry
+      requirement: Null resolve keeps B1 untouched; failed Retry still does; a fresh successful Retry commits B2 once.
+      actions: [14, 15, 18, 23, 26, 27, 30]
+      checkpoints:
+        - step: 20
+          expectation: Null resolve is presented as unavailable.
+        - step: 21
+          expectation: No edit occurred before a gate choice.
+        - step: 24
+          expectation: Failed Retry is visible.
+        - step: 25
+          expectation: Failed Retry did not edit the buffer.
+        - step: 28
+          expectation: Successful Retry closes the gate.
+        - step: 29
+          expectation: Successful Retry lands exact B2.
+        - step: 31
+          expectation: One Undo restores exact B1.
+      results: [20, 21, 24, 25, 28, 29, 31]
+    - id: ED-PARITY-005-V4-primary-only
+      requirement: Provider error leaves B1 intact; explicit primary-only omits the import and remains one-Undo recoverable.
+      actions: [32, 33, 36, 40, 43]
+      checkpoints:
+        - step: 38
+          expectation: Provider error is named as a failure.
+        - step: 39
+          expectation: No edit occurred on error.
+        - step: 41
+          expectation: Primary-only closes the gate.
+        - step: 42
+          expectation: Only the primary snippet text appears, with no import.
+        - step: 44
+          expectation: One Undo restores exact B1.
+      results: [38, 39, 41, 42, 44]
+    - id: ED-PARITY-005-V4-timeout-dismiss
+      requirement: Timeout names the reason; Dismiss preserves B1 and a new explicit request succeeds.
+      actions: [45, 46, 49, 52, 55, 56, 59, 61]
+      checkpoints:
+        - step: 51
+          expectation: Timeout reason is visible.
+        - step: 53
+          expectation: Dismiss closes the gate.
+        - step: 54
+          expectation: Dismiss left the exact prefix unchanged.
+        - step: 60
+          expectation: A new request can accept after recovery.
+        - step: 62
+          expectation: One Undo again restores exact B1.
+      results: [51, 53, 54, 60, 62]
+    - id: ED-PARITY-005-V4-invalid-edits
+      requirement: Overlapping or out-of-range resolved edits reject the entire acceptance.
+      actions: [64, 65, 68, 72, 73, 76]
+      checkpoints:
+        - step: 69
+          expectation: Overlap leaves exact B1 without a partial primary edit.
+        - step: 71
+          expectation: Overlap does not present a false recovery gate.
+        - step: 77
+          expectation: Invalid coordinates leave exact B1.
+      results: [69, 71, 77]
+    - id: ED-PARITY-005-V4-escape
+      requirement: Escape closes an unavailable resolve gate without writing the document.
+      actions: [78, 79, 82, 84]
+      checkpoints:
+        - step: 83
+          expectation: The unavailable gate opens before Escape.
+        - step: 85
+          expectation: Escape dismisses the gate.
+        - step: 86
+          expectation: B1 remains byte-for-byte unchanged in the editor.
+      results: [83, 85, 86]
+  visual:
+    - check: Gate labels, all controls and focus remain readable at the caret.
+      method: manual
+      reason: Requires screenshot and focus review.
+  native:
+    - check: Rust null/error distinction and real provider bytes.
+      method: external
+      reason: Browser stub cannot prove Rust IPC; case 005-05 owns it.

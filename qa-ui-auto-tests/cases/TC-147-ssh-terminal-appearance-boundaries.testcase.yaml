@@ -42,12 +42,14 @@ steps:
 - fill:
     selector: 'input[aria-label="Terminal font size"]'
     value: '4'
-- click: '[data-testid="terminal-preview"]'
+# Commit the out-of-range value by leaving the field. A synthesized Tab does
+# not move focus on the macOS in-process bridge, so blur the control explicitly.
+- blur: 'input[aria-label="Terminal font size"]'
 - wait_for: 'input[aria-label="Terminal font size"][value="8"]'
 - fill:
     selector: 'input[aria-label="Terminal font size"]'
     value: '40'
-- click: '[data-testid="terminal-preview"]'
+- blur: 'input[aria-label="Terminal font size"]'
 - wait_for: 'input[aria-label="Terminal font size"][value="32"]'
 - click: 'button[aria-label="Decrease text size"]'
 - wait_for: 'input[aria-label="Terminal font size"][value="31"]'
@@ -56,12 +58,12 @@ steps:
 - fill:
     selector: 'input[aria-label="Scrollback lines"]'
     value: '99'
-- click: '[data-testid="terminal-preview"]'
+- blur: 'input[aria-label="Scrollback lines"]'
 - wait_for: 'input[aria-label="Scrollback lines"][value="100"]'
 - fill:
     selector: 'input[aria-label="Scrollback lines"]'
     value: '200001'
-- click: '[data-testid="terminal-preview"]'
+- blur: 'input[aria-label="Scrollback lines"]'
 - wait_for: 'input[aria-label="Scrollback lines"][value="200000"]'
 - select_option:
     selector: 'select[aria-label="Terminal cursor"]'

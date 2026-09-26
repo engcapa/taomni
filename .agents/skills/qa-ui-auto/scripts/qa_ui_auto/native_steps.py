@@ -55,6 +55,7 @@ class NativeStepContext:
         self.session = session
         self.case_dir = case_dir
         self.cfg = cfg
+        self._parity005_trace_positions: dict[tuple[str, str, str], int] = {}
         self._permission_restores: dict[Path, int] = {}
         # External X11 CLIPBOARD owner started by native_clipboard_owner, plus
         # the host selection value captured before the case touched it.
@@ -1337,8 +1338,25 @@ def _do_type(ctx: NativeStepContext, args: Any) -> str:
 
 @_verb("terminal_input")
 def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
-    if not isinstance(args, dict) or set(args) - {"selector", "text", "submit"}:
-        raise StepError("terminal_input: expected {selector, text, submit?}")
+    selector, text, submit, verify = _terminal_input_args(args)
+    attempts = verify["attempts"] if verify else 1
+    for _ in range(attempts):
+        _dispatch_terminal_input(ctx, selector, text, submit)
+        if verify is None:
+            break
+        if _terminal_output_matches(ctx, verify):
+            break
+    else:
+        raise StepError(
+            f"terminal_input: {verify['selector']} did not match {verify['regex']!r} "
+            f"after {attempts} attempt(s)"
+        )
+    return f"sent {len(text)} chars to xterm input" + (" and submitted" if submit else "")
+
+
+def _terminal_input_args(args: Any) -> tuple[str, str, bool, dict[str, Any] | None]:
+    if not isinstance(args, dict) or set(args) - {"selector", "text", "submit", "verify"}:
+        raise StepError("terminal_input: expected {selector, text, submit?, verify?}")
     selector = args.get("selector")
     text = args.get("text")
     submit = args.get("submit", False)
@@ -1348,14 +1366,42 @@ def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
         raise StepError("terminal_input: text must be a string")
     if not isinstance(submit, bool):
         raise StepError("terminal_input: submit must be a boolean")
+    verify = args.get("verify")
+    parsed_verify = None if verify is None else _terminal_verify_args(verify)
+    return selector, text, submit, parsed_verify
+
+
+def _terminal_verify_args(verify: Any) -> dict[str, Any]:
+    if not isinstance(verify, dict) or set(verify) - {"selector", "regex", "timeout_sec", "attempts"}:
+        raise StepError("terminal_input: verify expects {selector, regex, timeout_sec?, attempts?}")
+    selector = verify.get("selector")
+    regex = verify.get("regex")
+    timeout = verify.get("timeout_sec", 10)
+    attempts = verify.get("attempts", 2)
+    if not isinstance(selector, str) or not selector:
+        raise StepError("terminal_input: verify selector must be a non-empty string")
+    if not isinstance(regex, str) or not regex:
+        raise StepError("terminal_input: verify regex must be a non-empty string")
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+        raise StepError("terminal_input: verify timeout_sec must be a positive number")
+    if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1:
+        raise StepError("terminal_input: verify attempts must be a positive integer")
+    return {
+        "selector": selector,
+        "regex": regex,
+        "timeout_sec": float(timeout),
+        "attempts": attempts,
+    }
+
+
+def _dispatch_terminal_input(ctx: NativeStepContext, selector: str, text: str, submit: bool) -> None:
     ctx.session.focus(selector)
     ctx.session.press_combo("Shift")
-    data = text
     result = ctx.session.execute(
         f"const element = document.querySelector({json.dumps(selector)});"
         "if (!element) return {found:false,focused:false};"
         "element.focus();"
-        f"const data = {json.dumps(data)};"
+        f"const data = {json.dumps(text)};"
         "element.dispatchEvent(new InputEvent('input',{"
         "data,inputType:'insertText',bubbles:true,composed:false}));"
         "return {found:true,focused:document.activeElement===element};"
@@ -1366,7 +1412,25 @@ def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
         raise StepError(f"terminal_input: target could not receive focus: {selector}")
     if submit:
         ctx.session.press_combo("Enter")
-    return f"sent {len(text)} chars to xterm input" + (" and submitted" if submit else "")
+
+
+def _terminal_output_matches(ctx: NativeStepContext, verify: dict[str, Any]) -> bool:
+    """Poll the pty buffer until the probe's own output shows up.
+
+    Windows OpenSSH/ConPTY intermittently drops part of a terminal write (a
+    missing leading byte, a truncated burst). An optional verify block lets the
+    probe be re-sent instead of failing the case on that transport hiccup; the
+    case's own assertion still decides what the run proves.
+    """
+    pattern = re.compile(verify["regex"])
+    deadline = time.monotonic() + verify["timeout_sec"]
+    while True:
+        text = ctx.session.text(verify["selector"])
+        if pattern.search(text or ""):
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.25)
 
 
 @_verb("press")
@@ -1432,6 +1496,29 @@ def _do_assert_items(ctx: NativeStepContext, args: Any) -> str:
 def _do_eval_readonly(ctx: NativeStepContext, args: Any) -> str:
     return _eval_readonly(ctx, args)
 
+
+@_verb("blur")
+def _do_blur(ctx: NativeStepContext, args: Any) -> str:
+    """Remove focus from a control the way leaving the field does.
+
+    A synthesized Tab does not move focus on the macOS in-process bridge, so a
+    blur-committed field (clamped number inputs, rename fields) never commits
+    there. HTMLElement.blur() dispatches the real blur/focusout events on every
+    platform.
+    """
+    if not isinstance(args, str) or not args:
+        raise StepError("blur: expected a non-empty selector string")
+    result = ctx.session.execute(
+        f"const element = document.querySelector({json.dumps(args)});"
+        "if (!element) return {found:false,blurred:false};"
+        "element.blur();"
+        "return {found:true,blurred:document.activeElement!==element};"
+    )
+    if not isinstance(result, dict) or result.get("found") is not True:
+        raise StepError(f"blur: target not found: {args}")
+    if result.get("blurred") is not True:
+        raise StepError(f"blur: element kept focus: {args}")
+    return f"blurred {args}"
 
 @_verb("hover")
 def _do_hover(ctx: NativeStepContext, args: Any) -> str:
@@ -2278,6 +2365,105 @@ def _do_save_race_trace(ctx: NativeStepContext, args: Any) -> str:
 @_verb("save_race_note")
 def _do_save_race_note(ctx: NativeStepContext, args: Any) -> str:
     return save_race.note(ctx, args)
+
+
+@_verb("parity005_native_fault")
+def _do_parity005_native_fault(ctx: NativeStepContext, args: Any) -> str:
+    mode = str(args)
+    if mode not in {"normal", "null", "error"}:
+        raise StepError(f"parity005_native_fault: invalid mode {mode!r}")
+    script = (
+        "const done = arguments[arguments.length - 1];"
+        "window.__TAURI__.core.invoke('qa_set_completion_resolve_fault',"
+        f"{{mode: {json.dumps(mode)}}})"
+        ".then(() => done({ok: true}), error => done({error: String(error)}));"
+    )
+    result = ctx.session.request("POST", ctx.session.endpoint("/execute/async"), {"script": script, "args": []})
+    if result != {"ok": True}:
+        raise StepError(f"parity005_native_fault: QA app rejected mode: {result!r}")
+    return f"QA Rust resolve fault mode: {mode}"
+
+
+@_verb("parity005_native_trace")
+def _do_parity005_native_trace(ctx: NativeStepContext, args: Any) -> str:
+    if not isinstance(args, dict) or args.get("phase") not in {"fetch", "resolve"}:
+        raise StepError("parity005_native_trace: phase must be fetch or resolve")
+    phase = args["phase"]
+    label = str(args.get("label_contains", ""))
+    detail = str(args.get("detail_contains", ""))
+    expected_kind = args.get("kind")
+    trace_key = (phase, label, detail)
+    previous_index = ctx._parity005_trace_positions.get(trace_key, -1)
+    deadline = time.time() + float(args.get("timeout_sec", 10))
+    selected: dict[str, Any] | None = None
+    matched_item: dict[str, Any] | None = None
+    selected_index = -1
+    state: dict[str, Any] | None = None
+    while time.time() < deadline:
+        state = ctx.session.execute("return window.__taomniQaCompletionObservation?.observe() ?? null;")
+        if not isinstance(state, dict):
+            raise StepError("parity005_native_trace: QA-only observation is unavailable")
+        events = state.get("events", [])
+        for index in range(len(events) - 1, previous_index, -1):
+            event = events[index]
+            if event.get("phase") != phase:
+                continue
+            candidates = [item for item in event.get("items", [])
+                          if (not label or label in str(item.get("label", "")))
+                          and (not detail or detail in str(item.get("detail", "")))]
+            requested = event.get("requestedRaw") or {}
+            requested_label = str(requested.get("label", "")) if isinstance(requested, dict) else ""
+            requested_detail = str(requested.get("detail", "")) if isinstance(requested, dict) else ""
+            if not candidates and (label and label not in requested_label
+                                   or detail and detail not in requested_detail):
+                continue
+            if expected_kind and (event.get("result") or {}).get("kind") != expected_kind:
+                continue
+            selected = event
+            matched_item = candidates[0] if candidates else None
+            selected_index = index
+            break
+        if selected is not None:
+            break
+        time.sleep(0.2)
+    if selected is None or state is None:
+        raise StepError(f"parity005_native_trace: missing {phase} {label!r} {expected_kind!r}; state={state!r}")
+    ctx._parity005_trace_positions[trace_key] = selected_index
+    if phase == "fetch" and label:
+        if matched_item is None or not isinstance(matched_item.get("raw"), dict):
+            raise StepError("parity005_native_trace: selected candidate lacks original provider item")
+    result = selected.get("result") or {}
+    if args.get("require_import"):
+        edits = (result.get("item") or {}).get("additionalTextEdits") or []
+        if not any("import org.apache.commons.lang3.StringUtils;" in edit.get("newText", "") for edit in edits):
+            raise StepError(f"parity005_native_trace: resolved item lacks the required import: {selected!r}")
+    if args.get("require_snippet") and (result.get("item") or {}).get("insertTextFormat") != 2:
+        raise StepError(f"parity005_native_trace: provider did not return snippet format: {selected!r}")
+    expected_range = args.get("expect_raw_range")
+    if expected_range:
+        raw = matched_item.get("raw") if phase == "fetch" and matched_item else selected.get("requestedRaw")
+        edit = (raw or {}).get("textEdit") or {}
+        insert = edit.get("insert") or {}
+        replace = edit.get("replace") or {}
+        actual = {
+            "line": (insert.get("start") or {}).get("line"),
+            "start": (insert.get("start") or {}).get("character"),
+            "insert_end": (insert.get("end") or {}).get("character"),
+            "replace_end": (replace.get("end") or {}).get("character"),
+        }
+        same_line = (insert.get("end") or {}).get("line") == actual["line"] \
+            and (replace.get("start") or {}).get("line") == actual["line"] \
+            and (replace.get("end") or {}).get("line") == actual["line"]
+        same_start = (replace.get("start") or {}).get("character") == actual["start"]
+        if not same_line or not same_start or actual != expected_range:
+            raise StepError(f"parity005_native_trace: raw insert/replace range {actual!r}, expected {expected_range!r}")
+        if phase == "resolve" and result.get("kind") == "resolved":
+            resolved_edit = (result.get("item") or {}).get("insertReplaceEdit") or {}
+            if resolved_edit.get("insert") != insert or resolved_edit.get("replace") != replace:
+                raise StepError("parity005_native_trace: resolved item lost the raw insert/replace ranges")
+    artifact = ctx.case_dir / str(args.get("artifact", f"parity005-native-{phase}.json"))
+    artifact.write_text(json.dumps({"selected": selected, "matched_item": matched_item, "event_index": selected_index, "events": state["events"]}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return f"native {phase} raw response observed: {artifact.name}"
 
 
 @_verb("vault_first_run")

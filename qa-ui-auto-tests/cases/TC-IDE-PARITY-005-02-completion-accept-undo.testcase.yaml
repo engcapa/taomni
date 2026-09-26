@@ -1,0 +1,474 @@
+id: TC-IDE-PARITY-005-02
+title: Completion import and snippet accept as one undoable edit
+description: Exact B-005 buffer and placeholder results through the real editor UI.
+covers: [F25.5]
+tags: [code-workspace, completion, parity005, p1]
+modes: [browser]
+fixtures: [reset_db, parity005_completion]
+timeout_sec: 240
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: End
+  - press: ArrowLeft
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete li[aria-selected="true"]'
+      contains: StringBuilder
+  - screenshot: tc-ide-parity-005-02-b1-popup.png
+  - wait: 0.12
+  - press: Enter
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals:
+        - package parity005;
+        - import java.lang.StringBuilder;
+        - ''
+        - 'public class Main {'
+        - '    void sample() {'
+        - '        StringBuilder("x", 1);'
+        - '    }'
+        - '}'
+        - ''
+  - eval_readonly:
+      expression: window.getSelection().toString() === '"x"'
+      expect_truthy: true
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals:
+        - package parity005;
+        - ''
+        - 'public class Main {'
+        - '    void sample() {'
+        - '        Stri;'
+        - '    }'
+        - '}'
+        - ''
+  - press: Control+Shift+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'StringBuilder("x", 1);'
+  - press: Control+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: Stri;
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - wait: 0.12
+  - press: Tab
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'StringBuilder("x", 1);'
+  - eval_readonly:
+      expression: window.getSelection().toString() === '"x"'
+      expect_truthy: true
+  - press: Tab
+  - eval_readonly:
+      expression: window.getSelection().toString() === '1'
+      expect_truthy: true
+  - press: Shift+Tab
+  - eval_readonly:
+      expression: window.getSelection().toString() === '"x"'
+      expect_truthy: true
+  - press: Tab
+  - press: Tab
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'StringBuilder("x", 1);'
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals:
+        - package parity005;
+        - ''
+        - 'public class Main {'
+        - '    void sample() {'
+        - '        Stri;'
+        - '    }'
+        - '}'
+        - ''
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - click: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: Stri;
+  - dblclick: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'StringBuilder("x", 1);'
+  - press: Control+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: Stri;
+  - screenshot: tc-ide-parity-005-02-after-undo.png
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Files"]'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+      value: Mid.java
+  - click: '[data-testid="code-workspace-search-everywhere"] button:has-text("Mid.java")'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: End
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 5, Col 18
+  - wait: 0.5
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete li[aria-selected="true"]'
+      contains: org.apache.commons.lang3.StringUtils
+  - wait: 0.12
+  - press: Enter
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import org.apache.commons.lang3.StringUtils;', '', 'public class Main {', '    void sample() {', '        StringUtilsSuffix;', '    }', '}', '']
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - press: Control+Shift+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: StringUtilsSuffix;
+  - press: Control+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: StringUtiSuffix;
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - wait: 0.12
+  - press: Tab
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import org.apache.commons.lang3.StringUtils;', '', 'public class Main {', '    void sample() {', '        StringUtils;', '    }', '}', '']
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 5, Col 18
+  - press: Control+Space
+  - parity005_trace: {pending: 0}
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - click: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: StringUtiSuffix;
+  - dblclick: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import org.apache.commons.lang3.StringUtils;', '', 'public class Main {', '    void sample() {', '        StringUtilsSuffix;', '    }', '}', '']
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
+  - screenshot: tc-ide-parity-005-02-mid-undo.png
+  - parity005_set_mode: empty-placeholder
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Files"]'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+      value: Main.java
+  - click: '[data-testid="code-workspace-search-everywhere"] button:has-text("Main.java")'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: End
+  - press: ArrowLeft
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - wait: 0.12
+  - press: Enter
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import java.lang.StringBuilder;', '', 'public class Main {', '    void sample() {', '        StringBuilder();', '    }', '}', '']
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 6, Col 23
+  - press: Tab
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 6, Col 24
+  - press: Shift+Tab
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 6, Col 23
+  - press: Tab
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import java.lang.StringBuilder;', '', 'public class Main {', '    void sample() {', '        StringBuilder();', '    }', '}', '']
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - parity005_set_mode: normal
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuffer")'
+  - press: ArrowDown
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete li[aria-selected="true"]'
+      contains: StringBuffer
+  - wait: 0.12
+  - press: Enter
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import java.lang.StringBuffer;', '', 'public class Main {', '    void sample() {', '        StringBuffer;', '    }', '}', '']
+  - eval_readonly:
+      expression: window.__taomniQaParity005.observe().events.at(-1).identity === 'parity005-buffer-2'
+      expect_truthy: true
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringJoiner")'
+  - click: '.cm-tooltip-autocomplete li:has-text("StringJoiner")'
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete li[aria-selected="true"]'
+      contains: StringJoiner
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: Stri;
+  - dblclick: '.cm-tooltip-autocomplete li:has-text("StringJoiner")'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', 'import java.util.StringJoiner;', '', 'public class Main {', '    void sample() {', '        StringJoiner;', '    }', '}', '']
+  - eval_readonly:
+      expression: window.__taomniQaParity005.observe().events.at(-1).identity === 'parity005-joiner-3'
+      expect_truthy: true
+  - press: Control+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
+  - set_viewport: {width: 950, height: 390}
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringJoiner")'
+  - eval_readonly:
+      expression: document.querySelector('.cm-tooltip-autocomplete')?.getBoundingClientRect().left >= 0 && document.querySelector('.cm-tooltip-autocomplete')?.getBoundingClientRect().right <= innerWidth && document.querySelector('.cm-tooltip-autocomplete')?.getBoundingClientRect().top >= 0 && document.querySelector('.cm-tooltip-autocomplete')?.getBoundingClientRect().bottom <= innerHeight
+      expect_truthy: true
+  - screenshot: tc-ide-parity-005-02-narrow-list.png
+  - press: Escape
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: Stri;
+  - set_viewport: {width: 1440, height: 900}
+  - click: '[data-testid="code-workspace-split-right"]'
+  - assert_count: {selector: '[data-testid="code-workspace-editor"] .cm-content', equal: 2}
+  - click: '[data-testid="code-workspace-editor"] .cm-content >> nth=0'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: End
+  - press: ArrowLeft
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuilder")'
+  - wait: 0.12
+  - press: Enter
+  - assert_count: {selector: '[data-testid="code-workspace-editor"] .cm-line:has-text("import java.lang.StringBuilder;")', equal: 2}
+  - assert_count: {selector: '[data-testid="code-workspace-editor"] .cm-line:has-text("StringBuilder(\"x\", 1);")', equal: 2}
+  - click: '[data-testid="code-workspace-editor"] .cm-content >> nth=1'
+  - press: Control+z
+  - assert_count: {selector: '[data-testid="code-workspace-editor"] .cm-line:has-text("Stri;")', equal: 2}
+  - assert_count: {selector: '[data-testid="code-workspace-editor"] .cm-line:has-text("import java.lang.StringBuilder;")', equal: 0}
+verification:
+  review: reviewed
+  requirements:
+    - id: ED-PARITY-005-V2-atomic
+      requirement: Enter lands exact primary plus import in one edit; one Undo restores B1 and Redo restores B2.
+      actions: [14, 19, 22, 24, 26]
+      checkpoints:
+        - step: 20
+          expectation: Complete B2 text includes one import and snippet expansion.
+        - step: 21
+          expectation: First placeholder is selected.
+        - step: 23
+          expectation: One Undo restores exact B1.
+        - step: 25
+          expectation: Redo restores the accepted text.
+        - step: 27
+          expectation: A second Undo restores the prefix.
+      results: [20, 21, 23, 25, 27]
+    - id: ED-PARITY-005-V2-tabstops
+      requirement: Tab acceptance and subsequent placeholder navigation do not add a document edit.
+      actions: [28, 31, 34, 36, 38, 39, 41]
+      checkpoints:
+        - step: 32
+          expectation: Tab accepts the same primary and import.
+        - step: 33
+          expectation: First placeholder is selected.
+        - step: 35
+          expectation: Tab selects the second placeholder.
+        - step: 37
+          expectation: Shift Tab returns to the first placeholder.
+        - step: 40
+          expectation: Navigation left the text unchanged.
+        - step: 42
+          expectation: One Undo after navigation restores exact B1.
+      results: [32, 33, 35, 37, 40, 42]
+    - id: ED-PARITY-005-V2-mouse
+      requirement: First click selects the provider item; double click accepts once and one Undo restores B1.
+      actions: [43, 45, 47, 49]
+      checkpoints:
+        - step: 46
+          expectation: Single click has not edited the prefix.
+        - step: 48
+          expectation: Double click accepted the full snippet.
+        - step: 50
+          expectation: One Undo restores the prefix.
+      results: [46, 48, 50]
+    - id: ED-PARITY-005-V2-mid-enter
+      requirement: Enter at Tmid uses the insert range, retaining Suffix and adding exactly one import; one Undo restores M0.
+      actions: [52, 56, 59, 74, 78, 80, 82, 84]
+      checkpoints:
+        - step: 58
+          expectation: Mid.java starts at exact M0.
+        - step: 73
+          expectation: The caret is after StringUti and before Suffix.
+        - step: 76
+          expectation: The selected item has the required package identity.
+        - step: 80
+          expectation: Enter produces complete StringUtilsSuffix plus one import.
+        - step: 82
+          expectation: One Undo restores exact M0.
+        - step: 84
+          expectation: Redo restores the insert result.
+        - step: 86
+          expectation: Undo returns to the original token.
+      results: [58, 73, 76, 80, 82, 84, 86]
+    - id: ED-PARITY-005-V2-mid-tab
+      requirement: Tab at Tmid uses the replace range and one Undo restores M0.
+      actions: [86, 89, 91]
+      checkpoints:
+        - step: 91
+          expectation: Tab replaces the full identifier suffix and lands one import.
+        - step: 93
+          expectation: One Undo restores exact M0.
+      results: [91, 93]
+    - id: ED-PARITY-005-V2-mid-mouse
+      requirement: Single click selects without editing; double click uses the insert range and one Undo restores M0.
+      actions: [95, 98, 100, 102]
+      checkpoints:
+        - step: 93
+          expectation: Undo restored the word-middle caret for the next round.
+        - step: 99
+          expectation: Single click retains M0.
+        - step: 101
+          expectation: Double click produces complete StringUtilsSuffix plus one import.
+        - step: 103
+          expectation: One Undo restores exact M0.
+      results: [93, 99, 101, 103]
+    - id: ED-PARITY-005-V2-empty-placeholder
+      requirement: A controlled empty snippet placeholder starts inside the call, Tab reaches the final stop without an edit, and one Undo restores B1.
+      actions: [105, 106, 110, 113, 121, 124, 127, 129, 131, 133]
+      checkpoints:
+        - step: 112
+          expectation: Main.java is restored to exact B1 before the variant.
+        - step: 125
+          expectation: The provider's empty placeholder expands to StringBuilder() with one import.
+        - step: 126
+          expectation: The caret begins inside the empty parentheses.
+        - step: 128
+          expectation: Tab moves to the final stop after the closing parenthesis.
+        - step: 130
+          expectation: Shift Tab returns to the empty placeholder without editing.
+        - step: 132
+          expectation: Navigation left the full accepted text unchanged.
+        - step: 134
+          expectation: One Undo returns to exact B1.
+      results: [112, 125, 126, 128, 130, 132, 134]
+    - id: ED-PARITY-005-V2-nonfirst
+      requirement: Keyboard and mouse select different non-first raw items, each resolving its own import and remaining one-Undo recoverable.
+      actions: [136, 138, 141, 144, 146, 148, 151, 154]
+      checkpoints:
+        - step: 139
+          expectation: ArrowDown selects StringBuffer.
+        - step: 142
+          expectation: StringBuffer lands only its matching import and text.
+        - step: 143
+          expectation: The resolve raw identity remains parity005-buffer-2.
+        - step: 145
+          expectation: One Undo restores B1.
+        - step: 149
+          expectation: A single click selects StringJoiner without editing.
+        - step: 150
+          expectation: The editor still contains the original prefix before double-click.
+        - step: 152
+          expectation: StringJoiner lands only its matching import and text.
+        - step: 153
+          expectation: The resolve raw identity remains parity005-joiner-3.
+        - step: 155
+          expectation: One Undo restores B1.
+      results: [139, 142, 143, 145, 149, 150, 152, 153, 155]
+    - id: ED-PARITY-005-V2-narrow
+      requirement: At 950 by 390 the completion list stays within the viewport and Escape leaves the buffer intact.
+      actions: [156, 157, 161]
+      checkpoints:
+        - step: 159
+          expectation: The popup rectangle is fully within the viewport.
+        - step: 162
+          expectation: Escape leaves B1 untouched.
+      results: [159, 162]
+    - id: ED-PARITY-005-V2-shared-history
+      requirement: Two UI views of Main.java show the same atomic acceptance; Undo from the sibling view restores both and removes the import.
+      actions: [164, 174, 177, 180, 181]
+      checkpoints:
+        - step: 165
+          expectation: The split exposes two editor views.
+        - step: 178
+          expectation: Both views show the same single import.
+        - step: 179
+          expectation: Both views show the accepted snippet text.
+        - step: 182
+          expectation: One Undo in the sibling view restores the prefix in both views.
+        - step: 183
+          expectation: The import is absent from both views after Undo.
+      results: [165, 178, 179, 182, 183]
+  visual:
+    - check: Selected row, documentation, popup anchor, density and clipping against IDEA R1/R2/R6.
+      method: manual
+      reason: Image review and comparable viewport settings are required beyond DOM assertions.
+  native:
+    - check: Real provider raw item, Rust resolve and host file bytes.
+      method: external
+      reason: Case 005-05 owns these boundaries; B-005 is a controlled browser response.

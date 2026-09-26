@@ -229,6 +229,16 @@
 - `[data-testid="project-facts-loading-icon"]` — display [optional] — F25.5.project-facts-loading-icon
 - `[data-testid="project-facts-ready-icon"]` — display [optional] — F25.5.project-facts-ready-icon
 - `[data-testid="code-workspace-lsp-status-pill"]` — display [optional] — F25.5.lsp-status-pill
+- `.cm-lsp-provider-option` — interactive [optional] — F25.5.completion-provider-option
+- `[data-testid="completion-resolve-gate"]` — display [optional] — F25.5.completion-resolve-gate
+- `[data-testid="completion-resolve-gate-retry"]` — interactive [optional] — F25.5.completion-resolve-gate-retry
+- `[data-testid="completion-resolve-gate-insert-without-import"]` — interactive [optional] — F25.5.completion-resolve-gate-insert-without-import
+- `[data-testid="completion-resolve-gate-dismiss"]` — interactive [optional] — F25.5.completion-resolve-gate-dismiss
+- `[data-testid="completion-resolve-gate-failed-note"]` — display [optional] — F25.5.completion-resolve-gate-failed-note
+- `[data-testid="keymap-item-editor.basicCompletion"]` — display [optional] — F25.5.keymap-basic-completion-item
+- `[data-testid="keymap-run-editor.basicCompletion"]` — interactive [optional] — F25.5.keymap-basic-completion-run
+- `xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"StringUtils") and contains(.,"org.apache.commons.lang3")]` — interactive [optional] — F25.5.completion-provider-type-option
+- `xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"append(String str)")]` — interactive [optional] — F25.5.completion-provider-method-option
 - `[data-testid="project-facts-untrusted-icon"]` — display [optional] — F25.5.project-facts-untrusted-icon
 - `[data-testid="project-facts-stale-icon"]` — display [optional] — F25.5.project-facts-stale-icon
 - `[data-testid="project-facts-failed-icon"]` — display [optional] — F25.5.project-facts-failed-icon

@@ -52,10 +52,17 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 60
+# The verify block re-sends the probe when Windows OpenSSH/ConPTY drops part
+# of the typed write; the assert_pattern below still decides the outcome.
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo qa-ssh-current-settings
     submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"]'
+      regex: (?m)^qa-ssh-current-settings\r?$
+      timeout_sec: 10
+      attempts: 2
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa-ssh-current-settings\r?$
@@ -97,6 +104,11 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo qa-ssh-after-current-settings
     submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"]'
+      regex: (?m)^qa-ssh-after-current-settings\r?$
+      timeout_sec: 10
+      attempts: 2
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa-ssh-after-current-settings\r?$

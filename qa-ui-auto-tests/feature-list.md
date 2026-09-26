@@ -6474,6 +6474,46 @@ controls:
     selector: '[data-testid="code-workspace-lsp-status-pill"]'
     kind: display
     optional: true       # per-file language-server state (LSP idle / Java / starting); ED-QUERY-004 native readiness signal
+  - id: completion-provider-option
+    selector: '.cm-lsp-provider-option'
+    kind: interactive
+    optional: true       # provider-backed completion row; class is scoped to the mounted autocomplete list
+  - id: completion-resolve-gate
+    selector: '[data-testid="completion-resolve-gate"]'
+    kind: display
+    optional: true
+  - id: completion-resolve-gate-retry
+    selector: '[data-testid="completion-resolve-gate-retry"]'
+    kind: interactive
+    optional: true
+  - id: completion-resolve-gate-insert-without-import
+    selector: '[data-testid="completion-resolve-gate-insert-without-import"]'
+    kind: interactive
+    optional: true
+  - id: completion-resolve-gate-dismiss
+    selector: '[data-testid="completion-resolve-gate-dismiss"]'
+    kind: interactive
+    optional: true
+  - id: completion-resolve-gate-failed-note
+    selector: '[data-testid="completion-resolve-gate-failed-note"]'
+    kind: display
+    optional: true
+  - id: keymap-basic-completion-item
+    selector: '[data-testid="keymap-item-editor.basicCompletion"]'
+    kind: display
+    optional: true
+  - id: keymap-basic-completion-run
+    selector: '[data-testid="keymap-run-editor.basicCompletion"]'
+    kind: interactive
+    optional: true
+  - id: completion-provider-type-option
+    selector: 'xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"StringUtils") and contains(.,"org.apache.commons.lang3")]'
+    kind: interactive
+    optional: true
+  - id: completion-provider-method-option
+    selector: 'xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"append(String str)")]'
+    kind: interactive
+    optional: true
   - id: project-facts-untrusted-icon
     selector: '[data-testid="project-facts-untrusted-icon"]'
     kind: display

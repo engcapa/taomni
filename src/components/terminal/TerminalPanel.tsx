@@ -276,6 +276,8 @@ interface TerminalPanelProps {
 }
 
 const DEFAULT_FONT_SIZE = 14;
+/** Upper bound on how long keystrokes wait for a hidden setup line to land. */
+const INJECTED_INPUT_HOLD_MAX_MS = 1_500;
 const CWD_QUERY_COMMAND =
   " printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; : __taomni_cwd_sync_done";
 function buildSshInitialCwdProbe(cwd: string): string {
@@ -1022,6 +1024,50 @@ export function TerminalPanel({
     refreshSuggestion();
   }, [suggestionsActive, history, refreshSuggestion]);
 
+  const writeXtermInputRef = useRef<((data: string) => void) | null>(null);
+  const injectedInputHoldRef = useRef<{
+    queue: string[];
+    pump: number | null;
+    expiresAt: number;
+    flushing: boolean;
+  }>({ queue: [], pump: null, expiresAt: 0, flushing: false });
+
+  const flushInjectedInputHold = useCallback(() => {
+    const hold = injectedInputHoldRef.current;
+    if (hold.pump !== null) {
+      window.clearInterval(hold.pump);
+      hold.pump = null;
+    }
+    hold.expiresAt = 0;
+    if (hold.queue.length === 0) return;
+    const queued = hold.queue.join("");
+    hold.queue = [];
+    // Re-enter the normal input path so the interceptor, pending-command
+    // tracking, MultiExec broadcast and send all see the held keystrokes in
+    // order — without holding them again.
+    hold.flushing = true;
+    try {
+      writeXtermInputRef.current?.(queued);
+    } finally {
+      hold.flushing = false;
+    }
+  }, []);
+
+  const holdInjectedInput = useCallback((data: string) => {
+    const hold = injectedInputHoldRef.current;
+    hold.queue.push(data);
+    if (hold.pump !== null) return;
+    hold.expiresAt = Date.now() + INJECTED_INPUT_HOLD_MAX_MS;
+    hold.pump = window.setInterval(() => {
+      const suppressor = injectedInputEchoSuppressorRef.current;
+      // Flush as soon as the injected line's own output proves it landed, or
+      // once the bounded hold expires so typing never stalls indefinitely.
+      if (!suppressor || suppressor.done || Date.now() >= hold.expiresAt) {
+        flushInjectedInputHold();
+      }
+    }, 100);
+  }, [flushInjectedInputHold]);
+
   const sendTerminalInput = useCallback((data: string) => {
     const sid = sessionIdRef.current;
     if (!sid || readOnlyRef.current || connectionStateRef.current !== "connected") return;
@@ -1064,6 +1110,16 @@ export function TerminalPanel({
     if (readOnlyRef.current) return;
     const filtered = imeGuardRef.current?.filterTerminalData(data) ?? data;
     if (filtered === null) {
+      return;
+    }
+
+    // A hidden setup line (shell integration, cwd probe, task wrapper) is being
+    // written into the same pty. Windows OpenSSH/ConPTY interleaves a concurrent
+    // keystroke write with it and corrupts both (an unterminated shell line),
+    // so hold the keystrokes and flush them once the injected line has landed.
+    const activeSuppressor = injectedInputEchoSuppressorRef.current;
+    if (!injectedInputHoldRef.current.flushing && activeSuppressor && !activeSuppressor.done) {
+      holdInjectedInput(filtered);
       return;
     }
 
@@ -1145,7 +1201,9 @@ export function TerminalPanel({
       onInputBroadcastRef.current?.(filtered);
     }
     sendTerminalInput(filtered);
-  }, [sendTerminalInput, setStatusMessage, setTerminalRuntime, ssh, tabId, trackPending, refreshSuggestion, isLocalPowerShell, terminalProfile?.aiInlineQqRender]);
+  }, [sendTerminalInput, setStatusMessage, setTerminalRuntime, ssh, tabId, trackPending, refreshSuggestion, isLocalPowerShell, terminalProfile?.aiInlineQqRender, holdInjectedInput]);
+
+  writeXtermInputRef.current = writeXtermInput;
 
   const writeBinaryInput = useCallback((data: string) => {
     const sid = sessionIdRef.current;
@@ -3396,6 +3454,13 @@ export function TerminalPanel({
       if (sockscapLaunchTimer) clearTimeout(sockscapLaunchTimer);
       installSshCwdIntegrationRef.current = null;
       automationInputSettlingRef.current = false;
+      // Drop (never deliver) keystrokes still held for a hidden setup line.
+      const heldInput = injectedInputHoldRef.current;
+      if (heldInput.pump !== null) {
+        window.clearInterval(heldInput.pump);
+        heldInput.pump = null;
+      }
+      heldInput.queue = [];
       unlistenExit?.();
       unlistenForwardError?.();
       unlistenAuthPrompt?.();

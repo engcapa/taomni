@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import platform
 import re
+import time
+from contextlib import suppress
 from typing import Any
 
 from . import StepContext, StepError, verb
@@ -43,9 +45,23 @@ def step_send_keys(ctx: StepContext, args: Any) -> None:
 
 @verb("terminal_input")
 def step_terminal_input(ctx: StepContext, args: Any) -> None:
-    selector, text, submit = _terminal_input_args(args)
+    selector, text, submit, verify = _terminal_input_args(args)
     if ctx.dry_run:
         return
+    attempts = verify["attempts"] if verify else 1
+    for _ in range(attempts):
+        _dispatch_terminal_input(ctx, selector, text, submit)
+        if verify is None:
+            return
+        if _terminal_output_matches(ctx, verify):
+            return
+    raise StepError(
+        f"terminal_input: {verify['selector']} did not match {verify['regex']!r} "
+        f"after {attempts} attempt(s)"
+    )
+
+
+def _dispatch_terminal_input(ctx: StepContext, selector: str, text: str, submit: bool) -> None:
     # A real modifier key cycle clears xterm's prior keypress suppression
     # state without inserting text. Send Enter separately from the text chunk.
     ctx.page.locator(selector).first.press("Shift")
@@ -69,6 +85,30 @@ def step_terminal_input(ctx: StepContext, args: Any) -> None:
         ctx.page.locator(selector).first.press("Enter")
 
 
+def _terminal_output_matches(ctx: StepContext, verify: dict[str, Any]) -> bool:
+    """Poll the pty buffer until the probe's own output shows up.
+
+    Windows OpenSSH/ConPTY intermittently drops part of a terminal write (a
+    missing leading byte, a truncated burst). An optional verify block lets the
+    probe be re-sent instead of failing the case on that transport hiccup; the
+    case's own assertion still decides what the run proves.
+    """
+    pattern = re.compile(verify["regex"])
+    deadline = time.monotonic() + verify["timeout_sec"]
+    while True:
+        locator = ctx.page.locator(verify["selector"]).first  # type: ignore[attr-defined]
+        candidates: list[str] = []
+        with suppress(Exception):
+            candidates.append(locator.text_content() or "")
+        with suppress(Exception):
+            candidates.append(locator.get_attribute("data-terminal-text") or "")
+        if any(pattern.search(candidate) for candidate in candidates):
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.25)
+
+
 def _typing_args(verb_name: str, args: Any) -> tuple[str | None, str]:
     if isinstance(args, str):
         return None, args
@@ -82,9 +122,9 @@ def _typing_args(verb_name: str, args: Any) -> tuple[str | None, str]:
     raise StepError(f"{verb_name}: expected string or {{selector, text}}")
 
 
-def _terminal_input_args(args: Any) -> tuple[str, str, bool]:
-    if not isinstance(args, dict) or set(args) - {"selector", "text", "submit"}:
-        raise StepError("terminal_input: expected {selector, text, submit?}")
+def _terminal_input_args(args: Any) -> tuple[str, str, bool, dict[str, Any] | None]:
+    if not isinstance(args, dict) or set(args) - {"selector", "text", "submit", "verify"}:
+        raise StepError("terminal_input: expected {selector, text, submit?, verify?}")
     selector = args.get("selector")
     text = args.get("text")
     submit = args.get("submit", False)
@@ -94,8 +134,54 @@ def _terminal_input_args(args: Any) -> tuple[str, str, bool]:
         raise StepError("terminal_input: text must be a string")
     if not isinstance(submit, bool):
         raise StepError("terminal_input: submit must be a boolean")
-    return selector, text, submit
+    verify = args.get("verify")
+    parsed_verify = None if verify is None else _terminal_verify_args(verify)
+    return selector, text, submit, parsed_verify
 
+
+def _terminal_verify_args(verify: Any) -> dict[str, Any]:
+    if not isinstance(verify, dict) or set(verify) - {"selector", "regex", "timeout_sec", "attempts"}:
+        raise StepError("terminal_input: verify expects {selector, regex, timeout_sec?, attempts?}")
+    selector = verify.get("selector")
+    regex = verify.get("regex")
+    timeout = verify.get("timeout_sec", 10)
+    attempts = verify.get("attempts", 2)
+    if not isinstance(selector, str) or not selector:
+        raise StepError("terminal_input: verify selector must be a non-empty string")
+    if not isinstance(regex, str) or not regex:
+        raise StepError("terminal_input: verify regex must be a non-empty string")
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+        raise StepError("terminal_input: verify timeout_sec must be a positive number")
+    if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1:
+        raise StepError("terminal_input: verify attempts must be a positive integer")
+    return {
+        "selector": selector,
+        "regex": regex,
+        "timeout_sec": float(timeout),
+        "attempts": attempts,
+    }
+
+
+@verb("blur")
+def step_blur(ctx: StepContext, args: Any) -> None:
+    """Remove focus from a control the way leaving the field does.
+
+    The platform drivers disagree about focus-moving keys: a W3C Tab moves
+    focus on Windows/Linux, while the macOS in-process bridge cannot perform
+    the browser default action for a synthesized Tab, so a blur-committed
+    field (clamped number inputs, rename fields) never commits. Calling
+    HTMLElement.blur() dispatches the real blur/focusout events on every
+    engine and keeps the case about the product behaviour.
+    """
+    if not isinstance(args, str) or not args:
+        raise StepError("blur: expected a non-empty selector string")
+    if ctx.dry_run:
+        return
+    blurred = ctx.page.locator(args).first.evaluate(  # type: ignore[attr-defined]
+        "(element) => { element.blur(); return document.activeElement !== element; }"
+    )
+    if blurred is not True:
+        raise StepError(f"blur: element kept focus: {args}")
 
 @verb("compose_text")
 def step_compose_text(ctx: StepContext, args: Any) -> None:

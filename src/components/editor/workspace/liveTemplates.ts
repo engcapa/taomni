@@ -1419,6 +1419,7 @@ export function createLiveTemplateCompletionSource(
     const listed = listLiveTemplateCompletions(context.state.doc, context.pos, language);
     if (!listed) {
       if (!context.explicit) return null;
+      if (context.matchBefore(/[\w$]+/)) return null;
       // Explicit invoke with no prefix: show a short starter set for the language.
       const starters = templatesFor(language, false)
         .filter((template) => !yieldsToProvider(template, owned))

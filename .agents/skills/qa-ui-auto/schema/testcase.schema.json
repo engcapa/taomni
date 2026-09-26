@@ -79,7 +79,8 @@
      "java_rename_deleted_fixtures",
      "view_state_fixtures",
      "editor_save_race",
-     "project_tree"
+     "project_tree",
+     "parity005_completion"
     ]
    },
    "uniqueItems": true
@@ -302,6 +303,15 @@
     "screenshot": {
      "$ref": "#/$defs/screenshot_arg"
     },
+    "set_viewport": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": ["width", "height"],
+     "properties": {
+      "width": {"type": "integer", "minimum": 320},
+      "height": {"type": "integer", "minimum": 240}
+     }
+    },
     "click": {
      "$ref": "#/$defs/click_arg"
     },
@@ -364,6 +374,9 @@
     },
     "press": {
      "$ref": "#/$defs/press_arg"
+    },
+    "blur": {
+     "$ref": "#/$defs/selector"
     },
     "select_option": {
      "$ref": "#/$defs/select_arg"
@@ -628,6 +641,57 @@
     "save_race_note": {
      "$ref": "#/$defs/save_race_note_arg"
     },
+    "parity005_set_mode": {
+     "enum": ["normal", "empty", "empty-placeholder", "fetch-hold", "resolve-hold", "resolve-null", "resolve-error", "resolve-timeout", "resolve-overlap", "resolve-invalid"]
+    },
+    "parity005_set_facts": {
+     "enum": ["ready", "loading", "degraded", "failed", "stale"]
+    },
+    "parity005_wait_pending": {
+     "enum": ["fetch", "resolve"]
+    },
+    "parity005_release": {
+     "enum": ["fetch", "resolve"]
+    },
+    "parity005_trace": {
+     "type": "object",
+     "additionalProperties": false,
+     "minProperties": 1,
+     "properties": {
+      "fetch": { "type": "integer", "minimum": 0 },
+      "resolve": { "type": "integer", "minimum": 0 },
+      "pending": { "type": "integer", "minimum": 0 }
+     }
+    },
+    "parity005_native_fault": {
+     "enum": ["normal", "null", "error"]
+    },
+    "parity005_native_trace": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": ["phase"],
+     "properties": {
+      "phase": {"enum": ["fetch", "resolve"]},
+      "label_contains": {"type": "string"},
+      "detail_contains": {"type": "string"},
+      "kind": {"enum": ["resolved", "unavailable", "timeout", "failed"]},
+      "require_import": {"type": "boolean"},
+      "require_snippet": {"type": "boolean"},
+      "expect_raw_range": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": ["line", "start", "insert_end", "replace_end"],
+       "properties": {
+        "line": {"type": "integer", "minimum": 0},
+        "start": {"type": "integer", "minimum": 0},
+        "insert_end": {"type": "integer", "minimum": 0},
+        "replace_end": {"type": "integer", "minimum": 0}
+       }
+      },
+      "artifact": {"type": "string"},
+      "timeout_sec": {"type": "number", "minimum": 0}
+     }
+    },
     "host_delete_file": {
      "$ref": "#/$defs/host_delete_file_arg"
     },
@@ -890,6 +954,36 @@
     "submit": {
      "type": "boolean",
      "default": false
+    },
+    "verify": {
+     "$ref": "#/$defs/terminal_input_verify"
+    }
+   }
+  },
+  "terminal_input_verify": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "selector",
+    "regex"
+   ],
+   "properties": {
+    "selector": {
+     "$ref": "#/$defs/selector"
+    },
+    "regex": {
+     "type": "string",
+     "minLength": 1
+    },
+    "timeout_sec": {
+     "type": "number",
+     "exclusiveMinimum": 0,
+     "default": 10
+    },
+    "attempts": {
+     "type": "integer",
+     "minimum": 1,
+     "default": 2
     }
    }
   },

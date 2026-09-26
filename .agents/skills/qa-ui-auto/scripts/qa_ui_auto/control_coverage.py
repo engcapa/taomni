@@ -69,7 +69,7 @@ INTERACTIVE_VERBS = {
     "middle_click",
     "click", "dblclick", "right_click", "hover", "drag_to", "native_click",
     "native_pointer_drag",
-    "fill", "type", "send_keys", "terminal_input", "press", "select_option", "upload_file",
+    "fill", "type", "send_keys", "terminal_input", "press", "blur", "select_option", "upload_file",
     "set_check", "send_text_via_label", "open_session", "click_menu",
     "quick_connect", "auth", "attach_sftp", "set_remote_path",
 }

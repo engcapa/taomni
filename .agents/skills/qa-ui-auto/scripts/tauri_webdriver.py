@@ -449,16 +449,17 @@ class NativeSession:
         if not sid:
             raise WebDriverError(f"could not create WebDriver session: {value}")
         self.session_id = sid
-        if platform.system() == "Darwin":
-            # The in-process WKWebView bridge can bind before React has
-            # mounted its root.  Do not let the first native step race that
-            # mount; transient bridge/evaluation failures are retryable, but
-            # the case deadline remains authoritative.
-            self.wait_for_app_ready()
+        # The macOS in-process WKWebView bridge can bind before React has
+        # mounted its root, and EdgeDriver can return the WebView2 session
+        # while the document is still about:blank (localStorage access is
+        # denied there).  Do not let the first native step or storage seed
+        # race that navigation; transient evaluation failures are retryable,
+        # but the case deadline remains authoritative.
+        self.wait_for_app_ready()
         self.install_console_hook()
 
     def wait_for_app_ready(self, timeout: float = 20.0) -> None:
-        """Wait until the macOS QA WebView has a mounted application root."""
+        """Wait until the QA WebView has a mounted application root."""
         end = time.monotonic() + timeout
         last_error = ""
         while time.monotonic() < end:
@@ -564,26 +565,44 @@ class NativeSession:
         return self.pointer_button_click(selector, 2)
 
     def pointer_button_click(self, selector: str, button: int) -> str:
-        element = self.find(selector, interactive=True)
-        origin = {"element-6066-11e4-a52e-4f735466cecf": element}
-        # Scroll only; dispatch the actual context click through W3C input.
-        self.request("POST", self.endpoint("/execute/sync"), {
-            "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
-            "args": [origin],
-        })
-        try:
-            self.request("POST", self.endpoint("/actions"), {"actions": [{
-                "type": "pointer", "id": "context-mouse",
-                "parameters": {"pointerType": "mouse"},
-                "actions": [
-                    {"type": "pointerMove", "duration": 0, "origin": origin, "x": 0, "y": 0},
-                    {"type": "pointerDown", "button": button},
-                    {"type": "pointerUp", "button": button},
-                ],
-            }]})
-        finally:
-            self.request("DELETE", self.endpoint("/actions"))
-        return f"pointer button {button} clicked {selector}"
+        # The row can be re-rendered (React replaces the node) between the
+        # locator resolution below and the scroll/input dispatch — for example
+        # right after a save or when the context menu mounts. A stale element
+        # then fails the whole case with a raw driver error, so re-resolve and
+        # retry instead of propagating the first stale reference.
+        last_stale: WebDriverError | None = None
+        for attempt in range(3):
+            element = self.find(selector, interactive=True)
+            origin = {"element-6066-11e4-a52e-4f735466cecf": element}
+            # Scroll only; dispatch the actual context click through W3C input.
+            try:
+                self.request("POST", self.endpoint("/execute/sync"), {
+                    "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
+                    "args": [origin],
+                })
+                self.request("POST", self.endpoint("/actions"), {"actions": [{
+                    "type": "pointer", "id": "context-mouse",
+                    "parameters": {"pointerType": "mouse"},
+                    "actions": [
+                        {"type": "pointerMove", "duration": 0, "origin": origin, "x": 0, "y": 0},
+                        {"type": "pointerDown", "button": button},
+                        {"type": "pointerUp", "button": button},
+                    ],
+                }]})
+            except WebDriverError as exc:
+                if "stale element reference" in str(exc) and attempt < 2:
+                    last_stale = exc
+                    time.sleep(0.3)
+                    continue
+                raise
+            finally:
+                # Best-effort: a failed release must not mask the real error or
+                # abort a stale-element retry.
+                with suppress(WebDriverError):
+                    self.request("DELETE", self.endpoint("/actions"))
+            return f"pointer button {button} clicked {selector}"
+        raise last_stale if last_stale else WebDriverError(
+            f"pointer button {button} click failed: {selector}")
 
     def focus(self, selector: str) -> str:
         """Focus for locator-scoped keys without activating a button/tree row."""
@@ -1129,7 +1148,14 @@ class NativeHarness:
         except BaseException:
             # If readiness fails after the bridge has started, there is no
             # session object for the runner's normal finally block to close.
-            # Mark the process stale so the next case cannot reuse it.
+            # Delete the half-started session so the driver terminates the
+            # app; an orphaned app keeps the run-owned profile (SQLite,
+            # WebView2) locked and every later case's reset fails.  Then mark
+            # the process stale so the next case cannot reuse it.
+            try:
+                session.close()
+            except Exception:  # noqa: BLE001 - preserve the original failure
+                pass
             self.driver.mark_session_closed()
             raise
         return session
