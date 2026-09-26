@@ -1,0 +1,222 @@
+id: TC-IDE-PARITY-004-01
+title: 'Keymap rebind: draft isolation, Apply commit, real dispatch and reopen read-back'
+description: 'ED-PARITY-004 A1.4/A1.5/S2/S3/S5 browser case. Proves the DEC-03 commit
+  boundary end to end through real UI controls and REAL key presses: a recorded
+  chord is draft-only until Apply, Apply makes the new chord execute and the old
+  one stop executing, the dialog reopens on the effective value, and a cancel
+  path discards the draft with zero live change.
+
+  A deliberate deviation from the P1 prose: P1 wrote that clicking Apply
+  detaches the dialog. Real IDEA 2026.2.3 (IU-262.10968.63, reference §3.1/§3.5)
+  keeps Settings open for Apply and only closes on OK, so this case closes the
+  dialog explicitly after Apply and asserts that behavior instead.
+
+  Mode: browser — every assertion is a renderer + per-profile localStorage
+  effect reachable in the Vite harness. Real-app-restart persistence is
+  TC-IDE-PARITY-004-04 (native).
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- keymap
+- ed-parity-004
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tab"]'
+- wait: 0.3
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- click: '[data-testid="keymap-scheme-copy"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- click: '[data-testid="keymap-add-editor.replace"]'
+- press: Alt+Shift+r
+- press: Enter
+- assert_text:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    contains: Alt+Shift+R
+- eval_readonly:
+    expression: '!(localStorage.getItem("taomni.codeWorkspace.keymap.v3:index") || "[]").includes(''"key":"r","ctrl":false,"alt":true,"shift":true'')'
+- screenshot: tc-ide-parity-004-01-draft.png
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+R
+- assert_visible: '[data-testid="code-workspace-editor-search"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- click: '[data-testid="keymap-scheme-copy"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- click: '[data-testid="keymap-add-editor.replace"]'
+- press: Alt+Shift+r
+- press: Enter
+- click: '[data-testid="keymap-settings-apply"]'
+- assert_disabled: '[data-testid="keymap-settings-apply"]'
+- assert_localstorage:
+    key: taomni.codeWorkspace.keymap.v3:index
+    contains: '"key":"r","ctrl":false,"alt":true,"shift":true'
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+Shift+r
+- assert_visible: '[data-testid="code-workspace-editor-search"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+R
+- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+Shift+r
+- assert_visible: '[data-testid="code-workspace-editor-search"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- assert_text:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    contains: Alt+Shift+R
+- click: '[data-testid="keymap-add-editor.replace"]'
+- press: Control+Alt+t
+- press: Enter
+- assert_enabled: '[data-testid="keymap-settings-apply"]'
+- screenshot: tc-ide-parity-004-01-reopen.png
+- press: Escape
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+Shift+r
+- assert_visible: '[data-testid="code-workspace-editor-search"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: "A1.4 DEC-03：录制并确认后的草稿不写任何存储，关闭对话框零写入，live 仍按旧 chord 派发。"
+    actions: [26, 27, 28]
+    checkpoints:
+    - step: 29
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Alt+Shift+R\"}}"
+    - step: 30
+      expectation: "{\"assert_localstorage\": {\"key\": \"taomni.codeWorkspace.keymap.v3:index\", \"exists\": false}}"
+    - step: 36
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
+    results: [30, 36]
+  - id: R2
+    requirement: "A1.4/A1.5 S3：Apply 是唯一提交边界；Apply 后新 chord 真的执行 Replace，旧 chord 不再命中该动作，重复按下不重复派发。"
+    actions: [53]
+    checkpoints:
+    - step: 54
+      expectation: "{\"assert_disabled\": \"[data-testid=\\\"keymap-settings-apply\\\"]\"}"
+    - step: 55
+      expectation: "{\"assert_localstorage\": {\"key\": \"taomni.codeWorkspace.keymap.v3:index\", \"contains\": \"Alt+Shift+R\"}}"
+    - step: 60
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
+    - step: 65
+      expectation: "{\"assert_not_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
+    - step: 68
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
+    results: [55, 60, 65, 68]
+  - id: R3
+    requirement: "A1.5 S3c：重开设置对话框读到 Apply 后的有效配置。"
+    actions: [78]
+    checkpoints:
+    - step: 81
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Alt+Shift+R\"}}"
+    results: [81]
+  - id: R4
+    requirement: "A1.2 S5：改键后不 Apply 直接 Esc 关闭，live 有效绑定仍按已生效的 Alt+Shift+R 工作。"
+    actions: [85]
+    checkpoints:
+    - step: 85
+      expectation: "{\"assert_enabled\": \"[data-testid=\\\"keymap-settings-apply\\\"]\"}"
+    - step: 88
+      expectation: "{\"wait_for\": {\"selector\": \"[data-testid=\\\"workspace-keymap-settings-dialog\\\"]\", \"state\": \"detached\", \"timeout_sec\": 5}}"
+    - step: 91
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
+    results: [91]
+  visual:
+  - check: 草稿态与 Apply 后的动作行 swatch、底部 OK/Cancel/Apply 三按钮（Apply 禁用态）布局无截断；
+      720px 对话框内动作标题与 swatch 不互相遮挡。
+    method: manual
+    reason: 像素/字体/DPI 边界不能由 DOM 断言代替，截图需人工评审。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；真实应用重启后的 profile 持久化由 TC-IDE-PARITY-004-04
+      在 native 层证明，browser 证据不替代它。
+    method: external
+    reason: browser 无法证明跨进程重启后 localStorage 存活。
+

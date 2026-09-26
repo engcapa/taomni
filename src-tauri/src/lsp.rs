@@ -63,6 +63,15 @@ const MAX_WORKSPACE_SYMBOL_DIAGNOSTICS: usize = 32;
 /// return thousands of entries, so bound parsing and IPC serialization before
 /// the response reaches the renderer thread.
 const MAX_COMPLETION_ITEMS: usize = 200;
+
+#[derive(Clone, Copy)]
+enum QaCompletionResolveFault {
+    Null,
+    Error,
+}
+
+static QA_COMPLETION_RESOLVE_FAULT: StdMutex<Option<QaCompletionResolveFault>> =
+    StdMutex::new(None);
 /// Keep opaque workspace-symbol resolve payloads short-lived and bounded. The
 /// token is only a routing handle; the raw provider payload never crosses the
 /// frontend boundary.
@@ -581,6 +590,14 @@ pub struct LspTextEdit {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct LspInsertReplaceEdit {
+    pub new_text: String,
+    pub insert: LspRange,
+    pub replace: LspRange,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LspCompletionItem {
     pub label: String,
     pub kind: Option<u32>,
@@ -592,6 +609,8 @@ pub struct LspCompletionItem {
     pub filter_text: Option<String>,
     pub sort_text: Option<String>,
     pub text_edit: Option<LspTextEdit>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub insert_replace_edit: Option<LspInsertReplaceEdit>,
     pub additional_text_edits: Vec<LspTextEdit>,
     /// Original server item, echoed back verbatim for `completionItem/resolve`.
     pub raw: Value,
@@ -606,6 +625,15 @@ pub struct LspCompletionResult {
     /// True when the server list was locally truncated at the hard cap.
     #[serde(default)]
     pub truncated: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum LspCompletionResolveResult {
+    Resolved { item: LspCompletionItem },
+    Unavailable { reason: String },
+    Timeout,
+    Failed { message: String },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -6507,7 +6535,7 @@ pub async fn lsp_completion_resolve(
     language_id: Option<String>,
     server_command_id: Option<String>,
     custom_server_command: Option<LspCustomServerCommand>,
-) -> Result<Option<LspCompletionItem>, String> {
+) -> Result<LspCompletionResolveResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let Some(session) = state
         .lsp
@@ -6518,15 +6546,102 @@ pub async fn lsp_completion_resolve(
         )
         .await
     else {
-        return Ok(None);
+        return Ok(LspCompletionResolveResult::Unavailable {
+            reason: "no-active-session".into(),
+        });
     };
-    let resolved = session
-        .request("completionItem/resolve", item.clone())
-        .await
-        .unwrap_or(Value::Null);
-    // Servers without resolve support may error or return null; fall back to
-    // the original item so callers always get something applicable.
-    Ok(parse_completion_item(&resolved).or_else(|| parse_completion_item(&item)))
+    let supports_resolve = {
+        let server_capabilities = session.server_capabilities.read().await;
+        let registrations = session.dynamic_capabilities.read().await;
+        completion_provider_supports_resolve(&server_capabilities, &registrations)
+            || jdtls_completion_item_supports_resolve(&item)
+    };
+    if !supports_resolve {
+        return Ok(LspCompletionResolveResult::Unavailable {
+            reason: "resolve-capability-missing".into(),
+        });
+    }
+    let response = session.request("completionItem/resolve", item).await;
+    let fault = QA_COMPLETION_RESOLVE_FAULT
+        .lock()
+        .ok()
+        .and_then(|mode| *mode);
+    let observed = match fault {
+        Some(QaCompletionResolveFault::Null) => Ok(Value::Null),
+        Some(QaCompletionResolveFault::Error) => {
+            Err("QA controlled completionItem/resolve transport error".into())
+        }
+        None => response,
+    };
+    Ok(classify_completion_resolve_response(observed))
+}
+
+fn completion_provider_supports_resolve(
+    server_capabilities: &Value,
+    registrations: &HashMap<String, DynamicCapabilityRegistration>,
+) -> bool {
+    server_capabilities
+        .get("completionProvider")
+        .and_then(|provider| provider.get("resolveProvider"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || registrations.values().any(|registration| {
+            registration.method == "textDocument/completion"
+                && registration
+                    .register_options
+                    .get("resolveProvider")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+        })
+}
+
+/// JDT LS 1.61 does not advertise `completionProvider.resolveProvider`, but
+/// its completion items carry the `java.completion.onDidSelect` command and
+/// opaque `data` consumed by the server's CompletionResolveHandler. Treat that
+/// explicit provider contract as resolve-capable while keeping unrelated
+/// providers behind the standard capability gate.
+fn jdtls_completion_item_supports_resolve(item: &Value) -> bool {
+    item.get("command")
+        .and_then(|command| command.get("command"))
+        .and_then(Value::as_str)
+        == Some("java.completion.onDidSelect")
+        && item.get("data").is_some_and(Value::is_object)
+}
+
+#[tauri::command]
+pub fn qa_set_completion_resolve_fault(app: AppHandle, mode: String) -> Result<(), String> {
+    if !cfg!(debug_assertions) || app.config().identifier != crate::QA_APP_ID {
+        return Err("completion fault control requires the isolated QA app".into());
+    }
+    let fault = match mode.as_str() {
+        "normal" => None,
+        "null" => Some(QaCompletionResolveFault::Null),
+        "error" => Some(QaCompletionResolveFault::Error),
+        _ => return Err("unsupported completion resolve fault mode".into()),
+    };
+    *QA_COMPLETION_RESOLVE_FAULT
+        .lock()
+        .map_err(|_| "completion resolve fault lock poisoned".to_string())? = fault;
+    Ok(())
+}
+
+fn classify_completion_resolve_response(
+    response: Result<Value, String>,
+) -> LspCompletionResolveResult {
+    match response {
+        Ok(Value::Null) => LspCompletionResolveResult::Unavailable {
+            reason: "resolver-returned-null".into(),
+        },
+        Ok(value) => parse_completion_item(&value)
+            .map(|item| LspCompletionResolveResult::Resolved { item })
+            .unwrap_or_else(|| LspCompletionResolveResult::Unavailable {
+                reason: "invalid-resolve-result".into(),
+            }),
+        Err(message) if message.to_ascii_lowercase().contains("timed out") => {
+            LspCompletionResolveResult::Timeout
+        }
+        Err(message) => LspCompletionResolveResult::Failed { message },
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -10268,6 +10383,27 @@ fn parse_text_edit(value: &Value) -> Option<LspTextEdit> {
     Some(LspTextEdit { range, new_text })
 }
 
+fn parse_completion_insert_replace_edit(value: &Value) -> Option<LspInsertReplaceEdit> {
+    if value.get("range").is_some() {
+        return None;
+    }
+    let new_text = value.get("newText")?.as_str()?.to_string();
+    let insert = parse_range(value.get("insert")?)?;
+    let replace = parse_range(value.get("replace")?)?;
+    let position = |p: &LspPosition| (p.line, p.character);
+    if insert.start != replace.start
+        || position(&insert.start) > position(&insert.end)
+        || position(&insert.end) > position(&replace.end)
+    {
+        return None;
+    }
+    Some(LspInsertReplaceEdit {
+        new_text,
+        insert,
+        replace,
+    })
+}
+
 fn parse_text_edits(value: &Value) -> Vec<LspTextEdit> {
     value
         .as_array()
@@ -10603,6 +10739,13 @@ fn parse_workspace_symbols(value: &Value) -> Vec<LspWorkspaceSymbol> {
 
 fn parse_completion_item(value: &Value) -> Option<LspCompletionItem> {
     let label = value.get("label")?.as_str()?.to_string();
+    let edit = value.get("textEdit");
+    let insert_replace_edit = match edit {
+        Some(edit) if edit.get("insert").is_some() || edit.get("replace").is_some() => {
+            Some(parse_completion_insert_replace_edit(edit)?)
+        }
+        _ => None,
+    };
     Some(LspCompletionItem {
         label,
         kind: value
@@ -10631,6 +10774,7 @@ fn parse_completion_item(value: &Value) -> Option<LspCompletionItem> {
             .and_then(Value::as_str)
             .map(ToString::to_string),
         text_edit: value.get("textEdit").and_then(parse_text_edit),
+        insert_replace_edit,
         additional_text_edits: value
             .get("additionalTextEdits")
             .and_then(Value::as_array)
@@ -13736,6 +13880,15 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         assert_eq!(item.insert_text_format, Some(2));
         // InsertReplaceEdit prefers the insert range.
         assert_eq!(item.text_edit.as_ref().unwrap().range.end.character, 8);
+        assert_eq!(
+            item.insert_replace_edit
+                .as_ref()
+                .unwrap()
+                .replace
+                .end
+                .character,
+            10
+        );
         assert_eq!(item.additional_text_edits.len(), 1);
         assert!(item.raw.get("label").is_some());
 
@@ -13757,6 +13910,151 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         assert!(truncated_flag, "local truncation must be observable");
         assert_eq!(items.len(), MAX_COMPLETION_ITEMS);
         assert_eq!(items.last().unwrap().label, "candidate-199");
+    }
+
+    #[test]
+    fn completion_item_preserves_insert_replace_ranges() {
+        let item = parse_completion_item(&json!({
+            "label": "StringUtils",
+            "textEdit": {
+                "newText": "StringUtils",
+                "insert": { "start": { "line": 4, "character": 8 }, "end": { "line": 4, "character": 17 } },
+                "replace": { "start": { "line": 4, "character": 8 }, "end": { "line": 4, "character": 23 } }
+            }
+        })).unwrap();
+        assert_eq!(item.text_edit.as_ref().unwrap().range.end.character, 17);
+        assert_eq!(
+            item.insert_replace_edit
+                .as_ref()
+                .unwrap()
+                .replace
+                .end
+                .character,
+            23
+        );
+        let wire = serde_json::to_value(&item).unwrap();
+        assert_eq!(wire["insertReplaceEdit"]["replace"]["end"]["character"], 23);
+        assert!(parse_completion_item(&json!({
+            "label": "bad",
+            "textEdit": {
+                "newText": "bad",
+                "insert": { "start": { "line": 4, "character": 8 }, "end": { "line": 4, "character": 23 } },
+                "replace": { "start": { "line": 4, "character": 8 }, "end": { "line": 4, "character": 17 } }
+            }
+        })).is_none());
+    }
+
+    #[test]
+    fn completion_resolve_does_not_fallback_on_null_or_error() {
+        assert!(matches!(
+            classify_completion_resolve_response(Ok(Value::Null)),
+            LspCompletionResolveResult::Unavailable { reason } if reason == "resolver-returned-null"
+        ));
+        assert!(matches!(
+            classify_completion_resolve_response(Err("provider rejected".into())),
+            LspCompletionResolveResult::Failed { message } if message == "provider rejected"
+        ));
+        assert!(matches!(
+            classify_completion_resolve_response(Err(
+                "language server request timed out: completionItem/resolve".into()
+            )),
+            LspCompletionResolveResult::Timeout
+        ));
+    }
+
+    #[test]
+    fn completion_resolve_supports_static_capability() {
+        let registrations = HashMap::new();
+        for options in [json!({}), json!({ "resolveProvider": false })] {
+            assert!(!completion_provider_supports_resolve(
+                &json!({ "completionProvider": options }),
+                &registrations
+            ));
+        }
+        assert!(completion_provider_supports_resolve(
+            &json!({ "completionProvider": { "resolveProvider": true } }),
+            &registrations
+        ));
+    }
+
+    #[test]
+    fn completion_resolve_tracks_dynamic_registration_and_unregistration() {
+        let params = json!({
+            "registrations": [
+                {
+                    "id": "completion-resolve",
+                    "method": "textDocument/completion",
+                    "registerOptions": { "resolveProvider": true }
+                },
+                {
+                    "id": "completion-no-resolve",
+                    "method": "textDocument/completion",
+                    "registerOptions": { "resolveProvider": false }
+                },
+                {
+                    "id": "symbols-resolve",
+                    "method": "workspace/symbol",
+                    "registerOptions": { "resolveProvider": true }
+                }
+            ]
+        });
+        let mut registrations = parse_dynamic_capability_registrations_checked(Some(&params))
+            .unwrap()
+            .into_iter()
+            .map(|registration| (registration.id.clone(), registration))
+            .collect::<HashMap<_, _>>();
+        assert!(completion_provider_supports_resolve(
+            &json!({}),
+            &registrations
+        ));
+        assert!(completion_provider_supports_resolve(
+            &json!({ "completionProvider": { "resolveProvider": false } }),
+            &registrations
+        ));
+
+        let unregister = json!({
+            "unregisterations": [{ "id": "completion-resolve", "method": "textDocument/completion" }]
+        });
+        for id in parse_dynamic_capability_unregistrations_checked(Some(&unregister)).unwrap() {
+            registrations.remove(&id);
+        }
+        assert!(!completion_provider_supports_resolve(
+            &json!({}),
+            &registrations
+        ));
+        assert!(completion_provider_supports_resolve(
+            &json!({ "completionProvider": { "resolveProvider": true } }),
+            &registrations
+        ));
+        registrations
+            .get_mut("completion-no-resolve")
+            .unwrap()
+            .register_options = json!({});
+        assert!(!completion_provider_supports_resolve(
+            &json!({}),
+            &registrations
+        ));
+    }
+
+    #[test]
+    fn jdtls_completion_item_resolves_without_advertised_capability() {
+        let item = json!({
+            "command": {
+                "command": "java.completion.onDidSelect",
+                "arguments": ["4", "1"]
+            },
+            "data": { "pid": "1", "rid": "4" }
+        });
+        assert!(jdtls_completion_item_supports_resolve(&item));
+
+        let unrelated = json!({
+            "command": { "command": "some.other.command" },
+            "data": { "pid": "1", "rid": "4" }
+        });
+        assert!(!jdtls_completion_item_supports_resolve(&unrelated));
+        assert!(!jdtls_completion_item_supports_resolve(&json!({
+            "command": { "command": "java.completion.onDidSelect" }
+        })));
     }
 
     #[test]

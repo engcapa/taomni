@@ -106,6 +106,16 @@ describe("Java live templates", () => {
 });
 
 describe("createLiveTemplateCompletionSource", () => {
+  it("does not mix unrelated templates into explicit Java type completion", () => {
+    const source = createLiveTemplateCompletionSource(() => "Main.java");
+    const typed = EditorState.create({ doc: "StringUti" });
+    expect(source(new CompletionContext(typed, 9, true))).toBeNull();
+
+    const empty = EditorState.create({ doc: "" });
+    const starters = source(new CompletionContext(empty, 0, true));
+    expect(starters).not.toBeNull();
+  });
+
   it("offers Java templates while typing an abbreviation", () => {
     const source = createLiveTemplateCompletionSource(() => "App.java");
     const state = EditorState.create({ doc: "sout" });

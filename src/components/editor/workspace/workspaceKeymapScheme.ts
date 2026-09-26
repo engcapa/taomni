@@ -137,6 +137,122 @@ export function isReservedStroke(stroke: ShortcutStroke): boolean {
   return RESERVED_STROKE_CODES.has(stroke.code) && bare;
 }
 
+// ---------------------------------------------------------------------------
+// Conflict identity + displacement (ED-PARITY-004 DEC-06 / DEC-04)
+// ---------------------------------------------------------------------------
+
+/**
+ * Canonical physical identity of one stroke: `code` plus the modifier bits,
+ * with the display-only `key` dropped. This is deliberately the SAME identity
+ * `strokesEqual` matches on, so a definition-derived `Ctrl+F` and a
+ * user-recorded `Ctrl+f` converge instead of forking the conflict graph (D1).
+ */
+export function strokeIdentity(stroke: ShortcutStroke): string {
+  const mods = [
+    stroke.ctrl && "ctrl",
+    stroke.alt && "alt",
+    stroke.shift && "shift",
+    stroke.meta && "meta",
+  ].filter(Boolean).join("+");
+  return mods ? `${mods}+${stroke.code}` : stroke.code;
+}
+
+/** Physical identity of a whole shortcut (two-stroke chords stay ordered). */
+export function shortcutIdentity(shortcut: Shortcut): string {
+  if (shortcut.kind === "mouse") {
+    const mods = [
+      shortcut.modifiers.ctrl && "ctrl",
+      shortcut.modifiers.alt && "alt",
+      shortcut.modifiers.shift && "shift",
+      shortcut.modifiers.meta && "meta",
+    ].filter(Boolean).join("+");
+    const base = `mouse:${shortcut.button}x${shortcut.clickCount}`;
+    return mods ? `${base}+${mods}` : base;
+  }
+  return shortcut.strokes.map(strokeIdentity).join(" ");
+}
+
+/** Where a resolved shortcut set came from, mirroring the host vocabulary. */
+export type KeymapBindingSource = "user" | "base";
+
+export interface StrokeConflictEntry {
+  actionId: string;
+  /** Where the holding binding came from. */
+  source: KeymapBindingSource;
+}
+
+/**
+ * Effective bindings for one action: the scheme delta wins whenever the entry
+ * is PRESENT — including an explicit empty array, which means "this action has
+ * no shortcuts" and must not fall back to the base default (DEC-04).
+ */
+export function effectiveSchemeBindings(
+  scheme: KeymapSchemeV3 | null,
+  baseBindings: ReadonlyMap<string, readonly Shortcut[]>,
+  actionId: string,
+): { shortcuts: readonly Shortcut[]; source: KeymapBindingSource } {
+  const delta = scheme?.bindings[actionId];
+  if (delta) return { shortcuts: delta, source: "user" };
+  return { shortcuts: baseBindings.get(actionId) ?? [], source: "base" };
+}
+
+/**
+ * Every action whose EFFECTIVE bindings already contain `candidate`, keyed by
+ * the physical identity dispatch uses. `baseBindings` must cover every action
+ * the caller knows about; entries the scheme overrides resolve through the
+ * delta, the rest through the built-in defaults.
+ *
+ * User-disabled actions are excluded by default: they cannot execute, so they
+ * are not a routing conflict — the same availability rule `prepareBinding`
+ * applies when it refuses to pick a winner.
+ */
+export function findStrokeConflicts(
+  scheme: KeymapSchemeV3 | null,
+  baseBindings: ReadonlyMap<string, readonly Shortcut[]>,
+  candidate: Shortcut,
+  options: { targetActionId?: string; includeDisabled?: boolean } = {},
+): readonly StrokeConflictEntry[] {
+  const identity = shortcutIdentity(candidate);
+  const disabled = new Set(scheme?.disabledActionIds ?? []);
+  const holders: StrokeConflictEntry[] = [];
+  for (const actionId of baseBindings.keys()) {
+    if (actionId === options.targetActionId) continue;
+    if (!options.includeDisabled && disabled.has(actionId)) continue;
+    const { shortcuts, source } = effectiveSchemeBindings(scheme, baseBindings, actionId);
+    if (shortcuts.some((shortcut) => shortcutIdentity(shortcut) === identity)) {
+      holders.push({ actionId, source });
+    }
+  }
+  return holders;
+}
+
+/**
+ * DEC-04: once the user confirms a colliding chord, the previous holder loses
+ * EXACTLY that stroke so the chord has a single owner. Every other binding of
+ * the holder is preserved, and a holder left with none receives an explicit
+ * empty array so its base default is not resurrected. No-op when the chord is
+ * unheld.
+ */
+export function displaceStroke(
+  scheme: KeymapSchemeV3,
+  baseBindings: ReadonlyMap<string, readonly Shortcut[]>,
+  keepActionId: string,
+  candidate: Shortcut,
+): KeymapSchemeV3 {
+  const identity = shortcutIdentity(candidate);
+  const disabled = new Set(scheme.disabledActionIds);
+  const bindings: Record<string, readonly Shortcut[]> = { ...scheme.bindings };
+  let changed = false;
+  for (const actionId of baseBindings.keys()) {
+    if (actionId === keepActionId || disabled.has(actionId)) continue;
+    const effective = bindings[actionId] ?? baseBindings.get(actionId) ?? [];
+    if (!effective.some((shortcut) => shortcutIdentity(shortcut) === identity)) continue;
+    bindings[actionId] = effective.filter((shortcut) => shortcutIdentity(shortcut) !== identity);
+    changed = true;
+  }
+  return changed ? { ...scheme, bindings, updatedAt: Date.now() } : scheme;
+}
+
 /** Empty user scheme over a platform base. */
 export function createKeymapScheme(input: {
   id: string;
@@ -197,10 +313,12 @@ function sanitizeScheme(value: unknown): KeymapSchemeV3 | null {
   if (raw.bindings && typeof raw.bindings === "object") {
     for (const [actionId, shortcuts] of Object.entries(raw.bindings as Record<string, unknown>)) {
       if (!Array.isArray(shortcuts)) continue;
-      const valid = shortcuts.filter((shortcut): shortcut is Shortcut =>
+      // An empty array is meaningful and must survive the round trip: it is the
+      // explicit "this action has no shortcuts" override `displaceStroke`
+      // writes for the previous holder of a reassigned chord (DEC-04).
+      bindings[actionId] = shortcuts.filter((shortcut): shortcut is Shortcut =>
         !!shortcut && typeof shortcut === "object"
         && ((shortcut as Shortcut).kind === "keyboard" || (shortcut as Shortcut).kind === "mouse"));
-      if (valid.length > 0) bindings[actionId] = valid;
     }
   }
   return {

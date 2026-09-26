@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => ({
     // bundle that can install the save-race probe control object. Normal builds
     // compile the install branch away, so there is no runtime entry to it.
     __TAOMNI_QA_SAVE_GATE__: JSON.stringify(mode === "qa"),
+    __TAOMNI_QA_COMPLETION_OBSERVATION__: JSON.stringify(mode === "qa"),
   },
   optimizeDeps: {
     // Keep qa-ui-auto startup from crawling the entire dependency graph in

@@ -1,0 +1,564 @@
+id: TC-IDE-PARITY-005-05
+title: Windows JDT LS completion, atomic import and snippet, save and resolve faults
+description: Isolated F2-COMP-005 Maven project through the packaged QA app, real WebView2, Rust IPC, JDT LS and host bytes.
+covers: [F25.5]
+tags: [code-workspace, completion, parity005, native-gate, provider-fixture, p1]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db, parity005_completion, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: ${cfg.app.base_url}
+  - vault_first_run: qa-parity005-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-parity005-native","name":"parity005","roots":[{"id":"parity005","name":"parity005","path":"${fixture.parity005_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"parity005","path":"src/main/java/parity005/Main.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+      timeout_sec: 90
+  - wait_for:
+      selector: '[data-testid="project-facts-ready-icon"]'
+      timeout_sec: 120
+  - wait_for:
+      selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+      timeout_sec: 120
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: Home
+  - press: Shift+End
+  - type: 'Object typeProbe = StringUti;'
+  - press: ArrowLeft
+  - assert_file_contains:
+      path: ${fixture.parity005_main}
+      contains: 'Object typeProbe = null;'
+  - press: Control+Space
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete'
+      timeout_sec: 120
+  - parity005_native_trace:
+      phase: fetch
+      label_contains: StringUtils
+      artifact: type-fetch-raw.json
+  - screenshot: tc-ide-parity-005-05-type-list.png
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [ArrowDown]
+      ready_selector: '.cm-tooltip-autocomplete'
+      ready_timeout_sec: 30
+      require_keydown_prevented: true
+  - wait: 0.12
+  - press: Enter
+  - parity005_native_trace:
+      phase: resolve
+      label_contains: StringUtils
+      kind: resolved
+      require_import: true
+      artifact: type-resolve-raw.json
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'Object typeProbe = StringUtils;'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'import org.apache.commons.lang3.StringUtils;'
+  - assert_file_contains:
+      path: ${fixture.parity005_main}
+      contains: 'Object typeProbe = null;'
+  - screenshot: tc-ide-parity-005-05-type-accepted.png
+  - press: Mod+s
+  - assert_file_contains:
+      path: ${fixture.parity005_main}
+      contains: 'import org.apache.commons.lang3.StringUtils;'
+  - assert_file_contains:
+      path: ${fixture.parity005_main}
+      contains: 'Object typeProbe = StringUtils;'
+  - press: Mod+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'Object typeProbe = StringUti;'
+  - eval_readonly:
+      expression: '!document.querySelector(".cm-content")?.textContent?.includes("import org.apache.commons.lang3.StringUtils;")'
+      expect_truthy: true
+  - press: Mod+s
+  - assert_file_contains:
+      path: ${fixture.parity005_main}
+      contains: 'Object typeProbe = StringUti;'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: Home
+  - press: Shift+End
+  - type: 'Object typeProbe = null;'
+  - press: ArrowDown
+  - press: Home
+  - press: Shift+End
+  - type: 'new StringBuilder().appen;'
+  - press: ArrowLeft
+  - press: Control+Space
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete'
+      timeout_sec: 120
+  - parity005_native_trace:
+      phase: fetch
+      label_contains: append
+      artifact: method-fetch-raw.json
+  - screenshot: tc-ide-parity-005-05-method-list.png
+  - click: 'xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"append(String str)")]'
+  - wait: 0.12
+  - press: Enter
+  - parity005_native_trace:
+      phase: resolve
+      label_contains: append
+      kind: resolved
+      require_snippet: true
+      artifact: method-resolve-raw.json
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'new StringBuilder().append('
+  - screenshot: tc-ide-parity-005-05-method-accepted.png
+  - press: Shift+Tab
+  - press: Tab
+  - press: Mod+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'new StringBuilder().appen;'
+  - press: Home
+  - press: Shift+End
+  - type: 'new StringBuilder().'
+  - press: Mod+s
+  - press: Control+Space
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 30
+  - parity005_native_trace:
+      phase: fetch
+      label_contains: append
+      artifact: after-save-fetch-raw.json
+  - press: Escape
+  - type: 'append("x");'
+  - press: Mod+s
+  - press: Home
+  - press: Shift+End
+  - type: 'new StringBuilder().'
+  - press: Mod+s
+  - press: Control+Space
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 30
+  - parity005_native_trace:
+      phase: fetch
+      label_contains: append
+      artifact: second-save-fetch-raw.json
+  - press: Escape
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: Home
+  - press: Shift+End
+  - type: 'Object typeProbe = StringUti;'
+  - press: ArrowLeft
+  - parity005_native_fault: 'null'
+  - press: Control+Space
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete'
+      timeout_sec: 30
+  - click: 'xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"StringUtils") and contains(.,"org.apache.commons.lang3")]'
+  - wait: 0.12
+  - press: Enter
+  - wait_for: '[data-testid="completion-resolve-gate"]'
+  - parity005_native_trace:
+      phase: resolve
+      label_contains: StringUtils
+      kind: unavailable
+      artifact: null-resolve-raw.json
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'Object typeProbe = StringUti;'
+  - parity005_native_fault: normal
+  - click: '[data-testid="completion-resolve-gate-retry"]'
+  - wait_for:
+      selector: '[data-testid="completion-resolve-gate"]'
+      state: hidden
+  - parity005_native_trace:
+      phase: resolve
+      label_contains: StringUtils
+      kind: resolved
+      require_import: true
+      artifact: null-retry-resolve-raw.json
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'Object typeProbe = StringUtils;'
+  - press: Mod+z
+  - parity005_native_fault: error
+  - press: Control+Space
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete'
+      timeout_sec: 30
+  - click: 'xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"StringUtils") and contains(.,"org.apache.commons.lang3")]'
+  - wait: 0.12
+  - press: Enter
+  - wait_for: '[data-testid="completion-resolve-gate"]'
+  - parity005_native_trace:
+      phase: resolve
+      label_contains: StringUtils
+      kind: failed
+      artifact: error-resolve-raw.json
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: 'Object typeProbe = StringUti;'
+  - parity005_native_fault: normal
+  - click: '[data-testid="completion-resolve-gate-dismiss"]'
+  - assert_not_visible: '[data-testid="completion-resolve-gate"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: Home
+  - press: Shift+End
+  - type: 'new StringBuilder().append("seed");'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: Home
+  - press: Shift+End
+  - type: 'Object typeProbe = StringUtiSuffix;'
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtiSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 5, Col 37
+  - press: Mod+s
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete'
+  - parity005_native_trace:
+      phase: fetch
+      label_contains: StringUtils
+      detail_contains: org.apache.commons.lang3
+      expect_raw_range: {line: 4, start: 27, insert_end: 36, replace_end: 42}
+      artifact: mid-enter-fetch-raw.json
+  - screenshot: tc-ide-parity-005-05-mid-list.png
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [ArrowDown]
+      ready_selector: '.cm-tooltip-autocomplete'
+      ready_timeout_sec: 30
+      require_keydown_prevented: true
+  - press: Enter
+  - parity005_native_trace:
+      phase: resolve
+      label_contains: StringUtils
+      detail_contains: org.apache.commons.lang3
+      kind: resolved
+      require_import: true
+      expect_raw_range: {line: 4, start: 27, insert_end: 36, replace_end: 42}
+      artifact: mid-enter-resolve-raw.json
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'import org.apache.commons.lang3.StringUtils;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtilsSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
+  - press: Mod+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtiSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 5, Col 37
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete'
+  - parity005_native_trace:
+      phase: fetch
+      label_contains: StringUtils
+      detail_contains: org.apache.commons.lang3
+      expect_raw_range: {line: 4, start: 27, insert_end: 36, replace_end: 42}
+      artifact: mid-tab-fetch-raw.json
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [ArrowDown]
+      ready_selector: '.cm-tooltip-autocomplete'
+      ready_timeout_sec: 30
+      require_keydown_prevented: true
+  - press: Tab
+  - parity005_native_trace:
+      phase: resolve
+      label_contains: StringUtils
+      detail_contains: org.apache.commons.lang3
+      kind: resolved
+      require_import: true
+      expect_raw_range: {line: 4, start: 27, insert_end: 36, replace_end: 42}
+      artifact: mid-tab-resolve-raw.json
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'import org.apache.commons.lang3.StringUtils;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtils;', '        new StringBuilder().append("seed");', '    }', '}', '']
+  - press: Mod+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtiSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 5, Col 37
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete'
+  - parity005_native_trace:
+      phase: fetch
+      label_contains: StringUtils
+      detail_contains: org.apache.commons.lang3
+      expect_raw_range: {line: 4, start: 27, insert_end: 36, replace_end: 42}
+      artifact: mid-mouse-fetch-raw.json
+  - click: 'xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"StringUtils") and contains(.,"org.apache.commons.lang3")]'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtiSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
+  - dblclick: 'xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"StringUtils") and contains(.,"org.apache.commons.lang3")]'
+  - parity005_native_trace:
+      phase: resolve
+      label_contains: StringUtils
+      detail_contains: org.apache.commons.lang3
+      kind: resolved
+      require_import: true
+      expect_raw_range: {line: 4, start: 27, insert_end: 36, replace_end: 42}
+      artifact: mid-mouse-resolve-raw.json
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'import org.apache.commons.lang3.StringUtils;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtilsSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
+  - press: Mod+z
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtiSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: Ln 5, Col 37
+  - click: '[data-testid="theme-cycle"]'
+  - click: '[data-testid="theme-cycle"]'
+  - assert_localstorage: {key: taomni.appTheme.v1, equals: dark}
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-of-type(5)'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Editor Appearance Settings
+  - press: Enter
+  - wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+  - fill: {selector: '[data-testid="workspace-editor-appearance-font-family"]', value: 'Source Code Pro'}
+  - fill: {selector: '[data-testid="workspace-editor-appearance-font-size-px"]', value: '16'}
+  - fill: {selector: '[data-testid="workspace-editor-appearance-line-height"]', value: '1.2'}
+  - fill: {selector: '[data-testid="workspace-editor-appearance-color-scheme-id"]', value: darcula}
+  - set_check: {selector: '[data-testid="workspace-editor-appearance-ligatures"]', checked: false}
+  - click: '[data-testid="workspace-editor-appearance-apply"]'
+  - assert_not_visible: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+  - eval_readonly:
+      expression: getComputedStyle(document.querySelector('.cm-content')).fontSize === '16px'
+      expect_truthy: true
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Home
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: ArrowDown
+  - press: End
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: ArrowLeft
+  - press: Control+Space
+  - wait_for: '.cm-tooltip-autocomplete'
+  - parity005_native_trace:
+      phase: fetch
+      label_contains: StringUtils
+      detail_contains: org.apache.commons.lang3
+      expect_raw_range: {line: 4, start: 27, insert_end: 36, replace_end: 42}
+      artifact: matched-profile-fetch-raw.json
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [ArrowDown]
+      ready_selector: '.cm-tooltip-autocomplete'
+      ready_timeout_sec: 30
+      require_keydown_prevented: true
+  - wait: 0.4
+  - eval_readonly:
+      expression: document.querySelector('.cm-tooltip-autocomplete')?.getBoundingClientRect().right <= innerWidth
+      expect_truthy: true
+  - screenshot: tc-ide-parity-005-05-matched-profile-list.png
+  - press: Escape
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtiSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
+verification:
+  review: reviewed
+  requirements:
+    - id: ED-PARITY-005-V5-type
+      requirement: Real ready JDT LS supplies the named class, its original item and import resolve; one acceptance and Undo reconcile with host bytes.
+      actions: [4, 7, 19, 22, 26, 28, 34, 37, 40]
+      checkpoints:
+        - step: 9
+          expectation: Maven project facts are ready before completion.
+        - step: 10
+          expectation: The Java semantic session is ready.
+        - step: 21
+          expectation: Unsaved prefix editing has not changed the host B0 bytes.
+        - step: 23
+          expectation: The real popup includes the full Commons Lang package identity.
+        - step: 24
+          expectation: The matching original JSON-RPC item is recorded.
+        - step: 29
+          expectation: Resolve returned a real item with the import additional edit.
+        - step: 30
+          expectation: The type identifier is accepted.
+        - step: 31
+          expectation: Exactly one import is visible in the editor.
+        - step: 32
+          expectation: Acceptance has not saved host bytes implicitly.
+        - step: 35
+          expectation: Explicit Save writes the import to host bytes.
+        - step: 36
+          expectation: Explicit Save writes the identifier to host bytes.
+        - step: 38
+          expectation: One Undo restores the prefix.
+        - step: 39
+          expectation: One Undo also removes the import.
+        - step: 41
+          expectation: Saving after Undo writes the prefix version to host bytes.
+      results: [9, 10, 21, 23, 24, 29, 30, 31, 32, 35, 36, 38, 39, 41]
+    - id: ED-PARITY-005-V5-snippet
+      requirement: The fixed append(String str) item is provider snippet format, accepts once and Undo restores the method prefix.
+      actions: [49, 53, 55, 59, 61, 65, 66, 67]
+      checkpoints:
+        - step: 56
+          expectation: The fixed method overload is in the real popup.
+        - step: 57
+          expectation: The original method item is saved before acceptance.
+        - step: 62
+          expectation: The real resolve preserves snippet format and raw fields.
+        - step: 63
+          expectation: The accepted call appears in the editor.
+        - step: 68
+          expectation: One Undo restores the method prefix after snippet navigation.
+      results: [56, 57, 62, 63, 68]
+    - id: ED-PARITY-005-V5-save-reuse
+      requirement: Two changed-and-saved Java buffers continue to obtain real method candidates.
+      actions: [71, 72, 73, 76, 77, 78, 81, 82, 83]
+      checkpoints:
+        - step: 74
+          expectation: The first save leaves member completion available.
+        - step: 75
+          expectation: The first post-save request appears in the real provider trace.
+        - step: 84
+          expectation: The second save leaves member completion available.
+        - step: 85
+          expectation: The second post-save request appears in the real provider trace.
+      results: [74, 75, 84, 85]
+    - id: ED-PARITY-005-V5-fault
+      requirement: Isolated Rust transport null and error faults show a zero-edit gate, recover after null and dismiss after error.
+      actions: [94, 96, 97, 99, 101, 105, 106, 110, 111, 112, 114, 116, 120, 121]
+      checkpoints:
+        - step: 102
+          expectation: A controlled null opens the unavailable gate.
+        - step: 103
+          expectation: Rust reports null as unavailable, not resolved.
+        - step: 104
+          expectation: The null response made no primary edit.
+        - step: 107
+          expectation: Retry closes the gate after restoring real provider resolve.
+        - step: 108
+          expectation: Retry records a real resolved import edit.
+        - step: 109
+          expectation: Retry accepts the identifier.
+        - step: 117
+          expectation: A controlled error opens the gate.
+        - step: 118
+          expectation: Rust reports the error as failed, not resolved.
+        - step: 119
+          expectation: The error response made no primary edit.
+        - step: 122
+          expectation: Dismiss closes the gate without accepting.
+      results: [102, 103, 104, 107, 108, 109, 117, 118, 119, 122]
+    - id: ED-PARITY-005-V5-midword
+      requirement: Real JDT LS insert and replace ranges produce distinct Enter, Tab and double-click results, each with one import and one Undo.
+      actions: [123, 140, 150, 151, 155, 156, 159, 162, 165, 166, 169, 172, 175, 177, 180]
+      checkpoints:
+        - step: 148
+          expectation: The same Java document has the exact Tmid preimage before all three entries.
+        - step: 149
+          expectation: The caret is between StringUti and Suffix.
+        - step: 153
+          expectation: The Commons Lang original item carries the provider's distinct insert and replace ranges.
+        - step: 157
+          expectation: Enter resolve preserves both ranges and returns the real import edit.
+        - step: 158
+          expectation: Enter keeps Suffix and adds exactly one import.
+        - step: 160
+          expectation: One Undo restores the full Tmid preimage after Enter.
+        - step: 164
+          expectation: The next provider request supplies the same range contract.
+        - step: 167
+          expectation: Tab resolve preserves both ranges and returns the real import edit.
+        - step: 168
+          expectation: Tab replaces Suffix and adds exactly one import.
+        - step: 170
+          expectation: One Undo restores the full Tmid preimage after Tab.
+        - step: 174
+          expectation: The mouse round receives a fresh real provider item.
+        - step: 176
+          expectation: A single click changes selection without editing the buffer.
+        - step: 178
+          expectation: Double-click resolve preserves both ranges and returns the real import edit.
+        - step: 179
+          expectation: Double click keeps Suffix and adds exactly one import.
+        - step: 181
+          expectation: One Undo restores the full Tmid preimage after double click.
+      results: [148, 149, 153, 157, 158, 160, 164, 167, 168, 170, 174, 176, 178, 179, 181]
+    - id: ED-PARITY-005-V6-matched-profile
+      requirement: The real JDT LS popup is captured with the IDEA reference theme and editor font settings while the Tmid buffer remains unchanged.
+      actions: [183, 184, 186, 188, 189, 190, 191, 193, 194, 195, 196, 197, 198, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 218, 221, 222]
+      checkpoints:
+        - step: 185
+          expectation: The application is using its dark theme.
+        - step: 192
+          expectation: The editor appearance action opened the real settings dialog.
+        - step: 199
+          expectation: Applying the font, line height and color scheme closed settings.
+        - step: 200
+          expectation: The editor font computes to 16px.
+        - step: 217
+          expectation: The matching real JDT LS candidate and insert/replace ranges are recorded.
+        - step: 220
+          expectation: The popup remains within the WebView viewport.
+        - step: 223
+          expectation: Escape leaves the Tmid buffer unchanged.
+      results: [185, 192, 199, 200, 217, 220, 223]
+  visual:
+    - check: Compare provider popup, selected row, documentation, acceptance and Undo states with IDEA R0-R6 at matching profile.
+      method: manual
+      reason: Pixel and interaction comparison requires review of both sides' original images.
+  native:
+    - check: Raw JDT LS candidate and resolve item, Rust null/error classification, Java save and independent host bytes.
+      method: automated
+      reason: Browser B-005 is a controlled renderer provider and cannot prove process, IPC or disk effects.

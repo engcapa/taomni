@@ -102,6 +102,8 @@ describe("CodeMirrorHost snippet accept then shared-owner undo", () => {
     }
     const selectedLi = document.querySelector('.cm-tooltip-autocomplete [aria-selected="true"]');
     expect(selectedLi?.textContent).toContain("append(double d)");
+    // CodeMirror rejects acceptance keys during its configured 75 ms popup guard.
+    await new Promise((resolve) => setTimeout(resolve, 90));
     fireEvent.keyDown(content, { key: "Enter" });
     await waitFor(() => expect(view.state.doc.toString()).toBe("        new StringBuilder().append(0)"));
     // The accept owns a tabstop session with the placeholder selected.

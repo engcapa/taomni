@@ -7,6 +7,7 @@ import {
   type KeymapSchemeV3,
 } from "./workspaceKeymapScheme";
 import type { WorkspaceActionDefinition } from "./workspaceActionRegistry";
+import { createCodeMirrorActionKeymap } from "./workspaceCodeMirrorKeymap";
 
 function keyEvent(code: string, mods: Partial<{ ctrl: boolean; alt: boolean; shift: boolean; meta: boolean }> = {}) {
   return {
@@ -109,6 +110,112 @@ describe("§8.18.2 scheme-aware binding resolution", () => {
 
     const dispatched = await host.dispatchKeydown(keyEvent("KeyF", { ctrl: true }));
     expect(dispatched).toBeNull();
+  });
+
+  it("D3 counterexample: an explicit empty override must not resurrect the base binding", () => {
+    const duplicate: WorkspaceActionDefinition = {
+      ...findAction,
+      id: "workspace.find2",
+      title: "Find Too",
+      keybinding: "Ctrl+f",
+    };
+    const host = makeHost([findAction, duplicate]);
+    // DEC-04 displacement: the new holder is granted Ctrl+f and the previous
+    // holder is written an EXPLICIT empty override, not an absent entry.
+    const displaced = userScheme((scheme) => {
+      const granted = setActionBindings(scheme, "workspace.find2", [
+        { kind: "keyboard", strokes: [{ code: "KeyF", key: "f", ctrl: true, alt: false, shift: false, meta: false }] },
+      ]);
+      return { ...granted, bindings: { ...granted.bindings, "workspace.find": [] } };
+    });
+    host.setKeymapScheme(displaced);
+
+    const resolved = host.prepareBinding(keyEvent("KeyF", { ctrl: true }));
+    expect(resolved.resolution).toBe("single");
+    expect(resolved.candidates).toHaveLength(1);
+    expect(resolved.candidates[0].actionId).toBe("workspace.find2");
+  });
+
+  it("DEC-05: all three dispatch entries report an observable conflict rejection", async () => {
+    const duplicate: WorkspaceActionDefinition = {
+      ...findAction,
+      id: "workspace.find2",
+      title: "Find Too",
+      keybinding: "Ctrl+f",
+    };
+    const notices: {
+      entry: string;
+      actionIds: string[];
+      consumed: boolean;
+      keybinding: string;
+    }[] = [];
+    const host = new WorkspaceActionHost({
+      workspaceId: "ws-conflict-signal",
+      onBindingConflict: (notice) => notices.push(notice),
+    });
+    host.registerActions([findAction, duplicate]);
+
+    // Entry 1: the async window dispatcher — must not execute or swallow.
+    const first = keyEvent("KeyF", { ctrl: true });
+    expect(await host.dispatchKeydown(first)).toBeNull();
+    expect(first.preventDefault).not.toHaveBeenCalled();
+
+    // Entry 2: the typed gated dispatcher.
+    const second = host.dispatchKeydownV2({
+      event: keyEvent("KeyF", { ctrl: true }),
+      workspaceId: "ws-conflict-signal",
+      targetViewId: null,
+    });
+    expect(second).toEqual({ kind: "rejected", reason: "conflict" });
+
+    // Entry 3: the editor adapter — still consumes (so CodeMirror cannot
+    // reinterpret the dead chord) but now emits the same signal.
+    const third = keyEvent("KeyF", { ctrl: true });
+    const handled = createCodeMirrorActionKeymap(host, {
+      actionIds: ["workspace.find", "workspace.find2"],
+      editorContextProvider: () => ({ focus: "editor", hasActiveFile: true }),
+    }).keydown(third as unknown as KeyboardEvent, null as never);
+    expect(handled).toBe(true);
+    expect(third.preventDefault).toHaveBeenCalled();
+
+    // D3 root cause: before this card the third entry swallowed the key with
+    // no signal at all, and the first two disagreed about consumption.
+    expect(notices.map((notice) => notice.entry)).toEqual(["dispatch", "dispatch-v2", "editor-keymap"]);
+    expect(notices.map((notice) => notice.consumed)).toEqual([false, false, true]);
+    for (const notice of notices) {
+      expect(notice.actionIds).toEqual(["workspace.find", "workspace.find2"]);
+      expect(notice.keybinding).toBe("Ctrl+f");
+    }
+  });
+
+  it("D1: diagnostics group Ctrl+F and Ctrl+f as one contested stroke", () => {
+    // workspace.find keeps its BASE default (display renders as "Ctrl+F");
+    // workspace.find2 holds a user-recorded stroke (display "Ctrl+f"). The
+    // physical code is identical, so the two are ONE contested stroke.
+    const duplicate: WorkspaceActionDefinition = {
+      ...findAction,
+      id: "workspace.find2",
+      title: "Find Too",
+      keybinding: "Ctrl+z",
+    };
+    const scheme = userScheme((s) => setActionBindings(s, "workspace.find2", [
+      { kind: "keyboard", strokes: [{ code: "KeyF", key: "f", ctrl: true, alt: false, shift: false, meta: false }] },
+    ]));
+    const host = makeHost([findAction, duplicate]);
+    host.setKeymapScheme(scheme);
+
+    const conflicts = host.getBindingDiagnostics();
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].actionIds.sort()).toEqual(["workspace.find", "workspace.find2"]);
+
+    // Both rows carry the diagnostic, so the settings surface can mark them.
+    const snapshot = host.getSnapshot();
+    for (const id of ["workspace.find", "workspace.find2"]) {
+      expect(snapshot.find((item) => item.id === id)?.bindingConflicts).toHaveLength(1);
+    }
+    // The display strings really do differ — this is the exact D1 fork.
+    expect(snapshot.find((item) => item.id === "workspace.find")?.keybinding).toBe("Ctrl+F");
+    expect(snapshot.find((item) => item.id === "workspace.find2")?.keybinding).toBe("Ctrl+f");
   });
 
   it("recognizes two-stroke chords: first stroke waits, second executes, Esc cancels", async () => {

@@ -52,6 +52,13 @@ export interface DocumentTransaction {
   changes: readonly DocumentChangeDelta[];
   origin: DocumentTransactionOrigin;
   timestamp: number;
+  /** Completion history restores the initiating view's caret on undo/redo. */
+  restoreSelection?: { anchor: number; head: number };
+}
+
+export interface CompletionSelectionSnapshot {
+  before: { anchor: number; head: number };
+  after: { anchor: number; head: number };
 }
 
 export interface DocumentHistoryState {
@@ -90,6 +97,7 @@ interface HistoryEntry {
   inverse: readonly DocumentChangeDelta[];
   /** ED-REPAIR-007: explicit composition session token */
   compositionSessionId?: string;
+  completionSelection?: CompletionSelectionSnapshot & { sourceViewId: string };
 }
 
 interface DocumentRecord {
@@ -328,6 +336,7 @@ export class WorkspaceDocumentTransactionOwner {
     changes: readonly DocumentChangeDelta[],
     origin: DocumentTransactionOrigin = "user-input",
     compositionSessionId?: string,
+    completionSelection?: CompletionSelectionSnapshot,
   ): DocumentTransaction | null {
     const record = this.documentsByFile.get(fileKey);
     if (!record || changes.length === 0) return null;
@@ -389,6 +398,9 @@ export class WorkspaceDocumentTransactionOwner {
           forward: applied.changes,
           inverse: applied.inverse,
           ...(origin === "composition" && compositionSessionId ? { compositionSessionId } : {}),
+          ...(origin === "completion" && completionSelection
+            ? { completionSelection: { ...completionSelection, sourceViewId } }
+            : {}),
         });
         if (origin === "composition") {
           record.openCompositionViewId = sourceViewId;
@@ -465,7 +477,9 @@ export class WorkspaceDocumentTransactionOwner {
     } satisfies WorkspaceDocumentOwnerTransactionObservation;
     this.notifyObserver(this.observer.onTransaction, observation);
     this.notifyObserver(this.observer.onHistoryReceipt, observation);
-    return transaction;
+    return entry.completionSelection?.sourceViewId === sourceViewId
+      ? { ...transaction, restoreSelection: entry.completionSelection.before }
+      : transaction;
   }
 
   redo(fileKey: string, sourceViewId: string): DocumentTransaction | null {
@@ -489,7 +503,9 @@ export class WorkspaceDocumentTransactionOwner {
     } satisfies WorkspaceDocumentOwnerTransactionObservation;
     this.notifyObserver(this.observer.onTransaction, observation);
     this.notifyObserver(this.observer.onHistoryReceipt, observation);
-    return transaction;
+    return entry.completionSelection?.sourceViewId === sourceViewId
+      ? { ...transaction, restoreSelection: entry.completionSelection.after }
+      : transaction;
   }
 
   clear(fileKey?: string): void {

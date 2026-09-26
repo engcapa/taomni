@@ -204,6 +204,25 @@ describe("§8.26 / ED-MULTIVIEW-002: WorkspaceDocumentTransactionOwner", () => {
     unsubscribe();
   });
 
+  it("restores a completion caret only in the view that accepted it", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const before = "StringUtiSuffix;";
+    owner.acquireView("Mid.java", "primary", before);
+    owner.acquireView("Mid.java", "secondary", before);
+    owner.dispatchTransaction(
+      "Mid.java",
+      "primary",
+      [{ from: 0, to: 15, insert: "StringUtils" }],
+      "completion",
+      undefined,
+      { before: { anchor: 9, head: 9 }, after: { anchor: 11, head: 11 } },
+    );
+    expect(owner.undo("Mid.java", "primary")?.restoreSelection).toEqual({ anchor: 9, head: 9 });
+    expect(owner.redo("Mid.java", "primary")?.restoreSelection).toEqual({ anchor: 11, head: 11 });
+    expect(owner.undo("Mid.java", "secondary")?.restoreSelection).toBeUndefined();
+    expect(owner.getDocument("Mid.java")).toBe(before);
+  });
+
   it("rejects a stale or malformed delta without changing document or history", () => {
     const owner = new WorkspaceDocumentTransactionOwner();
     owner.initializeDocument("main.ts", "hello");

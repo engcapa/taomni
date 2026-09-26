@@ -149,7 +149,12 @@ export function createCodeMirrorActionKeymap(
       );
       if (!enabled || resolved.resolution === "conflict") {
         if (resolved.resolution === "conflict" && resolved.candidates.some((c) => allowed.has(c.actionId))) {
+          // ED-PARITY-004 DEC-05: consuming here is still required — otherwise
+          // CodeMirror re-interprets the dead chord as an editing primitive. The
+          // consumption is no longer silent: the host publishes the rejection so
+          // the surface can name the ambiguous actions.
           event.preventDefault();
+          host.reportBindingConflict(resolved, "editor-keymap", true);
           return true;
         }
         return false;

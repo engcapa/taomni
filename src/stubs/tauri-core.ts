@@ -42,6 +42,13 @@ import {
 } from "./localVfs";
 import { emit } from "./tauri-event";
 import { promptAppDialog } from "../lib/appDialogs";
+import {
+  parity005Completion,
+  parity005Enabled,
+  parity005Resolve,
+  parity005Root,
+  parity005Status,
+} from "./parity005Completion";
 
 const SESSION_STORAGE_KEY = "taomni.sessions.v1";
 const GROUP_STORAGE_KEY = "taomni.groups.v1";
@@ -1059,8 +1066,16 @@ function stubLspPresetForPath(path: string) {
   return STUB_LSP_PRESETS.find((preset) => preset.fileExtensions.includes(ext)) ?? null;
 }
 
+function parity005DocumentPath(args?: InvokeArgs): string {
+  const filePath = String(args?.filePath ?? "");
+  return args?.rootPath === parity005Root
+    ? `${parity005Root}/${filePath.replace(/^\/+/, "")}`
+    : filePath;
+}
+
 function stubLspDocumentStatus(args?: InvokeArgs) {
-  const filePath = (args?.filePath as string | undefined) ?? "";
+  const filePath = parity005DocumentPath(args);
+  if (parity005Enabled(filePath)) return parity005Status(filePath);
   const preset = stubLspPresetForPath(filePath);
   return {
     path: filePath,
@@ -1083,16 +1098,16 @@ function stubLspServerStatuses() {
     presetId: preset.id,
     displayName: preset.displayName,
     documentLanguageIds: preset.documentLanguageIds,
-    available: false,
-    active: false,
+    available: preset.id === "java" && parity005Enabled(),
+    active: preset.id === "java" && parity005Enabled(),
     selectedCommandId: null,
     selectedCommand: null,
     installHint: preset.commands[0]?.installHint ?? "",
-    error: "Language servers are not available in browser preview",
+    error: preset.id === "java" && parity005Enabled() ? null : "Language servers are not available in browser preview",
     runtimeStatus: preset.id === "java"
-      ? "Java not probed in browser preview — need JDK 21+ for jdtls"
+      ? parity005Enabled() ? "B-005 controlled browser provider" : "Java not probed in browser preview — need JDK 21+ for jdtls"
       : null,
-    commands: preset.commands.map((command) => ({ ...command, available: false })),
+    commands: preset.commands.map((command) => ({ ...command, available: preset.id === "java" && parity005Enabled() })),
   }));
 }
 
@@ -2263,12 +2278,43 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_detect_servers": {
       return stubLspServerStatuses() as T;
     }
+    case "workspace_ingest_maven_project": {
+      const workspaceRoot = String((args?.request as { workspaceRoot?: string } | undefined)?.workspaceRoot ?? "");
+      if (parity005Enabled() && workspaceRoot === parity005Root) {
+        return {
+          status: "ready",
+          modules: [{
+            id: "parity005:completion", name: "completion", root: parity005Root,
+            pomPath: `${parity005Root}/pom.xml`,
+            sourceRoots: [`${parity005Root}/src/main/java`], testRoots: [], resourceRoots: [],
+            outputDir: null, dependencies: ["org.apache.commons:commons-lang3:3.12.0"],
+            classpath: ["commons-lang3-3.12.0.jar"],
+          }],
+          provenance: {
+            toolKind: "qa-fixture", toolVersion: null, javaHome: null, javaVersion: null,
+            argv: [], cwd: parity005Root, pomHash: "B-005", resolvedAt: new Date().toISOString(),
+          },
+          errorMessage: null,
+        } as T;
+      }
+      return { status: "failed", modules: [], provenance: null, errorMessage: "No Maven tooling in browser preview" } as T;
+    }
     case "lsp_document_status":
     case "lsp_open_document":
     case "lsp_change_document":
     case "lsp_save_document":
     case "lsp_close_document": {
       return stubLspDocumentStatus(args as InvokeArgs) as T;
+    }
+    case "lsp_completion": {
+      const path = parity005DocumentPath(args as InvokeArgs);
+      if (parity005Enabled(path)) return await parity005Completion(path, args as InvokeArgs) as T;
+      return { status: stubLspDocumentStatus(args as InvokeArgs), isIncomplete: false, items: [] } as T;
+    }
+    case "lsp_completion_resolve": {
+      const path = parity005DocumentPath(args as InvokeArgs);
+      if (parity005Enabled(path)) return await parity005Resolve(path, (args as InvokeArgs).item) as T;
+      return { kind: "unavailable", reason: "no-active-session" } as T;
     }
     case "lsp_stop_workspace": {
       return 0 as T;
@@ -2301,6 +2347,16 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "lsp_java_project_model": {
+      const path = parity005DocumentPath(args as InvokeArgs);
+      if (parity005Enabled(path)) {
+        return {
+          status: parity005Status(path), active: true, processId: null,
+          serverName: "B-005 controlled provider", serverVersion: "fixture",
+          registeredCommands: [], buildFiles: [`${parity005Root}/pom.xml`],
+          javaHomeUsed: null, javaProjects: [], classpathProbe: null,
+          probeReason: "browser-controlled-provider",
+        } as T;
+      }
       // §8.20.3 W2: lifecycle-only facts in browser mode — no provider, so
       // phase derivation degrades honestly instead of pretending readiness.
       return {

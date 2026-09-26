@@ -76,7 +76,7 @@ steps:
 - eval_readonly:
     expression: document.querySelector(".cm-content").textContent === "sout"
     expect_truthy: true
-- press: Escape
+# Undo already closed the popup; unhandled Escape enables CodeMirror's Tab focus escape.
 - press: End
 - press: Tab
 - assert_text:
@@ -109,7 +109,6 @@ verification:
     - 33
     - 35
     - 36
-    - 37
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -145,11 +144,11 @@ verification:
     - step: 34
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content\").textContent === \"sout\"",
         "expect_truthy": true}}'
-    - step: 38
+    - step: 37
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains":
         "System.out.println();"}}'
     results:
-    - 38
+    - 37
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

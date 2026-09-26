@@ -211,10 +211,12 @@ describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / A
     expect(view.state.doc.toString()).toBe("class App {\n  sout\n}");
   });
 
-  it("AC-03 / RT-04: mouse click accepts non-default candidate and single undo restores prefix", async () => {
+  it.each(["double-click", "Enter", "Tab"])("AC-03 / RT-04: mouse selects non-default provider candidate, %s accepts and single undo restores prefix", async (acceptWith) => {
     let revision = 0;
+    const completionController = new LspCompletionController({ showDocumentation: false });
     const soutItem = createProviderSoutItem();
     const soutmItem = createProviderSoutmItem();
+    const resolve = vi.fn(async (raw: unknown) => (raw as { label: string }).label === "soutm" ? soutmItem : soutItem);
     const complete = vi.fn(async () => ({
       status: {
         path: "App.java",
@@ -246,7 +248,8 @@ describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / A
         onDefinition={async () => false}
         onReferences={async () => undefined}
         onComplete={complete}
-        onCompleteResolve={async () => soutItem}
+        onCompleteResolve={resolve}
+        completionController={completionController}
         completionTriggers={["."]}
         hoverDocumentationDelayMs={0}
         onCompletionDiagnostic={vi.fn()}
@@ -279,16 +282,32 @@ describe("CodeMirrorHost Live Template Popup Interaction Regression (TASK-01 / A
     });
 
     const items = document.querySelectorAll<HTMLElement>(".cm-tooltip-autocomplete li");
-    expect(items.length).toBeGreaterThan(0);
+    const target = [...items].find((row) => row.textContent?.includes("provider soutm method"))!;
+    expect(target).toBeDefined();
+    expect(target).not.toHaveAttribute("aria-selected", "true");
 
-    // Click on the first item
-    fireEvent.mouseDown(items[0], { button: 0 });
+    fireEvent.mouseDown(target, { button: 0 });
+    expect(target).toHaveAttribute("aria-selected", "true");
+    expect(completionStatus(view.state)).toBe("active");
+    expect(view.hasFocus).toBe(true);
+    expect(view.state.doc.toString()).toBe("class App {\n  sout\n}");
+    expect(revision).toBe(0);
+    expect(resolve).not.toHaveBeenCalled();
+
+    if (acceptWith === "double-click") {
+      fireEvent.doubleClick(target, { button: 0 });
+    } else {
+      fireEvent.keyDown(content, { key: acceptWith });
+    }
     await waitFor(() => {
-      expect(view.state.doc.toString()).toContain('System.out.println("PROVIDER_SOUT");');
+      expect(view.state.doc.toString()).toBe('class App {\n  System.out.println("App.main()");\n}');
     });
+    expect(revision).toBe(1);
+    expect(resolve).toHaveBeenCalledTimes(1);
 
     act(() => { undo(view); });
     expect(view.state.doc.toString()).toBe("class App {\n  sout\n}");
+    expect(view.state.selection.main.head).toBe(18);
   });
 
   it("AC-05 / RT-08: delayed provider returning after local Tab expansion does not overwrite or reopen", async () => {

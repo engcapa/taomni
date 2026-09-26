@@ -22,6 +22,26 @@ export type CompletionScopeFactsState =
       generation: number;
     };
 
+export function sameCompletionScopeFacts(
+  a: CompletionScopeFactsState | undefined,
+  b: CompletionScopeFactsState | undefined,
+): boolean {
+  if (!a || !b) return a === b;
+  if (a.status !== b.status || a.generation !== b.generation) return false;
+  if (a.status === "scope-facts-missing" && b.status === "scope-facts-missing") {
+    return a.requestedScope === b.requestedScope && a.reason === b.reason;
+  }
+  if (a.status === "ready" && b.status === "ready") {
+    return a.scope === b.scope
+      && a.moduleId === b.moduleId
+      && a.sourceKind === b.sourceKind
+      && a.classpathFingerprint === b.classpathFingerprint
+      && a.dependencies.length === b.dependencies.length
+      && a.dependencies.every((dependency, index) => dependency === b.dependencies[index]);
+  }
+  return false;
+}
+
 /**
  * Resolves completion scope facts from the ready project generation (ED-COMP-004).
  * Enforces strict workspace isolation and fails closed with `scope-facts-missing`
