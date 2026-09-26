@@ -50,6 +50,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `send_keys` | string or `{selector, text}` | Same as `type`. |
 | `terminal_input` | `{selector, text, submit?}` | Dispatches standards-based text input to xterm's helper textarea, then optionally submits with a separate Enter key. A text-free Shift key cycle first resets xterm’s stale keypress suppression state. This exercises xterm `onData`, the product input path, and the real PTY while avoiding hidden-textarea key synthesis differences in Windows Chromium/WebView2. It is renderer/WebView automation, not physical OS keyboard evidence. Wait for `data-terminal-ready="true"` first. `verify` (`{selector, regex, timeout_sec?=10, attempts?=2}`) polls that selector's text / `data-terminal-text` after each dispatch and re-sends the whole input while it does not match — Windows OpenSSH/ConPTY intermittently drops part of a pty write, and re-sending the probe is the only recovery. The testcase's own assertion still owns the outcome. |
 | `compose_text` | `{selector, text, during_key?}` | Browser-only composition lifecycle; optionally dispatches one composing key before committing text. Never substitutes for native IME evidence. |
+| `set_viewport` | `{width, height}` | Browser-only: resize the current Playwright viewport to inspect responsive UI and popup clipping. |
 | `native_keys` | `{selector, keys, transport?, focus_target?, focus_prechecked?, ready_selector?, ready_timeout_sec?, ready_stable_sec?, require_keydown_prevented?}` | Requires the selector to own focus. `focus_target: true` first focuses it through WebDriver and then verifies ownership; use this when a platform click does not reliably transfer DOM focus. Default `transport: x11` injects XTest keys through Linux/X11 and identifies the Taomni window. `transport: webdriver` uses W3C actions in the platform WebView (Windows/Linux), not OS-level input. `ready_selector` is polled after input setup and immediately before delivery; `ready_stable_sec` additionally requires the same element and markup to remain stable. `require_keydown_prevented` observes each keydown after event dispatch and proves it was consumed. `focus_prechecked: true` is limited to a testcase that asserted focus immediately before a driver fault; it omits WebDriver probes/event collection and records that limitation. `focus_target` and `focus_prechecked` are mutually exclusive. Testcase assertions own the postcondition. |
 | `native_ime_keys` | `{selector, expected_engine, keys}` | Native Linux/X11 only. Injects physical XTest keys through the named configured fcitx5 engine and records an observation artifact; testcase assertions must verify the committed result. |
 | `native_editor_performance` | `{selector, keys, max_p95_ms, capture_text?, label?}` | Native packaged app only. Injects at least five ASCII keys through W3C WebDriver actions and records keydown-to-CodeMirror-DOM-mutation latency. `keys` accepts a single-char array or a plain string typed character-by-character. `capture_text` (default true) also records per-key rendered text; set it false for multi-megabyte documents so the O(N) textContent probe does not inflate the measured latency. `label` names the per-invocation artifact `native-editor-performance-<label>.json` so repeated measurement groups accumulate instead of overwriting. The artifact also records the next animation frame as a diagnostic, but does not gate on it because a frame requested from CodeMirror's mutation observer is one frame later than the paint containing that mutation. Fails when p95 exceeds the supplied guardrail. |
@@ -107,6 +108,28 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_file_sha256` | `{path, equals, timeout_sec?}` | Native-only: independently reads host bytes and requires an exact lowercase SHA-256 digest. |
 | `assert_native_process_delta` | `{pattern, baseline, max_delta, timeout_sec?}` | Native Linux only. Counts `/proc/*/cmdline` entries containing `pattern`, writes `native-process-observation.json`, and requires the count increase from `baseline` to remain within `0..max_delta`. |
 | `assert_system_clipboard` | `{equals \| contains \| readable, timeout_sec?}` | Native Linux/X11 only: reads the real CLIPBOARD selection from a separate process, never from the app's DOM or in-process state. The only step that can prove a copy actually crossed the OS boundary. An unresponsive owner is reported as unreadable, never as an empty string. Exactly one assertion key. |
+
+## ED-PARITY-005 controlled browser provider
+
+These verbs operate only on the isolated `/preview/parity005` browser fixture.
+They control mock response timing or failure at the Tauri browser bridge; the
+case still uses actual editor input and completion actions. They cannot prove
+real JDT LS, Rust IPC or disk effects.
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `parity005_set_mode` | `normal \| empty \| empty-placeholder \| fetch-hold \| resolve-hold \| resolve-null \| resolve-error \| resolve-timeout \| resolve-overlap \| resolve-invalid` | Selects the next controlled response. `empty-placeholder` uses `StringBuilder(${1:})$0`; `normal` restores success. |
+| `parity005_set_facts` | `ready \| loading \| degraded \| failed \| stale` | Browser fixture only: changes the isolated workspace facts generation/status; completion is still invoked through the editor. |
+| `parity005_wait_pending` | `fetch \| resolve` | Waits for a real pending request from the renderer. |
+| `parity005_release` | `fetch \| resolve` | Releases held responses; fails if none is pending. |
+| `parity005_trace` | `{fetch?, resolve?, pending?}` | Asserts exact request counts and saves the read-only event trace in the case report. |
+
+## ED-PARITY-005 isolated native provider boundary
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `parity005_native_trace` | `{phase: fetch \| resolve, label_contains?, detail_contains?, kind?, require_import?, require_snippet?, expect_raw_range?: {line, start, insert_end, replace_end}, artifact?, timeout_sec?}` | Requires a new matching QA observation since the previous call for the same phase/label/detail, checks original insert/replace ranges when requested, and saves the raw item/result. It does not issue requests or edit the document. |
+| `parity005_native_fault` | `normal \| null \| error` | Isolated QA app only: after a real provider resolve request, replaces its Rust transport result with a controlled null or error. The production app rejects the control command. |
 
 ## Save-race time-point gate (isolated QA build only)
 

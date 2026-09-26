@@ -19,6 +19,7 @@ import {
   type KeymapSchemeV3,
   type Shortcut,
   type ShortcutStroke,
+  shortcutIdentity,
   strokesEqual,
   strokeFromKeyboardEvent,
 } from "./workspaceKeymapScheme";
@@ -114,10 +115,39 @@ export interface ActionSnapshotItem {
   category: string;
   keybinding?: string;
   keybindings?: string[];
+  /**
+   * Physical EFFECTIVE shortcuts (user delta over the base defaults). This is
+   * the conflict/displacement identity — never the display strings, which fork
+   * on case (`Ctrl+F` vs `Ctrl+f`) and produced invisible conflicts (D1).
+   */
+  shortcuts?: readonly Shortcut[];
+  /** Physical built-in defaults, ignoring the active scheme. */
+  baseShortcuts?: readonly Shortcut[];
+  /** Where `shortcuts` came from. */
+  bindingSource?: ResolvedBindingSource;
   keywords?: string[];
   state: ActionState;
   evaluation: PreparedActionEvaluation;
   bindingConflicts?: ActionBindingConflictDiagnostic[];
+}
+
+/** Which dispatcher refused a stroke (ED-PARITY-004 DEC-05). */
+export type BindingConflictEntryPoint = "dispatch" | "dispatch-v2" | "editor-keymap";
+
+/**
+ * The single observable conflict-rejection signal. A stroke that resolves to
+ * two or more available candidates must not be silently swallowed: every entry
+ * point reports it, and the editor entry additionally records whether it had to
+ * consume the event to keep CodeMirror from re-interpreting the dead chord.
+ */
+export interface BindingConflictNotice {
+  /** Display form of the contested chord, e.g. `Ctrl+F`. */
+  keybinding: string;
+  /** Every action that claims the stroke, in candidate order. */
+  actionIds: string[];
+  entry: BindingConflictEntryPoint;
+  /** True when the entry called preventDefault to protect the editor. */
+  consumed: boolean;
 }
 
 export interface WorkspaceActionHostOptions {
@@ -127,6 +157,8 @@ export interface WorkspaceActionHostOptions {
   resolveFocus?: (target: EventTarget | null) => WorkspaceFocus;
   getDefaultFocus?: () => WorkspaceFocus;
   onExecuted?: (actionId: string, result: ActionResult) => void;
+  /** ED-PARITY-004 DEC-05: observable rejection for ambiguous strokes. */
+  onBindingConflict?: (notice: BindingConflictNotice) => void;
 }
 
 /**
@@ -209,18 +241,6 @@ function logicalKeyToCode(logicalKey: string): string | null {  const key = logi
     "-": "Minus", "=": "Equal", "`": "Backquote",
   };
   return named[key] ?? null;
-}
-
-function bindingIdentity(pattern: string): string | null {
-  const binding = parseKeybinding(pattern);
-  if (!binding) return null;
-  return [
-    binding.ctrl ? "ctrl" : "",
-    binding.shift ? "shift" : "",
-    binding.alt ? "alt" : "",
-    binding.meta ? "meta" : "",
-    binding.key,
-  ].filter(Boolean).join("+");
 }
 
 function defaultDisabledReason(context: WorkspaceActionContext): ActionDisabledReason {
@@ -346,6 +366,7 @@ export class WorkspaceActionHost {
   private readonly resolveFocus?: (target: EventTarget | null) => WorkspaceFocus;
   private readonly getDefaultFocus?: () => WorkspaceFocus;
   private readonly onExecuted?: (actionId: string, result: ActionResult) => void;
+  private readonly onBindingConflict?: (notice: BindingConflictNotice) => void;
 
   private actions = new Map<string, WorkspaceActionDefinition>();
   /** Layered registrations let split views unmount in either order. */
@@ -378,6 +399,7 @@ export class WorkspaceActionHost {
     this.resolveFocus = options.resolveFocus;
     this.getDefaultFocus = options.getDefaultFocus;
     this.onExecuted = options.onExecuted;
+    this.onBindingConflict = options.onBindingConflict;
   }
 
   getWorkspaceId(): string {
@@ -464,16 +486,25 @@ export class WorkspaceActionHost {
   /**
    * Effective shortcuts for one action: user scheme bindings win, then the
    * action's built-in defaults parsed into physical strokes.
+   *
+   * A PRESENT delta entry wins even when it is an empty array — that explicit
+   * override is how `displaceStroke` revokes a reassigned chord from its
+   * previous holder without letting the base default return (DEC-04).
    */
   effectiveShortcuts(actionId: string): { shortcuts: readonly Shortcut[]; source: ResolvedBindingSource } {
     const scheme = this.keymapScheme;
     const userBindings = scheme?.bindings[actionId];
-    if (userBindings && userBindings.length > 0) {
+    if (userBindings) {
       return { shortcuts: userBindings, source: "user" };
     }
+    return { shortcuts: this.baseDefinitionShortcuts(actionId), source: "base" };
+  }
+
+  /** Built-in definition defaults for one action, ignoring the active scheme. */
+  baseDefinitionShortcuts(actionId: string): readonly Shortcut[] {
     const action = this.actions.get(actionId);
-    if (!action) return { shortcuts: [], source: "base" };
-    return { shortcuts: parseDefinitionKeybindings(action), source: "base" };
+    if (!action) return [];
+    return parseDefinitionKeybindings(action);
   }
 
   isActionUserDisabled(actionId: string): boolean {
@@ -998,6 +1029,40 @@ export class WorkspaceActionHost {
   }
 
   /**
+   * DEC-05 observable rejection. Every entry point funnels its ambiguous-stroke
+   * decision through here so the three dispatchers cannot drift apart silently
+   * again: the target action never runs, and the caller always learns why.
+   */
+  reportBindingConflict(
+    resolved: ResolvedBinding,
+    entry: BindingConflictEntryPoint,
+    consumed: boolean,
+  ): void {
+    const enabled = resolved.candidates.filter(
+      (candidate) => candidate.evaluation.state.availability === "available",
+    );
+    const conflictIds = enabled.length > 0
+      ? enabled.map((candidate) => candidate.actionId)
+      : resolved.candidates.map((candidate) => candidate.actionId);
+    this.onBindingConflict?.({
+      keybinding: this.formatConflictDisplay(resolved.stroke),
+      actionIds: conflictIds,
+      entry,
+      consumed,
+    });
+  }
+
+  private formatConflictDisplay(stroke: ShortcutStroke): string {
+    return [
+      stroke.ctrl && "Ctrl",
+      stroke.alt && "Alt",
+      stroke.shift && "Shift",
+      stroke.meta && "Meta",
+      stroke.key ?? stroke.code,
+    ].filter(Boolean).join("+");
+  }
+
+  /**
    * Dispatch one keyboard event through `prepareBinding`. Only an actually
    * executing binding consumes the event: unavailable candidates and
    * conflicts fall through untouched so other surfaces keep working. A bare
@@ -1013,6 +1078,7 @@ export class WorkspaceActionHost {
       (candidate) => candidate.evaluation.state.availability === "available",
     );
     if (!enabled || resolved.resolution === "conflict") {
+      if (resolved.resolution === "conflict") this.reportBindingConflict(resolved, "dispatch", false);
       if (
         eventLogicalKey(event) === "escape"
         && this.hasPendingChord()
@@ -1094,6 +1160,7 @@ export class WorkspaceActionHost {
       };
     }
     if (resolved.resolution === "conflict") {
+      this.reportBindingConflict(resolved, "dispatch-v2", false);
       return { kind: "rejected", reason: "conflict" };
     }
     const enabled = resolved.candidates.find(
@@ -1123,17 +1190,28 @@ export class WorkspaceActionHost {
   getBindingDiagnostics(
     customContext?: ActionInvocation | WorkspaceActionContext | unknown,
   ): ActionBindingConflictDiagnostic[] {
-    const snapshot = this.getSnapshot(customContext);
+    return this.collectBindingConflicts(this.getSnapshot(customContext));
+  }
+
+  /**
+   * Group available actions by PHYSICAL binding identity. Display strings are
+   * never used as keys: `Ctrl+F` (base) and `Ctrl+f` (recorded) are one stroke,
+   * and keying on the string hid the conflict that dispatch then refused (D1).
+   */
+  private collectBindingConflicts(
+    snapshot: readonly ActionSnapshotItem[],
+  ): ActionBindingConflictDiagnostic[] {
     const byBinding = new Map<string, { display: string; actionIds: string[] }>();
     for (const item of snapshot) {
       if (item.state.availability !== "available") continue;
-      for (const binding of item.keybindings ?? []) {
-        const identity = bindingIdentity(binding);
-        if (!identity) continue;
-        const current = byBinding.get(identity) ?? { display: binding, actionIds: [] };
+      const displays = item.keybindings ?? [];
+      (item.shortcuts ?? []).forEach((shortcut, index) => {
+        const identity = shortcutIdentity(shortcut);
+        if (!identity) return;
+        const current = byBinding.get(identity) ?? { display: displays[index] ?? "", actionIds: [] };
         if (!current.actionIds.includes(item.id)) current.actionIds.push(item.id);
         byBinding.set(identity, current);
-      }
+      });
     }
     return Array.from(byBinding.values())
       .filter((entry) => entry.actionIds.length > 1)
@@ -1194,6 +1272,7 @@ export class WorkspaceActionHost {
     const items = Array.from(this.actions.values()).map((action): ActionSnapshotItem => {
       // Snapshot shows the EFFECTIVE bindings (scheme override > defaults)
       // so every surface displays the same truth the dispatcher resolves.
+      const { shortcuts, source } = this.effectiveShortcuts(action.id);
       const keybindings = this.effectiveKeybindingDisplay(action.id);
       const evaluation = this.prepareWithContext(action.id, context, "snapshot");
       return {
@@ -1202,6 +1281,9 @@ export class WorkspaceActionHost {
         category: action.category ?? "Edit",
         keybinding: keybindings[0],
         keybindings,
+        shortcuts,
+        baseShortcuts: this.baseDefinitionShortcuts(action.id),
+        bindingSource: source,
         keywords: action.keywords,
         state: evaluation.state,
         evaluation,
@@ -1209,26 +1291,8 @@ export class WorkspaceActionHost {
     });
 
     const byAction = new Map<string, ActionBindingConflictDiagnostic[]>();
-    const byBinding = new Map<string, { display: string; actionIds: string[] }>();
-    for (const item of items) {
-      if (item.state.availability !== "available") continue;
-      for (const binding of item.keybindings ?? []) {
-        const identity = bindingIdentity(binding);
-        if (!identity) continue;
-        const current = byBinding.get(identity) ?? { display: binding, actionIds: [] };
-        if (!current.actionIds.includes(item.id)) current.actionIds.push(item.id);
-        byBinding.set(identity, current);
-      }
-    }
-    for (const entry of byBinding.values()) {
-      if (entry.actionIds.length < 2) continue;
-      const diagnostic: ActionBindingConflictDiagnostic = {
-        kind: "binding-conflict",
-        keybinding: entry.display,
-        actionIds: entry.actionIds,
-        winnerId: entry.actionIds[0],
-      };
-      for (const id of entry.actionIds) {
+    for (const diagnostic of this.collectBindingConflicts(items)) {
+      for (const id of diagnostic.actionIds) {
         byAction.set(id, [...(byAction.get(id) ?? []), diagnostic]);
       }
     }

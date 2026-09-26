@@ -1,18 +1,19 @@
 id: TC-IDE-C1-01
-title: 'Keymap scheme surface: action binding recorded, conflict, close'
-description: '§8.19.10 gate case C1 (browser portion). Capability ids:
+title: 'Keymap scheme surface: copy, draft record, Apply commit'
+description: '§8.19.10 gate case C1 (browser portion) + ED-PARITY-004 A1.4/A1.5 draft/Apply
+  boundary. Capability ids: editor.keymap-editable / keymap.scheme-surface.
 
-  editor.keymap-editable / keymap.scheme-surface.
+  ED-PARITY-004 revision (P2): the previous description claimed a conflict but
+  the steps never produced one, so the claim was unverifiable. This case now
+  asserts the DEC-03 draft/Apply contract instead — conflict manufacture and
+  both conflict exits live in TC-IDE-PARITY-004-02, which is the case that
+  actually creates a contested chord.
 
-  Required mode: browser (settings surface is pure UI/store); physical
-
-  layout and OS shortcut interception stay native. Highest claim on green:
-
-  L1 browser-wired. Dispatches workspace.keymapSettings through Search
-
-  Everywhere, records a fresh primary chord on editor.replace via the
-
-  two-stroke recorder, verifies the replace slot renders, then closes.
+  Required mode: browser (settings surface is pure renderer + per-profile
+  localStorage). Highest claim on green: L1 browser-wired. Dispatches
+  workspace.keymapSettings through Search Everywhere, copies a user scheme,
+  records a fresh primary chord on editor.replace into the DRAFT, proves Apply
+  is the only commit edge, then applies and closes.
 
   '
 covers:
@@ -26,7 +27,7 @@ modes:
 - browser
 fixtures:
 - reset_db
-timeout_sec: 120
+timeout_sec: 150
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
@@ -59,10 +60,12 @@ steps:
     selector: '[data-testid="keymap-scheme-select"]'
     name: value
     equals: ''
-- click: '[data-testid="workspace-keymap-settings-dialog"] >> text=Copy'
+- assert_disabled: '[data-testid="keymap-settings-apply"]'
+- click: '[data-testid="keymap-scheme-copy"]'
 - eval_readonly:
     expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"keymap-scheme-select\"] option:checked")?.textContent?.includes("copy")
     expect_truthy: true
+- assert_enabled: '[data-testid="keymap-settings-apply"]'
 - fill:
     selector: '[data-testid="keymap-action-filter"]'
     value: Replace in File
@@ -72,7 +75,12 @@ steps:
 - press: Alt+Shift+r
 - press: Enter
 - assert_visible: '[data-testid="keymap-replace-editor.replace-0"]'
+- assert_text:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    contains: Alt+Shift+R
 - screenshot: tc-ide-c1-recorded.png
+- click: '[data-testid="keymap-settings-apply"]'
+- assert_disabled: '[data-testid="keymap-settings-apply"]'
 - click: '[data-testid="keymap-settings-close"]'
 - wait_for:
     selector: '[data-testid="workspace-keymap-settings-dialog"]'
@@ -82,7 +90,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 'Keymap scheme surface: action binding recorded, conflict, close：按步骤执行后，所有声明的可观察结果均满足。'
+    requirement: 'Keymap scheme surface: copy, draft record, Apply commit：按步骤执行后，所有声明的可观察结果均满足。'
     actions:
     - 1
     - 3
@@ -98,11 +106,17 @@ verification:
     - 20
     - 23
     - 25
-    - 27
+    - 26
+    - 28
     - 30
-    - 31
     - 32
+    - 33
+    - 34
     - 35
+    - 36
+    - 38
+    - 39
+    - 40
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -117,8 +131,8 @@ verification:
     - step: 12
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
     - step: 16
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]",
+        "timeout_sec": 30}}'
     - step: 21
       expectation: '{"wait_for": "[data-testid=\"workspace-keymap-settings-dialog\"]"}'
     - step: 22
@@ -126,23 +140,38 @@ verification:
     - step: 24
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"keymap-scheme-select\"]", "name": "value",
         "equals": ""}}'
-    - step: 26
+    - step: 25
+      expectation: '{"assert_disabled": "[data-testid=\"keymap-settings-apply\"]"}'
+    - step: 27
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\" + String.fromCharCode(61)
         + \"\\\"keymap-scheme-select\\\"] option:checked\")?.textContent?.includes(\"copy\")", "expect_truthy":
         true}}'
     - step: 28
+      expectation: '{"assert_enabled": "[data-testid=\"keymap-settings-apply\"]"}'
+    - step: 30
       expectation: '{"wait_for": "[data-testid=\"keymap-row-editor.replace\"]"}'
-    - step: 33
+    - step: 35
       expectation: '{"assert_visible": "[data-testid=\"keymap-replace-editor.replace-0\"]"}'
     - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-replace-editor.replace-0\"]", "contains":
+        "Alt+Shift+R"}}'
+    - step: 39
+      expectation: '{"assert_disabled": "[data-testid=\"keymap-settings-apply\"]"}'
+    - step: 41
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-keymap-settings-dialog\"]", "state": "detached",
         "timeout_sec": 5}}'
     results:
+    - 25
+    - 28
+    - 35
     - 36
+    - 39
+    - 41
   visual:
-  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+  - check: Keymap 对话框的 scheme 行、动作行、swatch 与底部 OK/Cancel/Apply 动作栏无截断或互相遮挡；
+      录制中的 conflict 区在 720px 宽度内完整可见。
     method: manual
-    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+    reason: 像素与字体/DPI 边界不能由 DOM 断言代替。
   native:
   - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
     method: external

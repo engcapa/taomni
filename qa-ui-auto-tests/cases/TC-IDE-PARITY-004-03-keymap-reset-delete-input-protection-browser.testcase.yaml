@@ -1,0 +1,284 @@
+id: TC-IDE-PARITY-004-03
+title: 'Keymap retained behavior: input protection, reserved strokes, IME, Reset/Delete, Shell shortcuts'
+description: 'ED-PARITY-004 A1.6/A3.3/A3.4/A3.5 browser case — S6/S7/S8 and the DEC-08
+  retention gates that the keymap refactor could plausibly have broken.
+
+  Covers: editable-field protection (filter and Cheat Sheet search must receive
+  Ctrl+F as text, never dispatch), reserved bare strokes still unbindable, IME
+  composition never recorded, user-disabled actions still visible with their
+  label, Reset/Delete round-trip, implicit fork from the default scheme, and the
+  already-delivered Shell shortcuts Control+Shift+N / Control+Alt+/ plus Ctrl+Z.
+
+  Mode: browser — every assertion is a renderer effect.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- keymap
+- ed-parity-004
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tab"]'
+- wait: 0.3
+- type: alpha
+- press: Control+z
+- press: Control+z
+- press: Control+z
+- press: Control+z
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - Browser preview uses an in-memory virtual local filesystem.
+    - Drop OS files here or download remote files to persist them in IndexedDB.
+    - The real Tauri build uses your actual OS filesystem.
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Alt+/
+- wait_for: '[data-testid="keymap-cheatsheet-dialog"]'
+- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+- type:
+    selector: '[data-testid="keymap-search-input"]'
+    text: Replace
+- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+- press: Control+f
+- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+- assert_attribute:
+    selector: '[data-testid="keymap-search-input"]'
+    name: value
+    equals: Replace
+- click: '[data-testid="keymap-cheatsheet-close"]'
+- wait_for:
+    selector: '[data-testid="keymap-cheatsheet-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- click: '[data-testid="keymap-scheme-copy"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- click: '[data-testid="keymap-action-filter"]'
+- press: Control+f
+- assert_attribute:
+    selector: '[data-testid="keymap-action-filter"]'
+    name: value
+    equals: Replace in File
+- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+- click: '[data-testid="keymap-add-editor.replace"]'
+- press: F5
+- press: Enter
+- click: '[data-testid="keymap-recorder-cancel"]'
+- assert_count:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    equal: 1
+- click: '[data-testid="keymap-add-editor.replace"]'
+- compose_text:
+    selector: '[data-testid="keymap-action-filter"]'
+    text: ni
+- assert_text:
+    selector: '[data-testid="keymap-recorder-strokes"]'
+    contains: press keys
+- click: '[data-testid="keymap-recorder-cancel"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- assert_count:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Find in File
+- wait_for: '[data-testid="keymap-row-editor.find"]'
+- set_check:
+    selector: '[data-testid="keymap-row-editor.find"] input[type="checkbox"]'
+    checked: false
+- assert_text:
+    selector: '[data-testid="keymap-row-editor.find"]'
+    contains: Disabled in Keymap
+- click: '[data-testid="keymap-scheme-copy"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- click: '[data-testid="keymap-add-editor.replace"]'
+- press: Alt+Shift+r
+- press: Enter
+- assert_enabled: '[data-testid="keymap-settings-apply"]'
+- click: '[data-testid="keymap-scheme-reset"]'
+- assert_text:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    contains: Ctrl+R
+- click: '[data-testid="keymap-settings-apply"]'
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+r
+- assert_visible: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- assert_text:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    contains: Ctrl+R
+- click: '[data-testid="keymap-scheme-delete"]'
+- assert_attribute:
+    selector: '[data-testid="keymap-scheme-select"]'
+    name: value
+    equals: ''
+- assert_text:
+    selector: '[data-testid="keymap-scheme-select"]'
+    contains: IDEA defaults (default)
+- click: '[data-testid="keymap-scheme-copy"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- click: '[data-testid="keymap-add-editor.replace"]'
+- press: Alt+Shift+r
+- press: Enter
+- click: '[data-testid="keymap-settings-apply"]'
+- assert_text:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    contains: Alt+Shift+R
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+Shift+r
+- assert_visible: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: "S6 A3.5：已交付的 Shell/编辑快捷键仍可用——Ctrl+Z 撤销到原始文档、Control+Alt+/ 打开 Cheat Sheet、Control+Shift+N 打开 Search Everywhere（后续步骤反复复用）。"
+    actions: [16, 17, 24]
+    checkpoints:
+    - step: 22
+      expectation: "{\"assert_items\": {\"selector\": \"[data-testid=\\\"code-workspace-editor\\\"] .cm-line\", \"equals\": [\"Browser preview uses an in-memory virtual local filesystem.\", \"Drop OS files here or download remote files to persist them in IndexedDB.\", \"The real Tauri build uses your actual OS filesystem.\", \"\"]}}"
+    - step: 25
+      expectation: "{\"wait_for\": \"[data-testid=\\\"keymap-cheatsheet-dialog\\\"]\"}"
+    results: [22, 25]
+  - id: R2
+    requirement: "S7 A3.2：焦点在 Cheat Sheet 搜索框与 Keymap filter 输入框时，Ctrl+F 不被工作区派发器抢走：编辑器查找面板保持关闭，输入框内容不被破坏。字符 'f' 是否字面插入由浏览器对 Ctrl 组合键的默认处理决定（Chromium/WebView2 不插入），不属于产品契约，故此处断言产品可负责的两半。"
+    actions: [29, 48]
+    checkpoints:
+    - step: 30
+      expectation: "{\"assert_not_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
+    - step: 31
+      expectation: "{\"assert_attribute\": {\"selector\": \"[data-testid=\\\"keymap-search-input\\\"]\", \"name\": \"value\", \"equals\": \"Replace\"}}"
+    - step: 50
+      expectation: "{\"assert_not_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
+    - step: 49
+      expectation: "{\"assert_attribute\": {\"selector\": \"[data-testid=\\\"keymap-action-filter\\\"]\", \"name\": \"value\", \"equals\": \"Replace in File\"}}"
+    results: [30, 31, 50, 49]
+  - id: R3
+    requirement: "A3.3/A3.5 DEC-08：录裸 F5 不产生新绑定（动作行仍只有 base 的 Ctrl+R）；IME 合成期间录制器不捕获任何 stroke，合成结束后动作行绑定数不变。"
+    actions: [52, 57]
+    checkpoints:
+    - step: 55
+      expectation: "{\"assert_count\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"equal\": 1}}"
+    - step: 58
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-recorder-strokes\\\"]\", \"contains\": \"press keys\"}}"
+    - step: 62
+      expectation: "{\"assert_count\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"equal\": 1}}"
+    results: [55, 58, 62]
+  - id: R4
+    requirement: "A3.4 DEC-08：user-disabled 动作在 Keymap 行中仍可见并带 'Disabled in Keymap' 标签。"
+    actions: [65]
+    checkpoints:
+    - step: 66
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.find\\\"]\", \"contains\": \"Disabled in Keymap\"}}"
+    results: [66]
+  - id: R5
+    requirement: "S8 A1.6 A3.1：Reset 回到 base 继承并可 Apply 生效（重开后仍显示 Ctrl+R，Ctrl+R 重新执行 Replace）；Delete 用户 scheme 后下拉回到默认项。"
+    actions: [74, 76, 97]
+    checkpoints:
+    - step: 75
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Ctrl+R\"}}"
+    - step: 81
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
+    - step: 96
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Ctrl+R\"}}"
+    - step: 98
+      expectation: "{\"assert_attribute\": {\"selector\": \"[data-testid=\\\"keymap-scheme-select\\\"]\", \"name\": \"value\", \"equals\": \"\"}}"
+    - step: 99
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-scheme-select\\\"]\", \"contains\": \"IDEA defaults (default)\"}}"
+    results: [81, 96, 98, 99]
+  - id: R6
+    requirement: "A3.1：删除用户 scheme 回到默认后仍可改键并 Apply 生效（重新建 scheme → 录 Alt+Shift+R → Apply → 真实按键执行 Replace）。"
+    actions: [104]
+    checkpoints:
+    - step: 107
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Alt+Shift+R\"}}"
+    - step: 112
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
+    results: [107, 112]
+  visual:
+  - check: "Reset 后动作行回到 base swatch、Delete 后下拉回到默认项、user-disabled 行的 Disabled in Keymap 标签在 720px 对话框内不截断。"
+    method: manual
+    reason: "像素/字体/DPI 边界不能由 DOM 断言代替。"
+  native:
+  - check: "真实 IME 合成会话与 OS 级快捷键拦截不在本用例范围；真实 IME 证据在参照包 §5 登记为未观测缺口，本卡同样记为未验证。"
+    method: external
+    reason: "browser 合成事件不能替代真实 IME 引擎证据。"

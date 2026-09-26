@@ -16,13 +16,17 @@ import yaml
 
 def is_check(step: dict) -> bool:
     verb, args = next(iter(step.items()))
-    if verb.startswith("assert_") or verb in {"wait_for", "native_editor_performance"}:
+    if verb.startswith("assert_") or verb in {"wait_for", "native_editor_performance", "parity005_wait_pending"}:
         return True
     if verb == "eval_readonly":
         return args.get("expect_truthy", True) or "contains" in args
     if verb == "save_race_trace":
         return any(args.get(k) for k in (
             "expect_contains", "expect_events", "require_ack_hashes", "require_settled_kind"))
+    if verb == "parity005_trace":
+        return any(key in args for key in ("fetch", "resolve", "pending"))
+    if verb == "parity005_native_trace":
+        return "phase" in args
     return False
 
 

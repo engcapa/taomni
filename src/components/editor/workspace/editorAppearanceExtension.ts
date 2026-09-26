@@ -73,6 +73,10 @@ export function editorAppearanceExtension(
     EditorView.theme({
       "&": root,
       ".cm-scroller": scroller,
+      ".cm-tooltip-autocomplete, .cm-completionInfo": {
+        fontFamily: profile.fontFamily,
+        fontSize: `${profile.fontSizePx}px`,
+      },
       ...(colors ? {
         ".cm-content, .cm-line": {
           color: colors["--taomni-code-text"],

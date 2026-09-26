@@ -1,0 +1,164 @@
+id: TC-IDE-PARITY-004-04
+title: 'Keymap rebind survives a real WebView context restart in the packaged app'
+description: 'ED-PARITY-004 A1.5 / V2 native gate case.
+
+  Sole native reason: the browser harness cannot prove that the committed keymap
+  survives destruction of the renderer context inside the packaged app. A
+  `reload_window` here tears down the real webview JS context and rebuilds it
+  from the on-disk WebView storage for the isolated QA profile, so a scheme that
+  comes back afterwards was genuinely persisted by Apply — not merely held in
+  React state across an in-session dialog close (which
+  TC-IDE-PARITY-004-01 already covers in browser).
+
+  Sequence: enter a disposable fixture workspace through persisted recents,
+  rebind editor.replace to Alt+Shift+R, Apply (the only commit edge), confirm
+  the stored bytes, destroy the webview context, re-enter, and prove the dialog
+  reads the effective value back and the live dispatcher runs the new chord.
+
+  Highest claim on green: L2 native (Windows / WebView2), packaged app UI, real
+  webview localStorage origin and the isolated com.taomni.app.qa profile.
+  macOS/Linux are recorded as unverified.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- keymap
+- ed-parity-004
+- native-gate
+- p1
+modes:
+- native
+native_platforms:
+- Windows
+fixtures:
+- reset_db
+- workspace_root
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-ed004","name":"qa-ed004","roots":[{"id":"qa-ed004","name":"qa-ed004","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-ed004","path":"notes.txt"},"lastOpenedAt":1756500000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Keymap Settings
+- press: Enter
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- click: '[data-testid="keymap-scheme-copy"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- click: '[data-testid="keymap-add-editor.replace"]'
+- press: Alt+Shift+r
+- press: Enter
+- assert_text:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    contains: Alt+Shift+R
+- click: '[data-testid="keymap-settings-apply"]'
+- assert_disabled: '[data-testid="keymap-settings-apply"]'
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- assert_localstorage:
+    key: taomni.codeWorkspace.keymap.v3:index
+    contains: '"ctrl":false,"alt":true,"shift":true'
+- screenshot: tc-ide-parity-004-04-before-restart.png
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Keymap Settings
+- press: Enter
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- assert_text:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    contains: Alt+Shift+R
+- screenshot: tc-ide-parity-004-04-after-restart.png
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+Shift+r
+- assert_visible: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+r
+- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: "A1.4 DEC-03：Apply 是唯一提交边界——Apply 后草稿变干净（Apply 禁用）且存储字节里出现新 chord 的物理结构。"
+    actions: [24, 26, 28]
+    checkpoints:
+    - step: 27
+      expectation: "{\"assert_disabled\": \"[data-testid=\\\"keymap-settings-apply\\\"]\"}"
+    - step: 30
+      expectation: "{\"assert_localstorage\": {\"key\": \"taomni.codeWorkspace.keymap.v3:index\", \"contains\": \"\\\"key\\\":\\\"r\\\",\\\"ctrl\\\":false,\\\"alt\\\":true,\\\"shift\\\":true\"}}"
+    results: [27, 30]
+  - id: R2
+    requirement: "A1.5 V2：销毁并重建真实 webview 上下文后，重开设置读到的是 Apply 后的生效绑定，而不是草稿或默认值。"
+    actions: [32, 45, 48]
+    checkpoints:
+    - step: 49
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Alt+Shift+R\"}}"
+    results: [49]
+  - id: R3
+    requirement: "A1.5 V2：重启后 live host 同样加载了持久化 scheme——新 chord 真实执行 Replace，旧 chord Ctrl+R 不再命中该动作。"
+    actions: [54, 59]
+    checkpoints:
+    - step: 55
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
+    - step: 60
+      expectation: "{\"assert_not_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
+    results: [55, 60]
+  visual:
+  - check: "重启前后两张截图中 editor.replace 行的 swatch 呈现一致（Alt+Shift+R），底部动作栏与行布局无截断。"
+    method: manual
+    reason: "像素/DPI 边界不能由 DOM 断言代替；截图需人工评审。"
+  native:
+  - check: "仅在用例声明的 Windows 执行模式中采集证据；browser 结果不替代 native，macOS/Linux 结果不外推。"
+    method: external
+    reason: "明确记录执行边界与未验证平台。"

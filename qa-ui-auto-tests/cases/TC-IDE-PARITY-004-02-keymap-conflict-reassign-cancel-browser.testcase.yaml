@@ -1,0 +1,228 @@
+id: TC-IDE-PARITY-004-02
+title: 'Keymap conflict: inline warning names every holder, cancel is zero-change, confirm reassigns'
+description: 'ED-PARITY-004 A1.1/A1.2/A1.3 browser case — the S4a/S4b sequence.
+
+  Records a chord that is already taken, proves the recorder shows an INLINE live
+  warning naming every holder (never a modal), proves cancelling that capture
+  changes nothing and Ctrl+F still runs Find, then confirms the same chord and
+  applies it so the chord has exactly one owner and the previous holder visibly
+  loses it.
+
+  Correction to the P1 prose: this platform''s editor.find carries a SECOND base
+  binding (Meta+F), so after Ctrl+F is reassigned the row keeps Meta+F instead of
+  becoming literally empty. DEC-04 revokes the contested STROKE, not the whole
+  binding set, so the assertions check that Ctrl+F is gone from editor.find and
+  that its unrelated Meta+F survives. A1.3''s actual target — exactly one available
+  candidate for the chord — is asserted by the live dispatch result.
+
+  Mode: browser; conflict identity, both exits and dispatch routing are all
+  renderer-observable.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- keymap
+- ed-parity-004
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tab"]'
+- wait: 0.3
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- click: '[data-testid="keymap-scheme-copy"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- click: '[data-testid="keymap-add-editor.replace"]'
+- press: Alt+Shift+r
+- press: Enter
+- click: '[data-testid="keymap-settings-apply"]'
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+Shift+r
+- assert_visible: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- click: '[data-testid="keymap-add-editor.replace"]'
+- press: Control+f
+- assert_visible: '[data-testid="keymap-capture-conflicts"]'
+- assert_text:
+    selector: '[data-testid="keymap-capture-conflicts"]'
+    contains: 'Already assigned to:'
+- assert_visible: '[data-testid="keymap-capture-conflict-editor.find"]'
+- assert_text:
+    selector: '[data-testid="keymap-capture-conflict-editor.find"]'
+    contains: editor.find
+- screenshot: tc-ide-parity-004-02-conflict.png
+- assert_count:
+    selector: '[data-testid="workspace-keymap-settings-dialog"] [aria-label="conflict"]'
+    equal: 0
+- click: '[data-testid="keymap-recorder-cancel"]'
+- assert_not_visible: '[data-testid="keymap-capture-conflicts"]'
+- assert_text:
+    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    contains: Alt+Shift+R
+- assert_disabled: '[data-testid="keymap-settings-apply"]'
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+f
+- assert_visible: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+- assert_not_visible: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- type: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Replace in File
+- wait_for: '[data-testid="keymap-row-editor.replace"]'
+- click: '[data-testid="keymap-add-editor.replace"]'
+- press: Control+f
+- assert_visible: '[data-testid="keymap-capture-conflict-editor.find"]'
+- assert_enabled: '[data-testid="keymap-recorder-ok"]'
+- press: Enter
+- click: '[data-testid="keymap-settings-apply"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Find in File
+- wait_for: '[data-testid="keymap-row-editor.find"]'
+- assert_text:
+    selector: '[data-testid="keymap-row-editor.find"]'
+    contains: Meta+F
+- assert_count:
+    selector: '[data-testid="workspace-keymap-settings-dialog"] [aria-label="conflict"]'
+    equal: 0
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+f
+- assert_visible: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+- screenshot: tc-ide-parity-004-02-reassigned.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: "A1.1 DEC-02/D1：录制已被占用的 chord 时，捕获控件内出现常驻就地冲突区，语义为 Already assigned to:，逐条指名占用动作（标题+id）。此处录到的是小写 Ctrl+f，而 editor.find 的存储绑定显示为 Ctrl+F——能指名即证明冲突按物理 stroke 判定而非显示字符串（D1 大小写分叉已消除）。警告只存在于录制器内，不会在动作行伪造已提交冲突。"
+    actions: [48]
+    checkpoints:
+    - step: 49
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"keymap-capture-conflicts\\\"]\"}"
+    - step: 50
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-capture-conflicts\\\"]\", \"contains\": \"Already assigned to:\"}}"
+    - step: 51
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"keymap-capture-conflict-editor.find\\\"]\"}"
+    - step: 52
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-capture-conflict-editor.find\\\"]\", \"contains\": \"editor.find\"}}"
+    - step: 54
+      expectation: "{\"assert_count\": {\"selector\": \"[data-testid=\\\"workspace-keymap-settings-dialog\\\"] [aria-label=\\\"conflict\\\"]\", \"equal\": 0}}"
+    results: [49, 50, 52, 54]
+  - id: R2
+    requirement: "A1.2 DEC-02/03：冲突不阻断录入但可取消；取消后冲突区清空、草稿恢复、Apply 仍禁用，关闭对话框后 Ctrl+F 仍执行原占用者 Find。"
+    actions: [55]
+    checkpoints:
+    - step: 56
+      expectation: "{\"assert_not_visible\": \"[data-testid=\\\"keymap-capture-conflicts\\\"]\"}"
+    - step: 57
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Alt+Shift+R\"}}"
+    - step: 58
+      expectation: "{\"assert_disabled\": \"[data-testid=\\\"keymap-settings-apply\\\"]\"}"
+    - step: 63
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"search\\\"]\"}"
+    - step: 64
+      expectation: "{\"assert_not_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
+    results: [56, 58, 63, 64]
+  - id: R3
+    requirement: "A1.3 DEC-02/04：冲突仍不阻断（OK 可用、Enter 可确认）；确认并 Apply 后原占用者 editor.find 失去该 chord 并保留其无关的 Meta+F，全局不再有任何已提交冲突徽标。"
+    actions: [79, 80, 28, 29]
+    checkpoints:
+    - step: 80
+      expectation: "{\"assert_enabled\": \"[data-testid=\\\"keymap-recorder-ok\\\"]\"}"
+    - step: 84
+      expectation: "{\"wait_for\": \"[data-testid=\\\"keymap-row-editor.find\\\"]\"}"
+    - step: 85
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.find\\\"]\", \"contains\": \"Meta+F\"}}"
+    - step: 86
+      expectation: "{\"assert_count\": {\"selector\": \"[data-testid=\\\"workspace-keymap-settings-dialog\\\"] [aria-label=\\\"conflict\\\"]\", \"equal\": 0}}"
+    results: [86, 85]
+  - id: R4
+    requirement: "A1.3 S4b：确认并 Apply 后真实按键 Ctrl+F 执行目标动作 Replace（可用候选恰好 1），不再由 Find 触发。"
+    actions: [78]
+    checkpoints:
+    - step: 91
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
+    results: [91]
+  visual:
+  - check: "捕获内冲突区（⚠ + 'Already assigned to:' + 逐条动作标题与 id）在 720px 对话框内完整可见，列表可滚动而非截断；冲突徽标与 swatch 不互相遮挡；底部 OK/Cancel/Apply 不被冲突区挤出。"
+    method: manual
+    reason: "像素/字体/DPI 边界不能由 DOM 断言代替，截图需人工评审。"
+  native:
+  - check: "IDEA 侧同一状态的锚点来自参照包 §3.4（IU-262.10968.63 录制器内就地警告）；本用例为 browser 证据，不替代 IDEA 侧采样，也不外推到 macOS/Linux。"
+    method: external
+    reason: "明确记录双侧证据边界。"

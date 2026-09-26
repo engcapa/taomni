@@ -31,6 +31,7 @@ import {
   type CompletionCandidateIdentity,
   type CompletionCandidatePair,
   type CompletionRequestIdentity,
+  withCompletionAcceptIntent,
 } from "./lspCompletion";
 
 function status(active: boolean): LspDocumentStatus {
@@ -83,6 +84,82 @@ describe("completionKindToType", () => {
     expect(completionKindToType(17)).toBe("file");
     expect(completionKindToType(null)).toBeUndefined();
     expect(completionKindToType(99)).toBe("text");
+  });
+});
+
+describe("ED-PARITY-005 completion identity and edit intent", () => {
+  const before = "package p;\n\nStringUtiSuffix;";
+  const caret = before.indexOf("StringUti") + 9;
+  const insert = {
+    start: { line: 2, character: 0 }, end: { line: 2, character: 9 },
+  };
+  const replace = {
+    start: { line: 2, character: 0 }, end: { line: 2, character: 15 },
+  };
+  const importEdit = {
+    range: { start: { line: 1, character: 0 }, end: { line: 1, character: 0 } },
+    newText: "import p.StringUtils;\n",
+  };
+  const item = {
+    label: "StringUtils", kind: 7, detail: "p.StringUtils", documentation: null,
+    insertText: "StringUtils", insertTextFormat: 1, filterText: null, sortText: null,
+    textEdit: { range: insert, newText: "StringUtils" },
+    insertReplaceEdit: { insert, replace, newText: "StringUtils" },
+    additionalTextEdits: [], raw: { label: "StringUtils" },
+  };
+  const identity = (generation: number): CompletionRequestIdentity => ({
+    workspaceId: "parity005", fileKey: "Main.java", filePath: "/Main.java",
+    uri: "file:///Main.java", languageId: "java", documentRevision: 0,
+    lspSessionGeneration: 1,
+    projectScope: {
+      status: "ready", scope: "module", moduleId: "main", sourceKind: "main",
+      dependencies: ["commons-lang3"], classpathFingerprint: "classpath-a", generation,
+    },
+  });
+
+  it("invalidates acceptance when project facts change", async () => {
+    const { EditorView } = await import("@codemirror/view");
+    let generation = 1;
+    const diagnostics = vi.fn();
+    const source = createLspCompletionSource({
+      identity: () => identity(generation),
+      fetch: async () => ({ status: status(true), isIncomplete: false, items: [{ ...item, additionalTextEdits: [importEdit] }] }),
+      triggerCharacters: () => [], getDocumentRevision: () => 0,
+      reportDiagnostic: diagnostics,
+    });
+    const state = EditorState.create({ doc: before, selection: { anchor: caret } });
+    const view = new EditorView({ state });
+    const result = await source(new CompletionContext(state, caret, true));
+    generation = 2;
+    const option = result!.options[0];
+    if (typeof option.apply === "function") option.apply(view, option, caret - 9, caret);
+    expect(view.state.doc.toString()).toBe(before);
+    expect(diagnostics).toHaveBeenCalledWith("identity-mismatch", "accept");
+    view.destroy();
+  });
+
+  it("preserves insert replace intent through resolve and undo", async () => {
+    const { EditorView } = await import("@codemirror/view");
+    const source = createLspCompletionSource({
+      identity: () => identity(1),
+      fetch: async () => ({ status: status(true), isIncomplete: false, items: [item] }),
+      resolve: async () => ({ kind: "resolved", item: { ...item, additionalTextEdits: [importEdit] } }),
+      triggerCharacters: () => [], getDocumentRevision: () => 0,
+      reportDiagnostic: vi.fn(),
+    });
+    const state = EditorState.create({ doc: before, selection: { anchor: caret }, extensions: [history()] });
+    const view = new EditorView({ state });
+    const result = await source(new CompletionContext(state, caret, true));
+    const option = result!.options[0];
+    withCompletionAcceptIntent(view, "replace", () => {
+      if (typeof option.apply === "function") option.apply(view, option, caret - 9, caret);
+    });
+    await vi.waitFor(() => expect(view.state.doc.toString()).toBe("package p;\nimport p.StringUtils;\n\nStringUtils;"));
+    expect(view.state.selection.main.head).toBe(view.state.doc.line(4).from + 11);
+    expect(undo(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe(before);
+    expect(view.state.selection.main.head).toBe(caret);
+    view.destroy();
   });
 });
 
@@ -187,6 +264,71 @@ describe("createLspCompletionSource", () => {
     expect(result?.options[0]?.displayLabel).toBe("toString(): string");
     expect(result?.options[0]?.sortText).toBe("0001");
     expect(result?.options[0]?.boost).toBeGreaterThan(0);
+  });
+
+  it("shows a qualified Java type name and package once", async () => {
+    const raw = { label: "StringUtils - org.apache.commons.lang3", data: { pid: "1", rid: "2" } };
+    const fetch = vi.fn(async (): Promise<LspCompletionResult> => ({
+      status: status(true),
+      isIncomplete: false,
+      items: [{
+        label: raw.label,
+        kind: 7,
+        detail: "org.apache.commons.lang3.StringUtils",
+        documentation: null,
+        insertText: "StringUtils",
+        insertTextFormat: 2,
+        filterText: "StringUtils",
+        sortText: "999998892",
+        textEdit: null,
+        additionalTextEdits: [],
+        raw,
+      }],
+    }));
+    const source = createFixtureCompletionSource({ fetch, triggerCharacters: () => [] });
+    const result = await source(contextAt("StringUti", 9, true));
+    expect(result?.options[0]).toMatchObject({
+      label: "StringUtils",
+      detail: "org.apache.commons.lang3",
+    });
+    expect(result?.options[0]?.displayLabel).toBeUndefined();
+  });
+
+  it("shows a Java method signature and return type without repeated provider detail", async () => {
+    const fetch = vi.fn(async (): Promise<LspCompletionResult> => ({
+      status: status(true),
+      isIncomplete: false,
+      items: [{
+        label: "append(String str) : StringBuilder",
+        kind: 2,
+        detail: "StringBuilder.append(String str) : StringBuilder",
+        documentation: null,
+        insertText: "append",
+        insertTextFormat: 2,
+        filterText: "append(${1:null})",
+        sortText: "999999035",
+        textEdit: null,
+        additionalTextEdits: [],
+        raw: { label: "append(String str) : StringBuilder" },
+      }],
+    }));
+    const source = createLspCompletionSource({
+      identity: () => ({
+        workspaceId: "parity005", fileKey: "Main.java", filePath: "/Main.java",
+        uri: "file:///Main.java", languageId: "java", documentRevision: 0,
+        lspSessionGeneration: 1,
+      }),
+      fetch,
+      triggerCharacters: () => [],
+      getDocumentRevision: () => 0,
+      reportDiagnostic: vi.fn(),
+    });
+    const result = await source(contextAt("appen", 5, true));
+    expect(result?.options[0]).toMatchObject({
+      label: "append(${1:null})",
+      displayLabel: "append(String str)",
+      detail: "StringBuilder",
+    });
   });
 
   it("passes the member-access trigger when typing after a trigger character", async () => {
