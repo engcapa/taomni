@@ -108,9 +108,9 @@ steps:
     equal: 0
 - click: '[data-testid="keymap-recorder-cancel"]'
 - assert_not_visible: '[data-testid="keymap-capture-conflicts"]'
-- assert_text:
+- assert_pattern:
     selector: '[data-testid="keymap-replace-editor.replace-0"]'
-    contains: Alt+Shift+R
+    regex: '(Alt|Option)[+]Shift[+]R'
 - assert_disabled: '[data-testid="keymap-settings-apply"]'
 - click: '[data-testid="keymap-settings-close"]'
 - wait_for:
@@ -190,7 +190,7 @@ verification:
     - step: 56
       expectation: "{\"assert_not_visible\": \"[data-testid=\\\"keymap-capture-conflicts\\\"]\"}"
     - step: 57
-      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Alt+Shift+R\"}}"
+      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
     - step: 58
       expectation: "{\"assert_disabled\": \"[data-testid=\\\"keymap-settings-apply\\\"]\"}"
     - step: 63

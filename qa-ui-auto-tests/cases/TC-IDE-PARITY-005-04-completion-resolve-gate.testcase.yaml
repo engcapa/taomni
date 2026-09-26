@@ -13,7 +13,7 @@ steps:
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
   - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+Home
+  - press: Mod+Home
   - press: ArrowDown
   - press: ArrowDown
   - press: ArrowDown

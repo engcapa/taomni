@@ -13,7 +13,7 @@ steps:
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
   - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+Home
+  - press: Mod+Home
   - press: ArrowDown
   - press: ArrowDown
   - press: ArrowDown
@@ -125,7 +125,7 @@ steps:
       selector: '[data-testid="code-workspace-editor"] .cm-line'
       equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+Home
+  - press: Mod+Home
   - press: ArrowDown
   - press: ArrowDown
   - press: ArrowDown
@@ -207,7 +207,7 @@ steps:
       selector: '[data-testid="code-workspace-editor"] .cm-line'
       equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+Home
+  - press: Mod+Home
   - press: ArrowDown
   - press: ArrowDown
   - press: ArrowDown
@@ -294,7 +294,7 @@ steps:
   - click: '[data-testid="code-workspace-split-right"]'
   - assert_count: {selector: '[data-testid="code-workspace-editor"] .cm-content', equal: 2}
   - click: '[data-testid="code-workspace-editor"] .cm-content >> nth=0'
-  - press: Control+Home
+  - press: Mod+Home
   - press: ArrowDown
   - press: ArrowDown
   - press: ArrowDown
