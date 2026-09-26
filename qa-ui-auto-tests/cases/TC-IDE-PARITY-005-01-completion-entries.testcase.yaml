@@ -1,0 +1,353 @@
+id: TC-IDE-PARITY-005-01
+title: Java Basic Completion entries, ordinal facts and focus protection
+description: 'ED-PARITY-005 V1 (A1/A3), browser with the controlled parity provider.
+
+  Ctrl+Space and Alt+/ both open exactly the controlled provider list at the same
+
+  prefix, the repeated invocation reports ordinal 2 without a second commit, the
+
+  Search Everywhere Actions entry and the keymap cheat sheet run the same action,
+
+  Escape leaves the buffer byte-identical, and Find-input focus is never stolen.
+
+  Boundary: mocked IPC provider (parity005_completion) — renderer routing, not
+
+  real JDT LS semantics.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- completion
+- ed-parity-005
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- wait_for: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="/preview/parity005"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="/preview/parity005"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Main.java"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Main.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringBuilder
+    timeout_sec: 10
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: org.apache.commons.lang3.StringUtils
+    timeout_sec: 10
+- eval_readonly:
+    expression: window.__taomniQaCompletion.requests
+    contains: '1'
+- eval_readonly:
+    expression: window.__taomniQaCompletion.activeFile
+    contains: Main.java
+- screenshot: tc-ide-parity-005-01-ctrl-space.png
+- press: Control+Space
+- wait: 0.5
+- eval_readonly:
+    expression: window.__taomniQaCompletion.requests
+    contains: '2'
+- press: Escape
+- wait: 0.5
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- eval_readonly:
+    expression: 'document.activeElement ? document.activeElement.className : ""'
+    contains: cm-content
+- press: Alt+/
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringBuilder
+    timeout_sec: 10
+- press: Escape
+- wait: 0.4
+- press: Control+Alt+Shift+N
+- wait_for: '[data-testid="code-workspace-search-everywhere"]'
+- click: '[data-testid="search-everywhere-tab-actions"]'
+- fill:
+    selector: '[data-testid="quick-pick-input"]'
+    value: Basic Completion
+- wait_for: '[data-testid="quick-pick-item"][data-index="0"]'
+- assert_text:
+    selector: '[data-testid="quick-pick-item"][data-index="0"]'
+    contains: Basic Completion
+- press: Enter
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringBuilder
+    timeout_sec: 10
+- press: Escape
+- wait: 0.4
+- press: Control+Alt+/
+- wait_for: '[data-testid="keymap-cheatsheet-dialog"]'
+- fill:
+    selector: '[data-testid="keymap-search-input"]'
+    value: Basic Completion
+- wait_for: '[data-testid="keymap-run-editor.basicCompletion"]'
+- assert_enabled: '[data-testid="keymap-run-editor.basicCompletion"]'
+- click: '[data-testid="keymap-run-editor.basicCompletion"]'
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringBuilder
+    timeout_sec: 10
+- press:
+    key: Escape
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_not_visible: .cm-tooltip-autocomplete
+- wait: 0.4
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+f
+- wait_for: '[data-testid="code-workspace-editor-search"]'
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    value: String
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    name: value
+    equals: String
+- press: Control+Space
+- wait: 0.8
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    name: value
+    equals: String
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('.cm-workspace-search-input')
+    expect_truthy: true
+- assert_not_visible: .cm-tooltip-autocomplete
+- eval_readonly:
+    expression: window.__taomniQaCompletion.requests === 5
+    expect_truthy: true
+- press: Escape
+- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- screenshot: tc-ide-parity-005-01-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 隔离 Java 工程通过受控 provider 打开 Basic Completion：两种绑定、Actions 入口与快捷键速查均到达同一动作，候选来自当前文档且无编辑；重复调用记录
+      ordinal 但不二次提交；Esc 后文本逐字节不变、焦点回编辑器；Find 输入占用键盘时两绑定不触发 editor 请求。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 22
+    - 28
+    - 29
+    - 31
+    - 32
+    - 35
+    - 37
+    - 39
+    - 40
+    - 41
+    - 43
+    - 44
+    - 47
+    - 49
+    - 51
+    - 52
+    - 53
+    - 55
+    - 58
+    - 60
+    - 62
+    - 64
+    - 66
+    - 67
+    - 69
+    - 71
+    - 72
+    - 77
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"welcome-recent-workspace-row\"][data-workspace-path=\"/preview/parity005\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"Main.java\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 19
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 21
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "StringBuilder",
+        "timeout_sec": 10}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "org.apache.commons.lang3.StringUtils",
+        "timeout_sec": 10}}'
+    - step: 25
+      expectation: '{"eval_readonly": {"expression": "window.__taomniQaCompletion.requests", "contains":
+        "1"}}'
+    - step: 26
+      expectation: '{"eval_readonly": {"expression": "window.__taomniQaCompletion.activeFile", "contains":
+        "Main.java"}}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "window.__taomniQaCompletion.requests", "contains":
+        "2"}}'
+    - step: 33
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 34
+      expectation: '{"eval_readonly": {"expression": "document.activeElement ? document.activeElement.className
+        : \"\"", "contains": "cm-content"}}'
+    - step: 36
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 38
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "StringBuilder",
+        "timeout_sec": 10}}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"quick-pick-item\"][data-index=\"0\"]"}'
+    - step: 46
+      expectation: '{"assert_text": {"selector": "[data-testid=\"quick-pick-item\"][data-index=\"0\"]",
+        "contains": "Basic Completion"}}'
+    - step: 48
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 50
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "StringBuilder",
+        "timeout_sec": 10}}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"keymap-cheatsheet-dialog\"]"}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"keymap-run-editor.basicCompletion\"]"}'
+    - step: 57
+      expectation: '{"assert_enabled": "[data-testid=\"keymap-run-editor.basicCompletion\"]"}'
+    - step: 59
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 61
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "StringBuilder",
+        "timeout_sec": 10}}'
+    - step: 63
+      expectation: '{"assert_not_visible": ".cm-tooltip-autocomplete"}'
+    - step: 65
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 68
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-search\"]"}'
+    - step: 70
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-search\"]
+        input[name=\"search\"]", "name": "value", "equals": "String"}}'
+    - step: 73
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-search\"]
+        input[name=\"search\"]", "name": "value", "equals": "String"}}'
+    - step: 74
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')",
+        "expect_truthy": true}}'
+    - step: 75
+      expectation: '{"assert_not_visible": ".cm-tooltip-autocomplete"}'
+    - step: 76
+      expectation: '{"eval_readonly": {"expression": "window.__taomniQaCompletion.requests === 5", "expect_truthy":
+        true}}'
+    - step: 78
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-search\"]"}'
+    - step: 79
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    results:
+    - 75
+    - 76
+    - 78
+    - 79
+  visual:
+  - check: 检查截图中的候选列表/文档/状态反馈无遮挡与溢出；截图本身不是视觉通过。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图人工评审。
+  native:
+  - check: 本用例只在 browser 模式运行；真实 JDT LS/Rust/磁盘字节由 TC-IDE-PARITY-005-05 native 覆盖，browser 结果不外推。
+    method: external
+    reason: 明确记录执行边界与未验证平台（Windows/macOS 未验证）。

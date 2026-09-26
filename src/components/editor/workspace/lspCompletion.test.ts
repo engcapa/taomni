@@ -18,6 +18,7 @@ import {
   completionKindToType,
   createFixtureCompletionSource,
   createLspCompletionSource,
+  withCompletionAcceptIntent,
   compareCandidatePairs,
   compareCompletionCandidates,
   matchCompletionQuery,
@@ -1908,5 +1909,294 @@ describe("ED-COMP-004: effective project scope recording", () => {
         expect.anything(),
       );
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ED-PARITY-005: Java Basic Completion accept ranges and one atomic undo
+// ---------------------------------------------------------------------------
+describe("ED-PARITY-005 insert/replace acceptance intent", () => {
+  const IMPORT = "import org.apache.commons.lang3.StringUtils;\n";
+
+  function javaDoc(): string {
+    return [
+      "package parity005;",
+      "",
+      "public class Main {",
+      "    void sample() {",
+      "        StringUtiSuffix;",
+      "    }",
+      "}",
+      "",
+    ].join("\n");
+  }
+
+  function javaStatus(): LspDocumentStatus {
+    return {
+      path: "/ws/Main.java",
+      uri: "file:///ws/Main.java",
+      presetId: "java",
+      languageId: "java",
+      displayName: "Java",
+      available: true,
+      active: true,
+      selectedCommandId: null,
+      selectedCommand: null,
+      installHint: null,
+      error: null,
+    };
+  }
+
+  function midWordItem(overrides: Record<string, unknown> = {}) {
+    const raw = { label: "StringUtils", data: "parity005-combined-1" };
+    return {
+      label: "StringUtils",
+      kind: 7,
+      detail: "org.apache.commons.lang3.StringUtils",
+      documentation: null,
+      insertText: null,
+      insertTextFormat: 1,
+      filterText: null,
+      sortText: null,
+      textEdit: {
+        range: { start: { line: 4, character: 8 }, end: { line: 4, character: 17 } },
+        newText: "StringUtils",
+      },
+      insertReplaceEdit: {
+        newText: "StringUtils",
+        insert: { start: { line: 4, character: 8 }, end: { line: 4, character: 17 } },
+        replace: { start: { line: 4, character: 8 }, end: { line: 4, character: 23 } },
+      },
+      additionalTextEdits: [],
+      raw,
+      ...overrides,
+    };
+  }
+
+  function sourceWith(item: ReturnType<typeof midWordItem>, exports: {
+    identity: () => CompletionRequestIdentity;
+    resolve?: () => Promise<unknown>;
+  }) {
+    return createLspCompletionSource({
+      identity: exports.identity,
+      fetch: async (): Promise<LspCompletionResult> => ({
+        status: javaStatus(),
+        isIncomplete: false,
+        items: [item as never],
+      }),
+      resolve: exports.resolve ? (() => exports.resolve!() as never) : undefined,
+      triggerCharacters: () => [],
+      getDocumentRevision: () => exports.identity().documentRevision,
+      reportDiagnostic: () => {},
+      onResolveGate: () => {},
+    });
+  }
+
+  it("ED-PARITY-005 preserves insert replace intent through resolve and undo", async () => {
+    const { EditorView } = await import("@codemirror/view");
+    const identity = (): CompletionRequestIdentity => ({
+      workspaceId: "ws-parity005",
+      fileKey: "Main.java",
+      filePath: "/ws/Main.java",
+      uri: "file:///ws/Main.java",
+      languageId: "java",
+      documentRevision: 1,
+      lspSessionGeneration: 2,
+    });
+
+    // --- Round 1: Enter (insert) keeps the suffix, resolves the import, one undo.
+    {
+      const item = midWordItem();
+      const resolve = vi.fn(async () => ({
+        kind: "resolved" as const,
+        item: {
+          ...item,
+          additionalTextEdits: [{
+            range: { start: { line: 1, character: 0 }, end: { line: 1, character: 0 } },
+            newText: IMPORT,
+          }],
+        },
+      }));
+      const source = sourceWith(item, { identity, resolve });
+      const state = EditorState.create({ doc: javaDoc(), extensions: [history()] });
+      const view = new EditorView({ state });
+      view.dispatch({ selection: { anchor: view.state.doc.line(5).from + 17 } });
+      const result = await source(new CompletionContext(view.state, view.state.selection.main.head, true));
+      const option = result!.options[0];
+      expect(typeof option.apply).toBe("function");
+      // Enter / mouse bind no intent: insert is the default.
+      if (typeof option.apply === "function") option.apply(view, option, view.state.doc.line(5).from + 8, view.state.doc.line(5).from + 17);
+      await vi.waitFor(() => {
+        expect(view.state.doc.toString()).toContain("        StringUtilsSuffix;");
+      });
+      const text = view.state.doc.toString();
+      expect(text).toContain(IMPORT);
+      expect(text.match(/StringUtils/g)!.length).toBe(2); // import fqn + identifier
+      expect(view.state.selection.main.empty).toBe(true);
+      expect(view.state.doc.sliceString(view.state.selection.main.head - 11, view.state.selection.main.head))
+        .toBe("StringUtils");
+      // Exactly one undo restores the exact preimage and the caret.
+      expect(undo(view)).toBe(true);
+      expect(view.state.doc.toString()).toBe(javaDoc());
+      view.destroy();
+    }
+
+    // --- Round 2: Tab (replace) replaces the whole identifier.
+    {
+      const item = midWordItem();
+      const resolve = vi.fn(async () => ({
+        kind: "resolved" as const,
+        item: {
+          ...item,
+          additionalTextEdits: [{
+            range: { start: { line: 1, character: 0 }, end: { line: 1, character: 0 } },
+            newText: IMPORT,
+          }],
+        },
+      }));
+      const source = sourceWith(item, { identity, resolve });
+      const state = EditorState.create({ doc: javaDoc(), extensions: [history()] });
+      const view = new EditorView({ state });
+      const caret = view.state.doc.line(5).from + 17;
+      view.dispatch({ selection: { anchor: caret } });
+      const result = await source(new CompletionContext(view.state, caret, true));
+      const option = result!.options[0];
+      if (typeof option.apply === "function") {
+        withCompletionAcceptIntent(view, "replace", () =>
+          (option.apply as (v: EditorView, c: unknown, f: number, t: number) => void)(
+            view, option, view.state.doc.line(5).from + 8, caret));
+      }
+      await vi.waitFor(() => {
+        expect(view.state.doc.toString()).toContain("        StringUtils;");
+      });
+      const text = view.state.doc.toString();
+      expect(text).not.toContain("StringUtilsSuffix");
+      expect(text).toContain(IMPORT);
+      expect(undo(view)).toBe(true);
+      expect(view.state.doc.toString()).toBe(javaDoc());
+      view.destroy();
+    }
+
+    // --- Round 3: a plain TextEdit (insert range only) is widened for Tab
+    // only in the safe Java identifier case.
+    {
+      const plain = midWordItem({ insertReplaceEdit: null });
+      const source = sourceWith(plain, {
+        identity,
+        resolve: async () => ({
+          kind: "resolved" as const,
+          item: {
+            ...plain,
+            additionalTextEdits: [{
+              range: { start: { line: 1, character: 0 }, end: { line: 1, character: 0 } },
+              newText: IMPORT,
+            }],
+          },
+        }),
+      });
+      const state = EditorState.create({ doc: javaDoc(), extensions: [history()] });
+      const view = new EditorView({ state });
+      const caret = view.state.doc.line(5).from + 17;
+      view.dispatch({ selection: { anchor: caret } });
+      const result = await source(new CompletionContext(view.state, caret, true));
+      const option = result!.options[0];
+      if (typeof option.apply === "function") {
+        withCompletionAcceptIntent(view, "replace", () =>
+          (option.apply as (v: EditorView, c: unknown, f: number, t: number) => void)(
+            view, option, view.state.doc.line(5).from + 8, caret));
+      }
+      await vi.waitFor(() => {
+        expect(view.state.doc.toString()).toContain("        StringUtils;");
+      });
+      expect(view.state.doc.toString()).not.toContain("StringUtilsSuffix");
+      view.destroy();
+    }
+
+    // --- Round 4: inside a string literal Tab must not guess a wider range.
+    {
+      const item = midWordItem({
+        textEdit: {
+          range: { start: { line: 3, character: 16 }, end: { line: 3, character: 25 } },
+          newText: "StringUtils",
+        },
+        insertReplaceEdit: null,
+        additionalTextEdits: [],
+      });
+      const source = sourceWith(item, {
+        identity: () => ({ ...identity(), documentRevision: 1 }),
+        resolve: async () => ({
+          kind: "resolved" as const,
+          item: { ...item },
+        }),
+      });
+      const doc = [
+        "package parity005;",
+        "",
+        "public class Main {",
+        '    String s = "StringUtiSuffix";',
+        "}",
+        "",
+      ].join("\n");
+      const state = EditorState.create({ doc, extensions: [history()] });
+      const view = new EditorView({ state });
+      const caret = view.state.doc.line(4).from + 25;
+      view.dispatch({ selection: { anchor: caret } });
+      const result = await source(new CompletionContext(view.state, caret, true));
+      const option = result!.options[0];
+      if (typeof option.apply === "function") {
+        withCompletionAcceptIntent(view, "replace", () =>
+          (option.apply as (v: EditorView, c: unknown, f: number, t: number) => void)(
+            view, option, view.state.doc.line(4).from + 16, caret));
+      }
+      await vi.waitFor(() => {
+        expect(view.state.doc.toString()).toContain('"StringUtilsSuffix"');
+      });
+      view.destroy();
+    }
+
+    // --- Round 5: contradictory dual ranges reject the whole acceptance.
+    {
+      const contradictory = midWordItem({
+        insertReplaceEdit: {
+          newText: "StringUtils",
+          insert: { start: { line: 4, character: 8 }, end: { line: 4, character: 17 } },
+          replace: { start: { line: 4, character: 10 }, end: { line: 4, character: 23 } },
+        },
+        additionalTextEdits: [{
+          range: { start: { line: 1, character: 0 }, end: { line: 1, character: 0 } },
+          newText: IMPORT,
+        }],
+      });
+      const diagnostics: string[] = [];
+      const source = createLspCompletionSource({
+        identity,
+        fetch: async (): Promise<LspCompletionResult> => ({
+          status: javaStatus(),
+          isIncomplete: false,
+          items: [contradictory as never],
+        }),
+        triggerCharacters: () => [],
+        getDocumentRevision: () => 1,
+        reportDiagnostic: (kind, detail) => diagnostics.push(detail ? `${kind}:${detail}` : kind),
+        onResolveGate: () => {},
+      });
+      const state = EditorState.create({ doc: javaDoc(), extensions: [history()] });
+      const view = new EditorView({ state });
+      const caret = view.state.doc.line(5).from + 17;
+      view.dispatch({ selection: { anchor: caret } });
+      const result = await source(new CompletionContext(view.state, caret, true));
+      const option = result!.options[0];
+      const dispatchSpy = vi.spyOn(view, "dispatch");
+      if (typeof option.apply === "function") {
+        withCompletionAcceptIntent(view, "replace", () =>
+          (option.apply as (v: EditorView, c: unknown, f: number, t: number) => void)(
+            view, option, view.state.doc.line(5).from + 8, caret));
+      }
+      await new Promise((r) => setTimeout(r, 10));
+      expect(view.state.doc.toString()).toBe(javaDoc());
+      expect(dispatchSpy).not.toHaveBeenCalled();
+      expect(diagnostics).toContain("invalid-additional-edits:primary-range");
+      view.destroy();
+    }
   });
 });

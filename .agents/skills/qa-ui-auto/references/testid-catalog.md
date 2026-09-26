@@ -152,6 +152,8 @@
 - `[data-testid^="keymap-category-"]` — interactive [optional] — F25.3.keymap-category
 - `[data-testid^="keymap-item-"]` — display [optional] — F25.3.keymap-item
   ↳ `[data-testid="keymap-item-workspace.renameSymbol"]` — alias
+- `[data-testid^="keymap-run-"]` — interactive [optional] — F25.3.keymap-run
+  ↳ `[data-testid="keymap-run-editor.basicCompletion"]` — alias
 - `[data-testid="keymap-cheatsheet-footer-close"]` — interactive — F25.3.keymap-cheatsheet-footer-close
 - `[data-testid="keymap-cheatsheet-close"]` — interactive [optional] — F25.3.keymap-cheatsheet-close
 - `[data-testid="editor-context-cut"]` — interactive [optional] — F25.3.context-cut
@@ -235,6 +237,14 @@
 - `[data-testid="code-workspace-tree-new-file"]` — interactive [optional] — F25.5.tree-new-file
 - `[data-testid="code-workspace-tree-new-directory"]` — interactive [optional] — F25.5.tree-new-directory
 - `[data-testid="code-workspace-search-everywhere"]` — display [optional] — F25.5.search-everywhere
+- `[data-testid="search-everywhere-tab-actions"]` — interactive [optional] — F25.5.search-everywhere-tab-actions
+- `[data-testid="quick-pick-input"]` — interactive [optional] — F25.5.quick-pick-input
+- `[data-testid="quick-pick-item"]` — interactive [optional] — F25.5.quick-pick-item
+- `[data-testid="completion-resolve-gate"]` — display [optional] — F25.5.completion-resolve-gate
+- `[data-testid="completion-resolve-gate-retry"]` — interactive [optional] — F25.5.completion-resolve-gate-retry
+- `[data-testid="completion-resolve-gate-insert-without-import"]` — interactive [optional] — F25.5.completion-resolve-gate-insert-without-import
+- `[data-testid="completion-resolve-gate-dismiss"]` — interactive [optional] — F25.5.completion-resolve-gate-dismiss
+- `[data-testid="completion-resolve-gate-failed-note"]` — display [optional] — F25.5.completion-resolve-gate-failed-note
 - `[data-testid="code-workspace-find-in-files-panel"]` — display [optional] — F25.5.find-panel
 - `[aria-label="Search query"]` — interactive [optional] — F25.5.find-query-input
 - `[aria-label="Include globs"]` — interactive [optional] — F25.5.find-include-globs

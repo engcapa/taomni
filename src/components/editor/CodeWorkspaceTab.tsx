@@ -129,7 +129,6 @@ import {
   nextLspRequestSequence,
   type LspCodeAction,
   type JavaTestItem,
-  type LspCompletionItem,
   type LspCompletionResult,
   type LspDiagnostic,
   type LspDocumentDescriptor,
@@ -178,11 +177,13 @@ import {
   type SaveTransactionV2,
   type WorkspaceStyleController,
 } from "./workspace/workspaceStyleController";
-import type {
-  CompletionAcceptanceDiagnostic,
-  CompletionInvocationRequest,
-  CompletionRequestIdentity,
-  CompletionRequestToken,
+import {
+  sameCompletionScopeFacts,
+  type CompletionAcceptanceDiagnostic,
+  type CompletionInvocationRequest,
+  type CompletionRequestIdentity,
+  type CompletionRequestToken,
+  type CompletionResolveProviderReply,
 } from "./workspace/lspCompletion";
 import {
   resolveCompletionScopeFacts,
@@ -16115,7 +16116,10 @@ export function CodeWorkspaceTab({
         && identity.uri === token.uri
         && identity.languageId === token.languageId
         && identity.documentRevision === token.documentRevision
-        && identity.lspSessionGeneration === token.lspSessionGeneration;
+        && identity.lspSessionGeneration === token.lspSessionGeneration
+        // ED-PARITY-005 DEC-03: a refreshed facts generation invalidates the
+        // old acceptance even when the file/session did not move.
+        && sameCompletionScopeFacts(identity.projectScope, token.projectScope);
     },
     [completionIdentityForFile, workspaceInstanceId],
   );
@@ -16205,15 +16209,37 @@ export function CodeWorkspaceTab({
       file: OpenFileState,
       raw: unknown,
       token: CompletionRequestToken,
-    ): Promise<LspCompletionItem | null> => {
+    ): Promise<CompletionResolveProviderReply> => {
       const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return null;
-      if (!isCompletionTokenCurrent(token)) return null;
+      if (!descriptor) return { kind: "unavailable", reason: "no-descriptor" };
+      if (!isCompletionTokenCurrent(token)) {
+        return { kind: "unavailable", reason: "identity-changed" };
+      }
       try {
+        // §ED-PARITY-005 D1: the native boundary returns a typed result.
+        // A provider null/timeout/error stays typed here so the renderer opens
+        // the gate instead of silently committing a primary-only acceptance.
         const resolved = await lspCompletionResolve(descriptor, raw);
-        return isCompletionTokenCurrent(token) ? resolved : null;
-      } catch {
-        return null;
+        if (!isCompletionTokenCurrent(token)) {
+          return { kind: "unavailable", reason: "identity-changed" };
+        }
+        switch (resolved?.kind) {
+          case "resolved":
+            return { kind: "resolved", item: resolved.item };
+          case "timeout":
+            return { kind: "timeout" };
+          case "failed":
+            return { kind: "failed", message: resolved.message };
+          case "unavailable":
+            return { kind: "unavailable", reason: resolved.reason };
+          default:
+            return { kind: "unavailable", reason: "no-result" };
+        }
+      } catch (error) {
+        return {
+          kind: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        };
       }
     },
     [isCompletionTokenCurrent, lspDescriptorForFile],

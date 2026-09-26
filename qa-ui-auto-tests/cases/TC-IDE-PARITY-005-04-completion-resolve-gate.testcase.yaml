@@ -1,0 +1,616 @@
+id: TC-IDE-PARITY-005-04
+title: Java Basic Completion resolve gate - D1 no fake success, retry, primary-only
+description: 'ED-PARITY-005 V4 (A1/A3), browser with the controlled parity provider.
+
+  A provider resolve that returns null, errors, times out or is unavailable must
+
+  never be reported as a successful original-item resolve: the gate opens with
+
+  the accurate reason, nothing is written, Retry is disabled while a fresh
+
+  resolve is in flight, a failing Retry shows the failed note, an explicit
+
+  Insert-without-import writes only the primary, Dismiss/Escape write nothing,
+
+  and overlapping provider edits reject the whole acceptance.
+
+  Boundary: mocked IPC provider — the renderer gate contract. The Rust
+
+  completionItem/resolve typing and real JDT LS timeouts are covered by the
+
+  native/provider case TC-IDE-PARITY-005-05.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- completion
+- ed-parity-005
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- wait_for: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="/preview/parity005"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="/preview/parity005"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Main.java"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="GateNull.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Enter
+- wait_for: '[data-testid="completion-resolve-gate"]'
+- assert_text:
+    selector: '[data-testid="completion-resolve-gate"]'
+    contains: Auto-import unavailable
+    timeout_sec: 10
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="completion-resolve-gate-insert-without-import"]'
+- assert_not_visible: '[data-testid="completion-resolve-gate"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- screenshot: tc-ide-parity-005-04-null-primary-only.png
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="GateError.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Enter
+- wait_for: '[data-testid="completion-resolve-gate"]'
+- assert_text:
+    selector: '[data-testid="completion-resolve-gate"]'
+    contains: resolve failed
+    timeout_sec: 10
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="completion-resolve-gate-retry"]'
+- wait_for: '[data-testid="completion-resolve-gate-failed-note"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="completion-resolve-gate-retry"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- screenshot: tc-ide-parity-005-04-retry-success.png
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="GateTimeout.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Enter
+- wait_for:
+    selector: '[data-testid="completion-resolve-gate"]'
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="completion-resolve-gate"]'
+    contains: timed out
+    timeout_sec: 10
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="completion-resolve-gate-retry"]'
+- assert_disabled: '[data-testid="completion-resolve-gate-retry"]'
+- assert_disabled: '[data-testid="completion-resolve-gate-insert-without-import"]'
+- wait_for:
+    selector: '[data-testid="completion-resolve-gate"]'
+    state: detached
+    timeout_sec: 15
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- screenshot: tc-ide-parity-005-04-timeout-retry.png
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="GateDismiss.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Enter
+- wait_for: '[data-testid="completion-resolve-gate"]'
+- press:
+    key: Escape
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_not_visible: '[data-testid="completion-resolve-gate"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Enter
+- wait_for: '[data-testid="completion-resolve-gate"]'
+- click: '[data-testid="completion-resolve-gate-dismiss"]'
+- assert_not_visible: '[data-testid="completion-resolve-gate"]'
+- wait: 1.0
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- screenshot: tc-ide-parity-005-04-dismiss.png
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="GateOverlap.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Enter
+- wait: 1.0
+- assert_not_visible: '[data-testid="completion-resolve-gate"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Completion rejected invalid provider edits
+    timeout_sec: 10
+- screenshot: tc-ide-parity-005-04-overlap-rejected.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: resolve 返回 null/失败/超时或不可用时打开 resolve gate 且零写入：gate 原因准确（unavailable、failed、timed out）、正文与
+      import/dirty/history 均不变；Retry 等待中按钮 disabled、重复点击不多发；Retry 失败显示 failed-note 且仍无编辑，再 Retry 成功仅一次完整
+      postimage；显式 Insert without import 只写 primary、不加 import 且一次 Undo 可回 prefix；Dismiss 与 Esc 关闭 gate
+      且零提交；重叠 provider edits 整笔拒绝、无部分落地。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 22
+    - 23
+    - 27
+    - 30
+    - 33
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 44
+    - 46
+    - 47
+    - 51
+    - 54
+    - 56
+    - 59
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 70
+    - 72
+    - 73
+    - 77
+    - 82
+    - 85
+    - 87
+    - 88
+    - 89
+    - 90
+    - 91
+    - 92
+    - 93
+    - 94
+    - 96
+    - 98
+    - 99
+    - 101
+    - 104
+    - 106
+    - 107
+    - 109
+    - 111
+    - 114
+    - 116
+    - 117
+    - 118
+    - 119
+    - 120
+    - 121
+    - 122
+    - 123
+    - 125
+    - 127
+    - 128
+    - 129
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"welcome-recent-workspace-row\"][data-workspace-path=\"/preview/parity005\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"Main.java\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 19
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 21
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"completion-resolve-gate\"]"}'
+    - step: 25
+      expectation: '{"assert_text": {"selector": "[data-testid=\"completion-resolve-gate\"]", "contains":
+        "Auto-import unavailable", "timeout_sec": 10}}'
+    - step: 26
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 28
+      expectation: '{"assert_not_visible": "[data-testid=\"completion-resolve-gate\"]"}'
+    - step: 29
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        StringBuilder;", "    }", "}", ""]}}'
+    - step: 31
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 43
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 45
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"completion-resolve-gate\"]"}'
+    - step: 49
+      expectation: '{"assert_text": {"selector": "[data-testid=\"completion-resolve-gate\"]", "contains":
+        "resolve failed", "timeout_sec": 10}}'
+    - step: 50
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"completion-resolve-gate-failed-note\"]"}'
+    - step: 53
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 55
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder;", "    }", "}", ""]}}'
+    - step: 57
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 60
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 69
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 71
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 74
+      expectation: '{"wait_for": {"selector": "[data-testid=\"completion-resolve-gate\"]", "timeout_sec":
+        20}}'
+    - step: 75
+      expectation: '{"assert_text": {"selector": "[data-testid=\"completion-resolve-gate\"]", "contains":
+        "timed out", "timeout_sec": 10}}'
+    - step: 76
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 78
+      expectation: '{"assert_disabled": "[data-testid=\"completion-resolve-gate-retry\"]"}'
+    - step: 79
+      expectation: '{"assert_disabled": "[data-testid=\"completion-resolve-gate-insert-without-import\"]"}'
+    - step: 80
+      expectation: '{"wait_for": {"selector": "[data-testid=\"completion-resolve-gate\"]", "state": "detached",
+        "timeout_sec": 15}}'
+    - step: 81
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder;", "    }", "}", ""]}}'
+    - step: 83
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 86
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 95
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 97
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 100
+      expectation: '{"wait_for": "[data-testid=\"completion-resolve-gate\"]"}'
+    - step: 102
+      expectation: '{"assert_not_visible": "[data-testid=\"completion-resolve-gate\"]"}'
+    - step: 103
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 105
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 108
+      expectation: '{"wait_for": "[data-testid=\"completion-resolve-gate\"]"}'
+    - step: 110
+      expectation: '{"assert_not_visible": "[data-testid=\"completion-resolve-gate\"]"}'
+    - step: 112
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 115
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 124
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 126
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 130
+      expectation: '{"assert_not_visible": "[data-testid=\"completion-resolve-gate\"]"}'
+    - step: 131
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 132
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Completion
+        rejected invalid provider edits", "timeout_sec": 10}}'
+    results:
+    - 126
+    - 130
+    - 131
+    - 132
+  visual:
+  - check: 检查截图中的候选列表/文档/状态反馈无遮挡与溢出；截图本身不是视觉通过。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图人工评审。
+  native:
+  - check: 本用例只在 browser 模式运行；真实 JDT LS/Rust/磁盘字节由 TC-IDE-PARITY-005-05 native 覆盖，browser 结果不外推。
+    method: external
+    reason: 明确记录执行边界与未验证平台（Windows/macOS 未验证）。

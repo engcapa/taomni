@@ -96,7 +96,6 @@ import { codeViewExtensions } from "../../../lib/codeViewTheme";
 import { getAppPlatform, isTauriRuntime } from "../../../lib/runtime";
 import type { EffectiveCodeStyle } from "./codeStyleModel";
 import type {
-  LspCompletionItem,
   LspCompletionResult,
   LspDiagnostic,
   LspDocumentHighlight,
@@ -127,17 +126,21 @@ import {
   activeLspSnippetChoices,
   advanceLspSnippetTabstop,
   cancelLspSnippetSession,
+  cancelPendingCompletionAcceptance,
+  hasPendingCompletionAcceptance,
   cycleLspSnippetChoice,
   retreatLspSnippetTabstop,
   createLspCompletionSource,
   LspCompletionController,
   lspSnippetSessionInvalidator,
   resetBasicCompletionSession,
+  withCompletionAcceptIntent,
   type CompletionAcceptanceDiagnostic,
   type CompletionInvocationRequest,
   type CompletionRequestIdentity,
   type CompletionRequestToken,
   type CompletionResolveGateRequest,
+  type CompletionResolveProviderReply,
 } from "./lspCompletion";
 import type { CompletionScopeFactsState } from "./completionScopeAdapter";
 import { createDiagnosticChrome } from "./lspDiagnosticChrome";
@@ -466,7 +469,7 @@ interface CodeMirrorHostProps {
   onCompleteResolve?: (
     raw: unknown,
     token: CompletionRequestToken,
-  ) => Promise<LspCompletionItem | null>;
+  ) => Promise<CompletionResolveProviderReply>;
   /** Live completion request identity (§8.16.2); null = typed unavailable. */
   getCompletionIdentity: () => CompletionRequestIdentity | null;
   onCompletionDiagnostic: (kind: CompletionAcceptanceDiagnostic, detail?: string) => void;
@@ -2351,6 +2354,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const completionCompartment = useRef(new Compartment());
   const renderedDocCompartment = useRef(new Compartment());
   const presentResolveGateRef = useRef<((request: CompletionResolveGateRequest) => void) | null>(null);
+  const dismissResolveGateRef = useRef<(() => boolean) | null>(null);
+  /**
+   * ED-PARITY-005: monotonic gate id. A newer gate (or an explicit dismiss)
+   * bumps it, so a late Retry callback from an older gate can never rewrite or
+   * close the newer surface.
+   */
+  const resolveGateSeqRef = useRef(0);
+  const resolveGateOpenRef = useRef(false);
 
   interface ActiveProviderTemplateState {
     workspaceId: string;
@@ -2787,6 +2798,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   // §8.19.4 resolve gate banner state; the closures inside the request guard
   // staleness themselves, this only drives presentation.
   const [resolveGateUi, setResolveGateUi] = useState<{
+    /** Gate identity; late callbacks from a superseded gate are ignored. */
+    seq: number;
     label: string;
     message: string;
     failed: boolean;
@@ -2933,10 +2946,21 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     // The gate request's own closures re-verify identity/doc before acting, so
     // a stale banner is inert — this only decides where it shows.
     const presentResolveGate = (request: CompletionResolveGateRequest) => {
+      // A new gate supersedes the previous one: bump the id first so every
+      // still-pending callback of the old gate becomes inert (§ED-PARITY-005
+      // DEC-06).
+      const gateSeq = ++resolveGateSeqRef.current;
+      resolveGateOpenRef.current = true;
       const view = viewRef.current;
       const coords = view?.coordsAtPos(request.range.from);
       const container = hostRef.current?.getBoundingClientRect();
+      if (view) {
+        // The chosen item is echoed in the banner; the list itself must not
+        // cover the gate's controls (Retry / Insert without import / Dismiss).
+        closeCompletion(view);
+      }
       setResolveGateUi({
+        seq: gateSeq,
         label: request.item.label,
         message: request.message,
         failed: false,
@@ -2947,11 +2971,33 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         insertWithoutImport: request.insertWithoutImport,
         dismiss: () => {
           request.dismiss();
-          setResolveGateUi(null);
+          if (resolveGateSeqRef.current === gateSeq) {
+            resolveGateOpenRef.current = false;
+            setResolveGateUi(null);
+            // The banner is gone: the caret belongs back in the editor.
+            viewRef.current?.focus();
+          }
         },
       });
     };
     presentResolveGateRef.current = presentResolveGate;
+    // Escape while an acceptance waits or a gate is open terminates the
+    // session: zero commit, no popup revival, no stale gate rewrite.
+    dismissResolveGateRef.current = () => {
+      const currentView = viewRef.current;
+      let handled = false;
+      if (currentView) {
+        handled = cancelPendingCompletionAcceptance(currentView, "escape") || handled;
+      }
+      if (resolveGateOpenRef.current) {
+        resolveGateOpenRef.current = false;
+        resolveGateSeqRef.current += 1;
+        setResolveGateUi(null);
+        currentView?.focus();
+        handled = true;
+      }
+      return handled;
+    };
     const clearPendingSelectionEmit = () => {
       if (selectionEmitTimerRef.current === null) return;
       window.clearTimeout(selectionEmitTimerRef.current);
@@ -3229,17 +3275,26 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             run: (view) => {
               // ED-AUDIT-011: Tab during IME composition selects the candidate.
               if (view.composing || view.state.readOnly) return false;
-              if (acceptCompletion(view)) return true;
+              // ED-PARITY-005 D2: Tab accepts with the *replace* range intent
+              // (IDEA Tmid Tab replaces the whole identifier). The intent is
+              // bound to this view for exactly this accept attempt; an
+              // acceptance that does not run cannot leak into the next Enter.
+              if (withCompletionAcceptIntent(view, "replace", () => acceptCompletion(view))) {
+                return true;
+              }
               const language = liveTemplateLanguageForPath(pathRef.current);
               const providerCandidate = getValidActiveProviderCandidate(view, language);
               if (providerCandidate) {
                 const { completion, from, to } = providerCandidate;
-                if (typeof completion.apply === "function") {
-                  completion.apply(view, completion, from, to);
-                } else if (typeof completion.apply === "string") {
+                const applyCompletion = completion.apply;
+                if (typeof applyCompletion === "function") {
+                  // Same Tab intent as the popup accept path above.
+                  withCompletionAcceptIntent(view, "replace", () =>
+                    applyCompletion(view, completion, from, to));
+                } else if (typeof applyCompletion === "string") {
                   view.dispatch({
-                    changes: { from, to, insert: completion.apply },
-                    selection: { anchor: from + completion.apply.length },
+                    changes: { from, to, insert: applyCompletion },
+                    selection: { anchor: from + applyCompletion.length },
                     userEvent: "input.complete",
                   });
                 } else {
@@ -3265,6 +3320,28 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             },
           },
         ])),
+        // ED-PARITY-005 DEC-06: while an acceptance waits on resolve (or a
+        // resolve gate is open) Escape terminates that session — zero commit,
+        // no revival. A function-apply leaves CodeMirror's completion state
+        // open, so the popup's own Escape binding would otherwise swallow the
+        // key; this runs before the keymaps and declines when nothing of this
+        // kind is waiting, so a visible list still closes normally first.
+        Prec.highest(EditorView.domEventHandlers({
+          keydown(event, view) {
+            if (event.key !== "Escape" || event.isComposing || view.composing) return false;
+            if (!hasPendingCompletionAcceptance(view) && !resolveGateOpenRef.current) {
+              return false;
+            }
+            const cancelled = dismissResolveGateRef.current?.() ?? false;
+            if (cancelled) {
+              // A function-apply leaves CodeMirror's completion state open;
+              // cancelling the acceptance must close its list instead of
+              // leaving a stale popup behind (DEC-06 zero-revival).
+              closeCompletion(view);
+            }
+            return cancelled;
+          },
+        })),
         keymap.of([
           // §8.19.2 retained primitives: with a host, ONLY the allowlisted
           // set remains here (Escape panel-close stack, closeBrackets typing,
@@ -3711,7 +3788,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           return true;
         },
         escapeStack: () =>
-          cancelLspSnippetSession(view)
+          // A waiting completion acceptance / open resolve gate owns Escape
+          // first: it must not leave a half-accepted import behind (DEC-06).
+          (dismissResolveGateRef.current?.() ?? false)
+          || cancelLspSnippetSession(view)
           || escapeEditorSelections(view)
           || (onParameterEscapeRef.current?.() ?? false),
         isEditorGeometryReady: () => isEditorGeometryReady(view),
@@ -3809,6 +3889,13 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       view.contentDOM.removeEventListener("compositionend", compositionEndGuard, true);
       view.contentDOM.removeEventListener("blur", compositionBlurGuard, true);
       view.contentDOM.removeEventListener("focusout", clipboardFocusOutGuard, true);
+      // A response that arrives after this view closed must not dispatch into
+      // the detached document (ED-PARITY-005 DEC-06).
+      cancelPendingCompletionAcceptance(view, "unmount");
+      resolveGateOpenRef.current = false;
+      resolveGateSeqRef.current += 1;
+      presentResolveGateRef.current = null;
+      dismissResolveGateRef.current = null;
       view.destroy();
       viewRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
@@ -4359,14 +4446,27 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             disabled={resolveGateUi.retrying}
             className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
-              setResolveGateUi((gate) => gate ? { ...gate, retrying: true, failed: false } : gate);
+              const gateSeq = resolveGateUi.seq;
+              setResolveGateUi((gate) => (
+                gate && gate.seq === gateSeq ? { ...gate, retrying: true, failed: false } : gate
+              ));
               void resolveGateUi.retry().then((outcome) => {
                 if (outcome === "committed") {
-                  setResolveGateUi(null);
+                  // Only this gate may close itself; a newer gate stays.
+                  setResolveGateUi((gate) => {
+                    if (!gate || gate.seq !== gateSeq) return gate;
+                    resolveGateOpenRef.current = false;
+                    return null;
+                  });
+                  if (resolveGateSeqRef.current === gateSeq) {
+                    viewRef.current?.focus();
+                  }
                   return;
                 }
                 // Retry also failed: keep the item visible with its choices.
-                setResolveGateUi((gate) => gate ? { ...gate, retrying: false, failed: true } : gate);
+                setResolveGateUi((gate) => (
+                  gate && gate.seq === gateSeq ? { ...gate, retrying: false, failed: true } : gate
+                ));
               });
             }}
           >
@@ -4379,7 +4479,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             className="shrink-0 rounded border border-[var(--taomni-border,#3a3f4b)] px-1.5 py-0.5 hover:bg-[var(--taomni-hover,#2a2e36)] disabled:opacity-50"
             onClick={() => {
               const inserted = resolveGateUi.insertWithoutImport();
-              if (inserted) setResolveGateUi(null);
+              if (inserted) {
+                resolveGateOpenRef.current = false;
+                setResolveGateUi(null);
+                viewRef.current?.focus();
+              }
             }}
           >
             Insert without import

@@ -207,3 +207,25 @@ P1 不执行本节命令。P2先落实V1–V6及fixture/controlled-provider/obse
 P2维护 `qa-ui-auto-tests/feature-list.md`、covers/controls，controls变化时重生成testid目录，case批次后 `audit --gate`；检查summary/receipt和selected/pass/fail/skip。回填本节AC→V→实际文件/ID→断言/报告/平台；保留失败chronology。所有原件放忽略目录，入库只交摘要与身份。
 
 **P1门槛结论（2026-09-25）**：G1版本与G2必要参照、snippet差异决定已完成；DEC-08/09、V2/V5/V6期望和设施责任已落盘。同卡author为ready/planning_required=false，无开发owner。完整[可复制P2提示词](handoff-p2-ed-parity-005.md)使用固定板/ID；所有产品验证仍未执行。D1/D2有真实剩余实现工作，P1不是产品done或双侧matched。其他平台验证及原生provider能力缺口不得借ready状态免除。
+
+<a id="p2-execution-backfill"></a>
+
+## 8. P2 执行回填（2026-09-26，Linux 当前端）
+
+交付身份：分支 `docs/code-workspace-idea-audit-20260913`，HEAD `25921fd774dfaa7e5832bdaec00caa187f7f4a0e`，QA source identity `d539b2e2…`；native QA binary `com.taomni.app.qa` debug sha256 `ddee1033…`。原件均在未入库的 `qa-ui-auto-report/`（browser `run-20260926-170621-839257794`、native `run-20260926-170346-832709851`，fixture manifest 在各自 case 目录）。
+
+| AC / V | 设计目标 | 实际 test / case | 模式与平台 | 结果 | 证据 / 断言 |
+|---|---|---|---|---|---|
+| A1/A3 V1 | 两个绑定、Action 与速查入口同一动作，重复调用不二次提交，Esc 零编辑，输入框保护 | `TC-IDE-PARITY-005-01-completion-entries.testcase.yaml`（76 步） | browser / Linux | passed | 候选来自受控 provider；`requests===1/2`；`.cm-line` 全文逐字节不变；Find 输入占位时 `requests===5` 不增长 |
+| A1/A2/A3 V2 | Enter/Tab/鼠标接受、词中 intent、plain range 扩词、字符串/矛盾 range 拒绝、snippet 纯导航、一次 Undo | `TC-IDE-PARITY-005-02-completion-accept-undo.testcase.yaml`（192 步） | browser / Linux | passed | B2/Tmid/N0 逐字节 postimage + 一次 Undo/Redo；M0 Enter→StringUtilsSuffix、Tab→StringUtils；字符串字面量保留后缀；矛盾双 range 零写入并给状态原因；空占位 Tab 退出 |
+| A1/A3 V3 | 未就绪原因、fetch/accept 取消、迟到隔离、零候选不造假、跨文件隔离 | `TC-IDE-PARITY-005-03-completion-lifecycle.testcase.yaml`（112 步） | browser / Linux | passed | scope-facts-missing 原因一次；Esc 后 3.5s 无 commit/popup/gate；零候选时 popup 无 provider 项；切文件后旧响应不携带旧候选 |
+| A1/A3 V4 | D1 fail-closed gate、Retry/primary-only/Dismiss、失败原因、等待禁用、重叠整笔拒绝 | `TC-IDE-PARITY-005-04-completion-resolve-gate.testcase.yaml`（133 步） | browser / Linux | passed | null/error/timeout 四轮零写入；failed-note；Retry 在飞行中 disabled；primary-only 只写正文；Dismiss/Esc 零提交；overlap 全拒绝 |
+| A1/A3 V5 | 真实 JDT LS 类型 import 与方法 snippet、磁盘字节、保存后补全 | `TC-IDE-PARITY-005-05-java-completion-native.testcase.yaml`（121 步） | native / Linux WebKitGTK | passed | 真实 lang3 StringUtils 候选 + resolve import；Save 后 host 字节含 import；Undo+Save 回 pristine `d1a95976…`；append 接受一次、Tab 无正文变化、一次 Undo；保存后 live buffer 仍可补全 |
+| A1 V5/provider | provider/Rust/磁盘边界 | 同上 native run + `cargo test --lib completion_`（3 passed） | native / Linux | passed | JDT LS `org.eclipse.jdt.ls.core_1.61.0.202607102111`、Zulu 25.0.2；Rust typed resolve 边界由 inline test 与真实报文共同覆盖 |
+| A2 V6 | 与 IDEA 同 fixture 三维比较 | 记录对照 `references/ed-parity-005-reference.md#observed/#followup-observed`（REF-PARITY-005-WIN-20260925，IU-262.10968.63） | 记录对照 | passed（行为级） | 相同 prefix/候选身份/一次 Undo/Tmid Enter-Tab-mouse 一致；provider snippet 默认值与 IDEA append() 差异为用户已接受；未做像素与真机复采，claim 上限为记录状态的行为级一致 |
+
+单测：`lspCompletion.test.ts`（`ED-PARITY-005 preserves insert replace intent through resolve and undo`）、`CodeMirrorHost.parity005.test.tsx`（Enter/Tab/mouse intent、facts 变代失效、Esc 取消不复活、旧 gate 不改新 gate）、`lsp.completionResolve.test.ts`（typed wire 映射）、Rust inline `completion_item_preserves_insert_replace_ranges` 与 `completion_resolve_does_not_fallback_on_null_or_error`；联合 8 文件 131/131。scoped typecheck 10 路径 0 错误。`audit --gate` 与 `contracts --gate` 通过（270/270 reviewed）。
+
+有意变更（DEC-03/04/06 授权）：resolve 失败/空/超时一律 fail-closed，且 capability 同时合并动态 `textDocument/completion` 注册的 `resolveProvider`（真实 jdtls 依赖此路径）；project facts generation 进入接受身份；Esc 取消等待中的接受并关闭候选列表；gate 打开时关闭候选列表并在关闭后把焦点还给编辑器。
+
+未验证 / 缺口：Windows/WebView2 与 macOS/WKWebView 的 native 序列未执行；本轮未做真机 IDEA 复采（用户明确不要求）与像素比较；性能/可访问性层不在本卡验收内。已确认与本卡无关的既有失败：`CodeMirrorHost.completion-undo.test.tsx` 的 `reverts a snippet overload accept through the workspace undo action`（stash 回 claim HEAD 后 3/3 同样失败，属测试自身 interactionDelay 竞态）。

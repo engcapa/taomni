@@ -1,0 +1,866 @@
+id: TC-IDE-PARITY-005-02
+title: Java Basic Completion accept, range intent, snippet and one undo
+description: 'ED-PARITY-005 V2 (A1/A2/A3), browser with the controlled parity provider.
+
+  Enter, Tab and mouse accept the controlled provider item with the frozen range
+
+  intent (insert vs replace), the import lands in the same single dispatch, one
+
+  undo restores the exact preimage and Redo/Undo keep working. The mid-word M0
+
+  fixture separates Enter (keeps the suffix) from Tab (replaces it); a plain
+
+  provider range widens only for the safe Java case; a string literal and a
+
+  contradictory dual range never guess a range. Snippet fields navigate with no
+
+  document edit and the acceptance is still exactly one undo step.
+
+  Boundary: mocked IPC provider — renderer transaction semantics, not real
+
+  JDT LS candidates or host bytes.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- completion
+- ed-parity-005
+- browser-gate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- wait_for: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="/preview/parity005"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="/preview/parity005"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Main.java"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Main.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- assert_text:
+    selector: .cm-tooltip-autocomplete li[aria-selected="true"]
+    contains: StringBuilder
+    timeout_sec: 10
+- hover: .cm-tooltip-autocomplete li[aria-selected="true"]
+- wait_for: '[data-testid="code-workspace-editor"] .cm-completionInfo, .cm-tooltip.cm-completionInfo'
+- assert_visible: .cm-tooltip-autocomplete li[aria-selected="true"]
+- press: Enter
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder("x", 1);'
+    - '    }'
+    - '}'
+    - ''
+- eval_readonly:
+    expression: window.__taomniQaCompletion.requests === 1
+    expect_truthy: true
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Shift+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder("x", 1);'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- assert_text:
+    selector: .cm-tooltip-autocomplete li[aria-selected="true"]
+    contains: StringBuilder
+    timeout_sec: 10
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder("x", 1);'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- assert_text:
+    selector: .cm-tooltip-autocomplete li[aria-selected="true"]
+    contains: StringBuilder
+    timeout_sec: 10
+- click: .cm-tooltip-autocomplete li[aria-selected="true"]
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder("x", 1);'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Enter
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder("x", 1);'
+    - '    }'
+    - '}'
+    - ''
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder("x", 1);'
+    - '    }'
+    - '}'
+    - ''
+- press: Shift+Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder("x", 1);'
+    - '    }'
+    - '}'
+    - ''
+- press: Tab
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder("x", 1);'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- screenshot: tc-ide-parity-005-02-b005-accept.png
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="MidWord.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtiSuffix;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- assert_text:
+    selector: .cm-tooltip-autocomplete li[aria-selected="true"]
+    contains: StringUtils
+    timeout_sec: 10
+- press: Enter
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import org.apache.commons.lang3.StringUtils;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtilsSuffix;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtiSuffix;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import org.apache.commons.lang3.StringUtils;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtils;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtiSuffix;'
+    - '    }'
+    - '}'
+    - ''
+- screenshot: tc-ide-parity-005-02-mid-word.png
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="PlainRange.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import org.apache.commons.lang3.StringUtils;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtils;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtiSuffix;'
+    - '    }'
+    - '}'
+    - ''
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="StringLit.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    String s = "StringUtiSuffix";'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    String s = "StringUtilsSuffix";'
+    - '}'
+    - ''
+- press: Control+z
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="BadRange.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Tab
+- wait: 0.6
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringUtiSuffix;'
+    - '    }'
+    - '}'
+    - ''
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Completion rejected invalid provider edits
+    timeout_sec: 10
+- screenshot: tc-ide-parity-005-02-bad-range.png
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="EmptySnippet.java"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: ArrowLeft
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Space
+- wait_for: .cm-tooltip-autocomplete
+- wait: 0.4
+- press: Enter
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder();'
+    - '    }'
+    - '}'
+    - ''
+- press: Tab
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - import java.lang.StringBuilder;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        StringBuilder();'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - package parity005;
+    - ''
+    - public class Main {
+    - '    void sample() {'
+    - '        Stri;'
+    - '    }'
+    - '}'
+    - ''
+- screenshot: tc-ide-parity-005-02-empty-snippet.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 在隔离 Java 工程中分别用 Enter、Tab、鼠标接受受控 provider 候选：import 与正文单次原子提交、dirty 变化、一次 Undo 精确恢复 preimage
+      且 Redo/Undo 可重复；词中 M0 场景 Enter 保留后缀、Tab 替换 identifier；plain range 仅在安全 Java 场景为 Tab 扩词尾；字符串字面量与矛盾双
+      range 一律不猜范围（后者整笔拒绝并给出原因）；snippet 纯导航不改正文且接受仍是一次 Undo。
+    actions:
+    - 1
+    - 3
+    - 5
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 22
+    - 24
+    - 27
+    - 31
+    - 33
+    - 35
+    - 37
+    - 39
+    - 41
+    - 43
+    - 45
+    - 47
+    - 49
+    - 51
+    - 53
+    - 55
+    - 56
+    - 58
+    - 60
+    - 62
+    - 63
+    - 65
+    - 68
+    - 70
+    - 71
+    - 72
+    - 73
+    - 74
+    - 75
+    - 76
+    - 77
+    - 78
+    - 79
+    - 80
+    - 81
+    - 82
+    - 83
+    - 85
+    - 87
+    - 89
+    - 91
+    - 93
+    - 95
+    - 96
+    - 98
+    - 101
+    - 103
+    - 104
+    - 105
+    - 106
+    - 107
+    - 108
+    - 109
+    - 110
+    - 111
+    - 112
+    - 113
+    - 114
+    - 115
+    - 116
+    - 117
+    - 119
+    - 120
+    - 122
+    - 124
+    - 126
+    - 127
+    - 128
+    - 129
+    - 130
+    - 131
+    - 132
+    - 133
+    - 134
+    - 135
+    - 136
+    - 137
+    - 138
+    - 139
+    - 140
+    - 142
+    - 144
+    - 145
+    - 147
+    - 148
+    - 150
+    - 151
+    - 152
+    - 153
+    - 154
+    - 155
+    - 156
+    - 157
+    - 158
+    - 159
+    - 160
+    - 161
+    - 162
+    - 163
+    - 164
+    - 166
+    - 167
+    - 168
+    - 172
+    - 174
+    - 175
+    - 176
+    - 177
+    - 178
+    - 179
+    - 180
+    - 181
+    - 183
+    - 185
+    - 186
+    - 188
+    - 190
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"welcome-recent-workspace-row\"][data-workspace-path=\"/preview/parity005\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"Main.java\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 19
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 21
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete li[aria-selected=\"true\"]",
+        "contains": "StringBuilder", "timeout_sec": 10}}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-completionInfo, .cm-tooltip.cm-completionInfo"}'
+    - step: 26
+      expectation: '{"assert_visible": ".cm-tooltip-autocomplete li[aria-selected=\"true\"]"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 29
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "window.__taomniQaCompletion.requests === 1", "expect_truthy":
+        true}}'
+    - step: 32
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 34
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 36
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 38
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 40
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete li[aria-selected=\"true\"]",
+        "contains": "StringBuilder", "timeout_sec": 10}}'
+    - step: 42
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 44
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 46
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 48
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete li[aria-selected=\"true\"]",
+        "contains": "StringBuilder", "timeout_sec": 10}}'
+    - step: 50
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 52
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 54
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 57
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 59
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 61
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 64
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder(\"x\", 1);", "    }", "}", ""]}}'
+    - step: 66
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 69
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 84
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        StringUtiSuffix;", "    }", "}", ""]}}'
+    - step: 86
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 88
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete li[aria-selected=\"true\"]",
+        "contains": "StringUtils", "timeout_sec": 10}}'
+    - step: 90
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import org.apache.commons.lang3.StringUtils;", "",
+        "public class Main {", "    void sample() {", "        StringUtilsSuffix;", "    }", "}", ""]}}'
+    - step: 92
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        StringUtiSuffix;", "    }", "}", ""]}}'
+    - step: 94
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 97
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import org.apache.commons.lang3.StringUtils;", "",
+        "public class Main {", "    void sample() {", "        StringUtils;", "    }", "}", ""]}}'
+    - step: 99
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        StringUtiSuffix;", "    }", "}", ""]}}'
+    - step: 102
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 118
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 121
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import org.apache.commons.lang3.StringUtils;", "",
+        "public class Main {", "    void sample() {", "        StringUtils;", "    }", "}", ""]}}'
+    - step: 123
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        StringUtiSuffix;", "    }", "}", ""]}}'
+    - step: 125
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 141
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    String s = \"StringUtiSuffix\";",
+        "}", ""]}}'
+    - step: 143
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 146
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    String s = \"StringUtilsSuffix\";",
+        "}", ""]}}'
+    - step: 149
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 165
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 169
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        StringUtiSuffix;", "    }", "}", ""]}}'
+    - step: 170
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Completion
+        rejected invalid provider edits", "timeout_sec": 10}}'
+    - step: 173
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 182
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    - step: 184
+      expectation: '{"wait_for": ".cm-tooltip-autocomplete"}'
+    - step: 187
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder();", "    }", "}", ""]}}'
+    - step: 189
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "import java.lang.StringBuilder;", "", "public class
+        Main {", "    void sample() {", "        StringBuilder();", "    }", "}", ""]}}'
+    - step: 191
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content
+        .cm-line", "equals": ["package parity005;", "", "public class Main {", "    void sample() {",
+        "        Stri;", "    }", "}", ""]}}'
+    results:
+    - 184
+    - 187
+    - 189
+    - 191
+  visual:
+  - check: 检查截图中的候选列表/文档/状态反馈无遮挡与溢出；截图本身不是视觉通过。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图人工评审。
+  native:
+  - check: 本用例只在 browser 模式运行；真实 JDT LS/Rust/磁盘字节由 TC-IDE-PARITY-005-05 native 覆盖，browser 结果不外推。
+    method: external
+    reason: 明确记录执行边界与未验证平台（Windows/macOS 未验证）。

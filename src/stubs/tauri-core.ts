@@ -1078,6 +1078,264 @@ function stubLspDocumentStatus(args?: InvokeArgs) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// ED-PARITY-005 QA completion fixture (dev-server preview only).
+//
+// The isolated QA fixture installs `window.__taomniQaCompletion` before the app
+// boots so browser cases can drive the real workspace tab, completion source,
+// accept transaction and resolve gate against a controlled provider. It never
+// exists in a packaged build (this file is only aliased by the Vite dev server)
+// and it never fabricates Java semantics: the config declares every item byte.
+// ---------------------------------------------------------------------------
+interface QaCompletionItemConfig {
+  label: string;
+  kind?: number | null;
+  detail?: string | null;
+  documentation?: string | null;
+  insertText?: string | null;
+  insertTextFormat?: number | null;
+  filterText?: string | null;
+  sortText?: string | null;
+  textEdit?: unknown;
+  insertReplaceEdit?: unknown;
+  additionalTextEdits?: unknown[];
+  raw?: unknown;
+}
+
+interface QaResolveStep {
+  /** ok | null | error | timeout | hold */
+  mode: string;
+  /** Milliseconds a `hold` waits before releasing (and resolves as `ok`). */
+  delayMs?: number;
+  item?: QaCompletionItemConfig;
+}
+
+interface QaCompletionFileConfig {
+  path: string;
+  text: string;
+  /** Items returned for this file's next textDocument/completion call. */
+  items?: QaCompletionItemConfig[];
+  /** Milliseconds the provider takes before answering a completion request. */
+  fetchDelayMs?: number;
+  /** Resolve behaviour queue for this file; the last entry repeats. */
+  resolveQueue?: QaResolveStep[];
+  /** Read-only observation counters for QA assertions. */
+  requests?: number;
+  resolves?: number;
+}
+
+interface QaCompletionConfig {
+  enabled?: boolean;
+  /** Read-only record of the paths the session probe asked about. */
+  statusProbes?: string[];
+  /** Workspace root served by the in-memory overlay, e.g. "/preview/parity005". */
+  workspaceRoot?: string;
+  files?: QaCompletionFileConfig[];
+  /** Last file selected by a completion request (observation only). */
+  activeFile?: string | null;
+  /** Total request/resolve counters (observation only). */
+  requests?: number;
+  resolves?: number;
+  releaseHolds?: number;
+}
+
+function qaCompletionConfig(): QaCompletionConfig | null {
+  try {
+    const raw = (globalThis as { __taomniQaCompletion?: QaCompletionConfig }).__taomniQaCompletion;
+    return raw && raw.enabled ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function qaCompletionFile(args?: InvokeArgs): QaCompletionFileConfig | null {
+  const qa = qaCompletionConfig();
+  if (!qa) return null;
+  const filePath = String((args as { filePath?: string } | undefined)?.filePath ?? "");
+  if (!filePath) return null;
+  return (qa.files ?? []).find((file) => (
+    filePath === file.path
+    || filePath.endsWith(file.path)
+    || file.path.endsWith(`/${filePath}`)
+    // The session probe may pass the root-relative path; fixture basenames
+    // are unique inside the QA workspace.
+    || file.path.split("/").pop() === filePath.split("/").pop()
+  )) ?? null;
+}
+
+/** ED-PARITY-005 QA overlay first, browser-preview status otherwise. */
+function stubOrQaDocumentStatus(args?: InvokeArgs) {
+  return qaCompletionStatus(args) ?? stubLspDocumentStatus(args);
+}
+
+function qaCompletionStatus(args?: InvokeArgs) {
+  const qa = qaCompletionConfig();
+  const probed = String((args as { filePath?: string } | undefined)?.filePath ?? "");
+  if (qa) {
+    qa.statusProbes = qa.statusProbes ?? [];
+    if (probed && !qa.statusProbes.includes(probed)) qa.statusProbes.push(probed);
+  }
+  const file = qaCompletionFile(args);
+  if (!file) return null;
+  const filePath = String((args as { filePath?: string } | undefined)?.filePath ?? file.path);
+  return {
+    path: filePath,
+    uri: `file://${filePath}`,
+    presetId: "java",
+    languageId: "java",
+    displayName: "Java (controlled parity provider)",
+    available: true,
+    active: true,
+    semanticReady: true,
+    selectedCommandId: "jdtls",
+    selectedCommand: "jdtls (controlled QA fixture)",
+    installHint: null,
+    error: null,
+    capabilities: {
+      textDocumentSyncKind: 1,
+      completion: true,
+      completionResolve: true,
+      signatureHelp: false,
+      hover: false,
+      definition: false,
+      declaration: false,
+      typeDefinition: false,
+      implementation: false,
+      references: false,
+      documentSymbol: false,
+      workspaceSymbol: false,
+      rename: false,
+      formatting: false,
+      rangeFormatting: false,
+      codeAction: false,
+      documentHighlight: false,
+      callHierarchy: false,
+      typeHierarchy: false,
+      inlayHint: false,
+      selectionRange: false,
+      semanticTokens: false,
+      codeActionKinds: [],
+      completionTriggerCharacters: ["."],
+      signatureTriggerCharacters: [],
+    },
+  };
+}
+
+/** Wraps a config item into the wire shape the completion parser expects. */
+function qaCompletionWireItem(item: QaCompletionItemConfig) {
+  return {
+    label: item.label,
+    kind: item.kind ?? 7,
+    detail: item.detail ?? null,
+    documentation: item.documentation ?? null,
+    insertText: item.insertText ?? null,
+    insertTextFormat: item.insertTextFormat ?? 1,
+    filterText: item.filterText ?? null,
+    sortText: item.sortText ?? null,
+    ...(item.textEdit !== undefined ? { textEdit: item.textEdit } : {}),
+    ...(item.insertReplaceEdit !== undefined
+      ? { insertReplaceEdit: item.insertReplaceEdit }
+      : {}),
+    ...(item.additionalTextEdits !== undefined
+      ? { additionalTextEdits: item.additionalTextEdits }
+      : {}),
+    ...(item.raw !== undefined ? item.raw : {}),
+  };
+}
+
+/** One file of the QA workspace overlay, or null when outside the root. */
+function qaWorkspaceFile(qa: QaCompletionConfig, absPath: string) {
+  const root = (qa.workspaceRoot ?? "").replace(/\/+$/, "");
+  if (!root || !absPath.startsWith(`${root}/`)) return null;
+  return (qa.files ?? []).find((file) => absPath === `${root}/${file.path}`) ?? null;
+}
+
+function qaWorkspaceEntries(qa: QaCompletionConfig, dirPath: string) {
+  const root = (qa.workspaceRoot ?? "").replace(/\/+$/, "");
+  const prefix = dirPath === root ? "" : `${dirPath.slice(root.length + 1)}/`;
+  const seen = new Map<string, {
+    name: string; path: string; fileType: "dir" | "file";
+    size: number; mtime: number; isHidden: boolean;
+  }>();
+  for (const file of qa.files ?? []) {
+    if (prefix && !file.path.startsWith(prefix)) continue;
+    if (!prefix && !file.path) continue;
+    const rest = file.path.slice(prefix.length);
+    const slash = rest.indexOf("/");
+    if (slash === -1) {
+      seen.set(rest, {
+        name: rest,
+        path: `${prefix}${rest}`,
+        fileType: "file",
+        size: new TextEncoder().encode(file.text).length,
+        mtime: 1756100000000,
+        isHidden: false,
+      });
+    } else {
+      const dir = rest.slice(0, slash);
+      seen.set(dir, {
+        name: dir,
+        path: `${prefix}${dir}`,
+        fileType: "dir",
+        size: 0,
+        mtime: 1756100000000,
+        isHidden: false,
+      });
+    }
+  }
+  return [...seen.values()];
+}
+
+function qaResolvePayload(file: QaCompletionFileConfig, step: QaResolveStep): unknown {
+  if (step.mode === "null") return null;
+  const item = step.item ?? (file.items ?? [])[0];
+  return item
+    ? { kind: "resolved", item: qaCompletionWireItem({ ...item }) }
+    : { kind: "unavailable", reason: "provider-returned-null" };
+}
+
+/** Defers a held resolve until its fixture delay elapses. */
+function qaHoldResolve(
+  qa: QaCompletionConfig,
+  file: QaCompletionFileConfig,
+  step: QaResolveStep,
+): Promise<unknown> {
+  const delay = Number.isFinite(step.delayMs) ? Number(step.delayMs) : 0;
+  return new Promise((resolve) => {
+    globalThis.setTimeout(() => {
+      qa.releaseHolds = (qa.releaseHolds ?? 0) + 1;
+      resolve(qaResolvePayload(file, { ...step, mode: step.item ? "ok" : step.mode }));
+    }, Math.max(0, delay));
+  });
+}
+
+function qaCompletionResolve(
+  qa: QaCompletionConfig,
+  file: QaCompletionFileConfig,
+): Promise<unknown> {
+  const queue = file.resolveQueue ?? [];
+  // `resolves` counts calls including the current one: the first call uses
+  // queue entry 0.
+  const index = Math.min(Math.max(0, (file.resolves ?? 1) - 1), Math.max(0, queue.length - 1));
+  const step = queue[index] ?? { mode: "unavailable" };
+  if (step.mode === "hold") return qaHoldResolve(qa, file, step);
+  if (step.mode === "null") return Promise.resolve(null);
+  if (step.mode === "error") {
+    return Promise.reject(new Error("controlled parity provider resolve error"));
+  }
+  if (step.mode === "timeout") {
+    // Longer than the renderer's local resolve watchdog, so the timeout path
+    // is the one under test.
+    return new Promise((resolve) => {
+      globalThis.setTimeout(
+        () => resolve(qaResolvePayload(file, { mode: "ok", item: step.item })),
+        8000,
+      );
+    });
+  }
+  return Promise.resolve(qaResolvePayload(file, step));
+}
+
 function stubLspServerStatuses() {
   return STUB_LSP_PRESETS.map((preset) => ({
     presetId: preset.id,
@@ -2261,6 +2519,22 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return false as T;
     }
     case "lsp_detect_servers": {
+      const qa = qaCompletionConfig();
+      if (qa) {
+        return [{
+          presetId: "java",
+          displayName: "Java (controlled parity provider)",
+          documentLanguageIds: ["java"],
+          available: true,
+          active: true,
+          selectedCommandId: "jdtls",
+          selectedCommand: "jdtls (controlled QA fixture)",
+          installHint: "",
+          error: null,
+          runtimeStatus: "controlled parity provider",
+          commands: [],
+        }] as T;
+      }
       return stubLspServerStatuses() as T;
     }
     case "lsp_document_status":
@@ -2268,7 +2542,46 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_change_document":
     case "lsp_save_document":
     case "lsp_close_document": {
-      return stubLspDocumentStatus(args as InvokeArgs) as T;
+      const qaStatus = qaCompletionStatus(args as InvokeArgs);
+      if (qaStatus) return qaStatus as T;
+      return stubOrQaDocumentStatus(args as InvokeArgs) as T;
+    }
+    case "lsp_completion": {
+      const qa = qaCompletionConfig();
+      const qaFile = qa ? qaCompletionFile(args as InvokeArgs) : null;
+      if (!qa || !qaFile) {
+        return {
+          status: stubOrQaDocumentStatus(args as InvokeArgs),
+          isIncomplete: false,
+          items: [],
+          truncated: false,
+        } as T;
+      }
+      qa.requests = (qa.requests ?? 0) + 1;
+      qaFile.requests = (qaFile.requests ?? 0) + 1;
+      qa.activeFile = qaFile.path;
+      const payload = {
+        status: qaCompletionStatus(args as InvokeArgs),
+        isIncomplete: false,
+        items: (qaFile.items ?? []).map(qaCompletionWireItem),
+        truncated: false,
+      };
+      const delay = Math.max(0, Number(qaFile.fetchDelayMs ?? 0));
+      if (delay > 0) {
+        // Pending-fetch observation window for the lifecycle case.
+        return new Promise<T>((resolve) => {
+          globalThis.setTimeout(() => resolve(payload as T), delay);
+        });
+      }
+      return payload as T;
+    }
+    case "lsp_completion_resolve": {
+      const qa = qaCompletionConfig();
+      const qaFile = qa ? qaCompletionFile(args as InvokeArgs) : null;
+      if (!qa || !qaFile) return { kind: "unavailable", reason: "no-active-session" } as T;
+      qa.resolves = (qa.resolves ?? 0) + 1;
+      qaFile.resolves = (qaFile.resolves ?? 0) + 1;
+      return qaCompletionResolve(qa, qaFile) as Promise<T>;
     }
     case "lsp_stop_workspace": {
       return 0 as T;
@@ -2279,13 +2592,13 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "lsp_get_diagnostics": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         diagnostics: [],
       } as T;
     }
     case "lsp_hover": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         contents: null,
         range: null,
       } as T;
@@ -2294,7 +2607,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       // Browser preview has no language server; the empty-signature shape
       // mirrors the native unavailable result (§8.20.2 W1).
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         signatures: [],
         activeSignature: 0,
         activeParameter: 0,
@@ -2304,7 +2617,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       // §8.20.3 W2: lifecycle-only facts in browser mode — no provider, so
       // phase derivation degrades honestly instead of pretending readiness.
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         active: false,
         processId: null,
         serverName: null,
@@ -2323,13 +2636,13 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_implementation":
     case "lsp_references": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         locations: [],
       } as T;
     }
     case "lsp_workspace_symbols": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         symbols: [],
         sessionCount: 0,
         providerCount: 0,
@@ -2349,7 +2662,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const decompiled = uri.includes(".class");
       const banner = "// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).\n";
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         uri,
         path: null,
         title: title.endsWith(".class") ? title.replace(/\.class$/, ".java") : title,
@@ -2375,44 +2688,44 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_type_hierarchy_supertypes":
     case "lsp_type_hierarchy_subtypes": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         items: [],
       } as T;
     }
     case "lsp_call_hierarchy_incoming":
     case "lsp_call_hierarchy_outgoing": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         entries: [],
       } as T;
     }
     case "lsp_document_highlights": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         highlights: [],
       } as T;
     }
     case "lsp_inlay_hints": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         hints: [],
       } as T;
     }
     case "lsp_selection_ranges": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         ranges: [],
       } as T;
     }
     case "lsp_code_action_resolve": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         action: null,
       } as T;
     }
     case "lsp_semantic_tokens": {
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status: stubOrQaDocumentStatus(args as InvokeArgs),
         tokens: [],
       } as T;
     }
@@ -2462,6 +2775,11 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
       const path = (args?.path as string) || "";
       const target = joinWorkspacePath(repoRoot, path);
+      // ED-PARITY-005 QA overlay: a fixture root is served from the config.
+      const qa = qaCompletionConfig();
+      if (qa && (target === qa.workspaceRoot || target.startsWith(qa.workspaceRoot + "/"))) {
+        return qaWorkspaceEntries(qa, target) as T;
+      }
       const entries = await vfsList(target);
       return entries.map((entry) => ({
         name: entry.name,
@@ -2480,6 +2798,14 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const maxDepth = (args?.maxDepth as number | null) ?? 16;
       let current = joinWorkspacePath(repoRoot, path);
       let currentRel = path;
+      // ED-PARITY-005 QA overlay: the fixture root replaces the real VFS.
+      {
+        const qa = qaCompletionConfig();
+        if (qa && (current === qa.workspaceRoot || current.startsWith(qa.workspaceRoot + "/"))) {
+          const overlay = qaWorkspaceEntries(qa, current);
+          return { path: currentRel, entries: overlay } as T;
+        }
+      }
       for (let depth = 0; depth < maxDepth; depth++) {
         const entries = await vfsList(current);
         const mapped = entries.map((entry) => ({
@@ -2553,6 +2879,21 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
       const path = args?.path as string;
       const target = joinWorkspacePath(repoRoot, path);
+      {
+        const qa = qaCompletionConfig();
+        const qaFile = qa ? qaWorkspaceFile(qa, target) : null;
+        if (qa && qaFile) {
+          return {
+            path: qaFile.path,
+            text: qaFile.text,
+            encoding: "UTF-8",
+            bom: false,
+            size: new TextEncoder().encode(qaFile.text).length,
+            mtime: 1756100000000,
+            hash: await sha256Hex(qaFile.text),
+          } as T;
+        }
+      }
       const [entry, text] = await Promise.all([vfsStat(target), vfsReadText(target)]);
       const bom = text.startsWith("\uFEFF");
       return {
@@ -2618,6 +2959,25 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const path = args?.path as string;
       assertWorkspaceWritablePath(path);
       const target = joinWorkspacePath(repoRoot, path);
+      // ED-PARITY-005 QA overlay: saves land in the fixture config so the case
+      // can observe buffer/disk identity without touching IndexedDB.
+      {
+        const qa = qaCompletionConfig();
+        const qaFile = qa ? qaWorkspaceFile(qa, target) : null;
+        if (qa && qaFile) {
+          const contents = (args?.contents as string) ?? "";
+          qaFile.text = contents;
+          return {
+            path: qaFile.path,
+            text: contents.startsWith("﻿") ? contents.slice(1) : contents,
+            encoding: "UTF-8",
+            bom: contents.startsWith("﻿"),
+            size: new TextEncoder().encode(contents).length,
+            mtime: 1756100000000,
+            hash: await sha256Hex(contents),
+          } as T;
+        }
+      }
       const expectedHash = (args?.expectedHash as string | null | undefined)?.trim();
       if (expectedHash) {
         const current = await vfsReadText(target);

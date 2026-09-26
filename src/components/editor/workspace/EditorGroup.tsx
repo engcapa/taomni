@@ -31,7 +31,6 @@ import type {
   LspSemanticToken,
 } from "../../../lib/editor/lsp";
 import type {
-  LspCompletionItem,
   LspCompletionResult,
 } from "../../../lib/editor/lsp";
 import type { ParameterPopupView } from "./referenceInfoSession";
@@ -55,6 +54,7 @@ import {
   type CompletionAcceptanceDiagnostic,
   type CompletionRequestIdentity,
   type CompletionRequestToken,
+  type CompletionResolveProviderReply,
 } from "./lspCompletion";
 import type { CompletionScopeFactsState } from "./completionScopeAdapter";
 import type { QuickDocContent } from "./referenceDocumentation";
@@ -229,7 +229,7 @@ interface EditorGroupProps {
     file: OpenFileViewModel,
     raw: unknown,
     token: CompletionRequestToken,
-  ) => Promise<LspCompletionItem | null>;
+  ) => Promise<CompletionResolveProviderReply>;
   /** Live completion request identity per file (§8.16.2). */
   onCompletionIdentity: (file: OpenFileViewModel) => CompletionRequestIdentity | null;
   onCompletionDiagnostic: (

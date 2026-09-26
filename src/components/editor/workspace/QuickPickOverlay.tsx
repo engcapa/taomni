@@ -128,6 +128,7 @@ export function QuickPickOverlay<T>({
           <input
             ref={inputRef}
             type="search"
+            data-testid="quick-pick-input"
             value={query}
             placeholder={placeholder}
             aria-label={inputLabel}
@@ -150,6 +151,7 @@ export function QuickPickOverlay<T>({
             <button
               key={itemKey(item)}
               type="button"
+              data-testid="quick-pick-item"
               data-index={index}
               data-selected={index === selected || undefined}
               className="h-7 w-full min-w-0 flex items-center gap-2 px-3 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-selection-match-bg)]"

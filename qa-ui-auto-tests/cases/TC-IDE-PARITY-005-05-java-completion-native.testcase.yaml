@@ -1,0 +1,425 @@
+id: TC-IDE-PARITY-005-05
+title: Java Basic Completion against real JDT LS - type import, snippet and disk bytes
+description: 'ED-PARITY-005 V5 (A1/A3), native on the isolated QA build with the real
+
+  Eclipse JDT LS over the maven-single sample project. A physically inserted
+
+  app-level completion at Ln 30 Col 22 offers the org.apache.commons.lang3
+
+  StringUtils candidate, Enter commits identifier + import in one transaction,
+
+  an explicit Save puts the import into the host file (assert_file_contains),
+
+  and one Ctrl+Z + Save returns the file to its pristine hash. The append
+
+  overload round then verifies that a method-snippet acceptance is one undo and
+
+  that Tab navigation inserts no document change. Saving afterwards keeps
+
+  completion working on the live buffer.
+
+  Boundary: browser cannot prove real JDT LS candidates, the Rust
+
+  completionItem/resolve boundary or host bytes, which is why this case is
+
+  native. Linux/WebKitGTK is the verified current platform; Windows/WebView2 and
+
+  macOS/WKWebView keep the same sequence unverified.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- completion
+- ed-parity-005
+- native
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- java_sample_projects
+- jdtls_required
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-parity005","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: completionTargets
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-lsp-status-pill"]'
+    contains: Java
+    timeout_sec: 60
+- wait: 8.0
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: Ln 30, Col 22
+    timeout_sec: 10
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 60
+- wait: 2.0
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: StringUtils
+    timeout_sec: 20
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: org.apache.commons.lang3
+    timeout_sec: 20
+- screenshot: tc-ide-parity-005-05-type-popup.png
+- eval_readonly:
+    expression: document.querySelector('.cm-tooltip-autocomplete [aria-selected]').textContent
+    contains: StringUtils
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - ArrowDown
+- wait: 1.0
+- eval_readonly:
+    expression: document.querySelector('.cm-tooltip-autocomplete [aria-selected]').textContent
+    contains: org.apache.commons.lang3
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Enter
+- wait: 3.0
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUtils
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: import org.apache.commons.lang3.StringUtils;
+    timeout_sec: 20
+- screenshot: tc-ide-parity-005-05-type-accepted.png
+- press: Control+s
+- wait: 2.0
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    contains: import org.apache.commons.lang3.StringUtils;
+    timeout_sec: 20
+- press: Control+z
+- wait: 1.0
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: StringUti
+    timeout_sec: 20
+- press: Control+s
+- wait: 2.0
+- assert_file_sha256:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    equals: d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59
+    timeout_sec: 20
+- screenshot: tc-ide-parity-005-05-type-undo-save.png
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: End
+- press: Alt+/
+- wait_for:
+    selector: .cm-tooltip-autocomplete
+    timeout_sec: 60
+- wait: 2.0
+- assert_text:
+    selector: .cm-tooltip-autocomplete
+    contains: append
+    timeout_sec: 20
+- screenshot: tc-ide-parity-005-05-method-popup.png
+- eval_readonly:
+    expression: document.querySelector('.cm-tooltip-autocomplete [aria-selected]').textContent
+    contains: append
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    keys:
+    - Enter
+- wait: 3.0
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: append(
+    timeout_sec: 20
+- eval_readonly:
+    expression: document.querySelectorAll('.cm-content .cm-line').length
+    expect_truthy: true
+- press: Tab
+- wait: 1.0
+- assert_pattern:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    regex: 'new StringBuilder\(\)\.append\([^
+
+      )]*\)'
+    timeout_sec: 20
+- screenshot: tc-ide-parity-005-05-method-tab.png
+- press: Control+z
+- wait: 1.0
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: appen
+    timeout_sec: 20
+- press: Control+s
+- wait: 2.0
+- assert_file_sha256:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    equals: d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59
+    timeout_sec: 20
+- screenshot: tc-ide-parity-005-05-method-undo-save.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 在真实 Eclipse JDT LS + 隔离 QA 构建上完成类型 import 与方法 snippet 两轮接受：Ln 30 Col 22 的候选来自 org.apache.commons.lang3（非
+      JDK 同名项），Enter 一次提交 identifier+import，显式 Save 后 host 文件字节包含该 import，一次 Ctrl+Z + Save 使文件 SHA-256
+      回到 pristine；append 候选接受后 Tab 仅做纯 snippet 导航（正文无新增换行/缩进），一次 Undo 恢复 appen 且保存后哈希仍为 pristine；保存后再次在
+      live buffer 上触发补全成功。browser 无法证明真实 provider 报文、Rust resolve 边界与 host 字节，故为 native；Windows/macOS
+      未验证。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 47
+    - 49
+    - 54
+    - 55
+    - 57
+    - 58
+    - 62
+    - 63
+    - 65
+    - 66
+    - 68
+    - 69
+    - 72
+    - 73
+    - 74
+    - 75
+    - 76
+    - 77
+    - 78
+    - 79
+    - 80
+    - 81
+    - 82
+    - 83
+    - 84
+    - 85
+    - 86
+    - 87
+    - 88
+    - 89
+    - 90
+    - 91
+    - 92
+    - 93
+    - 94
+    - 95
+    - 96
+    - 97
+    - 98
+    - 99
+    - 100
+    - 101
+    - 103
+    - 107
+    - 108
+    - 111
+    - 112
+    - 115
+    - 116
+    - 118
+    - 119
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec":
+        60}}'
+    - step: 10
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-language=\"java\"]",
+        "timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content",
+        "contains": "completionTargets", "timeout_sec": 60}}'
+    - step: 12
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
+        "Java", "timeout_sec": 60}}'
+    - step: 46
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains":
+        "Ln 30, Col 22", "timeout_sec": 10}}'
+    - step: 48
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 60}}'
+    - step: 50
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "StringUtils",
+        "timeout_sec": 20}}'
+    - step: 51
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "org.apache.commons.lang3",
+        "timeout_sec": 20}}'
+    - step: 53
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-tooltip-autocomplete
+        [aria-selected]'').textContent", "contains": "StringUtils"}}'
+    - step: 56
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-tooltip-autocomplete
+        [aria-selected]'').textContent", "contains": "org.apache.commons.lang3"}}'
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content",
+        "contains": "StringUtils", "timeout_sec": 20}}'
+    - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content",
+        "contains": "import org.apache.commons.lang3.StringUtils;", "timeout_sec": 20}}'
+    - step: 64
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java",
+        "contains": "import org.apache.commons.lang3.StringUtils;", "timeout_sec": 20}}'
+    - step: 67
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content",
+        "contains": "StringUti", "timeout_sec": 20}}'
+    - step: 70
+      expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java",
+        "equals": "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59", "timeout_sec": 20}}'
+    - step: 102
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 60}}'
+    - step: 104
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "append", "timeout_sec":
+        20}}'
+    - step: 106
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-tooltip-autocomplete
+        [aria-selected]'').textContent", "contains": "append"}}'
+    - step: 109
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content",
+        "contains": "append(", "timeout_sec": 20}}'
+    - step: 110
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-content .cm-line'').length",
+        "expect_truthy": true}}'
+    - step: 113
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content",
+        "regex": "new StringBuilder\\(\\)\\.append\\([^\n)]*\\)", "timeout_sec": 20}}'
+    - step: 117
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content",
+        "contains": "appen", "timeout_sec": 20}}'
+    - step: 120
+      expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java",
+        "equals": "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59", "timeout_sec": 20}}'
+    results:
+    - 110
+    - 113
+    - 117
+    - 120
+  visual:
+  - check: 检查截图中的候选列表/文档/状态反馈无遮挡与溢出；截图本身不是视觉通过。
+    method: manual
+    reason: 没有自动像素基准；需结合实际截图人工评审。
+  native:
+  - check: 本用例只在 browser 模式运行；真实 JDT LS/Rust/磁盘字节由 TC-IDE-PARITY-005-05 native 覆盖，browser 结果不外推。
+    method: external
+    reason: 明确记录执行边界与未验证平台（Windows/macOS 未验证）。

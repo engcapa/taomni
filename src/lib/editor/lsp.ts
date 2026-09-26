@@ -59,6 +59,8 @@ export interface LspCapabilitySummary {
   /** LSP TextDocumentSyncKind: 0 = none, 1 = full, 2 = incremental. */
   textDocumentSyncKind?: number;
   completion: boolean;
+  /** The completion provider accepts `completionItem/resolve`. */
+  completionResolve?: boolean;
   signatureHelp: boolean;
   hover: boolean;
   definition: boolean;
@@ -219,9 +221,23 @@ export interface LspCompletionItem {
   filterText: string | null;
   sortText: string | null;
   textEdit: LspTextEdit | null;
+  /**
+   * Both provider ranges when the server sent an LSP 3.16 InsertReplaceEdit
+   * (`textEdit: {newText, insert, replace}`). `textEdit` above keeps its
+   * insert-preferred compatibility shape; acceptance intent decides which of
+   * these two ranges is used.
+   */
+  insertReplaceEdit?: LspCompletionInsertReplaceEdit | null;
   additionalTextEdits: LspTextEdit[];
   /** Original server item, passed back verbatim to completionItem/resolve. */
   raw: unknown;
+}
+
+/** LSP 3.16 InsertReplaceEdit: one completion, two provider ranges. */
+export interface LspCompletionInsertReplaceEdit {
+  newText: string;
+  insert: LspRange;
+  replace: LspRange;
 }
 
 export interface LspCompletionResult {
@@ -609,11 +625,23 @@ export function lspCompletion(
   });
 }
 
+/**
+ * Typed completionItem/resolve result (§ED-PARITY-005 D1). A provider null,
+ * timeout or transport error is reported as such — never as a successful
+ * resolve of the original item, which used to make a failed auto-import look
+ * like a plain primary-only acceptance.
+ */
+export type LspCompletionResolveResult =
+  | { kind: "resolved"; item: LspCompletionItem }
+  | { kind: "unavailable"; reason: string }
+  | { kind: "timeout" }
+  | { kind: "failed"; message: string };
+
 export function lspCompletionResolve(
   descriptor: LspDocumentDescriptor,
   item: unknown,
-): Promise<LspCompletionItem | null> {
-  return invoke<LspCompletionItem | null>("lsp_completion_resolve", {
+): Promise<LspCompletionResolveResult> {
+  return invoke<LspCompletionResolveResult>("lsp_completion_resolve", {
     ...documentArgs(descriptor),
     item,
   });

@@ -79,6 +79,7 @@
      "java_rename_deleted_fixtures",
      "view_state_fixtures",
      "editor_save_race",
+     "parity005_completion",
      "project_tree"
     ]
    },

@@ -6498,6 +6498,38 @@ controls:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     kind: display
     optional: true       # Ctrl+Shift+N palette popup
+  - id: search-everywhere-tab-actions
+    selector: '[data-testid="search-everywhere-tab-actions"]'
+    kind: interactive
+    optional: true       # Actions tab (ED-PARITY-005 V1 entry routing)
+  - id: quick-pick-input
+    selector: '[data-testid="quick-pick-input"]'
+    kind: interactive
+    optional: true       # shared Search Everywhere / quick-pick query field
+  - id: quick-pick-item
+    selector: '[data-testid="quick-pick-item"]'
+    kind: interactive
+    optional: true       # one result row; cases refine with [data-index="0"]
+  - id: completion-resolve-gate
+    selector: '[data-testid="completion-resolve-gate"]'
+    kind: display
+    optional: true       # resolve gate banner (ED-PARITY-005 V4)
+  - id: completion-resolve-gate-retry
+    selector: '[data-testid="completion-resolve-gate-retry"]'
+    kind: interactive
+    optional: true       # fresh resolve; disabled while retrying
+  - id: completion-resolve-gate-insert-without-import
+    selector: '[data-testid="completion-resolve-gate-insert-without-import"]'
+    kind: interactive
+    optional: true       # explicit primary-only acceptance
+  - id: completion-resolve-gate-dismiss
+    selector: '[data-testid="completion-resolve-gate-dismiss"]'
+    kind: interactive
+    optional: true       # closes the gate without any write
+  - id: completion-resolve-gate-failed-note
+    selector: '[data-testid="completion-resolve-gate-failed-note"]'
+    kind: display
+    optional: true       # shown after a failed retry
   - id: find-panel
     selector: '[data-testid="code-workspace-find-in-files-panel"]'
     kind: display
@@ -7312,6 +7344,12 @@ controls:
     optional: true
     aliases:
       - '[data-testid="keymap-item-workspace.renameSymbol"]'
+  - id: keymap-run
+    selector: '[data-testid^="keymap-run-"]'
+    kind: interactive
+    optional: true       # executes the listed action (ED-PARITY-005 V1)
+    aliases:
+      - '[data-testid="keymap-run-editor.basicCompletion"]'
   - id: keymap-cheatsheet-footer-close
     selector: '[data-testid="keymap-cheatsheet-footer-close"]'
     kind: interactive

@@ -346,6 +346,7 @@ export function SearchEverywhere({
               type="button"
               role="tab"
               aria-selected={mode === tab.id}
+              data-testid={`search-everywhere-tab-${tab.id}`}
               data-active={mode === tab.id || undefined}
               className="h-7 shrink-0 rounded-t px-2.5 text-[11px] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
               onClick={() => setMode(tab.id)}
