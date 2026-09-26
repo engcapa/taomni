@@ -53,6 +53,10 @@ function rootForCwd(roots: CodeWorkspaceRootInfo[], cwd: string): string | null 
     .sort((left, right) => right.path.length - left.path.length)[0]?.path ?? null;
 }
 
+/** How long a queued task command waits for its terminal to register. */
+const PENDING_COMMAND_TIMEOUT_MS = 20_000;
+const PENDING_COMMAND_POLL_MS = 100;
+
 export interface TerminalDockHandle {
   openAt: (cwd: string, title?: string) => string;
   runCommand: (
@@ -83,6 +87,14 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
     const [activeId, setActiveId] = useState<string | null>(null);
     const [selectedRootId, setSelectedRootId] = useState(roots[0]?.id ?? "");
     const sequenceRef = useRef(0);
+    const instancesRef = useRef<WorkspaceTerminalInstance[]>([]);
+    instancesRef.current = instances;
+    const pendingDeliveriesRef = useRef(new Set<string>());
+    const mountedRef = useRef(true);
+
+    useEffect(() => () => {
+      mountedRef.current = false;
+    }, []);
     const rootById = useMemo(() => new Map(roots.map((root) => [root.id, root])), [roots]);
 
     useEffect(() => {
@@ -148,10 +160,26 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
     }, []);
 
     const deliverPendingCommand = useCallback((id: string) => {
-      let attempts = 0;
+      // A queued task command must reach its terminal, and the caller learns the
+      // outcome only through onTaskExit. Bounded polling would silently drop the
+      // command (leaving Build/Run stuck in "executing" forever), so poll until
+      // the terminal registers and report an explicit failure if it never does.
+      if (pendingDeliveriesRef.current.has(id)) return;
+      pendingDeliveriesRef.current.add(id);
+      const deadline = Date.now() + PENDING_COMMAND_TIMEOUT_MS;
+      const clearPending = () => setInstances((current) => current.map((item) => item.id === id
+        ? { ...item, pendingCommand: null, pendingExecution: null }
+        : item));
       const tryWrite = () => {
-        const instance = instances.find((item) => item.id === id);
-        if (!instance?.pendingCommand) return;
+        if (!mountedRef.current) {
+          pendingDeliveriesRef.current.delete(id);
+          return;
+        }
+        const instance = instancesRef.current.find((item) => item.id === id);
+        if (!instance?.pendingCommand) {
+          pendingDeliveriesRef.current.delete(id);
+          return;
+        }
         const terminal = getTerminal(id);
         if (terminal) {
           const command = instance.pendingExecution
@@ -168,16 +196,28 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
             );
             terminal.writeInput(buildInteractiveCommandInput(task.input));
           }
-          setInstances((current) => current.map((item) => item.id === id
-            ? { ...item, pendingCommand: null, pendingExecution: null }
-            : item));
+          clearPending();
+          pendingDeliveriesRef.current.delete(id);
           return;
         }
-        attempts += 1;
-        if (attempts < 40) window.setTimeout(tryWrite, 50);
+        if (Date.now() >= deadline) {
+          clearPending();
+          pendingDeliveriesRef.current.delete(id);
+          instance.onTaskExit?.(1);
+          return;
+        }
+        window.setTimeout(tryWrite, PENDING_COMMAND_POLL_MS);
       };
       window.setTimeout(tryWrite, 0);
-    }, [instances]);
+    }, []);
+
+    // Arm delivery from the instance list as well: a missed onSessionReady must
+    // not strand a queued command in an already-connected terminal.
+    useEffect(() => {
+      for (const instance of instances) {
+        if (instance.pendingCommand) deliverPendingCommand(instance.id);
+      }
+    }, [deliverPendingCommand, instances]);
 
     const selectedRoot = rootById.get(selectedRootId) ?? roots[0] ?? null;
 
