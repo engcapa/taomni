@@ -95,6 +95,7 @@ export interface EditorRevealTarget {
   line: number;
   character: number;
   nonce: number;
+  focus?: boolean;
 }
 
 interface EditorGroupProps {

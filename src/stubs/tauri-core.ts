@@ -2297,7 +2297,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
           errorMessage: null,
         } as T;
       }
-      return { status: "failed", modules: [], provenance: null, errorMessage: "No Maven tooling in browser preview" } as T;
+      return { status: "failed", modules: [], provenance: null, errorMessage: "No Maven tooling in browser preview; ready project facts require a build backend" } as T;
     }
     case "lsp_document_status":
     case "lsp_open_document":

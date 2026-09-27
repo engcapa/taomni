@@ -8416,13 +8416,18 @@ export function CodeWorkspaceTab({
     [activeFile, addLooseFilePath, openFile],
   );
 
-  const revealEditorLocation = useCallback((key: string, range: LspLocation["range"]) => {
+  const revealEditorLocation = useCallback((
+    key: string,
+    range: LspLocation["range"],
+    options?: { focus?: boolean },
+  ) => {
     revealNonceRef.current += 1;
     setRevealTarget({
       key,
       line: range.start.line,
       character: range.start.character,
       nonce: revealNonceRef.current,
+      focus: options?.focus ?? true,
     });
   }, []);
 
@@ -8792,14 +8797,22 @@ export function CodeWorkspaceTab({
 
   const openSearchMatch = useCallback(
     (match: WorkspaceSearchMatch, options: { preview: boolean }) => {
-      const ref: CodeWorkspaceFileRef = { kind: "root", rootId: match.rootId, path: match.path };
+      const absolute = replaceMatchAbsolutePath(match);
+      let ref: CodeWorkspaceFileRef = { kind: "root", rootId: match.rootId, path: match.path };
+      for (const root of rootsRef.current) {
+        const rel = relativePathWithinRoot(root.path, absolute);
+        if (rel !== null && rel !== "") {
+          ref = { kind: "root", rootId: root.id, path: rel };
+          break;
+        }
+      }
       // Backend line numbers are 1-based; reveal targets follow LSP 0-based.
       // ED-IMPROVE-004: backend offsets are code points, reveal ranges are UTF-16.
       const line = Math.max(0, match.lineNumber - 1);
       revealEditorLocation(fileKey(ref), {
         start: { line, character: codePointOffsetToUtf16Offset(match.lineText, match.matchStart) },
         end: { line, character: codePointOffsetToUtf16Offset(match.lineText, match.matchEnd) },
-      });
+      }, { focus: !options.preview });
       void openFile(ref, { preview: options.preview });
     },
     [openFile, revealEditorLocation],
@@ -10860,12 +10873,24 @@ export function CodeWorkspaceTab({
     };
   }, [roots, workspaceInstanceId]);
 
+  const [replaceFocusNonce, setReplaceFocusNonce] = useState(0);
+  const [undoConfirmDialogState, setUndoConfirmDialogState] = useState<{
+    label: string;
+  } | null>(null);
+  const undoOkButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (undoConfirmDialogState) {
+      undoOkButtonRef.current?.focus();
+    }
+  }, [undoConfirmDialogState]);
+
   const workspaceEditHistoryState = useMemo(
     () => workspaceEditHistory.state(),
     [workspaceEditHistory, workspaceEditHistoryRevision],
   );
 
-  const undoWorkspaceEdit = useCallback(async () => {
+  const performUndoWorkspaceEdit = useCallback(async () => {
     try {
       const result = await workspaceEditHistory.undo();
       if (result) {
@@ -10877,6 +10902,14 @@ export function CodeWorkspaceTab({
       setWorkspaceEditHistoryRevision((revision) => revision + 1);
     }
   }, [setStatusMessage, workspaceEditHistory]);
+
+  const undoWorkspaceEdit = useCallback(async () => {
+    const state = workspaceEditHistory.state();
+    if (!state.canUndo || state.busy) return;
+    setUndoConfirmDialogState({
+      label: state.undoLabel ?? "Workspace edit",
+    });
+  }, [workspaceEditHistory]);
 
   const redoWorkspaceEdit = useCallback(async () => {
     try {
@@ -10898,14 +10931,16 @@ export function CodeWorkspaceTab({
   // the stroke back to the document ledger (character-level history). A busy
   // journal blocks the stroke entirely so a document undo can never interleave
   // with a running multi-file restore.
+  // ED-PARITY-006 DEC-06: inside the editor surface, Ctrl+Z claims the journal
+  // without a prompt.
   const claimWorkspaceHistory = useCallback((action: "undo" | "redo"): boolean | undefined => {
     const state = workspaceEditHistory.state();
     if (state.busy) return false;
     if (action === "undo" ? !state.canUndo : !state.canRedo) return undefined;
-    if (action === "undo") void undoWorkspaceEdit();
+    if (action === "undo") void performUndoWorkspaceEdit();
     else void redoWorkspaceEdit();
     return true;
-  }, [redoWorkspaceEdit, undoWorkspaceEdit, workspaceEditHistory]);
+  }, [performUndoWorkspaceEdit, redoWorkspaceEdit, workspaceEditHistory]);
 
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
@@ -14242,8 +14277,9 @@ export function CodeWorkspaceTab({
       keybinding: "Ctrl+Shift+R",
       keywords: ["bulk replace"],
       run: () => {
-        openFindInFiles();
-        setStatusMessage("Enter a replace string and use Replace All in Find in Files");
+        setBottomDockOpen(true);
+        setBottomDockTab("search");
+        setReplaceFocusNonce((nonce) => nonce + 1);
       },
     },
     {
@@ -15600,7 +15636,8 @@ export function CodeWorkspaceTab({
       // Ctrl+F as text instead of the workspace dispatcher opening the editor
       // find panel behind the dialog. The Keymap recorder keeps working
       // because it listens on window capture independently of this guard.
-      + ', [data-testid="workspace-keymap-settings-dialog"], [data-testid="keymap-cheatsheet-dialog"]',
+      + ', [data-testid="workspace-keymap-settings-dialog"], [data-testid="keymap-cheatsheet-dialog"]'
+      + ', [data-testid="code-workspace-replace-preview"], [data-testid="code-workspace-undo-confirm"]',
     ));
   }, []);
 
@@ -15886,6 +15923,21 @@ export function CodeWorkspaceTab({
       if (isSurfaceOwnedKeyEvent(event.target)) return;
       const logicalKey = eventLogicalKey(event);
       const switcherModifier = event.ctrlKey || event.metaKey;
+
+      // ED-PARITY-006 DEC-06: Non-editor text inputs own their native undo/redo.
+      // Do not allow workspace-level undo/redo to claim Ctrl+Z / Ctrl+Y.
+      const targetEl = event.target instanceof Element ? event.target : null;
+      if (
+        (targetEl instanceof HTMLInputElement || targetEl instanceof HTMLTextAreaElement)
+        && !targetEl.closest(".cm-editor")
+      ) {
+        if (
+          (logicalKey === "z" && switcherModifier)
+          || (logicalKey === "y" && switcherModifier)
+        ) {
+          return;
+        }
+      }
       if (logicalKey === "tab" && switcherModifier && !event.altKey) {
         event.preventDefault();
         event.stopPropagation();
@@ -20220,6 +20272,7 @@ export function CodeWorkspaceTab({
                 roots={roots}
                 workspaceInstanceId={workspaceInstanceId}
                 focusNonce={searchFocusNonce}
+                replaceFocusNonce={replaceFocusNonce}
                 includePreset={searchIncludePreset}
                 queryPreset={searchQueryPreset}
                 onOpenMatch={openSearchMatch}
@@ -21271,6 +21324,55 @@ export function CodeWorkspaceTab({
           onSelect={autoImportCandidatePrompt.onSelect}
           onClose={autoImportCandidatePrompt.onClose}
         />
+      )}
+      {undoConfirmDialogState && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            data-testid="code-workspace-undo-confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="undo-confirm-title"
+            tabIndex={-1}
+            className="w-full max-w-sm rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-4 shadow-xl text-[12px]"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                setUndoConfirmDialogState(null);
+              }
+            }}
+          >
+            <h3 id="undo-confirm-title" className="font-semibold text-[var(--taomni-code-text)] mb-2">
+              Undo
+            </h3>
+            <p className="text-[var(--taomni-code-text)] mb-4">
+              Undo {undoConfirmDialogState.label}?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                data-testid="code-workspace-undo-cancel"
+                className="rounded border border-[var(--taomni-code-border)] px-3 py-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+                onClick={() => setUndoConfirmDialogState(null)}
+              >
+                Cancel
+              </button>
+              <button
+                ref={undoOkButtonRef}
+                autoFocus
+                type="button"
+                data-testid="code-workspace-undo-ok"
+                className="rounded bg-[var(--taomni-code-accent,#3b82f6)] px-3 py-1 text-white hover:opacity-90"
+                onClick={async () => {
+                  setUndoConfirmDialogState(null);
+                  await performUndoWorkspaceEdit();
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       </WorkspaceObservationBoundary>
     </WorkspaceClipboardSessionContext.Provider>

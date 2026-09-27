@@ -6,7 +6,7 @@
 
 import type { LspFileTextEdits, LspTextEdit, LspWorkspaceEdit } from "../../../lib/editor/lsp";
 import type { WorkspaceSearchMatch } from "../../../lib/editor/workspaceSearch";
-import { fsPathComparisonKey, relativePathWithinRoot } from "./codeWorkspaceModel";
+import { fsPathComparisonKey, normalizeFsPath, relativePathWithinRoot } from "./codeWorkspaceModel";
 import type { FindInFilesScopePlan } from "./findInFilesScopeModel";
 import { offsetFromLspPositionInStringStrict } from "./lspTextEdits";
 import {
@@ -506,6 +506,10 @@ export function findReplacePreimage(
   snapshot: Pick<ReplacePreviewSnapshot, "preimages">,
   path: string,
 ): ReplaceFilePreimage | null {
+  const exact = snapshot.preimages?.find(
+    (preimage) => preimage.path === path || normalizeFsPath(preimage.path) === normalizeFsPath(path),
+  );
+  if (exact) return exact;
   const key = replacePreimagePathKey(path);
   return snapshot.preimages?.find((preimage) => replacePreimagePathKey(preimage.path) === key) ?? null;
 }

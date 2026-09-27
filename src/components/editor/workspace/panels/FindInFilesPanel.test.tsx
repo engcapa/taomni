@@ -1207,5 +1207,320 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
       expect(capturedSnapshot?.requestIdentity?.matchCount).toBe(1);
     });
   });
+
+  describe("ED-PARITY-006: result exclusion, seeded preview and post-commit pruning", () => {
+    it("ED-PARITY-006 Delete on a focused result row toggles exclusion and moves focus", async () => {
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+        />,
+      );
+
+      const emit = await runSearch();
+      const m1 = searchMatch({ path: "src/a.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "alpha token one" });
+      const m2 = searchMatch({ path: "src/a.txt", lineNumber: 2, column: 1, matchStart: 5, matchEnd: 10, lineText: "beta token two" });
+      const m3 = searchMatch({ path: "src/b.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "gamma token three" });
+
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [m1, m2, m3] });
+        emit(doneEvent({ totalMatches: 3 }));
+      });
+
+      const rows = await screen.findAllByTestId("code-workspace-find-match-row");
+      expect(rows).toHaveLength(3);
+
+      // Focus row 2 (a.txt:2) and press Delete
+      rows[1].focus();
+      fireEvent.keyDown(rows[1], { key: "Delete" });
+
+      expect(rows[1]).toHaveAttribute("data-excluded", "true");
+      expect(document.activeElement).toBe(rows[2]);
+
+      // Row 3 (b.txt:1) is now focused. Press Delete
+      fireEvent.keyDown(rows[2], { key: "Delete" });
+      expect(rows[2]).toHaveAttribute("data-excluded", "true");
+
+      // Focus row 2 again and press Delete to restore
+      rows[1].focus();
+      fireEvent.keyDown(rows[1], { key: "Delete" });
+      expect(rows[1]).not.toHaveAttribute("data-excluded", "true");
+    });
+
+    it("ED-PARITY-006 Delete on a file header toggles every row of that file", async () => {
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+        />,
+      );
+
+      const emit = await runSearch();
+      const m1 = searchMatch({ path: "src/a.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "alpha token one" });
+      const m2 = searchMatch({ path: "src/a.txt", lineNumber: 2, column: 1, matchStart: 5, matchEnd: 10, lineText: "beta token two" });
+      const m3 = searchMatch({ path: "src/b.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "gamma token three" });
+
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [m1, m2, m3] });
+        emit(doneEvent({ totalMatches: 3 }));
+      });
+
+      const fileHeaders = screen.getAllByRole("button", { name: /app\/src\/[ab]\.txt/ });
+      expect(fileHeaders).toHaveLength(2);
+
+      // Delete on a.txt file header
+      fileHeaders[0].focus();
+      fireEvent.keyDown(fileHeaders[0], { key: "Delete" });
+
+      const rows = screen.getAllByTestId("code-workspace-find-match-row");
+      expect(rows[0]).toHaveAttribute("data-excluded", "true");
+      expect(rows[1]).toHaveAttribute("data-excluded", "true");
+      expect(rows[2]).not.toHaveAttribute("data-excluded", "true");
+
+      // Press Delete on a.txt file header again to restore
+      fireEvent.keyDown(fileHeaders[0], { key: "Delete" });
+      expect(rows[0]).not.toHaveAttribute("data-excluded", "true");
+      expect(rows[1]).not.toHaveAttribute("data-excluded", "true");
+    });
+
+    it("ED-PARITY-006 context menu Exclude and Restore mirror Delete", async () => {
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+        />,
+      );
+
+      const emit = await runSearch();
+      const m1 = searchMatch({ path: "src/a.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "alpha token one" });
+      const m2 = searchMatch({ path: "src/a.txt", lineNumber: 2, column: 1, matchStart: 5, matchEnd: 10, lineText: "beta token two" });
+
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [m1, m2] });
+        emit(doneEvent({ totalMatches: 2 }));
+      });
+
+      const rows = screen.getAllByTestId("code-workspace-find-match-row");
+
+      // Right-click row 2 -> Exclude
+      fireEvent.contextMenu(rows[1]);
+      const excludeItem = await screen.findByTestId("code-workspace-find-row-exclude");
+      fireEvent.click(excludeItem);
+      expect(rows[1]).toHaveAttribute("data-excluded", "true");
+
+      // Right-click row 2 again -> Restore
+      fireEvent.contextMenu(rows[1]);
+      const restoreItem = await screen.findByTestId("code-workspace-find-row-restore");
+      fireEvent.click(restoreItem);
+      expect(rows[1]).not.toHaveAttribute("data-excluded", "true");
+    });
+
+    it("ED-PARITY-006 Delete inside the query input edits text only", async () => {
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+        />,
+      );
+
+      const emit = await runSearch("token");
+      const m1 = searchMatch({ path: "src/a.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "alpha token one" });
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [m1] });
+        emit(doneEvent({ totalMatches: 1 }));
+      });
+
+      const input = screen.getByLabelText("Search query");
+      input.focus();
+      fireEvent.keyDown(input, { key: "Delete" });
+
+      const row = screen.getByTestId("code-workspace-find-match-row");
+      expect(row).not.toHaveAttribute("data-excluded", "true");
+    });
+
+    it("ED-PARITY-006 new search clears exclusions; collapse keeps them", async () => {
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+        />,
+      );
+
+      const emit = await runSearch("token");
+      const m1 = searchMatch({ path: "src/a.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "alpha token one" });
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [m1] });
+        emit(doneEvent({ totalMatches: 1 }));
+      });
+
+      const row = screen.getByTestId("code-workspace-find-match-row");
+      row.focus();
+      fireEvent.keyDown(row, { key: "Delete" });
+      expect(row).toHaveAttribute("data-excluded", "true");
+
+      // Collapse and expand file
+      const header = screen.getByRole("button", { name: /app\/src\/a\.txt/ });
+      fireEvent.click(header); // collapse
+      fireEvent.click(header); // expand
+      const rowAfter = screen.getByTestId("code-workspace-find-match-row");
+      expect(rowAfter).toHaveAttribute("data-excluded", "true");
+
+      // New search clears exclusions
+      const emit2 = await runSearch("token2");
+      act(() => {
+        emit2({ ...doneEvent(), kind: "batch", matches: [m1] });
+        emit2(doneEvent({ totalMatches: 1 }));
+      });
+      const rowNew = screen.getByTestId("code-workspace-find-match-row");
+      expect(rowNew).not.toHaveAttribute("data-excluded", "true");
+    });
+
+    it("ED-PARITY-006 Replace All seeds the preview with list exclusions", async () => {
+      const onReplaceMatches = vi.fn(async () => ({ ok: true }));
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={onReplaceMatches}
+        />,
+      );
+
+      const emit = await runSearch();
+      const m1 = searchMatch({ path: "src/a.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "alpha token one" });
+      const m2 = searchMatch({ path: "src/a.txt", lineNumber: 2, column: 1, matchStart: 5, matchEnd: 10, lineText: "beta token two" });
+      const m3 = searchMatch({ path: "src/b.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "gamma token three" });
+
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [m1, m2, m3] });
+        emit(doneEvent({ totalMatches: 3 }));
+      });
+
+      const rows = screen.getAllByTestId("code-workspace-find-match-row");
+      // Exclude row 2 (a.txt:2)
+      rows[1].focus();
+      fireEvent.keyDown(rows[1], { key: "Delete" });
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "coin" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+
+      expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+      expect(screen.getByTestId("code-workspace-replace-counts")).toHaveTextContent("2 of 3 occurrences");
+
+      // Commit
+      fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+      await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+
+      const committedMatches = (onReplaceMatches.mock.calls as unknown as Array<[WorkspaceSearchMatch[]]>)[0]![0];
+      expect(committedMatches).toHaveLength(2);
+      expect(committedMatches.map((m) => `${m.path}:${m.lineNumber}`)).toEqual(["src/a.txt:1", "src/b.txt:1"]);
+    });
+
+    it("ED-PARITY-006 Replace All is disabled when every result is excluded", async () => {
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+        />,
+      );
+
+      const emit = await runSearch();
+      const m1 = searchMatch({ path: "src/a.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "alpha token one" });
+
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [m1] });
+        emit(doneEvent({ totalMatches: 1 }));
+      });
+
+      const row = screen.getByTestId("code-workspace-find-match-row");
+      row.focus();
+      fireEvent.keyDown(row, { key: "Delete" });
+
+      const replaceAllBtn = screen.getByRole("button", { name: "Preview replace all matches" });
+      expect(replaceAllBtn).toBeDisabled();
+      expect(replaceAllBtn).toHaveAttribute("title", "All results are excluded");
+    });
+
+    it("ED-PARITY-006 successful commit prunes committed rows and keeps excluded rows", async () => {
+      const onReplaceMatches = vi.fn(async () => ({ ok: true, appliedCount: 2, fileCount: 2 }));
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={onReplaceMatches}
+        />,
+      );
+
+      const emit = await runSearch();
+      const m1 = searchMatch({ path: "src/a.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "alpha token one" });
+      const m2 = searchMatch({ path: "src/a.txt", lineNumber: 2, column: 1, matchStart: 5, matchEnd: 10, lineText: "beta token two" });
+      const m3 = searchMatch({ path: "src/b.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "gamma token three" });
+
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [m1, m2, m3] });
+        emit(doneEvent({ totalMatches: 3 }));
+      });
+
+      const rows = screen.getAllByTestId("code-workspace-find-match-row");
+      // Exclude row 2
+      rows[1].focus();
+      fireEvent.keyDown(rows[1], { key: "Delete" });
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "coin" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+
+      expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+      await waitFor(() => expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument());
+
+      // Only excluded row remains
+      const remainingRows = screen.getAllByTestId("code-workspace-find-match-row");
+      expect(remainingRows).toHaveLength(1);
+      expect(remainingRows[0]).toHaveAttribute("data-excluded", "true");
+      expect(screen.getByTestId("code-workspace-find-replaced-notice")).toHaveTextContent("Replaced 2 occurrences in 2 files");
+      expect(document.activeElement).toBe(remainingRows[0]);
+    });
+
+    it("ED-PARITY-006 failed commit keeps the result list unchanged", async () => {
+      const onReplaceMatches = vi.fn(async () => ({ ok: false, message: "Replace blocked: changed on disk" }));
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={onReplaceMatches}
+        />,
+      );
+
+      const emit = await runSearch();
+      const m1 = searchMatch({ path: "src/a.txt", lineNumber: 1, column: 1, matchStart: 6, matchEnd: 11, lineText: "alpha token one" });
+      const m2 = searchMatch({ path: "src/a.txt", lineNumber: 2, column: 1, matchStart: 5, matchEnd: 10, lineText: "beta token two" });
+
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [m1, m2] });
+        emit(doneEvent({ totalMatches: 2 }));
+      });
+
+      const rows = screen.getAllByTestId("code-workspace-find-match-row");
+      rows[1].focus();
+      fireEvent.keyDown(rows[1], { key: "Delete" });
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "coin" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+
+      expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+      await waitFor(() => expect(screen.getByTestId("code-workspace-replace-commit-error")).toBeInTheDocument());
+      // Dialog remains open
+      expect(screen.getByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+    });
+  });
 });
+
 

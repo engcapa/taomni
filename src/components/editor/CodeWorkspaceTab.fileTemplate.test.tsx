@@ -600,6 +600,12 @@ describe("ED-TEMPLATE-001: File and Code Templates production flow in CodeWorksp
     await act(async () => {
       fireEvent.keyDown(window, { key: "z", ctrlKey: true });
     });
+    const undoOk = screen.queryByTestId("code-workspace-undo-ok");
+    if (undoOk) {
+      await act(async () => {
+        fireEvent.click(undoOk);
+      });
+    }
 
     // Undo calls delete on the created file via workspaceApplyResourceOperation
     await waitFor(() => {

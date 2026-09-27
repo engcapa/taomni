@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createReplaceInFilesPlan,
 } from "../replaceInFilesModel";
@@ -19,8 +19,12 @@ export interface ReplacePreviewDialogProps {
   edit: LspWorkspaceEdit;
   /** Replacement text shown in the header. */
   replacement: string;
+  /** Query text used for the summary header (ED-PARITY-006). */
+  query?: string;
   /** ED-IMPROVE-005: frozen scope/query identity captured before the preview. */
   scopeLabel?: string;
+  /** ED-PARITY-006: initial excluded keys seeded from the results list. */
+  initialExcludedKeys?: ReadonlySet<string>;
   committing: boolean;
   commitError: string | null;
   onCommit: (excludedKeys: ReadonlySet<string>) => void;
@@ -34,16 +38,32 @@ export function stableUsageKey(path: string, startLine: number, startCharacter: 
 export function ReplacePreviewDialog({
   edit,
   replacement,
+  query,
   scopeLabel,
+  initialExcludedKeys,
   committing,
   commitError,
   onCommit,
   onCancel,
 }: ReplacePreviewDialogProps) {
-  const [excluded, setExcluded] = useState<ReadonlySet<string>>(() => new Set());
+  const [excluded, setExcluded] = useState<ReadonlySet<string>>(() => new Set(initialExcludedKeys ?? []));
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const commitButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    commitButtonRef.current?.focus();
+    return () => {
+      if (previouslyFocused && document.contains(previouslyFocused)) {
+        previouslyFocused.focus();
+      }
+    };
+  }, []);
+
+  const fullPlan = useMemo(() => createReplaceInFilesPlan(edit), [edit]);
   const live = useMemo(() => {
     const excludedUsageIds = new Set<string>();
-    for (const usage of createReplaceInFilesPlan(edit).preview.usages) {
+    for (const usage of fullPlan.preview.usages) {
       const key = stableUsageKey(
         usage.path,
         usage.range.start.line,
@@ -54,16 +74,17 @@ export function ReplacePreviewDialog({
       if (excluded.has(key)) excludedUsageIds.add(usage.id);
     }
     return createReplaceInFilesPlan(edit, excludedUsageIds);
-  }, [edit, excluded]);
+  }, [edit, excluded, fullPlan]);
   const byFile = useMemo(() => {
-    const groups = new Map<string, typeof live.preview.usages>();
-    for (const usage of live.preview.usages) {
+    const groups = new Map<string, typeof fullPlan.preview.usages>();
+    for (const usage of fullPlan.preview.usages) {
       const list = groups.get(usage.path);
       if (list) list.push(usage);
       else groups.set(usage.path, [usage]);
     }
     return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [live]);
+  }, [fullPlan]);
+
 
   const keyOf = (usage: { path: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }) => stableUsageKey(
     usage.path,
@@ -92,15 +113,76 @@ export function ReplacePreviewDialog({
     });
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (committing) {
+      if (event.key === "Escape" || event.key === "Enter") {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      onCancel();
+      return;
+    }
+    if (event.key === "Enter") {
+      const target = event.target as HTMLElement;
+      if (target instanceof HTMLInputElement && target.type === "checkbox") {
+        return;
+      }
+      if (live.includedMatches === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onCommit(excluded);
+      return;
+    }
+    if (event.key === "Tab") {
+      const container = dialogRef.current;
+      if (!container) return;
+      const focusable = Array.from(
+        container.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey) {
+        if (document.activeElement === first || !container.contains(document.activeElement)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !container.contains(document.activeElement)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    }
+  };
+
+  const includedFilesCount = byFile.filter(([_, usages]) => usages.some((usage) => !excluded.has(keyOf(usage)))).length;
+
   return (
     <div
+      ref={dialogRef}
       data-testid="code-workspace-replace-preview"
       role="dialog"
       aria-label="Replace in files preview"
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
       className="flex max-h-[70vh] min-h-0 w-[560px] max-w-[90vw] flex-col rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] text-[var(--taomni-code-text)]"
     >
       <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2">
         <div className="font-medium">Replace in files preview</div>
+        <div
+          data-testid="code-workspace-replace-summary"
+          className="mt-0.5 text-[11px] font-medium text-[var(--taomni-code-text)]"
+        >
+          {`Replace ${live.includedMatches} occurrences of '${query ?? ""}' across ${includedFilesCount} files with '${replacement}'?`}
+        </div>
         <div
           data-testid="code-workspace-replace-counts"
           className="mt-0.5 text-[11px] text-[var(--taomni-code-muted)]"
@@ -163,7 +245,7 @@ export function ReplacePreviewDialog({
             </section>
           );
         })}
-        {byFile.length === 0 && (
+        {live.includedMatches === 0 && (
           <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
             Every occurrence is excluded — nothing will be replaced.
           </div>
@@ -189,6 +271,7 @@ export function ReplacePreviewDialog({
           Cancel
         </button>
         <button
+          ref={commitButtonRef}
           type="button"
           data-testid="code-workspace-replace-commit"
           className="h-7 rounded bg-[var(--taomni-accent)] px-3 font-medium text-white disabled:opacity-50"

@@ -41,6 +41,7 @@ import {
   type ReplacePreviewSnapshot,
 } from "../replaceInFilesModel";
 import { ReplacePreviewDialog } from "./ReplacePreviewDialog";
+import { useContextMenu } from "../../../ContextMenu";
 import {
   useProjectFactsStore,
   type WorkspaceProjectFactsEntry,
@@ -68,6 +69,8 @@ interface FindInFilesPanelProps {
   ) => Promise<readonly ReplaceFilePreimage[]>;
   /** Bump to move focus into the query input (Ctrl+Shift+F). */
   focusNonce?: number;
+  /** Bump to move focus into the replace input (Ctrl+Shift+R, ED-PARITY-006). */
+  replaceFocusNonce?: number;
   /** Bump the nonce to overwrite the include globs ("Find in Directory..."). */
   includePreset?: { value: string; nonce: number };
   /** Bump the nonce to seed the query field (Search Everywhere Text tab). */
@@ -225,6 +228,7 @@ export function FindInFilesPanel({
   onReplaceMatches,
   onPrepareReplacePreimages,
   focusNonce = 0,
+  replaceFocusNonce = 0,
   includePreset,
   queryPreset,
   workspaceInstanceId,
@@ -240,6 +244,16 @@ export function FindInFilesPanel({
   const [groups, setGroups] = useState<MatchGroup[]>([]);
   const [summary, setSummary] = useState<SearchSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** ED-PARITY-006: result exclusion state, notice, and keyboard refs */
+  const [excludedMatchKeys, setExcludedMatchKeys] = useState<Set<string>>(() => new Set());
+  const [focusedMatchKey, setFocusedMatchKey] = useState<string | null>(null);
+  const [focusRowNonce, setFocusRowNonce] = useState(0);
+  const [replacedNotice, setReplacedNotice] = useState<string | null>(null);
+  const replaceAllButtonRef = useRef<HTMLButtonElement | null>(null);
+  const matchRowRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const contextMenu = useContextMenu();
+
   /** ED-FIND-004/005: frozen replace preview (plan + source edit + matches +
    * scope/query/replacement snapshot). */
   const [replacePreview, setReplacePreview] = useState<{
@@ -250,6 +264,7 @@ export function FindInFilesPanel({
     stableToUsageId: ReadonlyMap<string, string>;
     replacement: string;
     snapshot: ReplacePreviewSnapshot;
+    initialExcludedKeys?: ReadonlySet<string>;
   } | null>(null);
   const [replaceCommitting, setReplaceCommitting] = useState(false);
   const [replaceCommitError, setReplaceCommitError] = useState<string | null>(null);
@@ -338,6 +353,23 @@ export function FindInFilesPanel({
     inputRef.current?.select();
   }, [focusNonce]);
 
+  useEffect(() => {
+    if (!replaceFocusNonce) return;
+    if (!query.trim()) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    } else {
+      replaceInputRef.current?.focus();
+      replaceInputRef.current?.select();
+    }
+  }, [replaceFocusNonce, query]);
+
+  useEffect(() => {
+    if (focusedMatchKey && focusRowNonce > 0) {
+      matchRowRefs.current.get(focusedMatchKey)?.focus();
+    }
+  }, [focusRowNonce, focusedMatchKey, groups]);
+
   const appliedPresetNonceRef = useRef(0);
   useEffect(() => {
     if (!includePreset || includePreset.nonce === 0) return;
@@ -367,6 +399,8 @@ export function FindInFilesPanel({
     // so a stale plan can never commit.
     setReplacePreview(null);
     setReplaceCommitError(null);
+    setExcludedMatchKeys(new Set());
+    setReplacedNotice(null);
     if (active) void workspaceSearchCancel(active).catch(() => {});
   }, []);
 
@@ -387,6 +421,8 @@ export function FindInFilesPanel({
     setGroups([]);
     setSummary(null);
     setError(null);
+    setExcludedMatchKeys(new Set());
+    setReplacedNotice(null);
     setFileExpand({});
     setCollapsedFiles({});
     languagesRef.current = {};
@@ -560,6 +596,80 @@ export function FindInFilesPanel({
     setFileExpand((prev) => ({ ...prev, [key]: "all" }));
   }, []);
 
+  const visibleMatchKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const group of groups) {
+      if (collapsedFiles[group.key]) continue;
+      const limit = visibleLimitFor(group.key, group.matches.length);
+      const slice = group.matches.slice(0, limit);
+      for (const m of slice) {
+        keys.push(workspaceSearchMatchKey(m));
+      }
+    }
+    return keys;
+  }, [groups, collapsedFiles, visibleLimitFor]);
+
+  const toggleExcludeMatch = useCallback((key: string, moveFocus = false) => {
+    setExcludedMatchKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+    if (moveFocus) {
+      const idx = visibleMatchKeys.indexOf(key);
+      if (idx !== -1) {
+        const targetKey = visibleMatchKeys[idx + 1] ?? visibleMatchKeys[idx - 1];
+        if (targetKey) {
+          setFocusedMatchKey(targetKey);
+          matchRowRefs.current.get(targetKey)?.focus();
+        }
+      }
+    }
+  }, [visibleMatchKeys]);
+
+  const toggleExcludeGroup = useCallback((group: MatchGroup) => {
+    const groupMatchKeys = group.matches.map(workspaceSearchMatchKey);
+    setExcludedMatchKeys((prev) => {
+      const next = new Set(prev);
+      const anyIncluded = groupMatchKeys.some((k) => !next.has(k));
+      for (const k of groupMatchKeys) {
+        if (anyIncluded) {
+          next.add(k);
+        } else {
+          next.delete(k);
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const showMatchContextMenu = useCallback((event: React.MouseEvent, matchKey: string) => {
+    const isExcluded = excludedMatchKeys.has(matchKey);
+    contextMenu.show(event, [
+      isExcluded
+        ? {
+            label: "Restore",
+            testId: "code-workspace-find-row-restore",
+            onClick: () => toggleExcludeMatch(matchKey, false),
+          }
+        : {
+            label: "Exclude",
+            testId: "code-workspace-find-row-exclude",
+            onClick: () => toggleExcludeMatch(matchKey, false),
+          },
+    ]);
+  }, [contextMenu, excludedMatchKeys, toggleExcludeMatch]);
+
+  const allMatchesExcluded = useMemo(
+    () => allMatches.length > 0 && allMatches.every((m) => excludedMatchKeys.has(workspaceSearchMatchKey(m))),
+    [allMatches, excludedMatchKeys],
+  );
+
+
   // Lazily resolve CodeMirror languages for result paths so lines can share
   // the same grammar as the editor (and use --taomni-code-syntax-* colors).
   useEffect(() => {
@@ -637,7 +747,7 @@ export function FindInFilesPanel({
   }, [languagesByPath]);
 
   const replaceAll = useCallback(async () => {
-    if (!onReplaceMatches || allMatches.length === 0 || replacePreview || replacePreparingRef.current) return;
+    if (!onReplaceMatches || allMatches.length === 0 || allMatchesExcluded || replacePreview || replacePreparingRef.current) return;
     // ED-REPAIR-005: synchronously claim preparing state to prevent duplicate calls in the same event loop
     replacePreparingRef.current = true;
     setReplacePreparing(true);
@@ -722,6 +832,13 @@ export function FindInFilesPanel({
       }
       if (list && list.length === 0) remaining.delete(key);
     }
+    const initialExcludedKeys = new Set<string>();
+    for (const [stableKey, usageId] of stableToUsageId.entries()) {
+      const matchKey = usageToMatchKey.get(usageId);
+      if (matchKey && excludedMatchKeys.has(matchKey)) {
+        initialExcludedKeys.add(stableKey);
+      }
+    }
     const snapshot: ReplacePreviewSnapshot = {
       scope: frozenScope,
       query: frozenQuery,
@@ -750,11 +867,14 @@ export function FindInFilesPanel({
       stableToUsageId,
       replacement: frozenReplacement,
       snapshot,
+      initialExcludedKeys,
     });
   }, [
     allMatches,
+    allMatchesExcluded,
     caseSensitive,
     excludeGlobs,
+    excludedMatchKeys,
     includeGlobs,
     onPrepareReplacePreimages,
     onReplaceMatches,
@@ -813,13 +933,44 @@ export function FindInFilesPanel({
       );
       if (result.ok) {
         setReplacePreview(null);
+        // Post-commit pruning (DEC-05)
+        const committedMatchKeySet = new Set(filteredMatches.map(workspaceSearchMatchKey));
+        const nextGroupsMap = new Map<string, MatchGroup>();
+        let remainingMatchesCount = 0;
+        for (const [key, group] of groupsRef.current.entries()) {
+          const remainingInGroup = group.matches.filter(
+            (m) => !committedMatchKeySet.has(workspaceSearchMatchKey(m)),
+          );
+          if (remainingInGroup.length > 0) {
+            nextGroupsMap.set(key, { ...group, matches: remainingInGroup });
+            remainingMatchesCount += remainingInGroup.length;
+          }
+        }
+        groupsRef.current = nextGroupsMap;
+        const nextGroups = [...nextGroupsMap.values()];
+        setGroups(nextGroups);
+        setSummary((prev) => prev ? { ...prev, totalMatches: remainingMatchesCount } : null);
+
+        const appliedCount = result.appliedCount ?? filteredMatches.length;
+        const fileCount = result.fileCount ?? new Set(filteredMatches.map((m) => m.path)).size;
+        setReplacedNotice(`Replaced ${appliedCount} occurrence${appliedCount === 1 ? "" : "s"} in ${fileCount} file${fileCount === 1 ? "" : "s"}`);
+
+        const firstRemainingMatch = nextGroups[0]?.matches[0];
+        if (firstRemainingMatch) {
+          const firstKey = workspaceSearchMatchKey(firstRemainingMatch);
+          setFocusedMatchKey(firstKey);
+          setFocusRowNonce((n) => n + 1);
+          matchRowRefs.current.get(firstKey)?.focus();
+        } else {
+          inputRef.current?.focus();
+        }
       } else {
         setReplaceCommitError(result.message ?? "Replace blocked");
       }
     } finally {
       setReplaceCommitting(false);
     }
-  }, [onReplaceMatches, replacePreview, replacement]);
+  }, [onReplaceMatches, replacePreview]);
 
   const toggles = [
     { label: "Match case", icon: <CaseSensitive className="h-3.5 w-3.5" />, value: caseSensitive, set: setCaseSensitive },
@@ -937,6 +1088,7 @@ export function FindInFilesPanel({
         </label>
         <label className="inline-flex h-6 w-36 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5">
           <input
+            ref={replaceInputRef}
             value={replacement}
             placeholder="Replace with"
             aria-label="Replace text"
@@ -970,10 +1122,12 @@ export function FindInFilesPanel({
         {onReplaceMatches && (
           <div className="inline-flex items-center gap-1">
             <button
+              ref={replaceAllButtonRef}
               type="button"
               aria-label="Preview replace all matches"
+              title={allMatchesExcluded ? "All results are excluded" : undefined}
               data-testid="code-workspace-find-replace-all"
-              disabled={allMatches.length === 0 || replaceCommitting || replacePreparing || status === "searching"}
+              disabled={allMatches.length === 0 || allMatchesExcluded || replaceCommitting || replacePreparing || status === "searching"}
               className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
               onClick={() => void replaceAll()}
             >
@@ -1018,6 +1172,14 @@ export function FindInFilesPanel({
           {replaceCommitError}
         </div>
       ) : null}
+      {replacedNotice && (
+        <div
+          data-testid="code-workspace-find-replaced-notice"
+          className="border-b border-green-500/30 bg-green-500/10 px-2 py-1 text-[11px] text-green-500"
+        >
+          {replacedNotice}
+        </div>
+      )}
       {(summary?.truncated || summary?.cancelled) && (
         <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-500">
           {summary.cancelled ? "Search cancelled — results are partial." : `Match limit reached (${MAX_TOTAL_MATCHES}) — refine the query to see everything.`}
@@ -1057,11 +1219,17 @@ export function FindInFilesPanel({
             <section key={group.key} data-testid="code-workspace-find-file-group" data-file={group.title}>
               <button
                 type="button"
-                className="h-6 w-full flex items-center gap-2 px-3 font-medium text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                className="h-6 w-full flex items-center gap-2 px-3 font-medium text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] focus:outline-none focus:bg-[var(--taomni-code-active-line-bg)]"
                 title={group.title}
                 aria-expanded={!collapsed}
                 aria-label={collapsed ? `Expand ${group.title}` : `Collapse ${group.title}`}
                 onClick={() => toggleFileCollapsed(group.key)}
+                onKeyDown={(event) => {
+                  if (event.key === "Delete") {
+                    event.preventDefault();
+                    toggleExcludeGroup(group);
+                  }
+                }}
               >
                 <Chevron className="h-3.5 w-3.5 shrink-0" />
                 <File className="h-3.5 w-3.5 shrink-0" />
@@ -1074,14 +1242,57 @@ export function FindInFilesPanel({
               </button>
               {visibleMatches.map((match, index) => {
                 const segments = matchSegments(match);
+                const matchKey = workspaceSearchMatchKey(match);
+                const isExcluded = excludedMatchKeys.has(matchKey);
                 return (
                   <button
                     key={`${match.lineNumber}:${match.column}:${index}`}
+                    ref={(el) => {
+                      if (el) matchRowRefs.current.set(matchKey, el);
+                      else matchRowRefs.current.delete(matchKey);
+                    }}
                     type="button"
-                    className="h-6 w-full min-w-0 flex items-center gap-2 px-4 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
+                    data-testid="code-workspace-find-match-row"
+                    data-match-key={matchKey}
+                    data-excluded={isExcluded ? "true" : undefined}
+                    aria-selected={focusedMatchKey === matchKey}
+                    tabIndex={0}
+                    className={`h-6 w-full min-w-0 flex items-center gap-2 px-4 text-left hover:bg-[var(--taomni-code-active-line-bg)] focus:outline-none focus:bg-[var(--taomni-code-active-line-bg)] ${
+                      isExcluded ? "opacity-45 line-through" : ""
+                    }`}
                     title={`${group.title}:${match.lineNumber}:${match.column}`}
-                    onClick={() => onOpenMatch(match, { preview: true })}
+                    onClick={() => {
+                      setFocusedMatchKey(matchKey);
+                      matchRowRefs.current.get(matchKey)?.focus();
+                      onOpenMatch(match, { preview: true });
+                    }}
                     onDoubleClick={() => onOpenMatch(match, { preview: false })}
+                    onContextMenu={(e) => showMatchContextMenu(e, matchKey)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Delete") {
+                        e.preventDefault();
+                        toggleExcludeMatch(matchKey, true);
+                      } else if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        const idx = visibleMatchKeys.indexOf(matchKey);
+                        if (idx !== -1 && idx < visibleMatchKeys.length - 1) {
+                          const nextKey = visibleMatchKeys[idx + 1];
+                          setFocusedMatchKey(nextKey);
+                          matchRowRefs.current.get(nextKey)?.focus();
+                        }
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        const idx = visibleMatchKeys.indexOf(matchKey);
+                        if (idx > 0) {
+                          const prevKey = visibleMatchKeys[idx - 1];
+                          setFocusedMatchKey(prevKey);
+                          matchRowRefs.current.get(prevKey)?.focus();
+                        }
+                      } else if (e.key === "Enter") {
+                        e.preventDefault();
+                        onOpenMatch(match, { preview: false });
+                      }
+                    }}
                   >
                     <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
                       {match.lineNumber}:{match.column}
@@ -1123,17 +1334,21 @@ export function FindInFilesPanel({
           <ReplacePreviewDialog
             edit={replacePreview.edit}
             replacement={replacePreview.replacement}
+            query={query.trim()}
             scopeLabel={replaceScopeLabel(replacePreview.snapshot)}
+            initialExcludedKeys={replacePreview.initialExcludedKeys}
             committing={replaceCommitting}
             commitError={replaceCommitError}
             onCommit={(excluded) => void commitReplacePreview(excluded)}
             onCancel={() => {
               setReplacePreview(null);
               setReplaceCommitError(null);
+              replaceAllButtonRef.current?.focus();
             }}
           />
         </div>
       )}
+      {contextMenu.render}
     </div>
   );
 }

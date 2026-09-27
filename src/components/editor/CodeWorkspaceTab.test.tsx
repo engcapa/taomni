@@ -2441,6 +2441,12 @@ describe("CodeWorkspaceTab", () => {
     await act(async () => {
       fireEvent.keyDown(window, { key: "z", ctrlKey: true });
     });
+    const undoOk2442 = screen.queryByTestId("code-workspace-undo-ok");
+    if (undoOk2442) {
+      await act(async () => {
+        fireEvent.click(undoOk2442);
+      });
+    }
     await waitFor(() => expect(selectCodeWorkspaceUi(
       useCodeWorkspaceStore.getState(),
       "instance-actions",
@@ -10289,6 +10295,12 @@ end_of_record
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
+      const undoOk10290 = screen.queryByTestId("code-workspace-undo-ok");
+      if (undoOk10290) {
+        await act(async () => {
+          fireEvent.click(undoOk10290);
+        });
+      }
       await waitFor(() => expect(
         selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-compare-history")
           .openFiles["root:app:src/main.ts"]?.text,
@@ -10616,6 +10628,12 @@ end_of_record
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
+      const undoOk10629 = screen.queryByTestId("code-workspace-undo-ok");
+      if (undoOk10629) {
+        await act(async () => {
+          fireEvent.click(undoOk10629);
+        });
+      }
       await waitFor(() => expect(disk["src/main.ts"]).toBe(PRE["src/main.ts"]));
       await waitFor(() => expect(disk["src/other.ts"]).toBe(PRE["src/other.ts"]));
 
@@ -10647,6 +10665,12 @@ end_of_record
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
+      const undoOk10666 = screen.queryByTestId("code-workspace-undo-ok");
+      if (undoOk10666) {
+        await act(async () => {
+          fireEvent.click(undoOk10666);
+        });
+      }
       await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
         "Cannot undo workspace edit: Undo blocked to protect later edits",
       ));
@@ -12435,6 +12459,10 @@ end_of_record
       expect(attempts).toEqual(new Map([["src/a.ts", 1], ["src/b.ts", 2], ["src/d.ts", 2]]));
       await waitFor(() => expect(storedRecoveryEntries().some(({ entry }) => entry.status === "committed")).toBe(true));
       await act(async () => { fireEvent.keyDown(window, { key: "z", ctrlKey: true }); });
+      const undoOk12461 = screen.queryByTestId("code-workspace-undo-ok");
+      if (undoOk12461) {
+        await act(async () => { fireEvent.click(undoOk12461); });
+      }
       await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
       expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]);
       expect(disk["src/d.ts"]).toBe("hello delta");
@@ -12639,6 +12667,12 @@ end_of_record
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
+      const undoOk12668 = screen.queryByTestId("code-workspace-undo-ok");
+      if (undoOk12668) {
+        await act(async () => {
+          fireEvent.click(undoOk12668);
+        });
+      }
       await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
       expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]);
 
@@ -12731,6 +12765,12 @@ end_of_record
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
+      const undoOk12766 = screen.queryByTestId("code-workspace-undo-ok");
+      if (undoOk12766) {
+        await act(async () => {
+          fireEvent.click(undoOk12766);
+        });
+      }
       await waitFor(() => expect(disk["src/A.java"]).toBe("hello UPPER_A"));
       expect(disk["src/a.java"]).toBe("hello lower_a");
     });
@@ -12889,6 +12929,8 @@ end_of_record
         expect(disk["src/b.ts"]).toBe("hello modified");
         await waitFor(() => expect(registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled).toBe(true));
         await act(async () => { await registrationRef.current?.executeAction("workspace.undoWorkspaceEdit"); });
+        const undoOk = screen.queryByTestId("code-workspace-undo-ok");
+        if (undoOk) fireEvent.click(undoOk);
         await waitFor(() => expect(disk["src/a.ts"]).toBe("hello needle"));
         expect(disk["src/b.ts"]).toBe("hello modified");
         return;
@@ -13494,4 +13536,227 @@ end_of_record
       expect(document.activeElement).toBe(filterInput);
     });
   });
+
+  describe("ED-PARITY-006: workspace edit undo routing", () => {
+    function setupWorkspace(instanceId: string) {
+      const disk: Record<string, string> = {
+        "src/a.txt": "alpha token one",
+        "src/b.txt": "gamma token three",
+      };
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: `ws-${instanceId}`,
+        workspaceInstanceId: `instance-${instanceId}`,
+        name: instanceId,
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/a.txt" },
+      };
+      workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => (
+        path === "src"
+          ? Object.keys(disk).map((rel) => entry(rel.split("/").pop()!, rel))
+          : [entry("src", "src", "dir")]
+      ));
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+        if (!(path in disk)) throw new Error(`missing fixture file: ${path}`);
+        return file(path, disk[path]!, { hash: `hash-${disk[path]!}` });
+      });
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      return { disk, workspace, registrationRef, onCommandsChange };
+    }
+
+    async function seedAndCommitReplace(instanceId: string) {
+      const env = setupWorkspace(instanceId);
+      let searchHandler: ((event: workspaceSearchModule.WorkspaceSearchEvent) => void) | null = null;
+      const unlisten = vi.fn();
+      vi.spyOn(workspaceSearchModule, "subscribeWorkspaceSearch").mockImplementation(async (_id, handler) => {
+        searchHandler = handler;
+        return unlisten;
+      });
+      vi.spyOn(workspaceSearchModule, "workspaceSearchStart").mockResolvedValue("search-parity-006");
+
+      renderWorkspace(env.workspace, { onCommandsChange: env.onCommandsChange });
+      await screen.findByTitle("app / src/a.txt");
+
+      await act(async () => {
+        await env.registrationRef.current?.executeAction("workspace.findInFiles");
+      });
+
+      const searchInput = await screen.findByLabelText("Search query");
+      fireEvent.change(searchInput, { target: { value: "token" } });
+      fireEvent.keyDown(searchInput, { key: "Enter" });
+
+      await waitFor(() => expect(searchHandler).not.toBeNull());
+
+      await act(async () => {
+        searchHandler?.({
+          searchId: "search-parity-006",
+          kind: "batch",
+          matches: [
+            {
+              rootId: "app",
+              rootName: "app",
+              rootPath: "/repo/app",
+              path: "src/a.txt",
+              lineNumber: 1,
+              column: 7,
+              matchStart: 6,
+              matchEnd: 11,
+              lineText: "alpha token one",
+            },
+            {
+              rootId: "app",
+              rootName: "app",
+              rootPath: "/repo/app",
+              path: "src/b.txt",
+              lineNumber: 1,
+              column: 7,
+              matchStart: 6,
+              matchEnd: 11,
+              lineText: "gamma token three",
+            },
+          ],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 2,
+          error: null,
+        });
+        searchHandler?.({
+          searchId: "search-parity-006",
+          kind: "done",
+          matches: [],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 2,
+          error: null,
+        });
+      });
+
+      const replaceInput = screen.getByLabelText("Replace text");
+      fireEvent.change(replaceInput, { target: { value: "coin" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+      expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+      await waitFor(() => expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument());
+
+      expect(env.disk["src/a.txt"]).toBe("alpha coin one");
+      expect(env.disk["src/b.txt"]).toBe("gamma coin three");
+
+      return { ...env, searchInput };
+    }
+
+    it("ED-PARITY-006 Ctrl+Z in Search query does not undo the workspace edit", async () => {
+      const { disk, searchInput } = await seedAndCommitReplace("undo-input-protect");
+
+      searchInput.focus();
+      fireEvent.keyDown(searchInput, { key: "z", ctrlKey: true });
+      fireEvent.keyDown(searchInput, { key: "z", ctrlKey: true, shiftKey: true });
+
+      // No undo confirm dialog appears
+      expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument();
+      // Disk remains committed
+      expect(disk["src/a.txt"]).toBe("alpha coin one");
+      expect(disk["src/b.txt"]).toBe("gamma coin three");
+    });
+
+    it("ED-PARITY-006 Ctrl+Z on a result row asks before undoing", async () => {
+      await seedAndCommitReplace("undo-confirm-prompt");
+
+      const matchRows = screen.queryAllByTestId("code-workspace-find-match-row");
+      const targetElement = matchRows[0] ?? screen.getByTestId("code-workspace-find-replace-all");
+      targetElement.focus();
+      fireEvent.keyDown(targetElement, { key: "z", ctrlKey: true });
+
+      const confirmDialog = await screen.findByTestId("code-workspace-undo-confirm");
+      expect(confirmDialog).toBeInTheDocument();
+      expect(confirmDialog).toHaveTextContent("Undo Replace in files?");
+      expect(document.activeElement).toBe(screen.getByTestId("code-workspace-undo-ok"));
+    });
+
+    it("ED-PARITY-006 Cancel and Escape leave history untouched", async () => {
+      const { disk } = await seedAndCommitReplace("undo-cancel-esc");
+
+      const target = screen.getByTestId("code-workspace-find-replace-all");
+      target.focus();
+      fireEvent.keyDown(target, { key: "z", ctrlKey: true });
+
+      await screen.findByTestId("code-workspace-undo-confirm");
+      const cancelBtn = screen.getByTestId("code-workspace-undo-cancel");
+      fireEvent.click(cancelBtn);
+
+      await waitFor(() => expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument());
+      expect(disk["src/a.txt"]).toBe("alpha coin one");
+
+      // Trigger again and press Escape
+      fireEvent.keyDown(target, { key: "z", ctrlKey: true });
+      const confirmDialog2 = await screen.findByTestId("code-workspace-undo-confirm");
+      fireEvent.keyDown(confirmDialog2, { key: "Escape" });
+
+      await waitFor(() => expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument());
+      expect(disk["src/a.txt"]).toBe("alpha coin one");
+    });
+
+    it("ED-PARITY-006 OK undoes both files once", async () => {
+      const { disk } = await seedAndCommitReplace("undo-ok");
+
+      const target = screen.getByTestId("code-workspace-find-replace-all");
+      target.focus();
+      fireEvent.keyDown(target, { key: "z", ctrlKey: true });
+
+      await screen.findByTestId("code-workspace-undo-confirm");
+      fireEvent.click(screen.getByTestId("code-workspace-undo-ok"));
+
+      await waitFor(() => expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument());
+      expect(disk["src/a.txt"]).toBe("alpha token one");
+      expect(disk["src/b.txt"]).toBe("gamma token three");
+    });
+
+    it("ED-PARITY-006 editor Ctrl+Z still claims the journal without a prompt", async () => {
+      const { disk } = await seedAndCommitReplace("undo-editor-claim");
+
+      const editor = screen.getByTestId("code-workspace-editor");
+      editor.focus();
+      fireEvent.keyDown(editor, { key: "z", ctrlKey: true });
+
+      // No prompt appeared
+      expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument();
+      // Disk undone
+      await waitFor(() => expect(disk["src/a.txt"]).toBe("alpha token one"));
+    });
+
+    it("ED-PARITY-006 Replace in Files action focuses Replace text", async () => {
+      const env = setupWorkspace("replace-in-files-focus");
+      renderWorkspace(env.workspace, { onCommandsChange: env.onCommandsChange });
+      await screen.findByTitle("app / src/a.txt");
+
+      // Query empty -> focuses query input
+      await act(async () => {
+        await env.registrationRef.current?.executeAction("workspace.replaceInFiles");
+      });
+      const searchInput = await screen.findByLabelText("Search query");
+      expect(document.activeElement).toBe(searchInput);
+
+      // Query not empty -> focuses Replace text
+      fireEvent.change(searchInput, { target: { value: "token" } });
+      await act(async () => {
+        await env.registrationRef.current?.executeAction("workspace.replaceInFiles");
+      });
+      const replaceInput = screen.getByLabelText("Replace text");
+      expect(document.activeElement).toBe(replaceInput);
+    });
+  });
 });
+
