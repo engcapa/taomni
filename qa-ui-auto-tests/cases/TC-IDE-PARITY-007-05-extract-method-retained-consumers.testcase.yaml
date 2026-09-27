@@ -1,0 +1,310 @@
+id: TC-IDE-PARITY-007-05
+title: Extract Method shared entries and consumers stay intact
+description: Generic Refactor This / Alt+Enter candidate menus and the required-edit preview keep working around the Extract Method transaction.
+covers:
+- F25.5
+tags:
+- code-workspace
+- refactor
+- parity007
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity007_extract
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+Shift+T
+- wait_for: '[data-testid="context-menu"]'
+- assert_count:
+    selector: '[data-testid^="code-workspace-intention-"]'
+    equal: 2
+- click: '[data-testid^="code-workspace-intention-"] >> nth=0'
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- eval_readonly:
+    expression: document.activeElement.value
+    contains: extracted
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_trace:
+    requests: 1
+    resolves: 1
+    pending: 0
+- parity007_set_mode: none
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Alt+Enter
+- wait_for: '[data-testid="context-menu"]'
+- assert_count:
+    selector: '[data-testid^="code-workspace-intention-"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Extract to local variable
+- press: Escape
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: hidden
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_trace:
+    requests: 2
+    resolves: 1
+    pending: 0
+- parity007_set_mode: multi-file
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- wait_for:
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    contains: Extract to method
+- screenshot: tc-ide-parity-007-05-preview.png
+- click: '[data-testid="refactoring-preview-select-none"]'
+- assert_text:
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    contains: ExtractTarget.java
+- click: '[data-testid="refactoring-preview-cancel"]'
+- wait_for:
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    state: hidden
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-007-V3-05-refactor-this
+    requirement: Refactor This keeps its generic candidate list (method plus variable) and selecting the method candidate joins the same naming chain as the direct chord.
+    actions:
+    - 8
+    checkpoints:
+    - step: 20
+      expectation: The generic Refactor This menu lists exactly the two provider candidates.
+    - step: 23
+      expectation: Selecting the method candidate committed B1 through the naming dialog.
+    - step: 30
+      expectation: Undo after the unchanged-name path returns B0.
+    results:
+    - 20
+    - 23
+    - 30
+  - id: ED-PARITY-007-V3-05-alt-enter
+    requirement: 'Alt+Enter keeps the generic code-action flow: the non-method candidate is still listed and Escape leaves the buffer untouched.'
+    actions:
+    - 34
+    checkpoints:
+    - step: 45
+      expectation: Exactly the variable candidate is listed; the method filter did not drop it.
+    - step: 46
+      expectation: The variable candidate title is visible.
+    - step: 49
+      expectation: Escape leaves the buffer at B0.
+    - step: 50
+      expectation: Alt+Enter issued one request and resolved nothing.
+    results:
+    - 45
+    - 46
+    - 49
+    - 50
+  - id: ED-PARITY-007-V3-05-preview
+    requirement: A real multi-file method edit enters the shared preview; Select None cannot drop required files and Cancel leaves every file unchanged.
+    actions:
+    - 49
+    checkpoints:
+    - step: 63
+      expectation: The shared refactoring preview opened for the multi-file method edit.
+    - step: 64
+      expectation: The preview names the extraction.
+    - step: 67
+      expectation: After Select None the required ExtractTarget file is still listed.
+    - step: 70
+      expectation: Cancel closes the preview with the buffer back at B0 and no naming dialog.
+    results:
+    - 63
+    - 64
+    - 67
+    - 70
+  visual:
+  - check: Preview dialog layout and the extraction entry labels.
+    method: manual
+    reason: Screenshots are artifacts; not a verdict.
+  native:
+  - check: Rename/quickfix/save consumers and real host bytes.
+    method: external
+    reason: The shared unit suite and TC-IDE-PARITY-007-03 cover the native boundaries.

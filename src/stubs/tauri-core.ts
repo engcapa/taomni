@@ -49,6 +49,18 @@ import {
   parity005Root,
   parity005Status,
 } from "./parity005Completion";
+import {
+  parity007CodeActionResolve,
+  parity007CodeActions,
+  parity007DocumentSymbols,
+  parity007DocumentPath,
+  parity007Enabled,
+  parity007PrepareRename,
+  parity007Rename,
+  parity007Root,
+  parity007Status,
+  parity007WriteFailure,
+} from "./parity007Extract";
 
 const SESSION_STORAGE_KEY = "taomni.sessions.v1";
 const GROUP_STORAGE_KEY = "taomni.groups.v1";
@@ -1076,6 +1088,8 @@ function parity005DocumentPath(args?: InvokeArgs): string {
 function stubLspDocumentStatus(args?: InvokeArgs) {
   const filePath = parity005DocumentPath(args);
   if (parity005Enabled(filePath)) return parity005Status(filePath);
+  const editFilePath = parity007DocumentPath(args);
+  if (parity007Enabled(editFilePath)) return parity007Status(editFilePath);
   const preset = stubLspPresetForPath(filePath);
   return {
     path: filePath,
@@ -1098,16 +1112,23 @@ function stubLspServerStatuses() {
     presetId: preset.id,
     displayName: preset.displayName,
     documentLanguageIds: preset.documentLanguageIds,
-    available: preset.id === "java" && parity005Enabled(),
-    active: preset.id === "java" && parity005Enabled(),
+    available: preset.id === "java" && (parity005Enabled() || parity007Enabled()),
+    active: preset.id === "java" && (parity005Enabled() || parity007Enabled()),
     selectedCommandId: null,
     selectedCommand: null,
     installHint: preset.commands[0]?.installHint ?? "",
-    error: preset.id === "java" && parity005Enabled() ? null : "Language servers are not available in browser preview",
+    error: preset.id === "java" && (parity005Enabled() || parity007Enabled())
+      ? null
+      : "Language servers are not available in browser preview",
     runtimeStatus: preset.id === "java"
-      ? parity005Enabled() ? "B-005 controlled browser provider" : "Java not probed in browser preview — need JDK 21+ for jdtls"
+      ? parity007Enabled()
+        ? "B-007 controlled browser provider"
+        : parity005Enabled() ? "B-005 controlled browser provider" : "Java not probed in browser preview — need JDK 21+ for jdtls"
       : null,
-    commands: preset.commands.map((command) => ({ ...command, available: preset.id === "java" && parity005Enabled() })),
+    commands: preset.commands.map((command) => ({
+      ...command,
+      available: preset.id === "java" && (parity005Enabled() || parity007Enabled()),
+    })),
   }));
 }
 
@@ -2297,6 +2318,23 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
           errorMessage: null,
         } as T;
       }
+      if (parity007Enabled() && workspaceRoot === parity007Root) {
+        return {
+          status: "ready",
+          modules: [{
+            id: "parity007:extract", name: "extract", root: parity007Root,
+            pomPath: `${parity007Root}/pom.xml`,
+            sourceRoots: [`${parity007Root}/src/main/java`], testRoots: [], resourceRoots: [],
+            outputDir: null, dependencies: [],
+            classpath: [],
+          }],
+          provenance: {
+            toolKind: "qa-fixture", toolVersion: null, javaHome: null, javaVersion: null,
+            argv: [], cwd: parity007Root, pomHash: "B-007", resolvedAt: new Date().toISOString(),
+          },
+          errorMessage: null,
+        } as T;
+      }
       // No build backend exists in the browser preview. Return no usable
       // result instead of a well-formed failed response so the store's typed
       // prerequisite failure (ED-PROJECT-005 A4) names the missing backend
@@ -2351,6 +2389,16 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "lsp_java_project_model": {
+      const editPath = parity007DocumentPath(args as InvokeArgs);
+      if (parity007Enabled(editPath)) {
+        return {
+          status: parity007Status(editPath), active: true, processId: null,
+          serverName: "B-007 controlled provider", serverVersion: "fixture",
+          registeredCommands: [], buildFiles: [`${parity007Root}/pom.xml`],
+          javaHomeUsed: null, javaProjects: [], classpathProbe: null,
+          probeReason: "browser-controlled-provider",
+        } as T;
+      }
       const path = parity005DocumentPath(args as InvokeArgs);
       if (parity005Enabled(path)) {
         return {
@@ -2464,10 +2512,69 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         ranges: [],
       } as T;
     }
+    case "lsp_code_actions": {
+      const path = parity007DocumentPath(args as InvokeArgs);
+      if (parity007Enabled(path)) {
+        return await parity007CodeActions(path, args as InvokeArgs) as T;
+      }
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        actions: [],
+      } as T;
+    }
     case "lsp_code_action_resolve": {
+      const path = parity007DocumentPath(args as InvokeArgs);
+      if (parity007Enabled(path)) {
+        return await parity007CodeActionResolve(
+          path,
+          (args as InvokeArgs).action as Parameters<typeof parity007CodeActionResolve>[1],
+          `${parity007Root}/src/main/java/demo/ExtractHelper.java`,
+        ) as T;
+      }
       return {
         status: stubLspDocumentStatus(args as InvokeArgs),
         action: null,
+      } as T;
+    }
+    case "lsp_document_symbols": {
+      const path = parity007DocumentPath(args as InvokeArgs);
+      if (parity007Enabled(path)) return await parity007DocumentSymbols(path) as T;
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        symbols: [],
+      } as T;
+    }
+    case "lsp_prepare_rename": {
+      const path = parity007DocumentPath(args as InvokeArgs);
+      if (parity007Enabled(path)) {
+        return await parity007PrepareRename(path, {
+          line: Number((args as InvokeArgs).line ?? 0),
+          character: Number((args as InvokeArgs).character ?? 0),
+        }) as T;
+      }
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        range: null,
+        placeholder: null,
+        allowed: false,
+        message: "Rename is not available in browser preview",
+      } as T;
+    }
+    case "lsp_rename": {
+      const path = parity007DocumentPath(args as InvokeArgs);
+      if (parity007Enabled(path)) {
+        return await parity007Rename(
+          path,
+          {
+            line: Number((args as InvokeArgs).line ?? 0),
+            character: Number((args as InvokeArgs).character ?? 0),
+          },
+          String((args as InvokeArgs).newName ?? ""),
+        ) as T;
+      }
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        edit: { documentEdits: [], operations: [] },
       } as T;
     }
     case "lsp_semantic_tokens": {
@@ -2756,6 +2863,10 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const path = args?.path as string;
       const target = repoRoot ? joinWorkspacePath(repoRoot, path) : path;
       assertWorkspaceWritablePath(path);
+      // ED-PARITY-007 controlled write failure for the isolated fixture only.
+      if (isRoot && parity007Enabled(target) && parity007WriteFailure(target)) {
+        throw new Error("B-007 controlled write failure: the workspace file could not be written");
+      }
       const expectedHash = (args?.expectedHash as string | null | undefined)?.trim();
       const currentBytes = new Uint8Array(await vfsReadBytes(target));
       const oldHash = await sha256Bytes(currentBytes);

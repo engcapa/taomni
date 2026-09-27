@@ -124,6 +124,27 @@ real JDT LS, Rust IPC or disk effects.
 | `parity005_release` | `fetch \| resolve` | Releases held responses; fails if none is pending. |
 | `parity005_trace` | `{fetch?, resolve?, pending?}` | Asserts exact request counts and saves the read-only event trace in the case report. |
 
+## ED-PARITY-007 controlled browser provider
+
+These verbs drive only the isolated `/preview/parity007` Java fixture. The
+Extract Method transaction, candidate session, Rename chain, workspace edit and
+history stay on the production paths; the verbs change provider timing/failure
+and read a trace. They cannot prove JDT LS, host disk or WebView behaviour.
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `parity007_set_mode` | `normal \| multi-candidate \| none \| empty-supported \| disabled \| command-only \| malformed \| timeout \| changed \| error \| resolve-error \| symbols-error \| symbols-ambiguous \| rename-error \| multi-file \| write-failure` | Selects the next controlled response/fault. |
+| `parity007_hold` | `request \| resolve \| symbols-before \| symbols-after \| prepare-rename \| rename` | Holds the next matching provider response once. |
+| `parity007_wait_pending` | same phases | Waits for a real pending held response. |
+| `parity007_release` | same phases | Releases one pending response; fails when none is pending. |
+| `parity007_trace` | `{requests?, resolves?, symbols?, prepares?, renames?, pending?}` | Asserts exact IPC counts and saves the read-only event trace in the case report. |
+
+## ED-PARITY-007 isolated native program oracle
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `parity007_java_oracle` | `{scenario: e1 \| e3, expected, source, label?, artifact?}` | Compiles the current real host source (plus the fixed E1 `ExtractOracle`) with the configured JDK into a fresh report-root classes directory, runs it, normalises line endings and requires exact stdout with exit 0. It records the commands, JDK versions, source hash, exit codes and raw output, and never edits the document. |
+
 ## ED-PARITY-005 isolated native provider boundary
 
 | Verb | Args | Notes |

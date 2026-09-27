@@ -13,7 +13,9 @@ import {
 import type { CodeWorkspaceTabInfo } from "../../types";
 import type {
   LspCapabilitySummary,
+  LspCodeAction,
   LspDocumentHighlight,
+  LspDocumentSymbol,
   LspDocumentStatus,
   LspServerStatus,
 } from "../../lib/editor/lsp";
@@ -3461,6 +3463,91 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
       "save action issue: Organize imports: Code action request failed: provider transport failed",
     ));
+  });
+
+  // ED-PARITY-007 DEC-05: the Rust/TS failure classification change must not
+  // turn a provider failure into a silent "no actions" claim, and must never
+  // block the user's save.
+  it("ED-PARITY-007 organize imports on save reports provider failure but still saves", async () => {
+    const instanceId = "instance-parity007-save-action";
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-parity007-save-action",
+      workspaceInstanceId: instanceId,
+      name: "Parity 007 save action",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    const initialText = "import { b } from \"./b\";\nvalue();\n";
+    const dirtyText = initialText + "// dirty\n";
+    const status = documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ codeAction: true }),
+    });
+    window.localStorage.setItem("taomni.codeWorkspace.codeStyle.schemes.v1", JSON.stringify({
+      schemes: [{
+        schemaVersion: 3,
+        id: "save-actions",
+        name: "Save actions",
+        languageId: "ts",
+        basedOn: null,
+        values: {},
+        saveActions: { format: false, organizeImports: true, rearrange: false, cleanup: false },
+        exclusions: { patterns: [], formatterMarkers: true },
+      }],
+      activeByLanguage: { ts: "save-actions" },
+    }));
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", initialText));
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+      _root: string,
+      path: string,
+      text: string,
+    ) => writeAck(file(path, text, { hash: "hash-" + text })));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspChangeDocument.mockResolvedValue(status);
+    lspMocks.lspSaveDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspCodeActions.mockRejectedValue(new Error("provider transport failed"));
+
+    const rendered = renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!)!;
+    act(() => {
+      view.dispatch({ changes: { from: view.state.doc.length, insert: "// dirty\n" } });
+    });
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      instanceId,
+    ).openFiles["root:app:src/main.ts"]?.text).toBe(dirtyText));
+
+    fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+    // The provider failure is reported truthfully...
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+      "save action issue: Organize imports: Code action request failed: provider transport failed",
+    ));
+    // ...and the save itself still wrote the live buffer bytes.
+    await waitFor(() => expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledWith(
+      "/repo/app",
+      "src/main.ts",
+      dirtyText,
+      "hash-src/main.ts",
+      "UTF-8",
+      false,
+    ));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      instanceId,
+    ).openFiles["root:app:src/main.ts"]?.dirty).toBe(false));
+    expect(lspMocks.lspExecuteCommand).not.toHaveBeenCalled();
   });
 
   it("supersedes an older intention request when another entry opens", async () => {
@@ -13765,6 +13852,563 @@ end_of_record
 
       // Focus should remain on the filter input, not stolen back to editor
       expect(document.activeElement).toBe(filterInput);
+    });
+  });
+  describe("ED-PARITY-007: extract method direct run, naming and boundaries (mounted)", () => {
+    const EXTRACT_PATH = "src/main/java/demo/ExtractTarget.java";
+    const EXTRACT_KEY = "root:app:" + EXTRACT_PATH;
+    const EXTRACT_ABS = "/repo/app/" + EXTRACT_PATH;
+    const EXTRACT_URI = "file://" + EXTRACT_ABS;
+    const EXTRACT_TITLE = "app / " + EXTRACT_PATH;
+    const EXTRACT_INSTANCE = "instance-extract-007";
+    const B0 = [
+      "package demo;",
+      "",
+      "public class ExtractTarget {",
+      "    int total(int[] values) {",
+      "        int sum = 0;",
+      "        for (int v : values) {",
+      "            sum += v;",
+      "        }",
+      "        return sum * 2;",
+      "    }",
+      "",
+      "    String range(int[] values) {",
+      "        return null;",
+      "    }",
+      "}",
+      "",
+    ].join("\n");
+    const B1 = B0
+      .replace(
+        "        int sum = 0;\n        for (int v : values) {\n            sum += v;\n        }\n",
+        "        int sum = extracted(values);\n",
+      )
+      .replace(
+        "    }\n\n    String range",
+        "    }\n\n    private static int extracted(int[] values) {\n        int sum = 0;\n        for (int v : values) {\n            sum += v;\n        }\n        return sum;\n    }\n\n    String range",
+      );
+    const B2 = B1.split("extracted").join("sumOf");
+
+    type ExtractMode =
+      | "normal" | "multi" | "none" | "disabled" | "command-only" | "malformed"
+      | "timeout" | "changed" | "boom" | "resolve-error" | "symbols-error"
+      | "symbols-ambiguous" | "rename-error";
+
+    function extractMethodAction(title: string, disabled?: string) {
+      const raw: Record<string, unknown> = { title, kind: "refactor.extract.function", data: { parity007: title } };
+      if (disabled) raw.disabled = { reason: disabled };
+      return {
+        title,
+        kind: "refactor.extract.function",
+        isPreferred: !disabled,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw,
+      };
+    }
+
+    function extractVariableAction() {
+      return {
+        title: "Extract to local variable",
+        kind: "refactor.extract.variable",
+        isPreferred: false,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: "Extract to local variable", kind: "refactor.extract.variable" },
+      };
+    }
+
+    function javaSymbols(text: string): LspDocumentSymbol[] {
+      const symbols: LspDocumentSymbol[] = [];
+      const build = (
+        name: string,
+        kind: number,
+        depth: number,
+        line: number,
+        lineText: string,
+      ): LspDocumentSymbol => {
+        const column = Math.max(lineText.indexOf(name), 0);
+        return {
+          name,
+          detail: null,
+          kind,
+          depth,
+          range: { start: { line, character: 0 }, end: { line, character: lineText.length } },
+          selectionRange: { start: { line, character: column }, end: { line, character: column + name.length } },
+        };
+      };
+      text.split("\n").forEach((line, index) => {
+        const classMatch = /^\s*(?:public\s+)?class\s+([A-Za-z_$][\w$]*)/.exec(line);
+        if (classMatch) {
+          symbols.push(build(classMatch[1], 5, 0, index, line));
+          return;
+        }
+        const methodMatch = /^\s{2,}(?:(?:public|private|protected|static|final)\s+)*([\w$<>\[\],.\s]+?)\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{/.exec(line);
+        if (methodMatch) symbols.push(build(methodMatch[2], 6, 1, index, line));
+      });
+      return symbols;
+    }
+
+    function extractEdits() {
+      return [
+        {
+          range: { start: { line: 4, character: 0 }, end: { line: 8, character: 0 } },
+          newText: "        int sum = extracted(values);\n",
+        },
+        {
+          range: { start: { line: 11, character: 0 }, end: { line: 11, character: 0 } },
+          newText: "    private static int extracted(int[] values) {\n        int sum = 0;\n        for (int v : values) {\n            sum += v;\n        }\n        return sum;\n    }\n\n",
+        },
+      ];
+    }
+
+    interface ExtractFixture {
+      disk: Record<string, string>;
+      workspace: CodeWorkspaceTabInfo;
+      registrationRef: { current: WorkspaceCommandRegistration | null };
+      onCommandsChange: (tabId: string, next: WorkspaceCommandRegistration | null) => void;
+      text: () => string;
+    }
+
+    function setupExtract(instanceId: string, mode: ExtractMode = "normal"): ExtractFixture {
+      const disk: Record<string, string> = { [EXTRACT_PATH]: B0 };
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-" + instanceId,
+        workspaceInstanceId: instanceId,
+        name: "Extract",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: EXTRACT_PATH },
+      };
+      workspaceMocks.workspaceListDir.mockResolvedValue([
+        entry("demo", "src/main/java/demo", "dir"),
+      ]);
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => (
+        file(path, disk[path] ?? "")
+      ));
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: "hash-" + text }));
+      });
+      const status = documentStatus({
+        path: EXTRACT_ABS,
+        uri: EXTRACT_URI,
+        presetId: "java",
+        languageId: "java",
+        displayName: "Java",
+        available: true,
+        active: true,
+        capabilities: defaultCapabilities({ codeAction: true, documentSymbol: true, rename: true }),
+      });
+      lspMocks.lspOpenDocument.mockResolvedValue(status);
+      lspMocks.lspChangeDocument.mockResolvedValue(status);
+      lspMocks.lspSaveDocument.mockResolvedValue(status);
+      const text = () => selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        instanceId,
+      ).openFiles[EXTRACT_KEY]?.text ?? "";
+      lspMocks.lspDocumentSymbols.mockImplementation(async () => {
+        if (mode === "symbols-error") throw new Error("B-007 controlled documentSymbol failure");
+        const symbols = javaSymbols(text());
+        if (mode === "symbols-ambiguous" && /(extracted|sumOf)\(values\)/.test(text())) {
+          symbols.push({
+            name: "extractedExtra",
+            detail: null,
+            kind: 6,
+            depth: 1,
+            range: { start: { line: 12, character: 0 }, end: { line: 12, character: 0 } },
+            selectionRange: { start: { line: 12, character: 0 }, end: { line: 12, character: 0 } },
+          });
+        }
+        return { status, symbols };
+      });
+      lspMocks.lspCodeActions.mockImplementation(async () => {
+        if (mode === "timeout") throw new Error("language server request timed out: textDocument/codeAction");
+        if (mode === "changed") throw new Error("language server request cancelled: document changed");
+        if (mode === "boom") throw new Error("B-007 controlled provider error");
+        if (mode === "malformed") {
+          return { status, actions: [null, { kind: "quickfix" }] as unknown as LspCodeAction[] };
+        }
+        if (mode === "none") return { status, actions: [extractVariableAction()] };
+        if (mode === "disabled") {
+          return { status, actions: [extractMethodAction("Extract to method", "The selected block has several outputs")] };
+        }
+        if (mode === "multi") {
+          return {
+            status,
+            actions: [
+              extractMethodAction("Extract to method"),
+              extractMethodAction("Extract to method (second)"),
+              extractMethodAction("Extract to method (unavailable)", "Not available for this selection"),
+            ],
+          };
+        }
+        if (mode === "command-only") {
+          return {
+            status,
+            actions: [{
+              title: "Extract to method",
+              kind: "refactor.extract.function",
+              isPreferred: true,
+              edit: null,
+              command: "demo.unknownExtract",
+              commandArguments: [],
+              raw: { title: "Extract to method", kind: "refactor.extract.function", command: "demo.unknownExtract", arguments: [] },
+            }],
+          };
+        }
+        return { status, actions: [extractMethodAction("Extract to method"), extractVariableAction()] };
+      });
+      lspMocks.lspCodeActionResolve.mockImplementation(async (_descriptor: unknown, raw: unknown) => {
+        if (mode === "resolve-error") return { status, action: null };
+        const action = raw as Record<string, unknown>;
+        return {
+          status,
+          action: {
+            ...action,
+            edit: {
+              documentEdits: [{ uri: EXTRACT_URI, path: EXTRACT_ABS, edits: extractEdits() }],
+            },
+          },
+        };
+      });
+      lspMocks.lspPrepareRename.mockResolvedValue({
+        status,
+        allowed: true,
+        range: { start: { line: 11, character: 15 }, end: { line: 11, character: 24 } },
+        placeholder: "extracted",
+        message: null,
+      });
+      lspMocks.lspRename.mockImplementation(async (_descriptor: unknown, _position: unknown, newName: string) => {
+        if (!/^[A-Za-z_$][\w$]*$/.test(newName)) {
+          throw new Error("B-007 controlled rename failure: '" + newName + "' is not a valid identifier");
+        }
+        if (mode === "rename-error") throw new Error("B-007 controlled rename failure: name rejected");
+        const current = text();
+        const lines = current.split("\n");
+        return {
+          status,
+          edit: {
+            documentEdits: [{
+              uri: EXTRACT_URI,
+              path: EXTRACT_ABS,
+              edits: [{
+                range: {
+                  start: { line: 0, character: 0 },
+                  end: { line: lines.length - 1, character: (lines[lines.length - 1] ?? "").length },
+                },
+                newText: current.split("extracted").join(newName),
+              }],
+            }],
+          },
+        };
+      });
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      return { disk, workspace, registrationRef, onCommandsChange, text };
+    }
+
+    async function mountExtract(fixture: ExtractFixture) {
+      renderWorkspace(fixture.workspace, { onCommandsChange: fixture.onCommandsChange });
+      await screen.findByTitle(EXTRACT_TITLE);
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+      const pane = screen.getByTestId("code-workspace-editor-pane");
+      const content = pane.querySelector<HTMLElement>(".cm-content");
+      expect(content).not.toBeNull();
+      return { pane, content: content! };
+    }
+
+    function selectExtractRange(content: HTMLElement) {
+      const view = EditorView.findFromDOM(content);
+      expect(view).not.toBeNull();
+      act(() => {
+        view!.dispatch({
+          selection: EditorSelection.range(
+            view!.state.doc.line(5).from,
+            view!.state.doc.line(9).from,
+          ),
+        });
+      });
+      content.focus();
+      return view!;
+    }
+
+    function pressExtractChord(pane: HTMLElement) {
+      fireEvent.keyDown(pane, { key: "m", code: "KeyM", ctrlKey: true, altKey: true });
+    }
+
+    it("Ctrl+Alt+M runs the only method candidate without a menu and prompts for a name", async () => {
+      const fixture = setupExtract(EXTRACT_INSTANCE);
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+
+      await waitFor(() => expect(lspMocks.lspCodeActionResolve).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(lspMocks.lspCodeActions).toHaveBeenCalled());
+      // DEC-02: the method candidate is applied directly; no frozen menu appears.
+      expect(screen.queryByTestId("context-menu")).not.toBeInTheDocument();
+      // Only the method candidate was resolved (the variable candidate is filtered out).
+      expect(lspMocks.lspCodeActionResolve).toHaveBeenCalledTimes(1);
+
+      const input = await screen.findByTestId("text-input-dialog-input");
+      expect(screen.getByTestId("text-input-dialog")).toHaveTextContent("Extract Method");
+      expect(input).toHaveValue("extracted");
+      expect((input as HTMLInputElement).selectionStart).toBe(0);
+      expect((input as HTMLInputElement).selectionEnd).toBe("extracted".length);
+
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+      await waitFor(() => expect(fixture.disk[EXTRACT_PATH]).toBe(B1));
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("undo transaction"));
+      expect(screen.queryByTestId("code-workspace-intention-extract")).not.toBeInTheDocument();
+    });
+
+    it("Enter renames call site and declaration; Escape keeps the default name", async () => {
+      const fixture = setupExtract("instance-extract-enter");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+      const input = await screen.findByTestId("text-input-dialog-input");
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+
+      fireEvent.change(input, { target: { value: "sumOf" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(fixture.text()).toBe(B2));
+      expect(fixture.text()).toContain("int sumOf(int[] values)");
+      expect(fixture.text()).toContain("int sum = sumOf(values);");
+      expect(lspMocks.lspRename).toHaveBeenCalledWith(expect.anything(), expect.anything(), "sumOf");
+      await waitFor(() => expect(fixture.disk[EXTRACT_PATH]).toBe(B2));
+      expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
+      // DEC-03: the naming step hands the caret back on the call-statement line.
+      const view = EditorView.findFromDOM(content)!;
+      await waitFor(() => expect(
+        view.state.doc.lineAt(view.state.selection.main.head).text,
+      ).toBe("        int sum = sumOf(values);"));
+
+      // Fresh setup: Escape keeps the provider default name and adds no history.
+      await cleanup();
+      const escaped = setupExtract("instance-extract-escape");
+      const second = await mountExtract(escaped);
+      selectExtractRange(second.content);
+      pressExtractChord(second.pane);
+      const escapeInput = await screen.findByTestId("text-input-dialog-input");
+      await waitFor(() => expect(escaped.text()).toBe(B1));
+      const renamesBeforeEscape = lspMocks.lspRename.mock.calls.length;
+      fireEvent.keyDown(escapeInput, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument());
+      expect(escaped.text()).toBe(B1);
+      expect(lspMocks.lspRename.mock.calls.length).toBe(renamesBeforeEscape);
+    });
+
+    it("two editor undos and redos restore each transaction", async () => {
+      const fixture = setupExtract("instance-extract-undo");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+      const input = await screen.findByTestId("text-input-dialog-input");
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+      fireEvent.change(input, { target: { value: "sumOf" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(fixture.text()).toBe(B2));
+
+      content.focus();
+      fireEvent.keyDown(content, { key: "z", code: "KeyZ", ctrlKey: true });
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+      expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument();
+      expect(useAppStore.getState().statusMessage).toContain("Undid Rename symbol");
+
+      fireEvent.keyDown(content, { key: "z", code: "KeyZ", ctrlKey: true });
+      await waitFor(() => expect(fixture.text()).toBe(B0));
+      expect(useAppStore.getState().statusMessage).toContain("Undid");
+
+      fireEvent.keyDown(content, { key: "z", code: "KeyZ", ctrlKey: true, shiftKey: true });
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+      fireEvent.keyDown(content, { key: "z", code: "KeyZ", ctrlKey: true, shiftKey: true });
+      await waitFor(() => expect(fixture.text()).toBe(B2));
+    });
+
+    it("multiple method candidates support keyboard and pointer selection", async () => {
+      const fixture = setupExtract("instance-extract-multi", "multi");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+
+      const menu = await screen.findByTestId("context-menu");
+      expect(menu).toBeInTheDocument();
+      const candidates = Array.from(
+        menu.querySelectorAll<HTMLButtonElement>('[data-testid^="code-workspace-intention-"]'),
+      );
+      const labels = candidates.map((item) => item.textContent ?? "");
+      expect(candidates).toHaveLength(3);
+      expect(labels.some((label) => label.includes("Extract to method"))).toBe(true);
+      const disabledItem = candidates.find((item) => (item.textContent ?? "").includes("unavailable"));
+      expect(disabledItem).toBeDefined();
+      expect(disabledItem).toBeDisabled();
+      // The variable candidate never enters the Extract Method menu.
+      expect(screen.queryByText("Extract to local variable")).not.toBeInTheDocument();
+
+      // Pointer selection runs the first enabled method candidate.
+      const enabled = candidates.filter((item) => !item.disabled);
+      expect(enabled.length).toBeGreaterThan(0);
+      fireEvent.click(enabled[0]!);
+      await waitFor(() => expect(lspMocks.lspCodeActionResolve).toHaveBeenCalled());
+      const input = await screen.findByTestId("text-input-dialog-input");
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+      expect(input).toHaveValue("extracted");
+    });
+
+    it("empty selection follows actual method availability", async () => {
+      const available = setupExtract("instance-extract-empty-ok");
+      const first = await mountExtract(available);
+      const view = EditorView.findFromDOM(first.content)!;
+      act(() => {
+        view.dispatch({ selection: EditorSelection.cursor(view.state.doc.line(5).from) });
+      });
+      first.content.focus();
+      pressExtractChord(first.pane);
+      // The provider still offers a method extraction for the caret statement.
+      await waitFor(() => expect(available.text()).toBe(B1));
+      const input = await screen.findByTestId("text-input-dialog-input");
+      expect(input).toHaveValue("extracted");
+      fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument());
+
+      await cleanup();
+      const none = setupExtract("instance-extract-empty-none", "none");
+      const second = await mountExtract(none);
+      const secondView = EditorView.findFromDOM(second.content)!;
+      act(() => {
+        secondView.dispatch({ selection: EditorSelection.cursor(secondView.state.doc.line(5).from) });
+      });
+      second.content.focus();
+      pressExtractChord(second.pane);
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toBe(
+        "Extract Method: select the statements or expression to extract",
+      ));
+      expect(none.text()).toBe(B0);
+      expect(none.disk[EXTRACT_PATH]).toBe(B0);
+      // Only the earlier empty-selection success resolved a candidate; the
+      // zero-candidate boundary path resolves nothing.
+      expect(lspMocks.lspCodeActionResolve).toHaveBeenCalledTimes(1);
+    });
+
+    it("provider errors remain distinct from empty actions", async () => {
+      const cases: Array<{ mode: ExtractMode; expect: string }> = [
+        { mode: "timeout", expect: "Code action request timed out before the provider answered; try again" },
+        { mode: "changed", expect: "Refactor actions were cancelled because the document changed; try again" },
+        { mode: "boom", expect: "B-007 controlled provider error" },
+        { mode: "resolve-error", expect: "Code action resolve failed" },
+        { mode: "malformed", expect: "malformed" },
+        { mode: "command-only", expect: "Code action rejected" },
+        { mode: "disabled", expect: "The selected block has several outputs" },
+        { mode: "none", expect: "Extract Method is not available for this selection" },
+      ];
+      for (const entryCase of cases) {
+        const fixture = setupExtract("instance-extract-" + entryCase.mode, entryCase.mode);
+        const { pane, content } = await mountExtract(fixture);
+        selectExtractRange(content);
+        pressExtractChord(pane);
+        await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(entryCase.expect));
+        expect(fixture.disk[EXTRACT_PATH]).toBe(B0);
+        expect(fixture.text()).toBe(B0);
+        expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
+        await cleanup();
+      }
+    });
+
+    it("dirty buffer extracts without saving or prompting", async () => {
+      const fixture = setupExtract("instance-extract-dirty");
+      const { pane, content } = await mountExtract(fixture);
+      const view = EditorView.findFromDOM(content)!;
+      act(() => {
+        view.dispatch({ changes: { from: 0, to: 0, insert: "// pending\n" } });
+      });
+      await waitFor(() => expect(fixture.text()).toContain("// pending"));
+      selectExtractRange(content);
+      pressExtractChord(pane);
+
+      await waitFor(() => expect(fixture.text()).toContain("extracted(values)"));
+      expect(fixture.text()).toContain("// pending");
+      expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
+      expect(fixture.disk[EXTRACT_PATH]).toBe(B0);
+      expect(useAppStore.getState().statusMessage).toContain("save the file, then press Shift+F6");
+    });
+
+    it("ambiguous or failed symbol snapshots preserve the extraction", async () => {
+      for (const mode of ["symbols-error", "symbols-ambiguous"] as ExtractMode[]) {
+        const fixture = setupExtract("instance-extract-" + mode, mode);
+        const { pane, content } = await mountExtract(fixture);
+        selectExtractRange(content);
+        pressExtractChord(pane);
+        await waitFor(() => expect(useAppStore.getState().statusMessage).toBe(
+          "Extracted method; could not locate the new method to rename it",
+        ));
+        expect(fixture.text()).toBe(B1);
+        expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
+        expect(lspMocks.lspRename).not.toHaveBeenCalled();
+        await cleanup();
+      }
+    });
+
+    it("name input validates and retries without repeating extraction", async () => {
+      const fixture = setupExtract("instance-extract-retry");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+      const input = await screen.findByTestId("text-input-dialog-input");
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+      fireEvent.change(input, { target: { value: "1bad" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      // The provider rejects the name; the prompt reopens with the user's input
+      // and the committed extraction is never repeated.
+      const retry = await screen.findByTestId("text-input-dialog-input");
+      expect(retry).toHaveValue("1bad");
+      expect(fixture.text()).toBe(B1);
+      expect(lspMocks.lspCodeActions).toHaveBeenCalledTimes(1);
+      fireEvent.change(retry, { target: { value: "sumOf" } });
+      fireEvent.keyDown(retry, { key: "Enter" });
+      await waitFor(() => expect(fixture.text()).toBe(B2));
+      expect(lspMocks.lspRename).toHaveBeenCalledTimes(2);
+    });
+
+    it("late responses cannot reopen naming or rename another document", async () => {
+      const fixture = setupExtract("instance-extract-late");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+
+      // Hold the symbols-after sample, edit the committed buffer, then release:
+      // the naming chain must not prompt or write for the stale receipt.
+      let releaseSymbols: (() => void) | null = null;
+      const originalSymbols = lspMocks.lspDocumentSymbols.getMockImplementation()!;
+      lspMocks.lspDocumentSymbols.mockImplementation(async (descriptor: unknown) => {
+        const result = await originalSymbols(descriptor);
+        // Hold only the post-extraction sample, whichever call reaches it.
+        if (!releaseSymbols && fixture.text().includes("extracted(values)")) {
+          await new Promise<void>((resolve) => { releaseSymbols = resolve; });
+        }
+        return result;
+      });
+
+      pressExtractChord(pane);
+      await waitFor(() => expect(releaseSymbols).not.toBeNull());
+      const view = EditorView.findFromDOM(content)!;
+      act(() => {
+        view.dispatch({ changes: { from: 0, to: 0, insert: "// external\n" } });
+      });
+      await waitFor(() => expect(fixture.text()).toContain("// external"));
+      releaseSymbols!();
+      await waitFor(() => expect(fixture.text()).toContain("extracted(values)"));
+      expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
+      expect(lspMocks.lspRename).not.toHaveBeenCalled();
     });
   });
 });

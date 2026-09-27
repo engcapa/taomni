@@ -2466,6 +2466,127 @@ def _do_parity005_native_trace(ctx: NativeStepContext, args: Any) -> str:
     return f"native {phase} raw response observed: {artifact.name}"
 
 
+_PARITY007_ORACLE_E1 = """package demo;
+
+public class ExtractOracle {
+    public static void main(String[] args) {
+        ExtractTarget t = new ExtractTarget();
+        System.out.println(t.total(new int[]{1,2,3}) + "," + t.total(new int[]{}) + "," + t.total(new int[]{-2,1}) + "," + t.total(new int[]{1,2,3}));
+    }
+}
+"""
+
+
+def _parity007_java_tool(name: str) -> str:
+    import shutil
+
+    override = os.environ.get("TAOMNI_QA_JDK_HOME")
+    candidates: list[Path] = []
+    if override:
+        candidates.append(Path(override) / "bin" / name)
+    found = shutil.which(name)
+    if found:
+        candidates.append(Path(found))
+    for base in ("/data/dev/jdk-21/bin", "/data/dev/jdk-25/bin"):
+        candidates.append(Path(base) / name)
+    for candidate in candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    raise StepError(f"parity007_java_oracle: {name} is unavailable; set TAOMNI_QA_JDK_HOME or install a JDK")
+
+
+@_verb("parity007_java_oracle")
+def _do_parity007_java_oracle(ctx: NativeStepContext, args: Any) -> str:
+    """Compile and run the real extracted source, then compare stdout exactly.
+
+    This is the program oracle for A1/V4: structural inspection, an empty
+    diagnostic list and a code pattern are not semantic proof. The compile and
+    run commands, JDK identities, source hash, exit codes and raw output are
+    written beside the case report.
+    """
+    import shutil
+
+    if not isinstance(args, dict) or args.get("scenario") not in {"e1", "e3"}:
+        raise StepError("parity007_java_oracle: scenario must be e1 or e3")
+    expected = str(args.get("expected", "")).strip()
+    if not expected:
+        raise StepError("parity007_java_oracle: expected stdout is required")
+    scenario = str(args["scenario"])
+    source = Path(str(args.get("source", "")))
+    if not source.is_file():
+        raise StepError(f"parity007_java_oracle: source not found: {source}")
+    label = str(args.get("label", "state"))
+    work = ctx.case_dir / "parity007-oracle" / f"{scenario}-{label}"
+    classes = work / "classes"
+    if work.exists():
+        shutil.rmtree(work)
+    classes.mkdir(parents=True)
+
+    javac = _parity007_java_tool("javac")
+    java = _parity007_java_tool("java")
+    sources = [source]
+    if scenario == "e1":
+        oracle = work / "ExtractOracle.java"
+        oracle.write_text(_PARITY007_ORACLE_E1, encoding="utf-8", newline="")
+        sources.append(oracle)
+    source_sha = hashlib.sha256(source.read_bytes()).hexdigest()
+    javac_version = subprocess.run([javac, "-version"], capture_output=True, text=True, timeout=60)
+    java_version = subprocess.run([java, "-version"], capture_output=True, text=True, timeout=60)
+
+    compile_cmd = [javac, "-encoding", "UTF-8", "-d", str(classes), *[str(item) for item in sources]]
+    compile_result = subprocess.run(compile_cmd, capture_output=True, text=True, timeout=300, check=False)
+    main_class = "demo.ExtractOracle" if scenario == "e1" else "parity007.ExtractSample"
+    run_cmd = [java, "-cp", str(classes), main_class]
+    run_result = None
+    stdout = ""
+    if compile_result.returncode == 0:
+        run_result = subprocess.run(run_cmd, capture_output=True, text=True, timeout=180, check=False)
+        stdout = run_result.stdout.replace("\r\n", "\n").replace("\r", "\n")
+
+    artifact = ctx.case_dir / str(
+        args.get("artifact", f"parity007-oracle-{scenario}-{label}.json")
+    )
+    artifact.write_text(
+        json.dumps(
+            {
+                "scenario": scenario,
+                "label": label,
+                "source": str(source),
+                "sourceSha256": source_sha,
+                "javac": javac,
+                "java": java,
+                "javacVersion": (javac_version.stdout + javac_version.stderr).strip(),
+                "javaVersion": (java_version.stdout + java_version.stderr).strip(),
+                "compileCommand": compile_cmd,
+                "compileExit": compile_result.returncode,
+                "compileStdout": compile_result.stdout,
+                "compileStderr": compile_result.stderr,
+                "runCommand": None if run_result is None else run_cmd,
+                "runExit": None if run_result is None else run_result.returncode,
+                "stdout": stdout,
+                "stderr": "" if run_result is None else run_result.stderr,
+                "expected": expected,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    if compile_result.returncode != 0:
+        raise StepError(
+            f"parity007_java_oracle: javac failed ({compile_result.returncode}): {compile_result.stderr.strip()}"
+        )
+    assert run_result is not None
+    if run_result.returncode != 0:
+        raise StepError(
+            f"parity007_java_oracle: java exit {run_result.returncode}: {run_result.stderr.strip()}"
+        )
+    if stdout.strip() != expected:
+        raise StepError(f"parity007_java_oracle: stdout {stdout!r}, expected {expected!r}")
+    return f"parity007_java_oracle: {scenario}/{label} stdout {stdout.strip()!r}, source sha256 {source_sha[:12]}"
+
+
 @_verb("vault_first_run")
 def _do_vault_first_run(ctx: NativeStepContext, args: Any) -> str:
     """Complete the empty-vault first-run master-password gate.

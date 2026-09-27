@@ -1,0 +1,390 @@
+id: TC-IDE-PARITY-007-02
+title: Extract Method stale request, stale resolve, dirty buffer and repeated invocation
+description: 'Controlled B-007 provider timing through the production session: request/resolve staleness, dirty buffer behaviour and duplicate-invocation protection.'
+covers:
+- F25.5
+tags:
+- code-workspace
+- refactor
+- parity007
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity007_extract
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 60
+- parity007_hold: request
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- parity007_wait_pending: request
+- type: x
+- parity007_release: request
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: stale
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: x
+- assert_count:
+    selector: '[data-testid="context-menu"]'
+    equal: 0
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_trace:
+    pending: 0
+- parity007_hold: resolve
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- parity007_wait_pending: resolve
+- type: y
+- parity007_release: resolve
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: became stale
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_trace:
+    pending: 0
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+End
+- type: // pending
+- wait: 1
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: save the file, then press Shift+F6
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: extracted(values)
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: // pending
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: // pending
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- press: Control+Alt+M
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_trace:
+    pending: 0
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-007-V3-02-request
+    requirement: An edit during the code-action request window produces no extraction, keeps the user input, reports the accurate stale reason and can be retried successfully.
+    actions:
+    - 19
+    checkpoints:
+    - step: 23
+      expectation: The status line reports that the refactor actions became stale.
+    - step: 24
+      expectation: The typed character is still in the buffer.
+    - step: 25
+      expectation: No candidate menu was opened.
+    - step: 50
+      expectation: A second, unblocked invocation extracted exactly once and one undo returned B0.
+    results:
+    - 23
+    - 24
+    - 50
+  - id: ED-PARITY-007-V3-02-resolve
+    requirement: An edit while the provider resolves a selected candidate is rejected as stale with zero extraction and zero naming.
+    actions:
+    - 60
+    checkpoints:
+    - step: 66
+      expectation: The status line reports the code action became stale.
+    - step: 67
+      expectation: No naming dialog was opened.
+    - step: 72
+      expectation: The buffer returns to the initial B0 after undoing the typed character.
+    results:
+    - 66
+    - 67
+    - 72
+  - id: ED-PARITY-007-V3-02-dirty
+    requirement: 'A dirty buffer extracts into the buffer only: no naming prompt, no disk write, the pending input survives and undo keeps it.'
+    actions:
+    - 68
+    checkpoints:
+    - step: 89
+      expectation: The status line asks to save before renaming.
+    - step: 90
+      expectation: No naming dialog is shown for a dirty buffer.
+    - step: 91
+      expectation: The extracted call site is in the buffer.
+    - step: 92
+      expectation: Undo restores the pre-extraction buffer and still shows the pending input.
+    results:
+    - 89
+    - 90
+    - 91
+    - 92
+  - id: ED-PARITY-007-V3-02-repeat
+    requirement: 'Two quick chords never commit two extractions: one B1 and one undo back to B0, with no rename.'
+    actions:
+    - 106
+    checkpoints:
+    - step: 110
+      expectation: The buffer is exactly B1 after the repeated chords.
+    - step: 115
+      expectation: A single undo returns the initial B0.
+    - step: 116
+      expectation: The repeated flow left no pending provider response and no rename.
+    results:
+    - 110
+    - 115
+    - 116
+  visual:
+  - check: Status line wording and dialog absence across the stale states.
+    method: manual
+    reason: Text assertions own the behaviour; screenshots would add no verdict.
+  native:
+  - check: Real provider cancellation wording and real watcher-driven reload staleness.
+    method: external
+    reason: Controlled provider timing is renderer-level; TC-IDE-PARITY-007-03 covers the real JDT LS and host disk.

@@ -1,0 +1,1041 @@
+id: TC-IDE-PARITY-007-04
+title: Extract Method entries, chord protection and boundary wording
+description: Every reachable Extract Method entry, wrong-modifier and input protection, plus the controlled provider boundary and failure modes.
+covers:
+- F25.5
+tags:
+- code-workspace
+- refactor
+- parity007
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity007_extract
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- assert_text:
+    selector: '[data-testid="text-input-dialog"]'
+    contains: Extract Method
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- press: Control+Shift+N
+- wait_for: '[data-testid="code-workspace-search-everywhere"]'
+- click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+- fill:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    value: Extract Method
+- wait: 1
+- assert_text:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    contains: Extract Method
+- press: Enter
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- press: Control+Alt+/
+- wait_for: '[data-testid="keymap-cheatsheet-dialog"]'
+- fill:
+    selector: '[data-testid="keymap-search-input"]'
+    value: Extract Method
+- wait: 1
+- assert_text:
+    selector: '[data-testid="keymap-item-workspace.extractMethod"]'
+    contains: Extract Method
+- click: '[data-testid="keymap-run-workspace.extractMethod"]'
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_trace:
+    requests: 2
+    resolves: 2
+    pending: 0
+- press: Control+f
+- wait_for: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+- click: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+- press: Control+Alt+M
+- press: Escape
+- parity007_trace:
+    requests: 2
+    pending: 0
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+M
+- parity007_trace:
+    requests: 2
+    pending: 0
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Alt+M
+- parity007_trace:
+    requests: 2
+    pending: 0
+- assert_count:
+    selector: '[data-testid="context-menu"]'
+    equal: 0
+- parity007_set_mode: none
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Extract Method is not available for this selection
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: 'Extract Method: select the statements or expression to extract'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: empty-supported
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Control+Alt+M
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: disabled
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Nothing extractable in the current selection
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: malformed
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: malformed
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: command-only
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Code action rejected
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: timeout
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: timed out
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: changed
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: document changed
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: error
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: B-007 controlled provider error
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: resolve-error
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Code action resolve failed
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: symbols-error
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: could not locate the new method to rename it
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: symbols-ambiguous
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: could not locate the new method to rename it
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: rename-error
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: sumOf
+- press: Enter
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: B-007 controlled rename failure
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_set_mode: multi-candidate
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- wait_for: '[data-testid="context-menu"]'
+- assert_count:
+    selector: '[data-testid^="code-workspace-intention-"]'
+    equal: 3
+- press: Escape
+- wait_for:
+    selector: '[data-testid="context-menu"]'
+    state: hidden
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_trace:
+    pending: 0
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-007-V3-04-entries
+    requirement: Search Everywhere Actions and the keymap cheat sheet run the same direct Extract Method transaction as the editor chord.
+    actions:
+    - 17
+    checkpoints:
+    - step: 29
+      expectation: The Actions entry lists the Extract Method command.
+    - step: 32
+      expectation: The Actions entry produced the extracted B1 on the buffer.
+    - step: 37
+      expectation: Undo after the Escape path returns B0.
+    - step: 42
+      expectation: The cheat sheet lists and runs the Extract Method action.
+    - step: 51
+      expectation: Both entries left no pending provider response through the naming flow.
+    results:
+    - 29
+    - 32
+    - 37
+    - 42
+    - 51
+  - id: ED-PARITY-007-V3-04-protection
+    requirement: The chord is not dispatched from the Find input, requires both modifiers, and never opens a menu for a partial chord.
+    actions:
+    - 52
+    checkpoints:
+    - step: 57
+      expectation: Ctrl+Alt+M inside the Find query issues no request.
+    - step: 69
+      expectation: Ctrl+M without Alt issues no request.
+    - step: 81
+      expectation: Alt+M without Ctrl issues no request and opens no menu.
+    results:
+    - 57
+    - 69
+    - 81
+  - id: ED-PARITY-007-V3-04-boundaries
+    requirement: Zero-candidate results distinguish empty and non-empty selections, and a caret with a real method candidate still extracts.
+    actions:
+    - 84
+    checkpoints:
+    - step: 95
+      expectation: A non-empty selection without a method candidate gets the DEC-06 selection wording.
+    - step: 105
+      expectation: An empty caret without a method candidate gets the DEC-06 empty-selection wording.
+    - step: 116
+      expectation: An empty caret with a method candidate still produces B1 through the normal naming flow.
+    results:
+    - 95
+    - 105
+    - 116
+  - id: ED-PARITY-007-V3-04-failures
+    requirement: Each provider failure mode reports its real reason with zero writes, and symbol/rename failures keep the committed B1.
+    actions:
+    - 123
+    checkpoints:
+    - step: 134
+      expectation: A provider-declared disabled candidate reports its own reason and writes nothing.
+    - step: 149
+      expectation: A malformed provider response is reported as malformed, not as an empty list.
+    - step: 164
+      expectation: An unknown continuation command is rejected before any write.
+    - step: 179
+      expectation: A provider timeout is reported as a timeout.
+    - step: 194
+      expectation: A document-changed cancellation is reported as a cancellation.
+    - step: 239
+      expectation: An ambiguous symbol snapshot keeps B1 and explains that the new method could not be located.
+    - step: 279
+      expectation: A provider-rejected rename keeps B1 and shows the provider reason.
+    results:
+    - 134
+    - 149
+    - 164
+    - 179
+    - 194
+    - 239
+    - 279
+  - id: ED-PARITY-007-V3-04-menu
+    requirement: Multiple method candidates open the frozen menu with every method item, and Escape closes it with zero effect.
+    actions:
+    - 287
+    checkpoints:
+    - step: 299
+      expectation: Exactly three method candidates are listed (one disabled).
+    - step: 302
+      expectation: Escape closes the candidate menu and leaves the buffer unchanged.
+    results:
+    - 299
+    - 302
+  visual:
+  - check: Candidate menu anchor at the selection and the dialog chrome against the IDEA reference.
+    method: manual
+    reason: Screenshots are artifacts; the anchor is asserted through the menu geometry separately.
+  native:
+  - check: Real JDT LS candidate kinds, titles and resolve payloads.
+    method: external
+    reason: The controlled provider is fixture-bound; TC-IDE-PARITY-007-03 owns the real provider.
