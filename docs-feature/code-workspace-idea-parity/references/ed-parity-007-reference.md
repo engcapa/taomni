@@ -65,9 +65,9 @@ public class ExtractTarget {
 | R1 选区 | `02-selection-total` | 编辑器点第 5 行，Home、Shift+Down×4 选中 5–8 行 | 初态；`01-*` 为焦点未进入编辑器的诊断图，不作参照 |
 | R2 Ctrl+Alt+M | `03-after-ctrl-alt-m` | **无候选选择器、无对话框**，直接提取：调用处变为 `int sum = getSum(values);`，原 `return sum * 2;` 保留；新方法 `private static int getSum(int[] values) { … return sum; }` 插在 `total` 之后并以绿色高亮；调用处名称处于就地模板（框选 + 齿轮图标），下方名称建议列表 `getSum` / `getInt`，底部提示 `Press Alt+Shift+O to show options popup` | DEC-02 直达、DEC-03 命名；IDEA 默认名来自启发式，Taomni 默认名由 provider 决定，不要求同名 |
 | R3 输入名 | `04-typing-name` | 键入 `sumOf` 时调用处与声明处同步改名 | DEC-03：Taomni 用既有 Rename 路径同步两处 |
-| R4 Enter | `05-after-enter`、`05-after-enter-save.*` | 模板结束，caret 回到调用语句行首（5:9），声明 `private static int sumOf(int[] values)` 显示 `1 usage`；Ctrl+S 后磁盘即为 IDEA 结果字节 | 最终程序结构；IDEA 提取后需保存才落盘 |
-| R5 一次撤销 | `06-after-undo1`、`07-after-undo2*` | 一次 Ctrl+Z 同时撤销提取与改名，画面与 R1 完全相同（图像 hash 相同 `925922d6…`）；第二次 Ctrl+Z 只改变选区/caret；`07` 时磁盘仍为已保存的提取后字节 | DEC-04：IDEA 为单步撤销，Taomni 两个历史项为**待决差异** |
-| R6 Esc（名称列表可见） | `08-esc-in-template` | 第一次 Esc 只关闭名称建议列表，模板仍在（`getSum` 框选），提取保留 | IDEA 无“取消整个提取”的 Esc；Taomni 命名框 Esc = 保留默认名，与 IDEA 结果一致 |
+| R4 Enter | `05-after-enter`、`05-after-enter-save.*` | 模板结束，caret 回到调用语句行首（5:9），声明 `private static int sumOf(int[] values)` 显示 `1 usage`；Ctrl+S 后磁盘即为 IDEA 结果字节 | 最终程序结构；这里只证明 Ctrl+S 后的磁盘结果；没有测出自动保存时机，不能断言保存前永不落盘 |
+| R5 一次撤销 | `06-after-undo1`、`07-after-undo2*` | 一次 Ctrl+Z 同时撤销提取与改名，画面与 R1 完全相同（图像 hash 相同 `925922d6…`）；第二次 Ctrl+Z 只改变选区/caret；`07` 时磁盘仍为已保存的提取后字节 | DEC-04：IDEA 为单步撤销，Taomni 两个历史项为用户已接受差异（当前 DEC-04）；本行历史观察不改 |
+| R6 Esc（名称列表可见） | `08-esc-in-template` | 第一次 Esc 只关闭名称建议列表，模板仍在（`getSum` 框选），提取保留 | 只观察首次 Esc，不能推断不存在完整取消。Taomni 命名框 Esc 保留默认名为已接受产品决定，完整 Esc 语义比较保持 unverified |
 | R7 模板中 Ctrl+Z | `09`、`12-undo-after-esc` | 模板仍活动时 Ctrl+Z 只让名称重新全选，未撤销提取 | Taomni 模态命名框不存在此状态，不比较 |
 | R8 模板中再调用 | `10-multi-output` | 模板未结束时对另一选区按 Ctrl+Alt+M，红色气泡 `Extract Method is not finished yet.`，无新改动 | DEC-02 重入保护：Taomni 命名框打开时 Ctrl+Alt+M 被弹窗吞掉，不产生第二次提取 |
 | R9 Enter 默认名 + 撤销 | `13-enter-default-name`、`14-undo-default` | Enter 接受 `getSum`；一次 Ctrl+Z 回到与 `07` 相同画面（图像 hash 相同 `c286aed4…`） | 默认名路径同样单步撤销 |
@@ -84,3 +84,11 @@ public class ExtractTarget {
 3. 选中 E1，右键编辑器，展开 Refactor 子菜单截图；Esc。按 Ctrl+Alt+Shift+T 截图列表；Esc。按 Alt+Enter 截图；Esc。
 4. 选中第 6 行一半到第 7 行一半，Ctrl+Alt+M，记录拒绝文案（C1）。
 5. 结束只关闭本轮窗口，写 manifest。
+
+## 5. 本次静态修订与补充参照
+
+2026-09-27 在 cc 分支原位完善设计，本次没有新桌面输入。Linux 原包 manifest SHA 与本文件记录一致，47 个列出工件 hash 已在本次复核；hash 一致只证明工件完整，不认证所有解释。R4 的保存时机、R6 的完整取消结论已收窄为实际观察边界，R5 的待决标签同步为已有用户决定。采样记录/manifest 原件不改写。
+
+[Windows 历史补充与 E3 副作用 fixture](ed-parity-007-windows-reference.md)来自 astra 的 c017800d，原包当前缺失，明确 reference-unavailable；它提供取消层级的历史线索及可重建 13:1 输入，不与 Linux 观测合并。E1/E2 仍采用本页同字节 fixture；E3 在另一隔离 root 执行，所有 Taomni/JDT 产品结果仍 unrun。
+
+补采完整取消时：新授权时段内 fresh E1→Ctrl+Alt+M→首次 Esc→确认建议列表与模板状态→焦点保持模板名称→再次 Esc，逐步保存原图/selection/文本；分别再走更多选项 Cancel（若在本次比较目标内）。不能将先切到另一选区/发生重入错误后的 Esc 当同一序列。保存前、等待自动保存后、显式保存后分别读盘，才可讨论保存时机；无这些观察保持 unverified。
