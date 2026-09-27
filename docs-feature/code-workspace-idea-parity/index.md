@@ -4,7 +4,11 @@
 
 首次 P0 基线：`audit/plan` 整体 Code Workspace，起始分支 `main`、HEAD `27f99b6116f4f6aae906d324cb84e8359695e17a`。首次评估已经完成，之后已有多轮 P1–P3；后续无需重新执行首次 P0。
 
-## 当前 P1 接续（2026-09-26）
+## 当前 P1 接续（2026-09-27）
+
+本轮继续唯一板 **ED-PARITY-007**，来源 REQ-06 / CW-REFACTOR-002；[设计与 DEC/AC/V](java-extract-method-plan.md#ed-parity-007)、[用例设计与待决目标](java-extract-method-plan.md#test-cases)、[IDEA 实采/fixture/剩余缺口](references/ed-parity-007-reference.md)、[A/B 图稿](java-extract-method-options.png)、[静态记录](evidence/ed-parity-007-p1-static.md)。用户指定 Ultimate 2026.2.2 / IU-262.10315.125，本轮 11:33:41–11:42:16 已实采 inline 命名、更多选项、取消/应用、13:1、undo/redo 并归还桌面。BL-01 已解除；DEC-02 首包默认名+文件预览与 IDEA inline 的目标取舍、语义命名/临时事务合同待定。**P1 尚未就绪，仍 deferred / planning_required=true，无开发 owner**；无可立即领取 P2 指令。产品验证全未执行，没有功能/UI/交互对齐主张；实时状态以[唯一板](backlog.md)为准，不改选其他卡。 后续用户要求：IDEA **2026 系列即可**，不锁 patch/build；已预先生成[完整 P2 提示词](handoff-p2-ed-parity-007.md#p2-prompt)，保留当前未决前置，不等于可领取或已开发。
+
+## 历史任务入口（2026-09-26）
 
 本轮按唯一板选定 **ED-PARITY-006**，来源 REQ-08 / CW-SEARCH-002；[本卡设计及 DEC/AC/V](project-replace-exclude-plan.md#ed-parity-006)、[完整用例设计](project-replace-exclude-plan.md#test-cases)、[IDEA 2026.2.3 参照与 F1-REPL-006](references/ed-parity-006-reference.md#observed)、[完整 P2 提示词](handoff-p2-ed-parity-006.md)。用户确定 IDEA Ultimate 2026.2.3 / IU-262.10968.63（仅本卡）；15 分钟时段在隔离工程实采 scope/mask、Find 窗口 Delete 排除、Replace All 确认/取消/提交、Undo Replace 确认。确认缺陷 G1 结果列表无法排除、G2 提交后结果陈旧、G3 输入框 Ctrl+Z 直接撤销磁盘替换；用户选择撤销语义对齐 IDEA。保留冻结预览、preimage、preflight、ledger 与一次多文件 undo。**P1 规划完成，ready / planning_required=false，无开发 owner**，可由 P2 正式领取。不是功能/UI/交互已对齐；所有产品验证未执行，状态只看[唯一板](backlog.md)。
 

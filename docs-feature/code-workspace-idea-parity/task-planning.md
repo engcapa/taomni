@@ -106,6 +106,8 @@
 
 ## ED-PARITY-007 Java Extract Method 的支持边界、预览与撤销
 
+2026-09-27 P1 接续：[当前设计与 DEC/AC/V](java-extract-method-plan.md#ed-parity-007)、[用例设计与待决目标](java-extract-method-plan.md#test-cases)、[IDEA 主链实采](references/ed-parity-007-reference.md#capture-steps)、[方案图](java-extract-method-options.png)。用户授权时段内已采 2026.2.2 并归还；本卡仍 deferred / planning_required=true，DEC-02 默认名+完整预览与 inline 命名目标取舍及事务设计待定，不是无桌面授权。以下保留 P0 原始起点，当前细化以所链设计为准；产品验证全未执行。 后续用户要求：IDEA **2026 系列即可**，不锁 patch/build；已预先生成[完整 P2 提示词](handoff-p2-ed-parity-007.md#p2-prompt)，保留当前未决前置，不等于可领取或已开发。
+
 - 来源：REQ-06 / CW-REFACTOR-002；[P0 需求](overall-audit-plan-20260913.md#req-06)、[历史只读材料](../../claudedocs/code-workspace-idea-parity-backlog.md)。
 - 已知依据：P0 REQ-06 的 provider 能力与双侧交互待证；ED-REF-001 已在后续交付中记录 done，仅作 Rename 保留来源。
 - 本包边界：只选择一个可复现 Java Extract Method 场景，先确定 provider 是否支持，再形成真实差距的设计；不重复 Rename，不同时承接 Inline/Move/Change Signature。

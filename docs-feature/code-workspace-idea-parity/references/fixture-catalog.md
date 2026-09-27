@@ -38,6 +38,8 @@ line three
 <a id="f2"></a>
 ## F2：Java 工程与真实语义 / Build / Debug（待准备）
 
+2026-09-27 ED-PARITY-007 的缩小变体：[F2-EXTRACT-007](ed-parity-007-reference.md#fixture)，精确 Java/pom 字节与 hash、明确两行 range 已记录。IDEA 2026.2.2 本轮实采得到 `calculateTotal` post-image，运行 `13:1`、exit 0；一次 Undo/Redo 分别恢复 B0/post hash，最终回 B0 并关闭隔离 project。未执行 Maven import；产品 fixture/cases/provider/native 均未执行。命名与预览目标取舍仍待 DEC-02，不改本节其余历史状态。
+
 2026-09-25 ED-PARITY-005 的局部规格：[F2-COMP-005 与 B-005](ed-parity-005-reference.md#fixture)。F2-COMP-005 是先以完整语法导入、再受控编辑成 prefix 的两文件最小工程；B-005 为 browser 原子接受的可控协议fixture，不是真实Java语义参照。F2本轮已创建IDEA显式module/缓存库变体并局部实采（未执行Maven导入），B-005仍未创建/执行；目标build已确认2026.2.3；第二时段已补词中Enter/Tab/双击、live template导航、字体/缩放及边缘参照，用户接受provider snippet差异，详见[最终参照合同](ed-parity-005-reference.md#followup-observed)。P1就绪，产品结果未执行；不改变本节历史环境记录。
 
 先复用现有可重建 fixture 源：`src/components/editor/workspace/__fixtures__/jdtls/projects/` 下的 `maven-single`、`maven-multi-module`、`gradle-single`、`gradle-multi-module`、`maven-broken-classpath`。每次运行复制到报告目录，核对当前源码与依赖后写一份实际 manifest；不直接操作工程中的测试 seed。此前 App.java 语法问题的历史记录不是本次编译事实。

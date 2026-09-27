@@ -617,6 +617,8 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 ### CW-REFACTOR-002 — Extract / Inline / Change Signature / Move
 
+- **2026-09-27 P1 增量（仅 Extract 首包）：** [唯一板 ED-PARITY-007](backlog.md) / [设计 DEC/AC/V](java-extract-method-plan.md#ed-parity-007) / [用例与待决项](java-extract-method-plan.md#test-cases) / [F2-EXTRACT-007 实采](references/ed-parity-007-reference.md#capture-steps)。目标 2026.2.2 在本轮授权时段内已采：inline 命名、更多选项、取消、13:1、一次 undo/redo；已归还桌面。BL-01解除，DEC-02 的默认名+文件预览与 inline 取舍、临时事务适配待定，故 P1 仍**未就绪**、deferred/planning_required=true，无立即领取 P2 指令。静态类别过宽/必要 edits 未锁定仍是设计依据，JDT LS 源码不等于运行证明。下列 2026-09-13 功能/视觉/交互结论和旧日期不改；所有产品测试/双侧比较未执行。 后续用户要求：IDEA **2026 系列即可**，不锁 patch/build；已预先生成[完整 P2 提示词](handoff-p2-ed-parity-007.md#p2-prompt)，保留当前未决前置，不等于可领取或已开发。
+
 - **IDEA目标结果：** 重构正确保留程序行为，参数/副作用/冲突可预览，作用域明确，能取消和撤销。目标为需求；除I0明确事实外，细节未冒充实测。
 - **Fixture / 入口：** [F2/F4](references/fixture-catalog.md)；workspace.extractMethod/extractVariable/inline/changeSignature/moveRefactor。
 - **完整采样序列（未列为已执行的步骤均待采）：** 选择带副作用代码→提取→预览→Cancel→提交/undo；改签名/移动后检查所有调用点与冲突。每次保存初始/关键状态/退出后的原图或录屏，分别记录focus、caret/selection、菜单/弹层、错误、取消、undo与恢复；不适用项说明原因。
