@@ -1,0 +1,187 @@
+id: TC-IDE-PARITY-007-06
+title: Java Extract Method E3 side-effect program oracle on real JDT LS
+description: 'Isolated E3 sample: extracting and renaming must keep next(base) called exactly once, proven by running the program in a fresh JVM at every state.'
+covers:
+- F25.5
+tags:
+- code-workspace
+- refactor
+- parity007
+- native-gate
+- provider-fixture
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+fixtures:
+- reset_db
+- parity007_extract
+- jdtls_required
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-parity007-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "qa-parity007-e3-native", "name": "parity007-e3", "roots": [{"id": "parity007", "name": "parity007", "path": "${fixture.parity007_e3_root}", "kind": "folder"}], "looseFiles": [], "lastActiveFile":
+      {"kind": "root", "rootId": "parity007", "path": "src/main/java/parity007/ExtractSample.java"}, "lastOpenedAt": 1756100000000, "isGitRepo": false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_e3_root}"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+    timeout_sec: 90
+- wait_for:
+    selector: '[data-testid="project-facts-ready-icon"]'
+    timeout_sec: 120
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 120
+- assert_file_sha256:
+    path: ${fixture.parity007_e3_sample}
+    equals: ${fixture.parity007_e3_initial_sha}
+- parity007_java_oracle:
+    scenario: e3
+    expected: '13:1'
+    source: ${fixture.parity007_e3_sample}
+    label: b0
+    artifact: parity007-oracle-e3-b0.json
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: int doubled = next(base);
+- screenshot: tc-ide-parity-007-06-e3-b0.png
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: Shift+ArrowDown
+- press: Shift+End
+- press: Control+Alt+M
+- wait_for:
+    selector: '[data-testid="text-input-dialog-input"]'
+    timeout_sec: 90
+- assert_text:
+    selector: '[data-testid="text-input-dialog"]'
+    contains: Extract Method
+- assert_file_contains:
+    path: ${fixture.parity007_e3_sample}
+    contains: (base)
+- parity007_java_oracle:
+    scenario: e3
+    expected: '13:1'
+    source: ${fixture.parity007_e3_sample}
+    label: b1
+    artifact: parity007-oracle-e3-b1.json
+- screenshot: tc-ide-parity-007-06-e3-b1.png
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: calculateTotal
+- press: Enter
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+    timeout_sec: 60
+- assert_file_contains:
+    path: ${fixture.parity007_e3_sample}
+    contains: calculateTotal(base)
+- assert_file_contains:
+    path: ${fixture.parity007_e3_sample}
+    contains: int calculateTotal(int base)
+- parity007_java_oracle:
+    scenario: e3
+    expected: '13:1'
+    source: ${fixture.parity007_e3_sample}
+    label: b2
+    artifact: parity007-oracle-e3-b2.json
+- screenshot: tc-ide-parity-007-06-e3-b2.png
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_file_contains:
+    path: ${fixture.parity007_e3_sample}
+    contains: (base)
+- parity007_java_oracle:
+    scenario: e3
+    expected: '13:1'
+    source: ${fixture.parity007_e3_sample}
+    label: undo1
+    artifact: parity007-oracle-e3-undo1.json
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_file_sha256:
+    path: ${fixture.parity007_e3_sample}
+    equals: ${fixture.parity007_e3_initial_sha}
+- parity007_java_oracle:
+    scenario: e3
+    expected: '13:1'
+    source: ${fixture.parity007_e3_sample}
+    label: undo2-b0
+    artifact: parity007-oracle-e3-undo2-b0.json
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+z
+- parity007_java_oracle:
+    scenario: e3
+    expected: '13:1'
+    source: ${fixture.parity007_e3_sample}
+    label: redo1
+    artifact: parity007-oracle-e3-redo1.json
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+z
+- assert_file_contains:
+    path: ${fixture.parity007_e3_sample}
+    contains: calculateTotal(base)
+- parity007_java_oracle:
+    scenario: e3
+    expected: '13:1'
+    source: ${fixture.parity007_e3_sample}
+    label: redo2
+    artifact: parity007-oracle-e3-redo2.json
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-007-V4-4-e3
+    requirement: 'The E3 side-effect sample keeps next(base) called exactly once after the extraction and the rename: every fresh JVM prints exactly 13:1, including after undo and redo.'
+    actions:
+    - 12
+    checkpoints:
+    - step: 12
+      expectation: The unmodified E3 sample prints exactly 13:1 with exit 0.
+    - step: 37
+      expectation: The default-name extraction prints exactly 13:1 (no double next(base) call).
+    - step: 44
+      expectation: After naming calculateTotal the program still prints exactly 13:1.
+    - step: 49
+      expectation: The first undo keeps the program printing 13:1.
+    - step: 53
+      expectation: The second undo restores the exact initial bytes and prints 13:1.
+    - step: 60
+      expectation: Redo restores the renamed method and prints 13:1.
+    results:
+    - 12
+    - 37
+    - 44
+    - 49
+    - 53
+    - 60
+  visual:
+  - check: Real WebView rendering of the E3 extraction states.
+    method: manual
+    reason: Screenshots are recorded artifacts; pixel comparison is separate.
+  native:
+  - check: Real JDT LS edit on the side-effect sample plus javac/java semantics in a fresh JVM.
+    method: automated
+    reason: Only executing the program proves the single next(base) call.

@@ -52,14 +52,18 @@ import {
 import { parity008Handles, parity008Invoke } from "./parity008Git";
 import { parity009Cancel, parity009Capabilities, parity009Run } from "./parity009StructuralSearch";
 import {
+  parity007ChangeDocument,
+  parity007CloseDocument,
   parity007CodeActionResolve,
   parity007CodeActions,
   parity007DocumentSymbols,
   parity007DocumentPath,
   parity007Enabled,
+  parity007OpenDocument,
   parity007PrepareRename,
   parity007Rename,
   parity007Root,
+  parity007SaveDocument,
   parity007Status,
   parity007WriteFailure,
 } from "./parity007Extract";
@@ -2351,11 +2355,24 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       // exactly as the desktop build does when no Maven tooling is present.
       return undefined as T;
     }
-    case "lsp_document_status":
+    case "lsp_document_status": {
+      return stubLspDocumentStatus(args as InvokeArgs) as T;
+    }
     case "lsp_open_document":
     case "lsp_change_document":
     case "lsp_save_document":
     case "lsp_close_document": {
+      // ED-PARITY-007: the controlled provider must follow the real document
+      // lifecycle, otherwise a dirty buffer would still be served from the last
+      // saved VFS bytes and the symbols-after/dirty scenarios would be vacuous.
+      const documentPath = parity007DocumentPath(args as InvokeArgs);
+      if (parity007Enabled(documentPath)) {
+        const text = (args as InvokeArgs).text;
+        if (cmd === "lsp_close_document") parity007CloseDocument(documentPath);
+        else if (cmd === "lsp_open_document") parity007OpenDocument(documentPath, text as string | null);
+        else if (cmd === "lsp_save_document") parity007SaveDocument(documentPath, text as string | null);
+        else parity007ChangeDocument(documentPath, text as string | null);
+      }
       return stubLspDocumentStatus(args as InvokeArgs) as T;
     }
     case "lsp_completion": {

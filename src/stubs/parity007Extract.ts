@@ -206,7 +206,41 @@ if (typeof window !== "undefined") {
 // Real-document helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Provider-side document buffers. The workspace keeps dirty text in memory and
+ * only writes the VFS on save, so a provider that read the VFS directly would
+ * answer every request with the last saved revision — the dirty-buffer and
+ * symbols-after scenarios would silently test nothing. `lsp_open_document`,
+ * `lsp_change_document`, `lsp_save_document` and `lsp_close_document` are
+ * dispatched here so the controlled provider follows the real document
+ * lifecycle.
+ */
+const documentBuffers = new Map<string, string>();
+
+export function parity007OpenDocument(path: string, text: string | null | undefined): void {
+  if (typeof text === "string") documentBuffers.set(path, text);
+}
+
+export function parity007ChangeDocument(path: string, text: string | null | undefined): void {
+  if (typeof text === "string") documentBuffers.set(path, text);
+}
+
+export function parity007SaveDocument(path: string, text: string | null | undefined): void {
+  if (typeof text === "string") documentBuffers.set(path, text);
+}
+
+export function parity007CloseDocument(path: string): void {
+  documentBuffers.delete(path);
+}
+
+export function parity007DocumentBuffer(path: string): string | null {
+  return documentBuffers.get(path) ?? null;
+}
+
+/** Live provider text: the open buffer when present, otherwise the saved file. */
 async function readDocumentText(path: string): Promise<string> {
+  const buffered = documentBuffers.get(path);
+  if (buffered !== undefined) return buffered;
   try {
     return await vfsReadText(path);
   } catch {
@@ -221,6 +255,16 @@ function lineRange(text: string, line: number, start: number, end: number): LspR
     end: { line, character: Math.min(end, lineText.length) },
   };
 }
+
+/**
+ * Java keywords that can precede a parenthesis but are never a method name.
+ * Without this guard the same regex also matches "for (int v : values) {",
+ * which reports control flow as methods and poisons any outline diff.
+ */
+const NON_METHOD_KEYWORDS = new Set([
+  "for", "if", "else", "while", "switch", "case", "catch", "finally", "do",
+  "try", "return", "new", "throw", "assert", "synchronized", "super", "this",
+]);
 
 /** Minimal Java outline over the real bytes: the class plus its methods. */
 function symbolsFromText(text: string): LspDocumentSymbol[] {
@@ -244,6 +288,7 @@ function symbolsFromText(text: string): LspDocumentSymbol[] {
     const methodMatch = /^\s{2,}(?:(?:public|private|protected|static|final|synchronized|abstract|native)\s+)*([\w$<>\[\],.\s]+?)\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{/.exec(line);
     if (!methodMatch) return;
     const name = methodMatch[2]!;
+    if (NON_METHOD_KEYWORDS.has(name)) return;
     const column = line.indexOf(name);
     symbols.push({
       name,
@@ -255,6 +300,13 @@ function symbolsFromText(text: string): LspDocumentSymbol[] {
     });
   });
   return symbols;
+}
+
+/** True when a line starts a Java method declaration (not control flow). */
+function looksLikeMethodDeclaration(line: string): boolean {
+  const match = /^\s{2,}(?:(?:public|private|protected|static|final|synchronized|abstract|native)\s+)*([\w$<>\[\],.\s]+?)\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{/.exec(line);
+  if (!match) return false;
+  return !NON_METHOD_KEYWORDS.has(match[2]!);
 }
 
 function wordAt(text: string, position: LspPosition): { word: string; start: number; end: number } | null {
@@ -386,11 +438,29 @@ export async function parity007CodeActions(
   });
 }
 
+/**
+ * The real provider expands an empty selection to the statement the caret sits
+ * on. A fixture that anchors the edit on the zero-length caret instead inserts a
+ * call in front of the statement and reports a broken extraction, so mirror the
+ * provider behaviour: a caret inside a method body owns the whole statement line.
+ */
+function statementRangeFor(text: string, range: LspRange): LspRange {
+  const caret = range.start.line === range.end.line && range.start.character === range.end.character;
+  if (!caret) return range;
+  const lineText = text.split("\n")[range.start.line] ?? "";
+  if (!/^\s{8,}\S/.test(lineText)) return range;
+  return {
+    start: { line: range.start.line, character: 0 },
+    end: { line: range.start.line + 1, character: 0 },
+  };
+}
+
 async function extractEdit(path: string): Promise<LspWorkspaceEdit | null> {
   const text = await readDocumentText(path);
   if (!text) return null;
   const lines = text.split("\n");
-  const indent = (lines[lastSelectionRange.start.line] ?? "").match(/^\s*/)?.[0] ?? "";
+  const statementRange = statementRangeFor(text, lastSelectionRange);
+  const indent = (lines[statementRange.start.line] ?? "").match(/^\s*/)?.[0] ?? "";
   const methodLines = [
     `    private static int ${PARITY007_DEFAULT_NAME}(int[] values) {`,
     "        int sum = 0;",
@@ -402,8 +472,8 @@ async function extractEdit(path: string): Promise<LspWorkspaceEdit | null> {
     "",
   ];
   let insertLine = -1;
-  for (let index = lastSelectionRange.end.line + 1; index < lines.length; index += 1) {
-    if (/^\s+[\w$<>\[\],.\s]+?\s+[A-Za-z_$][\w$]*\s*\(/.test(lines[index] ?? "")) {
+  for (let index = statementRange.end.line + 1; index < lines.length; index += 1) {
+    if (looksLikeMethodDeclaration(lines[index] ?? "")) {
       insertLine = index;
       break;
     }
@@ -412,7 +482,7 @@ async function extractEdit(path: string): Promise<LspWorkspaceEdit | null> {
     uri: `file://${path}`,
     path,
     edits: [
-      { range: lastSelectionRange, newText: `${indent}int sum = ${PARITY007_DEFAULT_NAME}(values);\n` },
+      { range: statementRange, newText: `${indent}int sum = ${PARITY007_DEFAULT_NAME}(values);\n` },
       ...(insertLine >= 0
         ? [{
             range: { start: { line: insertLine, character: 0 }, end: { line: insertLine, character: 0 } },
@@ -465,9 +535,20 @@ export async function parity007CodeActionResolve(
 
 export async function parity007DocumentSymbols(path: string): Promise<LspDocumentSymbolsResult> {
   const text = await readDocumentText(path);
-  const postExtraction = new RegExp(`(?:\${PARITY007_DEFAULT_NAME}|\${PARITY007_RENAME_NAME})\\(values\\)`).test(text);
+  // Built by concatenation: an escaped template interpolation would leave the
+  // literal "${PARITY007_DEFAULT_NAME}" in the pattern and never match.
+  const postExtraction = new RegExp(
+    "(?:" + PARITY007_DEFAULT_NAME + "|" + PARITY007_RENAME_NAME + ")\\(values\\)",
+  ).test(text);
   const phase: Phase = postExtraction ? "symbols-after" : "symbols-before";
-  record(phase, parity007Mode());
+  const outline = symbolsFromText(text);
+  // The trace records the served outline and the buffer identity so a lifecycle
+  // failure can be attributed to the exact revision the provider answered with.
+  record(
+    phase,
+    parity007Mode() + " · bytes=" + String(text.length) + " · " +
+      outline.map((symbol) => symbol.name).join("/"),
+  );
   return held(phase, () => {
     const mode = parity007Mode();
     if (mode === "symbols-error") {

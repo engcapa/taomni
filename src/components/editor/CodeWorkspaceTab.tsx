@@ -1309,7 +1309,7 @@ type FormatFileOutcome =
  * the whole transaction was cancelled.
  */
 type RenameSymbolAtResult = {
-  status: "applied" | "unchanged" | "cancelled" | "stale" | "failed";
+  status: "applied" | "unchanged" | "empty-edit" | "cancelled" | "stale" | "failed";
   message?: string;
   recoveryId?: string;
   /** The provider refused the name before any write; the caller may retry. */
@@ -9594,6 +9594,13 @@ export function CodeWorkspaceTab({
     /** Canonical transaction guard, invoked after preview and immediately before mutation. */
     preflightMutation?: () => Promise<void> | void;
     /**
+     * ED-PARITY-007: extra synchronous guard evaluated at the exact mutation
+     * boundary, after every read and immediately before the first write. Used
+     * by the Extract naming step to re-verify its owner after async snapshot
+     * reads and the shared preview.
+     */
+    assertOwnerAtMutationBoundary?: () => void;
+    /**
      * ED-IMPROVE-002: structured transaction facts (effect, postcondition,
      * history/recovery identity) reported by the shell's apply owner.
      */
@@ -9726,7 +9733,10 @@ export function CodeWorkspaceTab({
           assertReplaceIdentity(preimage);
         }
       },
-      assertMutationBoundary: () => assertPassBoundary(pass),
+      assertMutationBoundary: () => {
+        assertPassBoundary(pass);
+        options.assertOwnerAtMutationBoundary?.();
+      },
       applyToOpenBuffer: (key, nextText) => {
         pass.mutationStarted = true;
         // ED-AUDIT-008: a restore replaying through this funnel must not
@@ -11586,12 +11596,21 @@ export function CodeWorkspaceTab({
           complete: false,
           reason: "provider code action edit",
         });
+        // DEC-07: a method extraction is one semantic edit — the declaration
+        // and the call site can never be excluded independently. Every text
+        // operation is therefore a required group, so the shared preview's
+        // Select None, per-file toggle and checkbox all leave it intact.
+        const isMethodExtraction = isExtractMethodKind(executablePlan.kind)
+          || isExtractMethodKind(action.kind);
         refactorPlan = buildRefactorPlan({
           actionId: intentionCandidateId ?? executablePlan.actionId,
           kind: refactorKind,
           evidence,
           edit: executablePlan.edit,
           roots: rootsRef.current,
+          requiredOperationIndexes: isMethodExtraction
+            ? workspaceEditOperations(executablePlan.edit).map((_, index) => index)
+            : undefined,
           completeness: {
             value: "partial",
             source: "protocol-bounded",
@@ -11681,7 +11700,24 @@ export function CodeWorkspaceTab({
             semanticRequireReady: false,
             plan: refactorPlan,
             recordHistory: false,
-            preflightMutation: transactionOptions?.onBeforeCommit,
+            // A superseded Extract Method session must never commit: the newer
+            // chord owns the transaction, so the older flow is refused at the
+            // last possible moment instead of writing a second extraction.
+            preflightMutation: async () => {
+              await transactionOptions?.onBeforeCommit?.();
+              if (receiptSessionId && extractSessionRef.current?.id !== receiptSessionId) {
+                throw new Error(
+                  "EXTRACT_OWNER_STALE: this extraction was superseded by a newer request",
+                );
+              }
+            },
+            assertOwnerAtMutationBoundary: () => {
+              if (receiptSessionId && extractSessionRef.current?.id !== receiptSessionId) {
+                throw new Error(
+                  "EXTRACT_OWNER_STALE: this extraction was superseded by a newer request",
+                );
+              }
+            },
             onActiveEditResolved: (nextEdit) => {
               appliedEdit = nextEdit;
             },
@@ -11995,34 +12031,59 @@ export function CodeWorkspaceTab({
      * frozen candidate menu; the pane +80/+80 origin stays the fallback.
      */
     anchor?: { clientX: number; clientY: number },
+    /**
+     * ED-PARITY-007 DEC-02: an already-frozen candidate list (the caller
+     * filtered it) rendered without a second provider request. The Extract
+     * Method multi-candidate path uses it so method-only filtering cannot be
+     * widened back to variable/constant/field proposals.
+     */
+    prefetched?: {
+      providerActions: readonly ProviderActionV4[];
+      context: CodeActionContextIdentity;
+      semanticToken: WorkspaceSemanticIndexBuildToken | null;
+    },
   ) => {
-    const requestAbort = new AbortController();
-    intentionRequestAbortRef.current?.abort();
-    intentionRequestAbortRef.current = requestAbort;
-    const requested = await requestCodeActions(
-      file,
-      range,
-      diagnostics,
-      only,
-      { signal: requestAbort.signal },
-    );
-    if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) return;
+    let providerActions: readonly ProviderActionV4[];
+    let actionContext: CodeActionContextIdentity;
+    let menuSemanticToken: WorkspaceSemanticIndexBuildToken | null;
+    let filtered: ProviderActionV4[];
+    if (prefetched) {
+      providerActions = prefetched.providerActions;
+      actionContext = prefetched.context;
+      menuSemanticToken = prefetched.semanticToken;
+      filtered = [...providerActions];
+    } else {
+      const requestAbort = new AbortController();
+      intentionRequestAbortRef.current?.abort();
+      intentionRequestAbortRef.current = requestAbort;
+      const requested = await requestCodeActions(
+        file,
+        range,
+        diagnostics,
+        only,
+        { signal: requestAbort.signal },
+      );
+      if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) return;
 
-    // Request-window staleness is decided by finishQuery acceptance inside
-    // requestCodeActions: the response is revision-pinned, and background
-    // provider progress (jdtls workDoneProgress) must not stale a produced
-    // result. Every requestFailure classification already surfaced its
-    // accurate status message there.
-    if (requested.requestFailure) return;
-    if (!requested.context) {
-      setStatusMessage(`No ${sectionLabel} provided by the language server`);
-      return;
+      // Request-window staleness is decided by finishQuery acceptance inside
+      // requestCodeActions: the response is revision-pinned, and background
+      // provider progress (jdtls workDoneProgress) must not stale a produced
+      // result. Every requestFailure classification already surfaced its
+      // accurate status message there.
+      if (requested.requestFailure) return;
+      if (!requested.context) {
+        setStatusMessage(`No ${sectionLabel} provided by the language server`);
+        return;
+      }
+      providerActions = requested.providerActions;
+      actionContext = requested.context;
+      menuSemanticToken = requested.semanticToken;
+      filtered = only.length === 0
+        ? [...providerActions]
+        : providerActions.filter((providerAction) => only.some((kind) => (
+          providerAction.action.kind === kind || providerAction.action.kind?.startsWith(`${kind}.`)
+        )));
     }
-    const filtered = only.length === 0
-      ? [...requested.providerActions]
-      : requested.providerActions.filter((providerAction) => only.some((kind) => (
-        providerAction.action.kind === kind || providerAction.action.kind?.startsWith(`${kind}.`)
-      )));
     if (!filtered.length) {
       setStatusMessage(`No ${sectionLabel} provided by the language server`);
       return;
@@ -12045,10 +12106,10 @@ export function CodeWorkspaceTab({
       )),
       {
         fileKey: file.key,
-        uri: requested.context.document.uri,
-        documentRevision: requested.context.document.revision,
-        providerGeneration: requested.context.provider.generation,
-        projectFingerprint: requested.context.provider.projectFingerprint,
+        uri: actionContext.document.uri,
+        documentRevision: actionContext.document.revision,
+        providerGeneration: actionContext.provider.generation,
+        projectFingerprint: actionContext.provider.projectFingerprint,
       },
     );
     // Grouped rendering: provider candidates first, then local editor actions
@@ -12090,7 +12151,7 @@ export function CodeWorkspaceTab({
                   ? beginExtractSessionRef.current?.({
                       file,
                       range,
-                      uri: requested.context!.document.uri,
+                      uri: actionContext.document.uri,
                       beforeSymbols: await captureMethodSymbolsRef.current?.(file) ?? null,
                     }) ?? null
                   : null;
@@ -12100,9 +12161,9 @@ export function CodeWorkspaceTab({
                 const outcome = await runCodeAction(
                   action,
                   file,
-                  requested.semanticToken,
+                  menuSemanticToken,
                   candidate.id,
-                  requested.context!,
+                  actionContext,
                   extractOwner?.id,
                 );
                 if (outcome.retryable) openFrozenMenu();
@@ -17062,15 +17123,21 @@ export function CodeWorkspaceTab({
         semanticIndex.abandonBuild(buildToken);
         return staleResult();
       }
-      if (!nextName || nextName === defaultName) {
+      if (!nextName) {
+        // The user dismissed the naming prompt (Escape/Cancel): keep the
+        // provider default name and never treat this as a provider answer.
+        semanticIndex.abandonBuild(buildToken);
+        return { status: "cancelled" };
+      }
+      if (nextName === defaultName) {
         semanticIndex.abandonBuild(buildToken);
         return { status: "unchanged" };
       }
       const beforeRename = semanticIndex.current();
-      if (
-        beforeRename.revision !== buildToken.revision
-        || beforeRename.activeProviders.length > 0
-      ) {
+      // ED-AUDIT-008: revision equality is the freshness contract. Unrelated
+      // provider work in flight (jdtls indexing/progress) is not a workspace
+      // change and must not cancel a rename the user already confirmed.
+      if (beforeRename.revision !== buildToken.revision) {
         semanticIndex.abandonBuild(buildToken);
         const message = "Rename was cancelled because the workspace changed while the dialog was open";
         setStatusMessage(message);
@@ -17094,7 +17161,9 @@ export function CodeWorkspaceTab({
         semanticIndex.finishQuery(buildToken, { kind: "rename", resultCount: 0 });
         const message = "Rename produced no edits";
         setStatusMessage(message);
-        return { status: "unchanged", message, retryable: true };
+        // Only the provider answering with an empty edit is replayable; a user
+        // cancel or an unchanged name must never resubmit a name.
+        return { status: "empty-edit", message, retryable: true };
       }
       const completion = semanticIndex.finishQuery(buildToken, {
         kind: "rename",
@@ -17162,14 +17231,38 @@ export function CodeWorkspaceTab({
           return { status: "cancelled", message };
         }
       }
-      await applyLspWorkspaceEdit(renamed.edit, {
+      const guardRenameOwner = (stage: string) => {
+        if (isCurrent()) return;
+        throw new Error(
+          `RENAME_OWNER_STALE: the rename owner changed before ${stage}`,
+        );
+      };
+      const outcomes = await applyLspWorkspaceEdit(renamed.edit, {
         preview: true,
         label: `Rename symbol to "${nextName}"`,
         semanticGeneration: buildToken.generation,
         semanticRevision: buildToken.revision,
         semanticWorkspaceOnly: true,
         plan,
+        // DEC-07: the Extract owner/receipt guard runs after the preview and
+        // immediately before the first writer, and again at the exact mutation
+        // boundary after any read, so a view/file switch during the async
+        // snapshot or preview can never rename an abandoned document.
+        preflightMutation: () => guardRenameOwner("the first write"),
+        assertOwnerAtMutationBoundary: () => guardRenameOwner("the mutation boundary"),
       });
+      const rejected = outcomes.find(
+        (outcome) => outcome.status === "failed" || outcome.status === "skipped",
+      );
+      if (rejected) {
+        const reason = "reason" in rejected && rejected.reason
+          ? rejected.reason
+          : "the workspace edit was rejected";
+        if (reason.includes("RENAME_OWNER_STALE")) return staleResult();
+        const message = `Rename failed: ${reason}`;
+        setStatusMessage(message);
+        return { status: "failed", message };
+      }
       return { status: "applied" };
     } catch (err) {
       const message = errorMessage(err);
@@ -17274,6 +17367,24 @@ export function CodeWorkspaceTab({
   }, [lspDescriptorForFile, updateLspStatusForFile]);
   captureMethodSymbolsRef.current = captureMethodSymbols;
 
+  /**
+   * DEC-03: an outline that is missing or empty is damaged provider data, not a
+   * real answer (a Java file always has at least its class). Re-read once before
+   * it can poison the post-extraction diff into an ambiguity.
+   */
+  const captureMethodSymbolsSettled = useCallback(async (
+    file: OpenFileState,
+  ): Promise<LspDocumentSymbol[] | null> => {
+    for (let read = 0; read < 2; read += 1) {
+      if (read > 0) {
+        await new Promise((resolve) => { window.setTimeout(resolve, 300); });
+      }
+      const symbols = await captureMethodSymbols(file);
+      if (symbols && symbols.length > 0) return symbols;
+    }
+    return null;
+  }, [captureMethodSymbols]);
+
   const beginExtractSession = useCallback((input: {
     file: OpenFileState;
     range: LspRange;
@@ -17358,20 +17469,29 @@ export function CodeWorkspaceTab({
     try {
       if (!ownerMatches() || !receiptMatches()) return;
       session.phase = "symbols-after";
-      const live = openFilesRef.current[session.fileKey];
-      // A dirty buffer was mutated without a save, so the provider model still
-      // holds the pre-extraction document; push the current buffer before the
-      // post snapshot or the new method cannot be found at all.
-      const synced = live
-        ? await ensureWorkspaceSemanticDocumentsSynced(live.key, semanticIndex.current().revision)
-        : null;
-      const afterSymbols = synced ? await captureMethodSymbols(synced) : null;
-      // A late symbols reply for a superseded owner or a moved B1 must not
-      // open a prompt or move focus.
-      if (!ownerMatches() || !receiptMatches()) return;
-      const found = afterSymbols && session.beforeSymbols
-        ? findExtractedMethodSymbol(session.beforeSymbols, afterSymbols)
-        : null;
+      // DEC-03: the provider outline can trail the freshly committed extraction,
+      // so a null diff is re-read once before the method is declared unlocatable.
+      let found: LspDocumentSymbol | null = null;
+      for (let read = 0; read < 2 && !found; read += 1) {
+        if (read > 0) {
+          await new Promise((resolve) => { window.setTimeout(resolve, 400); });
+          if (!ownerMatches() || !receiptMatches()) return;
+        }
+        const live = openFilesRef.current[session.fileKey];
+        // A dirty buffer was mutated without a save, so the provider model still
+        // holds the pre-extraction document; push the current buffer before the
+        // post snapshot or the new method cannot be found at all.
+        const synced = live
+          ? await ensureWorkspaceSemanticDocumentsSynced(live.key, semanticIndex.current().revision)
+          : null;
+        const afterSymbols = synced ? await captureMethodSymbolsSettled(synced) : null;
+        // A late symbols reply for a superseded owner or a moved B1 must not
+        // open a prompt or move focus.
+        if (!ownerMatches() || !receiptMatches()) return;
+        found = afterSymbols && session.beforeSymbols
+          ? findExtractedMethodSymbol(session.beforeSymbols, afterSymbols)
+          : null;
+      }
       const postLive = openFilesRef.current[session.fileKey];
       if (!postLive) return;
       if (!found) {
@@ -17415,11 +17535,16 @@ export function CodeWorkspaceTab({
         if (extractSessionRef.current !== session) return;
         if (outcome.status === "failed" && outcome.retryable && attempt < 4) continue;
         if (outcome.status === "failed") return; // real reason already surfaced; B1 kept
-        if (outcome.status === "unchanged" && proposed && replays < 3 && attempt < 4) {
+        // The owner/receipt was invalidated (possibly at the mutation boundary):
+        // nothing was written and the naming step must not claim otherwise.
+        if (outcome.status === "stale") return;
+        if (outcome.status === "empty-edit" && proposed && replays < 3 && attempt < 4) {
           // The provider answered the rename with an empty edit (its workspace
           // model can still trail the freshly written extraction). Replay the
           // same name against a settled model instead of dropping the naming
-          // step; the extraction and history stay untouched.
+          // step; the extraction and history stay untouched. Escape/Cancel and
+          // an unchanged name return "cancelled"/"unchanged" instead, so a
+          // dismissed prompt can never rename anything.
           replayName = proposed;
           replays += 1;
           await new Promise((resolve) => { window.setTimeout(resolve, 1200); });
@@ -17437,7 +17562,7 @@ export function CodeWorkspaceTab({
       finishExtractSession(session);
     }
   }, [
-    captureMethodSymbols,
+    captureMethodSymbolsSettled,
     ensureWorkspaceSemanticDocumentsSynced,
     extractOwnerSnapshot,
     finishExtractSession,
@@ -17454,14 +17579,40 @@ export function CodeWorkspaceTab({
     if (!file || file.loading || file.library) return;
     const caps = lspFilesRef.current[file.key]?.status?.capabilities;
     if (caps && !caps.codeAction) return;
+    // DEC-07 repeat protection: while one Extract Method owner is alive — from
+    // its first request through naming and the rename — a repeated chord is a
+    // no-op. Superseding a request that has already applied would commit a
+    // second extraction and history entry (observed as a corrupted double
+    // apply), so the first transaction keeps ownership until it finishes.
+    const inFlight = extractSessionRef.current;
+    if (inFlight && inFlight.phase !== "finished") return;
     const selection = editorSelectionRef.current;
     const range: LspRange = {
       start: selection.start,
       end: selection.empty ? selection.start : selection.end,
     };
+    // Reserve the transaction owner synchronously, before any await: a repeated
+    // chord that arrives while this run samples symbols or requests candidates
+    // must see a live owner and become a no-op instead of starting a second
+    // extraction that would commit twice.
+    const session = beginExtractSession({
+      file,
+      range,
+      uri: extractLiveUri(file.key),
+      beforeSymbols: null,
+    });
+    if (!session) return;
+    const abandon = () => {
+      finishExtractSession(session);
+    };
     // B0 symbols are sampled before any provider write so the post-extraction
-    // snapshot can be diffed against the frozen pre-commit context.
-    const beforeSymbols = await captureMethodSymbols(file);
+    // snapshot can be diffed against the frozen pre-commit context. The buffer is
+    // synchronized first: an undo or a previous transaction can leave the
+    // provider outline trailing the live buffer, which would poison the diff.
+    await ensureWorkspaceSemanticDocumentsSynced(file.key, semanticIndex.current().revision);
+    if (extractSessionRef.current !== session) return;
+    session.beforeSymbols = await captureMethodSymbolsSettled(file);
+    if (extractSessionRef.current !== session) return;
     const requestAbort = new AbortController();
     intentionRequestAbortRef.current?.abort();
     intentionRequestAbortRef.current = requestAbort;
@@ -17472,9 +17623,21 @@ export function CodeWorkspaceTab({
       ["refactor.extract"],
       { signal: requestAbort.signal },
     );
-    if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) return;
+    if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) {
+      abandon();
+      return;
+    }
     // DEC-05: request failures already surfaced their accurate message.
-    if (requested.requestFailure) return;
+    if (requested.requestFailure) {
+      if (intentionRequestAbortRef.current === requestAbort) intentionRequestAbortRef.current = null;
+      abandon();
+      return;
+    }
+    if (requested.context?.document.uri !== session.uri) {
+      // The document identity moved while the candidates were requested.
+      abandon();
+      return;
+    }
     const methodCandidates = requested.providerActions.filter(
       (entry) => isExtractMethodKind(entry.action.kind),
     );
@@ -17487,9 +17650,14 @@ export function CodeWorkspaceTab({
       // DEC-06: distinguish "nothing selected" from "this selection cannot be
       // extracted"; never claim the server offered no actions on failure.
       setStatusMessage(extractMethodBoundaryMessage(selection.empty));
+      if (intentionRequestAbortRef.current === requestAbort) intentionRequestAbortRef.current = null;
+      abandon();
       return;
     }
     if (methodCandidates.length > 1) {
+      // DEC-02: render exactly the frozen method candidates. Re-requesting with
+      // the parent "refactor.extract" prefix here would reintroduce
+      // variable/constant/field/interface proposals into the Extract Method menu.
       await showCodeActionsMenu(
         anchor?.clientX ?? (paneRect?.left ?? 0) + 80,
         anchor?.clientY ?? (paneRect?.top ?? 0) + 80,
@@ -17499,21 +17667,23 @@ export function CodeWorkspaceTab({
         ["refactor.extract"],
         "Extract Method",
         anchor,
+        {
+          providerActions: methodCandidates,
+          context: requested.context!,
+          semanticToken: requested.semanticToken,
+        },
       );
+      intentionRequestAbortRef.current = null;
+      abandon();
       return;
     }
     const only = methodCandidates[0]!;
     if (only.disabledReason) {
       setStatusMessage(only.disabledReason);
+      if (intentionRequestAbortRef.current === requestAbort) intentionRequestAbortRef.current = null;
+      abandon();
       return;
     }
-    const session = beginExtractSession({
-      file,
-      range,
-      uri: requested.context!.document.uri,
-      beforeSymbols,
-    });
-    if (!session) return;
     const intentionSnapshot = intentionSessionRef.current?.open(
       [candidateFromProviderAction(only.action, only.evidence, only.disabledReason)],
       {
@@ -17547,11 +17717,13 @@ export function CodeWorkspaceTab({
   }, [
     activeFile,
     beginExtractSession,
-    captureMethodSymbols,
+    captureMethodSymbolsSettled,
     continueExtractNaming,
+    ensureWorkspaceSemanticDocumentsSynced,
     finishExtractSession,
     requestCodeActions,
     runCodeAction,
+    semanticIndex.current,
     setStatusMessage,
     showCodeActionsMenu,
   ]);
