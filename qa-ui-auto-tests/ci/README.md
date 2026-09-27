@@ -23,6 +23,37 @@ GitHub only registers `workflow_dispatch` on the default branch. Publishing the
 new file on a feature branch alone is insufficient. Branch validation can use a
 temporary branch-specific caller; do not merge that temporary push trigger.
 
+### Development case contract
+
+Pull requests that touch product code receive a lightweight **Development case
+contract** check before any hosted matrix is requested. It reports the changed
+product paths, QA case paths and focused unit tests. A product change without a
+changed executable case is an advisory warning that must be addressed or
+explained in the PR/design. A mismatch between discovered case IDs and the CI
+policy is an error and blocks planning.
+
+When implementing a user-visible or native-boundary change, update or add the
+case in the same change, then register its exact YAML `id` in
+`qa-ui-auto-tests/ci/policy.yaml`. Add a dependency in
+`qa-ui-auto-tests/ci/dependencies.yaml` only when an earlier case is required.
+Keep `covers`, `feature-list.md`, controls and the testid catalog synchronized.
+The check is advisory for deciding whether a case is needed; the catalog
+equality check remains strict because an unregistered case makes selection
+non-deterministic.
+
+Local check from PowerShell:
+
+```powershell
+$env:PYTHONPATH = ".agents/skills/qa-ui-auto/scripts"
+python .agents/skills/qa-ui-auto/scripts/qa_ui_auto/dev_contract.py `
+  --base origin/main --head HEAD
+python -m qa_ui_auto.audit --gate
+python -m qa_ui_auto.ci plan --scope selected --case-ids TC-<id>
+```
+
+For documentation-only changes, record why no executable case is appropriate
+and name the retained case or static check that protects the existing behavior.
+
 Selectors are exact YAML `id` values, **not filenames**. `selected` unions case
 IDs, features and tags; `impacted` unions the conservative diff scope with these
 selectors. `all`/`smoke` reject extra selectors. The rename-restore database case
@@ -124,7 +155,7 @@ fixtures keep their existing behavior.
 
 ```sh
 export PYTHONPATH=.agents/skills/qa-ui-auto/scripts
-python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services
+python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_dev_contract
 python -m qa_ui_auto.audit --gate
 python -m qa_ui_auto.ci plan --scope selected --case-ids TC-012,TC-027
 ```

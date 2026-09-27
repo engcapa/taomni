@@ -46,6 +46,14 @@ on:
       features: {type: string, default: ''}
       tags: {type: string, default: ''}
       publish_issues: {type: boolean, default: false}
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'src-tauri/src/**'
+      - 'vite-plugins/**'
+      - 'qa-ui-auto-tests/**'
+      - '.agents/skills/qa-ui-auto/**'
+      - 'docs-feature/code-workspace-idea-parity/**'
   schedule:
     - cron: '17 19 * * *'
 
@@ -64,7 +72,27 @@ defaults:
     shell: bash
 
 jobs:
+  development-case-contract:
+    name: Development case contract
+    if: github.event_name == 'pull_request' && inputs.scope == ''
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1
+      - name: Check changed code has a QA case path
+        env:
+          QA_BASE: ${{ github.event.pull_request.base.sha }}
+          QA_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python .agents/skills/qa-ui-auto/scripts/qa_ui_auto/dev_contract.py --base "$QA_BASE" --head "$QA_HEAD"
+
   plan:
+    if: github.event_name != 'pull_request' || inputs.scope != ''
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -85,7 +113,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1
       - name: Validate QA tools
-        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services
+        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_dev_contract
       - name: Plan exact cases and dependencies
         id: plan
         env:
@@ -226,7 +254,7 @@ jobs:
 
   summarize:
     name: qa-ui-auto-platforms-result
-    if: always()
+    if: always() && needs.plan.result != 'skipped'
     needs: [plan, execute]
     runs-on: ubuntu-24.04
     steps:
