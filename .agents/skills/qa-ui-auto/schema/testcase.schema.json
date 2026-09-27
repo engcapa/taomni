@@ -1,1965 +1,2269 @@
 {
- "$schema": "https://json-schema.org/draft/2020-12/schema",
- "$id": "https://taomni.local/qa-ui-auto/testcase.schema.json",
- "title": "qa-ui-auto Test Case",
- "description": "Typed YAML test case consumed by .agents/skills/qa-ui-auto/scripts/runner.py. Authored by humans or by Claude Code via the qa-ui-auto skill. Inline JS is forbidden; only verbs from the controlled step library are allowed.",
- "type": "object",
- "required": [
-  "id",
-  "title",
-  "steps"
- ],
- "additionalProperties": false,
- "properties": {
-  "id": {
-   "type": "string",
-   "pattern": "^TC-[A-Za-z0-9_\\-]+$",
-   "description": "Unique stable identifier, e.g. TC-001 or TC-zmodem-conflict-overwrite."
-  },
-  "title": {
-   "type": "string",
-   "minLength": 1
-  },
-  "description": {
-   "type": "string"
-  },
-  "covers": {
-   "type": "array",
-   "description": "Feature IDs from tests/features.yaml that this case exercises.",
-   "items": {
-    "type": "string",
-    "pattern": "^F(?:[0-9]+(?:\\.[0-9]+)*[a-z]?|-[A-Z][A-Za-z0-9]*-[0-9]+(?:\\.[0-9]+)*[a-z]?)$"
-   },
-   "uniqueItems": true
-  },
-  "tags": {
-   "type": "array",
-   "items": {
-    "type": "string",
-    "minLength": 1
-   },
-   "uniqueItems": true
-  },
-  "modes": {
-   "type": "array",
-   "description": "Modes this case is valid in. Default is [browser]. Use [native] only when the case truly needs the Tauri Rust backend (local PTY, native dialogs, system clipboard).",
-   "items": {
-    "enum": [
-     "browser",
-     "native"
-    ]
-   },
-   "uniqueItems": true,
-   "minItems": 1,
-   "default": [
-    "browser"
-   ]
-  },
-  "fixtures": {
-   "type": "array",
-   "description": "Pre/post fixtures applied around this case. Each is implemented in scripts/fixtures/.",
-   "items": {
-    "enum": [
-     "reset_db",
-     "ssh_required",
-     "sftp_required",
-     "mysql_required",
-     "jdtls_required",
-     "java_test_bundle",
-     "linux_x11_required",
-     "workspace_root",
-     "java_sample_projects",
-     "java25_projects",
-     "git_diff_repo",
-     "welcome_recents",
-     "editor_typing_fixtures",
-     "restore_24tab_fixtures",
-     "sortable_java_fixtures",
-     "file_move_recovery_fixtures",
-     "java_rename_deleted_fixtures",
-     "view_state_fixtures",
-     "editor_save_race",
-     "project_tree",
-     "parity005_completion",
-     "parity006_replace",
-     "parity008_git",
-     "parity009_ssr"
-    ]
-   },
-   "uniqueItems": true
-  },
-  "native_platforms": {
-   "type": "array",
-   "items": {
-    "enum": [
-     "Linux",
-     "Windows",
-     "macOS"
-    ]
-   },
-   "uniqueItems": true,
-   "minItems": 1,
-   "description": "Optional native platform restriction. Does not certify that a platform was tested."
-  },
-  "browser_platforms": {
-   "type": "array",
-   "items": {
-    "enum": [
-     "Linux",
-     "Windows",
-     "macOS"
-    ]
-   },
-   "uniqueItems": true,
-   "minItems": 1,
-   "description": "Optional browser platform restriction for OS-dependent renderer chrome (e.g. macOS title-bar). Coverage stays global; the skip is explicit per host."
-  },
-  "timeout_sec": {
-   "type": "integer",
-   "minimum": 5,
-   "maximum": 600,
-   "default": 90,
-   "description": "Per-case wall-clock timeout. Default 90s."
-  },
-  "skip": {
-   "type": "string",
-   "description": "If set, the case is skipped and this reason is recorded in the report."
-  },
-  "steps": {
-   "type": "array",
-   "minItems": 1,
-   "items": {
-    "$ref": "#/$defs/step"
-   }
-  },
-  "verification": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "review",
-    "requirements",
-    "visual",
-    "native"
-   ],
-   "properties": {
-    "review": {
-     "enum": [
-      "pending",
-      "reviewed"
-     ]
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://taomni.local/qa-ui-auto/testcase.schema.json",
+  "title": "qa-ui-auto Test Case",
+  "description": "Typed YAML test case consumed by .agents/skills/qa-ui-auto/scripts/runner.py. Authored by humans or by Claude Code via the qa-ui-auto skill. Inline JS is forbidden; only verbs from the controlled step library are allowed.",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "steps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^TC-[A-Za-z0-9_\\-]+$",
+      "description": "Unique stable identifier, e.g. TC-001 or TC-zmodem-conflict-overwrite."
     },
-    "requirements": {
-     "type": "array",
-     "minItems": 1,
-     "items": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "covers": {
+      "type": "array",
+      "description": "Feature IDs from tests/features.yaml that this case exercises.",
+      "items": {
+        "type": "string",
+        "pattern": "^F(?:[0-9]+(?:\\.[0-9]+)*[a-z]?|-[A-Z][A-Za-z0-9]*-[0-9]+(?:\\.[0-9]+)*[a-z]?)$"
+      },
+      "uniqueItems": true
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "modes": {
+      "type": "array",
+      "description": "Modes this case is valid in. Default is [browser]. Use [native] only when the case truly needs the Tauri Rust backend (local PTY, native dialogs, system clipboard).",
+      "items": {
+        "enum": [
+          "browser",
+          "native"
+        ]
+      },
+      "uniqueItems": true,
+      "minItems": 1,
+      "default": [
+        "browser"
+      ]
+    },
+    "fixtures": {
+      "type": "array",
+      "description": "Pre/post fixtures applied around this case. Each is implemented in scripts/fixtures/.",
+      "items": {
+        "enum": [
+          "reset_db",
+          "ssh_required",
+          "sftp_required",
+          "mysql_required",
+          "jdtls_required",
+          "java_test_bundle",
+          "linux_x11_required",
+          "workspace_root",
+          "java_sample_projects",
+          "java25_projects",
+          "git_diff_repo",
+          "welcome_recents",
+          "editor_typing_fixtures",
+          "restore_24tab_fixtures",
+          "sortable_java_fixtures",
+          "file_move_recovery_fixtures",
+          "java_rename_deleted_fixtures",
+          "view_state_fixtures",
+          "editor_save_race",
+          "project_tree",
+          "parity005_completion",
+          "parity006_replace",
+          "parity008_git",
+          "parity009_ssr",
+          "parity007_extract"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "native_platforms": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "Linux",
+          "Windows",
+          "macOS"
+        ]
+      },
+      "uniqueItems": true,
+      "minItems": 1,
+      "description": "Optional native platform restriction. Does not certify that a platform was tested."
+    },
+    "browser_platforms": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "Linux",
+          "Windows",
+          "macOS"
+        ]
+      },
+      "uniqueItems": true,
+      "minItems": 1,
+      "description": "Optional browser platform restriction for OS-dependent renderer chrome (e.g. macOS title-bar). Coverage stays global; the skip is explicit per host."
+    },
+    "timeout_sec": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 600,
+      "default": 90,
+      "description": "Per-case wall-clock timeout. Default 90s."
+    },
+    "skip": {
+      "type": "string",
+      "description": "If set, the case is skipped and this reason is recorded in the report."
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "verification": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-       "id",
-       "requirement",
-       "actions",
-       "checkpoints",
-       "results"
+        "review",
+        "requirements",
+        "visual",
+        "native"
       ],
       "properties": {
-       "id": {
-        "type": "string",
-        "minLength": 1
-       },
-       "requirement": {
-        "type": "string",
-        "minLength": 1
-       },
-       "actions": {
-        "type": "array",
-        "minItems": 1,
-        "uniqueItems": true,
-        "items": {
-         "type": "integer",
-         "minimum": 1
-        }
-       },
-       "checkpoints": {
-        "type": "array",
-        "minItems": 1,
-        "items": {
-         "type": "object",
-         "additionalProperties": false,
-         "required": [
-          "step",
-          "expectation"
-         ],
-         "properties": {
-          "step": {
-           "type": "integer",
-           "minimum": 1
-          },
-          "expectation": {
-           "type": "string",
-           "minLength": 1
+        "review": {
+          "enum": [
+            "pending",
+            "reviewed"
+          ]
+        },
+        "requirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "requirement",
+              "actions",
+              "checkpoints",
+              "results"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requirement": {
+                "type": "string",
+                "minLength": 1
+              },
+              "actions": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "checkpoints": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "step",
+                    "expectation"
+                  ],
+                  "properties": {
+                    "step": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "expectation": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "results": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
           }
-         }
+        },
+        "visual": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check",
+              "method",
+              "reason"
+            ],
+            "properties": {
+              "check": {
+                "type": "string",
+                "minLength": 1
+              },
+              "method": {
+                "enum": [
+                  "automated",
+                  "manual",
+                  "external",
+                  "not-applicable"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "native": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check",
+              "method",
+              "reason"
+            ],
+            "properties": {
+              "check": {
+                "type": "string",
+                "minLength": 1
+              },
+              "method": {
+                "enum": [
+                  "automated",
+                  "manual",
+                  "external",
+                  "not-applicable"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
-       },
-       "results": {
-        "type": "array",
-        "minItems": 1,
-        "uniqueItems": true,
-        "items": {
-         "type": "integer",
-         "minimum": 1
-        }
-       }
       }
-     }
-    },
-    "visual": {
-     "type": "array",
-     "minItems": 1,
-     "items": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-       "check",
-       "method",
-       "reason"
-      ],
-      "properties": {
-       "check": {
-        "type": "string",
-        "minLength": 1
-       },
-       "method": {
-        "enum": [
-         "automated",
-         "manual",
-         "external",
-         "not-applicable"
-        ]
-       },
-       "reason": {
-        "type": "string",
-        "minLength": 1
-       }
-      }
-     }
-    },
-    "native": {
-     "type": "array",
-     "minItems": 1,
-     "items": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-       "check",
-       "method",
-       "reason"
-      ],
-      "properties": {
-       "check": {
-        "type": "string",
-        "minLength": 1
-       },
-       "method": {
-        "enum": [
-         "automated",
-         "manual",
-         "external",
-         "not-applicable"
-        ]
-       },
-       "reason": {
-        "type": "string",
-        "minLength": 1
-       }
-      }
-     }
     }
-   }
-  }
- },
- "$defs": {
-  "selector": {
-   "type": "string",
-   "minLength": 1,
-   "description": "Playwright-syntax selector. Prefer 'data-testid=...'. Other accepted: 'role=...', 'text=...', CSS, XPath via 'xpath=...'."
   },
-  "step": {
-   "type": "object",
-   "additionalProperties": false,
-   "minProperties": 1,
-   "maxProperties": 1,
-   "description": "Each step is a single-key map: {verb: args}. The args schema is verb-specific.",
-   "properties": {
-    "open": {
-     "$ref": "#/$defs/url_or_app"
+  "$defs": {
+    "selector": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Playwright-syntax selector. Prefer 'data-testid=...'. Other accepted: 'role=...', 'text=...', CSS, XPath via 'xpath=...'."
     },
-    "goto": {
-     "$ref": "#/$defs/url_arg"
-    },
-    "wait": {
-     "$ref": "#/$defs/seconds_arg"
-    },
-    "wait_for": {
-     "$ref": "#/$defs/wait_for_arg"
-    },
-    "screenshot": {
-     "$ref": "#/$defs/screenshot_arg"
-    },
-    "set_viewport": {
-     "type": "object",
-     "additionalProperties": false,
-     "required": ["width", "height"],
-     "properties": {
-      "width": {"type": "integer", "minimum": 320},
-      "height": {"type": "integer", "minimum": 240}
-     }
-    },
-    "click": {
-     "$ref": "#/$defs/click_arg"
-    },
-    "dblclick": {
-     "$ref": "#/$defs/click_arg"
-    },
-    "right_click": {
-     "$ref": "#/$defs/click_arg"
-    },
-    "hover": {
-     "$ref": "#/$defs/hover_arg"
-    },
-    "drag_to": {
-     "$ref": "#/$defs/drag_arg"
-    },
-    "fill": {
-     "$ref": "#/$defs/fill_arg"
-    },
-    "type": {
-     "$ref": "#/$defs/type_arg"
-    },
-    "send_keys": {
-     "$ref": "#/$defs/type_arg"
-    },
-    "terminal_input": {
-     "$ref": "#/$defs/terminal_input_arg"
-    },
-    "compose_text": {
-     "$ref": "#/$defs/compose_text_arg"
-    },
-    "native_ime_keys": {
-     "$ref": "#/$defs/native_ime_keys_arg"
-    },
-    "native_keys": {
-     "$ref": "#/$defs/native_keys_arg"
-    },
-    "assert_native_process_delta": {
-     "$ref": "#/$defs/assert_native_process_delta_arg"
-    },
-    "native_editor_performance": {
-     "$ref": "#/$defs/native_editor_performance_arg"
-    },
-    "native_click": {
-     "$ref": "#/$defs/native_click_arg"
-    },
-    "native_pointer_drag": {
-     "$ref": "#/$defs/native_pointer_drag_arg"
-    },
-    "native_set_writable": {
-     "$ref": "#/$defs/native_set_writable_arg"
-    },
-    "host_write_file": {
-     "$ref": "#/$defs/host_write_file_arg"
-    },
-    "native_clipboard_owner": {
-     "$ref": "#/$defs/native_clipboard_owner_arg"
-    },
-    "assert_system_clipboard": {
-     "$ref": "#/$defs/assert_system_clipboard_arg"
-    },
-    "press": {
-     "$ref": "#/$defs/press_arg"
-    },
-    "blur": {
-     "$ref": "#/$defs/selector"
-    },
-    "select_option": {
-     "$ref": "#/$defs/select_arg"
-    },
-    "upload_file": {
-     "$ref": "#/$defs/upload_arg"
-    },
-    "assert_visible": {
-     "$ref": "#/$defs/selector"
-    },
-    "assert_not_visible": {
-     "$ref": "#/$defs/selector"
-    },
-    "assert_text": {
-     "$ref": "#/$defs/assert_text_arg"
-    },
-    "assert_pattern": {
-     "$ref": "#/$defs/assert_pattern_arg"
-    },
-    "assert_count": {
-     "$ref": "#/$defs/assert_count_arg"
-    },
-    "assert_url": {
-     "$ref": "#/$defs/url_arg"
-    },
-    "assert_menu_items": {
-     "$ref": "#/$defs/menu_items_arg"
-    },
-    "click_menu": {
-     "$ref": "#/$defs/menu_pick_arg"
-    },
-    "quick_connect": {
-     "$ref": "#/$defs/quick_connect_arg"
-    },
-    "auth": {
-     "$ref": "#/$defs/auth_arg"
-    },
-    "open_session": {
-     "$ref": "#/$defs/open_session_arg"
-    },
-    "attach_sftp": {
-     "type": [
-      "null",
-      "object"
-     ]
-    },
-    "set_remote_path": {
-     "$ref": "#/$defs/text_arg"
-    },
-    "seed_clipboard": {
-     "$ref": "#/$defs/text_arg"
-    },
-    "seed_dialog": {
-     "$ref": "#/$defs/seed_dialog_arg"
-    },
-    "reload": {
-     "type": [
-      "null",
-      "object",
-      "string"
-     ]
-    },
-    "assert_localstorage": {
-     "$ref": "#/$defs/assert_localstorage_arg"
-    },
-    "assert_attribute": {
-     "$ref": "#/$defs/assert_attribute_arg"
-    },
-    "assert_disabled": {
-     "$ref": "#/$defs/selector"
-    },
-    "assert_enabled": {
-     "$ref": "#/$defs/selector"
-    },
-    "set_check": {
-     "$ref": "#/$defs/set_check_arg"
-    },
-    "send_text_via_label": {
-     "$ref": "#/$defs/send_text_via_label_arg"
-    },
-    "eval_readonly": {
-     "$ref": "#/$defs/eval_readonly_arg"
-    },
-    "assert_file_contains": {
-     "type": "object",
-     "required": [
-      "path",
-      "contains"
-     ],
-     "additionalProperties": false,
-     "properties": {
-      "path": {
-       "type": "string",
-       "minLength": 1,
-       "description": "Absolute host path (usually ${fixture.workspace_root}/<file>)."
-      },
-      "contains": {
-       "type": "string"
-      },
-      "timeout_sec": {
-       "type": "number",
-       "minimum": 1,
-       "maximum": 120
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "description": "Each step is a single-key map: {verb: args}. The args schema is verb-specific.",
+      "properties": {
+        "open": {
+          "$ref": "#/$defs/url_or_app"
+        },
+        "goto": {
+          "$ref": "#/$defs/url_arg"
+        },
+        "wait": {
+          "$ref": "#/$defs/seconds_arg"
+        },
+        "wait_for": {
+          "$ref": "#/$defs/wait_for_arg"
+        },
+        "screenshot": {
+          "$ref": "#/$defs/screenshot_arg"
+        },
+        "set_viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "width",
+            "height"
+          ],
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 320
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 240
+            }
+          }
+        },
+        "click": {
+          "$ref": "#/$defs/click_arg"
+        },
+        "dblclick": {
+          "$ref": "#/$defs/click_arg"
+        },
+        "right_click": {
+          "$ref": "#/$defs/click_arg"
+        },
+        "hover": {
+          "$ref": "#/$defs/hover_arg"
+        },
+        "drag_to": {
+          "$ref": "#/$defs/drag_arg"
+        },
+        "fill": {
+          "$ref": "#/$defs/fill_arg"
+        },
+        "type": {
+          "$ref": "#/$defs/type_arg"
+        },
+        "send_keys": {
+          "$ref": "#/$defs/type_arg"
+        },
+        "terminal_input": {
+          "$ref": "#/$defs/terminal_input_arg"
+        },
+        "compose_text": {
+          "$ref": "#/$defs/compose_text_arg"
+        },
+        "native_ime_keys": {
+          "$ref": "#/$defs/native_ime_keys_arg"
+        },
+        "native_keys": {
+          "$ref": "#/$defs/native_keys_arg"
+        },
+        "assert_native_process_delta": {
+          "$ref": "#/$defs/assert_native_process_delta_arg"
+        },
+        "native_editor_performance": {
+          "$ref": "#/$defs/native_editor_performance_arg"
+        },
+        "native_click": {
+          "$ref": "#/$defs/native_click_arg"
+        },
+        "native_pointer_drag": {
+          "$ref": "#/$defs/native_pointer_drag_arg"
+        },
+        "native_set_writable": {
+          "$ref": "#/$defs/native_set_writable_arg"
+        },
+        "host_write_file": {
+          "$ref": "#/$defs/host_write_file_arg"
+        },
+        "native_clipboard_owner": {
+          "$ref": "#/$defs/native_clipboard_owner_arg"
+        },
+        "assert_system_clipboard": {
+          "$ref": "#/$defs/assert_system_clipboard_arg"
+        },
+        "press": {
+          "$ref": "#/$defs/press_arg"
+        },
+        "blur": {
+          "$ref": "#/$defs/selector"
+        },
+        "select_option": {
+          "$ref": "#/$defs/select_arg"
+        },
+        "upload_file": {
+          "$ref": "#/$defs/upload_arg"
+        },
+        "assert_visible": {
+          "$ref": "#/$defs/selector"
+        },
+        "assert_not_visible": {
+          "$ref": "#/$defs/selector"
+        },
+        "assert_text": {
+          "$ref": "#/$defs/assert_text_arg"
+        },
+        "assert_pattern": {
+          "$ref": "#/$defs/assert_pattern_arg"
+        },
+        "assert_count": {
+          "$ref": "#/$defs/assert_count_arg"
+        },
+        "assert_url": {
+          "$ref": "#/$defs/url_arg"
+        },
+        "assert_menu_items": {
+          "$ref": "#/$defs/menu_items_arg"
+        },
+        "click_menu": {
+          "$ref": "#/$defs/menu_pick_arg"
+        },
+        "quick_connect": {
+          "$ref": "#/$defs/quick_connect_arg"
+        },
+        "auth": {
+          "$ref": "#/$defs/auth_arg"
+        },
+        "open_session": {
+          "$ref": "#/$defs/open_session_arg"
+        },
+        "attach_sftp": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "set_remote_path": {
+          "$ref": "#/$defs/text_arg"
+        },
+        "seed_clipboard": {
+          "$ref": "#/$defs/text_arg"
+        },
+        "seed_dialog": {
+          "$ref": "#/$defs/seed_dialog_arg"
+        },
+        "reload": {
+          "type": [
+            "null",
+            "object",
+            "string"
+          ]
+        },
+        "assert_localstorage": {
+          "$ref": "#/$defs/assert_localstorage_arg"
+        },
+        "assert_attribute": {
+          "$ref": "#/$defs/assert_attribute_arg"
+        },
+        "assert_disabled": {
+          "$ref": "#/$defs/selector"
+        },
+        "assert_enabled": {
+          "$ref": "#/$defs/selector"
+        },
+        "set_check": {
+          "$ref": "#/$defs/set_check_arg"
+        },
+        "send_text_via_label": {
+          "$ref": "#/$defs/send_text_via_label_arg"
+        },
+        "eval_readonly": {
+          "$ref": "#/$defs/eval_readonly_arg"
+        },
+        "assert_file_contains": {
+          "type": "object",
+          "required": [
+            "path",
+            "contains"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Absolute host path (usually ${fixture.workspace_root}/<file>)."
+            },
+            "contains": {
+              "type": "string"
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 120
+            }
+          },
+          "description": "Native-only: host-side disk re-read proving the save pipeline wrote the content (G0 disk-effect evidence)."
+        },
+        "assert_file_exists": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "object",
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "timeout_sec": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 120
+                }
+              }
+            }
+          ],
+          "description": "Native-only: host-side existence check."
+        },
+        "assert_file_receipt": {
+          "type": "object",
+          "required": [
+            "path",
+            "selector",
+            "encoding",
+            "bom",
+            "eol",
+            "expected_text"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1
+            },
+            "encoding": {
+              "enum": [
+                "UTF-8",
+                "UTF-16LE",
+                "UTF-16BE",
+                "ISO-8859-1"
+              ]
+            },
+            "bom": {
+              "type": "boolean"
+            },
+            "eol": {
+              "enum": [
+                "lf",
+                "crlf",
+                "cr"
+              ]
+            },
+            "expected_text": {
+              "type": "string"
+            },
+            "require_history": {
+              "type": "boolean",
+              "default": true
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 120
+            }
+          },
+          "description": "Native-only: independently hashes host bytes and reconciles encoding, BOM, EOL, length, disk hash, logical hash, and history identity with a production save receipt observation."
+        },
+        "assert_file_sha256": {
+          "type": "object",
+          "required": [
+            "path",
+            "equals"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "equals": {
+              "type": "string",
+              "description": "exact lowercase SHA-256 hex digest, or a ${fixture.*} placeholder that resolves to one before the step runs",
+              "pattern": "^([a-f0-9]{64}|\\$\\{fixture\\.[A-Za-z0-9_]+\\})$"
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 120
+            }
+          },
+          "description": "Native-only: independently hashes host file bytes and compares the digest with an exact expected SHA-256."
+        },
+        "seed_storage": {
+          "type": "object",
+          "required": [
+            "key",
+            "value"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "description": "JSON text stored verbatim under key."
+            }
+          },
+          "description": "Controlled persistence fixture: write one localStorage entry so native cases can enter a workspace without the undrivable native folder picker."
+        },
+        "reload_window": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {}
+            }
+          ],
+          "description": "Reload the webview document so store bootstraps re-read storage; waits for welcome-panel."
+        },
+        "vault_first_run": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Complete the empty-vault first-run master-password gate with the given QA password. Locked vault => loud failure; unlocked => no-op."
+        },
+        "save_race_arm": {
+          "$ref": "#/$defs/save_race_arm_arg"
+        },
+        "save_race_wait_entered": {
+          "$ref": "#/$defs/save_race_wait_entered_arg"
+        },
+        "save_race_release": {
+          "$ref": "#/$defs/save_race_release_arg"
+        },
+        "save_race_trace": {
+          "$ref": "#/$defs/save_race_trace_arg"
+        },
+        "save_race_note": {
+          "$ref": "#/$defs/save_race_note_arg"
+        },
+        "parity005_set_mode": {
+          "enum": [
+            "normal",
+            "empty",
+            "empty-placeholder",
+            "fetch-hold",
+            "resolve-hold",
+            "resolve-null",
+            "resolve-error",
+            "resolve-timeout",
+            "resolve-overlap",
+            "resolve-invalid"
+          ]
+        },
+        "parity005_set_facts": {
+          "enum": [
+            "ready",
+            "loading",
+            "degraded",
+            "failed",
+            "stale"
+          ]
+        },
+        "parity005_wait_pending": {
+          "enum": [
+            "fetch",
+            "resolve"
+          ]
+        },
+        "parity005_release": {
+          "enum": [
+            "fetch",
+            "resolve"
+          ]
+        },
+        "parity005_trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "fetch": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "resolve": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pending": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "parity005_native_fault": {
+          "enum": [
+            "normal",
+            "null",
+            "error"
+          ]
+        },
+        "parity005_native_trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "phase"
+          ],
+          "properties": {
+            "phase": {
+              "enum": [
+                "fetch",
+                "resolve"
+              ]
+            },
+            "label_contains": {
+              "type": "string"
+            },
+            "detail_contains": {
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "resolved",
+                "unavailable",
+                "timeout",
+                "failed"
+              ]
+            },
+            "require_import": {
+              "type": "boolean"
+            },
+            "require_snippet": {
+              "type": "boolean"
+            },
+            "expect_raw_range": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "line",
+                "start",
+                "insert_end",
+                "replace_end"
+              ],
+              "properties": {
+                "line": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "start": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "insert_end": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "replace_end": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "artifact": {
+              "type": "string"
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "host_delete_file": {
+          "$ref": "#/$defs/host_delete_file_arg"
+        },
+        "assert_text_equals": {
+          "$ref": "#/$defs/assert_text_equals_arg"
+        },
+        "assert_items": {
+          "$ref": "#/$defs/assert_items_arg"
+        },
+        "middle_click": {
+          "$ref": "#/$defs/selector"
+        },
+        "parity008_hold": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser parity008 fixture: hold git_blob_pair responses for this repo root (null clears)."
+        },
+        "parity008_release": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {}
+            }
+          ],
+          "description": "Browser parity008 fixture: release held diff reads; fails when none is pending."
+        },
+        "parity008_trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "writes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pending": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pending_min": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "last_pair_repo": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "parity009_set_mode": {
+          "enum": [
+            "normal",
+            "hold",
+            "unavailable",
+            "error"
+          ]
+        },
+        "parity009_release": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {}
+            }
+          ]
+        },
+        "parity009_trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "active": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "runs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "last_status": {
+              "enum": [
+                "ok",
+                "unavailable",
+                "error",
+                "cancelled"
+              ]
+            },
+            "last_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "parity007_set_mode": {
+          "enum": [
+            "normal",
+            "multi-candidate",
+            "none",
+            "empty-supported",
+            "disabled",
+            "command-only",
+            "malformed",
+            "timeout",
+            "changed",
+            "error",
+            "resolve-error",
+            "symbols-error",
+            "symbols-ambiguous",
+            "rename-error",
+            "multi-file",
+            "write-failure"
+          ]
+        },
+        "parity007_hold": {
+          "enum": [
+            "request",
+            "resolve",
+            "symbols-before",
+            "symbols-after",
+            "prepare-rename",
+            "rename"
+          ]
+        },
+        "parity007_wait_pending": {
+          "enum": [
+            "request",
+            "resolve",
+            "symbols-before",
+            "symbols-after",
+            "prepare-rename",
+            "rename"
+          ]
+        },
+        "parity007_release": {
+          "enum": [
+            "request",
+            "resolve",
+            "symbols-before",
+            "symbols-after",
+            "prepare-rename",
+            "rename"
+          ]
+        },
+        "parity007_trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "requests": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "resolves": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "symbols": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "prepares": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "renames": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pending": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "range": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start",
+                "end"
+              ],
+              "properties": {
+                "start": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "line",
+                    "character"
+                  ],
+                  "properties": {
+                    "line": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "character": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                "end": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "line",
+                    "character"
+                  ],
+                  "properties": {
+                    "line": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "character": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parity007_java_oracle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scenario",
+            "expected"
+          ],
+          "properties": {
+            "scenario": {
+              "enum": [
+                "e1",
+                "e3"
+              ]
+            },
+            "expected": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "artifact": {
+              "type": "string"
+            }
+          }
+        }
       }
-     },
-     "description": "Native-only: host-side disk re-read proving the save pipeline wrote the content (G0 disk-effect evidence)."
     },
-    "assert_file_exists": {
-     "oneOf": [
-      {
-       "type": "string",
-       "minLength": 1
-      },
-      {
-       "type": "object",
-       "required": [
-        "path"
-       ],
-       "additionalProperties": false,
-       "properties": {
-        "path": {
-         "type": "string"
+    "url_or_app": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      ]
+    },
+    "url_arg": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seconds_arg": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "text_arg": {
+      "type": "string"
+    },
+    "wait_for_arg": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/selector"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selector"
+          ],
+          "properties": {
+            "selector": {
+              "$ref": "#/$defs/selector"
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 120
+            },
+            "state": {
+              "enum": [
+                "attached",
+                "detached",
+                "visible",
+                "hidden"
+              ],
+              "default": "visible"
+            }
+          }
+        }
+      ]
+    },
+    "screenshot_arg": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "description": "Filename only; relative to qa-ui-auto-report/<run>/<case>/"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "selector": {
+              "$ref": "#/$defs/selector"
+            },
+            "full_page": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      ]
+    },
+    "click_arg": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/selector"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selector"
+          ],
+          "properties": {
+            "selector": {
+              "$ref": "#/$defs/selector"
+            },
+            "position": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "x",
+                "y"
+              ],
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              }
+            },
+            "modifiers": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "Alt",
+                  "Control",
+                  "Meta",
+                  "Shift",
+                  "Mod"
+                ]
+              },
+              "uniqueItems": true
+            },
+            "force": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "hover_arg": {
+      "$ref": "#/$defs/selector"
+    },
+    "drag_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "to"
+      ],
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/selector"
+        },
+        "to": {
+          "$ref": "#/$defs/selector"
+        }
+      }
+    },
+    "fill_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "value"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "type_arg": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selector",
+            "text"
+          ],
+          "properties": {
+            "selector": {
+              "$ref": "#/$defs/selector"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "compose_text_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "text"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "during_key": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "terminal_input_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "text"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "text": {
+          "type": "string"
+        },
+        "submit": {
+          "type": "boolean",
+          "default": false
+        },
+        "verify": {
+          "$ref": "#/$defs/terminal_input_verify"
+        }
+      }
+    },
+    "terminal_input_verify": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "regex"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "regex": {
+          "type": "string",
+          "minLength": 1
         },
         "timeout_sec": {
-         "type": "number",
-         "minimum": 1,
-         "maximum": 120
-        }
-       }
-      }
-     ],
-     "description": "Native-only: host-side existence check."
-    },
-    "assert_file_receipt": {
-     "type": "object",
-     "required": [
-      "path",
-      "selector",
-      "encoding",
-      "bom",
-      "eol",
-      "expected_text"
-     ],
-     "additionalProperties": false,
-     "properties": {
-      "path": {
-       "type": "string",
-       "minLength": 1
-      },
-      "selector": {
-       "type": "string",
-       "minLength": 1
-      },
-      "encoding": {
-       "enum": [
-        "UTF-8",
-        "UTF-16LE",
-        "UTF-16BE",
-        "ISO-8859-1"
-       ]
-      },
-      "bom": {
-       "type": "boolean"
-      },
-      "eol": {
-       "enum": [
-        "lf",
-        "crlf",
-        "cr"
-       ]
-      },
-      "expected_text": {
-       "type": "string"
-      },
-      "require_history": {
-       "type": "boolean",
-       "default": true
-      },
-      "timeout_sec": {
-       "type": "number",
-       "minimum": 1,
-       "maximum": 120
-      }
-     },
-     "description": "Native-only: independently hashes host bytes and reconciles encoding, BOM, EOL, length, disk hash, logical hash, and history identity with a production save receipt observation."
-    },
-    "assert_file_sha256": {
-     "type": "object",
-     "required": [
-      "path",
-      "equals"
-     ],
-     "additionalProperties": false,
-     "properties": {
-      "path": {
-       "type": "string",
-       "minLength": 1
-      },
-      "equals": {
-       "type": "string",
-       "description": "exact lowercase SHA-256 hex digest, or a ${fixture.*} placeholder that resolves to one before the step runs",
-       "pattern": "^([a-f0-9]{64}|\\$\\{fixture\\.[A-Za-z0-9_]+\\})$"
-      },
-      "timeout_sec": {
-       "type": "number",
-       "minimum": 1,
-       "maximum": 120
-      }
-     },
-     "description": "Native-only: independently hashes host file bytes and compares the digest with an exact expected SHA-256."
-    },
-    "seed_storage": {
-     "type": "object",
-     "required": [
-      "key",
-      "value"
-     ],
-     "additionalProperties": false,
-     "properties": {
-      "key": {
-       "type": "string",
-       "minLength": 1
-      },
-      "value": {
-       "type": "string",
-       "minLength": 1,
-       "description": "JSON text stored verbatim under key."
-      }
-     },
-     "description": "Controlled persistence fixture: write one localStorage entry so native cases can enter a workspace without the undrivable native folder picker."
-    },
-    "reload_window": {
-     "oneOf": [
-      {
-       "type": "null"
-      },
-      {
-       "type": "object",
-       "additionalProperties": false,
-       "properties": {}
-      }
-     ],
-     "description": "Reload the webview document so store bootstraps re-read storage; waits for welcome-panel."
-    },
-    "vault_first_run": {
-     "type": "string",
-     "minLength": 1,
-     "description": "Complete the empty-vault first-run master-password gate with the given QA password. Locked vault => loud failure; unlocked => no-op."
-    },
-    "save_race_arm": {
-     "$ref": "#/$defs/save_race_arm_arg"
-    },
-    "save_race_wait_entered": {
-     "$ref": "#/$defs/save_race_wait_entered_arg"
-    },
-    "save_race_release": {
-     "$ref": "#/$defs/save_race_release_arg"
-    },
-    "save_race_trace": {
-     "$ref": "#/$defs/save_race_trace_arg"
-    },
-    "save_race_note": {
-     "$ref": "#/$defs/save_race_note_arg"
-    },
-    "parity005_set_mode": {
-     "enum": ["normal", "empty", "empty-placeholder", "fetch-hold", "resolve-hold", "resolve-null", "resolve-error", "resolve-timeout", "resolve-overlap", "resolve-invalid"]
-    },
-    "parity005_set_facts": {
-     "enum": ["ready", "loading", "degraded", "failed", "stale"]
-    },
-    "parity005_wait_pending": {
-     "enum": ["fetch", "resolve"]
-    },
-    "parity005_release": {
-     "enum": ["fetch", "resolve"]
-    },
-    "parity008_hold": {
-     "oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}],
-     "description": "Browser parity008 fixture: hold git_blob_pair responses for this repo root (null clears)."
-    },
-    "parity008_release": {
-     "oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "properties": {}}],
-     "description": "Browser parity008 fixture: release held diff reads; fails when none is pending."
-    },
-    "parity008_trace": {
-     "type": "object",
-     "additionalProperties": false,
-     "minProperties": 1,
-     "properties": {
-      "writes": {"type": "integer", "minimum": 0},
-      "pending": {"type": "integer", "minimum": 0},
-      "pending_min": {"type": "integer", "minimum": 1},
-      "last_pair_repo": {"type": "string", "minLength": 1}
-     }
-    },
-    "parity009_set_mode": {
-     "enum": ["normal", "hold", "unavailable", "error"]
-    },
-    "parity009_release": {
-     "oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "properties": {}}]
-    },
-    "parity009_trace": {
-     "type": "object",
-     "additionalProperties": false,
-     "minProperties": 1,
-     "properties": {
-      "active": {"type": "integer", "minimum": 0},
-      "runs": {"type": "integer", "minimum": 0},
-      "last_status": {"enum": ["ok", "unavailable", "error", "cancelled"]},
-      "last_count": {"type": "integer", "minimum": 0}
-     }
-    },
-    "parity005_trace": {
-     "type": "object",
-     "additionalProperties": false,
-     "minProperties": 1,
-     "properties": {
-      "fetch": { "type": "integer", "minimum": 0 },
-      "resolve": { "type": "integer", "minimum": 0 },
-      "pending": { "type": "integer", "minimum": 0 }
-     }
-    },
-    "parity005_native_fault": {
-     "enum": ["normal", "null", "error"]
-    },
-    "parity005_native_trace": {
-     "type": "object",
-     "additionalProperties": false,
-     "required": ["phase"],
-     "properties": {
-      "phase": {"enum": ["fetch", "resolve"]},
-      "label_contains": {"type": "string"},
-      "detail_contains": {"type": "string"},
-      "kind": {"enum": ["resolved", "unavailable", "timeout", "failed"]},
-      "require_import": {"type": "boolean"},
-      "require_snippet": {"type": "boolean"},
-      "expect_raw_range": {
-       "type": "object",
-       "additionalProperties": false,
-       "required": ["line", "start", "insert_end", "replace_end"],
-       "properties": {
-        "line": {"type": "integer", "minimum": 0},
-        "start": {"type": "integer", "minimum": 0},
-        "insert_end": {"type": "integer", "minimum": 0},
-        "replace_end": {"type": "integer", "minimum": 0}
-       }
-      },
-      "artifact": {"type": "string"},
-      "timeout_sec": {"type": "number", "minimum": 0}
-     }
-    },
-    "host_delete_file": {
-     "$ref": "#/$defs/host_delete_file_arg"
-    },
-    "assert_text_equals": {
-     "$ref": "#/$defs/assert_text_equals_arg"
-    },
-    "assert_items": {
-     "$ref": "#/$defs/assert_items_arg"
-    },
-    "middle_click": {
-     "$ref": "#/$defs/selector"
-    }
-   }
-  },
-  "url_or_app": {
-   "oneOf": [
-    {
-     "type": "string",
-     "minLength": 1
-    },
-    {
-     "type": "object",
-     "additionalProperties": false,
-     "properties": {
-      "url": {
-       "type": "string"
-      }
-     },
-     "required": [
-      "url"
-     ]
-    }
-   ]
-  },
-  "url_arg": {
-   "type": "string",
-   "minLength": 1
-  },
-  "seconds_arg": {
-   "oneOf": [
-    {
-     "type": "number",
-     "minimum": 0
-    },
-    {
-     "type": "string",
-     "minLength": 1
-    }
-   ]
-  },
-  "text_arg": {
-   "type": "string"
-  },
-  "wait_for_arg": {
-   "oneOf": [
-    {
-     "$ref": "#/$defs/selector"
-    },
-    {
-     "type": "object",
-     "additionalProperties": false,
-     "required": [
-      "selector"
-     ],
-     "properties": {
-      "selector": {
-       "$ref": "#/$defs/selector"
-      },
-      "timeout_sec": {
-       "type": "number",
-       "minimum": 0.5,
-       "maximum": 120
-      },
-      "state": {
-       "enum": [
-        "attached",
-        "detached",
-        "visible",
-        "hidden"
-       ],
-       "default": "visible"
-      }
-     }
-    }
-   ]
-  },
-  "screenshot_arg": {
-   "oneOf": [
-    {
-     "type": "string",
-     "minLength": 1,
-     "description": "Filename only; relative to qa-ui-auto-report/<run>/<case>/"
-    },
-    {
-     "type": "object",
-     "additionalProperties": false,
-     "required": [
-      "path"
-     ],
-     "properties": {
-      "path": {
-       "type": "string",
-       "minLength": 1
-      },
-      "selector": {
-       "$ref": "#/$defs/selector"
-      },
-      "full_page": {
-       "type": "boolean",
-       "default": false
-      }
-     }
-    }
-   ]
-  },
-  "click_arg": {
-   "oneOf": [
-    {
-     "$ref": "#/$defs/selector"
-    },
-    {
-     "type": "object",
-     "additionalProperties": false,
-     "required": [
-      "selector"
-     ],
-     "properties": {
-      "selector": {
-       "$ref": "#/$defs/selector"
-      },
-      "position": {
-       "type": "object",
-       "additionalProperties": false,
-       "required": [
-        "x",
-        "y"
-       ],
-       "properties": {
-        "x": {
-         "type": "number"
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 10
         },
-        "y": {
-         "type": "number"
+        "attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2
         }
-       }
-      },
-      "modifiers": {
-       "type": "array",
-       "items": {
-        "enum": [
-         "Alt",
-         "Control",
-         "Meta",
-         "Shift",
-         "Mod"
-        ]
-       },
-       "uniqueItems": true
-      },
-      "force": {
-       "type": "boolean"
       }
-     }
-    }
-   ]
-  },
-  "hover_arg": {
-   "$ref": "#/$defs/selector"
-  },
-  "drag_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "from",
-    "to"
-   ],
-   "properties": {
-    "from": {
-     "$ref": "#/$defs/selector"
     },
-    "to": {
-     "$ref": "#/$defs/selector"
-    }
-   }
-  },
-  "fill_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "value"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "value": {
-     "type": "string"
-    }
-   }
-  },
-  "type_arg": {
-   "oneOf": [
-    {
-     "type": "string"
-    },
-    {
-     "type": "object",
-     "additionalProperties": false,
-     "required": [
-      "selector",
-      "text"
-     ],
-     "properties": {
-      "selector": {
-       "$ref": "#/$defs/selector"
-      },
-      "text": {
-       "type": "string"
+    "native_ime_keys_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "expected_engine",
+        "keys"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "expected_engine": {
+          "type": "string",
+          "minLength": 1
+        },
+        "keys": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
-     }
-    }
-   ]
-  },
-  "compose_text_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "text"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
     },
-    "text": {
-     "type": "string",
-     "minLength": 1
-    },
-    "during_key": {
-     "type": "string",
-     "minLength": 1
-    }
-   }
-  },
-  "terminal_input_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "text"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "text": {
-     "type": "string"
-    },
-    "submit": {
-     "type": "boolean",
-     "default": false
-    },
-    "verify": {
-     "$ref": "#/$defs/terminal_input_verify"
-    }
-   }
-  },
-  "terminal_input_verify": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "regex"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "regex": {
-     "type": "string",
-     "minLength": 1
-    },
-    "timeout_sec": {
-     "type": "number",
-     "exclusiveMinimum": 0,
-     "default": 10
-    },
-    "attempts": {
-     "type": "integer",
-     "minimum": 1,
-     "default": 2
-    }
-   }
-  },
-  "native_ime_keys_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "expected_engine",
-    "keys"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "expected_engine": {
-     "type": "string",
-     "minLength": 1
-    },
-    "keys": {
-     "type": "array",
-     "minItems": 1,
-     "items": {
-      "type": "string",
-      "minLength": 1
-     }
-    }
-   }
-  },
-  "native_keys_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "keys"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "keys": {
-     "type": "array",
-     "minItems": 1,
-     "items": {
-      "type": "string",
-      "minLength": 1
-     }
-    },
-    "focus_prechecked": {
-     "type": "boolean",
-     "description": "Skip the immediate WebDriver focus probe only when the testcase asserted DOM focus immediately before an external fault that makes WebDriver commands unavailable."
-    },
-    "focus_target": {
-     "type": "boolean",
-     "description": "Focus the selector through WebDriver immediately before verifying ownership and injecting keys. Mutually exclusive with focus_prechecked."
-    },
-    "ready_selector": {
-     "$ref": "#/$defs/selector",
-     "description": "Optional visible selector polled after native input setup and immediately before key delivery."
-    },
-    "ready_timeout_sec": {
-     "type": "number",
-     "minimum": 0
-    },
-    "ready_stable_sec": {
-     "type": "number",
-     "minimum": 0,
-     "description": "Require the ready element identity and markup to remain unchanged for this duration before delivering keys. Requires ready_selector."
-    },
-    "require_keydown_prevented": {
-     "type": "boolean",
-     "description": "Require each delivered keydown to be consumed with preventDefault; available only with WebDriver event observation."
-    },
-    "transport": {
-     "enum": [
-      "x11",
-      "webdriver"
-     ],
-     "default": "x11",
-     "description": "Native key transport. WebDriver uses packaged-webview W3C key actions; x11 uses XTest."
-    }
-   }
-  },
-  "assert_native_process_delta_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "pattern",
-    "baseline",
-    "max_delta"
-   ],
-   "properties": {
-    "pattern": {
-     "type": "string",
-     "minLength": 1
-    },
-    "baseline": {
-     "type": [
-      "integer",
-      "string"
-     ]
-    },
-    "max_delta": {
-     "type": "integer",
-     "minimum": 0
-    },
-    "timeout_sec": {
-     "type": "number",
-     "minimum": 0
-    }
-   }
-  },
-  "native_editor_performance_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "keys",
-    "max_p95_ms"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "keys": {
-     "anyOf": [
-      {
-       "type": "array",
-       "minItems": 5,
-       "items": {
-        "type": "string",
-        "minLength": 1,
-        "maxLength": 1
-       }
-      },
-      {
-       "type": "string",
-       "minLength": 5,
-       "description": "typed one character at a time; same semantics as the single-char array form"
+    "native_keys_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "keys"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "keys": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "focus_prechecked": {
+          "type": "boolean",
+          "description": "Skip the immediate WebDriver focus probe only when the testcase asserted DOM focus immediately before an external fault that makes WebDriver commands unavailable."
+        },
+        "focus_target": {
+          "type": "boolean",
+          "description": "Focus the selector through WebDriver immediately before verifying ownership and injecting keys. Mutually exclusive with focus_prechecked."
+        },
+        "ready_selector": {
+          "$ref": "#/$defs/selector",
+          "description": "Optional visible selector polled after native input setup and immediately before key delivery."
+        },
+        "ready_timeout_sec": {
+          "type": "number",
+          "minimum": 0
+        },
+        "ready_stable_sec": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Require the ready element identity and markup to remain unchanged for this duration before delivering keys. Requires ready_selector."
+        },
+        "require_keydown_prevented": {
+          "type": "boolean",
+          "description": "Require each delivered keydown to be consumed with preventDefault; available only with WebDriver event observation."
+        },
+        "transport": {
+          "enum": [
+            "x11",
+            "webdriver"
+          ],
+          "default": "x11",
+          "description": "Native key transport. WebDriver uses packaged-webview W3C key actions; x11 uses XTest."
+        }
       }
-     ]
     },
-    "max_p95_ms": {
-     "type": "number",
-     "exclusiveMinimum": 0
+    "assert_native_process_delta_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pattern",
+        "baseline",
+        "max_delta"
+      ],
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "max_delta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timeout_sec": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
     },
-    "capture_text": {
-     "type": "boolean",
-     "description": "default true; false skips per-mutation textContent reads so multi-megabyte documents are not dominated by probe overhead"
+    "native_editor_performance_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "keys",
+        "max_p95_ms"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "keys": {
+          "anyOf": [
+            {
+              "type": "array",
+              "minItems": 5,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1
+              }
+            },
+            {
+              "type": "string",
+              "minLength": 5,
+              "description": "typed one character at a time; same semantics as the single-char array form"
+            }
+          ]
+        },
+        "max_p95_ms": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "capture_text": {
+          "type": "boolean",
+          "description": "default true; false skips per-mutation textContent reads so multi-megabyte documents are not dominated by probe overhead"
+        },
+        "label": {
+          "type": "string",
+          "description": "names the per-invocation artifact native-editor-performance-<label>.json so repeated measurement groups accumulate instead of overwriting"
+        }
+      }
     },
-    "label": {
-     "type": "string",
-     "description": "names the per-invocation artifact native-editor-performance-<label>.json so repeated measurement groups accumulate instead of overwriting"
-    }
-   }
-  },
-  "native_click_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    }
-   }
-  },
-  "native_pointer_drag_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "from",
-    "to"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
+    "native_click_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        }
+      }
     },
-    "from": {
-     "$ref": "#/$defs/native_line_column"
+    "native_pointer_drag_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "from": {
+          "$ref": "#/$defs/native_line_column"
+        },
+        "to": {
+          "$ref": "#/$defs/native_line_column"
+        },
+        "modifiers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "Alt",
+              "Control",
+              "Meta",
+              "Shift",
+              "Mod"
+            ]
+          }
+        }
+      }
     },
-    "to": {
-     "$ref": "#/$defs/native_line_column"
+    "native_line_column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "line",
+        "column"
+      ],
+      "properties": {
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     },
-    "modifiers": {
-     "type": "array",
-     "uniqueItems": true,
-     "items": {
-      "enum": [
-       "Alt",
-       "Control",
-       "Meta",
-       "Shift",
-       "Mod"
+    "native_clipboard_owner_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "description": "Native-only: external X11 CLIPBOARD selection owner. grant takes the real selection; deny advertises standard text targets but rejects their conversion; suspend stops the owner so every client's read genuinely fails; resume restores the last granted text; release terminates it and records that the host selection was replaced.",
+      "properties": {
+        "action": {
+          "enum": [
+            "grant",
+            "deny",
+            "suspend",
+            "resume",
+            "release"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "assert_system_clipboard_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "equals"
+          ]
+        },
+        {
+          "required": [
+            "contains"
+          ]
+        },
+        {
+          "required": [
+            "readable"
+          ]
+        }
+      ],
+      "description": "Native-only: out-of-process read of the real X11 CLIPBOARD selection. Exactly one of equals/contains/readable.",
+      "properties": {
+        "equals": {
+          "type": "string"
+        },
+        "contains": {
+          "type": "string",
+          "minLength": 1
+        },
+        "readable": {
+          "type": "boolean"
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "native_set_writable_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "writable"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "writable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "host_write_file_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "text"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "press_arg": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key"
+          ],
+          "properties": {
+            "key": {
+              "type": "string"
+            },
+            "selector": {
+              "$ref": "#/$defs/selector"
+            }
+          }
+        }
       ]
-     }
-    }
-   }
-  },
-  "native_line_column": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "line",
-    "column"
-   ],
-   "properties": {
-    "line": {
-     "type": "integer",
-     "minimum": 1
     },
-    "column": {
-     "type": "integer",
-     "minimum": 0
-    }
-   }
-  },
-  "native_clipboard_owner_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "action"
-   ],
-   "description": "Native-only: external X11 CLIPBOARD selection owner. grant takes the real selection; deny advertises standard text targets but rejects their conversion; suspend stops the owner so every client's read genuinely fails; resume restores the last granted text; release terminates it and records that the host selection was replaced.",
-   "properties": {
-    "action": {
-     "enum": [
-      "grant",
-      "deny",
-      "suspend",
-      "resume",
-      "release"
-     ]
-    },
-    "text": {
-     "type": "string",
-     "minLength": 1
-    }
-   }
-  },
-  "assert_system_clipboard_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "oneOf": [
-    {
-     "required": [
-      "equals"
-     ]
-    },
-    {
-     "required": [
-      "contains"
-     ]
-    },
-    {
-     "required": [
-      "readable"
-     ]
-    }
-   ],
-   "description": "Native-only: out-of-process read of the real X11 CLIPBOARD selection. Exactly one of equals/contains/readable.",
-   "properties": {
-    "equals": {
-     "type": "string"
-    },
-    "contains": {
-     "type": "string",
-     "minLength": 1
-    },
-    "readable": {
-     "type": "boolean"
-    },
-    "timeout_sec": {
-     "type": "number",
-     "exclusiveMinimum": 0
-    }
-   }
-  },
-  "native_set_writable_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "path",
-    "writable"
-   ],
-   "properties": {
-    "path": {
-     "type": "string",
-     "minLength": 1
-    },
-    "writable": {
-     "type": "boolean"
-    }
-   }
-  },
-  "host_write_file_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "path",
-    "text"
-   ],
-   "properties": {
-    "path": {
-     "type": "string",
-     "minLength": 1
-    },
-    "text": {
-     "type": "string"
-    }
-   }
-  },
-  "press_arg": {
-   "oneOf": [
-    {
-     "type": "string",
-     "minLength": 1
-    },
-    {
-     "type": "object",
-     "additionalProperties": false,
-     "required": [
-      "key"
-     ],
-     "properties": {
-      "key": {
-       "type": "string"
-      },
-      "selector": {
-       "$ref": "#/$defs/selector"
+    "select_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
       }
-     }
-    }
-   ]
-  },
-  "select_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
     },
-    "label": {
-     "type": "string"
-    },
-    "value": {
-     "type": "string"
-    }
-   }
-  },
-  "upload_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "path"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "path": {
-     "type": "string"
-    }
-   }
-  },
-  "assert_text_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "contains"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "contains": {
-     "type": "string"
-    },
-    "timeout_sec": {
-     "type": "number",
-     "minimum": 0.5,
-     "maximum": 60,
-     "default": 10
-    }
-   }
-  },
-  "assert_pattern_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "regex"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "regex": {
-     "type": "string",
-     "minLength": 1
-    },
-    "timeout_sec": {
-     "type": "number",
-     "minimum": 0.5,
-     "maximum": 60,
-     "default": 10
-    }
-   }
-  },
-  "assert_count_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "min": {
-     "type": "integer",
-     "minimum": 0
-    },
-    "max": {
-     "type": "integer",
-     "minimum": 0
-    },
-    "equal": {
-     "type": "integer",
-     "minimum": 0
-    }
-   }
-  },
-  "menu_items_arg": {
-   "type": "array",
-   "minItems": 1,
-   "items": {
-    "type": "string",
-    "minLength": 1
-   },
-   "description": "Each entry is the visible label of a context-menu item to assert visible."
-  },
-  "menu_pick_arg": {
-   "oneOf": [
-    {
-     "type": "string",
-     "minLength": 1
-    },
-    {
-     "type": "object",
-     "additionalProperties": false,
-     "required": [
-      "label"
-     ],
-     "properties": {
-      "label": {
-       "type": "string"
+    "upload_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "path"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "path": {
+          "type": "string"
+        }
       }
-     }
-    }
-   ]
-  },
-  "quick_connect_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "url"
-   ],
-   "properties": {
-    "url": {
-     "type": "string",
-     "minLength": 1,
-     "description": "ssh://user@host:port"
-    }
-   }
-  },
-  "auth_arg": {
-   "oneOf": [
-    {
-     "type": "string"
     },
-    {
-     "type": "object",
-     "additionalProperties": false,
-     "properties": {
-      "password": {
-       "type": "string"
+    "assert_text_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "contains"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "contains": {
+          "type": "string"
+        },
+        "timeout_sec": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 60,
+          "default": 10
+        }
       }
-     },
-     "required": [
-      "password"
-     ]
-    }
-   ]
-  },
-  "open_session_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "name"
-   ],
-   "properties": {
-    "name": {
-     "type": "string"
     },
-    "double_click": {
-     "type": "boolean",
-     "default": true
-    }
-   }
-  },
-  "eval_readonly_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "expression"
-   ],
-   "description": "READ-ONLY JavaScript expression evaluated in the page. May not contain assignments, function declarations, DOM mutations, or `await`. Validator rejects steps that look like side effects.",
-   "properties": {
-    "expression": {
-     "type": "string",
-     "minLength": 1,
-     "maxLength": 400,
-     "not": {
-      "anyOf": [
-       {
-        "pattern": "[^=!<>]=[^=]"
-       },
-       {
-        "pattern": "\\+=|-=|\\*=|/="
-       },
-       {
-        "pattern": "\\bawait\\b"
-       },
-       {
-        "pattern": "\\bfunction\\b"
-       },
-       {
-        "pattern": "\\bnew\\b"
-       },
-       {
-        "pattern": "\\bclick\\("
-       },
-       {
-        "pattern": "\\bsetAttribute\\("
-       },
-       {
-        "pattern": "\\bremoveAttribute\\("
-       },
-       {
-        "pattern": "\\bdispatchEvent\\("
-       },
-       {
-        "pattern": "\\.innerHTML\\s*="
-       },
-       {
-        "pattern": "\\bdocument\\.write"
-       }
-      ]
-     }
-    },
-    "expect_truthy": {
-     "type": "boolean",
-     "default": true
-    },
-    "contains": {
-     "type": "string",
-     "description": "Optional: assert that String(result) contains this substring."
-    }
-   }
-  },
-  "seed_dialog_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "description": "Pre-arm window.prompt and window.confirm responses for the next interaction.",
-   "properties": {
-    "prompt": {
-     "oneOf": [
-      {
-       "type": "string"
-      },
-      {
-       "type": "array",
-       "items": {
-        "type": "string"
-       }
+    "assert_pattern_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "regex"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "regex": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_sec": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 60,
+          "default": 10
+        }
       }
-     ]
     },
-    "confirm": {
-     "type": "boolean"
-    }
-   }
-  },
-  "assert_localstorage_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "key"
-   ],
-   "properties": {
-    "key": {
-     "type": "string",
-     "minLength": 1
-    },
-    "exists": {
-     "type": "boolean"
-    },
-    "contains": {
-     "type": "string"
-    },
-    "equals": {
-     "type": "string"
-    }
-   }
-  },
-  "assert_attribute_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "name"
-   ],
-   "anyOf": [
-    {
-     "required": [
-      "equals"
-     ]
-    },
-    {
-     "required": [
-      "matches"
-     ]
-    }
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "name": {
-     "type": "string",
-     "minLength": 1
-    },
-    "equals": {
-     "type": "string"
-    },
-    "matches": {
-     "type": "string"
-    }
-   }
-  },
-  "set_check_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "checked"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "checked": {
-     "type": "boolean"
-    }
-   }
-  },
-  "send_text_via_label_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "label_contains",
-    "checked"
-   ],
-   "properties": {
-    "label_contains": {
-     "type": "string",
-     "minLength": 1
-    },
-    "checked": {
-     "type": "boolean"
-    }
-   }
-  },
-  "save_race_arm_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "stage"
-   ],
-   "properties": {
-    "stage": {
-     "enum": [
-      "prepare",
-      "ack",
-      "watcher",
-      "fault"
-     ]
-    },
-    "workspaceId": {
-     "type": "string",
-     "minLength": 1
-    },
-    "fileKey": {
-     "type": "string",
-     "minLength": 1
-    },
-    "transactionId": {
-     "type": "string",
-     "minLength": 1
-    },
-    "filePath": {
-     "type": "string",
-     "minLength": 1
-    },
-    "mode": {
-     "enum": [
-      "unknown-response",
-      "unknown-response-delay"
-     ],
-     "description": "fault stage only: unknown-response withholds one real successful response immediately; unknown-response-delay holds the real response (success or typed failure) behind the fault hold so the runner can mutate the real disk before the production read-back classification runs"
-    },
-    "timeoutMs": {
-     "type": "integer",
-     "minimum": 100,
-     "maximum": 120000
-    }
-   },
-   "description": "ED-PARITY-002 isolated-QA-build only: arm one save-transaction delivery point (prepare/ack/watcher) or a controlled unknown-response write fault. Fails explicitly when the binary is not the QA build with the save gate."
-  },
-  "save_race_wait_entered_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "stage"
-   ],
-   "properties": {
-    "stage": {
-     "enum": [
-      "prepare",
-      "ack",
-      "watcher",
-      "fault"
-     ]
-    },
-    "timeout_sec": {
-     "type": "number",
-     "minimum": 0.5,
-     "maximum": 120,
-     "default": 20
-    }
-   },
-   "description": "ED-PARITY-002 isolated-QA-build only: block until the armed delivery point is entered (the production save transaction or the delayed fault is genuinely held there)."
-  },
-  "save_race_release_arg": {
-   "oneOf": [
-    {
-     "type": "null"
-    },
-    {
-     "type": "object",
-     "additionalProperties": false,
-     "properties": {
-      "reason": {
-       "type": "string",
-       "minLength": 1
+    "assert_count_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "min": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "equal": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
-     }
-    }
-   ],
-   "description": "ED-PARITY-002 isolated-QA-build only: release the held delivery point so the production transaction continues."
-  },
-  "save_race_trace_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "properties": {
-    "artifact": {
-     "type": "string",
-     "minLength": 1
     },
-    "expect_contains": {
-     "type": "array",
-     "items": {
-      "type": "string",
-      "minLength": 1
-     },
-     "description": "ordered subsequence of timeline events that must be present"
-    },
-    "expect_events": {
-     "type": "array",
-     "items": {
-      "type": "string",
-      "minLength": 1
-     },
-     "description": "exact ordered timeline event sequence"
-    },
-    "require_ack_hashes": {
-     "type": "boolean"
-    },
-    "require_settled_kind": {
-     "type": "string",
-     "minLength": 1,
-     "description": "assert the last recorded production commit-settled result kind"
-    },
-    "require_readback_outcome": {
-     "enum": [
-      "committed",
-      "none",
-      "foreign"
-     ],
-     "description": "assert the last recorded unknown-effect read-back classification"
-    },
-    "forbid_between": {
-     "type": "object",
-     "additionalProperties": false,
-     "required": [
-      "anchor",
-      "until",
-      "events"
-     ],
-     "properties": {
-      "anchor": {
-       "type": "string",
-       "minLength": 1
-      },
-      "until": {
-       "type": "string",
-       "minLength": 1
-      },
-      "events": {
-       "type": "array",
-       "minItems": 1,
-       "items": {
+    "menu_items_arg": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
         "type": "string",
         "minLength": 1
-       }
+      },
+      "description": "Each entry is the visible label of a context-menu item to assert visible."
+    },
+    "menu_pick_arg": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "label"
+          ],
+          "properties": {
+            "label": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "quick_connect_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ssh://user@host:port"
+        }
       }
-     },
-     "description": "assert none of the listed events occurred between the anchor and the until event (e.g. zero writer invocations during a W0 hold)"
+    },
+    "auth_arg": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "password": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "password"
+          ]
+        }
+      ]
+    },
+    "open_session_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "double_click": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "eval_readonly_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expression"
+      ],
+      "description": "READ-ONLY JavaScript expression evaluated in the page. May not contain assignments, function declarations, DOM mutations, or `await`. Validator rejects steps that look like side effects.",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "not": {
+            "anyOf": [
+              {
+                "pattern": "[^=!<>]=[^=]"
+              },
+              {
+                "pattern": "\\+=|-=|\\*=|/="
+              },
+              {
+                "pattern": "\\bawait\\b"
+              },
+              {
+                "pattern": "\\bfunction\\b"
+              },
+              {
+                "pattern": "\\bnew\\b"
+              },
+              {
+                "pattern": "\\bclick\\("
+              },
+              {
+                "pattern": "\\bsetAttribute\\("
+              },
+              {
+                "pattern": "\\bremoveAttribute\\("
+              },
+              {
+                "pattern": "\\bdispatchEvent\\("
+              },
+              {
+                "pattern": "\\.innerHTML\\s*="
+              },
+              {
+                "pattern": "\\bdocument\\.write"
+              }
+            ]
+          }
+        },
+        "expect_truthy": {
+          "type": "boolean",
+          "default": true
+        },
+        "contains": {
+          "type": "string",
+          "description": "Optional: assert that String(result) contains this substring."
+        }
+      }
+    },
+    "seed_dialog_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Pre-arm window.prompt and window.confirm responses for the next interaction.",
+      "properties": {
+        "prompt": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "confirm": {
+          "type": "boolean"
+        }
+      }
+    },
+    "assert_localstorage_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "contains": {
+          "type": "string"
+        },
+        "equals": {
+          "type": "string"
+        }
+      }
+    },
+    "assert_attribute_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "name"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "equals"
+          ]
+        },
+        {
+          "required": [
+            "matches"
+          ]
+        }
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "equals": {
+          "type": "string"
+        },
+        "matches": {
+          "type": "string"
+        }
+      }
+    },
+    "set_check_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "checked"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "checked": {
+          "type": "boolean"
+        }
+      }
+    },
+    "send_text_via_label_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label_contains",
+        "checked"
+      ],
+      "properties": {
+        "label_contains": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checked": {
+          "type": "boolean"
+        }
+      }
+    },
+    "save_race_arm_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "prepare",
+            "ack",
+            "watcher",
+            "fault"
+          ]
+        },
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fileKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transactionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "filePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "unknown-response",
+            "unknown-response-delay"
+          ],
+          "description": "fault stage only: unknown-response withholds one real successful response immediately; unknown-response-delay holds the real response (success or typed failure) behind the fault hold so the runner can mutate the real disk before the production read-back classification runs"
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 120000
+        }
+      },
+      "description": "ED-PARITY-002 isolated-QA-build only: arm one save-transaction delivery point (prepare/ack/watcher) or a controlled unknown-response write fault. Fails explicitly when the binary is not the QA build with the save gate."
+    },
+    "save_race_wait_entered_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "prepare",
+            "ack",
+            "watcher",
+            "fault"
+          ]
+        },
+        "timeout_sec": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 120,
+          "default": 20
+        }
+      },
+      "description": "ED-PARITY-002 isolated-QA-build only: block until the armed delivery point is entered (the production save transaction or the delayed fault is genuinely held there)."
+    },
+    "save_race_release_arg": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "description": "ED-PARITY-002 isolated-QA-build only: release the held delivery point so the production transaction continues."
+    },
+    "save_race_trace_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect_contains": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "ordered subsequence of timeline events that must be present"
+        },
+        "expect_events": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "exact ordered timeline event sequence"
+        },
+        "require_ack_hashes": {
+          "type": "boolean"
+        },
+        "require_settled_kind": {
+          "type": "string",
+          "minLength": 1,
+          "description": "assert the last recorded production commit-settled result kind"
+        },
+        "require_readback_outcome": {
+          "enum": [
+            "committed",
+            "none",
+            "foreign"
+          ],
+          "description": "assert the last recorded unknown-effect read-back classification"
+        },
+        "forbid_between": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "anchor",
+            "until",
+            "events"
+          ],
+          "properties": {
+            "anchor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "until": {
+              "type": "string",
+              "minLength": 1
+            },
+            "events": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "description": "assert none of the listed events occurred between the anchor and the until event (e.g. zero writer invocations during a W0 hold)"
+        }
+      },
+      "description": "ED-PARITY-002 isolated-QA-build only: persist the in-page save-race timeline artifact and assert recorded events; ack-delivered entries carry the real native writtenHash."
+    },
+    "save_race_note_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "expression"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expression": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "description": "read-only JS expression; mutation-looking expressions are rejected"
+        }
+      },
+      "description": "ED-PARITY-002 isolated-QA-build only: record one read-only DOM/JS observation (focus, selection, undo text, recovery row) into save-race-notes.json. Recording only; never executes app actions."
+    },
+    "host_delete_file_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "description": "Native-only: delete an existing host file inside the retained report root and record its before hash. Used for the unreadable read-back branch of a controlled response fault."
+    },
+    "assert_text_equals_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "equals"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "equals": {
+          "type": "string"
+        },
+        "timeout_sec": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 60
+        }
+      }
+    },
+    "assert_items_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "equals"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "equals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeout_sec": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 60
+        },
+        "attribute": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
-   },
-   "description": "ED-PARITY-002 isolated-QA-build only: persist the in-page save-race timeline artifact and assert recorded events; ack-delivered entries carry the real native writtenHash."
-  },
-  "save_race_note_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "label",
-    "expression"
-   ],
-   "properties": {
-    "label": {
-     "type": "string",
-     "minLength": 1
-    },
-    "artifact": {
-     "type": "string",
-     "minLength": 1
-    },
-    "expression": {
-     "type": "string",
-     "minLength": 1,
-     "maxLength": 400,
-     "description": "read-only JS expression; mutation-looking expressions are rejected"
-    }
-   },
-   "description": "ED-PARITY-002 isolated-QA-build only: record one read-only DOM/JS observation (focus, selection, undo text, recovery row) into save-race-notes.json. Recording only; never executes app actions."
-  },
-  "host_delete_file_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "path"
-   ],
-   "properties": {
-    "path": {
-     "type": "string",
-     "minLength": 1
-    }
-   },
-   "description": "Native-only: delete an existing host file inside the retained report root and record its before hash. Used for the unreadable read-back branch of a controlled response fault."
-  },
-  "assert_text_equals_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "equals"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "equals": {
-     "type": "string"
-    },
-    "timeout_sec": {
-     "type": "number",
-     "minimum": 0.5,
-     "maximum": 60
-    }
-   }
-  },
-  "assert_items_arg": {
-   "type": "object",
-   "additionalProperties": false,
-   "required": [
-    "selector",
-    "equals"
-   ],
-   "properties": {
-    "selector": {
-     "$ref": "#/$defs/selector"
-    },
-    "equals": {
-     "type": "array",
-     "items": {
-      "type": "string"
-     }
-    },
-    "timeout_sec": {
-     "type": "number",
-     "minimum": 0.5,
-     "maximum": 60
-    },
-    "attribute": {
-     "type": "string",
-     "minLength": 1
-    }
-   }
   }
- }
 }

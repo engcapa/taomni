@@ -141,6 +141,7 @@ import {
   type LspLocation,
   type LspPosition,
   type LspRange,
+  type LspRenameResult,
   type LspWorkspaceEdit,
   type LspWorkspaceApplyEditRequest,
   type LspWorkspaceEditOperation,
@@ -1234,6 +1235,20 @@ import {
   isCleanupActionKind,
   isRearrangeActionKind,
 } from "./workspace/rearrangeCleanupWorkflow";
+import {
+  EXTRACT_NAMING_UNAVAILABLE_MESSAGE,
+  extractBufferMatches,
+  extractDirtyBufferMessage,
+  extractMethodBoundaryMessage,
+  extractOwnerMatches,
+  extractReceiptMatches,
+  findExtractedMethodSymbol,
+  isExtractMethodKind,
+  type ExtractOwnerSnapshot,
+  type ExtractReceipt,
+  type ExtractSession,
+} from "./workspace/extractMethodFlow";
+import { TextInputDialog } from "../sidebar/ConfirmDialog";
 
 interface ResourceCleanupRecoveryView {
   readonly recoveryId: string;
@@ -1287,6 +1302,40 @@ type FormatFileOutcome =
   | { state: "formatted"; text: string }
   | { state: "unchanged"; text: string }
   | { state: "unavailable"; reason: string };
+
+/**
+ * ED-PARITY-007 DEC-07: typed Rename outcome. Extract Method uses it to keep
+ * the committed extraction when the naming step fails, instead of pretending
+ * the whole transaction was cancelled.
+ */
+type RenameSymbolAtResult = {
+  status: "applied" | "unchanged" | "cancelled" | "stale" | "failed";
+  message?: string;
+  recoveryId?: string;
+  /** The provider refused the name before any write; the caller may retry. */
+  retryable?: boolean;
+};
+
+/**
+ * ED-PARITY-007 DEC-07: shell-side extension of the pure Extract session. The
+ * before-symbols sample belongs to the frozen pre-commit context, the receipt
+ * is attached at the canonical commit boundary, and the abort controller only
+ * records that this owner stopped listening.
+ */
+type ExtractSessionState = ExtractSession & {
+  beforeSymbols: LspDocumentSymbol[] | null;
+  receipt?: ExtractReceipt;
+  abortController: AbortController;
+};
+
+interface ExtractNamingPromptState {
+  sessionId: string;
+  title: string;
+  label: string;
+  confirmLabel: string;
+  initialValue: string;
+  resolve: (value: string | null) => void;
+}
 
 export function CodeWorkspaceTab({
   tabId,
@@ -2421,6 +2470,23 @@ export function CodeWorkspaceTab({
   const goToImplementationRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
   const renameSymbolRef = useRef<() => Promise<void>>(async () => {});
   const safeDeleteSymbolRef = useRef<() => Promise<void>>(async () => {});
+  // ED-PARITY-007: one local Extract Method transaction owner. Ref-backed so
+  // the shared candidate menu (defined earlier in this component) can join the
+  // same naming chain without a circular hook dependency.
+  const extractSessionRef = useRef<ExtractSessionState | null>(null);
+  const beginExtractSessionRef = useRef<((input: {
+    file: OpenFileState;
+    range: LspRange;
+    uri: string;
+    beforeSymbols: LspDocumentSymbol[] | null;
+  }) => ExtractSessionState | null) | null>(null);
+  const continueExtractNamingRef = useRef<((receipt: ExtractReceipt) => Promise<void>) | null>(null);
+  const captureMethodSymbolsRef = useRef<((file: OpenFileState) => Promise<LspDocumentSymbol[] | null>) | null>(null);
+  const finishExtractSessionRef = useRef<((session: ExtractSessionState) => void) | null>(null);
+  const runExtractMethodRef = useRef<() => Promise<void>>(async () => {});
+  const [extractNamingPrompt, setExtractNamingPrompt] = useState<ExtractNamingPromptState | null>(null);
+  const extractNamingPromptRef = useRef<ExtractNamingPromptState | null>(null);
+  extractNamingPromptRef.current = extractNamingPrompt;
   // Hover enriches the AI prompt with type information. The LSP hover callback
   // is declared further down, so read it through a ref.
   const getLspHoverRef = useRef<(
@@ -11311,7 +11377,9 @@ export function CodeWorkspaceTab({
             ? serviceRes.reason
             : serviceRes.state === "timeout"
               ? "Code action request timed out before the provider answered; try again"
-              : "Code action request was cancelled";
+              : serviceRes.state === "cancelled" && serviceRes.detail?.includes("document changed")
+                ? "Refactor actions were cancelled because the document changed; try again"
+                : "Code action request was cancelled";
         setStatusMessage(message);
         return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "provider", message } };
       }
@@ -11379,7 +11447,18 @@ export function CodeWorkspaceTab({
     semanticToken: WorkspaceSemanticIndexBuildToken | null = null,
     intentionCandidateId?: string,
     intentionContext?: CodeActionContextIdentity,
-  ): Promise<{ ok: boolean; message: string | null; retryable: boolean }> => {
+    /**
+     * ED-PARITY-007 DEC-07: when the caller owns an Extract Method session, the
+     * applied result carries a frozen B1 receipt keyed by that session so the
+     * naming phase can never be rebound to a later revision.
+     */
+    receiptSessionId?: string,
+  ): Promise<{
+    ok: boolean;
+    message: string | null;
+    retryable: boolean;
+    appliedReceipt?: ExtractReceipt;
+  }> => {
     try {
       const assertSemanticCurrent = () => {
         // Revision-pinned freshness: background provider progress does not
@@ -11675,11 +11754,25 @@ export function CodeWorkspaceTab({
           setStatusMessage(message);
           return { ok: false, message, retryable: false };
         }
+        // DEC-07: freeze B1 at the canonical commit/history boundary. The live
+        // buffer is read synchronously here so a later `symbols-after` await
+        // can never mistake newer user text for the extraction result.
+        const committed = openFilesRef.current[file.key];
+        const appliedReceipt: ExtractReceipt | undefined = receiptSessionId && committed
+          ? {
+              sessionId: receiptSessionId,
+              fileKey: file.key,
+              uri: context.document.uri,
+              postRevision: committed.documentRevision,
+              postText: committed.text,
+              historyId: result.historyId,
+            }
+          : undefined;
         markProviderSuppressionApplied(action, file);
         setStatusMessage(result.historyId
           ? `Applied code action: ${executablePlan.title}; undo transaction ${result.historyId}`
           : `Executed code action: ${executablePlan.title}`);
-        return { ok: true, message: null, retryable: false };
+        return { ok: true, message: null, retryable: false, appliedReceipt };
       }
       if (result.status === "cancelled") {
         const message = `Code action cancelled: ${result.reason}`;
@@ -11897,6 +11990,11 @@ export function CodeWorkspaceTab({
     diagnostics: LspDiagnostic[] = [],
     only: string[] = [],
     sectionLabel = "code actions",
+    /**
+     * ED-PARITY-007 DEC-02: an explicit popup anchor (selection start) for the
+     * frozen candidate menu; the pane +80/+80 origin stays the fallback.
+     */
+    anchor?: { clientX: number; clientY: number },
   ) => {
     const requestAbort = new AbortController();
     intentionRequestAbortRef.current?.abort();
@@ -11984,15 +12082,37 @@ export function CodeWorkspaceTab({
               || resolveState.status === "resolving"
               || resolveState.status === "stale",
             onClick: () => {
-              void runCodeAction(
-                action,
-                file,
-                requested.semanticToken,
-                candidate.id,
-                requested.context!,
-              ).then((outcome) => {
+              // DEC-02: a generic entry (Refactor This / Alt+Enter / lightbulb /
+              // Problems quick fix) that selects a method extraction joins the
+              // same transaction, including the post-extraction naming step.
+              void (async () => {
+                const extractOwner = isExtractMethodKind(action.kind)
+                  ? beginExtractSessionRef.current?.({
+                      file,
+                      range,
+                      uri: requested.context!.document.uri,
+                      beforeSymbols: await captureMethodSymbolsRef.current?.(file) ?? null,
+                    }) ?? null
+                  : null;
+                // The owner is past the request window: only the canonical
+                // revision/generation guards decide whether the apply is stale.
+                if (extractOwner) extractOwner.phase = "resolve";
+                const outcome = await runCodeAction(
+                  action,
+                  file,
+                  requested.semanticToken,
+                  candidate.id,
+                  requested.context!,
+                  extractOwner?.id,
+                );
                 if (outcome.retryable) openFrozenMenu();
-              });
+                if (outcome.appliedReceipt) {
+                  if (extractOwner) extractOwner.receipt = outcome.appliedReceipt;
+                  void continueExtractNamingRef.current?.(outcome.appliedReceipt);
+                } else if (extractOwner) {
+                  finishExtractSessionRef.current?.(extractOwner);
+                }
+              })();
             },
           });
         }
@@ -12000,7 +12120,12 @@ export function CodeWorkspaceTab({
           menuItems.push({ label: "", separator: true });
         }
       }
-      openTreeContextMenuAt(clientX, clientY, menuItems, { appearance: "code-candidates" });
+      openTreeContextMenuAt(
+        anchor?.clientX ?? clientX,
+        anchor?.clientY ?? clientY,
+        menuItems,
+        { appearance: "code-candidates" },
+      );
     };
     openFrozenMenu();
   }, [
@@ -14547,7 +14672,7 @@ export function CodeWorkspaceTab({
       keywords: ["refactor", "extract", "method", "function"],
       when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
         && !activeFile.library && !!activeCapabilities?.codeAction,
-      run: () => void openRefactorActions(["refactor.extract", "refactor.extract.function", "refactor.extract.method"], "Extract Method/Function actions"),
+      run: () => void runExtractMethodRef.current(),
     },
     {
       id: "workspace.extractVariable",
@@ -16865,31 +16990,56 @@ export function CodeWorkspaceTab({
   goToTypeDefinitionRef.current = goToTypeDefinition;
   goToImplementationRef.current = goToImplementation;
 
-  const renameSymbolAtCursor = useCallback(async () => {
-    const file = activeFile;
-    if (!file || file.loading) return;
+  const renameSymbolAt = useCallback(async (
+    file: OpenFileState,
+    position: LspPosition,
+    options: {
+      title?: string;
+      label?: string;
+      confirmLabel?: string;
+      /** Caller-owned prompt (Extract Method naming); defaults to the Rename dialog. */
+      promptName?: (defaultName: string) => Promise<string | null>;
+      /** Re-checked after every await; false aborts without writing. */
+      isCurrent?: () => boolean;
+    } = {},
+  ): Promise<RenameSymbolAtResult> => {
+    const isCurrent = () => (options.isCurrent ? options.isCurrent() : true);
+    const staleResult = (): RenameSymbolAtResult => ({
+      status: "stale",
+      message: "Rename was cancelled because the workspace changed",
+    });
+    if (!isCurrent()) return staleResult();
     const caps = lspFilesRef.current[file.key]?.status?.capabilities;
     if (caps && !caps.rename) {
-      setStatusMessage("Rename is not supported by this language server");
-      return;
+      const message = "Rename is not supported by this language server";
+      setStatusMessage(message);
+      return { status: "failed", message };
     }
     const expectedRevision = semanticIndex.current().revision;
     const live = await ensureWorkspaceSemanticDocumentsSynced(file.key, expectedRevision);
+    if (!isCurrent()) return staleResult();
     if (!live) {
-      setStatusMessage("Rename requires the language server to finish synchronizing current editor buffers");
-      return;
+      const message = "Rename requires the language server to finish synchronizing current editor buffers";
+      setStatusMessage(message);
+      return { status: "failed", message };
     }
     const descriptor = lspDescriptorForFile(live);
-    if (!descriptor) return;
-    const position = editorSelectionRef.current.start;
+    if (!descriptor) {
+      return { status: "failed", message: "Cannot resolve the language server for this rename" };
+    }
     const buildToken = semanticIndex.beginBuild("language-server");
     try {
       const prepared = await lspPrepareRename(descriptor, position);
       updateLspStatusForFile(live, prepared.status);
+      if (!isCurrent()) {
+        semanticIndex.abandonBuild(buildToken);
+        return staleResult();
+      }
       if (!prepared.allowed && prepared.range == null && !prepared.placeholder) {
         semanticIndex.abandonBuild(buildToken);
-        setStatusMessage(prepared.message ?? "Cannot rename symbol here");
-        return;
+        const message = prepared.message ?? "Cannot rename symbol here";
+        setStatusMessage(message);
+        return { status: "failed", message };
       }
       const defaultName = prepared.placeholder
         ?? (() => {
@@ -16900,15 +17050,21 @@ export function CodeWorkspaceTab({
           }
           return line.slice(position.character).match(/^[A-Za-z0-9_$]+/)?.[0] ?? "";
         })();
-      const nextName = await promptAppDialog({
-        title: "Rename Symbol",
-        label: "New name",
-        initialValue: defaultName,
-        confirmLabel: "Rename",
-      });
+      const nextName = options.promptName
+        ? await options.promptName(defaultName)
+        : await promptAppDialog({
+            title: options.title ?? "Rename Symbol",
+            label: options.label ?? "New name",
+            initialValue: defaultName,
+            confirmLabel: options.confirmLabel ?? "Rename",
+          });
+      if (!isCurrent()) {
+        semanticIndex.abandonBuild(buildToken);
+        return staleResult();
+      }
       if (!nextName || nextName === defaultName) {
         semanticIndex.abandonBuild(buildToken);
-        return;
+        return { status: "unchanged" };
       }
       const beforeRename = semanticIndex.current();
       if (
@@ -16916,16 +17072,29 @@ export function CodeWorkspaceTab({
         || beforeRename.activeProviders.length > 0
       ) {
         semanticIndex.abandonBuild(buildToken);
-        setStatusMessage("Rename was cancelled because the workspace changed while the dialog was open");
-        return;
+        const message = "Rename was cancelled because the workspace changed while the dialog was open";
+        setStatusMessage(message);
+        return { status: "stale", message };
       }
-      const renamed = await lspRename(descriptor, position, nextName);
+      let renamed: LspRenameResult;
+      try {
+        renamed = await lspRename(descriptor, position, nextName);
+      } catch (err) {
+        // The semantic provider rejected the name; nothing was written, so a
+        // caller that owns its own prompt may keep the input and retry.
+        const message = errorMessage(err);
+        semanticIndex.failBuild(buildToken, message);
+        setStatusMessage(message);
+        return { status: "failed", message, retryable: true };
+      }
       updateLspStatusForFile(live, renamed.status);
+      if (!isCurrent()) return staleResult();
       const operationCount = workspaceEditOperations(renamed.edit).length;
       if (operationCount === 0) {
         semanticIndex.finishQuery(buildToken, { kind: "rename", resultCount: 0 });
-        setStatusMessage("Rename produced no edits");
-        return;
+        const message = "Rename produced no edits";
+        setStatusMessage(message);
+        return { status: "unchanged", message, retryable: true };
       }
       const completion = semanticIndex.finishQuery(buildToken, {
         kind: "rename",
@@ -16935,8 +17104,9 @@ export function CodeWorkspaceTab({
         !completion.accepted
         || !workspaceSemanticIndexBuildIsCurrent(completion.snapshot, buildToken)
       ) {
-        setStatusMessage("Rename result became stale because the workspace changed; run Rename again");
-        return;
+        const message = "Rename result became stale because the workspace changed; run Rename again";
+        setStatusMessage(message);
+        return { status: "stale", message };
       }
       const documentUri = descriptor.documentUri ?? lspFilesRef.current[file.key]?.status?.uri ?? descriptor.filePath;
       const evidence = buildCapabilityEvidence({
@@ -16971,8 +17141,9 @@ export function CodeWorkspaceTab({
       const gate = refactorApplyGate(plan);
       if (!gate.allowed) {
         semanticIndex.abandonBuild(buildToken);
-        setStatusMessage(`Rename blocked: ${gate.reason}`);
-        return;
+        const message = `Rename blocked: ${gate.reason}`;
+        setStatusMessage(message);
+        return { status: "failed", message };
       }
       if (gate.requiresConfirm) {
         const confirmed = await confirmAppDialog({
@@ -16980,10 +17151,15 @@ export function CodeWorkspaceTab({
           message: gate.reason ?? "The rename produced warnings. Proceed anyway?",
           confirmLabel: "Proceed",
         });
+        if (!isCurrent()) {
+          semanticIndex.abandonBuild(buildToken);
+          return staleResult();
+        }
         if (!confirmed) {
           semanticIndex.abandonBuild(buildToken);
-          setStatusMessage("Rename cancelled");
-          return;
+          const message = "Rename cancelled";
+          setStatusMessage(message);
+          return { status: "cancelled", message };
         }
       }
       await applyLspWorkspaceEdit(renamed.edit, {
@@ -16994,12 +17170,14 @@ export function CodeWorkspaceTab({
         semanticWorkspaceOnly: true,
         plan,
       });
+      return { status: "applied" };
     } catch (err) {
-      semanticIndex.failBuild(buildToken, errorMessage(err));
-      setStatusMessage(errorMessage(err));
+      const message = errorMessage(err);
+      semanticIndex.failBuild(buildToken, message);
+      setStatusMessage(message);
+      return { status: "failed", message };
     }
   }, [
-    activeFile,
     applyLspWorkspaceEdit,
     ensureWorkspaceSemanticDocumentsSynced,
     lspDescriptorForFile,
@@ -17011,7 +17189,425 @@ export function CodeWorkspaceTab({
     setStatusMessage,
     updateLspStatusForFile,
   ]);
+
+  const renameSymbolAtCursor = useCallback(async () => {
+    const file = activeFile;
+    if (!file || file.loading) return;
+    await renameSymbolAt(file, editorSelectionRef.current.start);
+  }, [activeFile, renameSymbolAt]);
   renameSymbolRef.current = renameSymbolAtCursor;
+
+  // ---------------------------------------------------------------------------
+  // ED-PARITY-007 DEC-02/03/05/06/07: direct Extract Method transaction
+  // ---------------------------------------------------------------------------
+  const extractLiveUri = useCallback((fileKey: string): string => {
+    const live = openFilesRef.current[fileKey];
+    if (!live) return "";
+    const descriptor = lspDescriptorForFile(live);
+    return descriptor?.documentUri
+      ?? lspFilesRef.current[live.key]?.status?.uri
+      ?? descriptor?.filePath
+      ?? "";
+  }, [lspDescriptorForFile]);
+
+  const extractOwnerSnapshot = useCallback((session: ExtractSession): ExtractOwnerSnapshot => ({
+    sessionId: session.id,
+    workspaceInstance: workspaceInstanceId,
+    sourceViewId: activeEditorGroupIdRef.current,
+    fileKey: session.fileKey,
+    uri: extractLiveUri(session.fileKey),
+    providerGeneration: lspSessionGeneration(),
+    projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
+  }), [
+    extractLiveUri,
+    lspSessionGeneration,
+    projectAnalysisSnapshot?.projectFingerprint,
+    workspaceInstanceId,
+  ]);
+
+  const dismissExtractNamingPrompt = useCallback((sessionId?: string) => {
+    const current = extractNamingPromptRef.current;
+    if (!current || (sessionId !== undefined && current.sessionId !== sessionId)) return;
+    extractNamingPromptRef.current = null;
+    setExtractNamingPrompt(null);
+    current.resolve(null);
+  }, []);
+
+  const resolveExtractNamingPrompt = useCallback((value: string | null) => {
+    const current = extractNamingPromptRef.current;
+    if (!current) return;
+    extractNamingPromptRef.current = null;
+    setExtractNamingPrompt(null);
+    current.resolve(value);
+  }, []);
+
+  const finishExtractSession = useCallback((session: ExtractSessionState) => {
+    session.phase = "finished";
+    if (extractSessionRef.current === session) extractSessionRef.current = null;
+    dismissExtractNamingPrompt(session.id);
+  }, [dismissExtractNamingPrompt]);
+  finishExtractSessionRef.current = finishExtractSession;
+
+  const invalidateExtractSession = useCallback(() => {
+    const session = extractSessionRef.current;
+    if (!session) return;
+    // Aborting only stops this owner from accepting further replies; it never
+    // claims the language server cancelled anything.
+    session.abortController.abort();
+    finishExtractSession(session);
+  }, [finishExtractSession]);
+
+  /** DEC-03: zero-candidate boundary text; provider failures use DEC-05 text. */
+  const captureMethodSymbols = useCallback(async (
+    file: OpenFileState,
+  ): Promise<LspDocumentSymbol[] | null> => {
+    const live = openFilesRef.current[file.key];
+    const descriptor = live ? lspDescriptorForFile(live) : null;
+    if (!live || !descriptor) return null;
+    try {
+      const result = await lspDocumentSymbols(descriptor);
+      updateLspStatusForFile(live, result.status);
+      return result.symbols;
+    } catch {
+      return null;
+    }
+  }, [lspDescriptorForFile, updateLspStatusForFile]);
+  captureMethodSymbolsRef.current = captureMethodSymbols;
+
+  const beginExtractSession = useCallback((input: {
+    file: OpenFileState;
+    range: LspRange;
+    uri: string;
+    beforeSymbols: LspDocumentSymbol[] | null;
+  }): ExtractSessionState | null => {
+    const live = openFilesRef.current[input.file.key];
+    if (!live || live.loading) return null;
+    const previous = extractSessionRef.current;
+    if (previous) {
+      // A newer request supersedes the old local owner; the old prompt is
+      // resolved with null so it can never write for the new selection.
+      previous.abortController.abort();
+      finishExtractSession(previous);
+    }
+    const session: ExtractSessionState = {
+      id: `extract-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      workspaceInstance: workspaceInstanceId,
+      sourceViewId: activeEditorGroupIdRef.current,
+      fileKey: input.file.key,
+      uri: input.uri,
+      providerGeneration: lspSessionGeneration(),
+      projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
+      baseRevision: live.documentRevision,
+      baseText: live.text,
+      selection: { start: input.range.start, end: input.range.end },
+      phase: "request",
+      beforeSymbols: input.beforeSymbols,
+      abortController: new AbortController(),
+    };
+    extractSessionRef.current = session;
+    return session;
+  }, [
+    finishExtractSession,
+    lspSessionGeneration,
+    projectAnalysisSnapshot?.projectFingerprint,
+    workspaceInstanceId,
+  ]);
+  beginExtractSessionRef.current = beginExtractSession;
+
+  const promptExtractName = useCallback((
+    sessionId: string,
+    options: { title: string; label: string; confirmLabel: string; initialValue: string },
+  ): Promise<string | null> => new Promise<string | null>((resolve) => {
+    const pending: ExtractNamingPromptState = { sessionId, ...options, resolve };
+    extractNamingPromptRef.current = pending;
+    setExtractNamingPrompt(pending);
+  }), []);
+
+  // The local Extract prompt reuses TextInputDialog but owns its own focus
+  // loop: Tab/Shift+Tab cycle input -> Cancel -> Confirm and never escape to
+  // the workspace behind the modal. Enter/Escape stay with the dialog itself
+  // (which already ignores composing Enter).
+  const handleExtractNamingTab = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab" || event.nativeEvent.isComposing) return;
+    const dialog = event.currentTarget.querySelector<HTMLElement>('[data-testid="text-input-dialog"]');
+    if (!dialog) return;
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>("input, button"),
+    ).filter((element) => !element.hasAttribute("disabled"));
+    if (focusable.length === 0) return;
+    const index = focusable.findIndex((element) => element === document.activeElement);
+    const nextIndex = event.shiftKey
+      ? (index <= 0 ? focusable.length - 1 : index - 1)
+      : (index === -1 || index === focusable.length - 1 ? 0 : index + 1);
+    event.preventDefault();
+    event.stopPropagation();
+    focusable[nextIndex]?.focus();
+  }, []);
+
+  const continueExtractNaming = useCallback(async (receipt: ExtractReceipt) => {
+    const session = extractSessionRef.current;
+    if (!session || session.id !== receipt.sessionId) return;
+    const ownerMatches = () => extractSessionRef.current === session
+      && extractOwnerMatches(session, extractOwnerSnapshot(session));
+    const receiptMatches = () => {
+      const live = openFilesRef.current[session.fileKey];
+      return live
+        ? extractReceiptMatches(receipt, { revision: live.documentRevision, text: live.text })
+        : false;
+    };
+    try {
+      if (!ownerMatches() || !receiptMatches()) return;
+      session.phase = "symbols-after";
+      const live = openFilesRef.current[session.fileKey];
+      // A dirty buffer was mutated without a save, so the provider model still
+      // holds the pre-extraction document; push the current buffer before the
+      // post snapshot or the new method cannot be found at all.
+      const synced = live
+        ? await ensureWorkspaceSemanticDocumentsSynced(live.key, semanticIndex.current().revision)
+        : null;
+      const afterSymbols = synced ? await captureMethodSymbols(synced) : null;
+      // A late symbols reply for a superseded owner or a moved B1 must not
+      // open a prompt or move focus.
+      if (!ownerMatches() || !receiptMatches()) return;
+      const found = afterSymbols && session.beforeSymbols
+        ? findExtractedMethodSymbol(session.beforeSymbols, afterSymbols)
+        : null;
+      const postLive = openFilesRef.current[session.fileKey];
+      if (!postLive) return;
+      if (!found) {
+        setStatusMessage(EXTRACT_NAMING_UNAVAILABLE_MESSAGE);
+        return;
+      }
+      // DEC-03/DEC-08: a dirty buffer keeps the extraction in the buffer; the
+      // Rename chain's dirty gate would refuse it, so no prompt is shown.
+      if (postLive.dirty) {
+        setStatusMessage(extractDirtyBufferMessage(found.name));
+        return;
+      }
+      session.phase = "naming";
+      // DEC-07: a provider rejection keeps the committed extraction, the real
+      // error text and the user's input, so the name can be corrected and
+      // retried without repeating the extraction.
+      let proposed: string | null = null;
+      let replayName: string | null = null;
+      let replays = 0;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const attemptFile = openFilesRef.current[session.fileKey] ?? postLive;
+        const replayed = replayName;
+        replayName = null;
+        const outcome = await renameSymbolAt(attemptFile, found.selectionRange.start, {
+          title: "Extract Method",
+          label: "Method name",
+          confirmLabel: "Rename",
+          isCurrent: () => ownerMatches() && receiptMatches(),
+          promptName: async (defaultName) => {
+            if (replayed) return replayed;
+            const value = await promptExtractName(session.id, {
+              title: "Extract Method",
+              label: "Method name",
+              confirmLabel: "Rename",
+              initialValue: proposed ?? defaultName,
+            });
+            if (value && value !== defaultName) proposed = value;
+            return value;
+          },
+        });
+        if (extractSessionRef.current !== session) return;
+        if (outcome.status === "failed" && outcome.retryable && attempt < 4) continue;
+        if (outcome.status === "failed") return; // real reason already surfaced; B1 kept
+        if (outcome.status === "unchanged" && proposed && replays < 3 && attempt < 4) {
+          // The provider answered the rename with an empty edit (its workspace
+          // model can still trail the freshly written extraction). Replay the
+          // same name against a settled model instead of dropping the naming
+          // step; the extraction and history stay untouched.
+          replayName = proposed;
+          replays += 1;
+          await new Promise((resolve) => { window.setTimeout(resolve, 1200); });
+          if (!ownerMatches() || !receiptMatches()) return;
+          continue;
+        }
+        // DEC-03: focus returns to the editor at the call-statement line. The
+        // rename committed a new revision for this same owner, so only the
+        // owner identity is re-checked here — a switched/closed view stays
+        // untouched.
+        revealNavLocation(session.fileKey, session.selection.start);
+        return;
+      }
+    } finally {
+      finishExtractSession(session);
+    }
+  }, [
+    captureMethodSymbols,
+    ensureWorkspaceSemanticDocumentsSynced,
+    extractOwnerSnapshot,
+    finishExtractSession,
+    promptExtractName,
+    renameSymbolAt,
+    revealNavLocation,
+    semanticIndex.current,
+    setStatusMessage,
+  ]);
+  continueExtractNamingRef.current = continueExtractNaming;
+
+  const runExtractMethod = useCallback(async () => {
+    const file = activeFile;
+    if (!file || file.loading || file.library) return;
+    const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+    if (caps && !caps.codeAction) return;
+    const selection = editorSelectionRef.current;
+    const range: LspRange = {
+      start: selection.start,
+      end: selection.empty ? selection.start : selection.end,
+    };
+    // B0 symbols are sampled before any provider write so the post-extraction
+    // snapshot can be diffed against the frozen pre-commit context.
+    const beforeSymbols = await captureMethodSymbols(file);
+    const requestAbort = new AbortController();
+    intentionRequestAbortRef.current?.abort();
+    intentionRequestAbortRef.current = requestAbort;
+    const requested = await requestCodeActions(
+      file,
+      range,
+      [],
+      ["refactor.extract"],
+      { signal: requestAbort.signal },
+    );
+    if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) return;
+    // DEC-05: request failures already surfaced their accurate message.
+    if (requested.requestFailure) return;
+    const methodCandidates = requested.providerActions.filter(
+      (entry) => isExtractMethodKind(entry.action.kind),
+    );
+    const paneRect = editorPaneRef.current?.getBoundingClientRect();
+    const rect = selection.rect;
+    const anchor = rect
+      ? { clientX: Math.round(rect.left), clientY: Math.round(rect.bottom) }
+      : undefined;
+    if (methodCandidates.length === 0) {
+      // DEC-06: distinguish "nothing selected" from "this selection cannot be
+      // extracted"; never claim the server offered no actions on failure.
+      setStatusMessage(extractMethodBoundaryMessage(selection.empty));
+      return;
+    }
+    if (methodCandidates.length > 1) {
+      await showCodeActionsMenu(
+        anchor?.clientX ?? (paneRect?.left ?? 0) + 80,
+        anchor?.clientY ?? (paneRect?.top ?? 0) + 80,
+        file,
+        range,
+        [],
+        ["refactor.extract"],
+        "Extract Method",
+        anchor,
+      );
+      return;
+    }
+    const only = methodCandidates[0]!;
+    if (only.disabledReason) {
+      setStatusMessage(only.disabledReason);
+      return;
+    }
+    const session = beginExtractSession({
+      file,
+      range,
+      uri: requested.context!.document.uri,
+      beforeSymbols,
+    });
+    if (!session) return;
+    const intentionSnapshot = intentionSessionRef.current?.open(
+      [candidateFromProviderAction(only.action, only.evidence, only.disabledReason)],
+      {
+        fileKey: file.key,
+        uri: requested.context!.document.uri,
+        documentRevision: requested.context!.document.revision,
+        providerGeneration: requested.context!.provider.generation,
+        projectFingerprint: requested.context!.provider.projectFingerprint,
+      },
+    );
+    const candidateId = intentionSnapshot?.candidates[0]?.id;
+    if (!candidateId) {
+      finishExtractSession(session);
+      return;
+    }
+    session.phase = "resolve";
+    const outcome = await runCodeAction(
+      only.action,
+      file,
+      requested.semanticToken,
+      candidateId,
+      requested.context!,
+      session.id,
+    );
+    if (!outcome.appliedReceipt) {
+      finishExtractSession(session);
+      return;
+    }
+    session.receipt = outcome.appliedReceipt;
+    await continueExtractNaming(outcome.appliedReceipt);
+  }, [
+    activeFile,
+    beginExtractSession,
+    captureMethodSymbols,
+    continueExtractNaming,
+    finishExtractSession,
+    requestCodeActions,
+    runCodeAction,
+    setStatusMessage,
+    showCodeActionsMenu,
+  ]);
+  runExtractMethodRef.current = runExtractMethod;
+
+  // DEC-07 invalidation: switching files or workspaces (including closing the
+  // source view and reopening the same key) drops the local owner and only its
+  // own prompt. The guard also drops a pre-commit session whose frozen B0 no
+  // longer matches the live buffer, or a post-commit session whose B1 moved.
+  const extractGuardRevision = activeFile
+    ? `${activeFile.key}:${activeFile.documentRevision}:${activeFile.text.length}:${activeFile.dirty ? 1 : 0}`
+    : "";
+  useEffect(() => {
+    const session = extractSessionRef.current;
+    if (!session) return;
+    if (workspaceInstanceId !== session.workspaceInstance || activeKey !== session.fileKey) {
+      invalidateExtractSession();
+      return;
+    }
+    const live = openFilesRef.current[session.fileKey];
+    if (!live) {
+      invalidateExtractSession();
+      return;
+    }
+    const current = { revision: live.documentRevision, text: live.text };
+    if (session.receipt) {
+      if (!extractReceiptMatches(session.receipt, current)) invalidateExtractSession();
+      return;
+    }
+    // Before the commit the request window is the only phase where an external
+    // edit must drop the owner eagerly; during resolve/commit the canonical
+    // revision/generation guards already reject the apply, and after the commit
+    // the receipt check above owns the decision.
+    if (!session.receipt && session.phase === "request") {
+      if (!extractBufferMatches(
+        { revision: session.baseRevision, text: session.baseText },
+        current,
+      )) {
+        invalidateExtractSession();
+      }
+    }
+  }, [activeKey, extractGuardRevision, invalidateExtractSession, workspaceInstanceId]);
+
+  useEffect(() => () => {
+    const session = extractSessionRef.current;
+    if (session) {
+      session.phase = "finished";
+      extractSessionRef.current = null;
+      session.abortController.abort();
+    }
+    const pending = extractNamingPromptRef.current;
+    if (pending) {
+      extractNamingPromptRef.current = null;
+      pending.resolve(null);
+    }
+  }, []);
 
   const safeDeleteSymbolAtCursor = useCallback(async () => {
     const file = activeFile;
@@ -21411,6 +22007,18 @@ export function CodeWorkspaceTab({
             void undoWorkspaceEdit();
           }}
         />
+      )}
+      {extractNamingPrompt && (
+        <div data-testid="extract-method-name-prompt" onKeyDown={handleExtractNamingTab}>
+          <TextInputDialog
+            title={extractNamingPrompt.title}
+            label={extractNamingPrompt.label}
+            initialValue={extractNamingPrompt.initialValue}
+            confirmLabel={extractNamingPrompt.confirmLabel}
+            onCancel={() => resolveExtractNamingPrompt(null)}
+            onConfirm={(value) => resolveExtractNamingPrompt(value)}
+          />
+        </div>
       )}
       </WorkspaceObservationBoundary>
     </WorkspaceClipboardSessionContext.Provider>

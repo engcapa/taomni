@@ -1,0 +1,254 @@
+id: TC-IDE-PARITY-007-03
+title: Java Extract Method on real JDT LS with E1/E3 program oracles
+description: Packaged QA app, real JDT LS, real host bytes and javac/java execution of the extracted sources.
+covers:
+- F25.5
+tags:
+- code-workspace
+- refactor
+- parity007
+- native-gate
+- provider-fixture
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+fixtures:
+- reset_db
+- parity007_extract
+- jdtls_required
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-parity007-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "qa-parity007-native", "name": "parity007", "roots": [{"id": "parity007", "name": "parity007", "path": "${fixture.parity007_root}", "kind": "folder"}], "looseFiles": [], "lastActiveFile":
+      {"kind": "root", "rootId": "parity007", "path": "src/main/java/demo/ExtractTarget.java"}, "lastOpenedAt": 1756100000000, "isGitRepo": false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+    timeout_sec: 90
+- wait_for:
+    selector: '[data-testid="project-facts-ready-icon"]'
+    timeout_sec: 120
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 120
+- assert_file_sha256:
+    path: ${fixture.parity007_extract_target}
+    equals: ${fixture.parity007_initial_sha}
+- parity007_java_oracle:
+    scenario: e1
+    expected: 12,0,-2,12
+    source: ${fixture.parity007_extract_target}
+    label: b0
+- screenshot: tc-ide-parity-007-03-b0.png
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- wait_for:
+    selector: '[data-testid="text-input-dialog-input"]'
+    timeout_sec: 90
+- assert_file_contains:
+    path: ${fixture.parity007_extract_target}
+    contains: int sum = getSum(values);
+- assert_file_contains:
+    path: ${fixture.parity007_extract_target}
+    contains: private int getSum(int[] values) {
+- parity007_java_oracle:
+    scenario: e1
+    expected: 12,0,-2,12
+    source: ${fixture.parity007_extract_target}
+    label: b1
+- screenshot: tc-ide-parity-007-03-b1.png
+- wait_for:
+    selector: '[data-testid="text-input-dialog-input"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="text-input-dialog"]'
+    contains: Extract Method
+- eval_readonly:
+    expression: document.activeElement.value
+    contains: getSum
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: sumOf
+- press: Enter
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+    timeout_sec: 60
+- assert_file_contains:
+    path: ${fixture.parity007_extract_target}
+    contains: int sum = sumOf(values);
+- assert_file_contains:
+    path: ${fixture.parity007_extract_target}
+    contains: private int sumOf(int[] values) {
+- parity007_java_oracle:
+    scenario: e1
+    expected: 12,0,-2,12
+    source: ${fixture.parity007_extract_target}
+    label: b2
+- screenshot: tc-ide-parity-007-03-b2.png
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_file_contains:
+    path: ${fixture.parity007_extract_target}
+    contains: int sum = getSum(values);
+- parity007_java_oracle:
+    scenario: e1
+    expected: 12,0,-2,12
+    source: ${fixture.parity007_extract_target}
+    label: undo1-b1
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_file_sha256:
+    path: ${fixture.parity007_extract_target}
+    equals: ${fixture.parity007_initial_sha}
+- parity007_java_oracle:
+    scenario: e1
+    expected: 12,0,-2,12
+    source: ${fixture.parity007_extract_target}
+    label: undo2-b0
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+z
+- assert_file_contains:
+    path: ${fixture.parity007_extract_target}
+    contains: int sum = getSum(values);
+- parity007_java_oracle:
+    scenario: e1
+    expected: 12,0,-2,12
+    source: ${fixture.parity007_extract_target}
+    label: redo1-b1
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+z
+- assert_file_contains:
+    path: ${fixture.parity007_extract_target}
+    contains: int sum = sumOf(values);
+- parity007_java_oracle:
+    scenario: e1
+    expected: 12,0,-2,12
+    source: ${fixture.parity007_extract_target}
+    label: redo2-b2
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_file_sha256:
+    path: ${fixture.parity007_extract_target}
+    equals: ${fixture.parity007_initial_sha}
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+End
+- type: // pending
+- assert_file_contains:
+    path: ${fixture.parity007_extract_target}
+    contains: return min + ".." + max;
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- wait_for:
+    selector: '[data-testid="status-bar-message"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: save the file, then press Shift+F6
+- assert_not_visible: '[data-testid="text-input-dialog"]'
+- assert_file_sha256:
+    path: ${fixture.parity007_extract_target}
+    equals: ${fixture.parity007_initial_sha}
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: // pending
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-007-V4-1-provider
+    requirement: The real JDT LS offers the method extraction for E1; the direct chord applies it, the host file becomes B1, and the E1 program oracle keeps stdout 12,0,-2,12.
+    actions:
+    - 11
+    checkpoints:
+    - step: 11
+      expectation: The host ExtractTarget.java still has the reference B0 bytes before the extraction.
+    - step: 12
+      expectation: javac/java of the initial source prints exactly 12,0,-2,12 with exit 0.
+    - step: 26
+      expectation: The real provider edit produced the call site and the new method on disk.
+    - step: 28
+      expectation: The extracted B1 still prints exactly 12,0,-2,12.
+    results:
+    - 11
+    - 12
+    - 26
+    - 28
+  - id: ED-PARITY-007-V4-2-naming-undo
+    requirement: Naming through the real Rename chain updates the declaration and the call site, and two undos then redos walk the host bytes B2 -> B1 -> B0 -> B1 -> B2 with the oracle holding at every
+      state.
+    actions:
+    - 36
+    checkpoints:
+    - step: 36
+      expectation: The host file has sumOf in the declaration and the call site.
+    - step: 38
+      expectation: The renamed B2 still prints 12,0,-2,12.
+    - step: 43
+      expectation: The first undo restores B1 on disk and the oracle still passes.
+    - step: 46
+      expectation: The second undo restores the exact initial B0 hash.
+    - step: 55
+      expectation: Redo restores B1 then B2 on disk and the oracle still passes.
+    results:
+    - 36
+    - 38
+    - 43
+    - 46
+    - 55
+  - id: ED-PARITY-007-V4-3-dirty
+    requirement: With unsaved input the extraction stays in the buffer, never writes the pending input to disk, does not prompt for a name, and undo keeps the pending input.
+    actions:
+    - 57
+    checkpoints:
+    - step: 77
+      expectation: The status line asks to save before renaming.
+    - step: 78
+      expectation: No naming dialog appears for the dirty buffer.
+    - step: 79
+      expectation: The host file is unchanged by the dirty extraction.
+    - step: 82
+      expectation: Undo keeps the pending input in the buffer.
+    results:
+    - 77
+    - 78
+    - 79
+    - 82
+  visual:
+  - check: Real WebView dialog rendering and the extracted method layout.
+    method: manual
+    reason: Screenshots are recorded artifacts; pixel comparison is separate.
+  native:
+  - check: Real JDT LS kind/resolve/edit, host disk bytes, watcher, javac/java semantics.
+    method: automated
+    reason: This case is the native gate; the controlled browser provider cannot prove any of these.

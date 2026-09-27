@@ -43,6 +43,7 @@ from . import parity005_completion
 from . import parity006_replace
 from . import parity008_git
 from . import parity009_ssr
+from . import parity007_extract
 from . import editor_save_race
 
 
@@ -85,6 +86,7 @@ REGISTRY: dict[str, Fixture] = {
     "parity006_replace": Fixture("parity006_replace", parity006_replace.setup, parity006_replace.teardown),
     "parity008_git": Fixture("parity008_git", parity008_git.setup, parity008_git.teardown),
     "parity009_ssr": Fixture("parity009_ssr", parity009_ssr.setup, parity009_ssr.teardown),
+    "parity007_extract": Fixture("parity007_extract", parity007_extract.setup, parity007_extract.teardown),
 }
 
 
