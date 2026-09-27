@@ -415,15 +415,37 @@ export function useWelcomeSessionResume(
 
   const clearRecord = useCallback(async () => {
     try {
-      await clearWelcomeRunSnapshot({ expectedRevision: revisionRef.current || undefined });
+      let expectedRevision = revisionRef.current || undefined;
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          await clearWelcomeRunSnapshot({ expectedRevision });
+          break;
+        } catch (error) {
+          // The background snapshot collector can commit between the panel
+          // read and the user's clear click. Refresh once per observed CAS
+          // conflict so clear remains atomic without dropping a newer record.
+          if (
+            attempt >= 2 ||
+            !String(error).toLowerCase().includes("snapshot revision mismatch")
+          ) {
+            throw error;
+          }
+          const response = await getWelcomeRunSnapshot();
+          if (response.issue) throw error;
+          expectedRevision = response.record?.revision;
+          if (expectedRevision === undefined && !response.legacyCandidate) {
+            await clearWelcomeRunSnapshot({});
+            break;
+          }
+        }
+      }
       recordRef.current = null;
       setOutcomes([]);
       setView({ state: "empty" });
-      void load();
     } catch (error) {
       setView({ state: "unavailable", reason: "storage", message: String(error) });
     }
-  }, [load]);
+  }, []);
 
   return {
     view,

@@ -102,9 +102,7 @@ steps:
 - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
 - click: '[data-testid="code-workspace-bottom-tab-overflow-debug"]'
 - wait_for: '[data-testid="debug-panel"]'
-- click: '[data-testid="code-workspace-bottom-tab-overflow"]'
-- wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
-- click: '[data-testid="code-workspace-bottom-tab-overflow-terminal"]'
+- click: '[data-testid="code-workspace-bottom-tab-terminal"]'
 - wait_for: '[data-testid="code-workspace-bottom-dock-body"]'
 - screenshot: tc-ide-cw-layout-01-resize-and-split.png
 verification:
