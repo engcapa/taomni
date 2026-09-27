@@ -113,6 +113,7 @@ export const WORKSPACE_BOTTOM_DOCK_WINDOWS: readonly { id: string; title: string
   { id: "problems", title: "Problems" },
   { id: "analysis", title: "Analysis" },
   { id: "search", title: "Search" },
+  { id: "structural", title: "Structural Search" },
   { id: "references", title: "References" },
   { id: "call-hierarchy", title: "Call Hierarchy" },
   { id: "type-hierarchy", title: "Type Hierarchy" },

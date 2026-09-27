@@ -30,6 +30,8 @@ interface DiffViewerProps {
   /** P2: allow editing the worktree (new) side of the diff. */
   worktreeEditable?: boolean;
   onSaveWorktree?: (text: string) => Promise<void> | void;
+  /** Repository that produced `pair`; exposed as `data-repo-root` so callers can prove diff identity. */
+  repoRoot?: string | null;
 }
 const VIEW_KEY = "taomni.git.diff.view";
 const WS_KEY = "taomni.git.diff.ws";
@@ -1034,6 +1036,7 @@ export function DiffViewer({
   normalizeLineEndingsBusy = false,
   worktreeEditable = false,
   onSaveWorktree,
+  repoRoot,
 }: DiffViewerProps) {
   const instanceId = useId().replace(/:/g, "");
   const leftPaneId = `git-diff-left-pane-${instanceId}`;
@@ -1379,6 +1382,7 @@ export function DiffViewer({
     <div
       data-testid="git-diff-viewer"
       data-path={pair.path}
+      data-repo-root={repoRoot ?? undefined}
       className="h-full min-h-0 min-w-0 w-full flex flex-col bg-[var(--taomni-panel-bg)]"
     >
       {eolOnly && eolLabel ? (

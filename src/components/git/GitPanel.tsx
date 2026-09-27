@@ -212,6 +212,8 @@ export function GitPanel({
   const [repoRefreshRevision, setRepoRefreshRevision] = useState(0);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const anchorRef = useRef<string | null>(null);
+  /** The workspace header reuses this panel across repositories: only the latest refresh commits. */
+  const refreshSequenceRef = useRef(0);
   const [operation, setOperation] = useState<GitOperationState | null>(null);
   const [compare, setCompare] = useState<{ refA: string; refB: string; title: string } | null>(null);
   const [historyPath, setHistoryPath] = useState<string | null>(null);
@@ -301,10 +303,13 @@ export function GitPanel({
   }, [setGitUiFontSize, visible]);
 
   const refresh = useCallback(async () => {
+    const sequence = ++refreshSequenceRef.current;
+    const isCurrent = () => refreshSequenceRef.current === sequence;
     setLoading(true);
     setError(null);
     try {
       const next = await gitSnapshot(repoRoot);
+      if (!isCurrent()) return;
       setSnapshot(next);
       setSettingsDraft(normalizeSettings(next.settings));
       setRemoteDrafts((current) => buildRemoteDrafts(next.remotes, current));
@@ -328,16 +333,18 @@ export function GitPanel({
       const remote = selectedRemote(next);
       setRemoteName((current) => current || remote?.name || "");
       try {
-        setOperation(await gitOperationState(repoRoot));
+        const nextOperation = await gitOperationState(repoRoot);
+        if (isCurrent()) setOperation(nextOperation);
       } catch {
-        setOperation(null);
+        if (isCurrent()) setOperation(null);
       }
     } catch (err) {
+      if (!isCurrent()) return;
       const message = errorMessage(err);
       setError(message);
       setStatusMessage(message);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [repoRoot, setStatusMessage]);
 

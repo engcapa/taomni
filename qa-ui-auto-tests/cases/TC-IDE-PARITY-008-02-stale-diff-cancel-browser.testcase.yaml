@@ -1,0 +1,124 @@
+id: TC-IDE-PARITY-008-02
+title: Late repo-a diff is discarded after switching to repo-b; cancelled Discard requests no Git write
+description: >-
+  ED-PARITY-008 V-008-02/V-008-03 browser half. parity008_hold keeps the repo-a diff read pending,
+  the user switches to repo-b, then the late repo-a response is released: the pane must keep the
+  repo-b title, identity and text. Discard is then cancelled in the confirmation dialog and the
+  Git tab is closed; the controlled fixture must have received zero Git write commands. Real disk
+  hashes are TC-IDE-PARITY-008-03 (native).
+covers: [F26.2]
+tags: [git, code-workspace, parity008, p1]
+modes: [browser]
+fixtures: [reset_db, parity008_git]
+timeout_sec: 180
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
+  - wait_for: '[data-testid="code-workspace-git-panel-toggle"]:not([disabled])'
+  - click: '[data-testid="code-workspace-git-panel-toggle"]'
+  - wait_for: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
+  - click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
+  - wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"]'
+  - parity008_hold: ${fixture.parity008_root}/repo-a
+  - click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-a"][data-path="same.txt"]'
+  - parity008_trace: {pending_min: 1}
+  - assert_text_equals:
+      selector: '[data-testid="workspace-diff-title"]'
+      equals: repo-a / same.txt
+  - assert_count:
+      selector: '[data-testid="git-diff-viewer"]'
+      equal: 0
+  - parity008_hold: null
+  - click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
+  - wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"]'
+  - parity008_release: null
+  - parity008_trace: {pending: 0, writes: 0}
+  - assert_text_equals:
+      selector: '[data-testid="workspace-diff-title"]'
+      equals: repo-b / same.txt
+  - assert_attribute:
+      selector: '[data-testid="git-diff-viewer"]'
+      name: data-repo-root
+      equals: ${fixture.parity008_root}/repo-b
+  - assert_pattern:
+      selector: '[data-testid="git-diff-viewer"]'
+      regex: '(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE'
+  - assert_text_equals:
+      selector: '[data-testid="workspace-diff-file-position"]'
+      equals: 3/3 files
+  - screenshot: tc-ide-parity-008-02-late-a-dropped.png
+  - click: '[data-testid="git-diff-discard"]'
+  - wait_for: '[data-testid="confirm-dialog"]'
+  - click: '[data-testid="confirm-dialog-cancel"]'
+  - assert_not_visible: '[data-testid="confirm-dialog"]'
+  - parity008_trace: {writes: 0, pending: 0}
+  - click: '[data-testid="tab-item"][data-tab-type="git"] [data-testid="tab-close"]'
+  - assert_count:
+      selector: '[data-testid="workspace-git-manager"]'
+      equal: 0
+  - parity008_trace: {writes: 0, pending: 0}
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-008-V3
+    requirement: repo-a diff 挂起时切到 repo-b，迟到的 repo-a 响应被丢弃，面板保持 repo-b 身份/文本/位置。
+    actions:
+    - 8
+    - 10
+    - 11
+    - 15
+    - 16
+    - 18
+    checkpoints:
+    - step: 12
+      expectation: '{parity008_trace: {pending_min: 1}}'
+    - step: 13
+      expectation: '{assert_text_equals: {equals: repo-a / same.txt, selector: ''[data-testid="workspace-diff-title"]''}}'
+    - step: 14
+      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="git-diff-viewer"]''}}'
+    - step: 17
+      expectation: '{wait_for: ''[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"]''}'
+    - step: 19
+      expectation: '{parity008_trace: {pending: 0, writes: 0}}'
+    - step: 20
+      expectation: '{assert_text_equals: {equals: repo-b / same.txt, selector: ''[data-testid="workspace-diff-title"]''}}'
+    - step: 21
+      expectation: '{assert_attribute: {equals: ''${fixture.parity008_root}/repo-b'', name: data-repo-root, selector: ''[data-testid="git-diff-viewer"]''}}'
+    - step: 22
+      expectation: '{assert_pattern: {regex: ''(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE'', selector: ''[data-testid="git-diff-viewer"]''}}'
+    - step: 23
+      expectation: '{assert_text_equals: {equals: 3/3 files, selector: ''[data-testid="workspace-diff-file-position"]''}}'
+    results:
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+  - id: ED-PARITY-008-A3
+    requirement: Discard 在确认框取消、关闭 Git tab 后 fixture 未收到任何 Git 写命令。
+    actions:
+    - 25
+    - 27
+    - 30
+    checkpoints:
+    - step: 28
+      expectation: '{assert_not_visible: ''[data-testid="confirm-dialog"]''}'
+    - step: 29
+      expectation: '{parity008_trace: {pending: 0, writes: 0}}'
+    - step: 31
+      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="workspace-git-manager"]''}}'
+    - step: 32
+      expectation: '{parity008_trace: {pending: 0, writes: 0}}'
+    results:
+    - 31
+    - 32
+  visual:
+  - check: 截图中标题、n/N 导航、两侧标签/结果树与高亮无截断遮挡；与 IDEA 参照的视觉差异单独记录于 comparison record。
+    method: manual
+    reason: 像素与视觉 parity 不能由 DOM 断言替代。
+  native:
+  - check: Browser 仅证明 renderer 入口/路由/可见结果；真实 Tauri IPC、磁盘与 provider 由对应 native case 证明。
+    method: not-applicable
+    reason: browser mode 使用受控 stub，不跨越 OS/IPC 边界。

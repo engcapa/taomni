@@ -124,6 +124,22 @@ real JDT LS, Rust IPC or disk effects.
 | `parity005_release` | `fetch \| resolve` | Releases held responses; fails if none is pending. |
 | `parity005_trace` | `{fetch?, resolve?, pending?}` | Asserts exact request counts and saves the read-only event trace in the case report. |
 
+## ED-PARITY-008 / ED-PARITY-009 controlled browser fixtures
+
+Browser-only. `parity008_git` serves two fixture repositories through the stub
+`invoke`; `parity009_ssr` enables a Lezer-AST Structural Search backend over the
+VFS. They control timing/mode and read a trace; actions still use the product
+UI. They prove neither real Git bytes, Tauri IPC nor the tree-sitter backend.
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `parity008_hold` | repo root string \| `null` | Holds later `git_blob_pair` reads for that repository (`null` clears). |
+| `parity008_release` | `null` | Releases held diff reads; fails when none is pending. |
+| `parity008_trace` | `{writes?, pending?, pending_min?, last_pair_repo?}` | Asserts refused Git write count, exact/minimum held reads (dev StrictMode may issue a guarded duplicate read) and the last diff read's repo; saves the trace. |
+| `parity009_set_mode` | `normal \| hold \| unavailable \| error` | Next Structural Search response mode; `unavailable` also flips the capability probe. |
+| `parity009_release` | `null` | Releases a held search; fails when none is held. |
+| `parity009_trace` | `{active?, runs?, last_status?, last_count?}` | Asserts active requests, completed runs and the last typed status/count; saves the trace. |
+
 ## ED-PARITY-005 isolated native provider boundary
 
 | Verb | Args | Notes |

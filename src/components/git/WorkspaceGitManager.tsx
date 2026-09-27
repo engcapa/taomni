@@ -112,6 +112,18 @@ interface RepoSnapshotState {
 
 type BatchResult = "completed" | "skipped";
 
+/**
+ * A diff pair tagged with the request identity that produced it. The pane only
+ * renders a pair whose key matches the focused change, so a response for a
+ * previous repository/file can never appear under the current title
+ * (ED-PARITY-008).
+ */
+interface FocusedPairState {
+  key: string;
+  repoRoot: string;
+  pair: GitBlobPair | null;
+}
+
 type RepoScope =
   | { mode: "all" }
   | { mode: "single"; repoRoot: string }
@@ -141,8 +153,9 @@ export function WorkspaceGitManager({
   const [selectedChangeKeys, setSelectedChangeKeys] = useState<Set<string>>(() => new Set());
   const [focusedChangeKey, setFocusedChangeKey] = useState<string | null>(null);
   const [changeMenu, setChangeMenu] = useState<{ x: number; y: number } | null>(null);
-  const [pair, setPair] = useState<GitBlobPair | null>(null);
-  const [pairLoading, setPairLoading] = useState(false);
+  const [pairState, setPairState] = useState<FocusedPairState | null>(null);
+  /** Bumped only when a current snapshot lands, so diffs re-read after real refreshes. */
+  const [snapshotRevisions, setSnapshotRevisions] = useState<Record<string, number>>({});
   const [repoRemoteNames, setRepoRemoteNames] = useState<Record<string, string>>({});
   const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null);
   const [treeMode, setTreeMode] = useState(() => {
@@ -155,6 +168,10 @@ export function WorkspaceGitManager({
   /** Repo paths that failed with missing-cwd style errors; skip further snapshots. */
   const [deadRepoRoots, setDeadRepoRoots] = useState<Set<string>>(() => new Set());
   const anchorChangeKeyRef = useRef<string | null>(null);
+  /** Per-repository snapshot request sequence; only the latest response may commit. */
+  const refreshSequenceRef = useRef(new Map<string, number>());
+  const liveRepoRootsRef = useRef(new Set<string>());
+  const pairGenerationRef = useRef(0);
 
   const selectedRoot = useMemo(
     () => normalizedRoots.find((root) => root.repoRoot === selectedRepoRoot) ?? normalizedRoots[0] ?? null,
@@ -237,6 +254,31 @@ export function WorkspaceGitManager({
     () => focusedChangeKey && validChangeKeys.has(focusedChangeKey) ? [focusedChangeKey] : [],
     [focusedChangeKey, validChangeKeys],
   );
+  const focusedPairTarget = useMemo(() => {
+    if (!focusedChange) return null;
+    const { repoRoot, change } = focusedChange;
+    const revision = snapshotRevisions[repoRoot] ?? 0;
+    return {
+      key: [repoRoot, change.path, change.oldPath ?? "", change.status, change.staged, change.unstaged, revision].join("\u0000"),
+      repoRoot,
+      path: change.path,
+      oldPath: change.oldPath,
+    };
+    // Depend on the identity fields, not the change object: a loading toggle
+    // rebuilds the object without changing what the diff should show.
+  }, [
+    focusedChange?.repoRoot,
+    focusedChange?.change.path,
+    focusedChange?.change.oldPath,
+    focusedChange?.change.status,
+    focusedChange?.change.staged,
+    focusedChange?.change.unstaged,
+    focusedChange ? snapshotRevisions[focusedChange.repoRoot] : undefined,
+  ]);
+  const focusedPairKey = focusedPairTarget?.key ?? null;
+  const currentPairState = pairState && pairState.key === focusedPairKey ? pairState : null;
+  const pair = currentPairState?.pair ?? null;
+  const pairLoading = !!focusedPairTarget && !currentPairState;
   const totalChangedFiles = allChanges.length;
   const title = workspaceName?.trim() || "Code Workspace";
   const singleRepoMode = normalizedRoots.length === 1;
@@ -254,6 +296,7 @@ export function WorkspaceGitManager({
   }, [treeMode]);
 
   useEffect(() => {
+    liveRepoRootsRef.current = new Set(normalizedRoots.map((root) => root.repoRoot));
     setDeadRepoRoots((current) => {
       const next = retainDeadRepoRoots(current, normalizedRoots);
       if (next.size === current.size && [...next].every((root) => current.has(root))) return current;
@@ -310,6 +353,14 @@ export function WorkspaceGitManager({
       }));
       throw new Error(message);
     }
+    const sequence = (refreshSequenceRef.current.get(repoRoot) ?? 0) + 1;
+    refreshSequenceRef.current.set(repoRoot, sequence);
+    // A superseded or removed-root response still resolves for its caller but
+    // never commits: a late A must not overwrite a newer A, nor revive a root.
+    const isCurrent = () => (
+      refreshSequenceRef.current.get(repoRoot) === sequence
+      && liveRepoRootsRef.current.has(repoRoot)
+    );
     setSnapshots((current) => ({
       ...current,
       [repoRoot]: {
@@ -320,17 +371,21 @@ export function WorkspaceGitManager({
     }));
     try {
       const snapshot = await gitSnapshot(repoRoot);
-      setSnapshots((current) => ({
-        ...current,
-        [repoRoot]: {
-          snapshot,
-          loading: false,
-          error: null,
-        },
-      }));
+      if (isCurrent()) {
+        setSnapshots((current) => ({
+          ...current,
+          [repoRoot]: {
+            snapshot,
+            loading: false,
+            error: null,
+          },
+        }));
+        setSnapshotRevisions((current) => ({ ...current, [repoRoot]: (current[repoRoot] ?? 0) + 1 }));
+      }
       return snapshot;
     } catch (err) {
       const message = errorMessage(err);
+      if (!isCurrent()) throw err;
       if (isMissingRepoPathError(message)) {
         setDeadRepoRoots((current) => {
           if (current.has(repoRoot)) return current;
@@ -369,37 +424,36 @@ export function WorkspaceGitManager({
     void refreshRepos(liveRoots);
   }, [liveRoots, refreshRepos, singleRepoMode, visible]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadPair() {
-      if (!focusedChange) {
-        setPair(null);
-        return;
-      }
-      setPairLoading(true);
-      try {
-        const next = await gitBlobPair(
-          focusedChange.repoRoot,
-          focusedChange.change.path,
-          "HEAD",
-          GIT_REF_WORKTREE,
-          focusedChange.change.oldPath,
-        );
-        if (!cancelled) setPair(next);
-      } catch (err) {
-        if (!cancelled) {
-          setPair(null);
-          setStatusMessage(errorMessage(err));
-        }
-      } finally {
-        if (!cancelled) setPairLoading(false);
-      }
+  const loadFocusedPair = useCallback(async (
+    target: NonNullable<typeof focusedPairTarget>,
+  ): Promise<GitBlobPair | null> => {
+    const generation = ++pairGenerationRef.current;
+    const isCurrent = () => pairGenerationRef.current === generation;
+    try {
+      const next = await gitBlobPair(target.repoRoot, target.path, "HEAD", GIT_REF_WORKTREE, target.oldPath);
+      if (!isCurrent()) return null;
+      setPairState({ key: target.key, repoRoot: target.repoRoot, pair: next });
+      return next;
+    } catch (err) {
+      if (!isCurrent()) return null;
+      setPairState({ key: target.key, repoRoot: target.repoRoot, pair: null });
+      setStatusMessage(errorMessage(err));
+      return null;
     }
-    void loadPair();
+  }, [setStatusMessage]);
+
+  useEffect(() => {
+    if (!focusedPairTarget) {
+      pairGenerationRef.current += 1;
+      setPairState(null);
+      return;
+    }
+    void loadFocusedPair(focusedPairTarget);
+    // Leaving this key invalidates its in-flight read even if nothing replaces it.
     return () => {
-      cancelled = true;
+      pairGenerationRef.current += 1;
     };
-  }, [focusedChange, setStatusMessage]);
+  }, [focusedPairTarget, loadFocusedPair]);
 
   const toggleChangeChecked = useCallback((repoRoot: string, paths: string[], checked: boolean) => {
     setUncheckedChangeKeys((current) => {
@@ -614,17 +668,9 @@ export function WorkspaceGitManager({
   }, [discardChangesByKeys, focusedOperationKeys]);
 
   const reloadFocusedPair = useCallback(async () => {
-    if (!focusedChange) return null;
-    const nextPair = await gitBlobPair(
-      focusedChange.repoRoot,
-      focusedChange.change.path,
-      "HEAD",
-      GIT_REF_WORKTREE,
-      focusedChange.change.oldPath,
-    );
-    setPair(nextPair);
-    return nextPair;
-  }, [focusedChange]);
+    if (!focusedPairTarget) return null;
+    return loadFocusedPair(focusedPairTarget);
+  }, [focusedPairTarget, loadFocusedPair]);
 
   const normalizeFocusedLineEndings = useCallback(() => {
     if (!focusedChange || !pair) return;

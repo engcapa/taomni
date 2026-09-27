@@ -163,6 +163,7 @@ const BOTTOM_DOCK_TABS: BottomDockTabId[] = [
   "problems",
   "analysis",
   "search",
+  "structural",
   "references",
   "call-hierarchy",
   "type-hierarchy",

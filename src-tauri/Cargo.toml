@@ -84,6 +84,11 @@ notify = "8.2"
 grep-matcher = "0.1"
 grep-regex = "0.1"
 grep-searcher = "0.1"
+# Code Workspace Structural Search (ED-PARITY-009): Java AST matching. The
+# grammar is compiled from bundled C sources by `cc`, so it builds on all three
+# desktop targets without a system tree-sitter install.
+tree-sitter = "=0.25.10"
+tree-sitter-java = "=0.23.5"
 # Pure-Rust jq engine for the `read_capture` `jq` op — no external `jq` binary,
 # so it works on the Windows Taomni host too. Versions are mutually compatible
 # (the embedding chains defs/funs from all three; see agent/capture/reduce.rs).

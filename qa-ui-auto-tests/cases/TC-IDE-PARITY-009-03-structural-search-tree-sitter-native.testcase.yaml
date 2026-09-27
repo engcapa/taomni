@@ -1,0 +1,187 @@
+id: TC-IDE-PARITY-009-03
+title: Native tree-sitter Structural Search counts, typed error, Esc cancel with request release and unchanged bytes
+description: >-
+  ED-PARITY-009 V-009-01..03 native half. The real Tauri structural_search_* IPC and bundled
+  tree-sitter-java backend search the byte-identical IDEA F2 fixture: Module scope returns 3 exact
+  locations, Text=42 returns 1 and Text=999 an empty (not unavailable) result; an unbalanced template
+  returns the typed invalid-pattern error in the dialog; an In Project search over the 1,500-file bulk
+  root is cancelled with Esc while parsing and the backend's active request count returns to 0; the
+  source file keeps its SHA-256 and the editor buffer is not dirtied.
+covers: [F25.6]
+tags: [code-workspace, structural-search, parity009, native-gate, p2]
+modes: [native]
+native_platforms: [Windows, Linux]
+fixtures: [reset_db, parity009_ssr]
+timeout_sec: 420
+steps:
+  - open: ${cfg.app.base_url}
+  - vault_first_run: qa-parity009-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-parity009-native","name":"parity009","roots":[{"id":"parity009","name":"parity009","path":"${fixture.parity009_root}","kind":"folder"},{"id":"parity009-bulk","name":"parity009-bulk","path":"${fixture.parity009_bulk_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"parity009","path":"src/StructuralTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity009_root}"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-of-type(5)'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Search Structurally
+  - press: Enter
+  - wait_for: '[data-testid="structural-search-dialog"]'
+  - click: '[data-testid="structural-search-scope-module"]'
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for:
+      selector: '[data-testid="structural-search-panel"][data-phase="results"]'
+      timeout_sec: 60
+  - assert_items:
+      selector: '[data-testid="structural-search-match"]'
+      attribute: data-line
+      equals: ['3', '4', '5']
+  - assert_text:
+      selector: '[data-testid="structural-search-backend"]'
+      contains: tree-sitter-java · tree-sitter-java 0.23.5
+  - screenshot: tc-ide-parity-009-03-native-results.png
+  - click: '[data-testid="structural-search-match"][data-line="4"]'
+  - assert_text_equals:
+      selector: '[data-testid="code-workspace-editor"] .cm-activeLine'
+      equals: '    System.out.println(42);'
+  - click: '[data-testid="structural-search-edit-query"]'
+  - wait_for: '[data-testid="structural-search-dialog"]'
+  - fill:
+      selector: '[data-testid="structural-search-variable-text"]'
+      value: '42'
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for:
+      selector: '[data-testid="structural-search-panel"][data-phase="results"]'
+      timeout_sec: 60
+  - assert_items:
+      selector: '[data-testid="structural-search-match"]'
+      attribute: data-line
+      equals: ['4']
+  - click: '[data-testid="structural-search-edit-query"]'
+  - fill:
+      selector: '[data-testid="structural-search-variable-text"]'
+      value: '999'
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for:
+      selector: '[data-testid="structural-search-empty"]'
+      timeout_sec: 60
+  - assert_count:
+      selector: '[data-testid="structural-search-unavailable"]'
+      equal: 0
+  - click: '[data-testid="structural-search-edit-query"]'
+  - fill:
+      selector: '[data-testid="structural-search-variable-text"]'
+      value: ''
+  - fill:
+      selector: '[data-testid="structural-search-template"]'
+      value: 'System.out.println($arg$'
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for: '[data-testid="structural-search-error"]'
+  - assert_text:
+      selector: '[data-testid="structural-search-error"]'
+      contains: not a single Java statement, expression or class member
+  - screenshot: tc-ide-parity-009-03-native-invalid.png
+  - fill:
+      selector: '[data-testid="structural-search-template"]'
+      value: 'System.out.println($arg$);'
+  - click: '[data-testid="structural-search-scope-workspace"]'
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for: '[data-testid="structural-search-running"]'
+  - wait: 1
+  - press: Escape
+  - assert_not_visible: '[data-testid="structural-search-dialog"]'
+  - wait_for:
+      selector: '[data-testid="structural-search-panel"][data-phase="cancelled"][data-active-requests="0"]'
+      timeout_sec: 60
+  - assert_visible: '[data-testid="structural-search-cancelled"]'
+  - screenshot: tc-ide-parity-009-03-native-cancelled.png
+  - assert_count:
+      selector: '[data-editor-tab-key][data-dirty="true"]'
+      equal: 0
+  - assert_file_sha256:
+      path: ${fixture.parity009_target}
+      equals: ${fixture.parity009_target_sha256}
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-009-N1
+    requirement: 原生 tree-sitter-java 后端经真实 IPC 返回 3 / Text=42→1 / Text=999→空态，并导航到第 4 行。
+    actions:
+    - 7
+    - 15
+    - 17
+    - 18
+    - 23
+    - 27
+    - 28
+    - 32
+    - 33
+    checkpoints:
+    - step: 19
+      expectation: '{wait_for: {selector: ''[data-testid="structural-search-panel"][data-phase="results"]'', timeout_sec:
+        60}}'
+    - step: 20
+      expectation: '{assert_items: {attribute: data-line, equals: [''3'', ''4'', ''5''], selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 21
+      expectation: '{assert_text: {contains: tree-sitter-java · tree-sitter-java 0.23.5, selector: ''[data-testid="structural-search-backend"]''}}'
+    - step: 24
+      expectation: '{assert_text_equals: {equals: ''    System.out.println(42);'', selector: ''[data-testid="code-workspace-editor"]
+        .cm-activeLine''}}'
+    - step: 29
+      expectation: '{wait_for: {selector: ''[data-testid="structural-search-panel"][data-phase="results"]'', timeout_sec:
+        60}}'
+    - step: 30
+      expectation: '{assert_items: {attribute: data-line, equals: [''4''], selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 34
+      expectation: '{wait_for: {selector: ''[data-testid="structural-search-empty"]'', timeout_sec: 60}}'
+    - step: 35
+      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-unavailable"]''}}'
+    results:
+    - 30
+    - 34
+    - 35
+  - id: ED-PARITY-009-N2
+    requirement: 无效模板为类型化错误；大工作区 In Project 运行中 Esc 取消，后端 active requests 回到 0；源文件 SHA-256 不变、编辑器不 dirty。
+    actions:
+    - 38
+    - 39
+    - 44
+    - 45
+    - 48
+    checkpoints:
+    - step: 40
+      expectation: '{wait_for: ''[data-testid="structural-search-error"]''}'
+    - step: 41
+      expectation: '{assert_text: {contains: ''not a single Java statement, expression or class member'', selector: ''[data-testid="structural-search-error"]''}}'
+    - step: 46
+      expectation: '{wait_for: ''[data-testid="structural-search-running"]''}'
+    - step: 49
+      expectation: '{assert_not_visible: ''[data-testid="structural-search-dialog"]''}'
+    - step: 50
+      expectation: '{wait_for: {selector: ''[data-testid="structural-search-panel"][data-phase="cancelled"][data-active-requests="0"]'',
+        timeout_sec: 60}}'
+    - step: 51
+      expectation: '{assert_visible: ''[data-testid="structural-search-cancelled"]''}'
+    - step: 53
+      expectation: '{assert_count: {equal: 0, selector: ''[data-editor-tab-key][data-dirty="true"]''}}'
+    - step: 54
+      expectation: '{assert_file_sha256: {equals: ''${fixture.parity009_target_sha256}'', path: ''${fixture.parity009_target}''}}'
+    results:
+    - 51
+    - 53
+    - 54
+  visual:
+  - check: 截图中标题、n/N 导航、两侧标签/结果树与高亮无截断遮挡；与 IDEA 参照的视觉差异单独记录于 comparison record。
+    method: manual
+    reason: 像素与视觉 parity 不能由 DOM 断言替代。
+  native:
+  - check: 当前平台 Windows/WebView2 真实 Tauri IPC 与主机文件 SHA-256；Linux/macOS 未在本机执行。
+    method: automated
+    reason: assert_file_sha256 由 harness 在主机侧独立读取字节。

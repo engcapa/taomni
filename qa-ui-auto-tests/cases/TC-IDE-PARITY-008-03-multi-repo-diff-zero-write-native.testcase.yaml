@@ -1,0 +1,200 @@
+id: TC-IDE-PARITY-008-03
+title: Native two-repository Changes diff via real Git IPC with zero Git writes on disk
+description: >-
+  ED-PARITY-008 V-008-02/V-008-03 native half. parity008_git creates the two real F3 repositories
+  (repo-a: HEAD/INDEX/WORKTREE + untracked, repo-b: worktree edit) in the OS temp directory, outside
+  any checkout, and gives repo-b/stable.txt a newer mtime with unchanged bytes: the stale index stat
+  entry for which a plain `git status` rewrites .git/index. The real Tauri git_snapshot / git_blob_pair IPC must render repo-a then repo-b diffs from
+  disk (HEAD oid, bytes, 1/3→3/3), keep the editor's dirty buffer, and after switching, Discard→Cancel
+  and closing the Git tab, every .git/index, refs/heads/main and worktree file keeps its fixture SHA-256.
+covers: [F26.2]
+tags: [git, code-workspace, parity008, native-gate, p1]
+modes: [native]
+native_platforms: [Windows, Linux]
+fixtures: [reset_db, parity008_git]
+timeout_sec: 300
+steps:
+  - open: ${cfg.app.base_url}
+  - vault_first_run: qa-parity008-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-parity008-native","name":"parity008","roots":[{"id":"parity008","name":"parity008","path":"${fixture.parity008_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"parity008","path":"repo-a/same.txt"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - seed_storage:
+      key: taomni.git.workspace.changes.tree
+      value: '"flat"'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Mod+End
+  - type: 'edit-kept'
+  - wait_for: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-git-panel-toggle"]:not([disabled])'
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-git-panel-toggle"]'
+  - wait_for:
+      selector: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+      timeout_sec: 60
+  - assert_items:
+      selector: '[data-testid="workspace-change-row"]'
+      attribute: aria-label
+      equals: ['repo-a same.txt Staged', 'repo-a untracked.txt Untracked', 'repo-b same.txt Modified']
+  - click: '[data-testid="workspace-change-row"][data-repo-root$="repo-a"][data-path="same.txt"]'
+  - wait_for:
+      selector: '[data-testid="git-diff-viewer"][data-repo-root$="repo-a"][data-path="same.txt"]'
+      timeout_sec: 30
+  - assert_text_equals:
+      selector: '[data-testid="workspace-diff-file-position"]'
+      equals: 1/3 files
+  - assert_text:
+      selector: '[data-testid="workspace-diff-old-label"]'
+      contains: HEAD ${fixture.parity008_repo_a_head7}
+  - assert_pattern:
+      selector: '[data-testid="git-diff-viewer"]'
+      regex: '(?s)repo-a HEAD.*shared line.*repo-a WORKTREE.*shared line'
+  - screenshot: tc-ide-parity-008-03-repo-a.png
+  - click: '[data-testid="workspace-diff-next-file"]'
+  - wait_for: '[data-testid="git-diff-viewer"][data-repo-root$="repo-a"][data-path="untracked.txt"]'
+  - click: '[data-testid="workspace-diff-next-file"]'
+  - wait_for:
+      selector: '[data-testid="git-diff-viewer"][data-repo-root$="repo-b"][data-path="same.txt"]'
+      timeout_sec: 30
+  - assert_text_equals:
+      selector: '[data-testid="workspace-diff-title"]'
+      equals: repo-b / same.txt
+  - assert_text_equals:
+      selector: '[data-testid="workspace-diff-file-position"]'
+      equals: 3/3 files
+  - assert_text:
+      selector: '[data-testid="workspace-diff-old-label"]'
+      contains: HEAD ${fixture.parity008_repo_b_head7}
+  - assert_pattern:
+      selector: '[data-testid="git-diff-viewer"]'
+      regex: '(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE'
+  - screenshot: tc-ide-parity-008-03-repo-b.png
+  - click: '[data-testid="git-diff-discard"]'
+  - wait_for: '[data-testid="confirm-dialog"]'
+  - click: '[data-testid="confirm-dialog-cancel"]'
+  - assert_not_visible: '[data-testid="confirm-dialog"]'
+  - click: '[data-testid="tab-item"][data-tab-type="git"] [data-testid="tab-close"]'
+  - assert_count:
+      selector: '[data-testid="workspace-git-manager"]'
+      equal: 0
+  - click: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-line'
+      equals: ['repo-a WORKTREE', 'shared line', 'edit-kept']
+  - assert_visible: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+  - assert_file_sha256:
+      path: ${fixture.parity008_repo_a}/.git/index
+      equals: ${fixture.parity008_repo_a_index_sha256}
+  - assert_file_sha256:
+      path: ${fixture.parity008_repo_b}/.git/index
+      equals: ${fixture.parity008_repo_b_index_sha256}
+  - assert_file_sha256:
+      path: ${fixture.parity008_repo_a}/.git/refs/heads/main
+      equals: ${fixture.parity008_repo_a_main_sha256}
+  - assert_file_sha256:
+      path: ${fixture.parity008_repo_b}/.git/refs/heads/main
+      equals: ${fixture.parity008_repo_b_main_sha256}
+  - assert_file_sha256:
+      path: ${fixture.parity008_repo_a}/same.txt
+      equals: ${fixture.parity008_repo_a_worktree_sha256}
+  - assert_file_sha256:
+      path: ${fixture.parity008_repo_b}/same.txt
+      equals: ${fixture.parity008_repo_b_worktree_sha256}
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-008-N1
+    requirement: 真实 Git IPC 下两仓库状态与 HEAD/INDEX/WORKTREE 内容、HEAD 短 oid、1/3→3/3 与 manifest 一致且不串仓库。
+    actions:
+    - 8
+    - 15
+    - 18
+    - 24
+    - 26
+    checkpoints:
+    - step: 17
+      expectation: '{assert_items: {attribute: aria-label, equals: [repo-a same.txt Staged, repo-a untracked.txt Untracked,
+        repo-b same.txt Modified], selector: ''[data-testid="workspace-change-row"]''}}'
+    - step: 19
+      expectation: '{wait_for: {selector: ''[data-testid="git-diff-viewer"][data-repo-root$="repo-a"][data-path="same.txt"]'',
+        timeout_sec: 30}}'
+    - step: 20
+      expectation: '{assert_text_equals: {equals: 1/3 files, selector: ''[data-testid="workspace-diff-file-position"]''}}'
+    - step: 21
+      expectation: '{assert_text: {contains: ''HEAD ${fixture.parity008_repo_a_head7}'', selector: ''[data-testid="workspace-diff-old-label"]''}}'
+    - step: 22
+      expectation: '{assert_pattern: {regex: ''(?s)repo-a HEAD.*shared line.*repo-a WORKTREE.*shared line'', selector: ''[data-testid="git-diff-viewer"]''}}'
+    - step: 27
+      expectation: '{wait_for: {selector: ''[data-testid="git-diff-viewer"][data-repo-root$="repo-b"][data-path="same.txt"]'',
+        timeout_sec: 30}}'
+    - step: 28
+      expectation: '{assert_text_equals: {equals: repo-b / same.txt, selector: ''[data-testid="workspace-diff-title"]''}}'
+    - step: 29
+      expectation: '{assert_text_equals: {equals: 3/3 files, selector: ''[data-testid="workspace-diff-file-position"]''}}'
+    - step: 30
+      expectation: '{assert_text: {contains: ''HEAD ${fixture.parity008_repo_b_head7}'', selector: ''[data-testid="workspace-diff-old-label"]''}}'
+    - step: 31
+      expectation: '{assert_pattern: {regex: ''(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE'', selector: ''[data-testid="git-diff-viewer"]''}}'
+    results:
+    - 28
+    - 29
+    - 30
+    - 31
+  - id: ED-PARITY-008-N2
+    requirement: fixture 预置 stale stat 条件下浏览/切换/Discard 取消/关闭后 .git/index、refs/heads/main 与工作区字节不变，编辑器 dirty 缓冲保留。
+    actions:
+    - 10
+    - 12
+    - 33
+    - 35
+    - 37
+    - 39
+    checkpoints:
+    - step: 13
+      expectation: '{wait_for: ''[data-editor-tab-key][data-active="true"][data-dirty="true"]''}'
+    - step: 36
+      expectation: '{assert_not_visible: ''[data-testid="confirm-dialog"]''}'
+    - step: 38
+      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="workspace-git-manager"]''}}'
+    - step: 40
+      expectation: '{assert_items: {equals: [repo-a WORKTREE, shared line, edit-kept], selector: ''[data-testid="code-workspace-editor"]
+        .cm-line''}}'
+    - step: 41
+      expectation: '{assert_visible: ''[data-editor-tab-key][data-active="true"][data-dirty="true"]''}'
+    - step: 42
+      expectation: '{assert_file_sha256: {equals: ''${fixture.parity008_repo_a_index_sha256}'', path: ''${fixture.parity008_repo_a}/.git/index''}}'
+    - step: 43
+      expectation: '{assert_file_sha256: {equals: ''${fixture.parity008_repo_b_index_sha256}'', path: ''${fixture.parity008_repo_b}/.git/index''}}'
+    - step: 44
+      expectation: '{assert_file_sha256: {equals: ''${fixture.parity008_repo_a_main_sha256}'', path: ''${fixture.parity008_repo_a}/.git/refs/heads/main''}}'
+    - step: 45
+      expectation: '{assert_file_sha256: {equals: ''${fixture.parity008_repo_b_main_sha256}'', path: ''${fixture.parity008_repo_b}/.git/refs/heads/main''}}'
+    - step: 46
+      expectation: '{assert_file_sha256: {equals: ''${fixture.parity008_repo_a_worktree_sha256}'', path: ''${fixture.parity008_repo_a}/same.txt''}}'
+    - step: 47
+      expectation: '{assert_file_sha256: {equals: ''${fixture.parity008_repo_b_worktree_sha256}'', path: ''${fixture.parity008_repo_b}/same.txt''}}'
+    results:
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+  visual:
+  - check: 截图中标题、n/N 导航、两侧标签/结果树与高亮无截断遮挡；与 IDEA 参照的视觉差异单独记录于 comparison record。
+    method: manual
+    reason: 像素与视觉 parity 不能由 DOM 断言替代。
+  native:
+  - check: 当前平台 Windows/WebView2 真实 Tauri IPC 与主机文件 SHA-256；Linux/macOS 未在本机执行。
+    method: automated
+    reason: assert_file_sha256 由 harness 在主机侧独立读取字节。

@@ -27,6 +27,8 @@ def is_check(step: dict) -> bool:
         return any(key in args for key in ("fetch", "resolve", "pending"))
     if verb == "parity005_native_trace":
         return "phase" in args
+    if verb in {"parity008_trace", "parity009_trace"}:
+        return bool(args)
     return False
 
 

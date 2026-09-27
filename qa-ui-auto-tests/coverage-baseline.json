@@ -1,10 +1,10 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 68,
-    "required": 396,
-    "covered_required": 379,
-    "shallow": 51,
+    "features_with_controls": 70,
+    "required": 512,
+    "covered_required": 510,
+    "shallow": 45,
     "orphans": 0
   },
   "features": {
@@ -44,8 +44,8 @@
       "shallow": 0
     },
     "F2.2": {
-      "required": 1,
-      "covered_required": 1,
+      "required": 2,
+      "covered_required": 2,
       "shallow": 2
     },
     "F4.1": {
@@ -59,8 +59,8 @@
       "shallow": 4
     },
     "F4.3": {
-      "required": 0,
-      "covered_required": 0,
+      "required": 4,
+      "covered_required": 4,
       "shallow": 0
     },
     "F4.4": {
@@ -99,13 +99,13 @@
       "shallow": 0
     },
     "F5.2": {
-      "required": 15,
-      "covered_required": 2,
+      "required": 29,
+      "covered_required": 29,
       "shallow": 0
     },
     "F5.5": {
-      "required": 1,
-      "covered_required": 1,
+      "required": 2,
+      "covered_required": 2,
       "shallow": 0
     },
     "F6.2": {
@@ -114,8 +114,8 @@
       "shallow": 5
     },
     "F6.3": {
-      "required": 38,
-      "covered_required": 38,
+      "required": 81,
+      "covered_required": 81,
       "shallow": 0
     },
     "F6.4": {
@@ -149,8 +149,8 @@
       "shallow": 0
     },
     "F7.5": {
-      "required": 20,
-      "covered_required": 20,
+      "required": 23,
+      "covered_required": 23,
       "shallow": 0
     },
     "F8.2": {
@@ -185,7 +185,7 @@
     },
     "F12.1": {
       "required": 6,
-      "covered_required": 2,
+      "covered_required": 6,
       "shallow": 0
     },
     "F-AI-2.1": {
@@ -194,8 +194,8 @@
       "shallow": 0
     },
     "F-AI-2.2": {
-      "required": 5,
-      "covered_required": 5,
+      "required": 6,
+      "covered_required": 6,
       "shallow": 0
     },
     "F-AI-2.3": {
@@ -229,8 +229,8 @@
       "shallow": 2
     },
     "F-Confirm-1": {
-      "required": 0,
-      "covered_required": 0,
+      "required": 1,
+      "covered_required": 1,
       "shallow": 0
     },
     "F-ImportPreview-1": {
@@ -326,12 +326,12 @@
     "F25.1": {
       "required": 44,
       "covered_required": 44,
-      "shallow": 1
+      "shallow": 0
     },
     "F25.5": {
-      "required": 3,
-      "covered_required": 3,
-      "shallow": 9
+      "required": 18,
+      "covered_required": 18,
+      "shallow": 2
     },
     "F25.2": {
       "required": 10,
@@ -339,14 +339,24 @@
       "shallow": 0
     },
     "F25.3": {
-      "required": 0,
-      "covered_required": 0,
+      "required": 1,
+      "covered_required": 1,
       "shallow": 0
+    },
+    "F25.6": {
+      "required": 22,
+      "covered_required": 21,
+      "shallow": 1
     },
     "F26.1": {
       "required": 13,
       "covered_required": 13,
       "shallow": 0
+    },
+    "F26.2": {
+      "required": 10,
+      "covered_required": 9,
+      "shallow": 1
     }
   }
 }

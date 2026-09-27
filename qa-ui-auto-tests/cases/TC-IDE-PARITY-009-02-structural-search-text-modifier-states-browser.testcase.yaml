@@ -1,0 +1,198 @@
+id: TC-IDE-PARITY-009-02
+title: Structural Search $arg$ Text 42/999/invert, empty vs unavailable, error, and Esc cancel of a running search
+description: >-
+  ED-PARITY-009 V-009-02/V-009-03 browser half. Adds the Text modifier to $arg$ (42 → 1 result, 999 →
+  empty state, inverted 42 → 2 results), shows a typed backend error inside the dialog, cancels a held
+  request with Esc (request released, late result dropped, previous results kept), and shows the typed
+  unavailable state with Find disabled. Uses the parity009_ssr browser fixture; native tree-sitter
+  counts and resource release are TC-IDE-PARITY-009-03.
+covers: [F25.6]
+tags: [code-workspace, structural-search, parity009, p2]
+modes: [browser]
+fixtures: [reset_db, parity009_ssr]
+timeout_sec: 180
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity009_root}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+      value: Search Structurally
+  - press: Enter
+  - wait_for: '[data-testid="structural-search-dialog"]'
+  - fill:
+      selector: '[data-testid="structural-search-variable-text"]'
+      value: '42'
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for: '[data-testid="structural-search-panel"][data-phase="results"]'
+  - assert_items:
+      selector: '[data-testid="structural-search-match"]'
+      attribute: data-line
+      equals: ['4']
+  - parity009_trace: {runs: 1, last_status: ok, last_count: 1}
+  - screenshot: tc-ide-parity-009-02-text-42.png
+  - click: '[data-testid="structural-search-edit-query"]'
+  - wait_for: '[data-testid="structural-search-dialog"]'
+  - assert_attribute:
+      selector: '[data-testid="structural-search-variable-text"]'
+      name: value
+      equals: '42'
+  - fill:
+      selector: '[data-testid="structural-search-variable-text"]'
+      value: '999'
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for: '[data-testid="structural-search-empty"]'
+  - assert_attribute:
+      selector: '[data-testid="structural-search-panel"]'
+      name: data-phase
+      equals: empty
+  - assert_count:
+      selector: '[data-testid="structural-search-unavailable"]'
+      equal: 0
+  - parity009_trace: {runs: 2, last_status: ok, last_count: 0}
+  - screenshot: tc-ide-parity-009-02-text-999-empty.png
+  - click: '[data-testid="structural-search-edit-query"]'
+  - fill:
+      selector: '[data-testid="structural-search-variable-text"]'
+      value: '42'
+  - click: '[data-testid="structural-search-variable-invert"]'
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for: '[data-testid="structural-search-panel"][data-phase="results"]'
+  - assert_items:
+      selector: '[data-testid="structural-search-match"]'
+      attribute: data-line
+      equals: ['3', '5']
+  - parity009_set_mode: error
+  - click: '[data-testid="structural-search-edit-query"]'
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for: '[data-testid="structural-search-error"]'
+  - assert_attribute:
+      selector: '[data-testid="structural-search-dialog"]'
+      name: data-phase
+      equals: error
+  - parity009_set_mode: hold
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for: '[data-testid="structural-search-running"]'
+  - parity009_trace: {active: 1}
+  - press: Escape
+  - assert_not_visible: '[data-testid="structural-search-dialog"]'
+  - parity009_trace: {active: 0, runs: 5, last_status: cancelled}
+  - assert_attribute:
+      selector: '[data-testid="structural-search-panel"]'
+      name: data-phase
+      equals: cancelled
+  - assert_items:
+      selector: '[data-testid="structural-search-match"]'
+      attribute: data-line
+      equals: ['3', '5']
+  - assert_visible: '[data-testid="structural-search-cancelled"]'
+  - parity009_set_mode: unavailable
+  - click: '[data-testid="structural-search-edit-query"]'
+  - wait_for: '[data-testid="structural-search-dialog"] [data-testid="structural-search-unavailable"]'
+  - assert_disabled: '[data-testid="structural-search-find"]'
+  - screenshot: tc-ide-parity-009-02-unavailable.png
+  - click: '[data-testid="structural-search-cancel"]'
+  - assert_not_visible: '[data-testid="structural-search-dialog"]'
+  - parity009_trace: {runs: 5, active: 0}
+  - assert_count:
+      selector: '[data-editor-tab-key][data-dirty="true"]'
+      equal: 0
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-009-V2
+    requirement: $arg$ Text=42 返回 1、Text=999 为空态（非 unavailable）、Invert 42 返回 2。
+    actions:
+    - 13
+    - 14
+    - 22
+    - 23
+    - 30
+    - 31
+    - 32
+    checkpoints:
+    - step: 15
+      expectation: '{wait_for: ''[data-testid="structural-search-panel"][data-phase="results"]''}'
+    - step: 16
+      expectation: '{assert_items: {attribute: data-line, equals: [''4''], selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 17
+      expectation: '{parity009_trace: {last_count: 1, last_status: ok, runs: 1}}'
+    - step: 21
+      expectation: '{assert_attribute: {equals: ''42'', name: value, selector: ''[data-testid="structural-search-variable-text"]''}}'
+    - step: 24
+      expectation: '{wait_for: ''[data-testid="structural-search-empty"]''}'
+    - step: 25
+      expectation: '{assert_attribute: {equals: empty, name: data-phase, selector: ''[data-testid="structural-search-panel"]''}}'
+    - step: 26
+      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-unavailable"]''}}'
+    - step: 27
+      expectation: '{parity009_trace: {last_count: 0, last_status: ok, runs: 2}}'
+    - step: 33
+      expectation: '{wait_for: ''[data-testid="structural-search-panel"][data-phase="results"]''}'
+    - step: 34
+      expectation: '{assert_items: {attribute: data-line, equals: [''3'', ''5''], selector: ''[data-testid="structural-search-match"]''}}'
+    results:
+    - 16
+    - 17
+    - 25
+    - 26
+    - 27
+    - 34
+  - id: ED-PARITY-009-V3
+    requirement: 后端错误留在对话框；运行中 Esc 取消并释放请求、保留上次结果；unavailable 禁用 Find；编辑器不 dirty。
+    actions:
+    - 35
+    - 37
+    - 40
+    - 41
+    - 44
+    - 50
+    - 51
+    - 55
+    checkpoints:
+    - step: 38
+      expectation: '{wait_for: ''[data-testid="structural-search-error"]''}'
+    - step: 39
+      expectation: '{assert_attribute: {equals: error, name: data-phase, selector: ''[data-testid="structural-search-dialog"]''}}'
+    - step: 42
+      expectation: '{wait_for: ''[data-testid="structural-search-running"]''}'
+    - step: 43
+      expectation: '{parity009_trace: {active: 1}}'
+    - step: 45
+      expectation: '{assert_not_visible: ''[data-testid="structural-search-dialog"]''}'
+    - step: 46
+      expectation: '{parity009_trace: {active: 0, last_status: cancelled, runs: 5}}'
+    - step: 47
+      expectation: '{assert_attribute: {equals: cancelled, name: data-phase, selector: ''[data-testid="structural-search-panel"]''}}'
+    - step: 48
+      expectation: '{assert_items: {attribute: data-line, equals: [''3'', ''5''], selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 49
+      expectation: '{assert_visible: ''[data-testid="structural-search-cancelled"]''}'
+    - step: 52
+      expectation: '{wait_for: ''[data-testid="structural-search-dialog"] [data-testid="structural-search-unavailable"]''}'
+    - step: 53
+      expectation: '{assert_disabled: ''[data-testid="structural-search-find"]''}'
+    - step: 56
+      expectation: '{assert_not_visible: ''[data-testid="structural-search-dialog"]''}'
+    - step: 57
+      expectation: '{parity009_trace: {active: 0, runs: 5}}'
+    - step: 58
+      expectation: '{assert_count: {equal: 0, selector: ''[data-editor-tab-key][data-dirty="true"]''}}'
+    results:
+    - 56
+    - 57
+    - 58
+  visual:
+  - check: 截图中标题、n/N 导航、两侧标签/结果树与高亮无截断遮挡；与 IDEA 参照的视觉差异单独记录于 comparison record。
+    method: manual
+    reason: 像素与视觉 parity 不能由 DOM 断言替代。
+  native:
+  - check: Browser 仅证明 renderer 入口/路由/可见结果；真实 Tauri IPC、磁盘与 provider 由对应 native case 证明。
+    method: not-applicable
+    reason: browser mode 使用受控 stub，不跨越 OS/IPC 边界。
