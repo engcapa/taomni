@@ -77,7 +77,7 @@ import {
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { redactVncHandoff, vncConsumeDetachClaim, vncCreateDetachClaim } from "../lib/vnc";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
-import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, MailAuthMode, MailProvider, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
+import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, MailAuthMode, MailProvider, CodeWorkspaceFileRef, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
 import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { normalizeLocalStartCwd, terminalCwdTitlePrefix } from "../lib/terminalCwd";
 import { buildTabDetailSummary } from "../lib/tabDetails";
@@ -2197,6 +2197,12 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
+  const [gitOpenFileRequest, setGitOpenFileRequest] = useState<{
+    tabId: string;
+    ref: CodeWorkspaceFileRef;
+    nonce: number;
+  } | null>(null);
+
   const openCodeWorkspaceTab = useCallback((repoRoot: string, initialPath?: string | null) => {
     const normalized = repoRoot.trim();
     if (!normalized) return;
@@ -2216,6 +2222,29 @@ export function MainLayout() {
       initialFile: initialPath ? { kind: "root", rootId: root.id, path: initialPath } : null,
     });
   }, [openCodeWorkspaceInfo]);
+
+  const openLinkedCodeWorkspace = useCallback((gitTab: Tab, repoRoot: string, path?: string | null) => {
+    const sourceInstanceId = gitTab.git?.sourceWorkspaceInstanceId;
+    const source = sourceInstanceId ? tabsRef.current.find((tab) => (
+      tab.type === "code-workspace"
+      && tab.codeWorkspace
+      && (tab.codeWorkspace.workspaceInstanceId ?? tab.codeWorkspace.workspaceId) === sourceInstanceId
+    )) : undefined;
+    const gitRoot = gitTab.git?.workspaceRoots?.find((root) => root.repoRoot === repoRoot);
+    const sourceRoot = source?.codeWorkspace?.roots?.find((root) => gitRoot?.rootIds.includes(root.id));
+    if (!source || !sourceRoot) {
+      openCodeWorkspaceTab(repoRoot, path);
+      return;
+    }
+    if (path) {
+      setGitOpenFileRequest((current) => ({
+        tabId: source.id,
+        ref: { kind: "root", rootId: sourceRoot.id, path },
+        nonce: (current?.nonce ?? 0) + 1,
+      }));
+    }
+    setActiveTab(source.id);
+  }, [openCodeWorkspaceTab, setActiveTab]);
 
   const openRecentCodeWorkspace = useCallback((workspace: RecentWorkspace) => {
     openCodeWorkspaceInfo({
@@ -4489,7 +4518,7 @@ export function MainLayout() {
                           roots={workspaceRoots}
                           activeRepoRoot={tab.git.activeRepoRoot ?? tab.git.repoRoot}
                           visible={isActive}
-                          onOpenWorkspace={openCodeWorkspaceTab}
+                          onOpenWorkspace={(repoRoot, path) => openLinkedCodeWorkspace(tab, repoRoot, path)}
                         />
                       ) : (
                         <GitPanel
@@ -4515,6 +4544,7 @@ export function MainLayout() {
                         tabId={tab.id}
                         workspace={tab.codeWorkspace}
                         visible={isActive}
+                        externalOpenFile={gitOpenFileRequest?.tabId === tab.id ? gitOpenFileRequest : null}
                         onOpenGitManager={openWorkspaceGitManager}
                         onSyncGitManager={syncWorkspaceGitManager}
                         onCommandsChange={handleWorkspaceCommandsChange}

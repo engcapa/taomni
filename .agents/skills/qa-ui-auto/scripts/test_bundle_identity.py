@@ -25,6 +25,7 @@ from qa_ui_auto.bundle_identity import (
     build_release_bundle_identity,
     verify_bundle_integrity,
     inspect_repository_identities,
+    runtime_platform,
 )
 from qa_ui_auto.runner_receipt import (
     DEFAULT_RUNNER_KEY_REGISTRY,
@@ -53,6 +54,12 @@ class TestBundleIdentity(unittest.TestCase):
         """Ensures compute_simple_hex_digest produces byte-identical hash with TS."""
         d = compute_simple_hex_digest("test-input-string")
         self.assertEqual(d, "b2a06f7e401e88d4e7f53a2beab4227eb2a06f7e401e88d4e7f53a2beab4227e")
+
+    def test_native_bundle_platform_uses_the_host(self):
+        self.assertEqual(runtime_platform("native", "win32"), "windows")
+        self.assertEqual(runtime_platform("native", "linux"), "linux")
+        self.assertEqual(runtime_platform("native", "darwin"), "macos")
+        self.assertEqual(runtime_platform("browser", "win32"), "cross-platform")
 
     def test_ed_rel_002_a1_identical_inputs_byte_identical(self):
         """ED-REL-002-A1: Identical inputs produce byte-identical release bundle identities."""

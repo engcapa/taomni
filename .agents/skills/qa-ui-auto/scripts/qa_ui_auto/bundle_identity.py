@@ -15,6 +15,19 @@ import sys
 from typing import Any
 
 
+def runtime_platform(mode: str, host_platform: str | None = None) -> str:
+    if mode != "native":
+        return "cross-platform"
+    platform = host_platform or sys.platform
+    if platform.startswith("win"):
+        return "windows"
+    if platform.startswith("linux"):
+        return "linux"
+    if platform == "darwin":
+        return "macos"
+    return platform
+
+
 def _imul(a: int, b: int) -> int:
     """32-bit signed integer multiplication (matching JavaScript Math.imul)."""
     res = (a * b) & 0xFFFFFFFF
@@ -262,7 +275,7 @@ def inspect_repository_identities(
     bundle_identity = build_release_bundle_identity(
         bundle_id=bundle_id,
         version=version,
-        platform="linux" if mode == "native" else "cross-platform",
+        platform=runtime_platform(mode),
         files=source_files,
         test_plan=test_plan,
     )

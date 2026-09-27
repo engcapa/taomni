@@ -1,0 +1,49 @@
+id: TC-IDE-PARITY-009-01
+title: Java structural search returns three AST matches and navigates
+description: Real workspace action, template, result tree, navigation, and selected source range.
+covers: [F25.5]
+tags: [code-workspace, structural-search, parity009, p1]
+modes: [browser]
+fixtures: [reset_db, structural_search_java]
+timeout_sec: 150
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.structural_search_root}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: {key: Mod+Shift+Alt+s, selector: '[data-testid="code-workspace-editor"] .cm-content'}
+  - wait_for: '[data-testid="structural-search-panel"]'
+  - eval_readonly:
+      expression: 'document.activeElement?.getAttribute("data-testid") === "structural-search-pattern"'
+      expect_truthy: true
+  - click: '[data-testid="structural-search-submit"]'
+  - assert_text: {selector: '[data-testid="structural-search-status"]', contains: '3 results'}
+  - assert_text: {selector: '[data-testid="structural-search-status"]', contains: 'lezer-java'}
+  - assert_count: {selector: '[data-testid="structural-search-file"]', equal: 1}
+  - click: '[data-testid="structural-search-file"]'
+  - assert_count: {selector: '[data-testid="structural-search-result"]', equal: 3}
+  - click: '[data-testid="structural-search-result"]:has-text("println(42)")'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-selectionBackground") !== null'
+      expect_truthy: true
+  - screenshot: tc-ide-parity-009-01-results.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-009-01
+      requirement: Java AST search finds exactly three real println invocations and selecting a result highlights the source range.
+      actions: [1, 4, 6, 9, 13, 15]
+      checkpoints:
+        - {step: 8, expectation: The Action shortcut focuses the template input.}
+        - {step: 10, expectation: Exactly three structural results are returned.}
+        - {step: 11, expectation: The browser uses the Lezer Java parser.}
+        - {step: 12, expectation: The result tree has one file group.}
+        - {step: 14, expectation: The group contains only the three real calls.}
+        - {step: 17, expectation: Navigation selects the matched source range.}
+      results: [8, 10, 11, 12, 14, 17]
+  visual:
+    - {check: 'Review template, results tree, and selected source against IDEA F2.', method: manual, reason: Browser screenshot is not an automatic visual match.}
+  native:
+    - {check: Native parser and disk preservation., method: not-applicable, reason: TC-IDE-PARITY-009-03 runs the native IPC adapter.}

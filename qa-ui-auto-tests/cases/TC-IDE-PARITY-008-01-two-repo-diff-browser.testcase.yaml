@@ -1,0 +1,51 @@
+id: TC-IDE-PARITY-008-01
+title: Two repository Changes diff keeps each root's bytes and status
+description: F3 browser routing across two independent repositories with the same path.
+covers: [F26.1]
+tags: [code-workspace, git, parity008, p1]
+modes: [browser]
+fixtures: [reset_db, parity008_git_repos]
+timeout_sec: 150
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_repo_a}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-git-panel-toggle"]'
+  - click: '[data-testid="code-workspace-git-panel-toggle"]'
+  - wait_for: '[data-testid="workspace-git-manager"]'
+  - assert_count: {selector: '[data-testid="workspace-flat-repo-group"]', equal: 2}
+  - assert_count: {selector: '[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_a}"] [data-testid="workspace-change-row"]', equal: 2}
+  - assert_count: {selector: '[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_b}"] [data-testid="workspace-change-row"]', equal: 1}
+  - click: '[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_a}"] [data-testid="workspace-change-row"][aria-label="repo-a same.txt Staged"]'
+  - wait_for: '[data-testid="git-diff-viewer"][data-path="same.txt"]'
+  - assert_text: {selector: '[data-testid="git-diff-viewer"]', contains: 'repo-a HEAD'}
+  - assert_text: {selector: '[data-testid="git-diff-viewer"]', contains: 'repo-a WORKTREE'}
+  - click: '[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_b}"] [data-testid="workspace-change-row"][aria-label="repo-b same.txt Modified"]'
+  - assert_text: {selector: '[data-testid="git-diff-viewer"]', contains: 'repo-b HEAD'}
+  - assert_text: {selector: '[data-testid="git-diff-viewer"]', contains: 'repo-b WORKTREE'}
+  - eval_readonly:
+      expression: 'document.querySelector("[data-testid" + String.fromCharCode(61) + "\"git-diff-viewer\"]")?.textContent?.includes("repo-a WORKTREE") === false'
+      expect_truthy: true
+  - screenshot: tc-ide-parity-008-01-two-repos.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-008-01
+      requirement: Two groups expose the fixture status and selecting equal paths displays the correct root's HEAD and worktree bytes.
+      actions: [1, 3, 4, 7, 12, 16]
+      checkpoints:
+        - {step: 9, expectation: Both repository groups are present.}
+        - {step: 10, expectation: repo-a has modified and untracked changes.}
+        - {step: 11, expectation: repo-b has one worktree change.}
+        - {step: 14, expectation: repo-a HEAD text is visible.}
+        - {step: 15, expectation: repo-a worktree text is visible.}
+        - {step: 17, expectation: repo-b HEAD text is visible after switching.}
+        - {step: 18, expectation: repo-b worktree text is visible after switching.}
+        - {step: 19, expectation: The old repo-a worktree text is absent.}
+      results: [9, 10, 11, 14, 15, 17, 18, 19]
+  visual:
+    - {check: Review the two-group Changes layout and diff readability against IDEA F3 screenshots., method: manual, reason: A screenshot alone does not establish visual parity.}
+  native:
+    - {check: 'Real Git index, HEAD, and zero-write postconditions.', method: not-applicable, reason: This browser case uses VFS; TC-IDE-PARITY-008-03 checks native Git.}

@@ -1,0 +1,44 @@
+id: TC-IDE-PARITY-008-02
+title: Git diff return preserves the unsaved editor buffer
+description: Browser editor and Git tab round trip with an unsaved buffer.
+covers: [F25.5, F26.1]
+tags: [code-workspace, git, parity008, p1]
+modes: [browser]
+fixtures: [reset_db, parity008_git_repos]
+timeout_sec: 150
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_repo_a}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: {key: Mod+Home, selector: '[data-testid="code-workspace-editor"] .cm-content'}
+  - type: X
+  - wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
+  - assert_text_equals: {selector: '[data-testid="code-workspace-editor"] .cm-content', equals: 'Xrepo-a WORKTREE'}
+  - click: '[data-testid="code-workspace-git-panel-toggle"]'
+  - wait_for: '[data-testid="workspace-git-manager"]'
+  - click: '[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_a}"] [data-testid="workspace-change-row"][aria-label="repo-a same.txt Staged"]'
+  - wait_for: '[data-testid="git-diff-viewer"][data-path="same.txt"]'
+  - click: '[data-testid="git-diff-open-in-editor"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - assert_text_equals: {selector: '[data-testid="code-workspace-editor"] .cm-content', equals: 'Xrepo-a WORKTREE'}
+  - wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
+  - screenshot: tc-ide-parity-008-02-return.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-008-02
+      requirement: Returning from Git diff preserves the dirty editor text and dirty state.
+      actions: [1, 4, 6, 7, 8, 11, 13, 15]
+      checkpoints:
+        - {step: 9, expectation: Editor becomes dirty after the local edit.}
+        - {step: 10, expectation: The edited buffer contains the exact expected text.}
+        - {step: 17, expectation: The exact buffer text remains after return.}
+        - {step: 18, expectation: The editor remains dirty.}
+      results: [10, 17, 18]
+  visual:
+    - {check: Review editor and diff transition screenshot., method: manual, reason: Browser screenshot is a review artifact only.}
+  native:
+    - {check: Real Git and disk state., method: not-applicable, reason: TC-IDE-PARITY-008-03 verifies the host repository.}

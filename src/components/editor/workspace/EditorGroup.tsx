@@ -95,6 +95,8 @@ export interface EditorRevealTarget {
   key: string;
   line: number;
   character: number;
+  endLine?: number;
+  endCharacter?: number;
   nonce: number;
 }
 

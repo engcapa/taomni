@@ -83,6 +83,7 @@ import {
   type WorkspaceWriteAck,
 } from "../../lib/editor/workspace";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
+import type { StructuralSearchResult } from "../../lib/editor/structuralSearch";
 import {
   gitBlameLines,
   gitBlobPair,
@@ -505,6 +506,7 @@ import {
   type ProblemsScope,
 } from "./workspace/panels/ProblemsPanel";
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
+import { StructuralSearchPanel } from "./workspace/panels/StructuralSearchPanel";
 import { DocumentationPane } from "./workspace/panels/DocumentationPane";
 import { HierarchyPanel } from "./workspace/panels/HierarchyPanel";
 import {
@@ -690,6 +692,7 @@ interface CodeWorkspaceTabProps {
   tabId: string;
   workspace: CodeWorkspaceTabInfo;
   visible?: boolean;
+  externalOpenFile?: { ref: CodeWorkspaceFileRef; nonce: number } | null;
   onOpenGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
   onSyncGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
   onCommandsChange?: (tabId: string, registration: WorkspaceCommandRegistration | null) => void;
@@ -1288,6 +1291,7 @@ export function CodeWorkspaceTab({
   tabId,
   workspace,
   visible = true,
+  externalOpenFile = null,
   onOpenGitManager,
   onSyncGitManager,
   onCommandsChange,
@@ -3680,6 +3684,12 @@ export function CodeWorkspaceTab({
     setBottomDockOpen(true);
     setBottomDockTab("search");
     setSearchFocusTarget(focusTarget);
+    setSearchFocusNonce((nonce) => nonce + 1);
+  }, []);
+
+  const openStructuralSearch = useCallback(() => {
+    setBottomDockOpen(true);
+    setBottomDockTab("structural-search");
     setSearchFocusNonce((nonce) => nonce + 1);
   }, []);
 
@@ -8827,6 +8837,34 @@ export function CodeWorkspaceTab({
     },
     [openFile, setStatusMessage],
   );
+
+  const openStructuralResult = useCallback((result: StructuralSearchResult) => {
+    const root = rootsRef.current.find((candidate) => candidate.id === result.rootId);
+    if (!root) {
+      setStatusMessage(`Cannot open structural result outside the workspace: ${result.path}`);
+      return;
+    }
+    const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: result.path };
+    revealNonceRef.current += 1;
+    setRevealTarget({
+      key: fileKey(ref),
+      line: Math.max(0, result.line - 1),
+      character: result.column,
+      endLine: Math.max(0, result.endLine - 1),
+      endCharacter: result.endColumn,
+      nonce: revealNonceRef.current,
+      focus: true,
+    });
+    void openFile(ref, { preview: true });
+  }, [openFile, setStatusMessage]);
+
+  const lastExternalOpenNonceRef = useRef(0);
+  useEffect(() => {
+    if (!externalOpenFile) return;
+    if (lastExternalOpenNonceRef.current === externalOpenFile.nonce) return;
+    lastExternalOpenNonceRef.current = externalOpenFile.nonce;
+    void openFile(externalOpenFile.ref, { preview: true });
+  }, [externalOpenFile, openFile]);
 
   // ED-MAIN-005 / ED-REPAIR-005: read the frozen per-file preimage before the replace preview
   // can be confirmed. Validates frozen workspace instance, roots, and buffer states across
@@ -14281,6 +14319,18 @@ export function CodeWorkspaceTab({
       },
     },
     {
+      id: "workspace.structuralSearch",
+      title: "Search Structurally…",
+      category: "Search",
+      keybinding: "Ctrl+Shift+Alt+S",
+      keywords: ["structural search", "AST", "Java", "template", "println"],
+      when: () => !!activeFile,
+      run: () => {
+        openStructuralSearch();
+        return true;
+      },
+    },
+    {
       id: "workspace.fileStructure",
       title: "File Structure",
       category: "Navigation",
@@ -15556,6 +15606,7 @@ export function CodeWorkspaceTab({
     openCodeActionsAtCursor,
     openFile,
     openFindInFiles,
+    openStructuralSearch,
     openGitManager,
     openHierarchy,
     openLooseFile,
@@ -20444,6 +20495,26 @@ export function CodeWorkspaceTab({
                     ...(report.ok ? {} : { message: statusMsg }),
                   };
                 }}
+              />
+            ),
+          },
+          {
+            id: "structural-search",
+            label: "Structural Search",
+            icon: <Braces className="h-3.5 w-3.5" />,
+            content: (
+              <StructuralSearchPanel
+                roots={roots}
+                active={bottomDockOpen && bottomDockTab === "structural-search"}
+                focusNonce={searchFocusNonce}
+                activeFile={activeFile?.ref.kind === "root" ? {
+                  rootId: activeFile.ref.rootId,
+                  path: activeFile.ref.path,
+                  text: activeFile.text,
+                  loading: activeFile.loading,
+                } : null}
+                onOpenResult={openStructuralResult}
+                onClose={() => setBottomDockOpen(false)}
               />
             ),
           },

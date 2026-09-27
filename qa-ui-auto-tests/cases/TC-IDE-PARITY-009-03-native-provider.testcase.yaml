@@ -1,0 +1,58 @@
+id: TC-IDE-PARITY-009-03
+title: Native tree-sitter Java search and read-only close
+description: Tauri IPC with real Java file and tree-sitter backend; fixture file hash stays unchanged.
+covers: [F25.5]
+tags: [code-workspace, structural-search, parity009, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, structural_search_java]
+timeout_sec: 180
+steps:
+  - open: ${cfg.app.base_url}
+  - vault_first_run: qa-native-gate-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-structural-search","name":"structural-search","roots":[{"id":"structural-search","name":"structural-search","path":"${fixture.structural_search_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"structural-search","path":"StructuralTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.structural_search_root}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: {key: Mod+Shift+Alt+s, selector: '[data-testid="code-workspace-editor"] .cm-content'}
+  - wait_for: '[data-testid="structural-search-panel"]'
+  - click: '[data-testid="structural-search-submit"]'
+  - assert_text: {selector: '[data-testid="structural-search-status"]', contains: '3 results'}
+  - assert_text: {selector: '[data-testid="structural-search-status"]', contains: 'tree-sitter-java'}
+  - assert_file_sha256: {path: '${fixture.structural_search_file}', equals: '${fixture.structural_search_sha256}'}
+  - fill: {selector: '[data-testid="structural-search-text"]', value: '42'}
+  - click: '[data-testid="structural-search-submit"]'
+  - assert_text: {selector: '[data-testid="structural-search-status"]', contains: '1 result'}
+  - fill: {selector: '[data-testid="structural-search-text"]', value: '999'}
+  - click: '[data-testid="structural-search-submit"]'
+  - assert_visible: '[data-testid="structural-search-empty"]'
+  - fill: {selector: '[data-testid="structural-search-pattern"]', value: 'System.out.print($arg$);'}
+  - click: '[data-testid="structural-search-submit"]'
+  - assert_text: {selector: '[data-testid="structural-search-status"]', contains: 'Unavailable'}
+  - press: {key: Escape, selector: '[data-testid="structural-search-text"]'}
+  - assert_attribute: {selector: '[data-testid="code-workspace-bottom-dock-body"]', name: hidden, equals: ''}
+  - assert_file_sha256: {path: '${fixture.structural_search_file}', equals: '${fixture.structural_search_sha256}'}
+  - screenshot: tc-ide-parity-009-03-native.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-009-03
+      requirement: Real Tauri IPC uses tree-sitter Java, distinguishes 3/1/0 and typed unavailable, and closes without writing the host Java file.
+      actions: [1, 4, 5, 7, 9, 11, 15, 16, 18, 19, 21, 22, 24]
+      checkpoints:
+        - {step: 12, expectation: Native parser returns three matches.}
+        - {step: 13, expectation: The result identifies tree-sitter-java.}
+        - {step: 14, expectation: Host file remains unchanged after initial search.}
+        - {step: 17, expectation: Text=42 yields one result.}
+        - {step: 20, expectation: Text=999 yields ready empty.}
+        - {step: 23, expectation: Unsupported template returns typed unavailable through Tauri IPC.}
+        - {step: 25, expectation: Escape collapses the dock and returns to the editor.}
+        - {step: 26, expectation: Host file hash remains unchanged after close.}
+      results: [12, 13, 14, 17, 20, 23, 25, 26]
+  visual:
+    - {check: Review native Java result layout and close screenshot against IDEA F2., method: manual, reason: Screenshot capture does not establish a measured match.}
+  native:
+    - {check: Tauri IPC parser identity and host file SHA-256., method: automated, reason: Browser parser and VFS do not prove native provider or disk effects.}

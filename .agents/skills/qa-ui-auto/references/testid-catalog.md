@@ -382,6 +382,18 @@
 - `[data-testid="new-java-class-name-input"]` — interactive [optional] — F25.5.new-java-class-name-input
 - `[data-testid="new-java-class-kind-select"]` — interactive [optional] — F25.5.new-java-class-kind-select
 - `[data-testid="new-java-class-cancel"]` — interactive [optional] — F25.5.new-java-class-cancel
+- `[data-testid="structural-search-panel"]` — display [optional] — F25.5.structural-search-panel
+- `[aria-label="Close structural search"]` — interactive [optional] — F25.5.structural-search-close
+- `[data-testid="structural-search-pattern"]` — interactive [optional] — F25.5.structural-search-pattern
+- `[data-testid="structural-search-text"]` — interactive [optional] — F25.5.structural-search-text
+- `[data-testid="structural-search-scope"]` — interactive [optional] — F25.5.structural-search-scope
+- `[data-testid="structural-search-submit"]` — interactive [optional] — F25.5.structural-search-submit
+- `[data-testid="structural-search-cancel"]` — interactive [optional] — F25.5.structural-search-cancel
+- `[data-testid="structural-search-results"]` — display [optional] — F25.5.structural-search-results
+- `[data-testid="structural-search-file"]` — interactive [optional] — F25.5.structural-search-file
+- `[data-testid="structural-search-result"]` — interactive [optional] — F25.5.structural-search-result
+- `[data-testid="structural-search-empty"]` — display [optional] — F25.5.structural-search-empty
+- `[data-testid="structural-search-status"]` — display [optional] — F25.5.structural-search-status
 
 ## code-workspace/execution (F25.1)
 
@@ -720,6 +732,8 @@
 ## git/diff (F26.1)
 
 - `[data-testid="git-panel"]` — display — F26.1.git-panel
+- `[data-testid="workspace-git-manager"]` — display [optional] — F26.1.workspace-git-manager
+- `[data-testid="workspace-flat-repo-group"]` — display [optional] — F26.1.workspace-flat-repo-group
 - `[data-testid="git-log-tab"]` — interactive — F26.1.git-log-tab
 - `[data-testid="git-log-commit"]` — interactive — F26.1.git-log-commit
 - `[data-testid="git-log-file"]` — interactive — F26.1.git-log-file
@@ -743,6 +757,15 @@
   ↳ `.git-log-view [data-testid="git-diff-prev"]` — alias
 - `[data-testid="git-diff-next"]` — interactive — F26.1.diff-next
   ↳ `.git-log-view [data-testid="git-diff-next"]` — alias
+- `[data-testid="workspace-repo-selector"]` — interactive [optional] — F26.1.workspace-repo-selector
+- `[data-testid="workspace-repo-selector-menu"]` — display [optional] — F26.1.workspace-repo-selector-menu
+- `[data-testid="workspace-flat-repo-header"]` — display [optional] — F26.1.workspace-flat-repo-header
+- `[data-testid="workspace-change-row"]` — interactive [optional] — F26.1.workspace-change-row
+  ↳ `[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_a}"] [data-testid="workspace-change-row"]` — alias
+  ↳ `[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_a}"] [data-testid="workspace-change-row"][aria-label="repo-a same.txt Staged"]` — alias
+  ↳ `[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_b}"] [data-testid="workspace-change-row"]` — alias
+  ↳ `[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_b}"] [data-testid="workspace-change-row"][aria-label="repo-b same.txt Modified"]` — alias
+- `[data-testid="git-diff-open-in-editor"]` — interactive [optional] — F26.1.workspace-diff-open-in-editor
 - `[data-testid="git-log-list-resize-handle"]` — interactive [optional] — F26.1.git-log-list-resize-handle
   ↳ `.git-log-view [data-testid="git-log-list-resize-handle"]` — alias
 - `[data-testid="git-log-files-resize-handle"]` — interactive [optional] — F26.1.git-log-files-resize-handle

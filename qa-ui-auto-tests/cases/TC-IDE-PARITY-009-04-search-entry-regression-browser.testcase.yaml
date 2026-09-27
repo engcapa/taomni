@@ -1,0 +1,51 @@
+id: TC-IDE-PARITY-009-04
+title: Structural Search keeps local Find and regex project search separate
+description: Shared search shortcuts, focus, and result surfaces remain independent.
+covers: [F25.5]
+tags: [code-workspace, structural-search, parity008, parity009, regression, p1]
+modes: [browser]
+fixtures: [reset_db, structural_search_java]
+timeout_sec: 150
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.structural_search_root}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: {key: Mod+f, selector: '[data-testid="code-workspace-editor"] .cm-content'}
+  - wait_for: '[data-testid="code-workspace-editor-search"]'
+  - press: Escape
+  - press: {key: Mod+Shift+Alt+s, selector: '[data-testid="code-workspace-editor"] .cm-content'}
+  - wait_for: '[data-testid="structural-search-panel"]'
+  - eval_readonly:
+      expression: 'document.activeElement?.getAttribute("data-testid") === "structural-search-pattern"'
+      expect_truthy: true
+  - click: '[aria-label="Close structural search"]'
+  - assert_not_visible: '[data-testid="structural-search-panel"]'
+  - press: {key: Mod+Shift+f, selector: '[data-testid="code-workspace-editor"] .cm-content'}
+  - wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
+  - click: '[data-testid="code-workspace-find-in-files-panel"] [aria-label="Regular expression"]'
+  - fill: {selector: '[aria-label="Search query"]', value: 'println\(42\)'}
+  - click: '[data-testid="code-workspace-find-run-search"]'
+  - assert_count: {selector: '[data-testid="code-workspace-find-match-row"]', equal: 1}
+  - assert_not_visible: '[data-testid="structural-search-panel"]'
+  - screenshot: tc-ide-parity-009-04-search-regression.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-009-04
+      requirement: Local Find, Structural Search shortcut/focus/close, and regex project search retain independent entries and results.
+      actions: [1, 4, 6, 8, 9, 12, 14, 16, 17, 18]
+      checkpoints:
+        - {step: 7, expectation: Local Find opens from its shortcut.}
+        - {step: 10, expectation: Structural Search opens from its shortcut.}
+        - {step: 11, expectation: Structural Search owns input focus.}
+        - {step: 13, expectation: Closing Structural Search removes its surface.}
+        - {step: 15, expectation: Project search opens from its own shortcut.}
+        - {step: 19, expectation: Regex search finds one matching line.}
+        - {step: 20, expectation: Structural Search stays closed.}
+      results: [7, 10, 11, 13, 15, 19, 20]
+  visual:
+    - {check: Review search surface transitions and focus., method: manual, reason: Screenshot is a review artifact.}
+  native:
+    - {check: Native parser and file byte boundary., method: not-applicable, reason: TC-IDE-PARITY-009-03 covers native.}

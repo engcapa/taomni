@@ -208,6 +208,8 @@ xcap = { version = "0.9.6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
 tauri-plugin-dialog = "2.7.3"
 sqlparser = "0.62.0"
+tree-sitter = "0.24"
+tree-sitter-java = "0.23.5"
 scopeguard = "1.2"
 
 [patch.crates-io]

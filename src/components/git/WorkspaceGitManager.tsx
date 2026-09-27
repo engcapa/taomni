@@ -155,6 +155,13 @@ export function WorkspaceGitManager({
   /** Repo paths that failed with missing-cwd style errors; skip further snapshots. */
   const [deadRepoRoots, setDeadRepoRoots] = useState<Set<string>>(() => new Set());
   const anchorChangeKeyRef = useRef<string | null>(null);
+  // Snapshot and pair requests can outlive a scope/root switch. Keep a
+  // per-repository sequence so a late response cannot reinsert a removed root
+  // or replace the current repository's state.
+  const snapshotRequestSequenceRef = useRef(new Map<string, number>());
+  const normalizedRootsRef = useRef(normalizedRoots);
+  normalizedRootsRef.current = normalizedRoots;
+  const pairRequestGenerationRef = useRef(0);
 
   const selectedRoot = useMemo(
     () => normalizedRoots.find((root) => root.repoRoot === selectedRepoRoot) ?? normalizedRoots[0] ?? null,
@@ -298,18 +305,27 @@ export function WorkspaceGitManager({
   }, [normalizedRoots, repoScope, rootsKey]);
 
   const refreshRepo = useCallback(async (repoRoot: string) => {
+    const requestSequence = (snapshotRequestSequenceRef.current.get(repoRoot) ?? 0) + 1;
+    snapshotRequestSequenceRef.current.set(repoRoot, requestSequence);
+    const isCurrentRequest = () => (
+      snapshotRequestSequenceRef.current.get(repoRoot) === requestSequence
+      && normalizedRootsRef.current.some((root) => root.repoRoot === repoRoot)
+    );
     if (deadRepoRoots.has(repoRoot)) {
       const message = `Repository path no longer exists: ${repoRoot}`;
-      setSnapshots((current) => ({
-        ...current,
-        [repoRoot]: {
-          snapshot: null,
-          loading: false,
-          error: message,
-        },
-      }));
+      if (isCurrentRequest()) {
+        setSnapshots((current) => ({
+          ...current,
+          [repoRoot]: {
+            snapshot: null,
+            loading: false,
+            error: message,
+          },
+        }));
+      }
       throw new Error(message);
     }
+    if (!isCurrentRequest()) throw new Error("Git snapshot request superseded");
     setSnapshots((current) => ({
       ...current,
       [repoRoot]: {
@@ -320,18 +336,20 @@ export function WorkspaceGitManager({
     }));
     try {
       const snapshot = await gitSnapshot(repoRoot);
-      setSnapshots((current) => ({
-        ...current,
-        [repoRoot]: {
-          snapshot,
-          loading: false,
-          error: null,
-        },
-      }));
+      if (isCurrentRequest()) {
+        setSnapshots((current) => ({
+          ...current,
+          [repoRoot]: {
+            snapshot,
+            loading: false,
+            error: null,
+          },
+        }));
+      }
       return snapshot;
     } catch (err) {
       const message = errorMessage(err);
-      if (isMissingRepoPathError(message)) {
+      if (isCurrentRequest() && isMissingRepoPathError(message)) {
         setDeadRepoRoots((current) => {
           if (current.has(repoRoot)) return current;
           const next = new Set(current);
@@ -339,14 +357,16 @@ export function WorkspaceGitManager({
           return next;
         });
       }
-      setSnapshots((current) => ({
-        ...current,
-        [repoRoot]: {
-          snapshot: isMissingRepoPathError(message) ? null : (current[repoRoot]?.snapshot ?? null),
-          loading: false,
-          error: message,
-        },
-      }));
+      if (isCurrentRequest()) {
+        setSnapshots((current) => ({
+          ...current,
+          [repoRoot]: {
+            snapshot: isMissingRepoPathError(message) ? null : (current[repoRoot]?.snapshot ?? null),
+            loading: false,
+            error: message,
+          },
+        }));
+      }
       throw err;
     }
   }, [deadRepoRoots]);
@@ -370,12 +390,17 @@ export function WorkspaceGitManager({
   }, [liveRoots, refreshRepos, singleRepoMode, visible]);
 
   useEffect(() => {
+    const pairGeneration = ++pairRequestGenerationRef.current;
     let cancelled = false;
     async function loadPair() {
       if (!focusedChange) {
         setPair(null);
+        setPairLoading(false);
         return;
       }
+      // Clear the previous pair before awaiting the new root/path. This keeps
+      // the title and bytes visibly aligned while the selected repo changes.
+      setPair(null);
       setPairLoading(true);
       try {
         const next = await gitBlobPair(
@@ -385,14 +410,14 @@ export function WorkspaceGitManager({
           GIT_REF_WORKTREE,
           focusedChange.change.oldPath,
         );
-        if (!cancelled) setPair(next);
+        if (!cancelled && pairRequestGenerationRef.current === pairGeneration) setPair(next);
       } catch (err) {
-        if (!cancelled) {
+        if (!cancelled && pairRequestGenerationRef.current === pairGeneration) {
           setPair(null);
           setStatusMessage(errorMessage(err));
         }
       } finally {
-        if (!cancelled) setPairLoading(false);
+        if (!cancelled && pairRequestGenerationRef.current === pairGeneration) setPairLoading(false);
       }
     }
     void loadPair();
@@ -615,15 +640,22 @@ export function WorkspaceGitManager({
 
   const reloadFocusedPair = useCallback(async () => {
     if (!focusedChange) return null;
-    const nextPair = await gitBlobPair(
-      focusedChange.repoRoot,
-      focusedChange.change.path,
-      "HEAD",
-      GIT_REF_WORKTREE,
-      focusedChange.change.oldPath,
-    );
-    setPair(nextPair);
-    return nextPair;
+    const pairGeneration = ++pairRequestGenerationRef.current;
+    setPair(null);
+    setPairLoading(true);
+    try {
+      const nextPair = await gitBlobPair(
+        focusedChange.repoRoot,
+        focusedChange.change.path,
+        "HEAD",
+        GIT_REF_WORKTREE,
+        focusedChange.change.oldPath,
+      );
+      if (pairRequestGenerationRef.current === pairGeneration) setPair(nextPair);
+      return nextPair;
+    } finally {
+      if (pairRequestGenerationRef.current === pairGeneration) setPairLoading(false);
+    }
   }, [focusedChange]);
 
   const normalizeFocusedLineEndings = useCallback(() => {

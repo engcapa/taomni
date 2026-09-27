@@ -1,0 +1,50 @@
+id: TC-IDE-PARITY-009-02
+title: Structural Text modifier distinguishes one, zero, and unavailable
+description: Text=42 finds one; Text=999 is a ready empty result; an unknown template is unavailable.
+covers: [F25.5]
+tags: [code-workspace, structural-search, parity009, p1]
+modes: [browser]
+fixtures: [reset_db, structural_search_java]
+timeout_sec: 150
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.structural_search_root}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: {key: Mod+Shift+Alt+s, selector: '[data-testid="code-workspace-editor"] .cm-content'}
+  - wait_for: '[data-testid="structural-search-panel"]'
+  - fill: {selector: '[data-testid="structural-search-text"]', value: '42'}
+  - click: '[data-testid="structural-search-submit"]'
+  - assert_text: {selector: '[data-testid="structural-search-status"]', contains: '1 result'}
+  - click: '[data-testid="structural-search-file"]'
+  - assert_count: {selector: '[data-testid="structural-search-result"]', equal: 1}
+  - assert_text: {selector: '[data-testid="structural-search-result"]', contains: 'println(42)'}
+  - fill: {selector: '[data-testid="structural-search-text"]', value: '999'}
+  - click: '[data-testid="structural-search-submit"]'
+  - assert_text: {selector: '[data-testid="structural-search-status"]', contains: '0 results'}
+  - assert_visible: '[data-testid="structural-search-empty"]'
+  - fill: {selector: '[data-testid="structural-search-pattern"]', value: 'System.out.print($arg$);'}
+  - click: '[data-testid="structural-search-submit"]'
+  - assert_text: {selector: '[data-testid="structural-search-status"]', contains: 'Unavailable'}
+  - assert_not_visible: '[data-testid="structural-search-empty"]'
+  - screenshot: tc-ide-parity-009-02-unavailable.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-009-02
+      requirement: Exact Text modifier results and typed unavailable state are distinct from a ready empty result.
+      actions: [1, 4, 6, 8, 9, 11, 14, 15, 18, 19]
+      checkpoints:
+        - {step: 10, expectation: Text=42 returns one result.}
+        - {step: 12, expectation: Exactly one result row is visible.}
+        - {step: 13, expectation: The row is the numeric 42 invocation.}
+        - {step: 16, expectation: Text=999 returns zero results.}
+        - {step: 17, expectation: A ready empty state is visible.}
+        - {step: 20, expectation: Unknown template reports typed unavailable.}
+        - {step: 21, expectation: The ready empty state is gone.}
+      results: [10, 12, 13, 16, 17, 20, 21]
+  visual:
+    - {check: 'Review Text modifier, empty state, and unavailable message.', method: manual, reason: Screenshots are retained for comparison.}
+  native:
+    - {check: Native provider result and disk bytes., method: not-applicable, reason: TC-IDE-PARITY-009-03 covers those boundaries.}

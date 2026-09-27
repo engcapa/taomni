@@ -42,6 +42,8 @@ from . import project_tree
 from . import parity005_completion
 from . import parity006_replace
 from . import editor_save_race
+from . import parity008_git_repos
+from . import structural_search_java
 
 
 class FixtureContext(Protocol):
@@ -81,6 +83,8 @@ REGISTRY: dict[str, Fixture] = {
     "editor_save_race": Fixture("editor_save_race", editor_save_race.setup, editor_save_race.teardown),
     "parity005_completion": Fixture("parity005_completion", parity005_completion.setup, parity005_completion.teardown),
     "parity006_replace": Fixture("parity006_replace", parity006_replace.setup, parity006_replace.teardown),
+    "parity008_git_repos": Fixture("parity008_git_repos", parity008_git_repos.setup, parity008_git_repos.teardown),
+    "structural_search_java": Fixture("structural_search_java", structural_search_java.setup, structural_search_java.teardown),
 }
 
 

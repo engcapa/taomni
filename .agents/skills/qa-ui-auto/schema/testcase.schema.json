@@ -81,7 +81,9 @@
      "editor_save_race",
      "project_tree",
      "parity005_completion",
-     "parity006_replace"
+      "parity006_replace",
+      "parity008_git_repos",
+      "structural_search_java"
     ]
    },
    "uniqueItems": true

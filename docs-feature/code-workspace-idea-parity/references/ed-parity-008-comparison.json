@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "taskId": "ED-PARITY-008",
+  "acceptance": ["ED-PARITY-008-A1", "ED-PARITY-008-A2", "ED-PARITY-008-A3"],
+  "scenarioId": "CW-GIT-001+CW-GIT-003",
+  "fixture": {
+    "files": [
+      {"path": "qa-ui-auto-report/parity008-009-native-final/run-20260927-190917-170406100/native-workspaces/TC-IDE-PARITY-008-03-git-repos/parity008-a-m_olu537/same.txt", "sha256": "aa946c7fdc7c883f20d0de2d1fe824977c4db1be50f01c91348b491e6c993c65"},
+      {"path": "qa-ui-auto-report/parity008-009-native-final/run-20260927-190917-170406100/native-workspaces/TC-IDE-PARITY-008-03-git-repos/parity008-b-9codyrlu/same.txt", "sha256": "aacded5b503c7dfdecf45fc039e08d511ea41fc0d9a8b26ed35f1f5cbe1c8fdb"}
+    ],
+    "contentSource": "parity008_git_repos fixture and its run-local manifest; IDEA summary describes the same two-repository status shape, but its original fixture bytes are unavailable",
+    "rootAlias": "F3 two local repositories, repo-a and repo-b; exact IDEA byte identity unverified",
+    "initialState": {"dirty": false, "onDisk": true}
+  },
+  "settings": {
+    "keymap": {"name": "IDEA Windows default / Taomni Windows", "bindings": []},
+    "editor": {"ideaTheme": "dark", "taomniTheme": "light", "ideaClientWidth": 1920, "ideaClientHeight": 1080},
+    "language": "plain text and Git",
+    "locale": "en-US"
+  },
+  "steps": [
+    {"stepId": "G1", "actionName": "Open Changes and inspect both repositories", "keys": ["mouse"], "input": null, "preState": "Two local repositories with separate HEAD, index and worktree states", "observedFields": ["results"]},
+    {"stepId": "G2", "actionName": "Open repo-a same.txt HEAD to worktree diff", "keys": ["mouse"], "input": null, "preState": "G1 complete", "observedFields": ["results", "documents"]},
+    {"stepId": "G3", "actionName": "Switch to repo-b same.txt diff", "keys": ["mouse"], "input": null, "preState": "G2 complete", "observedFields": ["results", "documents"]},
+    {"stepId": "G4", "actionName": "Return to editor with an unsaved selection", "keys": ["mouse"], "input": null, "preState": "G3 complete; editor has an unsaved buffer", "observedFields": ["documents", "selection", "focus"]},
+    {"stepId": "G5", "actionName": "Compare matching-state visual geometry", "keys": ["mouse"], "input": null, "preState": "G1 and G3 visible states", "observedFields": ["results"]}
+  ],
+  "idea": {
+    "version": "2026.2.2", "buildNumber": "IU-262.10315.125", "edition": "Ultimate", "os": "Windows 11 remote desktop",
+    "sampledAt": "2026-09-27T15:45:00+08:00", "operator": "reference-package desktop sampling; valid g01/g03/g05 states summarized in the linked record",
+    "settingsSnapshot": {"theme": "dark", "client": "1920x1080 at 96 DPI", "repositoryCount": 2},
+    "artifacts": [{"path": "docs-feature/code-workspace-idea-parity/references/ed-parity-008-009-reference.md", "sha256": "5b08f4e55b1ab51f697db739ecec6a9fc81114900a7dbe6866e8bfba47a0aede", "type": "reference-summary", "acquisition": "read-only review of valid 2026-09-27 IDEA sample notes; original screenshots absent from this checkout"}],
+    "observations": [
+      {"stepId": "G1", "status": "observed", "results": [{"label": "Commit tool window groups repo-a and repo-b, main branches and distinct changes"}]},
+      {"stepId": "G2", "status": "observed", "results": [{"label": "repo-a same.txt HEAD to WORKTREE diff, first of two"}]},
+      {"stepId": "G3", "status": "observed", "results": [{"label": "repo-b same.txt diff, second of two; path, content and hash change with repository"}]},
+      {"stepId": "G4", "status": "not-run", "reason": "The reference notes only say editor text remains unchanged; a dirty selection/caret sequence was not sampled on IDEA."},
+      {"stepId": "G5", "status": "not-run", "reason": "The g01/g03/g05 originals named by the reference are missing, so geometry and visual state cannot be rechecked."}
+    ]
+  },
+  "taomni": {
+    "head": "a8e9fd640fd3d3795db26822bd49a32c232db3a2",
+    "sourceIdentity": {"sourceTreeHash": "e8895765c1645136706a3650672108d182f964d0e3aa25a16b3121f504a0ab21", "sourceDirty": true},
+    "qaBuildIdentity": "com.taomni.app.qa debug binary sha256:2c6b71cde97de6e9ecfb2ac4f316c30cb924911e343eb8a2b0a8a2f998058c33",
+    "os": "Windows", "webview": "WebView2 native; Chromium browser case", "provider": {"id": "Tauri Git IPC", "version": null},
+    "mode": "browser TC-IDE-PARITY-008-01/02 and native TC-IDE-PARITY-008-03",
+    "summary": {"path": "qa-ui-auto-report/parity008-009-native-final/run-20260927-190917-170406100/summary.json", "sha256": "efb4aae615aee1d568f1bb7d3fec37dc91f4d4eea19fcec32a3dd33948172db7"},
+    "receipt": {"path": "qa-ui-auto-report/parity008-009-native-final/run-20260927-190917-170406100/runner_receipt.json", "sha256": "e6a41b3a89189e845cfa92a256b7b6d2b446ae54f3a42507682b81062a99422a"},
+    "observations": [
+      {"stepId": "G1", "status": "observed", "results": [{"label": "Two Git groups on main, repo-a MM plus untracked and repo-b M"}]},
+      {"stepId": "G2", "status": "observed", "results": [{"label": "repo-a HEAD and WORKTREE texts stay in repo-a diff"}]},
+      {"stepId": "G3", "status": "observed", "results": [{"label": "repo-b HEAD and WORKTREE texts replace repo-a; native HEAD/index/worktree SHA assertions pass"}]},
+      {"stepId": "G4", "status": "observed", "focus": "Code Workspace editor", "recovery": "Edit returns to the dirty editor; text and selection remain"},
+      {"stepId": "G5", "status": "observed", "results": [{"label": "Browser and native screenshots retained; no paired IDEA originals"}]}
+    ]
+  },
+  "observations": [
+    {"stepId": "G1", "status": "different", "idea": "Commit tool window with two repository groups", "taomni": "Git tab Changes view with two repository groups", "linkedAcceptance": ["ED-PARITY-008-A2"]},
+    {"stepId": "G2", "status": "matched", "idea": "Selecting repo-a shows its HEAD to worktree diff", "taomni": "Selecting repo-a shows its HEAD to worktree diff", "linkedAcceptance": ["ED-PARITY-008-A1", "ED-PARITY-008-A2"]},
+    {"stepId": "G3", "status": "matched", "idea": "Switching to repo-b changes path and diff content without repo-a bleed", "taomni": "Switching to repo-b changes path and diff content without repo-a bleed", "linkedAcceptance": ["ED-PARITY-008-A1", "ED-PARITY-008-A2"]},
+    {"stepId": "G4", "status": "not-compared", "idea": null, "taomni": "Dirty text and selection survive Edit return", "linkedAcceptance": ["ED-PARITY-008-A2", "ED-PARITY-008-A3"]},
+    {"stepId": "G5", "status": "not-compared", "idea": null, "taomni": "Light Git tab and diff split visible in retained screenshots", "linkedAcceptance": ["ED-PARITY-008-A2"]}
+  ],
+  "deltas": [
+    {"field": "interaction.container", "ideaValue": "Commit tool window", "taomniValue": "separate Git tab", "classification": "confirmed-gap", "linkedAcceptance": ["ED-PARITY-008-A2"], "explanation": "Both expose repository groups and diff navigation, but their entry and return containers differ.", "disposition": "recorded presentation difference; functional two-repository scope is verified"},
+    {"field": "visual.match", "ideaValue": "g01/g03/g05 originals unavailable", "taomniValue": "browser and native screenshots present, light theme", "classification": "environment", "linkedAcceptance": ["ED-PARITY-008-A2"], "explanation": "The IDEA source images and exact fixture byte manifest are absent; pixel geometry and identical bytes cannot be reviewed.", "disposition": "visual and exact fixture equivalence unverified; no matched claim"}
+  ],
+  "verdict": {"state": "unverified", "reason": "The sampled IDEA summary supports the two-repository functional sequence, while dirty-selection and matching-state visual originals are missing. G4/G5 remain unverified; this is a scoped comparison record, not an overall IDEA match."},
+  "ceiling": {"capability": "two-repository Git Changes/diff switch, stale isolation, dirty editor return and zero Git writes", "fixture": "F3-equivalent isolated repositories with native SHA manifest; exact IDEA bytes unverified", "provider": "Tauri Git IPC", "platform": "Windows/WebView2; macOS and Linux native unverified", "level": "L2"},
+  "artifacts": [
+    {"path": "docs-feature/code-workspace-idea-parity/references/ed-parity-008-009-reference.md", "sha256": "5b08f4e55b1ab51f697db739ecec6a9fc81114900a7dbe6866e8bfba47a0aede", "type": "reference-summary", "acquisition": "read-only IDEA 2026.2.2 sample summary"},
+    {"path": "qa-ui-auto-report/parity008-009-browser-platform-final/run-20260927-190932-431068500/summary.json", "sha256": "1b6844816093eedf6bf5ec8b39ca98002fdb08e1fd69f317119b36881caed59e", "type": "qa-summary", "acquisition": "Windows browser runner, five selected passes"},
+    {"path": "qa-ui-auto-report/parity008-009-browser-platform-final/run-20260927-190932-431068500/runner_receipt.json", "sha256": "0a4196c8f8ad35f1049f4f01549dd23db53b1a67d1d26cb504a3363b6234ecfb", "type": "runner-receipt", "acquisition": "matching browser receipt"},
+    {"path": "qa-ui-auto-report/parity008-009-native-final/run-20260927-190917-170406100/summary.json", "sha256": "efb4aae615aee1d568f1bb7d3fec37dc91f4d4eea19fcec32a3dd33948172db7", "type": "qa-summary", "acquisition": "isolated Windows native runner, two selected passes"},
+    {"path": "qa-ui-auto-report/parity008-009-native-final/run-20260927-190917-170406100/runner_receipt.json", "sha256": "e6a41b3a89189e845cfa92a256b7b6d2b446ae54f3a42507682b81062a99422a", "type": "runner-receipt", "acquisition": "matching native receipt"},
+    {"path": "qa-ui-auto-report/parity008-009-browser-platform-final/run-20260927-190932-431068500/TC-IDE-PARITY-008-01/tc-ide-parity-008-01-two-repos.png", "sha256": "299e36648b70021214cfd884d57db640d9bf29d2dd4a675920c45928cfe87b6e", "type": "screenshot", "acquisition": "browser case 008-01 after repo-b switch"},
+    {"path": "qa-ui-auto-report/parity008-009-native-final/run-20260927-190917-170406100/TC-IDE-PARITY-008-03/tc-ide-parity-008-03-native.png", "sha256": "67b9fe84eda9a4c1da3a29214f49c2a7785ba441413e206f5ff2a0c0d7b32476", "type": "screenshot", "acquisition": "isolated WebView2 case 008-03"}
+  ],
+  "notes": ["Function: both sides group two repositories and replace diff context on root switch. Interaction: IDEA Commit tool window versus Taomni Git tab. Visual: IDEA originals and byte manifest absent, so geometry and fidelity are unverified.", "No IDEA Git write set was measured; zero-write assertion is current Taomni native evidence only."]
+}

@@ -371,6 +371,8 @@ export function applyPersistedEditorViewState(
 export interface EditorRevealTarget {
   line: number;
   character: number;
+  endLine?: number;
+  endCharacter?: number;
   focus?: boolean;
 }
 
@@ -4424,8 +4426,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     const view = viewRef.current;
     if (!view || !reveal) return;
     const pos = offsetFromLspPosition(view.state.doc, reveal);
+    const end = reveal.endLine !== undefined && reveal.endCharacter !== undefined
+      ? offsetFromLspPosition(view.state.doc, { line: reveal.endLine, character: reveal.endCharacter })
+      : pos;
     view.dispatch({
-      selection: { anchor: pos },
+      selection: { anchor: pos, head: end },
       effects: EditorView.scrollIntoView(pos, { y: "center" }),
     });
     if (reveal.focus !== false) view.focus();

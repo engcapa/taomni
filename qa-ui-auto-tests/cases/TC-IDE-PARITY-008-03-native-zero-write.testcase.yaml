@@ -1,0 +1,61 @@
+id: TC-IDE-PARITY-008-03
+title: Native two-repository diff switch and zero Git writes
+description: Native Git fixture records HEAD, index, status, and worktree hashes for executable postconditions.
+covers: [F26.1]
+tags: [code-workspace, git, parity008, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, parity008_git_repos]
+timeout_sec: 180
+steps:
+  - open: ${cfg.app.base_url}
+  - vault_first_run: qa-native-gate-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-parity008","name":"parity008","roots":[{"id":"parity008-a","name":"repo-a","path":"${fixture.parity008_repo_a}","kind":"git"},{"id":"parity008-b","name":"repo-b","path":"${fixture.parity008_repo_b}","kind":"git"}],"looseFiles":[],"lastOpenedAt":1756100000000,"lastActiveFile":{"kind":"root","rootId":"parity008-a","path":"same.txt"},"isGitRepo":true}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_repo_a}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-git-panel-toggle"]'
+  - click: '[data-testid="code-workspace-git-panel-toggle"]'
+  - wait_for: '[data-testid="workspace-git-manager"]'
+  - wait_for: '[data-testid="workspace-flat-repo-group"][data-repo-root$="${fixture.parity008_repo_a_basename}"] [data-testid="workspace-change-row"][aria-label$=" same.txt Staged"]'
+  - wait_for: '[data-testid="workspace-flat-repo-group"][data-repo-root$="${fixture.parity008_repo_b_basename}"]'
+  - assert_count: {selector: '[data-testid="workspace-flat-repo-group"]', equal: 2}
+  - click: '[data-testid="workspace-flat-repo-group"][data-repo-root$="${fixture.parity008_repo_a_basename}"] [data-testid="workspace-change-row"][aria-label$=" same.txt Staged"]'
+  - assert_text: {selector: '[data-testid="git-diff-viewer"]', contains: 'repo-a HEAD'}
+  - assert_text: {selector: '[data-testid="git-diff-viewer"]', contains: 'repo-a WORKTREE'}
+  - click: '[data-testid="workspace-flat-repo-group"][data-repo-root$="${fixture.parity008_repo_b_basename}"] [data-testid="workspace-change-row"][aria-label$=" same.txt Modified"]'
+  - assert_text: {selector: '[data-testid="git-diff-viewer"]', contains: 'repo-b HEAD'}
+  - assert_text: {selector: '[data-testid="git-diff-viewer"]', contains: 'repo-b WORKTREE'}
+  - assert_file_sha256: {path: '${fixture.parity008_repo_a}/same.txt', equals: '${fixture.parity008_a_same_txt_worktree_sha256}'}
+  - assert_file_sha256: {path: '${fixture.parity008_repo_b}/same.txt', equals: '${fixture.parity008_b_same_txt_worktree_sha256}'}
+  - assert_file_sha256: {path: '${fixture.parity008_repo_a}/.git/index', equals: '${fixture.parity008_a_index_file_sha256}'}
+  - assert_file_sha256: {path: '${fixture.parity008_repo_b}/.git/index', equals: '${fixture.parity008_b_index_file_sha256}'}
+  - assert_file_sha256: {path: '${fixture.parity008_repo_a}/.git/refs/heads/main', equals: '${fixture.parity008_a_head_ref_sha256}'}
+  - assert_file_sha256: {path: '${fixture.parity008_repo_b}/.git/refs/heads/main', equals: '${fixture.parity008_b_head_ref_sha256}'}
+  - screenshot: tc-ide-parity-008-03-native.png
+verification:
+  review: reviewed
+  requirements:
+    - id: V-008-03
+      requirement: Tauri IPC reads two real Git repositories; switching roots does not write HEAD, index, status, or worktree bytes.
+      actions: [1, 4, 5, 7, 10, 15, 18]
+      checkpoints:
+        - {step: 14, expectation: Both real repositories appear.}
+        - {step: 16, expectation: repo-a HEAD bytes appear.}
+        - {step: 17, expectation: repo-a worktree bytes appear.}
+        - {step: 19, expectation: repo-b HEAD bytes appear.}
+        - {step: 20, expectation: repo-b worktree bytes appear.}
+        - {step: 21, expectation: repo-a worktree SHA is unchanged.}
+        - {step: 22, expectation: repo-b worktree SHA is unchanged.}
+        - {step: 23, expectation: repo-a index SHA is unchanged.}
+        - {step: 24, expectation: repo-b index SHA is unchanged.}
+        - {step: 25, expectation: repo-a HEAD ref SHA is unchanged.}
+        - {step: 26, expectation: repo-b HEAD ref SHA is unchanged.}
+      results: [14, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26]
+  visual:
+    - {check: Review native Changes and diff screenshot against IDEA F3., method: manual, reason: Screenshot capture alone is not a parity verdict.}
+  native:
+    - {check: Verify Git HEAD/index/worktree file hashes from the native fixture baseline., method: automated, reason: Browser VFS cannot establish real Git read-only behavior.}

@@ -6215,6 +6215,8 @@ files:
   - src/components/editor/workspace/AutoImportCandidateDialog.tsx
   - src/components/editor/workspace/FileTemplateSettingsDialog.tsx
   - src/components/editor/workspace/NewJavaClassDialog.tsx
+  - src/components/editor/workspace/panels/StructuralSearchPanel.tsx
+  - src/lib/editor/structuralSearch.ts
 controls:
   - id: editor-find-panel
     selector: '[data-testid="code-workspace-editor-search"]'
@@ -7094,6 +7096,54 @@ controls:
     selector: '[data-testid="new-java-class-cancel"]'
     kind: interactive
     optional: true
+  - id: structural-search-panel
+    selector: '[data-testid="structural-search-panel"]'
+    kind: display
+    optional: true
+  - id: structural-search-close
+    selector: '[aria-label="Close structural search"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-pattern
+    selector: '[data-testid="structural-search-pattern"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-text
+    selector: '[data-testid="structural-search-text"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-scope
+    selector: '[data-testid="structural-search-scope"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-submit
+    selector: '[data-testid="structural-search-submit"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-cancel
+    selector: '[data-testid="structural-search-cancel"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-results
+    selector: '[data-testid="structural-search-results"]'
+    kind: display
+    optional: true
+  - id: structural-search-file
+    selector: '[data-testid="structural-search-file"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-result
+    selector: '[data-testid="structural-search-result"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-empty
+    selector: '[data-testid="structural-search-empty"]'
+    kind: display
+    optional: true
+  - id: structural-search-status
+    selector: '[data-testid="structural-search-status"]'
+    kind: display
+    optional: true
 -->
 
 - 编辑器工作台的壳层控件：文件树（add-folder/open-file 行）、编辑器 pane/tab-strip/.cm-content、底部 dock 的 terminal tab、split down/close、Ctrl+Tab Switcher 弹层与 Keymap 设置面。
@@ -7433,6 +7483,8 @@ files:
   - src/components/git/GitPanel.tsx
   - src/components/git/CommitLog.tsx
   - src/components/git/WorkspaceCommitLog.tsx
+  - src/components/git/WorkspaceGitManager.tsx
+  - src/components/git/WorkspaceChangesView.tsx
   - src/components/git/CompareView.tsx
   - src/components/git/shared/DiffPane.tsx
   - src/components/git/DiffViewer.tsx
@@ -7440,6 +7492,14 @@ controls:
   - id: git-panel
     selector: '[data-testid="git-panel"]'
     kind: display
+  - id: workspace-git-manager
+    selector: '[data-testid="workspace-git-manager"]'
+    kind: display
+    optional: true
+  - id: workspace-flat-repo-group
+    selector: '[data-testid="workspace-flat-repo-group"]'
+    kind: display
+    optional: true
   - id: git-log-tab
     selector: '[data-testid="git-log-tab"]'
     kind: interactive
@@ -7490,6 +7550,31 @@ controls:
     selector: '[data-testid="git-diff-next"]'
     kind: interactive
     aliases: ['.git-log-view [data-testid="git-diff-next"]']
+  - id: workspace-repo-selector
+    selector: '[data-testid="workspace-repo-selector"]'
+    kind: interactive
+    optional: true
+  - id: workspace-repo-selector-menu
+    selector: '[data-testid="workspace-repo-selector-menu"]'
+    kind: display
+    optional: true
+  - id: workspace-flat-repo-header
+    selector: '[data-testid="workspace-flat-repo-header"]'
+    kind: display
+    optional: true
+  - id: workspace-change-row
+    selector: '[data-testid="workspace-change-row"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_a}"] [data-testid="workspace-change-row"]'
+      - '[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_a}"] [data-testid="workspace-change-row"][aria-label="repo-a same.txt Staged"]'
+      - '[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_b}"] [data-testid="workspace-change-row"]'
+      - '[data-testid="workspace-flat-repo-group"][data-repo-root="${fixture.parity008_repo_b}"] [data-testid="workspace-change-row"][aria-label="repo-b same.txt Modified"]'
+  - id: workspace-diff-open-in-editor
+    selector: '[data-testid="git-diff-open-in-editor"]'
+    kind: interactive
+    optional: true
   - id: git-log-list-resize-handle
     selector: '[data-testid="git-log-list-resize-handle"]'
     kind: interactive

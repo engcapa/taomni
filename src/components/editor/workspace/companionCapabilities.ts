@@ -2,7 +2,7 @@
  * C8-A/B/C companion capability models (§8.18.9): Structural Search and
  * Replace, Maven/Gradle dependency completion, and Full Line local
  * completion. These modules define the typed contracts, availability gates
- * and safety policies. Backends (tree-sitter Java parser, registry metadata,
+ * and safety policies. Backends (Java parser, registry metadata,
  * local model runtime) are separate deliverables — until one is present each
  * capability reports a typed unavailable instead of faking results.
  */
@@ -33,12 +33,11 @@ export interface StructuralQuery {
 
 /** Languages with an official SSR story AND a real local parser backend. */
 export const SSR_SUPPORTED_LANGUAGES: ReadonlySet<string> = new Set([
-  // Java becomes available once the tree-sitter-java backend lands; the
-  // schema below is already final so enabling is additive-only.
+  "java",
 ]);
 
 export type StructuralSearchAvailability =
-  | { available: true; backend: "tree-sitter" }
+  | { available: true; backend: "lezer-java" | "tree-sitter-java" }
   | { available: false; reason: "unsupported-language" | "parser-not-ready" | "backend-missing" };
 
 export function structuralSearchAvailability(languageId: string, hasBackend: boolean): StructuralSearchAvailability {
@@ -46,7 +45,7 @@ export function structuralSearchAvailability(languageId: string, hasBackend: boo
     return { available: false, reason: hasBackend ? "unsupported-language" : "backend-missing" };
   }
   if (!hasBackend) return { available: false, reason: "parser-not-ready" };
-  return { available: true, backend: "tree-sitter" };
+  return { available: true, backend: "lezer-java" };
 }
 
 export function validateStructuralQuery(query: StructuralQuery): string | null {

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../stores/appStore";
-import type { GitRemote, GitSnapshot } from "../../lib/git";
+import type { GitBlobPair, GitRemote, GitSnapshot } from "../../lib/git";
 import { WorkspaceGitManager } from "./WorkspaceGitManager";
 
 const gitMocks = vi.hoisted(() => ({
@@ -125,6 +125,24 @@ function originSnapshot(repoRoot: string, changes: GitSnapshot["changes"] = []):
       tokenRef: null,
     }],
   });
+}
+
+function blobPair(path: string, oldText: string, newText: string): GitBlobPair {
+  return {
+    path,
+    oldPath: null,
+    oldText,
+    newText,
+    oldExists: true,
+    newExists: true,
+    binary: false,
+    image: false,
+    oldImageB64: null,
+    newImageB64: null,
+    oversize: false,
+    oldSize: oldText.length,
+    newSize: newText.length,
+  };
 }
 
 describe("WorkspaceGitManager", () => {
@@ -607,6 +625,118 @@ describe("WorkspaceGitManager", () => {
       );
     });
     expect(gitMocks.gitCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a late diff pair after switching repositories", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      repoRoot === "/repo/app"
+        ? snapshot(repoRoot, [change("app.txt")])
+        : snapshot(repoRoot, [change("service.txt")])
+    ));
+    let resolveApp!: (pair: GitBlobPair) => void;
+    let resolveService!: (pair: GitBlobPair) => void;
+    gitMocks.gitBlobPair.mockImplementation((repoRoot: string) => new Promise<GitBlobPair>((resolve) => {
+      if (repoRoot === "/repo/app") resolveApp = resolve;
+      else resolveService = resolve;
+    }));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /app app\.txt Modified/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: /service service\.txt Modified/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /app app\.txt Modified/i }));
+    await waitFor(() => expect(gitMocks.gitBlobPair).toHaveBeenCalledWith(
+      "/repo/app", "app.txt", "HEAD", ":WORKTREE", null,
+    ));
+    fireEvent.click(screen.getByRole("button", { name: /service service\.txt Modified/i }));
+    await waitFor(() => expect(gitMocks.gitBlobPair).toHaveBeenCalledWith(
+      "/repo/service", "service.txt", "HEAD", ":WORKTREE", null,
+    ));
+
+    resolveService(blobPair("service.txt", "service-head", "service-worktree"));
+    await waitFor(() => expect(screen.getByTestId("git-diff-viewer")).toHaveAttribute("data-path", "service.txt"));
+
+    resolveApp(blobPair("app.txt", "app-head", "app-worktree"));
+    await Promise.resolve();
+    expect(screen.getByTestId("git-diff-viewer")).toHaveAttribute("data-path", "service.txt");
+  });
+
+  it("does not reinsert a removed repository when its snapshot resolves late", async () => {
+    let resolveApp!: (value: GitSnapshot) => void;
+    gitMocks.gitSnapshot.mockImplementation((repoRoot: string) => {
+      if (repoRoot === "/repo/app") return new Promise<GitSnapshot>((resolve) => {
+        resolveApp = resolve;
+      });
+      return Promise.resolve(snapshot(repoRoot, [change("service.txt")]));
+    });
+    const { rerender } = render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /service service\.txt Modified/i })).toBeInTheDocument());
+    rerender(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/service"
+        roots={[
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+    resolveApp(snapshot("/repo/app", [change("app.txt")]));
+    await Promise.resolve();
+
+    expect(screen.queryByRole("button", { name: /app app\.txt Modified/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/service");
+    expect(gitMocks.gitSnapshot.mock.calls.filter(([root]) => root === "/repo/app")).toHaveLength(1);
+  });
+
+  it("unmounts a pending diff without issuing Git writes", async () => {
+    let resolvePair!: (pair: GitBlobPair) => void;
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")])
+    ));
+    gitMocks.gitBlobPair.mockImplementation(() => new Promise<GitBlobPair>((resolve) => {
+      resolvePair = resolve;
+    }));
+    const { unmount } = render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(gitMocks.gitBlobPair).toHaveBeenCalled());
+    unmount();
+    resolvePair(blobPair("src/App.tsx", "old", "new"));
+    await Promise.resolve();
+
+    expect(gitMocks.gitStage).not.toHaveBeenCalled();
+    expect(gitMocks.gitUnstage).not.toHaveBeenCalled();
+    expect(gitMocks.gitCommit).not.toHaveBeenCalled();
+    expect(gitMocks.gitDiscard).not.toHaveBeenCalled();
+    expect(gitMocks.gitCleanUntracked).not.toHaveBeenCalled();
+    expect(workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
   });
 
   it("filters workspace changes to the custom repository scope from the header selector", async () => {

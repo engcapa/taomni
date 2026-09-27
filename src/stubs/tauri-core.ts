@@ -654,6 +654,97 @@ function assertWorkspaceWritablePath(path: string): void {
   }
 }
 
+const PARITY008_ROOT = `${VFS_ROOT}/parity008`;
+const PARITY008_REPO_BASELINES: Record<string, string> = {
+  [`${PARITY008_ROOT}/repo-a`]: "repo-a HEAD\n",
+  [`${PARITY008_ROOT}/repo-b`]: "repo-b HEAD\n",
+};
+
+function parity008RepoRoot(path: string): string | null {
+  const normalized = path.replace(/\\/g, "/").replace(/\/+$/, "");
+  return Object.prototype.hasOwnProperty.call(PARITY008_REPO_BASELINES, normalized) ? normalized : null;
+}
+
+async function parity008GitSnapshot(repoRoot: string): Promise<Record<string, unknown> | null> {
+  const normalizedRoot = parity008RepoRoot(repoRoot);
+  if (!normalizedRoot) return null;
+  const path = "same.txt";
+  const worktree = await vfsReadText(`${normalizedRoot}/${path}`);
+  return {
+    repoRoot: normalizedRoot,
+    currentBranch: "main",
+    headOid: normalizedRoot.endsWith("repo-a") ? "parity008-a-head" : "parity008-b-head",
+    detached: false,
+    upstream: null,
+    ahead: 0,
+    behind: 0,
+    changes: [{
+      path,
+      oldPath: null,
+      status: "modified",
+      staged: normalizedRoot.endsWith("repo-a"),
+      unstaged: true,
+      conflict: false,
+    }, ...(normalizedRoot.endsWith("repo-a") ? [{
+      path: "untracked.txt",
+      oldPath: null,
+      status: "untracked",
+      staged: false,
+      unstaged: true,
+      conflict: false,
+    }] : [])],
+    remotes: [],
+    branches: [{
+      name: "main",
+      fullName: "refs/heads/main",
+      current: true,
+      remote: false,
+      upstream: null,
+      oid: normalizedRoot.endsWith("repo-a") ? "parity008-a-head" : "parity008-b-head",
+      subject: "parity008 baseline",
+    }],
+    stashes: [],
+    tags: [],
+    settings: {
+      userName: null,
+      userEmail: null,
+      httpProxy: null,
+      httpsProxy: null,
+      pullRebase: null,
+      pushDefault: null,
+      coreAutocrlf: null,
+      coreFilemode: null,
+      commitGpgsign: null,
+    },
+    worktree,
+  };
+}
+
+async function parity008GitBlobPair(
+  repoRoot: string,
+  path: string,
+): Promise<Record<string, unknown> | null> {
+  const normalizedRoot = parity008RepoRoot(repoRoot);
+  if (!normalizedRoot || path !== "same.txt") return null;
+  const oldText = PARITY008_REPO_BASELINES[normalizedRoot]!;
+  const newText = await vfsReadText(`${normalizedRoot}/${path}`);
+  return {
+    path,
+    oldPath: null,
+    oldText,
+    newText,
+    oldExists: true,
+    newExists: true,
+    binary: false,
+    image: false,
+    oldImageB64: null,
+    newImageB64: null,
+    oversize: false,
+    oldSize: oldText.length,
+    newSize: newText.length,
+  };
+}
+
 /** Pending stub-search cancellations by search id (browser preview only). */
 const stubSearchCancelIds = new Set<string>();
 
@@ -2249,6 +2340,19 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "git_blame_lines": {
       return [] as T;
     }
+    case "git_snapshot": {
+      const repoRoot = String(args?.repoRoot ?? "");
+      const snapshot = await parity008GitSnapshot(repoRoot);
+      if (snapshot) return snapshot as T;
+      throw new Error(`Git snapshot is not available in browser preview for ${repoRoot}`);
+    }
+    case "git_blob_pair": {
+      const repoRoot = String(args?.repoRoot ?? "");
+      const path = String(args?.path ?? "");
+      const pair = await parity008GitBlobPair(repoRoot, path);
+      if (pair) return pair as T;
+      throw new Error(`Git blob pair is not available in browser preview for ${repoRoot}/${path}`);
+    }
     case "history_snapshot": {
       return null as T;
     }
@@ -2626,9 +2730,19 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "workspace_detect_git_roots": {
-      // The in-memory VFS has no .git directories; report no repos so
-      // useWorkspaceGitSnapshots keeps an empty (never undefined) list.
-      return [] as unknown as T;
+      // The normal in-memory VFS has no .git directories. The parity008
+      // fixture opts into two explicit read-only roots so the renderer can
+      // exercise its multi-repository routing in browser mode.
+      const roots = Array.isArray(args?.roots) ? args.roots as Array<Record<string, unknown>> : [];
+      const parityRoots = roots
+        .map((root) => ({
+          id: String(root.id ?? ""),
+          name: String(root.name ?? ""),
+          path: String(root.path ?? ""),
+        }))
+        .filter((root) => parity008RepoRoot(root.path) !== null)
+        .map((root) => ({ ...root, repoRoot: root.path, rootIds: [root.id] }));
+      return parityRoots as T;
     }
     case "workspace_read_loose_file": {
       const path = args?.path as string;
