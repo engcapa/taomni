@@ -4,7 +4,11 @@
 
 首次 P0 基线：`audit/plan` 整体 Code Workspace，起始分支 `main`、HEAD `27f99b6116f4f6aae906d324cb84e8359695e17a`。首次评估已经完成，之后已有多轮 P1–P3；后续无需重新执行首次 P0。
 
-## 当前 P1 接续（2026-09-25）
+## 当前 P1 接续（2026-09-26）
+
+本轮按唯一板选定 **ED-PARITY-006**，来源 REQ-08 / CW-SEARCH-002；[本卡设计及 DEC/AC/V](project-replace-exclude-plan.md#ed-parity-006)、[完整用例设计](project-replace-exclude-plan.md#test-cases)、[IDEA 2026.2.3 参照与 F1-REPL-006](references/ed-parity-006-reference.md#observed)、[完整 P2 提示词](handoff-p2-ed-parity-006.md)。用户确定 IDEA Ultimate 2026.2.3 / IU-262.10968.63（仅本卡）；15 分钟时段在隔离工程实采 scope/mask、Find 窗口 Delete 排除、Replace All 确认/取消/提交、Undo Replace 确认。确认缺陷 G1 结果列表无法排除、G2 提交后结果陈旧、G3 输入框 Ctrl+Z 直接撤销磁盘替换；用户选择撤销语义对齐 IDEA。保留冻结预览、preimage、preflight、ledger 与一次多文件 undo。**P1 规划完成，ready / planning_required=false，无开发 owner**，可由 P2 正式领取。不是功能/UI/交互已对齐；所有产品验证未执行，状态只看[唯一板](backlog.md)。
+
+## 历史任务入口（2026-09-25）
 
 本轮按唯一板选定 **ED-PARITY-005**，来源 REQ-05 / CW-LANG-001、CW-LANG-002；[本卡设计及 DEC/AC/V](java-basic-completion-plan.md#ed-parity-005)、[完整用例设计](java-basic-completion-plan.md#test-cases)、[参照/fixture](references/ed-parity-005-reference.md#followup-observed)、[完整 P2 提示词](handoff-p2-ed-parity-005.md)、[静态记录](evidence/ed-parity-005-p1-static.md)。IDEA Ultimate 2026.2.3 / IU-262.10968.63已由用户确定，两时段实采补齐必要目标；用户明确保留provider snippet默认值差异。设计保留既有scope/同步/原子接受/保存修复，处理D1 resolve失败回退与D2词中insert/replace意图丢失。**P1规划完成，ready / planning_required=false，无开发owner**，可由P2正式领取。不是功能/UI/交互已对齐；所有产品验证未执行，当前状态只看[唯一板](backlog.md)。
 

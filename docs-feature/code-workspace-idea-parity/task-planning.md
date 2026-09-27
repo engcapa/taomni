@@ -89,6 +89,8 @@
 
 ## ED-PARITY-006 项目搜索排除结果、替换预览与取消
 
+2026-09-26 P1 已细化至[本卡设计](project-replace-exclude-plan.md#ed-parity-006)、[完整用例](project-replace-exclude-plan.md#test-cases)及[IDEA 2026.2.3 参照与 F1-REPL-006](references/ed-parity-006-reference.md#observed)；[完整 P2 交接](handoff-p2-ed-parity-006.md)。下方保留 P0 原始起点；独立 DEC-01..09、A1..A3、V1..V6、文件责任以设计为准。已确认 G1–G3 缺陷、G4/G5 体验差异，用户定撤销语义对齐 IDEA。Required evidence 不变。ready / planning_required=false，无开发 owner；产品验证未执行。
+
 - 来源：REQ-08 / CW-SEARCH-002；[P0 需求](overall-audit-plan-20260913.md#req-08)、[历史只读材料](../../claudedocs/code-workspace-idea-parity-backlog.md)。
 - 已知依据：P0 B12 只有空面板；源码记录已存在 scope/preview/frozen preimage 接线，旧“未接线”描述不作为新 bug。
 - 本包边界：明确 scope/mask 的两文件搜索→排除一个结果→预览→取消/提交→undo；冲突负路径由 P1 在同一包内限定，避免全搜索引擎重构。

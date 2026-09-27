@@ -307,6 +307,22 @@ describe("ED-IMPROVE-004: code-point offsets map to UTF-16 LSP ranges", () => {
   });
 });
 
+describe("ED-PARITY-006: same-line retained occurrence freshness", () => {
+  it("R2 blocks the retained coordinate after a shorter earlier replacement", () => {
+    const lineText = "token token";
+    const inputs = searchMatchesToReplaceInputs([0, 6].map((offset) => ({
+      rootId: "app", rootName: "app", rootPath: "/ws", path: "a.txt",
+      lineNumber: 1, column: offset + 1, matchStart: offset, matchEnd: offset + 5, lineText,
+    })));
+    const edit = buildReplaceInFilesWorkspaceEdit({ matches: [inputs[0]!], replacementText: "coin" });
+    const after = applyLspTextEditsToString(`${lineText}\n`, edit.documentEdits[0]!.edits);
+    expect(after).toBe("coin token\n");
+    const conflicts = verifyReplaceMatchFreshness(new Map([["/ws/a.txt", after]]), [inputs[1]!]);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]!.reason).toContain("changed since search");
+  });
+});
+
 describe("ED-MAIN-004: mixed EOL and illegal search coordinates", () => {
   function matchForLine(lineText: string, lineNumber: number, matchStart: number, matchEnd: number) {
     return {
@@ -1435,5 +1451,4 @@ describe("ED-IMPROVE-005: frozen replace preview snapshot", () => {
     });
   });
 });
-
 
