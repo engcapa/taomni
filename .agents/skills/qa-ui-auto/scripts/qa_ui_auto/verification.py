@@ -13,6 +13,7 @@ from .feature_catalog import load_features
 from .provenance import digest_file, input_digest, execution_identity, source_input, conditions_identity
 from .testcase import TestCase, discover
 from .report_paths import summaries
+from .console import configure_console_encoding
 
 PLATFORMS = ("Linux", "Windows", "macOS")
 LINUX_VERBS = {"native_set_writable", "assert_native_process_delta", "native_process_snapshot",
@@ -241,6 +242,7 @@ def coverage_status(cases, features, observations, targets) -> dict:
 
 
 def main(argv=None) -> int:
+    configure_console_encoding()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["plan", "status"])
     parser.add_argument("--diff", help="git base ref; include local changes")

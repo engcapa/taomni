@@ -49,11 +49,11 @@ def step_wait(ctx: StepContext, args: Any) -> None:
 def step_wait_for(ctx: StepContext, args: Any) -> None:
     if isinstance(args, dict):
         selector = args["selector"]
-        timeout = float(args.get("timeout_sec", 15)) * 1000.0
+        timeout = float(args.get("timeout_sec", 30)) * 1000.0
         state = args.get("state", "visible")
     else:
         selector = str(args)
-        timeout = 15_000.0
+        timeout = 30_000.0
         state = "visible"
     if ctx.dry_run:
         ctx.page.locator(selector)  # noqa: B018  syntax check only

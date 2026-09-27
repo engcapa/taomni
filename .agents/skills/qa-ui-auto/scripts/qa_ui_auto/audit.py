@@ -56,6 +56,7 @@ from qa_ui_auto.control_coverage import (  # noqa: E402
 )
 from qa_ui_auto.diff_impact import analyze as diff_analyze, _git_diff_names, _normalize  # noqa: E402
 from qa_ui_auto.gen_testid_catalog import render as render_catalog  # noqa: E402
+from qa_ui_auto.console import configure_console_encoding  # noqa: E402
 
 DEFAULT_FEATURES = Path("qa-ui-auto-tests/feature-list.md")
 DEFAULT_CASES = Path("qa-ui-auto-tests/cases")
@@ -689,6 +690,7 @@ def render_text(rep: AuditReport, *, focus_feature: str | None = None) -> str:
 # ---------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> int:
+    configure_console_encoding()
     ap = argparse.ArgumentParser(prog="qa_ui_auto.audit")
     ap.add_argument("--features", default=str(DEFAULT_FEATURES))
     ap.add_argument("--cases", default=str(DEFAULT_CASES))
