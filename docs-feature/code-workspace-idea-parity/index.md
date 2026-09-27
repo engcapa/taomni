@@ -115,3 +115,8 @@
 - 更新主 CW-SHELL-001、配套 CW-SET-001 和真实共享消费者；Tree done / Find implemented 原卡状态不变。产品测试、build、Taomni/browser/native runner均0；QA只读plan一次。桌面已归还。
 
 2026-09-14 21:22补采修订：用户已采纳图稿v2默认结构，BL-SL-02已解除。第二轮补齐Project折叠重开、bottom真实resize及记忆、Run空态、Problems Esc直接输入/undo、Restore Current Layout、干净窄窗和主题/UI字体/zoom/keymap。BL-SL-01收敛到Font/lineHeight/density/effective scale、真实min/max及overflow细节；板仍不在可领取队列。桌面已归还，本轮没有Taomni执行或三维matched。
+
+
+## 2026-09-27 P1 剩余卡统一规划
+
+`ED-PARITY-008` 与 `ED-PARITY-009` 已在唯一任务板中分别转为 `ready`、`p0.planning_required=false`。统一设计与用例见 [p1-remaining-unified-plan.md](p1-remaining-unified-plan.md)，统一 P2 交接见 [handoff-p2-p1-remaining.md](handoff-p2-p1-remaining.md)，IDEA 采样摘要见 [references/ed-parity-008-009-reference.md](references/ed-parity-008-009-reference.md)。状态、owner、证据仍只看 backlog 中各自细卡；本次仅完成 P1 规划，产品验证未执行。

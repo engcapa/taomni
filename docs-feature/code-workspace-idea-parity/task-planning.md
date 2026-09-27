@@ -123,6 +123,8 @@
 
 ## ED-PARITY-008 两个本地仓库间切换 Git diff 上下文
 
+P1 统一设计与测试用例已迁移至 [p1-remaining-unified-plan.md#ed-parity-008](p1-remaining-unified-plan.md#ed-parity-008)，P2 总交接见 [handoff-p2-p1-remaining.md](handoff-p2-p1-remaining.md)。
+
 - 来源：REQ-07 / CW-GIT-001、CW-GIT-003；[P0 需求](overall-audit-plan-20260913.md#req-07)、[历史只读材料](../../claudedocs/code-workspace-idea-parity-backlog.md)。
 - 已知依据：P0 Git 仅有源码路径，无真实 Git fixture；REQ-07 的其余运行调试目标仍在总矩阵。
 - 本包边界：F3 两个隔离本地 repo 的文件状态→打开 diff→切 root→返回编辑器；不 commit/push，不扩到 merge/rebase 或 Run/Debug。
@@ -137,6 +139,8 @@
 <a id="ed-parity-009"></a>
 
 ## ED-PARITY-009 Java Structural Search 的首个结构匹配场景
+
+P1 统一设计与测试用例已迁移至 [p1-remaining-unified-plan.md#ed-parity-009](p1-remaining-unified-plan.md#ed-parity-009)，P2 总交接见 [handoff-p2-p1-remaining.md](handoff-p2-p1-remaining.md)。
 
 - 来源：REQ-09 / CW-SEARCH-003；[P0 需求](overall-audit-plan-20260913.md#req-09)、[历史只读材料](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-audit.md)。
 - 已知依据：P0 静态记录 SSR 语言集合为空；本次仅补录该需求，当前生产引擎是否已有变化由 P1 核对。
