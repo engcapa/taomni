@@ -21,12 +21,19 @@ COMMITTED_FILES = {
     "src/a.txt": "alpha coin one\nbeta token two\n",
     "src/b.txt": "gamma coin three\n",
 }
+EXTERNAL_B = "gamma token changed\n"
+DIRTY_A = FILES["src/a.txt"] + "x"
+DIRTY_COMMITTED_A = COMMITTED_FILES["src/a.txt"] + "x"
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _manifest(root: str, case_id: str) -> dict[str, Any]:
     def entry(text: str) -> dict[str, Any]:
         raw = text.encode("utf-8")
-        return {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+        return {"sha256": _sha256(text), "bytes": len(raw)}
 
     return {
         "case": case_id,
@@ -34,6 +41,11 @@ def _manifest(root: str, case_id: str) -> dict[str, Any]:
         "files": {
             path: {"initial": entry(FILES[path]), "committed": entry(COMMITTED_FILES[path])}
             for path in FILES
+        },
+        "transient": {
+            "external_b": entry(EXTERNAL_B),
+            "dirty_a": entry(DIRTY_A),
+            "dirty_committed_a": entry(DIRTY_COMMITTED_A),
         },
         "provider": "browser VFS controlled" if root == BROWSER_ROOT else "real host disk",
     }
@@ -89,6 +101,11 @@ def setup(ctx: Any) -> None:
     for relative in FILES:
         key = relative.replace("/", "_").replace(".", "_")
         values[f"parity006_{key}"] = f"{root}/{relative}"
+        values[f"parity006_{key}_initial_sha256"] = _sha256(FILES[relative])
+        values[f"parity006_{key}_committed_sha256"] = _sha256(COMMITTED_FILES[relative])
+    values["parity006_src_b_txt_external_sha256"] = _sha256(EXTERNAL_B)
+    values["parity006_src_a_txt_dirty_sha256"] = _sha256(DIRTY_A)
+    values["parity006_src_a_txt_dirty_committed_sha256"] = _sha256(DIRTY_COMMITTED_A)
 
     case_dir = Path(getattr(ctx, "case_dir", report_root))
     case_dir.mkdir(parents=True, exist_ok=True)

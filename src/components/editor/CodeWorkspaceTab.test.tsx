@@ -527,6 +527,12 @@ function renderWorkspace(
   return render(options.strict ? <StrictMode>{element}</StrictMode> : element);
 }
 
+async function confirmWorkspaceUndo() {
+  const dialog = await screen.findByRole("dialog", { name: "Undo" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "OK" }));
+  await waitFor(() => expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument());
+}
+
 describe("extractContextSnippet", () => {
   it("extracts the first line and its following context at offset zero", () => {
     expect(extractContextSnippet("first\nsecond\nthird", 0, 0)).toEqual({
@@ -2441,6 +2447,7 @@ describe("CodeWorkspaceTab", () => {
     await act(async () => {
       fireEvent.keyDown(window, { key: "z", ctrlKey: true });
     });
+    await confirmWorkspaceUndo();
     await waitFor(() => expect(selectCodeWorkspaceUi(
       useCodeWorkspaceStore.getState(),
       "instance-actions",
@@ -10289,6 +10296,7 @@ end_of_record
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
+      await confirmWorkspaceUndo();
       await waitFor(() => expect(
         selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-compare-history")
           .openFiles["root:app:src/main.ts"]?.text,
@@ -10466,22 +10474,55 @@ end_of_record
       expect(disk["src/a.txt"]).toBe("alpha coin\n");
     });
 
+    it("ED-PARITY-006 traps Undo confirmation keys and restores its result-row entry", async () => {
+      const { disk } = await mountReplaceHistoryAndSearch("instance-parity-006-undo-focus");
+      const row = await screen.findByTestId("code-workspace-find-match-row");
+      row.focus();
+      fireEvent.keyDown(row, { key: "z", code: "KeyZ", ctrlKey: true });
+      const dialog = await screen.findByRole("dialog", { name: "Undo" });
+      expect(dialog).toHaveAttribute("aria-modal", "true");
+      const ok = within(dialog).getByRole("button", { name: "OK" });
+      const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+      await waitFor(() => expect(document.activeElement).toBe(ok));
+
+      fireEvent.keyDown(ok, { key: "Tab" });
+      expect(document.activeElement).toBe(cancel);
+      fireEvent.keyDown(cancel, { key: "Tab" });
+      expect(document.activeElement).toBe(ok);
+      fireEvent.keyDown(ok, { key: "Tab", shiftKey: true });
+      expect(document.activeElement).toBe(cancel);
+      fireEvent.keyDown(cancel, { key: "Tab", shiftKey: true });
+      expect(document.activeElement).toBe(ok);
+
+      fireEvent.keyDown(ok, { key: "Enter" });
+      expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument();
+      await waitFor(() => expect(document.activeElement).toBe(row));
+      await waitFor(() => {
+        expect(disk["src/a.txt"]).toBe("alpha token\n");
+        expect(disk["src/b.txt"]).toBe("beta token\n");
+      });
+      expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(4);
+    });
+
     it("ED-PARITY-006 Cancel and Escape leave history untouched, then OK undoes both files once", async () => {
       const { disk } = await mountReplaceHistoryAndSearch("instance-parity-006-cancel-ok");
       const row = await screen.findByTestId("code-workspace-find-match-row");
       row.focus();
       fireEvent.keyDown(row, { key: "z", ctrlKey: true });
       fireEvent.click(await screen.findByTestId("code-workspace-undo-confirm-cancel"));
+      await waitFor(() => expect(document.activeElement).toBe(row));
       expect(disk["src/a.txt"]).toBe("alpha coin\n");
+      expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(2);
 
-      row.focus();
       fireEvent.keyDown(row, { key: "z", ctrlKey: true });
-      const dialog = await screen.findByTestId("code-workspace-undo-confirm");
-      fireEvent.keyDown(dialog, { key: "Escape" });
+      await screen.findByTestId("code-workspace-undo-confirm");
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("code-workspace-undo-confirm-ok")));
+      fireEvent.keyDown(document.activeElement!, { key: "Escape" });
       expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument();
+      await waitFor(() => expect(document.activeElement).toBe(row));
       expect(disk["src/b.txt"]).toBe("beta coin\n");
+      expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(2);
 
-      row.focus();
       fireEvent.keyDown(row, { key: "z", ctrlKey: true });
       fireEvent.click(await screen.findByTestId("code-workspace-undo-confirm-ok"));
       await waitFor(() => {
@@ -10842,6 +10883,7 @@ end_of_record
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
+      await confirmWorkspaceUndo();
       await waitFor(() => expect(disk["src/main.ts"]).toBe(PRE["src/main.ts"]));
       await waitFor(() => expect(disk["src/other.ts"]).toBe(PRE["src/other.ts"]));
 
@@ -10873,6 +10915,7 @@ end_of_record
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
+      await confirmWorkspaceUndo();
       await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
         "Cannot undo workspace edit: Undo blocked to protect later edits",
       ));
@@ -12661,6 +12704,7 @@ end_of_record
       expect(attempts).toEqual(new Map([["src/a.ts", 1], ["src/b.ts", 2], ["src/d.ts", 2]]));
       await waitFor(() => expect(storedRecoveryEntries().some(({ entry }) => entry.status === "committed")).toBe(true));
       await act(async () => { fireEvent.keyDown(window, { key: "z", ctrlKey: true }); });
+      await confirmWorkspaceUndo();
       await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
       expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]);
       expect(disk["src/d.ts"]).toBe("hello delta");
@@ -12865,6 +12909,7 @@ end_of_record
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
+      await confirmWorkspaceUndo();
       await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
       expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]);
 
@@ -12957,6 +13002,7 @@ end_of_record
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
+      await confirmWorkspaceUndo();
       await waitFor(() => expect(disk["src/A.java"]).toBe("hello UPPER_A"));
       expect(disk["src/a.java"]).toBe("hello lower_a");
     });

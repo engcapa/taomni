@@ -9,7 +9,7 @@
 - IDEA 目标：用户确定 **2026.2.3 / IU-262.10968.63**（仅本卡）。用户授权 15 分钟桌面，已在隔离工程实采 R1–R8，见[参照包](references/ed-parity-006-reference.md#observed)。
 - 用户结果：隔离两文件 fixture → Directory=`src` + mask `*.txt` 搜索 `token` 得 3 条 → 在**结果列表**排除 1 条 → Replace All 打开确认预览（计数已扣除排除项）→ Esc/Cancel 零写入 → 再次确认提交 2 处 → 结果只剩排除行 → 在非编辑器焦点 Ctrl+Z 弹确认 → OK 一次撤销两文件。冲突负路径限定为“预览后外部修改一个文件”和“目标文件在编辑器 dirty”两种，均零写入。
 - 不纳入：搜索引擎/ripgrep 重构、regex 捕获组替换、Find 工具窗 tab 历史/pin、结构搜索（ED-PARITY-009）、编辑器内 Ctrl+Z 的确认语义（IDEA 未采，保持现状）。
-- **P1 于 2026-09-26 规划就绪，当时产品验证未执行。** 用户已决定撤销语义对齐 IDEA（DEC-06）；P2 本轮实现与实际证据见第 8 节。
+- **P1 于 2026-09-26 规划就绪，当时产品验证未执行。** 用户已决定撤销语义对齐 IDEA（DEC-06）；P2 初次实现与实际证据见第 8 节，review 修复后的最终证据见第 9 节。
 
 ## 2. 当前生产事实与差距分类
 
@@ -38,6 +38,7 @@
   1. 目标在非 CodeMirror 的 `input`/`textarea`（Search query、Replace text、include/exclude、directory 等）时，Ctrl/Cmd+Z、Ctrl/Cmd+Shift+Z、Ctrl+Y 不进入工作区派发，保留原生文字撤销。实现位于 `handleWorkspaceCommand`（或 `workspace.undoWorkspaceEdit`/`redo` 的 `when` 读取目标），不改 host 的其他 modal 语义。
   2. 在结果列表/面板按钮/底部 dock 非输入焦点，`workspace.undoWorkspaceEdit` 先弹工作区确认框（`data-testid="code-workspace-undo-confirm"`，标题 `Undo`，正文 `Undo {undoLabel}?`，`-ok` / `-cancel`，焦点在 OK，Esc=Cancel）：OK 调既有 `undoWorkspaceEdit`，Cancel 零效果、历史不变。命令面板/菜单调用同一 action，因而同样确认。
   3. 编辑器内 Ctrl+Z 的 `claimWorkspaceHistory` 路径与 redo 不加确认（IDEA 未采，保持现状，记为未比较）。Rename 等其他 workspace edit 在非编辑器焦点撤销也会确认，这是有意改变，须回归。
+  4. 2026-09-27 用户 review 补齐确认框键盘契约：独立组件具有 `aria-modal` 与可访问名称；打开同步聚焦 OK；Tab/Shift+Tab 在 OK/Cancel 循环；Enter 执行当前按钮、Escape 取消且各只处理一次，不穿透编辑器；关闭恢复原入口，Actions 入口恢复打开 Actions 前的焦点。实际结果见第 9 节。
 - **DEC-07 落盘语义保留**：Taomni 提交与撤销直接写盘并更新打开缓冲（既有 applier/ledger/recovery），不引入 IDEA 的“撤销后待保存”。已接受差异，比较中单列。
 - **DEC-08 冲突范围**：只验证 (a) 预览打开后外部改写 `src/b.txt` → 提交被 `changed on disk since the frozen replace preview` / freshness 阻断，四文件零写入，弹窗保持；恢复字节后同一冻结预览可提交；(b) `src/a.txt` 已打开且 dirty → `has unsaved modifications` 阻断零写入，保存后需重开预览。均沿用既有消息，不新增文案。IDEA 侧未采（参照 §4 C1/C2），不签比较结论。
 - **DEC-09 Replace in Files 入口**：保持 Ctrl+Shift+R 打开同一面板；改为把焦点放到 Replace text（若 query 为空则 Search query），去掉“Enter a replace string…”状态提示。对应 IDEA popup 在 Replace 模式直接可输入（R3）。
@@ -49,6 +50,7 @@
 | `src/components/editor/workspace/panels/FindInFilesPanel.tsx`：`excludedMatchKeys`、结果行渲染、`replaceAll`、`commitReplacePreview`、DEC-05 修剪 | DEC-02/03/05 主 owner |
 | `panels/ReplacePreviewDialog.tsx`：`initialExcludedKeys`、summary、keydown/focus | DEC-03/04 |
 | `src/components/editor/CodeWorkspaceTab.tsx`：`handleWorkspaceCommand` 输入框豁免、`workspace.undoWorkspaceEdit` 确认、`workspace.replaceInFiles` 聚焦、`isSurfaceOwnedKeyEvent`（仅 R1 证实时）、FindInFilesPanel 新 prop（如 `replaceFocusNonce`） | DEC-04/06/09 |
+| `src/components/editor/workspace/UndoWorkspaceEditConfirmDialog.tsx`：Undo 确认框键盘循环、单次确认/取消、打开/关闭焦点 | DEC-06，2026-09-27 review 修复 |
 | 共享消费者（只回归不改） | `workspaceEditHistory.ts`；Rename/Refactor undo（TC-IDE-C6-04，编辑器焦点）；AUDIT-003 冲突 ledger；本地 Find（`editorSearchPanel.ts`，TC-IDE-FINDFOCUS-01）；Search Everywhere Text 预置 `queryPreset`；Find in Directory `includePreset`；`workspaceActionRegistry.ts` 标题/键位不变 |
 
 新增 testid 仅上列；`qa-ui-auto-tests/feature-list.md` F25.5 controls 由 P2 同步。三端：纯 renderer 与键路由，无平台特定 API；macOS 以 Cmd 修饰，`press: Mod+z` 覆盖。
@@ -269,3 +271,22 @@ P0 增量输入：REQ-08 / **CW-SEARCH-002** 在本卡 F1-REPL-006 与 Linux/Web
 
 变更文件组：9 个生产/测试 TypeScript paths；新增 006-01/02/03，更新 D2-02/AUDIT-003 及 D1-01 browser provider 提示；新增 parity006 fixture 与 registry/schema；feature controls 与 testid catalog；本设计和本卡任务板。共享 `workspaceEditHistory.ts`、`replaceInFilesModel.ts`、`workspaceActionRegistry.ts` 生产文件未修改。原件与辅助 evidence/comparison 脚本均在 ignored `qa-ui-auto-report/`，不入库。未提交、推送、合并、发布或启动其他 agent/P3。
 
+<a id="review-completion"></a>
+
+## 9. Review 修复与最终验收（2026-09-27）
+
+用户追加“两项修复、两项验收收尾”后，以 HEAD `f5d9c44474b9217c23d8c9a0268b449f1faf94af` 完成 Undo 确认框键盘/焦点修复与消费者测试适配。开始时本卡已 `done`，没有重领或绕过 task-board 修改 metadata；本节补记当前证据，旧第 8 节保留为历史。完整生产效果链、变更文件、实际命令、失败原件与源码/case/runner/binary 身份见[本轮报告](evidence/ed-parity-006-review-report.md)。
+
+| AC / V | 最终实际检查 | 结果与原件（根目录 `qa-ui-auto-report/ed-parity-006/`） |
+|---|---|---|
+| A1 / V1、A3 / V6 | FindInFilesPanel、ReplacePreviewDialog、replaceInFilesModel、buildReplaceEdits、KeymapSettingsDialog | 130/130，`review-v6-unit.log`，13.57 s |
+| A3 / V2/V6 | CodeWorkspaceTab + fileTemplate 目标/调用方 27 项，补充保留 7 项；Cancel/Escape 零写入/回焦、整批 Undo、后续修改保护、editor claim、Rename/redo | 27/27 + 7/7，`review-unit-final.log` / `review-unit-retained.log`，82.96 / 26.99 s；未选中不算 PASS |
+| A1 / V3、A3 / V4/V6 browser | 006-01/02、D2-01、D1-01、FINDFOCUS-01；006-02 连续真实 Tab/Shift+Tab/Enter/Escape，不重设焦点；Actions 回原结果行 | 5/5，0 fail/skip，`review-browser-verified/run-20260927-092109-201690714/`，171.821 s |
+| A1/A3 / V4/V6 native | 006-03：真实搜索/四文件 hash/外部与 dirty 阻断及恢复；AUDIT-003：真实写入失败/ledger/无成功历史/恢复 | Linux/WebKitGTK passed，`review-native-verified/run-20260927-092449-358177511/`；最终整批 3/3、0 fail/skip，104.119 s |
+| A3 / V6 native | D2-02：替换/确认 Undo、UTF-16 与大小写敏感路径恢复；保留原 hash 断言 | 同上 native 批次 passed，85 步，case 46.984 s |
+| A1/A3 / typecheck 与门禁 | 四个本轮 TS/TSX paths；audit、contracts、限定 8 ID 的 status | scoped/external errors=0；audit required 480/480、0 gaps；contracts 273/273、0 gaps；`review-status-verified.json` 为 `ok=true, gaps=[]` |
+| A2 / V5 | 当前 Taomni 截图三维自检、已接受差异/未采边界登记 | Undo 小弹窗及 preview/dirty/final 无本卡截断遮挡；用户免 IDEA 真机比较，无 matched 主张；C1-C5 保持 unverified |
+
+最终 source `3c24a5c144f2b2f481945202e7285c8c86b9170aecdf57b79913eaf5bc752381`，runner `af1bfc5dfcc8ec3521798f0ccb0c74366c1ba327f411e1ecc3a8a08468a9b6ee`，binary `0afb4417a41a830d7255dd35528ddc516b444a5c247ce47d927199d44f3a17a4`。本轮一次 native 构建 297.034 s，四次执行复用同一 binary；所有最终原件 `identity_stable=true`。旧原件已找到但只绑定旧源码，本轮未借用其 PASS。
+
+review 收尾同时修复 Exclude/Restore testid 静态映射，required 属性保留；native SHA 改为 fixture 生成值；共用快捷键改为 Mod。全量 mounted 尝试中断、并发 browser 启动超时、两次 native 同步断言失败及重跑归因见报告第 5 节，未删字节/历史断言或提高超时。Windows/macOS 与 IDEA 双侧比较未验证；当前 Linux 交付门槛满足，任务维持 `done`。没有提交、推送或启动其他 agent。

@@ -541,6 +541,7 @@ describe("ED-TEMPLATE-001: File and Code Templates production flow in CodeWorksp
     await act(async () => {
       await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
     });
+    expect(screen.queryByTestId("code-workspace-undo-confirm")).not.toBeInTheDocument();
 
     // When write fails, undo is not registered to prevent false success (ED-MAIN-001 / ED-AUDIT-014)
     expect(workspaceMocks.workspaceApplyResourceOperation).not.toHaveBeenCalledWith(
@@ -600,6 +601,7 @@ describe("ED-TEMPLATE-001: File and Code Templates production flow in CodeWorksp
     await act(async () => {
       fireEvent.keyDown(window, { key: "z", ctrlKey: true });
     });
+    fireEvent.click(await screen.findByTestId("code-workspace-undo-confirm-ok"));
 
     // Undo calls delete on the created file via workspaceApplyResourceOperation
     await waitFor(() => {

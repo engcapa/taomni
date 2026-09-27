@@ -116,3 +116,18 @@ stale、skip、未验证和外部条件；是否提交/推送。不要自动启�
 最终 source `26652deb092d7c6d3eb71ba6f4a978e93c2c78e64efdd4b7890a9b3cad508a51`，QA binary `com.taomni.app.qa` SHA-256 `0608a948c6f8e01550f8b11e21b9579a28e116b5363157ab7013f49d063a92b5`。8 个目标/保留 UI case 的 `status --gate --platform Linux` 为 `ok=true, gaps=[]`；`audit --gate`、`contracts --gate`、9-path typecheck 均通过。完整命令、失败归因、耗时与平台边界见设计第 8 节及 ignored `qa-ui-auto-report/ed-parity-006/evidence.json`。Windows/WebView2、macOS/WKWebView 和 IDEA C1–C5 均未验证；没有视觉 matched 结论，也没有提交或推送。
 
 静态 audit 仍报告右键 Exclude/Restore 两个 required testid 未按 selector 触达；006-01 已通过 `right_click` 和可见菜单文字 `click_menu` 实际点击两项并断言状态，故这是审计器的 testid 归属限制，详见设计第 8.3 节。`audit --gate` 通过，不等于零静态提示。
+
+## Review 最终回填（2026-09-27）
+
+上述为初次交付历史。本轮按用户 review 修复 Undo 弹窗焦点与旧测试遗漏，补齐最终源码 Linux native，未重领已有 done 卡。当前结论以[设计第 9 节](project-replace-exclude-plan.md#review-completion)和[最终报告](evidence/ed-parity-006-review-report.md)为准。
+
+| AC / V | 当前实际用例与结果 | 原件（`qa-ui-auto-report/ed-parity-006/`） |
+|---|---|---|
+| A1 / V1/V3、A3 / V6 | 五个小单测套件 130/130；006-01、D2-01、D1-01、FINDFOCUS-01 browser passed | `review-v6-unit.log`；`review-browser-verified/run-20260927-092109-201690714/` |
+| A3 / V2/V4/V6 | mounted 27/27 + 7/7；006-02 默认 OK、Tab 双向循环、Enter/Cancel、Escape、Actions 回焦、输入/编辑器路由 passed，按键前未重设焦点 | `review-unit-final.log`、`review-unit-retained.log`；同上 browser（总计 5/5） |
+| A1/A3 / V4/V6 native | 006-03 真实搜索/四文件字节/外部与 dirty 冲突/整批 Undo；AUDIT-003 写入失败/ledger/无成功历史/恢复；D2-02 UTF-16/大小写身份/确认 Undo，三项当前 passed | `review-native-verified/run-20260927-092449-358177511/`，3/3、0 fail/skip、104.119 s |
+| A2 / V5 | 当前 Taomni preview、Undo dialog、dirty/final 截图自检；无本卡遮挡截断 | 用户免 IDEA 真机比较；C1-C5、双侧 matched 仍 unverified |
+
+源码 HEAD `f5d9c44474b9217c23d8c9a0268b449f1faf94af` + 未提交工作区；source `3c24a5c144f2b2f481945202e7285c8c86b9170aecdf57b79913eaf5bc752381`，runner `af1bfc5dfcc8ec3521798f0ccb0c74366c1ba327f411e1ecc3a8a08468a9b6ee`，binary `0afb4417a41a830d7255dd35528ddc516b444a5c247ce47d927199d44f3a17a4`。一次 native 构建 297.034 s，后续复跑复用该 binary。typecheck scoped/external errors=0；Exclude/Restore required 属性保留且静态缺口已关闭，audit 480/480 required、0 gaps；contracts 273/273、0 gaps；8 ID 的 `review-status-verified.json` 为 `ok=true, gaps=[]`。
+
+两个 baseline 旧测试失败、新弹窗回归失败、全量 mounted 中断、browser 启动超时及 native 同步断言失败均保留，详见最终报告第 5 节；旧 source 报告、dry-run、非选中测试不算本轮 PASS。当前 Linux/WebKitGTK 满足本轮交付门槛，任务维持 `done`；Windows/macOS 未验证，IDEA 未比较。未提交、推送、委派或启动 P3。

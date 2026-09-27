@@ -613,6 +613,7 @@ import {
 import { type RecentFileEntry } from "./workspace/RecentFilesPopup";
 import { EditorGroup } from "./workspace/EditorGroup";
 import { WorkspacePopupsHost } from "./workspace/WorkspacePopupsHost";
+import { UndoWorkspaceEditConfirmDialog } from "./workspace/UndoWorkspaceEditConfirmDialog";
 import { WorkspaceSdkStatus } from "./workspace/WorkspaceSdkStatus";
 import { ProjectFactsStatusBadge } from "./workspace/ProjectFactsStatusBadge";
 import { WorkspaceBuildRunToolsDialog } from "./workspace/WorkspaceBuildRunToolsDialog";
@@ -1461,7 +1462,7 @@ export function CodeWorkspaceTab({
   const [searchFocusTarget, setSearchFocusTarget] = useState<"query" | "replace">("query");
   const [workspaceUndoConfirmOpen, setWorkspaceUndoConfirmOpen] = useState(false);
   const undoConfirmTriggerRef = useRef<HTMLElement | null>(null);
-  const undoConfirmOkRef = useRef<HTMLButtonElement | null>(null);
+  const searchEverywhereTriggerRef = useRef<HTMLElement | null>(null);
   const ensureWorkspaceUi = useCodeWorkspaceStore((s) => s.ensureInstance);
   const disposeWorkspaceUi = useCodeWorkspaceStore((s) => s.disposeInstance);
   const patchWorkspaceUi = useCodeWorkspaceStore((s) => s.patchInstance);
@@ -1881,6 +1882,11 @@ export function CodeWorkspaceTab({
     patchWorkspaceUi(workspaceInstanceId, { rightPaneTab: tab });
   }, [patchWorkspaceUi, workspaceInstanceId]);
   const setSearchEverywhereOpen = useCallback((open: boolean) => {
+    if (open && !selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).searchEverywhereOpen) {
+      searchEverywhereTriggerRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    }
     patchWorkspaceUi(workspaceInstanceId, { searchEverywhereOpen: open });
   }, [patchWorkspaceUi, workspaceInstanceId]);
   const setSearchEverywhereMode = useCallback((mode: SearchEverywhereMode) => {
@@ -10896,21 +10902,16 @@ export function CodeWorkspaceTab({
   }, [setStatusMessage, workspaceEditHistory]);
 
   const requestWorkspaceUndoConfirmation = useCallback(() => {
-    undoConfirmTriggerRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    undoConfirmTriggerRef.current = activeElement?.closest('[data-testid="code-workspace-search-everywhere"]')
+      ? searchEverywhereTriggerRef.current
+      : activeElement;
     setWorkspaceUndoConfirmOpen(true);
   }, []);
 
   const closeWorkspaceUndoConfirmation = useCallback(() => {
     setWorkspaceUndoConfirmOpen(false);
-    requestAnimationFrame(() => undoConfirmTriggerRef.current?.focus());
   }, []);
-
-  useEffect(() => {
-    if (!workspaceUndoConfirmOpen) return;
-    requestAnimationFrame(() => undoConfirmOkRef.current?.focus());
-  }, [workspaceUndoConfirmOpen]);
 
   const redoWorkspaceEdit = useCallback(async () => {
     try {
@@ -21333,53 +21334,15 @@ export function CodeWorkspaceTab({
         />
       )}
       {workspaceUndoConfirmOpen && (
-        <div
-          data-testid="code-workspace-undo-confirm"
-          role="dialog"
-          aria-label="Undo"
-          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              event.stopPropagation();
-              closeWorkspaceUndoConfirmation();
-            } else if (event.key === "Enter" && event.target === event.currentTarget) {
-              event.preventDefault();
-              event.stopPropagation();
-              setWorkspaceUndoConfirmOpen(false);
-              void undoWorkspaceEdit();
-            }
+        <UndoWorkspaceEditConfirmDialog
+          label={workspaceEditHistoryState.undoLabel}
+          returnFocusTo={undoConfirmTriggerRef.current}
+          onCancel={closeWorkspaceUndoConfirmation}
+          onConfirm={() => {
+            setWorkspaceUndoConfirmOpen(false);
+            void undoWorkspaceEdit();
           }}
-        >
-          <div className="w-[360px] max-w-[90vw] rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-4 text-[12px] text-[var(--taomni-code-text)] shadow-xl">
-            <div className="font-medium">Undo</div>
-            <div className="mt-2 text-[11px] text-[var(--taomni-code-muted)]">
-              Undo {workspaceEditHistoryState.undoLabel ?? "workspace edit"}?
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                data-testid="code-workspace-undo-confirm-cancel"
-                className="h-7 rounded px-3 hover:bg-[var(--taomni-code-active-line-bg)]"
-                onClick={closeWorkspaceUndoConfirmation}
-              >
-                Cancel
-              </button>
-              <button
-                ref={undoConfirmOkRef}
-                type="button"
-                data-testid="code-workspace-undo-confirm-ok"
-                className="h-7 rounded bg-[var(--taomni-accent)] px-3 font-medium text-white"
-                onClick={() => {
-                  setWorkspaceUndoConfirmOpen(false);
-                  void undoWorkspaceEdit();
-                }}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
+        />
       )}
       </WorkspaceObservationBoundary>
     </WorkspaceClipboardSessionContext.Provider>

@@ -34,7 +34,7 @@ steps:
 - wait_for:
     selector: '[data-testid="code-workspace-editor-pane"]'
     timeout_sec: 60
-- press: Control+Shift+F
+- press: Mod+Shift+F
 - wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
 - select_option:
     selector: '[data-testid="code-workspace-find-scope-select"]'
@@ -65,16 +65,16 @@ steps:
 - press: Escape
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
-    equals: 873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0
+    equals: ${fixture.parity006_src_a_txt_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_b_txt}
-    equals: f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b
+    equals: ${fixture.parity006_src_b_txt_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_c_md}
-    equals: 579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8
+    equals: ${fixture.parity006_src_c_md_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_other_d_txt}
-    equals: f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6
+    equals: ${fixture.parity006_other_d_txt_initial_sha256}
 - click: '[data-testid="code-workspace-find-replace-all"]'
 - wait_for: '[data-testid="code-workspace-replace-preview"]'
 - host_write_file:
@@ -88,16 +88,16 @@ steps:
     contains: changed
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
-    equals: 873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0
+    equals: ${fixture.parity006_src_a_txt_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_b_txt}
-    equals: 3fdbe20f333734fd1575f6f246a411df8694f78c4690381370a6f44884355951
+    equals: ${fixture.parity006_src_b_txt_external_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_c_md}
-    equals: 579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8
+    equals: ${fixture.parity006_src_c_md_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_other_d_txt}
-    equals: f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6
+    equals: ${fixture.parity006_other_d_txt_initial_sha256}
 - host_write_file:
     path: ${fixture.parity006_src_b_txt}
     text: 'gamma token three
@@ -106,53 +106,53 @@ steps:
 - click: '[data-testid="code-workspace-replace-commit"]'
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
-    equals: 9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76
+    equals: ${fixture.parity006_src_a_txt_committed_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_b_txt}
-    equals: 570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62
+    equals: ${fixture.parity006_src_b_txt_committed_sha256}
 - assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
 - assert_count:
     selector: '[data-testid="code-workspace-find-match-row"]'
     equal: 1
 - press:
-    key: Control+z
+    key: Mod+z
     selector: '[aria-label="Search query"]'
-- press: Control+Shift+z
-- press: Control+y
+- press: Mod+Shift+z
+- press: Mod+y
 - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
-    equals: 9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76
+    equals: ${fixture.parity006_src_a_txt_committed_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_b_txt}
-    equals: 570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62
+    equals: ${fixture.parity006_src_b_txt_committed_sha256}
 - press:
-    key: Control+z
+    key: Mod+z
     selector: '[data-testid="code-workspace-find-match-row"]'
 - wait_for: '[data-testid="code-workspace-undo-confirm"]'
 - click: '[data-testid="code-workspace-undo-confirm-cancel"]'
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
-    equals: 9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76
+    equals: ${fixture.parity006_src_a_txt_committed_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_b_txt}
-    equals: 570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62
+    equals: ${fixture.parity006_src_b_txt_committed_sha256}
 - click: '[data-testid="code-workspace-find-match-row"]'
-- press: Control+z
+- press: Mod+z
 - wait_for: '[data-testid="code-workspace-undo-confirm"]'
 - click: '[data-testid="code-workspace-undo-confirm-ok"]'
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
-    equals: 873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0
+    equals: ${fixture.parity006_src_a_txt_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_b_txt}
-    equals: f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b
+    equals: ${fixture.parity006_src_b_txt_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_c_md}
-    equals: 579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8
+    equals: ${fixture.parity006_src_c_md_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_other_d_txt}
-    equals: f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6
+    equals: ${fixture.parity006_other_d_txt_initial_sha256}
 - fill:
     selector: '[aria-label="Search query"]'
     value: token
@@ -176,26 +176,26 @@ steps:
     contains: unsaved modifications
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
-    equals: 873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0
+    equals: ${fixture.parity006_src_a_txt_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_b_txt}
-    equals: f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b
+    equals: ${fixture.parity006_src_b_txt_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_c_md}
-    equals: 579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8
+    equals: ${fixture.parity006_src_c_md_initial_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_other_d_txt}
-    equals: f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6
+    equals: ${fixture.parity006_other_d_txt_initial_sha256}
 - screenshot: tc-ide-parity-006-03-dirty-block.png
 - press: Escape
 - assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
 - press:
-    key: Control+s
+    key: Mod+s
     selector: '[data-testid="code-workspace-editor"] .cm-content'
 - wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
-    equals: 38986130adf821e9202cb38a7a57a5c636cc28b32d24f670be927d91d4dfc1a9
+    equals: ${fixture.parity006_src_a_txt_dirty_sha256}
 - click: '[data-testid="code-workspace-find-replace-all"]'
 - wait_for: '[data-testid="code-workspace-replace-preview"]'
 - eval_readonly:
@@ -203,10 +203,10 @@ steps:
 - press: Enter
 - assert_file_sha256:
     path: ${fixture.parity006_src_a_txt}
-    equals: b8f0e3547c0d555985a666f837d17eb415b132de174cb642bcdb1ce4a1a4ce64
+    equals: ${fixture.parity006_src_a_txt_dirty_committed_sha256}
 - assert_file_sha256:
     path: ${fixture.parity006_src_b_txt}
-    equals: 570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62
+    equals: ${fixture.parity006_src_b_txt_committed_sha256}
 - assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
 - assert_text:
     selector: '[data-testid="code-workspace-find-replaced-notice"]'
@@ -281,30 +281,30 @@ verification:
     - step: 22
       expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
     - step: 24
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "${fixture.parity006_src_a_txt_initial_sha256}"}}'
     - step: 25
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "${fixture.parity006_src_b_txt_initial_sha256}"}}'
     - step: 26
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "${fixture.parity006_src_c_md_initial_sha256}"}}'
     - step: 27
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "${fixture.parity006_other_d_txt_initial_sha256}"}}'
     - step: 29
       expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
     - step: 32
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains":
         "changed"}}'
     - step: 33
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "${fixture.parity006_src_a_txt_initial_sha256}"}}'
     - step: 34
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "3fdbe20f333734fd1575f6f246a411df8694f78c4690381370a6f44884355951"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "${fixture.parity006_src_b_txt_external_sha256}"}}'
     - step: 35
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "${fixture.parity006_src_c_md_initial_sha256}"}}'
     - step: 36
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "${fixture.parity006_other_d_txt_initial_sha256}"}}'
     - step: 39
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "${fixture.parity006_src_a_txt_committed_sha256}"}}'
     - step: 40
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "${fixture.parity006_src_b_txt_committed_sha256}"}}'
     - step: 41
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
     - step: 42
@@ -312,25 +312,25 @@ verification:
     - step: 46
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-undo-confirm\"]"}'
     - step: 47
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "${fixture.parity006_src_a_txt_committed_sha256}"}}'
     - step: 48
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "${fixture.parity006_src_b_txt_committed_sha256}"}}'
     - step: 50
       expectation: '{"wait_for": "[data-testid=\"code-workspace-undo-confirm\"]"}'
     - step: 52
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "9f74ac3fdce327b28f07af9b9353c6ba719e48794de155cd893df4545e1b6e76"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "${fixture.parity006_src_a_txt_committed_sha256}"}}'
     - step: 53
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "${fixture.parity006_src_b_txt_committed_sha256}"}}'
     - step: 56
       expectation: '{"wait_for": "[data-testid=\"code-workspace-undo-confirm\"]"}'
     - step: 58
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "${fixture.parity006_src_a_txt_initial_sha256}"}}'
     - step: 59
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "${fixture.parity006_src_b_txt_initial_sha256}"}}'
     - step: 60
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "${fixture.parity006_src_c_md_initial_sha256}"}}'
     - step: 61
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "${fixture.parity006_other_d_txt_initial_sha256}"}}'
     - step: 64
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-find-match-row\"][title=\"src/a.txt:2:6\"]",
         "timeout_sec": 60}}'
@@ -342,27 +342,27 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains":
         "unsaved modifications"}}'
     - step: 75
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "873a6cda893e92a63dd175780098d330d1097c8094bc47270519f0ffba2ffdf0"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "${fixture.parity006_src_a_txt_initial_sha256}"}}'
     - step: 76
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "f3d30aaf5d933f1843b9601dbd472c4980396c2e07896dd76ee86cf250b7bf6b"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "${fixture.parity006_src_b_txt_initial_sha256}"}}'
     - step: 77
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "579e85d4aa9eeb523c0ce75281c16d5aa92e63db351ee392134b2a9a27ba3fd8"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_c_md}", "equals": "${fixture.parity006_src_c_md_initial_sha256}"}}'
     - step: 78
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "f7c026fadd1f6bdca980a0b35ad5a861b41aaa8a313656efed401a7adf8883b6"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_other_d_txt}", "equals": "${fixture.parity006_other_d_txt_initial_sha256}"}}'
     - step: 81
       expectation: Escape closes the blocked preview before saving and reopening.
     - step: 83
       expectation: '{"wait_for": "[data-testid=\"code-workspace-save-observation\"][data-dirty=\"false\"]"}'
     - step: 84
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "38986130adf821e9202cb38a7a57a5c636cc28b32d24f670be927d91d4dfc1a9"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "${fixture.parity006_src_a_txt_dirty_sha256}"}}'
     - step: 86
       expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
     - step: 87
       expectation: Primary replace button owns keyboard focus before recovery Enter.
     - step: 89
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "b8f0e3547c0d555985a666f837d17eb415b132de174cb642bcdb1ce4a1a4ce64"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_a_txt}", "equals": "${fixture.parity006_src_a_txt_dirty_committed_sha256}"}}'
     - step: 90
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "570f58d60eb06a6ada1d3057635302bdbf99ebe13ff7ab75c8b92d1701f58a62"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_src_b_txt}", "equals": "${fixture.parity006_src_b_txt_committed_sha256}"}}'
     - step: 91
       expectation: Recovery commit settles and closes the preview.
     - step: 92

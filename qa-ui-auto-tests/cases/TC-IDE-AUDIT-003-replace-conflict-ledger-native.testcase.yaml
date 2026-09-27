@@ -71,9 +71,7 @@ steps:
     timeout_sec: 10
 - host_write_file:
     path: ${fixture.workspace_root}/notes.txt
-    text: 'externally rewritten
-
-      '
+    text: ${fixture.workspace_notes_txt_external_text}
 - click: '[data-testid="code-workspace-replace-commit"]'
 - assert_text:
     selector: '[data-testid="code-workspace-replace-commit-error"]'
@@ -82,7 +80,7 @@ steps:
 - wait_for: '[data-testid="code-workspace-replace-preview"]'
 - assert_file_sha256:
     path: ${fixture.workspace_root}/notes.txt
-    equals: 5185a66ab96d05620dff4ba24fcb4fec28df21dae051c073396380b99270497b
+    equals: ${fixture.workspace_notes_txt_external_sha256}
     timeout_sec: 10
 - host_write_file:
     path: ${fixture.workspace_root}/notes.txt
@@ -105,9 +103,12 @@ steps:
     contains: notes.txt
     timeout_sec: 60
 - click: '[data-testid="code-workspace-find-match-row"]'
-- press: Control+z
+- press: Mod+z
 - wait_for: '[data-testid="code-workspace-undo-confirm"]'
 - click: '[data-testid="code-workspace-undo-confirm-ok"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Undid Replace in files
 - assert_file_contains:
     path: ${fixture.workspace_root}/notes.txt
     contains: scratch notes
@@ -153,7 +154,7 @@ steps:
 - wait_for: '[data-testid="code-workspace-replace-preview"]'
 - assert_file_sha256:
     path: ${fixture.workspace_root}/notes.txt
-    equals: d10eea22971a9850a14277b8e4b2f5922c5f27530a9d216774c8029d6340a538
+    equals: ${fixture.workspace_notes_txt_initial_sha256}
     timeout_sec: 10
 - click: '[data-testid="code-workspace-replace-cancel"]'
 - assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
@@ -161,13 +162,13 @@ steps:
     path: ${fixture.workspace_root}
     writable: true
 - click: '[data-testid="code-workspace-editor"]'
-- press: Control+s
+- press: Mod+s
 - assert_file_contains:
     path: ${fixture.workspace_root}/notes.txt
     contains: snatch notes
     timeout_sec: 30
 - press:
-    key: Control+z
+    key: Mod+z
     selector: '[data-testid="code-workspace-editor"] .cm-content'
 - assert_file_contains:
     path: ${fixture.workspace_root}/notes.txt
@@ -203,20 +204,20 @@ verification:
     - 36
     - 37
     - 39
-    - 41
-    - 44
+    - 42
     - 45
     - 46
-    - 48
+    - 47
     - 49
-    - 52
+    - 50
     - 53
-    - 56
-    - 60
-    - 62
+    - 54
+    - 57
+    - 61
     - 63
     - 64
-    - 66
+    - 65
+    - 67
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -225,75 +226,77 @@ verification:
     - step: 9
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "scratch
-        notes", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "scratch notes", "timeout_sec":
+        60}}'
     - step: 12
       expectation: '{"wait_for": "[data-testid=\"code-workspace-find-in-files-panel\"]"}'
     - step: 14
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
     - step: 18
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
-        "notes.txt", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "notes.txt",
+        "timeout_sec": 60}}'
     - step: 21
       expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
     - step: 22
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
-        "1 of 1", "timeout_sec": 10}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains": "1 of 1",
+        "timeout_sec": 10}}'
     - step: 25
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains":
-        "changed since search", "timeout_sec": 15}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains": "changed
+        since search", "timeout_sec": 15}}'
     - step: 26
       expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
     - step: 27
-      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "5185a66ab96d05620dff4ba24fcb4fec28df21dae051c073396380b99270497b",
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "${fixture.workspace_notes_txt_external_sha256}",
         "timeout_sec": 10}}'
     - step: 30
-      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch
-        notes", "timeout_sec": 30}}'
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch notes", "timeout_sec":
+        30}}'
     - step: 31
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
     - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
-        "notes.txt", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "notes.txt",
+        "timeout_sec": 60}}'
     - step: 38
       expectation: '{"wait_for": "[data-testid=\"code-workspace-undo-confirm\"]"}'
     - step: 40
-      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "scratch
-        notes", "timeout_sec": 30}}'
-    - step: 42
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Undid Replace in files"}}'
+    - step: 41
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "scratch notes",
+        "timeout_sec": 30}}'
     - step: 43
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "scratch
-        notes", "timeout_sec": 30}}'
-    - step: 47
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
-        "notes.txt", "timeout_sec": 60}}'
-    - step: 50
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "scratch notes", "timeout_sec":
+        30}}'
+    - step: 48
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "notes.txt",
+        "timeout_sec": 60}}'
     - step: 51
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
-        "1 of 1", "timeout_sec": 10}}'
-    - step: 54
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 55
-      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Retry",
-        "timeout_sec": 15}}'
-    - step: 57
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains":
-        "nothing applied", "timeout_sec": 15}}'
-    - step: 58
       expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
-    - step: 59
-      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "d10eea22971a9850a14277b8e4b2f5922c5f27530a9d216774c8029d6340a538",
+    - step: 52
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains": "1 of 1",
         "timeout_sec": 10}}'
-    - step: 61
+    - step: 55
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 56
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Retry", "timeout_sec":
+        15}}'
+    - step: 58
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains": "nothing
+        applied", "timeout_sec": 15}}'
+    - step: 59
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 60
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "${fixture.workspace_notes_txt_initial_sha256}",
+        "timeout_sec": 10}}'
+    - step: 62
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
-    - step: 65
-      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch
-        notes", "timeout_sec": 30}}'
-    - step: 67
-      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch
-        notes", "timeout_sec": 30}}'
+    - step: 66
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch notes", "timeout_sec":
+        30}}'
+    - step: 68
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch notes", "timeout_sec":
+        30}}'
     results:
     - 3
     - 8
@@ -312,19 +315,20 @@ verification:
     - 35
     - 38
     - 40
-    - 42
+    - 41
     - 43
-    - 47
-    - 50
+    - 44
+    - 48
     - 51
-    - 54
+    - 52
     - 55
-    - 57
+    - 56
     - 58
     - 59
-    - 61
-    - 65
-    - 67
+    - 60
+    - 62
+    - 66
+    - 68
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

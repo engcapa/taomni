@@ -13,7 +13,7 @@ steps:
   - click: '[data-testid="welcome-history-tab-workspaces"]'
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity006_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
-  - press: Control+Shift+F
+  - press: Mod+Shift+F
   - wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
   - eval_readonly:
       expression: document.activeElement?.getAttribute('aria-label') === 'Search query'
@@ -57,13 +57,13 @@ steps:
       expression: document.activeElement?.textContent?.includes('gamma token three') === true
       expect_truthy: true
   - right_click: '[data-testid="code-workspace-find-match-row"]:has-text("beta token two")'
-  - click_menu: Restore
+  - click: '[data-testid="code-workspace-find-row-restore"]'
   - assert_attribute:
       selector: '[data-testid="code-workspace-find-match-row"]:has-text("beta token two")'
       name: data-excluded
       equals: 'false'
   - right_click: '[data-testid="code-workspace-find-match-row"]:has-text("beta token two")'
-  - click_menu: Exclude
+  - click: '[data-testid="code-workspace-find-row-exclude"]'
   - assert_attribute:
       selector: '[data-testid="code-workspace-find-match-row"]:has-text("beta token two")'
       name: data-excluded

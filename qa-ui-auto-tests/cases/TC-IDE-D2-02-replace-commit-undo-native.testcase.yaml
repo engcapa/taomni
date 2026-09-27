@@ -38,6 +38,8 @@ tags:
 - p1
 modes:
 - native
+native_platforms:
+- Linux  # A.java/a.java identity segment requires a case-sensitive filesystem.
 fixtures:
 - reset_db
 - workspace_root
@@ -85,6 +87,7 @@ steps:
     contains: 1 of 1
     timeout_sec: 10
 - click: '[data-testid="code-workspace-replace-commit"]'
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
 - assert_file_contains:
     path: ${fixture.workspace_root}/notes.txt
     contains: snatch notes
@@ -99,9 +102,10 @@ steps:
     contains: notes.txt
     timeout_sec: 60
 - click: '[data-testid="code-workspace-find-match-row"]'
-- press: Control+z
+- press: Mod+z
 - wait_for: '[data-testid="code-workspace-undo-confirm"]'
 - click: '[data-testid="code-workspace-undo-confirm-ok"]'
+- assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
 - assert_file_contains:
     path: ${fixture.workspace_root}/notes.txt
     contains: scratch notes
@@ -125,13 +129,14 @@ steps:
     contains: 2 of 2
     timeout_sec: 10
 - click: '[data-testid="code-workspace-replace-commit"]'
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
 - assert_file_sha256:
     path: ${fixture.workspace_root}/unicode.txt
-    equals: f92df32d9b7e0ac26c410d4ee14c41700f02512e25fb701732bba1931b7e78c8
+    equals: ${fixture.workspace_unicode_txt_committed_sha256}
     timeout_sec: 30
 - assert_file_sha256:
     path: ${fixture.workspace_root}/notes.txt
-    equals: 1547844594dec1a34955217c21adc261063b390647aae0582e7a70f952dccc0a
+    equals: ${fixture.workspace_notes_txt_committed_sha256}
     timeout_sec: 30
 - fill:
     selector: '[aria-label="Search query"]'
@@ -143,16 +148,17 @@ steps:
     contains: unicode.txt
     timeout_sec: 60
 - click: '[data-testid="code-workspace-find-match-row"]'
-- press: Control+z
+- press: Mod+z
 - wait_for: '[data-testid="code-workspace-undo-confirm"]'
 - click: '[data-testid="code-workspace-undo-confirm-ok"]'
+- assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
 - assert_file_sha256:
     path: ${fixture.workspace_root}/unicode.txt
-    equals: fd567d8fb0684d0ac4754b8453a837f68113374f0abd92135fb6959b37d1b6c3
+    equals: ${fixture.workspace_unicode_txt_initial_sha256}
     timeout_sec: 30
 - assert_file_sha256:
     path: ${fixture.workspace_root}/notes.txt
-    equals: d10eea22971a9850a14277b8e4b2f5922c5f27530a9d216774c8029d6340a538
+    equals: ${fixture.workspace_notes_txt_initial_sha256}
     timeout_sec: 30
 - screenshot: tc-ide-d2-02-replace-undo.png
 - assert_file_contains:
@@ -186,13 +192,14 @@ steps:
     contains: 2 of 2
     timeout_sec: 10
 - click: '[data-testid="code-workspace-replace-commit"]'
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
 - assert_file_sha256:
     path: ${fixture.workspace_root}/A.java
-    equals: 34ff590ff2c2bb60fd7d7759c35d6248150e5ea694a47c032e580e484fef3df9
+    equals: ${fixture.workspace_A_java_committed_sha256}
     timeout_sec: 30
 - assert_file_sha256:
     path: ${fixture.workspace_root}/a.java
-    equals: 0b7fa25adf2ccbc0aa923ec8b0ac6b43dcd43781c360ca3da056a13276f38e2b
+    equals: ${fixture.workspace_a_java_committed_sha256}
     timeout_sec: 30
 - fill:
     selector: '[aria-label="Search query"]'
@@ -204,16 +211,17 @@ steps:
     contains: A.java
     timeout_sec: 60
 - click: '[data-testid="code-workspace-find-match-row"]'
-- press: Control+z
+- press: Mod+z
 - wait_for: '[data-testid="code-workspace-undo-confirm"]'
 - click: '[data-testid="code-workspace-undo-confirm-ok"]'
+- assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
 - assert_file_sha256:
     path: ${fixture.workspace_root}/A.java
-    equals: d35a1d24a4a83b201cf533f96f2dfa0392d1ada7043d8c587a69aa46ef16b2a2
+    equals: ${fixture.workspace_A_java_initial_sha256}
     timeout_sec: 30
 - assert_file_sha256:
     path: ${fixture.workspace_root}/a.java
-    equals: 15d66fc6cb85ec5cd64547811d5551a91454946f3a7ddb985af514b56906c4a1
+    equals: ${fixture.workspace_a_java_initial_sha256}
     timeout_sec: 30
 - screenshot: tc-ide-d2-02-replace-case-undo.png
 verification:
@@ -235,36 +243,36 @@ verification:
     - 18
     - 19
     - 22
-    - 24
     - 25
     - 26
-    - 28
+    - 27
     - 29
-    - 31
-    - 33
-    - 34
+    - 30
+    - 32
     - 35
+    - 36
     - 37
-    - 38
-    - 41
-    - 44
-    - 45
-    - 46
+    - 39
+    - 40
+    - 43
+    - 47
     - 48
     - 49
     - 51
-    - 57
-    - 58
-    - 59
+    - 52
+    - 54
+    - 61
     - 62
     - 63
     - 66
-    - 69
+    - 67
     - 70
-    - 71
-    - 73
     - 74
+    - 75
     - 76
+    - 78
+    - 79
+    - 81
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -273,90 +281,102 @@ verification:
     - step: 9
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "scratch
-        notes", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "scratch notes", "timeout_sec":
+        60}}'
     - step: 12
       expectation: '{"wait_for": "[data-testid=\"code-workspace-find-in-files-panel\"]"}'
     - step: 13
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-search\"]", "name":
-        "aria-selected", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-search\"]", "name": "aria-selected",
+        "equals": "true"}}'
     - step: 17
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
-        "notes.txt", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "notes.txt",
+        "timeout_sec": 60}}'
     - step: 20
       expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
     - step: 21
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
-        "1 of 1", "timeout_sec": 10}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains": "1 of 1",
+        "timeout_sec": 10}}'
     - step: 23
-      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch
-        notes", "timeout_sec": 30}}'
-    - step: 27
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
-        "notes.txt", "timeout_sec": 60}}'
-    - step: 30
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 24
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "snatch notes", "timeout_sec":
+        30}}'
+    - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "notes.txt",
+        "timeout_sec": 60}}'
+    - step: 31
       expectation: '{"wait_for": "[data-testid=\"code-workspace-undo-confirm\"]"}'
-    - step: 32
-      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "scratch
-        notes", "timeout_sec": 30}}'
-    - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
-        "unicode.txt", "timeout_sec": 60}}'
-    - step: 39
+    - step: 33
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-undo-confirm\"]"}'
+    - step: 34
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/notes.txt", "contains": "scratch notes",
+        "timeout_sec": 30}}'
+    - step: 38
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "unicode.txt",
+        "timeout_sec": 60}}'
+    - step: 41
       expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
-    - step: 40
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
-        "2 of 2", "timeout_sec": 10}}'
     - step: 42
-      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/unicode.txt", "equals": "f92df32d9b7e0ac26c410d4ee14c41700f02512e25fb701732bba1931b7e78c8",
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains": "2 of 2",
+        "timeout_sec": 10}}'
+    - step: 44
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 45
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/unicode.txt", "equals": "${fixture.workspace_unicode_txt_committed_sha256}",
         "timeout_sec": 30}}'
-    - step: 43
-      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "1547844594dec1a34955217c21adc261063b390647aae0582e7a70f952dccc0a",
+    - step: 46
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "${fixture.workspace_notes_txt_committed_sha256}",
         "timeout_sec": 30}}'
-    - step: 47
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
-        "unicode.txt", "timeout_sec": 60}}'
     - step: 50
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-undo-confirm\"]"}'
-    - step: 52
-      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/unicode.txt", "equals": "fd567d8fb0684d0ac4754b8453a837f68113374f0abd92135fb6959b37d1b6c3",
-        "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "unicode.txt",
+        "timeout_sec": 60}}'
     - step: 53
-      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "d10eea22971a9850a14277b8e4b2f5922c5f27530a9d216774c8029d6340a538",
-        "timeout_sec": 30}}'
-    - step: 55
-      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/A.java", "contains": "class CaseAlpha",
-        "timeout_sec": 10}}'
-    - step: 56
-      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/a.java", "contains": "class CaseBeta",
-        "timeout_sec": 10}}'
-    - step: 60
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
-        "A.java", "timeout_sec": 60}}'
-    - step: 61
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
-        "a.java", "timeout_sec": 60}}'
-    - step: 64
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
-    - step: 65
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains":
-        "2 of 2", "timeout_sec": 10}}'
-    - step: 67
-      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/A.java", "equals": "34ff590ff2c2bb60fd7d7759c35d6248150e5ea694a47c032e580e484fef3df9",
-        "timeout_sec": 30}}'
-    - step: 68
-      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/a.java", "equals": "0b7fa25adf2ccbc0aa923ec8b0ac6b43dcd43781c360ca3da056a13276f38e2b",
-        "timeout_sec": 30}}'
-    - step: 72
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains":
-        "A.java", "timeout_sec": 60}}'
-    - step: 75
       expectation: '{"wait_for": "[data-testid=\"code-workspace-undo-confirm\"]"}'
-    - step: 77
-      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/A.java", "equals": "d35a1d24a4a83b201cf533f96f2dfa0392d1ada7043d8c587a69aa46ef16b2a2",
+    - step: 55
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-undo-confirm\"]"}'
+    - step: 56
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/unicode.txt", "equals": "${fixture.workspace_unicode_txt_initial_sha256}",
         "timeout_sec": 30}}'
-    - step: 78
-      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/a.java", "equals": "15d66fc6cb85ec5cd64547811d5551a91454946f3a7ddb985af514b56906c4a1",
+    - step: 57
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "${fixture.workspace_notes_txt_initial_sha256}",
+        "timeout_sec": 30}}'
+    - step: 59
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/A.java", "contains": "class CaseAlpha", "timeout_sec":
+        10}}'
+    - step: 60
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_root}/a.java", "contains": "class CaseBeta", "timeout_sec":
+        10}}'
+    - step: 64
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "A.java",
+        "timeout_sec": 60}}'
+    - step: 65
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "a.java",
+        "timeout_sec": 60}}'
+    - step: 68
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 69
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains": "2 of 2",
+        "timeout_sec": 10}}'
+    - step: 71
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 72
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/A.java", "equals": "${fixture.workspace_A_java_committed_sha256}",
+        "timeout_sec": 30}}'
+    - step: 73
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/a.java", "equals": "${fixture.workspace_a_java_committed_sha256}",
+        "timeout_sec": 30}}'
+    - step: 77
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "A.java",
+        "timeout_sec": 60}}'
+    - step: 80
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-undo-confirm\"]"}'
+    - step: 82
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-undo-confirm\"]"}'
+    - step: 83
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/A.java", "equals": "${fixture.workspace_A_java_initial_sha256}",
+        "timeout_sec": 30}}'
+    - step: 84
+      expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/a.java", "equals": "${fixture.workspace_a_java_initial_sha256}",
         "timeout_sec": 30}}'
     results:
     - 3
@@ -369,30 +389,36 @@ verification:
     - 20
     - 21
     - 23
-    - 27
-    - 30
-    - 32
-    - 36
-    - 39
-    - 40
+    - 24
+    - 28
+    - 31
+    - 33
+    - 34
+    - 38
+    - 41
     - 42
-    - 43
-    - 47
+    - 44
+    - 45
+    - 46
     - 50
-    - 52
     - 53
     - 55
     - 56
+    - 57
+    - 59
     - 60
-    - 61
     - 64
     - 65
-    - 67
     - 68
+    - 69
+    - 71
     - 72
-    - 75
+    - 73
     - 77
-    - 78
+    - 80
+    - 82
+    - 83
+    - 84
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

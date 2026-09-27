@@ -6180,13 +6180,14 @@ controls:
 id: F25.5
 status: partial
 area: code-workspace/editor-shell
-components: [CodeWorkspaceTab, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog, RefactorRecoveryReviewDialog]
+components: [CodeWorkspaceTab, UndoWorkspaceEditConfirmDialog, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog, RefactorRecoveryReviewDialog]
 files:
   - src/components/editor/workspace/CodeMirrorHost.tsx
   - src/components/editor/workspace/liveTemplates.ts
   - src/components/editor/workspace/editorSearchPanel.ts
   - src/components/editor/workspace/lspHyperlink.ts
   - src/components/editor/CodeWorkspaceTab.tsx
+  - src/components/editor/workspace/UndoWorkspaceEditConfirmDialog.tsx
   - src/components/editor/workspace/RefactorRecoveryReviewDialog.tsx
   - src/components/editor/workspace/refactorPlan.ts
   - src/components/editor/workspace/refactorRecoveryController.ts

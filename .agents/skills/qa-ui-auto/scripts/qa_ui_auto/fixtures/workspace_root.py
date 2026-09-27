@@ -11,6 +11,7 @@ depending on real disk effects is correctly environment-blocked there.
 
 from __future__ import annotations
 
+import hashlib
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ SEED_FILES = {
     "A.java": "class CaseAlpha { void match() {} }\n",
     "a.java": "class CaseBeta { void match() {} }\n",
 }
+EXTERNAL_NOTES = "externally rewritten\n"
 
 
 def setup(ctx: Any) -> None:
@@ -56,6 +58,15 @@ def setup(ctx: Any) -> None:
     # These values are interpolated into JSON localStorage payloads and CSS
     # selectors. Slash-separated absolute paths work on Windows and POSIX.
     values["workspace_root"] = root.as_posix()
+    values["workspace_notes_txt_external_text"] = EXTERNAL_NOTES
+    values["workspace_notes_txt_external_sha256"] = hashlib.sha256(EXTERNAL_NOTES.encode("utf-8")).hexdigest()
+    for name in ("notes.txt", "unicode.txt", "A.java", "a.java"):
+        key = name.replace(".", "_")
+        initial = SEED_FILES[name].encode("utf-8")
+        before, after = ("notes", "remarks") if name.endswith(".txt") else ("match", "swapped")
+        committed = SEED_FILES[name].replace(before, after).encode("utf-8")
+        values[f"workspace_{key}_initial_sha256"] = hashlib.sha256(initial).hexdigest()
+        values[f"workspace_{key}_committed_sha256"] = hashlib.sha256(committed).hexdigest()
 
 
 def teardown(ctx: Any) -> None:
