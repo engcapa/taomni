@@ -49,6 +49,7 @@ mod workspace;
 mod workspace_execution;
 mod workspace_fs;
 mod workspace_search;
+mod structural_search;
 pub mod workspace_tooling;
 mod wsl;
 
@@ -199,6 +200,7 @@ pub fn run() {
                 .lsp
                 .attach_app(app.handle().clone());
             app.manage(workspace_search::WorkspaceSearchState::default());
+            app.manage(structural_search::StructuralSearchState::default());
             let local_history = local_history::init_local_history(app.handle())
                 .expect("failed to init local history store");
             app.manage(local_history);
@@ -634,6 +636,9 @@ pub fn run() {
             dependency_index::dependency_index_versions,
             workspace_search::workspace_search_start,
             workspace_search::workspace_search_cancel,
+            structural_search::structural_search_capabilities,
+            structural_search::structural_search_run,
+            structural_search::structural_search_cancel,
             lsp::lsp_list_presets,
             lsp::lsp_set_java_home,
             lsp::lsp_set_java_vmargs,

@@ -96,6 +96,8 @@ export interface EditorRevealTarget {
   line: number;
   character: number;
   nonce: number;
+  /** When set, the reveal selects [line:character, end) (e.g. a Structural Search match). */
+  end?: { line: number; character: number };
 }
 
 interface EditorGroupProps {
@@ -717,6 +719,7 @@ export function EditorGroup({
                   data-active={active || undefined}
                   data-preview={preview || undefined}
                   data-pinned={pinned || undefined}
+                  data-dirty={file.dirty || undefined}
                   className="h-full min-w-[96px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
                 >
                   <button

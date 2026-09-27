@@ -41,7 +41,7 @@ steps:
 - assert_count:
     selector: '[data-testid^="code-workspace-intention-"]'
     equal: 2
-- click: '[data-testid^="code-workspace-intention-"] >> nth=0'
+- click: '[data-testid^="code-workspace-intention-"]:has-text("Extract to method") >> nth=0'
 - wait_for: '[data-testid="text-input-dialog-input"]'
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -212,10 +212,85 @@ steps:
     selector: '[data-testid="refactoring-preview-dialog"]'
     contains: Extract to method
 - screenshot: tc-ide-parity-007-05-preview.png
-- click: '[data-testid="refactoring-preview-select-none"]'
 - assert_text:
     selector: '[data-testid="refactoring-preview-dialog"]'
     contains: ExtractTarget.java
+- eval_readonly:
+    expression: document.querySelectorAll("input:checked").length > 2
+    expect_truthy: true
+- assert_pattern:
+    selector: '[data-testid="refactoring-preview-apply"]'
+    regex: Do Refactor \([1-9][0-9]*\)
+- click: '[data-testid="refactoring-preview-select-none"]'
+- eval_readonly:
+    expression: document.querySelectorAll("input:checked").length > 2
+    expect_truthy: true
+- assert_pattern:
+    selector: '[data-testid="refactoring-preview-apply"]'
+    regex: Do Refactor \([1-9][0-9]*\)
+- click: '[data-testid="refactoring-preview-apply"]'
+- wait_for:
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    state: hidden
+    timeout_sec: 30
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: private static int extracted(int[] values) {
+- screenshot: tc-ide-parity-007-05-preview-applied.png
+- wait_for:
+    selector: '[data-testid="text-input-dialog-input"]'
+    timeout_sec: 30
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- wait: 0.5
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- wait_for:
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    timeout_sec: 30
 - click: '[data-testid="refactoring-preview-cancel"]'
 - wait_for:
     selector: '[data-testid="refactoring-preview-dialog"]'
@@ -283,23 +358,30 @@ verification:
     - 49
     - 50
   - id: ED-PARITY-007-V3-05-preview
-    requirement: A real multi-file method edit enters the shared preview; Select None cannot drop required files and Cancel leaves every file unchanged.
+    requirement: A real multi-file method edit enters the shared preview; every extraction operation is a required edit, so Select None cannot deselect the declaration or the call site, Apply commits the
+      complete extraction and its naming step, and a fresh Cancel leaves every file unchanged.
     actions:
-    - 49
+    - 51
     checkpoints:
-    - step: 63
-      expectation: The shared refactoring preview opened for the multi-file method edit.
-    - step: 64
-      expectation: The preview names the extraction.
     - step: 67
-      expectation: After Select None the required ExtractTarget file is still listed.
+      expectation: The extraction changes are all selected before the exclusion attempt.
+    - step: 68
+      expectation: The Apply label counts the required changes, so a broken partial apply cannot start.
     - step: 70
-      expectation: Cancel closes the preview with the buffer back at B0 and no naming dialog.
+      expectation: After Select None the required declaration and call-site edits are still selected.
+    - step: 71
+      expectation: The Apply label still counts the full edit after Select None (never 0).
+    - step: 74
+      expectation: 'Apply commits the complete extraction: call site and new method in the same buffer.'
+    - step: 97
+      expectation: A fresh preview cancelled with Cancel leaves the committed text unchanged.
     results:
-    - 63
-    - 64
     - 67
+    - 68
     - 70
+    - 71
+    - 74
+    - 97
   visual:
   - check: Preview dialog layout and the extraction entry labels.
     method: manual

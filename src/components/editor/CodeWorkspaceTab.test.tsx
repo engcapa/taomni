@@ -13859,6 +13859,9 @@ end_of_record
     const EXTRACT_KEY = "root:app:" + EXTRACT_PATH;
     const EXTRACT_ABS = "/repo/app/" + EXTRACT_PATH;
     const EXTRACT_URI = "file://" + EXTRACT_ABS;
+    const HELPER_PATH = "src/main/java/demo/ExtractHelper.java";
+    const HELPER_ABS = "/repo/app/" + HELPER_PATH;
+    const HELPER_URI = "file://" + HELPER_ABS;
     const EXTRACT_TITLE = "app / " + EXTRACT_PATH;
     const EXTRACT_INSTANCE = "instance-extract-007";
     const B0 = [
@@ -13891,9 +13894,9 @@ end_of_record
     const B2 = B1.split("extracted").join("sumOf");
 
     type ExtractMode =
-      | "normal" | "multi" | "none" | "disabled" | "command-only" | "malformed"
+      | "normal" | "multi" | "multi-mixed" | "none" | "disabled" | "command-only" | "malformed"
       | "timeout" | "changed" | "boom" | "resolve-error" | "symbols-error"
-      | "symbols-ambiguous" | "rename-error";
+      | "symbols-ambiguous" | "rename-error" | "multi-file" | "rename-multi-file";
 
     function extractMethodAction(title: string, disabled?: string) {
       const raw: Record<string, unknown> = { title, kind: "refactor.extract.function", data: { parity007: title } };
@@ -13947,7 +13950,14 @@ end_of_record
           return;
         }
         const methodMatch = /^\s{2,}(?:(?:public|private|protected|static|final)\s+)*([\w$<>\[\],.\s]+?)\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{/.exec(line);
-        if (methodMatch) symbols.push(build(methodMatch[2], 6, 1, index, line));
+        const name = methodMatch?.[2];
+        // Control-flow keywords also match the shape above; the real provider
+        // reports methods only, so the fixture must not invent method symbols.
+        const controlKeyword = name !== undefined && [
+          "for", "if", "else", "while", "switch", "case", "catch", "finally",
+          "do", "try", "return", "new", "throw", "assert", "synchronized",
+        ].includes(name);
+        if (methodMatch && !controlKeyword) symbols.push(build(name!, 6, 1, index, line));
       });
       return symbols;
     }
@@ -13974,7 +13984,10 @@ end_of_record
     }
 
     function setupExtract(instanceId: string, mode: ExtractMode = "normal"): ExtractFixture {
-      const disk: Record<string, string> = { [EXTRACT_PATH]: B0 };
+      const disk: Record<string, string> = {
+        [EXTRACT_PATH]: B0,
+        [HELPER_PATH]: "package demo;\n\npublic class ExtractHelper {\n}\n",
+      };
       const workspace: CodeWorkspaceTabInfo = {
         repoRoot: "/repo/app",
         workspaceId: "ws-" + instanceId,
@@ -14051,6 +14064,27 @@ end_of_record
             ],
           };
         }
+        if (mode === "multi-mixed") {
+          // Two method candidates plus non-method extraction kinds. The Extract
+          // Method menu must list only the methods.
+          return {
+            status,
+            actions: [
+              extractMethodAction("Extract to method"),
+              extractMethodAction("Extract to method (second)"),
+              extractVariableAction(),
+              {
+                title: "Extract to constant",
+                kind: "refactor.extract.constant",
+                isPreferred: false,
+                edit: null,
+                command: null,
+                commandArguments: null,
+                raw: { title: "Extract to constant", kind: "refactor.extract.constant" },
+              },
+            ],
+          };
+        }
         if (mode === "command-only") {
           return {
             status,
@@ -14070,15 +14104,19 @@ end_of_record
       lspMocks.lspCodeActionResolve.mockImplementation(async (_descriptor: unknown, raw: unknown) => {
         if (mode === "resolve-error") return { status, action: null };
         const action = raw as Record<string, unknown>;
-        return {
-          status,
-          action: {
-            ...action,
-            edit: {
-              documentEdits: [{ uri: EXTRACT_URI, path: EXTRACT_ABS, edits: extractEdits() }],
-            },
-          },
-        };
+        const documentEdits = [{ uri: EXTRACT_URI, path: EXTRACT_ABS, edits: extractEdits() }];
+        if (mode === "multi-file") {
+          // A real multi-file method extraction crosses into the shared preview.
+          documentEdits.push({
+            uri: HELPER_URI,
+            path: HELPER_ABS,
+            edits: [{
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+              newText: "// extract-cross-file\n",
+            }],
+          });
+        }
+        return { status, action: { ...action, edit: { documentEdits } } };
       });
       lspMocks.lspPrepareRename.mockResolvedValue({
         status,
@@ -14094,6 +14132,33 @@ end_of_record
         if (mode === "rename-error") throw new Error("B-007 controlled rename failure: name rejected");
         const current = text();
         const lines = current.split("\n");
+        if (mode === "rename-multi-file") {
+          // The rename itself is multi-file, so the shared preview sits between
+          // the last owner check and the first writer.
+          return {
+            status,
+            edit: {
+              documentEdits: [{
+                uri: EXTRACT_URI,
+                path: EXTRACT_ABS,
+                edits: [{
+                  range: {
+                    start: { line: 0, character: 0 },
+                    end: { line: lines.length - 1, character: (lines[lines.length - 1] ?? "").length },
+                  },
+                  newText: current.split("extracted").join(newName),
+                }],
+              }, {
+                uri: HELPER_URI,
+                path: HELPER_ABS,
+                edits: [{
+                  range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+                  newText: "// rename-cross-file\n",
+                }],
+              }],
+            },
+          };
+        }
         return {
           status,
           edit: {
@@ -14349,9 +14414,11 @@ end_of_record
         const { pane, content } = await mountExtract(fixture);
         selectExtractRange(content);
         pressExtractChord(pane);
+        // DEC-03 re-reads a damaged outline once, so the naming chain settles
+        // after two provider samples per side.
         await waitFor(() => expect(useAppStore.getState().statusMessage).toBe(
           "Extracted method; could not locate the new method to rename it",
-        ));
+        ), { timeout: 6000 });
         expect(fixture.text()).toBe(B1);
         expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
         expect(lspMocks.lspRename).not.toHaveBeenCalled();
@@ -14410,5 +14477,119 @@ end_of_record
       expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
       expect(lspMocks.lspRename).not.toHaveBeenCalled();
     });
+    it("Escape in the retry prompt cancels the naming step without replaying the rejected name", async () => {
+      // Regression: a dismissed retry prompt is not a provider empty edit. Before
+      // the fix the loop replayed the previously entered name and renamed both
+      // the declaration and the call site without any user confirmation.
+      const fixture = setupExtract("instance-extract-cancel-retry", "rename-error");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+      const input = await screen.findByTestId("text-input-dialog-input");
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+
+      fireEvent.change(input, { target: { value: "sumOf" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      const retry = await screen.findByTestId("text-input-dialog-input");
+      expect(retry).toHaveValue("sumOf");
+      expect(lspMocks.lspRename).toHaveBeenCalledTimes(1);
+
+      fireEvent.keyDown(retry, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument());
+      // Wait past the empty-edit replay delay: nothing may run on its own.
+      await act(async () => {
+        await new Promise((resolve) => { window.setTimeout(resolve, 1600); });
+      });
+      expect(lspMocks.lspRename).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("text-input-dialog")).not.toBeInTheDocument();
+      expect(fixture.text()).toBe(B1);
+      expect(fixture.text()).toContain("int sum = extracted(values);");
+      expect(fixture.disk[EXTRACT_PATH]).toBe(B1);
+    });
+
+    it("extract preview keeps the declaration and call site as required edits", async () => {
+      // Regression: the multi-file extraction preview offered every operation as
+      // excludable, so Deselect All could commit a broken partial extraction.
+      const fixture = setupExtract("instance-extract-preview-required", "multi-file");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+
+      const dialog = await screen.findByTestId("refactoring-preview-dialog");
+      const usageInputs = () => Array.from(
+        dialog.querySelectorAll<HTMLInputElement>('[data-testid^="refactoring-preview-usage-"]'),
+      );
+      const usages = usageInputs();
+      expect(usages.length).toBeGreaterThan(1);
+      expect(usages.every((usage) => usage.disabled)).toBe(true);
+      expect(usages.every((usage) => usage.checked)).toBe(true);
+
+      const applyButton = within(dialog).getByTestId("refactoring-preview-apply");
+      const labelBefore = applyButton.textContent;
+      fireEvent.click(within(dialog).getByTestId("refactoring-preview-select-none"));
+      await waitFor(() => expect(usageInputs().every((usage) => usage.checked)).toBe(true));
+      expect(usageInputs().length).toBe(usages.length);
+      expect(applyButton.textContent).toBe(labelBefore);
+      expect(applyButton.textContent).not.toBe("Do Refactor (0)");
+
+      fireEvent.click(applyButton);
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+      expect(fixture.text()).toContain("int sum = extracted(values);");
+      expect(fixture.text()).toContain("private static int extracted(int[] values) {");
+      expect(fixture.disk[HELPER_PATH]).toContain("// extract-cross-file");
+    });
+
+    it("a view switch while the rename preview is open never renames the abandoned file", async () => {
+      // DEC-07: the owner guard runs again at the preflight and at the exact
+      // mutation boundary, so an async preview cannot commit a rename for a
+      // document the user has left.
+      const fixture = setupExtract("instance-extract-owner-guard", "rename-multi-file");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+
+      const input = await screen.findByTestId("text-input-dialog-input");
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+      fireEvent.change(input, { target: { value: "sumOf" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      const dialog = await screen.findByTestId("refactoring-preview-dialog");
+      // Switch the active view while the rename is paused on the preview.
+      fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+      await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane").length).toBeGreaterThan(1));
+
+      fireEvent.click(within(dialog).getByTestId("refactoring-preview-apply"));
+      await act(async () => {
+        await new Promise((resolve) => { window.setTimeout(resolve, 300); });
+      });
+      expect(fixture.text()).not.toContain("sumOf");
+      expect(fixture.disk[EXTRACT_PATH]).not.toContain("sumOf");
+      expect(fixture.disk[HELPER_PATH]).not.toContain("// rename-cross-file");
+    });
+
+    it("the Extract Method menu lists only method candidates", async () => {
+      // DEC-02: two method candidates plus variable/constant proposals must not
+      // widen the menu, and no second provider request may run for it.
+      const fixture = setupExtract("instance-extract-mixed-menu", "multi-mixed");
+      const { pane, content } = await mountExtract(fixture);
+      selectExtractRange(content);
+      pressExtractChord(pane);
+
+      const menu = await screen.findByTestId("context-menu");
+      const candidates = Array.from(
+        menu.querySelectorAll<HTMLButtonElement>('[data-testid^="code-workspace-intention-"]'),
+      );
+      expect(candidates).toHaveLength(2);
+      expect(candidates.every((item) => (item.textContent ?? "").includes("Extract to method"))).toBe(true);
+      expect(lspMocks.lspCodeActions).toHaveBeenCalledTimes(1);
+      expect(within(menu).queryByText("Extract to local variable")).not.toBeInTheDocument();
+      expect(within(menu).queryByText(/Extract to constant/)).not.toBeInTheDocument();
+
+      fireEvent.click(candidates[0]!);
+      const input = await screen.findByTestId("text-input-dialog-input");
+      await waitFor(() => expect(fixture.text()).toBe(B1));
+      expect(input).toHaveValue("extracted");
+    });
+
   });
 });

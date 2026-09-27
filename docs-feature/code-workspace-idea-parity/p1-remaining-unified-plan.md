@@ -54,3 +54,17 @@ P2 将用例落盘为拟新增 `qa-ui-auto-tests/cases/TC-IDE-PARITY-008-01..03-
 三端均做代码兼容审查；当前端按环境识别执行真实 Tauri native，Windows WebView2、macOS WKWebView、Linux WebKitGTK 分别记录，缺设备只保留未验证。快速迭代用 Vitest/browser；稳定后一次 scoped typecheck、Rust focused tests 和当前端 native；最后写 IDEA comparison record。008 required evidence 为 code-audit/unit/typecheck/browser/native/idea-comparison；009 另含 provider/rust。P1 没有运行产品测试、构建或 Taomni runner。
 
 规划完成只表示设计、fixture、IDEA 参照和 AC/V 已就绪，不表示实现或 matched。P2 必须把 owner/claim/evidence/status 回填各自原卡，统一交接只编排顺序。
+
+<a id="p2-results"></a>
+## P2 实施结果与 AC → V → 测试映射（2026-09-27，Windows 11 本机）
+
+| AC | V | 实际测试 | 结果 |
+|---|---|---|---|
+| 008-A1 | V-008-01 | `TC-IDE-PARITY-008-01`（browser）、`TC-IDE-PARITY-008-03`（native N1）、`WorkspaceGitManager.parity008.test.tsx` | pass：分组/分支、1/3→3/3、HEAD oid/Working tree、字节与 diff 身份按仓库 |
+| 008-A2 | — | `qa-ui-auto-report/idea-comparison/ED-PARITY-008/run-20260927-191930/record.json` | valid，verdict `unverified`；未跟踪文件内联 vs Unversioned、diff 面板 vs 编辑器 tab 等差异单列 |
+| 008-A3 | V-008-02/03 | `TC-IDE-PARITY-008-02`（browser）、`TC-IDE-PARITY-008-03`（native N2）、`git::tests::snapshot_does_not_rewrite_index_for_stale_stat_entries`、`GitPanel.test.tsx` 迟到快照 | pass：迟到响应丢弃、Discard 取消/关闭 0 写、`.git/index`/ref/工作区 SHA-256 不变、dirty/选区保留 |
+| 009-A1 | V-009-01/02 | `structural_search::tests`（11）、`TC-IDE-PARITY-009-01/02`、`TC-IDE-PARITY-009-03`（native N1/N2） | pass：3/1/0 精确 AST 集合，typed unavailable/invalid-pattern/unsupported-constraint |
+| 009-A2 | V-009-01/02 | `TC-IDE-PARITY-009-01/02`、`qa-ui-auto-report/idea-comparison/ED-PARITY-009/run-20260927-191930/record.json` | S2/S3 结果集 matched；对话框/空态/导航 different；verdict `unverified` |
+| 009-A3 | V-009-03/04 | `TC-IDE-PARITY-009-02`（cancel）、`TC-IDE-PARITY-009-03`（native cancel + SHA-256）、`TC-IDE-PARITY-009-04`、`StructuralSearch.parity009.test.tsx` | pass：Esc 取消释放请求（active 0）、Find/regex/编辑器不变 |
+
+实施中确认并修复的缺陷：多仓库快照无请求序号（迟到 A 覆盖新 A）；diff pair 无身份键且随 loading 抖动重读；GitPanel 跨 repoRoot 刷新无序号；只读 `git status` 与每次刷新的冲突探测 `git diff --diff-filter=U` 会回写过期 stat 的 `.git/index`（改为 `GIT_OPTIONAL_LOCKS=0` + `ls-files --unmerged`）；SSR 会话 StrictMode 重挂载误报 unavailable；运行中 Esc 被工作区键路由吞掉。原生 Git fixture 必须位于 OS 临时目录，否则 Git 根探测会向上并入开发仓库。Linux/macOS 仅做代码兼容审查，未本机执行。

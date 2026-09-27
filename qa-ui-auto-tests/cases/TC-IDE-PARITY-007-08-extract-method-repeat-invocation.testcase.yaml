@@ -1,0 +1,133 @@
+id: TC-IDE-PARITY-007-08
+title: Extract Method repeated invocation commits once
+description: Two chords in quick succession must commit exactly one extraction and one history entry.
+covers:
+- F25.5
+tags:
+- code-workspace
+- refactor
+- parity007
+- provider-fixture
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity007_extract
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Control+Alt+M
+- press: Control+Alt+M
+- parity007_trace:
+    pending: 0
+- wait_for: '[data-testid="text-input-dialog-input"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = extracted(values);'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    private static int extracted(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_trace:
+    pending: 0
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-007-V3-08-repeat
+    requirement: 'A repeated invocation commits exactly one extraction: the buffer becomes B1 once, one undo restores B0, and no provider response stays pending.'
+    actions:
+    - 17
+    checkpoints:
+    - step: 19
+      expectation: The repeated chords left no pending provider response.
+    - step: 21
+      expectation: 'Exactly one extraction was committed: the buffer is B1 with a single new method.'
+    - step: 26
+      expectation: A single undo restores the initial B0.
+    - step: 27
+      expectation: The closing observation still sees no pending response.
+    results:
+    - 19
+    - 21
+    - 26
+    - 27
+  visual:
+  - check: Real WebView rendering of the repeated-invocation flow.
+    method: manual
+    reason: Screenshots are recorded artifacts; pixel comparison is separate.
+  native:
+  - check: No native-only path is exercised by this controlled-provider case.
+    method: manual
+    reason: The repeated-chord guard is client-side and covered natively by TC-IDE-PARITY-007-03/06.

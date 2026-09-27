@@ -90,7 +90,8 @@ describe("§8.18.9.4 formatter exclusion + markers", () => {
 
 describe("§8.18.9.1 structural search gate", () => {
   it("stays unavailable until a real parser backend exists", () => {
-    expect(structuralSearchAvailability("java", false)).toEqual({ available: false, reason: "backend-missing" });
+    expect(structuralSearchAvailability("java", false)).toEqual({ available: false, reason: "parser-not-ready" });
+    expect(structuralSearchAvailability("java", true)).toEqual({ available: true, backend: "tree-sitter" });
     expect(structuralSearchAvailability("kotlin", true)).toEqual({ available: false, reason: "unsupported-language" });
   });
 

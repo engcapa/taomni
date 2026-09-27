@@ -82,6 +82,8 @@
           "project_tree",
           "parity005_completion",
           "parity006_replace",
+          "parity008_git",
+          "parity009_ssr",
           "parity007_extract"
         ]
       },
@@ -794,6 +796,101 @@
         },
         "middle_click": {
           "$ref": "#/$defs/selector"
+        },
+        "parity008_hold": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Browser parity008 fixture: hold git_blob_pair responses for this repo root (null clears)."
+        },
+        "parity008_release": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {}
+            }
+          ],
+          "description": "Browser parity008 fixture: release held diff reads; fails when none is pending."
+        },
+        "parity008_trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "writes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pending": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pending_min": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "last_pair_repo": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "parity009_set_mode": {
+          "enum": [
+            "normal",
+            "hold",
+            "unavailable",
+            "error"
+          ]
+        },
+        "parity009_release": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {}
+            }
+          ]
+        },
+        "parity009_trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "active": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "runs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "last_status": {
+              "enum": [
+                "ok",
+                "unavailable",
+                "error",
+                "cancelled"
+              ]
+            },
+            "last_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
         },
         "parity007_set_mode": {
           "enum": [
