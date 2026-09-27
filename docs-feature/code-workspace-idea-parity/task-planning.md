@@ -106,7 +106,7 @@
 
 ## ED-PARITY-007 Java Extract Method 的支持边界、预览与撤销
 
-2026-09-27 P1 已细化至[本卡设计](extract-method-plan.md#ed-parity-007)、[完整用例](extract-method-plan.md#test-cases)及[IDEA 2026.2.2 Linux 参照与 F2-EXTRACT-007](references/ed-parity-007-reference.md#observed)；[完整 P2 交接](handoff-p2-ed-parity-007.md)。下方保留 P0 原始起点；独立 DEC-01..08、A1..A3、V1..V6、S0..S10 与文件责任以设计为准。IDEA 版本要求为 Ultimate 2026.x 任一发行版（仅本卡，参照实采于 2026.2.2）、提取后弹出命名、接受两步撤销。已确认 D1 provider 失败被说成“无动作”，G1–G3 为体验差异；多输出 record 折叠为能力差距交 P0。Required evidence 增加 `browser`、`rust`，原种类保留。ready / planning_required=false，无开发 owner；产品验证未执行。
+2026-09-27 P1 已细化至[本卡设计](extract-method-plan.md#ed-parity-007)、[完整用例](extract-method-plan.md#test-cases)、[IDEA 2026.2.2 Linux 参照与 F2-EXTRACT-007](references/ed-parity-007-reference.md#observed)、[Windows 历史边界/E3 oracle](references/ed-parity-007-windows-reference.md#semantic-fixture)及[完整 P2 交接](handoff-p2-ed-parity-007.md)。cc 方案修订保留 modal 命名/两步撤销，补局部 owner/receipt 迟到守卫、完整入口/Undo-Redo、E1/E3 `13:1` 程序 oracle；Windows 原件当前不可复核。下方保留 P0 原始起点；独立 DEC-01..08、A1..A3、V1..V6、S0..S10 与文件责任以设计为准。IDEA 版本要求为 Ultimate 2026.x 任一发行版（仅本卡，参照实采于 2026.2.2）、提取后弹出命名、接受两步撤销；补入局部 owner/receipt 迟到守卫、完整入口/Undo-Redo 覆盖和 E1/E3 `13:1` 程序 oracle。已确认 D1 provider 失败被说成“无动作”，G1–G3 为体验差异；多输出 record 折叠为能力差距交 P0。Required evidence 增加 `browser`、`rust`，原种类保留。ready / planning_required=false，无开发 owner；产品验证未执行。
 
 - 来源：REQ-06 / CW-REFACTOR-002；[P0 需求](overall-audit-plan-20260913.md#req-06)、[历史只读材料](../../claudedocs/code-workspace-idea-parity-backlog.md)。
 - 已知依据：P0 REQ-06 的 provider 能力与双侧交互待证；ED-REF-001 已在后续交付中记录 done，仅作 Rename 保留来源。

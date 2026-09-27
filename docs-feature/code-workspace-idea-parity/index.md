@@ -6,7 +6,7 @@
 
 ## 当前 P1 接续（2026-09-27）
 
-本轮按唯一板选定 **ED-PARITY-007**，来源 REQ-06 / CW-REFACTOR-002；[本卡设计及 DEC/AC/V](extract-method-plan.md#ed-parity-007)、[完整用例设计](extract-method-plan.md#test-cases)、[IDEA 2026.2.2 Linux 参照与 F2-EXTRACT-007](references/ed-parity-007-reference.md#observed)、[完整 P2 提示词](handoff-p2-ed-parity-007.md)。IDEA 版本要求为 Ultimate 2026.x 任一发行版（仅本卡），本轮参照实采于本机 2026.2.2 / IU-262.10315.125；15 分钟时段在隔离工程实采直达就地提取、命名模板、单步撤销、重入保护与多输出 record 折叠。确认 D1 provider 失败被说成“无动作”；用户定提取后弹出命名、接受两步撤销。多输出 record 折叠为能力差距，留 P0 增量。**P1 规划完成，ready / planning_required=false，无开发 owner**，可由 P2 正式领取。不是功能/UI/交互已对齐；所有产品验证未执行，状态只看[唯一板](backlog.md)。
+本轮按唯一板选定 **ED-PARITY-007**，来源 REQ-06 / CW-REFACTOR-002；[本卡设计及 DEC/AC/V](extract-method-plan.md#ed-parity-007)、[完整用例设计](extract-method-plan.md#test-cases)、[IDEA 2026.2.2 Linux 参照与 F2-EXTRACT-007](references/ed-parity-007-reference.md#observed)、[Windows 历史边界/E3 oracle](references/ed-parity-007-windows-reference.md#semantic-fixture)、[完整 P2 提示词](handoff-p2-ed-parity-007.md)。IDEA 版本要求为 Ultimate 2026.x 任一发行版（仅本卡），本轮参照实采于本机 2026.2.2 / IU-262.10315.125；15 分钟时段在隔离工程实采直达就地提取、命名模板、单步撤销、重入保护与多输出 record 折叠；本次吸收 cc 修订中的局部命名 owner、receipt/迟到守卫和 E1/E3 程序 oracle。确认 D1 provider 失败被说成“无动作”；用户定提取后弹出命名、接受两步撤销；补入局部 owner/receipt 迟到守卫、完整入口/Undo-Redo 覆盖和 E1/E3 `13:1` 程序 oracle。多输出 record 折叠为能力差距，留 P0 增量；Windows 历史原件当前不可复核，不作为本轮 native 证据。**P1 规划完成，ready / planning_required=false，无开发 owner**，可由 P2 正式领取。不是功能/UI/交互已对齐；所有产品验证未执行，状态只看[唯一板](backlog.md)。
 
 ## 历史任务入口（2026-09-26）
 
