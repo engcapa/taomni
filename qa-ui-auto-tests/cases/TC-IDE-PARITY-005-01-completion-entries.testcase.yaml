@@ -89,7 +89,7 @@ steps:
   - wait_for:
       selector: '[data-testid="keymap-cheatsheet-dialog"]'
       state: hidden
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - click: '[data-testid="code-workspace-editor"] .cm-line:nth-child(5)'
   - press: End
   - press: ArrowLeft
   - press: Control+Space
