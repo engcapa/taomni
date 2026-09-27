@@ -40,7 +40,19 @@ export type CodeActionProviderResultV4 =
   }
   | { state: "unsupported"; reason: string; evidence: CapabilityEvidenceV3 }
   | { state: "timeout"; requestId: string; cancelled: boolean; providerStillHealthy: boolean; retryAfter: "manual" | "restart" }
-  | { state: "cancelled"; requestId: string; reason: "aborted"; providerStillHealthy: boolean }
+  | {
+    state: "cancelled";
+    requestId: string;
+    reason: "aborted";
+    providerStillHealthy: boolean;
+    /**
+     * ED-PARITY-007 DEC-05: the raw provider message when the language server
+     * itself cancelled the request (for example "…cancelled: document
+     * changed"), so callers can report the real cause instead of a generic
+     * "no actions provided". Absent for caller-side aborts.
+     */
+    detail?: string;
+  }
   | { state: "failed"; message: string; providerStillHealthy: boolean };
 
 /**
@@ -104,6 +116,17 @@ export function buildCodeActionClientCapabilities(): Record<string, unknown> {
 }
 
 /**
+ * LSP 3.16 `CodeAction.disabled`: the server can return an action it would
+ * refuse, with the reason. Such a candidate renders as a disabled menu entry
+ * instead of an action that only fails after the user selects it.
+ */
+function providerDeclaredDisabledReason(action: LspCodeAction): string | null {
+  const disabled = (action.raw as { disabled?: { reason?: unknown } } | null | undefined)?.disabled;
+  const reason = disabled?.reason;
+  return typeof reason === "string" && reason.trim().length > 0 ? reason : null;
+}
+
+/**
  * Maps raw provider actions into ProviderActionV4 with evidence.
  */
 export function toProviderActionsV4(
@@ -120,7 +143,7 @@ export function toProviderActionsV4(
   return actions.map((action) => ({
     action,
     evidence,
-    disabledReason,
+    disabledReason: disabledReason ?? providerDeclaredDisabledReason(action),
   }));
 }
 
@@ -134,7 +157,7 @@ export function evaluateCodeActionResult(
     | { kind: "malformed"; malformedCount: number; message: string }
     | { kind: "unsupported"; reason: string }
     | { kind: "timeout"; requestId: string; cancelled: boolean; providerStillHealthy: boolean; retryAfter: "manual" | "restart" }
-    | { kind: "cancelled"; requestId: string; reason: "aborted"; providerStillHealthy: boolean }
+    | { kind: "cancelled"; requestId: string; reason: "aborted"; providerStillHealthy: boolean; detail?: string }
     | { kind: "failed"; message: string; providerStillHealthy: boolean },
   evidenceInput: Omit<BuildEvidenceInput, "capabilityId" | "complete" | "reason">,
 ): CodeActionProviderResultV4 {
@@ -204,6 +227,7 @@ export function evaluateCodeActionResult(
       requestId: outcome.requestId,
       reason: outcome.reason,
       providerStillHealthy: outcome.providerStillHealthy,
+      ...(outcome.detail ? { detail: outcome.detail } : {}),
     };
   }
   return {
@@ -431,7 +455,28 @@ export class CanonicalCodeActionService {
           evidenceInput,
         );
       }
-      if (message === "CODE_ACTION_TIMEOUT" || message.includes("timeout") || message.includes("Timeout")) {
+      // ED-PARITY-007 DEC-05: a provider-side cancellation is not a generic
+      // failure. JDT LS / the Rust bridge cancel pending requests with
+      // "language server request cancelled: document changed" when a didChange
+      // supersedes them.
+      if (message.includes("document changed")) {
+        return evaluateCodeActionResult(
+          {
+            kind: "cancelled",
+            requestId,
+            reason: "aborted",
+            providerStillHealthy: true,
+            detail: message,
+          },
+          evidenceInput,
+        );
+      }
+      if (
+        message === "CODE_ACTION_TIMEOUT"
+        || message.includes("timeout")
+        || message.includes("Timeout")
+        || message.includes("timed out")
+      ) {
         return evaluateCodeActionResult(
           {
             kind: "timeout",

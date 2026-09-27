@@ -6285,6 +6285,22 @@ controls:
     selector: '[data-testid="refactoring-preview-apply"]'
     kind: interactive
     optional: true       # applies the previewed refactoring (C6-04)
+  - id: refactoring-preview-select-none
+    selector: '[data-testid="refactoring-preview-select-none"]'
+    kind: interactive
+    optional: true       # required extraction edits cannot be dropped (ED-PARITY-007-05)
+  - id: refactoring-preview-cancel
+    selector: '[data-testid="refactoring-preview-cancel"]'
+    kind: interactive
+    optional: true       # cancel leaves every affected file unchanged (ED-PARITY-007-05)
+  - id: intention-candidate-item        # frozen provider candidate rows
+    selector: '[data-testid^="code-workspace-intention-"]'
+    kind: interactive
+    optional: true
+  - id: extract-method-name-prompt      # ED-PARITY-007 owner-scoped naming wrapper
+    selector: '[data-testid="extract-method-name-prompt"]'
+    kind: display
+    optional: true       # mounted only while an Extract Method transaction owns the naming step
   - id: refactor-recovery-review
     selector: '[data-testid="refactor-recovery-review"]'
     kind: display
@@ -6505,6 +6521,14 @@ controls:
     optional: true
   - id: keymap-basic-completion-run
     selector: '[data-testid="keymap-run-editor.basicCompletion"]'
+    kind: interactive
+    optional: true
+  - id: keymap-extract-method-item
+    selector: '[data-testid="keymap-item-workspace.extractMethod"]'
+    kind: display
+    optional: true
+  - id: keymap-extract-method-run
+    selector: '[data-testid="keymap-run-workspace.extractMethod"]'
     kind: interactive
     optional: true
   - id: completion-provider-type-option
@@ -7385,6 +7409,7 @@ controls:
     optional: true
     aliases:
       - '[data-testid="keymap-item-workspace.renameSymbol"]'
+      - '[data-testid="keymap-item-workspace.extractMethod"]'
   - id: keymap-cheatsheet-footer-close
     selector: '[data-testid="keymap-cheatsheet-footer-close"]'
     kind: interactive

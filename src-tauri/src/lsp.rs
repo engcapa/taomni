@@ -8338,20 +8338,21 @@ pub async fn lsp_code_actions(
         }
     };
     let context = code_action_context(diagnostics.unwrap_or_default(), only);
-    let result = session
-        .request(
-            "textDocument/codeAction",
-            json!({
-                "textDocument": { "uri": document.uri },
-                "range": {
-                    "start": { "line": start_line, "character": start_character },
-                    "end": { "line": end_line, "character": end_character },
-                },
-                "context": context,
-            }),
-        )
-        .await
-        .unwrap_or(Value::Null);
+    let actions = code_actions_from_response(
+        session
+            .request(
+                "textDocument/codeAction",
+                json!({
+                    "textDocument": { "uri": document.uri },
+                    "range": {
+                        "start": { "line": start_line, "character": start_character },
+                        "end": { "line": end_line, "character": end_character },
+                    },
+                    "context": context,
+                }),
+            )
+            .await,
+    )?;
     let status = state
         .lsp
         .document_status(
@@ -8360,10 +8361,7 @@ pub async fn lsp_code_actions(
             custom_server_command.as_ref(),
         )
         .await;
-    Ok(LspCodeActionsResult {
-        status,
-        actions: parse_code_actions(&result),
-    })
+    Ok(LspCodeActionsResult { status, actions })
 }
 
 /// Resolve a lazily populated CodeAction only after the user selects it.
@@ -10674,6 +10672,22 @@ fn parse_code_actions(value: &Value) -> Vec<LspCodeAction> {
         .as_array()
         .map(|items| items.iter().filter_map(parse_code_action).collect())
         .unwrap_or_default()
+}
+
+/// ED-PARITY-007 DEC-05: keep a provider failure visible instead of collapsing
+/// it into an empty action list. `Err` (transport error, 8 s request timeout,
+/// "document changed" cancellation) propagates to the caller so the workspace
+/// reports the real failure instead of claiming the server offered no actions.
+/// A JSON `null` response is a valid empty result, and a missing session
+/// remains the caller's `Ok` empty result.
+fn code_actions_from_response(
+    response: Result<Value, String>,
+) -> Result<Vec<LspCodeAction>, String> {
+    match response {
+        Ok(Value::Null) => Ok(Vec::new()),
+        Ok(value) => Ok(parse_code_actions(&value)),
+        Err(message) => Err(message),
+    }
 }
 
 fn parse_workspace_symbol(value: &Value) -> Option<LspWorkspaceSymbol> {
@@ -13410,6 +13424,57 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         assert_eq!(symbols[1].name, "path");
         assert_eq!(symbols[1].depth, 1);
         assert_eq!(symbols[1].detail.as_deref(), Some("string"));
+    }
+
+    #[test]
+    fn code_actions_from_response_propagates_errors() {
+        let timeout = code_actions_from_response(Err(
+            "language server request timed out: textDocument/codeAction".into(),
+        ));
+        assert_eq!(
+            timeout.err().as_deref(),
+            Some("language server request timed out: textDocument/codeAction")
+        );
+        let cancelled = code_actions_from_response(Err(
+            "language server request cancelled: document changed".into(),
+        ));
+        assert_eq!(
+            cancelled.err().as_deref(),
+            Some("language server request cancelled: document changed")
+        );
+    }
+
+    #[test]
+    fn code_actions_from_response_keeps_null_as_empty() {
+        let actions = code_actions_from_response(Ok(Value::Null)).expect("null is valid");
+        assert!(actions.is_empty());
+        let empty = code_actions_from_response(Ok(json!([]))).expect("empty array is valid");
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn code_actions_from_response_parses_actions() {
+        let response = json!([
+            {
+                "title": "Extract to method",
+                "kind": "refactor.extract.function",
+                "isPreferred": true,
+                "data": { "extractMethod": true }
+            }
+        ]);
+        let actions = code_actions_from_response(Ok(response)).expect("actions");
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0].title, "Extract to method");
+        assert_eq!(actions[0].kind.as_deref(), Some("refactor.extract.function"));
+        assert!(actions[0].is_preferred);
+        assert_eq!(
+            actions[0]
+                .raw
+                .get("data")
+                .and_then(|data| data.get("extractMethod"))
+                .and_then(Value::as_bool),
+            Some(true)
+        );
     }
 
     #[test]
