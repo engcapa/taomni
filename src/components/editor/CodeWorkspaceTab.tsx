@@ -8848,6 +8848,12 @@ export function CodeWorkspaceTab({
   const structuralSearch = useStructuralSearchSession({
     roots: structuralRoots,
     activeFile: structuralActiveFile,
+    getBuffers: () => Object.values(openFilesRef.current).flatMap((file) => (
+      file.ref.kind === "root" && !file.loading && !file.error && /\.java$/i.test(file.ref.path)
+        && structuralRoots.some((root) => root.id === (file.ref.kind === "root" ? file.ref.rootId : null))
+        ? [{ rootId: file.ref.rootId, path: file.ref.path, text: file.text }]
+        : []
+    )),
     onShowResults: showStructuralResults,
     onStatus: setStatusMessage,
   });

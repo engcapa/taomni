@@ -19,6 +19,14 @@ export interface StructuralSearchRequest {
   query: StructuralQuery;
   roots: StructuralSearchRoot[];
   activeFile: { rootId: string; path: string } | null;
+  /** Loaded editor snapshots, including inactive/unsaved Java documents. */
+  buffers?: StructuralSearchBuffer[];
+}
+
+export interface StructuralSearchBuffer {
+  rootId: string;
+  path: string;
+  text: string;
 }
 
 export interface StructuralPosition {
@@ -71,7 +79,11 @@ export type StructuralErrorCode =
   | "invalid-pattern"
   | "unsupported-constraint"
   | "invalid-scope"
-  | "invalid-request";
+  | "invalid-request"
+  | "file-read"
+  | "unsupported-encoding"
+  | "file-too-large"
+  | "file-parse";
 
 export type StructuralSearchResponse =
   | {

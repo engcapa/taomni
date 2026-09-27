@@ -6,6 +6,7 @@ import {
   structuralSearchRun,
   structuralTemplateVariables,
   type StructuralMatch,
+  type StructuralSearchBuffer,
   type StructuralSearchCapabilities,
   type StructuralSearchResponse,
   type StructuralSearchRoot,
@@ -49,6 +50,7 @@ export interface StructuralSearchResultState {
 interface Options {
   roots: readonly StructuralSearchRoot[];
   activeFile: { rootId: string; path: string } | null;
+  getBuffers?: () => StructuralSearchBuffer[];
   onShowResults: () => void;
   onStatus: (message: string) => void;
 }
@@ -60,7 +62,7 @@ function capabilitiesUnavailableMessage(caps: StructuralSearchCapabilities | nul
   return `Structural Search backend ${caps.backend.id} is not ready`;
 }
 
-export function useStructuralSearchSession({ roots, activeFile, onShowResults, onStatus }: Options) {
+export function useStructuralSearchSession({ roots, activeFile, getBuffers, onShowResults, onStatus }: Options) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draft, setDraft] = useState<StructuralSearchDraft>({
     pattern: DEFAULT_STRUCTURAL_TEMPLATE,
@@ -182,7 +184,7 @@ export function useStructuralSearchSession({ roots, activeFile, onShowResults, o
     setMessage(null);
     let response: StructuralSearchResponse | undefined;
     try {
-      response = await structuralSearchRun({ requestId, query, roots: [...roots], activeFile });
+      response = await structuralSearchRun({ requestId, query, roots: [...roots], activeFile, buffers: getBuffers?.() ?? [] });
     } catch (error) {
       if (generationRef.current !== generation || !mountedRef.current) return;
       activeRequestRef.current = null;
@@ -231,7 +233,7 @@ export function useStructuralSearchSession({ roots, activeFile, onShowResults, o
         setMessage("Structural search cancelled");
         return;
     }
-  }, [activeFile, buildQuery, capabilities, capabilitiesLoaded, onShowResults, onStatus, refreshCapabilities, roots]);
+  }, [activeFile, buildQuery, capabilities, capabilitiesLoaded, getBuffers, onShowResults, onStatus, refreshCapabilities, roots]);
 
   return {
     dialogOpen,

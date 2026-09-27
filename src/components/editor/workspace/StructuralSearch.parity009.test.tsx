@@ -6,6 +6,7 @@ import type {
   StructuralSearchCapabilities,
   StructuralSearchRequest,
   StructuralSearchResponse,
+  StructuralSearchBuffer,
 } from "../../../lib/editor/structuralSearch";
 import { StructuralSearchDialog } from "./StructuralSearchDialog";
 import { StructuralSearchPanel } from "./panels/StructuralSearchPanel";
@@ -63,10 +64,11 @@ function deferred<T>() {
 const onOpenMatch = vi.fn();
 const onStatus = vi.fn();
 
-function Harness() {
+function Harness({ buffers = [] }: { buffers?: StructuralSearchBuffer[] }) {
   const session = useStructuralSearchSession({
     roots: [{ id: "root", name: "parity009", path: "/fx/parity009" }],
     activeFile: { rootId: "root", path: "src/StructuralTarget.java" },
+    getBuffers: () => buffers,
     onShowResults: () => undefined,
     onStatus,
   });
@@ -100,6 +102,35 @@ describe("Structural Search session ED-PARITY-009", () => {
   });
 
   afterEach(() => cleanup());
+
+  it("snapshots all loaded buffers at Find, including inactive and empty documents", async () => {
+    const buffers = [
+      { rootId: "root", path: "src/StructuralTarget.java", text: "class A {}" },
+      { rootId: "root", path: "src/Inactive.java", text: "class B { void f() { System.out.println(999); } }" },
+      { rootId: "root", path: "src/Empty.java", text: "" },
+    ];
+    const view = render(<Harness buffers={buffers} />);
+    await openDialog();
+    const updated = buffers.map((buffer) => ({ ...buffer, text: buffer.text.replace("999", "42") }));
+    view.rerender(<Harness buffers={updated} />);
+    fireEvent.click(screen.getByTestId("structural-search-find"));
+    await waitFor(() => expect(lastRequest().buffers).toEqual(updated));
+  });
+
+  it("shows a file error instead of an empty result and can retry", async () => {
+    ipc.structuralSearchRun.mockImplementationOnce(async (request: StructuralSearchRequest) => ({
+      status: "error", requestId: request.requestId, code: "unsupported-encoding",
+      message: "Cannot search /root/Legacy.java: file is not UTF-8",
+    }));
+    render(<Harness />);
+    await openDialog();
+    fireEvent.click(screen.getByTestId("structural-search-find"));
+    await waitFor(() => expect(screen.getByTestId("structural-search-error")).toHaveTextContent("Legacy.java: file is not UTF-8"));
+    expect(screen.queryByTestId("structural-search-empty")).toBeNull();
+    expect(screen.getByTestId("structural-search-find")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("structural-search-find"));
+    await waitFor(() => expect(screen.getByTestId("structural-search-summary")).toHaveTextContent("3 results"));
+  });
 
   it("finds the default Java template In Project and renders class → method → locations", async () => {
     render(<Harness />);

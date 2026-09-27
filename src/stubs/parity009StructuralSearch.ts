@@ -199,9 +199,11 @@ async function search(request: StructuralSearchRequest): Promise<StructuralSearc
   const results: StructuralMatch[] = [];
   let filesScanned = 0;
   for (const root of roots) {
-    const files = query.scope === "file" && request.activeFile ? [request.activeFile.path] : await javaFiles(root.path);
+    const buffers = (request.buffers ?? []).filter((buffer) => buffer.rootId === root.id);
+    const files = query.scope === "file" && request.activeFile ? [request.activeFile.path]
+      : [...new Set([...await javaFiles(root.path), ...buffers.map((buffer) => buffer.path)])].sort();
     for (const path of files) {
-      const source = await vfsReadText(`${root.path}/${path}`);
+      const source = buffers.find((buffer) => buffer.path === path)?.text ?? await vfsReadText(`${root.path}/${path}`);
       filesScanned += 1;
       const tree = javaLanguage.parser.parse(source);
       tree.iterate({

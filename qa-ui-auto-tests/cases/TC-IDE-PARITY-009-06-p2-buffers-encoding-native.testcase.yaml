@@ -1,0 +1,229 @@
+id: TC-IDE-PARITY-009-06
+title: Structural Search dirty buffers, scope and typed file errors
+description: 'Review S5/S6 regression: renderer entry, active/inactive buffer search, file/module scope and unchanged editor.
+  Native also proves actual parser IPC, UTF-16 error/retry, and unchanged disk hashes.'
+covers:
+- F25.5
+- F25.6
+tags:
+- code-workspace
+- structural-search
+- parity009
+- regression
+- p2
+modes:
+- native
+fixtures:
+- reset_db
+- parity009_ssr
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-p2-fix-password
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 45
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "qa-p2", "name": "p2-fix", "roots": [{"id": "parity009", "name": "parity009", "path": "${fixture.parity009_root}",
+      "kind": "folder"}, {"id": "encoding", "name": "encoding", "path": "${fixture.parity009_encoding_root}", "kind": "folder"}],
+      "looseFiles": [], "lastActiveFile": {"kind": "root", "rootId": "parity009", "path": "src/StructuralTarget.java"}, "lastOpenedAt":
+      1756100000000, "isGitRepo": false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 45
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+a
+- type: class StructuralTarget { void run() { System.out.println(999); } }
+- wait_for:
+    selector: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
+    timeout_sec: 45
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 45
+- click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-of-type(5)'
+- fill:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    value: Search Structurally
+- press: Enter
+- wait_for:
+    selector: '[data-testid="structural-search-dialog"]'
+    timeout_sec: 45
+- assert_attribute:
+    selector: '[data-testid="structural-search-language"]'
+    name: value
+    equals: java
+- click: '[data-testid="structural-search-scope-module"]'
+- fill:
+    selector: '[data-testid="structural-search-variable-text"]'
+    value: '42'
+- click: '[data-testid="structural-search-find"]'
+- wait_for:
+    selector: '[data-testid="structural-search-empty"]'
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="structural-search-match"]'
+    equal: 0
+- click: '[data-testid="structural-search-edit-query"]'
+- fill:
+    selector: '[data-testid="structural-search-variable-text"]'
+    value: '999'
+- click: '[data-testid="structural-search-find"]'
+- wait_for:
+    selector: '[data-testid="structural-search-match"]'
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="structural-search-match"]'
+    equal: 1
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Other.java"]'
+- assert_text_equals:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    equals: class Other {}
+- click: '[data-testid="structural-search-edit-query"]'
+- click: '[data-testid="structural-search-scope-file"]'
+- click: '[data-testid="structural-search-find"]'
+- wait_for:
+    selector: '[data-testid="structural-search-empty"]'
+    timeout_sec: 45
+- click: '[data-testid="structural-search-edit-query"]'
+- click: '[data-testid="structural-search-scope-module"]'
+- click: '[data-testid="structural-search-find"]'
+- wait_for:
+    selector: '[data-testid="structural-search-match"]'
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="structural-search-match"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="structural-search-match"]'
+    name: data-path
+    equals: src/StructuralTarget.java
+- click: '[data-testid="structural-search-match"]'
+- assert_text_equals:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    equals: class StructuralTarget { void run() { System.out.println(999); } }
+- wait_for:
+    selector: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
+    timeout_sec: 45
+- screenshot: dirty-inactive-buffer.png
+- click: '[data-testid="structural-search-edit-query"]'
+- click: '[data-testid="structural-search-scope-workspace"]'
+- click: '[data-testid="structural-search-find"]'
+- wait_for:
+    selector: '[data-testid="structural-search-error"]'
+    timeout_sec: 45
+- assert_text:
+    selector: '[data-testid="structural-search-error"]'
+    contains: 'Legacy.java: file is not UTF-8'
+- assert_count:
+    selector: '[data-testid="structural-search-empty"]'
+    equal: 0
+- screenshot: encoding-error.png
+- click: '[data-testid="structural-search-scope-module"]'
+- click: '[data-testid="structural-search-find"]'
+- wait_for:
+    selector: '[data-testid="structural-search-match"]'
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="structural-search-match"]'
+    equal: 1
+- assert_not_visible: '[data-testid="structural-search-dialog"]'
+- assert_file_sha256:
+    path: ${fixture.parity009_target}
+    equals: ${fixture.parity009_target_sha256}
+- assert_file_sha256:
+    path: ${fixture.parity009_encoding_file}
+    equals: ${fixture.parity009_encoding_sha256}
+native_platforms:
+- Windows
+- Linux
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-009-P2-BUFFERS-ENCODING
+    requirement: Unsaved changes replace disk content even when inactive; file scope excludes other buffers; errors never
+      become empty results, retry works and native disk bytes remain unchanged.
+    actions:
+    - 6
+    - 7
+    - 9
+    - 10
+    - 11
+    - 13
+    - 15
+    - 16
+    - 17
+    - 20
+    - 21
+    - 22
+    - 25
+    - 26
+    - 27
+    - 30
+    - 32
+    - 33
+    - 34
+    - 36
+    - 37
+    - 38
+    - 42
+    - 46
+    - 47
+    - 48
+    - 53
+    - 54
+    checkpoints:
+    - step: 19
+      expectation: '{assert_attribute: {equals: java, name: value, selector: ''[data-testid="structural-search-language"]''}}'
+    - step: 24
+      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 29
+      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 31
+      expectation: "{assert_text_equals: {equals: 'class Other {}', selector: '[data-testid=\"code-workspace-editor\"]\n \
+        \     .cm-content'}}"
+    - step: 40
+      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 41
+      expectation: '{assert_attribute: {equals: src/StructuralTarget.java, name: data-path, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 43
+      expectation: "{assert_text_equals: {equals: 'class StructuralTarget { void run() { System.out.println(999);\n      }\
+        \ }', selector: '[data-testid=\"code-workspace-editor\"] .cm-content'}}"
+    - step: 50
+      expectation: '{assert_text: {contains: ''Legacy.java: file is not UTF-8'', selector: ''[data-testid="structural-search-error"]''}}'
+    - step: 51
+      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-empty"]''}}'
+    - step: 56
+      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 57
+      expectation: '{assert_not_visible: ''[data-testid="structural-search-dialog"]''}'
+    - step: 58
+      expectation: '{assert_file_sha256: {equals: ''${fixture.parity009_target_sha256}'', path: ''${fixture.parity009_target}''}}'
+    - step: 59
+      expectation: '{assert_file_sha256: {equals: ''${fixture.parity009_encoding_sha256}'', path: ''${fixture.parity009_encoding_file}''}}'
+    results:
+    - 19
+    - 24
+    - 29
+    - 31
+    - 40
+    - 41
+    - 43
+    - 50
+    - 51
+    - 56
+    - 57
+    - 58
+    - 59
+  visual:
+  - check: Existing search dialog and result layout retained.
+    method: not-applicable
+    reason: This regression changes search inputs and error semantics, not layout.
+  native:
+  - check: Real parser IPC, unsupported file error and disk hashes.
+    method: automated
+    reason: Browser VFS cannot establish host byte and encoding behavior.

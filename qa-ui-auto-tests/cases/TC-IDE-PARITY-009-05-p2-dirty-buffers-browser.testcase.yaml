@@ -1,0 +1,173 @@
+id: TC-IDE-PARITY-009-05
+title: Structural Search includes inactive unsaved buffers within scope
+description: 'Review S5/S6 regression: renderer entry, active/inactive buffer search, file/module scope and unchanged editor.
+  Native also proves actual parser IPC, UTF-16 error/retry, and unchanged disk hashes.'
+covers:
+- F25.5
+- F25.6
+tags:
+- code-workspace
+- structural-search
+- parity009
+- regression
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
+- parity009_ssr
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 45
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "qa-p2", "name": "p2-fix", "roots": [{"id": "parity009", "name": "parity009", "path": "${fixture.parity009_root}",
+      "kind": "folder"}], "looseFiles": [], "lastActiveFile": {"kind": "root", "rootId": "parity009", "path": "src/StructuralTarget.java"},
+      "lastOpenedAt": 1756100000000, "isGitRepo": false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 45
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+a
+- type: class StructuralTarget { void run() { System.out.println(999); } }
+- wait_for:
+    selector: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
+    timeout_sec: 45
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 45
+- click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-of-type(5)'
+- fill:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    value: Search Structurally
+- press: Enter
+- wait_for:
+    selector: '[data-testid="structural-search-dialog"]'
+    timeout_sec: 45
+- assert_attribute:
+    selector: '[data-testid="structural-search-language"]'
+    name: value
+    equals: java
+- click: '[data-testid="structural-search-scope-module"]'
+- fill:
+    selector: '[data-testid="structural-search-variable-text"]'
+    value: '42'
+- click: '[data-testid="structural-search-find"]'
+- wait_for:
+    selector: '[data-testid="structural-search-empty"]'
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="structural-search-match"]'
+    equal: 0
+- click: '[data-testid="structural-search-edit-query"]'
+- fill:
+    selector: '[data-testid="structural-search-variable-text"]'
+    value: '999'
+- click: '[data-testid="structural-search-find"]'
+- wait_for:
+    selector: '[data-testid="structural-search-match"]'
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="structural-search-match"]'
+    equal: 1
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Other.java"]'
+- assert_text_equals:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    equals: class Other {}
+- click: '[data-testid="structural-search-edit-query"]'
+- click: '[data-testid="structural-search-scope-file"]'
+- click: '[data-testid="structural-search-find"]'
+- wait_for:
+    selector: '[data-testid="structural-search-empty"]'
+    timeout_sec: 45
+- click: '[data-testid="structural-search-edit-query"]'
+- click: '[data-testid="structural-search-scope-module"]'
+- click: '[data-testid="structural-search-find"]'
+- wait_for:
+    selector: '[data-testid="structural-search-match"]'
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="structural-search-match"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="structural-search-match"]'
+    name: data-path
+    equals: src/StructuralTarget.java
+- click: '[data-testid="structural-search-match"]'
+- assert_text_equals:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    equals: class StructuralTarget { void run() { System.out.println(999); } }
+- wait_for:
+    selector: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
+    timeout_sec: 45
+- screenshot: dirty-inactive-buffer.png
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-009-P2-BUFFERS
+    requirement: Search and navigation use unsaved editor content; inactive files participate in module searches but not the
+      current-file scope.
+    actions:
+    - 5
+    - 6
+    - 8
+    - 9
+    - 10
+    - 12
+    - 14
+    - 15
+    - 16
+    - 19
+    - 20
+    - 21
+    - 24
+    - 25
+    - 26
+    - 29
+    - 31
+    - 32
+    - 33
+    - 35
+    - 36
+    - 37
+    - 41
+    checkpoints:
+    - step: 18
+      expectation: '{assert_attribute: {equals: java, name: value, selector: ''[data-testid="structural-search-language"]''}}'
+    - step: 23
+      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 28
+      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 30
+      expectation: "{assert_text_equals: {equals: 'class Other {}', selector: '[data-testid=\"code-workspace-editor\"]\n \
+        \     .cm-content'}}"
+    - step: 39
+      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 40
+      expectation: '{assert_attribute: {equals: src/StructuralTarget.java, name: data-path, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 42
+      expectation: "{assert_text_equals: {equals: 'class StructuralTarget { void run() { System.out.println(999);\n      }\
+        \ }', selector: '[data-testid=\"code-workspace-editor\"] .cm-content'}}"
+    results:
+    - 18
+    - 23
+    - 28
+    - 30
+    - 39
+    - 40
+    - 42
+  visual:
+  - check: Existing search dialog and result layout retained.
+    method: not-applicable
+    reason: This regression changes search inputs and error semantics, not layout.
+  native:
+  - check: Renderer workflow only.
+    method: not-applicable
+    reason: Browser VFS cannot establish host byte and encoding behavior.

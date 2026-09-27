@@ -7524,6 +7524,7 @@ controls:
 -->
 
 - `Search Structurally…`（Actions 入口，无默认快捷键）打开 Java 模板对话框：`$var$` 变量、Count [1,1]、Text（正则）/Invert 修饰符、Match case、In Project/Module/Current File 范围。
+- 搜索优先使用所有已加载 Java 编辑器的快照，包含非活动 dirty 缓冲，按所选范围过滤且不保存磁盘。无法读取、非 UTF-8、超过 2 MiB 或 parser 未完成时显示带路径的类型化错误，不能当作空结果；TC-IDE-PARITY-009-05/06 覆盖缓冲/范围/错误恢复与 native 零写入。
 - 原生后端为 tree-sitter-java AST 匹配（节点类型 + 叶子 token），排除注释、字符串与相似调用；无 regex 回退，不可用/无效模板/不支持的修饰符均为类型化状态。结果进入底部 “Structural Search” 工具窗：文件 → 类 → 方法 → 位置树，预览/打开并选中匹配范围；Esc/Cancel 取消并释放请求。Replace、Type/Reference/Script 修饰符与其他语言尚未实现。
 
 ## 26. Git Diff Viewport

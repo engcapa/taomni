@@ -69,6 +69,7 @@ def setup(ctx: Any) -> None:
                 try { await vfs.vfsStat(dir); } catch { await vfs.vfsMkdir(dir); }
               }
               await vfs.vfsWriteText(root + '/' + path, text);
+              await vfs.vfsWriteText(root + '/Other.java', 'class Other {}');
               localStorage.setItem('taomni.qa.parity009.enabled', 'true');
               localStorage.setItem('taomni.qa.parity009.mode', 'normal');
               localStorage.setItem('taomni.recentWorkspaces.v1', JSON.stringify([{
@@ -87,6 +88,13 @@ def setup(ctx: Any) -> None:
         target = root / TARGET_PATH
         target.parent.mkdir(parents=True)
         target.write_bytes(TARGET.encode())
+        (root / 'Other.java').write_text('class Other {}', encoding='utf-8')
+        errors = Path(tempfile.mkdtemp(prefix="parity009-encoding-", dir=str(base))).resolve()
+        unsupported = errors / "Legacy.java"
+        unsupported.write_bytes(b'\xff\xfe' + TARGET.encode('utf-16-le'))
+        values["parity009_encoding_root"] = errors.as_posix()
+        values["parity009_encoding_file"] = unsupported.as_posix()
+        values["parity009_encoding_sha256"] = hashlib.sha256(unsupported.read_bytes()).hexdigest()
         bulk = Path(tempfile.mkdtemp(prefix="parity009-bulk-", dir=str(base))).resolve()
         (bulk / "bulk").mkdir()
         for index in range(BULK_FILES):

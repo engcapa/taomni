@@ -74,6 +74,20 @@ describe("parity009 browser Structural Search fixture", () => {
     });
   });
 
+  it("searches open buffers over disk, including inactive and empty files, within scope", async () => {
+    const { parity009Run } = await import("./parity009StructuralSearch");
+    const input = request("System.out.println($arg$);", "999");
+    input.buffers = [
+      { rootId: "root", path: "src/StructuralTarget.java", text: "" },
+      { rootId: "root", path: "src/Inactive.java", text: TARGET.replace("42", "999") },
+    ];
+    const result = await parity009Run(input);
+    expect(result.status === "ok" && result.matches.map((match) => match.path)).toEqual(["src/Inactive.java"]);
+    input.query.scope = "file";
+    expect(await parity009Run(input)).toMatchObject({ status: "ok", matches: [] });
+    expect(files.get("/preview/parity009/src/StructuralTarget.java")).toBe(TARGET);
+  });
+
   it("cancels a held request and releases it", async () => {
     const { parity009Run, parity009Cancel, parity009Capabilities } = await import("./parity009StructuralSearch");
     localStorage.setItem("taomni.qa.parity009.mode", "hold");

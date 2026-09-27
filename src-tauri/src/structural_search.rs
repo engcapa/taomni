@@ -12,7 +12,8 @@ use ignore::WalkBuilder;
 use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use std::path::{Path, PathBuf};
+use std::io::Read;
+use std::path::{Component, Path, PathBuf};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -85,12 +86,22 @@ pub struct StructuralActiveFile {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct StructuralSearchBuffer {
+    pub root_id: String,
+    pub path: String,
+    pub text: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StructuralSearchRequest {
     pub request_id: String,
     pub query: StructuralQuery,
     pub roots: Vec<StructuralSearchRoot>,
     #[serde(default)]
     pub active_file: Option<StructuralActiveFile>,
+    #[serde(default)]
+    pub buffers: Vec<StructuralSearchBuffer>,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
@@ -175,6 +186,10 @@ pub enum StructuralErrorCode {
     UnsupportedConstraint,
     InvalidScope,
     InvalidRequest,
+    FileRead,
+    UnsupportedEncoding,
+    FileTooLarge,
+    FileParse,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
@@ -735,6 +750,88 @@ fn scope_error(message: impl Into<String>) -> PatternError {
     }
 }
 
+fn file_error(
+    code: StructuralErrorCode,
+    path: &Path,
+    detail: impl std::fmt::Display,
+) -> PatternError {
+    PatternError {
+        code,
+        message: format!("Cannot search {}: {detail}", path.display()),
+    }
+}
+
+fn buffer_path(path: &str) -> Result<String, PatternError> {
+    let normalized = path.replace('\\', "/");
+    if normalized.is_empty()
+        || !Path::new(&normalized)
+            .components()
+            .all(|part| matches!(part, Component::Normal(_)))
+        || !is_java_file(Path::new(&normalized))
+    {
+        return Err(scope_error(format!(
+            "Editor buffer must be a relative Java path: {path}"
+        )));
+    }
+    Ok(normalized)
+}
+
+fn collect_buffers(
+    request: &StructuralSearchRequest,
+) -> Result<HashMap<(usize, String), &str>, PatternError> {
+    let mut buffers = HashMap::new();
+    for buffer in &request.buffers {
+        let index = request
+            .roots
+            .iter()
+            .position(|root| root.id == buffer.root_id)
+            .ok_or_else(|| scope_error("Editor buffer is outside the workspace"))?;
+        let key = (index, buffer_path(&buffer.path)?);
+        if buffers.insert(key, buffer.text.as_str()).is_some() {
+            return Err(scope_error("Duplicate editor buffer path"));
+        }
+    }
+    Ok(buffers)
+}
+
+/// Bound the read itself (not only a stat check) and never report skipped input
+/// as a successful empty search. Editor snapshots take precedence over disk.
+fn read_search_source(path: &Path, buffer: Option<&str>) -> Result<Vec<u8>, PatternError> {
+    let bytes = if let Some(text) = buffer {
+        if text.len() as u64 > MAX_FILE_BYTES {
+            return Err(file_error(
+                StructuralErrorCode::FileTooLarge,
+                path,
+                "file exceeds the 2 MiB search limit",
+            ));
+        }
+        text.as_bytes().to_vec()
+    } else {
+        let file = std::fs::File::open(path)
+            .map_err(|error| file_error(StructuralErrorCode::FileRead, path, error))?;
+        let mut bytes = Vec::new();
+        file.take(MAX_FILE_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|error| file_error(StructuralErrorCode::FileRead, path, error))?;
+        bytes
+    };
+    if bytes.len() as u64 > MAX_FILE_BYTES {
+        return Err(file_error(
+            StructuralErrorCode::FileTooLarge,
+            path,
+            "file exceeds the 2 MiB search limit",
+        ));
+    }
+    if std::str::from_utf8(&bytes).is_err() {
+        return Err(file_error(
+            StructuralErrorCode::UnsupportedEncoding,
+            path,
+            "file is not UTF-8; open it in the editor or save a UTF-8 copy before searching",
+        ));
+    }
+    Ok(bytes)
+}
+
 /// Resolve `workspace` / `module` / `file` into an ordered Java file list.
 /// `module` is the workspace root containing the active file, the closest
 /// Taomni equivalent of an IDEA module until project models expose modules.
@@ -742,6 +839,7 @@ fn collect_files(
     roots: &[StructuralSearchRoot],
     scope: &str,
     active: Option<&StructuralActiveFile>,
+    buffers: &HashMap<(usize, String), &str>,
     cancelled: &AtomicBool,
 ) -> Result<Vec<SearchFile>, PatternError> {
     let active_root = || {
@@ -761,9 +859,14 @@ fn collect_files(
             let root = std::fs::canonicalize(&roots[index].path).map_err(|error| {
                 scope_error(format!("Resolve root {}: {error}", roots[index].path))
             })?;
-            let absolute = std::fs::canonicalize(root.join(&active.path)).map_err(|error| {
-                scope_error(format!("Resolve active file {}: {error}", active.path))
-            })?;
+            let relative = buffer_path(&active.path)?;
+            let absolute = if buffers.contains_key(&(index, relative.clone())) {
+                root.join(&relative)
+            } else {
+                std::fs::canonicalize(root.join(&relative)).map_err(|error| {
+                    file_error(StructuralErrorCode::FileRead, &root.join(&relative), error)
+                })?
+            };
             if !absolute.starts_with(&root) || !is_java_file(&absolute) {
                 return Err(scope_error(
                     "Scope 'file' needs an active Java file inside the workspace",
@@ -789,15 +892,9 @@ fn collect_files(
             if cancelled.load(Ordering::Relaxed) {
                 return Ok(files);
             }
-            let Ok(entry) = entry else { continue };
+            let entry =
+                entry.map_err(|error| file_error(StructuralErrorCode::FileRead, &root, error))?;
             if !entry.file_type().is_some_and(|kind| kind.is_file()) || !is_java_file(entry.path())
-            {
-                continue;
-            }
-            if entry
-                .metadata()
-                .map(|meta| meta.len() > MAX_FILE_BYTES)
-                .unwrap_or(true)
             {
                 continue;
             }
@@ -807,6 +904,17 @@ fn collect_files(
                 relative: relative_path(&root, &absolute),
                 absolute,
             });
+        }
+        // Include explicitly open Java documents even if ignored, newly created,
+        // or deleted on disk; their loaded buffer remains the user's source.
+        for (buffer_root, path) in buffers.keys() {
+            if *buffer_root == index && !root_files.iter().any(|file| file.relative == *path) {
+                root_files.push(SearchFile {
+                    root_index: index,
+                    relative: path.clone(),
+                    absolute: root.join(path),
+                });
+            }
         }
         root_files.sort_by(|a, b| a.relative.cmp(&b.relative));
         files.extend(root_files);
@@ -881,10 +989,15 @@ pub fn run_structural_search(
         filters,
         match_case: query.match_case,
     };
+    let buffers = match collect_buffers(request) {
+        Ok(buffers) => buffers,
+        Err(error) => return error_response(request_id, error),
+    };
     let files = match collect_files(
         &request.roots,
         &query.scope,
         request.active_file.as_ref(),
+        &buffers,
         cancelled,
     ) {
         Ok(files) => files,
@@ -916,14 +1029,24 @@ pub fn run_structural_search(
                 stats,
             };
         }
-        let Ok(bytes) = std::fs::read(&file.absolute) else {
-            continue;
+        let bytes = match read_search_source(
+            &file.absolute,
+            buffers
+                .get(&(file.root_index, file.relative.clone()))
+                .copied(),
+        ) {
+            Ok(bytes) => bytes,
+            Err(error) => return error_response(request_id, error),
         };
-        if std::str::from_utf8(&bytes).is_err() {
-            continue;
-        }
         let Some(tree) = parser.parse(&bytes, None) else {
-            continue;
+            return error_response(
+                request_id,
+                file_error(
+                    StructuralErrorCode::FileParse,
+                    &file.absolute,
+                    "Java parser did not complete",
+                ),
+            );
         };
         stats.files_scanned += 1;
         if tree.root_node().has_error() {
@@ -1109,6 +1232,7 @@ mod tests {
                 root_id: "root".to_string(),
                 path: "src/StructuralTarget.java".to_string(),
             }),
+            buffers: Vec::new(),
         }
     }
 
@@ -1126,6 +1250,153 @@ mod tests {
             }
             other => panic!("expected ok, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn editor_snapshots_override_disk_and_include_inactive_files_without_writes() {
+        let dir = fixture();
+        let target = dir.path().join("src/StructuralTarget.java");
+        let before = fs::read(&target).unwrap();
+        let mut req = request(dir.path(), query(TEMPLATE, Some("999")));
+        req.buffers = vec![
+            StructuralSearchBuffer {
+                root_id: "root".into(),
+                path: "src/StructuralTarget.java".into(),
+                text: "".into(),
+            },
+            StructuralSearchBuffer {
+                root_id: "root".into(),
+                path: "src/Inactive.java".into(),
+                text: TARGET.replace("42", "999"),
+            },
+        ];
+        for scope in ["workspace", "module"] {
+            req.query.scope = scope.into();
+            let hits = ok_matches(run_structural_search(&req, &AtomicBool::new(false)));
+            assert_eq!(hits.len(), 1);
+            assert_eq!(hits[0].path, "src/Inactive.java");
+            assert_eq!(hits[0].captures[0].text, "999");
+        }
+        req.query.scope = "file".into();
+        assert!(ok_matches(run_structural_search(&req, &AtomicBool::new(false))).is_empty());
+        req.active_file.as_mut().unwrap().path = "src/Inactive.java".into();
+        assert_eq!(
+            ok_matches(run_structural_search(&req, &AtomicBool::new(false))).len(),
+            1
+        );
+        assert_eq!(fs::read(&target).unwrap(), before);
+        assert!(!dir.path().join("src/Inactive.java").exists());
+    }
+
+    #[test]
+    fn editor_buffers_respect_module_root_and_reject_path_escape() {
+        let dir = fixture();
+        let other = fixture();
+        let mut req = request(dir.path(), query(TEMPLATE, Some("999")));
+        req.roots.push(StructuralSearchRoot {
+            id: "other".into(),
+            name: "other".into(),
+            path: other.path().to_string_lossy().into(),
+        });
+        req.buffers.push(StructuralSearchBuffer {
+            root_id: "other".into(),
+            path: "src/StructuralTarget.java".into(),
+            text: TARGET.replace("42", "999"),
+        });
+        assert_eq!(
+            ok_matches(run_structural_search(&req, &AtomicBool::new(false))).len(),
+            1
+        );
+        req.query.scope = "module".into();
+        assert!(ok_matches(run_structural_search(&req, &AtomicBool::new(false))).is_empty());
+        req.buffers[0].path = "../Outside.java".into();
+        assert!(matches!(
+            run_structural_search(&req, &AtomicBool::new(false)),
+            StructuralSearchResponse::Error {
+                code: StructuralErrorCode::InvalidScope,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn unsupported_encoding_is_a_typed_error_in_every_scope_and_buffer_can_recover() {
+        let dir = fixture();
+        let path = dir.path().join("src/StructuralTarget.java");
+        let bytes: Vec<u8> = [0xff, 0xfe]
+            .into_iter()
+            .chain(TARGET.encode_utf16().flat_map(u16::to_le_bytes))
+            .collect();
+        fs::write(&path, &bytes).unwrap();
+        for scope in ["workspace", "module", "file"] {
+            let mut req = request(dir.path(), query(TEMPLATE, None));
+            req.query.scope = scope.into();
+            let response = run_structural_search(&req, &AtomicBool::new(false));
+            match response {
+                StructuralSearchResponse::Error {
+                    code: StructuralErrorCode::UnsupportedEncoding,
+                    message,
+                    ..
+                } => assert!(message.contains("StructuralTarget.java")),
+                other => panic!("must not report successful empty results: {other:?}"),
+            }
+            req.buffers.push(StructuralSearchBuffer {
+                root_id: "root".into(),
+                path: "src/StructuralTarget.java".into(),
+                text: TARGET.into(),
+            });
+            assert_eq!(
+                ok_matches(run_structural_search(&req, &AtomicBool::new(false))).len(),
+                3
+            );
+        }
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+    }
+
+    #[test]
+    fn oversized_files_fail_explicitly_in_both_disk_and_buffer_searches() {
+        let dir = fixture();
+        let oversized = " ".repeat(MAX_FILE_BYTES as usize + 1);
+        let path = dir.path().join("src/StructuralTarget.java");
+        fs::write(&path, &oversized).unwrap();
+        for scope in ["workspace", "file"] {
+            let mut req = request(dir.path(), query(TEMPLATE, None));
+            req.query.scope = scope.into();
+            assert!(matches!(
+                run_structural_search(&req, &AtomicBool::new(false)),
+                StructuralSearchResponse::Error {
+                    code: StructuralErrorCode::FileTooLarge,
+                    ..
+                }
+            ));
+            fs::write(&path, TARGET).unwrap();
+            req.buffers.push(StructuralSearchBuffer {
+                root_id: "root".into(),
+                path: "src/StructuralTarget.java".into(),
+                text: oversized.clone(),
+            });
+            assert!(matches!(
+                run_structural_search(&req, &AtomicBool::new(false)),
+                StructuralSearchResponse::Error {
+                    code: StructuralErrorCode::FileTooLarge,
+                    ..
+                }
+            ));
+            fs::write(&path, &oversized).unwrap();
+        }
+    }
+
+    #[test]
+    fn missing_or_unreadable_source_is_not_an_empty_search() {
+        let dir = fixture();
+        let path = dir.path().join("Missing.java");
+        let err = read_search_source(&path, None).unwrap_err();
+        assert_eq!(err.code, StructuralErrorCode::FileRead);
+        assert!(err.message.contains("Missing.java"));
+        assert_eq!(
+            read_search_source(dir.path(), None).unwrap_err().code,
+            StructuralErrorCode::FileRead
+        );
     }
 
     fn error_code(response: StructuralSearchResponse) -> StructuralErrorCode {
