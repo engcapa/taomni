@@ -9,6 +9,7 @@ from ci_desktop import Desktop
 class DesktopTests(unittest.TestCase):
     def test_missing_bus_fails_before_starting_window_manager(self):
         with tempfile.TemporaryDirectory() as d, patch('ci_desktop.platform.system',return_value='Linux'), \
+             patch('ci_desktop.platform.machine',return_value='x86_64'), \
              patch.dict(os.environ,{'DISPLAY':':99','DBUS_SESSION_BUS_ADDRESS':''}), \
              patch('ci_desktop.subprocess.Popen') as spawn:
             with self.assertRaisesRegex(RuntimeError,'DBUS_SESSION_BUS_ADDRESS'):

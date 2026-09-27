@@ -16,6 +16,21 @@ P0 新卡，完成这一张卡的参考、设计、AC/V 和 P2 交接。不要�
 - fixture 与参考：docs-feature/code-workspace-idea-parity/references/fixture-catalog.md 及所选卡关联的参考包
 - P2 模板：docs-feature/code-workspace-idea-parity/agent-collaboration-prompts.md 中“P2 开发并自验”
 
+【IDEA 版本范围】
+目标 IntelliJ IDEA 版本范围为 `2026.*`。不要把固定 P1 入口绑定到某个具体的 `2026.x` build；
+实际采样或复用参照时仍必须记录准确的 edition、精确 build、平台、主题、缩放、字体、keymap 和
+fixture。若具体 build 会影响目标行为、视觉或交互结论，必须核对该 build，或向用户提出针对该结论的
+具体问题。
+
+【开发期 QA 用例合同】
+P1 必须在本卡 spec 的 `test-cases` 锚点写完整的可执行映射；P2 接手后，任何产品行为、控件、
+Action、快捷键、焦点、保存/撤销、IPC、磁盘或 native 边界变更都要在同一工作包中新增或更新
+`qa-ui-auto-tests/cases/TC-<id>-<slug>.testcase.yaml`，并把准确 ID 登记到
+`qa-ui-auto-tests/ci/policy.yaml`。feature/controls、covers、fixtures、modes 和必要依赖必须同步，
+不能只补单测或把“后续补 QA”留给下一轮。P2 完成前运行 `audit --gate`、selected plan/run，
+回填真实报告身份与 `pass/fail/skip/unrun`；纯文档/证据变化需记录为何不适合可执行 case。
+详见 `$qa-ui-auto` 的 Development-Time Case Contract。
+
 P0 首次运行已经完成，后续也执行过 P1–P3。沿用已有 P0，不能因为材料有旧日期就重跑首次整体评估。
 唯一任务板中的 ED-PARITY-xxx 才是本提示词可选择的卡。claudedocs 下所有旧 backlog，包括
 code-workspace-idea-parity-backlog.md、find-focus、tree-open-focus、shell-layout 及各日期板，

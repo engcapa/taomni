@@ -35,6 +35,7 @@
 
 - **唯一新任务板：[backlog.md](backlog.md)**，新卡 ID 为 `ED-PARITY-xxx`。P0 从真实差距产卡；P1 自动选定一张卡做规划；P2 在该卡 ready 后正式领取开发。禁止混入或接续 `claudedocs/` 旧板任务。
 - **可直接复制：[固定 P1 提示词](handoff-p1-next.md)**。无需填写任务或环境参数；缺少影响设计的 IDEA 信息时，P1 可以询问用户。
+- **开发期 QA 用例合同：[qa-ui-auto 规则](../../.agents/skills/qa-ui-auto/SKILL.md#development-time-case-contract)** / [CI 检查说明](../../qa-ui-auto-tests/ci/README.md#development-case-contract)。P1 在 `test-cases` 锚点写完整映射；P2/P5 在同一工作包中落盘 YAML case、登记 `policy.yaml`、同步 feature/controls 并回填真实运行证据。
 - [P0 新卡待细化规格](task-planning.md)：当前是文档补录的起点，必须完成 P1 才能进入开发。
 - [原协作模板](agent-collaboration-prompts.md)：保留原带参数 P1；P0 模板现要求产出新卡，后续增量继续维护同一板。
 

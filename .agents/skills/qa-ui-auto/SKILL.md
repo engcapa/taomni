@@ -62,6 +62,43 @@ clipboard, IME, shortcuts and windows need native evidence at affected boundarie
 Real browser service bridges do not become native evidence. UI and interaction
 can be redesigned; test the new target while preserving retained capabilities.
 
+## Development-Time Case Contract
+
+Treat an executable QA case as part of a user-facing change, not as a later
+release task. Before asking for review, inspect the diff and either update an
+existing case or add `qa-ui-auto-tests/cases/TC-<id>-<slug>.testcase.yaml` for
+each changed workflow. This applies to renderer behavior, controls, Actions,
+shortcuts, focus, persistence, IPC, disk, process, dialog, and native boundary
+changes. A focused unit test supports a case; it does not replace an entry
+workflow when the user-visible path changed.
+
+Every new or changed case must have a stable `id`, explicit `covers`,
+`fixtures`, and `modes`. Register every case ID in
+`qa-ui-auto-tests/ci/policy.yaml` in the same change, add required edges to
+`qa-ui-auto-tests/ci/dependencies.yaml`, and keep `feature-list.md` controls
+and the case selectors in sync. A missing policy entry blocks CI planning;
+never hide it with `unavailable` or a skip.
+
+For a pure implementation refactor, generated code, or documentation-only
+change where no executable case is appropriate, record the concrete reason in
+the design or PR and identify the retained case that still protects the
+behavior. Do not claim coverage from a plan, schema check, or static audit.
+
+The pull-request workflow runs the advisory development contract check. Run it
+locally before review when product files changed:
+
+```powershell
+$env:PYTHONPATH = ".agents/skills/qa-ui-auto/scripts"
+python .agents/skills/qa-ui-auto/scripts/qa_ui_auto/dev_contract.py `
+  --base origin/main --head HEAD
+python -m qa_ui_auto.audit --gate
+python -m qa_ui_auto.ci plan --scope selected --case-ids TC-<id>
+```
+
+The contract check warns when product files have no case diff and fails on
+catalog drift. The actual selected case still needs a focused run and a report
+with pass/fail/skip status.
+
 ## Commands
 
 From repository root, set `PYTHONPATH=.agents/skills/qa-ui-auto/scripts`.
