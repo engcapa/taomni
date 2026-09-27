@@ -152,6 +152,7 @@
 - `[data-testid^="keymap-category-"]` — interactive [optional] — F25.3.keymap-category
 - `[data-testid^="keymap-item-"]` — display [optional] — F25.3.keymap-item
   ↳ `[data-testid="keymap-item-workspace.renameSymbol"]` — alias
+  ↳ `[data-testid="keymap-item-workspace.extractMethod"]` — alias
 - `[data-testid="keymap-cheatsheet-footer-close"]` — interactive — F25.3.keymap-cheatsheet-footer-close
 - `[data-testid="keymap-cheatsheet-close"]` — interactive [optional] — F25.3.keymap-cheatsheet-close
 - `[data-testid="editor-context-cut"]` — interactive [optional] — F25.3.context-cut
@@ -182,6 +183,10 @@
 - `[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]` — interactive [optional] — F25.5.external-file-conflict-dismiss
 - `[data-testid="refactoring-preview-dialog"]` — display [optional] — F25.5.refactoring-preview-dialog
 - `[data-testid="refactoring-preview-apply"]` — interactive [optional] — F25.5.refactoring-preview-apply
+- `[data-testid="refactoring-preview-select-none"]` — interactive [optional] — F25.5.refactoring-preview-select-none
+- `[data-testid="refactoring-preview-cancel"]` — interactive [optional] — F25.5.refactoring-preview-cancel
+- `[data-testid^="code-workspace-intention-"]` — interactive [optional] — F25.5.intention-candidate-item
+- `[data-testid="extract-method-name-prompt"]` — display [optional] — F25.5.extract-method-name-prompt
 - `[data-testid="refactor-recovery-review"]` — display [optional] — F25.5.refactor-recovery-review
 - `[data-testid="refactor-recovery-resource"]` — display [optional] — F25.5.refactor-recovery-resource
 - `[data-testid="refactor-recovery-keep"]` — interactive [optional] — F25.5.refactor-recovery-keep
@@ -237,6 +242,8 @@
 - `[data-testid="completion-resolve-gate-failed-note"]` — display [optional] — F25.5.completion-resolve-gate-failed-note
 - `[data-testid="keymap-item-editor.basicCompletion"]` — display [optional] — F25.5.keymap-basic-completion-item
 - `[data-testid="keymap-run-editor.basicCompletion"]` — interactive [optional] — F25.5.keymap-basic-completion-run
+- `[data-testid="keymap-item-workspace.extractMethod"]` — display [optional] — F25.5.keymap-extract-method-item
+- `[data-testid="keymap-run-workspace.extractMethod"]` — interactive [optional] — F25.5.keymap-extract-method-run
 - `xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"StringUtils") and contains(.,"org.apache.commons.lang3")]` — interactive [optional] — F25.5.completion-provider-type-option
 - `xpath=//div[contains(@class,"cm-tooltip-autocomplete")]//li[contains(.,"append(String str)")]` — interactive [optional] — F25.5.completion-provider-method-option
 - `[data-testid="project-facts-untrusted-icon"]` — display [optional] — F25.5.project-facts-untrusted-icon
