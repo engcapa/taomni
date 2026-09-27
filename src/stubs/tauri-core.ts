@@ -2297,7 +2297,11 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
           errorMessage: null,
         } as T;
       }
-      return { status: "failed", modules: [], provenance: null, errorMessage: "No Maven tooling in browser preview" } as T;
+      // No build backend exists in the browser preview. Return no usable
+      // result instead of a well-formed failed response so the store's typed
+      // prerequisite failure (ED-PROJECT-005 A4) names the missing backend
+      // exactly as the desktop build does when no Maven tooling is present.
+      return undefined as T;
     }
     case "lsp_document_status":
     case "lsp_open_document":

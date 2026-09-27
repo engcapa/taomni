@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   createReplaceInFilesPlan,
 } from "../replaceInFilesModel";
@@ -19,6 +19,10 @@ export interface ReplacePreviewDialogProps {
   edit: LspWorkspaceEdit;
   /** Replacement text shown in the header. */
   replacement: string;
+  /** Frozen query shown in the IDEA-style replacement summary. */
+  query?: string;
+  /** Exclusions selected in the result list before opening the preview. */
+  initialExcludedKeys?: ReadonlySet<string>;
   /** ED-IMPROVE-005: frozen scope/query identity captured before the preview. */
   scopeLabel?: string;
   committing: boolean;
@@ -34,16 +38,32 @@ export function stableUsageKey(path: string, startLine: number, startCharacter: 
 export function ReplacePreviewDialog({
   edit,
   replacement,
+  query = "",
+  initialExcludedKeys,
   scopeLabel,
   committing,
   commitError,
   onCommit,
   onCancel,
 }: ReplacePreviewDialogProps) {
-  const [excluded, setExcluded] = useState<ReadonlySet<string>>(() => new Set());
-  const live = useMemo(() => {
+  const [excluded, setExcluded] = useState<ReadonlySet<string>>(() => new Set(initialExcludedKeys));
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const commitRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    setExcluded(new Set(initialExcludedKeys));
+    commitRef.current?.focus();
+  }, [edit, initialExcludedKeys]);
+  useLayoutEffect(() => {
+    // Disabled controls lose focus in WebKit. Keep pending keys in the modal
+    // and restore its primary action when a blocked commit becomes retryable.
+    (committing ? dialogRef.current : commitRef.current)?.focus();
+  }, [committing]);
+  const allPlan = useMemo(() => createReplaceInFilesPlan(edit), [edit]);
+  const excludedUsageIds = useMemo(() => {
     const excludedUsageIds = new Set<string>();
-    for (const usage of createReplaceInFilesPlan(edit).preview.usages) {
+    for (const usage of allPlan.preview.usages) {
       const key = stableUsageKey(
         usage.path,
         usage.range.start.line,
@@ -53,17 +73,21 @@ export function ReplacePreviewDialog({
       );
       if (excluded.has(key)) excludedUsageIds.add(usage.id);
     }
-    return createReplaceInFilesPlan(edit, excludedUsageIds);
-  }, [edit, excluded]);
+    return excludedUsageIds;
+  }, [allPlan, excluded]);
+  const live = useMemo(
+    () => createReplaceInFilesPlan(edit, excludedUsageIds),
+    [edit, excludedUsageIds],
+  );
   const byFile = useMemo(() => {
-    const groups = new Map<string, typeof live.preview.usages>();
-    for (const usage of live.preview.usages) {
+    const groups = new Map<string, typeof allPlan.preview.usages>();
+    for (const usage of allPlan.preview.usages) {
       const list = groups.get(usage.path);
       if (list) list.push(usage);
       else groups.set(usage.path, [usage]);
     }
     return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [live]);
+  }, [allPlan]);
 
   const keyOf = (usage: { path: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }) => stableUsageKey(
     usage.path,
@@ -83,7 +107,7 @@ export function ReplacePreviewDialog({
   const toggleFile = (path: string, checked: boolean) => {
     setExcluded((current) => {
       const next = new Set(current);
-      for (const usage of live.preview.usages) {
+      for (const usage of allPlan.preview.usages) {
         if (usage.path !== path) continue;
         if (checked) next.delete(keyOf(usage));
         else next.add(keyOf(usage));
@@ -92,15 +116,71 @@ export function ReplacePreviewDialog({
     });
   };
 
+  const includedFiles = useMemo(
+    () => new Set(allPlan.preview.usages
+      .filter((usage) => !excluded.has(keyOf(usage)))
+      .map((usage) => usage.path)).size,
+    [allPlan, excluded],
+  );
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (committing) {
+      if (["Escape", "Enter", "Tab"].includes(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      onCancel();
+      return;
+    }
+    if (event.key === "Tab") {
+      const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+        "input:not(:disabled), button:not(:disabled), [tabindex='0']",
+      ));
+      const first = controls[0];
+      const last = controls.at(-1);
+      if ((event.shiftKey && document.activeElement === first)
+        || (!event.shiftKey && document.activeElement === last)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
+      }
+      return;
+    }
+    if (event.key === "Enter") {
+      if (event.target instanceof HTMLInputElement && event.target.type === "checkbox") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.target === cancelRef.current) {
+        onCancel();
+        return;
+      }
+      if (live.includedMatches > 0) onCommit(excluded);
+    }
+  };
+
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       data-testid="code-workspace-replace-preview"
       role="dialog"
+      aria-modal="true"
       aria-label="Replace in files preview"
+      onKeyDown={handleKeyDown}
       className="flex max-h-[70vh] min-h-0 w-[560px] max-w-[90vw] flex-col rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] text-[12px] text-[var(--taomni-code-text)]"
     >
       <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2">
         <div className="font-medium">Replace in files preview</div>
+        <div
+          data-testid="code-workspace-replace-summary"
+          className="mt-0.5 text-[11px] text-[var(--taomni-code-text)]"
+        >
+          Replace {live.includedMatches} occurrence{live.includedMatches === 1 ? "" : "s"} of '{query}' across {includedFiles} file{includedFiles === 1 ? "" : "s"} with '{replacement}'?
+        </div>
         <div
           data-testid="code-workspace-replace-counts"
           className="mt-0.5 text-[11px] text-[var(--taomni-code-muted)]"
@@ -163,7 +243,7 @@ export function ReplacePreviewDialog({
             </section>
           );
         })}
-        {byFile.length === 0 && (
+        {byFile.length > 0 && live.includedMatches === 0 && (
           <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
             Every occurrence is excluded — nothing will be replaced.
           </div>
@@ -181,6 +261,7 @@ export function ReplacePreviewDialog({
       <div className="shrink-0 flex items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
         <button
           type="button"
+          ref={cancelRef}
           data-testid="code-workspace-replace-cancel"
           className="h-7 rounded px-3 hover:bg-[var(--taomni-code-active-line-bg)]"
           onClick={onCancel}
@@ -190,6 +271,7 @@ export function ReplacePreviewDialog({
         </button>
         <button
           type="button"
+          ref={commitRef}
           data-testid="code-workspace-replace-commit"
           className="h-7 rounded bg-[var(--taomni-accent)] px-3 font-medium text-white disabled:opacity-50"
           disabled={committing || live.includedMatches === 0}

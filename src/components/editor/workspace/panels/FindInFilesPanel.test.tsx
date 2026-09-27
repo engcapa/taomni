@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ComponentProps } from "react";
 import type {
   WorkspaceSearchEvent,
   WorkspaceSearchMatch,
@@ -253,6 +254,149 @@ describe("FindInFilesPanel", () => {
       expect(line?.querySelector(".tok-keyword")).toBeTruthy();
     });
     expect(screen.getByTestId("code-workspace-find-match-hit")).toHaveTextContent("needle");
+  });
+});
+
+describe("ED-PARITY-006: result exclusion, seeded preview and post-commit pruning", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  type ReplaceMatchesHandler = NonNullable<ComponentProps<typeof FindInFilesPanel>["onReplaceMatches"]>;
+
+  async function emitParityResults(
+    onReplaceMatches: ReplaceMatchesHandler = vi.fn(async () => ({ ok: true as const })),
+  ) {
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ lineNumber: 1, lineText: "alpha needle", matchStart: 6, matchEnd: 12, column: 7 }),
+      searchMatch({ lineNumber: 2, lineText: "beta needle", matchStart: 5, matchEnd: 11, column: 6 }),
+      searchMatch({ path: "src/b.ts", lineNumber: 1, lineText: "gamma needle", matchStart: 6, matchEnd: 12, column: 7 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    return { matches, onReplaceMatches };
+  }
+
+  it("ED-PARITY-006 Delete on a focused result row toggles exclusion and moves focus", async () => {
+    await emitParityResults();
+    const rows = screen.getAllByTestId("code-workspace-find-match-row");
+    rows[1]?.focus();
+    fireEvent.keyDown(rows[1]!, { key: "Delete" });
+
+    expect(rows[1]).toHaveAttribute("data-excluded", "true");
+    expect(document.activeElement).toBe(rows[2]);
+    expect(screen.getAllByTestId("code-workspace-find-file-count")[0]).toHaveTextContent("2");
+
+    fireEvent.keyDown(rows[2]!, { key: "Delete" });
+    expect(rows[2]).toHaveAttribute("data-excluded", "true");
+    rows[1]?.focus();
+    fireEvent.keyDown(rows[1]!, { key: "Delete" });
+    expect(rows[1]).toHaveAttribute("data-excluded", "false");
+  });
+
+  it("ED-PARITY-006 Delete on a file header toggles every row of that file", async () => {
+    await emitParityResults();
+    const header = screen.getByRole("button", { name: "Collapse app/src/a.ts" });
+    fireEvent.keyDown(header, { key: "Delete" });
+    expect(screen.getAllByTestId("code-workspace-find-match-row")[0]).toHaveAttribute("data-excluded", "true");
+    expect(screen.getAllByTestId("code-workspace-find-match-row")[1]).toHaveAttribute("data-excluded", "true");
+    expect(screen.getAllByTestId("code-workspace-find-match-row")[2]).toHaveAttribute("data-excluded", "false");
+    fireEvent.keyDown(header, { key: "Delete" });
+    expect(screen.getAllByTestId("code-workspace-find-match-row")[0]).toHaveAttribute("data-excluded", "false");
+    expect(screen.getAllByTestId("code-workspace-find-match-row")[1]).toHaveAttribute("data-excluded", "false");
+  });
+
+  it("ED-PARITY-006 context menu Exclude and Restore mirror Delete", async () => {
+    await emitParityResults();
+    const row = screen.getAllByTestId("code-workspace-find-match-row")[1]!;
+    fireEvent.contextMenu(row, { clientX: 20, clientY: 20 });
+    fireEvent.click(screen.getByTestId("code-workspace-find-row-exclude"));
+    expect(row).toHaveAttribute("data-excluded", "true");
+    fireEvent.contextMenu(row, { clientX: 20, clientY: 20 });
+    fireEvent.click(screen.getByTestId("code-workspace-find-row-restore"));
+    expect(row).toHaveAttribute("data-excluded", "false");
+  });
+
+  it("ED-PARITY-006 Delete inside the query input edits text only", async () => {
+    await emitParityResults();
+    const input = screen.getByLabelText("Search query") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "needl" } });
+    input.focus();
+    fireEvent.keyDown(input, { key: "Delete" });
+    expect(input.value).toBe("needl");
+    expect(screen.getAllByTestId("code-workspace-find-match-row").every((row) => row.getAttribute("data-excluded") === "false")).toBe(true);
+  });
+
+  it("ED-PARITY-006 a new search clears exclusions while collapse preserves them", async () => {
+    await emitParityResults();
+    const row = screen.getAllByTestId("code-workspace-find-match-row")[1]!;
+    fireEvent.keyDown(row, { key: "Delete" });
+    fireEvent.click(screen.getByRole("button", { name: "Collapse app/src/a.ts" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand app/src/a.ts" }));
+    expect(screen.getAllByTestId("code-workspace-find-match-row")[1]).toHaveAttribute("data-excluded", "true");
+    const emit = await runSearch("next");
+    act(() => {
+      emit({ ...doneEvent({ searchId: "search-1", totalMatches: 1 }), kind: "batch", matches: [searchMatch()] });
+      emit(doneEvent({ searchId: "search-1", totalMatches: 1 }));
+    });
+    expect(screen.getAllByTestId("code-workspace-find-match-row")[0]).toHaveAttribute("data-excluded", "false");
+  });
+
+  it("ED-PARITY-006 Replace All is disabled when every result is excluded", async () => {
+    const { onReplaceMatches } = await emitParityResults();
+    for (const row of screen.getAllByTestId("code-workspace-find-match-row")) {
+      fireEvent.keyDown(row, { key: "Delete" });
+    }
+    const replaceAll = screen.getByRole("button", { name: "Preview replace all matches" });
+    expect(replaceAll).toBeDisabled();
+    expect(onReplaceMatches).not.toHaveBeenCalled();
+  });
+
+  it("ED-PARITY-006 Replace All seeds exclusions and prunes committed rows", async () => {
+    const { onReplaceMatches } = await emitParityResults();
+    const rows = screen.getAllByTestId("code-workspace-find-match-row");
+    rows[1]?.focus();
+    fireEvent.keyDown(rows[1]!, { key: "Delete" });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "coin" } });
+    expect(screen.getByRole("button", { name: "Preview replace all matches" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+
+    const excludedCheckboxes = await screen.findAllByTestId("code-workspace-replace-usage");
+    expect(excludedCheckboxes.some((checkbox) => !(checkbox as HTMLInputElement).checked)).toBe(true);
+    expect(screen.getByTestId("code-workspace-replace-counts")).toHaveTextContent("2 of 3");
+
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getAllByTestId("code-workspace-find-match-row")).toHaveLength(1));
+    expect(screen.getByTestId("code-workspace-find-match-row")).toHaveAttribute("data-excluded", "true");
+    expect(screen.getByTestId("code-workspace-find-replaced-notice")).toHaveTextContent("Replaced 2 occurrences in 2 files");
+  });
+
+  it("ED-PARITY-006 failed commit keeps the result list unchanged", async () => {
+    const { onReplaceMatches } = await emitParityResults(vi.fn(async () => ({
+      ok: false as const,
+      message: "Replace blocked: changed on disk",
+    })));
+    const rows = screen.getAllByTestId("code-workspace-find-match-row");
+    fireEvent.keyDown(rows[1]!, { key: "Delete" });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "coin" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    fireEvent.click(await screen.findByTestId("code-workspace-replace-commit"));
+    expect(await screen.findByTestId("code-workspace-replace-commit-error")).toHaveTextContent("changed on disk");
+    expect(screen.getAllByTestId("code-workspace-find-match-row")).toHaveLength(3);
+    expect(screen.getAllByTestId("code-workspace-find-match-row")[1]).toHaveAttribute("data-excluded", "true");
+    expect(onReplaceMatches).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -1208,4 +1352,3 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     });
   });
 });
-

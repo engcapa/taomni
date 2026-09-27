@@ -1,0 +1,212 @@
+id: TC-IDE-PARITY-006-02
+title: Replace undo confirmation and input focus routing
+description: Browser VFS sequence for workspace undo confirmation, input Ctrl+Z exemption,
+  editor undo ownership, and the Replace in Files focus target.
+covers: [F25.5]
+tags: [code-workspace, ide-find, replace, undo, parity006, p1]
+modes: [browser]
+fixtures: [reset_db, parity006_replace]
+timeout_sec: 240
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity006_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - press: Mod+Shift+F
+  - wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
+  - select_option:
+      selector: '[data-testid="code-workspace-find-scope-select"]'
+      value: directory
+  - fill:
+      selector: '[data-testid="code-workspace-find-directory-input"]'
+      value: src
+  - fill:
+      selector: '[aria-label="Include globs"]'
+      value: "*.txt"
+  - fill:
+      selector: '[aria-label="Search query"]'
+      value: token
+  - press: Enter
+  - wait_for: '[data-testid="code-workspace-find-file-group"]'
+  - click: '[data-testid="code-workspace-find-match-row"]:has-text("beta token two")'
+  - press: Delete
+  - fill:
+      selector: '[aria-label="Replace text"]'
+      value: coin
+  - click: '[data-testid="code-workspace-find-replace-all"]'
+  - wait_for: '[data-testid="code-workspace-replace-preview"]'
+  - press: Enter
+  - assert_text:
+      selector: '[data-testid="code-workspace-find-replaced-notice"]'
+      contains: Replaced 2 occurrences in 2 files
+  - click: '[aria-label="Search query"]'
+  - press: Mod+z
+  - press: Mod+Shift+z
+  - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+      equals: [alpha coin one, beta token two, '']
+  - click: '[data-testid="code-workspace-find-match-row"]'
+  - press: Mod+z
+  - wait_for: '[data-testid="code-workspace-undo-confirm"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-undo-confirm"]'
+      contains: Undo Replace in files?
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-ok'
+      expect_truthy: true
+  - screenshot: tc-ide-parity-006-02-undo-dialog.png
+  - press: Tab
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-cancel'
+      expect_truthy: true
+  - press: Tab
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-ok'
+      expect_truthy: true
+  - press: Shift+Tab
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-cancel'
+      expect_truthy: true
+  - press: Shift+Tab
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-ok'
+      expect_truthy: true
+  - press: Tab
+  - press: Enter
+  - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-find-match-row'
+      expect_truthy: true
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+      equals: [alpha coin one, beta token two, '']
+  - press: Mod+z
+  - wait_for: '[data-testid="code-workspace-undo-confirm"]'
+  - press: Escape
+  - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-find-match-row'
+      expect_truthy: true
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+      equals: [alpha coin one, beta token two, '']
+  - press: Mod+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+      value: Undo Replace in files
+  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Undo Replace in files'
+  - wait_for: '[data-testid="code-workspace-undo-confirm"]'
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-undo-confirm-ok'
+      expect_truthy: true
+  - press: Enter
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: Undid Replace in files (2 files)
+  - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-find-match-row'
+      expect_truthy: true
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+      equals: [alpha token one, beta token two, '']
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: End
+  - type: x
+  - press: Mod+z
+  - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
+  - assert_items:
+      selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+      equals: [alpha token one, beta token two, '']
+  - press: Mod+Shift+R
+  - wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('aria-label') === 'Replace text'
+      expect_truthy: true
+  - screenshot: tc-ide-parity-006-02-undo-routing.png
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-006-V2
+    requirement: Input undo remains local; result and Actions undo trap keyboard focus, cancel preserves history, and one confirmed undo restores both files.
+    actions: [1, 3, 4, 6, 8, 9, 10, 11, 12, 14, 15, 16, 17, 19, 21, 22, 23, 26, 27, 32, 34, 36, 38, 40, 41, 45, 47, 51, 53, 54, 55, 58, 63, 64, 65, 66, 69]
+    checkpoints:
+    - step: 2
+      expectation: Welcome is ready.
+    - step: 5
+      expectation: Workspace is open.
+    - step: 7
+      expectation: Find panel opens from its shortcut.
+    - step: 13
+      expectation: Scoped results are visible.
+    - step: 18
+      expectation: Replace preview opens.
+    - step: 20
+      expectation: Two files are replaced.
+    - step: 24
+      expectation: Input undo and redo open no workspace confirmation.
+    - step: 25
+      expectation: Input undo and redo leave replaced editor text intact.
+    - step: 28
+      expectation: Result-row shortcut opens confirmation.
+    - step: 29
+      expectation: Confirmation names the replacement.
+    - step: 30
+      expectation: OK has initial focus.
+    - step: 33
+      expectation: Tab from OK wraps to Cancel.
+    - step: 35
+      expectation: Tab from Cancel returns to OK.
+    - step: 37
+      expectation: Shift+Tab from OK moves to Cancel.
+    - step: 39
+      expectation: Shift+Tab from Cancel wraps to OK.
+    - step: 42
+      expectation: Enter on Cancel closes confirmation.
+    - step: 43
+      expectation: Cancel restores focus to the result row.
+    - step: 44
+      expectation: Cancel preserves the replaced editor text.
+    - step: 46
+      expectation: Undo reopens from restored result-row focus.
+    - step: 48
+      expectation: Escape closes confirmation.
+    - step: 49
+      expectation: Escape restores focus to the result row.
+    - step: 50
+      expectation: Escape preserves the replaced editor text.
+    - step: 52
+      expectation: Actions palette opens from the result row.
+    - step: 56
+      expectation: Actions Undo opens confirmation.
+    - step: 57
+      expectation: OK has focus without test-directed refocus.
+    - step: 59
+      expectation: Enter confirms one two-file undo.
+    - step: 60
+      expectation: Confirmation closes after undo.
+    - step: 61
+      expectation: Actions Undo returns focus to its prior result-row entry.
+    - step: 62
+      expectation: Both editor lines are restored.
+    - step: 67
+      expectation: Editor claim undo opens no workspace confirmation.
+    - step: 68
+      expectation: Local editor text is restored.
+    - step: 70
+      expectation: Replace panel opens from its shortcut.
+    - step: 71
+      expectation: Replacement input receives focus.
+    results: [20, 24, 25, 29, 33, 35, 37, 39, 42, 43, 44, 46, 48, 49, 50, 56, 57, 59, 60, 61, 62, 67, 68, 71]
+  visual:
+  - check: Undo dialog and focus transitions are readable.
+    method: manual
+    reason: Screenshot is retained without a pixel matched claim.
+  native:
+  - check: Packaged WebView key routing and host bytes require TC-IDE-PARITY-006-03 on the current platform; other platforms remain unverified.
+    method: external
+    reason: Browser VFS does not certify native disk or OS shortcut behavior.

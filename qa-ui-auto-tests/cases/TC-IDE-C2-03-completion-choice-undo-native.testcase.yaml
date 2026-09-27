@@ -7,7 +7,8 @@ description: '§8.19.10 native gate case (ED-COMP-004 A1). Enters the in-repo
   waits for the real JDT LS provider, places the caret after the bare `Stri`
 
   token with physical keys, fires explicit completion with Alt+/ (Ctrl+Space is reserved by the CI IME),
-  explicitly clicks the java.lang.String candidate (provider order varies), and proves one undo restores the prefix. The request carries the
+  explicitly double-clicks the java.lang.String candidate (provider order varies; one
+  click selects and only a second click accepts per the ED-PARITY-005 mouse contract), and proves one undo restores the prefix. The request carries the
 
   effective project scope recorded from the ready same-workspace snapshot
 
@@ -104,8 +105,8 @@ steps:
 - wait_for:
     selector: .cm-tooltip-autocomplete
     timeout_sec: 30
-- click: xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel')
-    and normalize-space(.)='String - java.lang']
+- dblclick: xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//li[.//span[contains(@class,'cm-completionLabel')
+    and normalize-space(.)='String'] and .//span[contains(@class,'cm-completionDetail') and normalize-space(.)='java.lang']]
 - assert_text_equals:
     selector: '[data-testid="code-workspace-editor"] .cm-line:nth-child(21)'
     equals: '            String'

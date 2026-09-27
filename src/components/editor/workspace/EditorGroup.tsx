@@ -91,6 +91,7 @@ import type { PersistedEditorViewState } from "./workspaceLayoutPersistence";
 export type MarkdownViewMode = "edit" | "preview" | "split";
 
 export interface EditorRevealTarget {
+  focus?: boolean;
   key: string;
   line: number;
   character: number;

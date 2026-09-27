@@ -17,8 +17,8 @@ steps:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       contains: Stri;
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+End
-  - press: Control+Home
+  - press: Mod+End
+  - press: Mod+Home
   - press: ArrowDown
   - press: ArrowDown
   - press: ArrowDown
@@ -139,7 +139,7 @@ steps:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       contains: Stri;
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+Home
+  - press: Mod+Home
   - press: ArrowDown
   - press: ArrowDown
   - press: ArrowDown

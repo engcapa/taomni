@@ -202,7 +202,7 @@
 - `[data-editor-group-id="secondary"] [data-testid="code-workspace-editor-tab-strip"]` — interactive [optional] — F25.5.editor-leaf-secondary-tab-strip
 - `[data-testid="code-workspace-editor"] .cm-content` — interactive [optional] — F25.5.editor-content
 - `.cm-tooltip-autocomplete` — display [optional] — F25.5.editor-completion-popup
-- `xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//span[contains(@class,'cm-completionLabel') and normalize-space(.)='String - java.lang']` — interactive [optional] — F25.5.editor-completion-string-candidate
+- `xpath=//div[contains(@class,'cm-tooltip-autocomplete')]//li[.//span[contains(@class,'cm-completionLabel') and normalize-space(.)='String'] and .//span[contains(@class,'cm-completionDetail') and normalize-space(.)='java.lang']]` — interactive [optional] — F25.5.editor-completion-string-candidate
 - `[data-testid="code-workspace-lightbulb"]` — interactive [optional] — F25.5.editor-lightbulb
 - `[data-testid="code-workspace-file-status"]` — display [optional] — F25.5.file-status
 - `[data-testid="code-workspace-save-observation"]` — display [optional] — F25.5.save-observation
@@ -258,13 +258,21 @@
 - `[data-testid="code-workspace-find-error"]` — display [optional] — F25.5.find-error
 - `[data-testid="code-workspace-find-file-group"]` — display [optional] — F25.5.find-file-group
 - `[data-testid="code-workspace-find-match-hit"]` — display [optional] — F25.5.find-match-hit
+- `[data-testid="code-workspace-find-match-row"]` — interactive — F25.5.find-match-row
+- `[data-testid="code-workspace-find-row-exclude"]` — interactive — F25.5.find-row-exclude
+- `[data-testid="code-workspace-find-row-restore"]` — interactive — F25.5.find-row-restore
 - `[data-testid="code-workspace-replace-preview"]` — display [optional] — F25.5.replace-preview
+- `[data-testid="code-workspace-replace-summary"]` — display — F25.5.replace-summary
 - `[data-testid="code-workspace-replace-counts"]` — display [optional] — F25.5.replace-counts
 - `[data-testid="code-workspace-replace-usage"]` — interactive [optional] — F25.5.replace-usage
 - `[data-testid="code-workspace-replace-file-toggle"]` — interactive [optional] — F25.5.replace-file-toggle
 - `[data-testid="code-workspace-replace-commit"]` — interactive [optional] — F25.5.replace-commit
 - `[data-testid="code-workspace-replace-cancel"]` — interactive [optional] — F25.5.replace-cancel
 - `[data-testid="code-workspace-replace-commit-error"]` — display [optional] — F25.5.replace-commit-error
+- `[data-testid="code-workspace-find-replaced-notice"]` — display — F25.5.find-replaced-notice
+- `[data-testid="code-workspace-undo-confirm"]` — display — F25.5.workspace-undo-confirm
+- `[data-testid="code-workspace-undo-confirm-cancel"]` — interactive — F25.5.workspace-undo-confirm-cancel
+- `[data-testid="code-workspace-undo-confirm-ok"]` — interactive — F25.5.workspace-undo-confirm-ok
 - `[data-testid="code-workspace-bottom-tab-terminal"]` — interactive [optional] — F25.5.bottom-dock-terminal-tab
 - `[data-testid="code-workspace-bottom-tab-search"]` — interactive [optional] — F25.5.bottom-dock-search-tab
 - `[data-testid="code-workspace-tab-policy-settings"]` — interactive [optional] — F25.5.tab-policy-settings

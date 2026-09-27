@@ -80,7 +80,8 @@
      "view_state_fixtures",
      "editor_save_race",
      "project_tree",
-     "parity005_completion"
+     "parity005_completion",
+     "parity006_replace"
     ]
    },
    "uniqueItems": true
