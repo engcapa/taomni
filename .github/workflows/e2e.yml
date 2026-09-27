@@ -112,7 +112,10 @@ jobs:
   # ── push to main / workflow_dispatch: ubuntu + windows matrix ──────────
   full-matrix:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 30 || 20 }}
+    # The full browser suite has grown beyond the original 20-minute budget.
+    # Keep enough time for every case to finish so timeout is not reported as
+    # a case failure.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
