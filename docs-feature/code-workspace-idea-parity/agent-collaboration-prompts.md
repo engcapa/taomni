@@ -12,6 +12,26 @@
 当前 P0 首次运行已完成，之后已有多轮 P1–P3。日常继续规划请直接复制
 [固定 P1：自动选一张新卡做规划](handoff-p1-next.md)，无需填写输入；原带参数 P1 保留。
 
+## 开发期 QA 用例合同
+
+P1 的设计必须先写完整的 `test-cases` 锚点，P2/P5 的实现必须在同一
+工作包中把可执行用例落到 `qa-ui-auto-tests/cases/TC-<id>-<slug>.testcase.yaml`。
+新增或修改用户可观察行为、控件、Action、快捷键、焦点、保存/撤销、IPC、磁盘、进程、
+对话框或其他 native 边界时，不能只补单测、只写 AC/V 或把“后续补 QA”留给下一轮。
+
+每个新 case 要同步 `id`、`covers`、`fixtures`、`modes`、feature/controls，并在同一改动中把
+ID 加入 `qa-ui-auto-tests/ci/policy.yaml`；有前置关系才改
+`qa-ui-auto-tests/ci/dependencies.yaml`。P2/P5 完成前至少运行一次
+`python -m qa_ui_auto.audit --gate` 和目标 case 的 selected plan/run，回填真实
+`pass/fail/skip/unrun`、平台、source/case/runner/config/build 身份。静态 plan、schema 或
+文档不能替代行为通过。
+
+纯文档、纯参考或确实不适合可执行 case 的实现，要在设计/PR 写明原因和仍保护该行为的已有
+case。PR 上的 `Development case contract` 会在产品源码变更而没有 case diff 时提醒；case
+目录与 `policy.yaml` 不一致会阻止 QA planning。完整规则见
+[$qa-ui-auto](../../.agents/skills/qa-ui-auto/SKILL.md#development-time-case-contract) 和
+[CI runbook](../../qa-ui-auto-tests/ci/README.md#development-case-contract)。
+
 **本轮任务来源约束：** P0 必须把评估后的新差距写成 [独立任务板](backlog.md) 的
 `ED-PARITY-xxx` 新卡。后续 P1 只从该板选卡做规划，P2 只从该板正式领取开发；P3/P4 接续同一卡。
 `claudedocs/` 的旧板、旧 ID 和旧交接只作历史参照，不能混入新队列或继承其完成状态。
@@ -305,6 +325,8 @@ Action 验证可用/禁用、路由与实际效果；快捷键必须实际按键
 新增项先查重，标为“P2 待实现”，不能伪称已经存在。IDEA UI/交互用例还要链接匹配参照和观察状态。
 可执行 UI 用例由 P2 写入 qa-ui-auto-tests/cases/TC-<id>-<slug>.testcase.yaml；单测放对应
 src/**/*.test.ts(x)、Rust inline 或 src-tauri/tests/integration/；runner 不支持的真实边界写原生/手工步骤。
+P1 还必须在交接中写明每个拟新增/修改 case 的 `id`、`covers`、`fixtures`、`modes`、feature/controls
+和 `qa-ui-auto-tests/ci/policy.yaml` 登记责任；P2 不得把这些配置留到“以后补”。
 P1 默认只写上述用例设计，不改可执行测试或目录，不运行产品测试。逐 AC 覆盖目标和受影响保留行为，
 允许复用充分的现有用例；纯文案/外观不用机械新增单测。完整用例及实现责任明确才算规划就绪，
 只有 AC/V 标题、命令或“P2 自行补测试”不够；尚未执行保持未执行，不以缺少未来测试文件阻塞合理规划。
@@ -378,6 +400,10 @@ efficient-verification.md；改既有行为读 regression-protection.md，写 YA
 covers、fixtures、modes、必要 native_platforms 和支持的 verbs，断言用户结果及必要真实副作用。
 同步 qa-ui-auto-tests/feature-list.md 的 feature/controls；只在 controls 变化时重生成
 .agents/skills/qa-ui-auto/references/testid-catalog.md，用例/目录变更批次结束按 authoring.md 做一次 audit --gate。
+新增或修改 case 必须在同一工作包中同步 `qa-ui-auto-tests/ci/policy.yaml`，有前置关系才改
+`qa-ui-auto-tests/ci/dependencies.yaml`；先运行 `python -m qa_ui_auto.ci plan --scope selected
+--case-ids <实际 ID>`，再运行目标 case 并回填真实 report/receipt。产品源码有变更却没有 case diff
+时，必须说明复用的 retained case 或在 PR/design 记录具体不适合自动化的原因。
 需要 fixture/verb/selector 支持时在授权范围内补齐对应设施，不能虚构可执行命令；runner 不支持的
 AC 按其真实边界补自动化或手工检查及证据，不自动升级 native。设计段落、控件触达、静态 audit 和 dry-run 都不算行为通过。
 按最小充分集合执行目标与保留行为检查，核对实际选中及 pass/fail/skip 数、summary/receipt 和证据身份。
@@ -599,6 +625,10 @@ $idea-reference、$feature-design、$code-workspace-idea-task、$qa-ui-auto；�
 6. 用定向单测、挂载或 browser 快速迭代；输入稳定后才集中构建并执行必要当前端 native 场景。
    browser 不证明 IPC、磁盘、进程、IME、clipboard、OS shortcut 或 native window 行为。复用证据前
    核对 source/case/runner/config/build 身份；未运行不得写通过。
+   开发行为、控件、Action、快捷键、焦点、保存撤销或 native 边界有变化时，必须同批更新/新增
+   `qa-ui-auto-tests/cases/TC-<id>-<slug>.testcase.yaml`，登记 `policy.yaml`，同步 covers/fixtures/
+   modes/feature/controls；不能只补单测或只写文档。先执行 `python -m qa_ui_auto.audit --gate` 和
+   selected plan，再把实际 pass/fail/skip/unrun 与证据身份回填设计/交接。
 7. 对匹配状态进行 Taomni 与 IDEA 的功能、UI 和交互比较。本轮发现的范围内回归直接修复并复验；
    不删除步骤、放宽断言、扩大超时或修改期望来制造通过。自己的复核明确标为自检。
 8. 如实更新自己领取的任务状态和证据。Windows、macOS、Linux 均在产品兼容范围；完成当前端必要
