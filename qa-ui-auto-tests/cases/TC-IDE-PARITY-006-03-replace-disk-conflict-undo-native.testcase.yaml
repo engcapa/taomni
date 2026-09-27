@@ -1,0 +1,308 @@
+id: TC-IDE-PARITY-006-03
+title: Replace disk conflict and undo in native app
+description: Native gate case for ED-PARITY-006 A1/A3/V4 on Windows and Linux. Tests real ripgrep search backend; proves Escape cancels with zero disk modifications (pinned SHA-256); external modification between preview and commit blocks with freshness error and zero writes; restoring bytes allows commit; undo from result row with confirmation restores disk bytes in one transaction; dirty editor buffer blocks commit with unsaved modifications error.
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-find
+- replace
+- native-gate
+- parity006
+- p1
+modes:
+- native
+native_platforms:
+- Windows
+- Linux
+fixtures:
+- reset_db
+- parity006_replace
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-parity006","name":"qa-root","roots":[{"id":"qa-root","name":"qa-root","path":"${fixture.parity006_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-root","path":"src/a.txt"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity006_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-bottom-tab-search"]'
+- wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
+- select_option:
+    selector: '[data-testid="code-workspace-find-scope-select"]'
+    value: directory
+- fill:
+    selector: '[data-testid="code-workspace-find-directory-input"]'
+    value: src
+- fill:
+    selector: '[aria-label="Include globs"]'
+    value: '*.txt'
+- fill:
+    selector: '[aria-label="Search query"]'
+    value: token
+- press: Enter
+- click: '[data-testid="code-workspace-find-run-search"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-find-file-group"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-find-in-files-panel"]'
+    contains: 3 results · 2 files
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+- press:
+    key: Delete
+    selector: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+    name: data-excluded
+    equals: 'true'
+- fill:
+    selector: '[aria-label="Replace text"]'
+    value: coin
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- press: Escape
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
+- assert_file_sha256:
+    path: ${fixture.parity006_a}
+    equals: ${fixture.parity006_sha_initial_a}
+    timeout_sec: 30
+- assert_file_sha256:
+    path: ${fixture.parity006_b}
+    equals: ${fixture.parity006_sha_initial_b}
+    timeout_sec: 30
+- assert_file_sha256:
+    path: ${fixture.parity006_c}
+    equals: ${fixture.parity006_sha_initial_c}
+    timeout_sec: 30
+- assert_file_sha256:
+    path: ${fixture.parity006_d}
+    equals: ${fixture.parity006_sha_initial_d}
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- host_write_file:
+    path: ${fixture.parity006_b}
+    text: "gamma token changed\n"
+- click: '[data-testid="code-workspace-replace-commit"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-commit-error"]'
+    contains: changed
+    timeout_sec: 15
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- assert_file_sha256:
+    path: ${fixture.parity006_a}
+    equals: ${fixture.parity006_sha_initial_a}
+    timeout_sec: 30
+- assert_file_sha256:
+    path: ${fixture.parity006_b}
+    equals: ${fixture.parity006_sha_changed_b}
+    timeout_sec: 30
+- host_write_file:
+    path: ${fixture.parity006_b}
+    text: "gamma token three\n"
+- click: '[data-testid="code-workspace-replace-commit"]'
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
+- assert_file_sha256:
+    path: ${fixture.parity006_a}
+    equals: ${fixture.parity006_sha_commit_a}
+    timeout_sec: 30
+- assert_file_sha256:
+    path: ${fixture.parity006_b}
+    equals: ${fixture.parity006_sha_commit_b}
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-find-match-row"]'
+- press: Control+z
+- wait_for: '[data-testid="code-workspace-undo-confirm"]'
+- click: '[data-testid="code-workspace-undo-ok"]'
+- assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
+- assert_file_sha256:
+    path: ${fixture.parity006_a}
+    equals: ${fixture.parity006_sha_initial_a}
+    timeout_sec: 30
+- assert_file_sha256:
+    path: ${fixture.parity006_b}
+    equals: ${fixture.parity006_sha_initial_b}
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-find-run-search"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-find-file-group"]'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+- press:
+    key: Delete
+    selector: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+- dblclick: '[data-testid="code-workspace-find-match-row"][title*="a.txt:1"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: End
+- press: x
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- click: '[data-testid="code-workspace-replace-commit"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-commit-error"]'
+    contains: unsaved modifications
+    timeout_sec: 15
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- assert_file_sha256:
+    path: ${fixture.parity006_a}
+    equals: ${fixture.parity006_sha_initial_a}
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-replace-cancel"]'
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+s
+- assert_file_contains:
+    path: ${fixture.parity006_a}
+    contains: x
+    timeout_sec: 30
+- screenshot: tc-ide-parity-006-03-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 真实ripgrep匹配、Escape取消磁盘零改动、外部修改冲突阻断且恢复后可正常提交、一次Undo恢复两文件
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 20
+    - 21
+    - 23
+    - 24
+    - 26
+    - 32
+    - 34
+    - 35
+    - 40
+    - 41
+    - 45
+    - 46
+    - 48
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-find-in-files-panel\"]"}'
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-find-file-group\"]", "timeout_sec": 60}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "3 results · 2 files", "timeout_sec": 60}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-find-match-row\"][title*=\"a.txt:2\"]", "name": "data-excluded", "equals": "true"}}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 27
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 28
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_a}", "equals": "${fixture.parity006_sha_initial_a}", "timeout_sec": 30}}'
+    - step: 29
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_b}", "equals": "${fixture.parity006_sha_initial_b}", "timeout_sec": 30}}'
+    - step: 30
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_c}", "equals": "${fixture.parity006_sha_initial_c}", "timeout_sec": 30}}'
+    - step: 31
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_d}", "equals": "${fixture.parity006_sha_initial_d}", "timeout_sec": 30}}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains": "changed", "timeout_sec": 15}}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 38
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_a}", "equals": "${fixture.parity006_sha_initial_a}", "timeout_sec": 30}}'
+    - step: 39
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_b}", "equals": "${fixture.parity006_sha_changed_b}", "timeout_sec": 30}}'
+    - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 43
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_a}", "equals": "${fixture.parity006_sha_commit_a}", "timeout_sec": 30}}'
+    - step: 44
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_b}", "equals": "${fixture.parity006_sha_commit_b}", "timeout_sec": 30}}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-undo-confirm\"]"}'
+    - step: 49
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-undo-confirm\"]"}'
+    - step: 50
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_a}", "equals": "${fixture.parity006_sha_initial_a}", "timeout_sec": 30}}'
+    - step: 51
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_b}", "equals": "${fixture.parity006_sha_initial_b}", "timeout_sec": 30}}'
+    results:
+    - 28
+    - 29
+    - 30
+    - 31
+    - 36
+    - 38
+    - 39
+    - 43
+    - 44
+    - 50
+    - 51
+  - id: R2
+    requirement: 编辑器未保存状态冲突阻断、磁盘零写入且保存后可通过预览重新提交
+    actions:
+    - 52
+    - 54
+    - 55
+    - 56
+    - 58
+    - 59
+    - 60
+    - 61
+    - 63
+    - 67
+    - 69
+    - 70
+    checkpoints:
+    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-find-file-group\"]", "timeout_sec": 60}}'
+    - step: 57
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
+    - step: 62
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 64
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-commit-error\"]", "contains": "unsaved modifications", "timeout_sec": 15}}'
+    - step: 65
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 66
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity006_a}", "equals": "${fixture.parity006_sha_initial_a}", "timeout_sec": 30}}'
+    - step: 68
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 71
+      expectation: '{"assert_file_contains": {"path": "${fixture.parity006_a}", "contains": "x", "timeout_sec": 30}}'
+    results:
+    - 64
+    - 66
+    - 68
+    - 71
+  visual:
+  - check: 原生窗口下替换冲突错误提示、按钮禁用态与对话框对齐无截断
+    method: manual
+    reason: 原生渲染边界与系统DPI缩放需人工评审
+  native:
+  - check: Windows当前端真实ripgrep、文件修改与哈希阻断；Linux同序列保留计划
+    method: automated
+    reason: 验证真实磁盘写入与文件系统哈希一致性

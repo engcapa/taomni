@@ -265,6 +265,14 @@
 - `[data-testid="code-workspace-replace-commit"]` — interactive [optional] — F25.5.replace-commit
 - `[data-testid="code-workspace-replace-cancel"]` — interactive [optional] — F25.5.replace-cancel
 - `[data-testid="code-workspace-replace-commit-error"]` — display [optional] — F25.5.replace-commit-error
+- `[data-testid="code-workspace-find-match-row"]` — interactive [optional] — F25.5.find-match-row
+- `[data-testid="code-workspace-find-row-exclude"]` — interactive [optional] — F25.5.find-row-exclude
+- `[data-testid="code-workspace-find-row-restore"]` — interactive [optional] — F25.5.find-row-restore
+- `[data-testid="code-workspace-replace-summary"]` — display [optional] — F25.5.replace-summary
+- `[data-testid="code-workspace-find-replaced-notice"]` — display [optional] — F25.5.find-replaced-notice
+- `[data-testid="code-workspace-undo-confirm"]` — display [optional] — F25.5.undo-confirm
+- `[data-testid="code-workspace-undo-ok"]` — interactive [optional] — F25.5.undo-ok
+- `[data-testid="code-workspace-undo-cancel"]` — interactive [optional] — F25.5.undo-cancel
 - `[data-testid="code-workspace-bottom-tab-terminal"]` — interactive [optional] — F25.5.bottom-dock-terminal-tab
 - `[data-testid="code-workspace-bottom-tab-search"]` — interactive [optional] — F25.5.bottom-dock-search-tab
 - `[data-testid="code-workspace-tab-policy-settings"]` — interactive [optional] — F25.5.tab-policy-settings

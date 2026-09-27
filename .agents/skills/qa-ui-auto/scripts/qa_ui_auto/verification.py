@@ -15,7 +15,7 @@ from .testcase import TestCase, discover
 from .report_paths import summaries
 
 PLATFORMS = ("Linux", "Windows", "macOS")
-LINUX_VERBS = {"native_set_writable", "assert_native_process_delta", "native_process_snapshot",
+LINUX_VERBS = {"assert_native_process_delta", "native_process_snapshot",
                "native_click", "native_pointer_drag", "native_ime_keys", "native_clipboard_owner",
                "assert_system_clipboard"}
 REVIEW_TAGS = {"needs-review", "legacy-imported"}

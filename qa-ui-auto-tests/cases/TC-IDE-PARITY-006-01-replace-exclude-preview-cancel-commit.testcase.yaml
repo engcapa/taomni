@@ -1,0 +1,284 @@
+id: TC-IDE-PARITY-006-01
+title: Replace exclude preview cancel commit in browser
+description: Browser gate case for ED-PARITY-006 A1/V3. Directory scope + mask search finds 3 occurrences across 2 files; result row exclusion via Delete key and context menu; Replace All preview reflects seeded exclusions in summary and checkboxes; Escape cancels with zero disk/buffer commit; Enter commits 2 replacements and prunes committed rows; post-commit notice and remaining row state verified.
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-find
+- replace
+- parity006
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity006_replace
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity006_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+F
+- wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('aria-label') === 'Search query'
+    expect_truthy: true
+- select_option:
+    selector: '[data-testid="code-workspace-find-scope-select"]'
+    value: directory
+- fill:
+    selector: '[data-testid="code-workspace-find-directory-input"]'
+    value: src
+- fill:
+    selector: '[aria-label="Include globs"]'
+    value: '*.txt'
+- fill:
+    selector: '[aria-label="Search query"]'
+    value: token
+- press: Enter
+- wait_for: '[data-testid="code-workspace-find-file-group"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-find-in-files-panel"]'
+    contains: 3 results · 2 files
+- assert_count:
+    selector: '[data-testid="code-workspace-find-file-group"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="code-workspace-find-match-row"]'
+    equal: 3
+- assert_text:
+    selector: '[data-testid="code-workspace-find-in-files-panel"]'
+    contains: src/a.txt
+- assert_text:
+    selector: '[data-testid="code-workspace-find-in-files-panel"]'
+    contains: src/b.txt
+- click: '[data-testid="code-workspace-find-match-row"][title*="b.txt:1"]'
+- wait_for: '[data-testid="code-workspace-editor-tab-strip"] button[title*="b.txt"]'
+- click: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+- press:
+    key: Delete
+    selector: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+    name: data-excluded
+    equals: 'true'
+- eval_readonly:
+    expression: Boolean(document.activeElement?.getAttribute('title')?.includes('b.txt:1'))
+    expect_truthy: true
+- right_click: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+- wait_for: '[data-testid="code-workspace-find-row-restore"]'
+- click: '[data-testid="code-workspace-find-row-restore"]'
+- eval_readonly:
+    expression: document.querySelector('[data-excluded]') === null
+    expect_truthy: true
+- right_click: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+- wait_for: '[data-testid="code-workspace-find-row-exclude"]'
+- click: '[data-testid="code-workspace-find-row-exclude"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+    name: data-excluded
+    equals: 'true'
+- fill:
+    selector: '[aria-label="Replace text"]'
+    value: coin
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-summary"]'
+    contains: Replace 2 occurrences of 'token' across 2 files with 'coin'?
+- assert_text:
+    selector: '[data-testid="code-workspace-replace-counts"]'
+    contains: 2 of 3
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-replace-commit'
+    expect_truthy: true
+- screenshot: tc-ide-parity-006-01-preview.png
+- press: Escape
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'code-workspace-find-replace-all'
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="code-workspace-find-match-row"]'
+    equal: 3
+- assert_attribute:
+    selector: '[data-testid="code-workspace-find-match-row"][title*="a.txt:2"]'
+    name: data-excluded
+    equals: 'true'
+- click: '[data-testid="code-workspace-editor-tab-strip"] button[title*="a.txt"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - alpha token one
+    - beta token two
+    - ''
+- click: '[data-testid="code-workspace-editor-tab-strip"] button[title*="b.txt"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - gamma token three
+    - ''
+- click: '[data-testid="code-workspace-find-replace-all"]'
+- wait_for: '[data-testid="code-workspace-replace-preview"]'
+- press: Enter
+- assert_not_visible: '[data-testid="code-workspace-replace-preview"]'
+- wait_for: '[data-testid="code-workspace-find-replaced-notice"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-find-replaced-notice"]'
+    contains: Replaced 2 occurrences in 2 files
+- assert_count:
+    selector: '[data-testid="code-workspace-find-match-row"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-find-match-row"]'
+    name: data-excluded
+    equals: 'true'
+- click: '[data-testid="code-workspace-editor-tab-strip"] button[title*="a.txt"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - alpha coin one
+    - beta token two
+    - ''
+- click: '[data-testid="code-workspace-editor-tab-strip"] button[title*="b.txt"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - gamma coin three
+    - ''
+- assert_disabled: '[data-testid="code-workspace-find-replace-all"]'
+- screenshot: tc-ide-parity-006-01-post-commit.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 范围掩码匹配准确、结果行排除与恢复、快捷键Delete/右键菜单同步
+    actions:
+    - 1
+    - 3
+    - 4
+    - 6
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 20
+    - 22
+    - 23
+    - 26
+    - 28
+    - 30
+    - 32
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-find-in-files-panel\"]"}'
+    - step: 8
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"aria-label\") === \"Search query\"", "expect_truthy": true}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-find-file-group\"]"}'
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "3 results · 2 files"}}'
+    - step: 16
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-find-file-group\"]", "equal": 2}}'
+    - step: 17
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-find-match-row\"]", "equal": 3}}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "src/a.txt"}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-in-files-panel\"]", "contains": "src/b.txt"}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-tab-strip\"] button[title*=\"b.txt\"]"}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-find-match-row\"][title*=\"a.txt:2\"]", "name": "data-excluded", "equals": "true"}}'
+    - step: 25
+      expectation: '{"eval_readonly": {"expression": "Boolean(document.activeElement?.getAttribute(\"title\")?.includes(\"b.txt:1\"))", "expect_truthy": true}}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-find-row-restore\"]"}'
+    - step: 29
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-excluded]\") === null", "expect_truthy": true}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-find-row-exclude\"]"}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-find-match-row\"][title*=\"a.txt:2\"]", "name": "data-excluded", "equals": "true"}}'
+    results:
+    - 24
+    - 25
+    - 29
+    - 33
+  - id: R2
+    requirement: 预览扣除排除项、Escape零提交、提交修剪已替换行、已排除行保留且全部排除时禁用Replace All
+    actions:
+    - 34
+    - 35
+    - 41
+    - 46
+    - 48
+    - 50
+    - 52
+    - 58
+    - 60
+    checkpoints:
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-summary\"]", "contains": "Replace 2 occurrences"}}'
+    - step: 38
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-replace-counts\"]", "contains": "2 of 3"}}'
+    - step: 39
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"code-workspace-replace-commit\"", "expect_truthy": true}}'
+    - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 43
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"code-workspace-find-replace-all\"", "expect_truthy": true}}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-find-match-row\"]", "equal": 3}}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-find-match-row\"][title*=\"a.txt:2\"]", "name": "data-excluded", "equals": "true"}}'
+    - step: 47
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["alpha token one", "beta token two", ""]}}'
+    - step: 49
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["gamma token three", ""]}}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 53
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-replace-preview\"]"}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-find-replaced-notice\"]"}'
+    - step: 55
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-find-replaced-notice\"]", "contains": "Replaced 2 occurrences in 2 files"}}'
+    - step: 56
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-find-match-row\"]", "equal": 1}}'
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-find-match-row\"]", "name": "data-excluded", "equals": "true"}}'
+    - step: 59
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["alpha coin one", "beta token two", ""]}}'
+    - step: 61
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equals": ["gamma coin three", ""]}}'
+    - step: 62
+      expectation: '{"assert_disabled": "[data-testid=\"code-workspace-find-replace-all\"]"}'
+    results:
+    - 42
+    - 47
+    - 49
+    - 55
+    - 56
+    - 57
+    - 59
+    - 61
+    - 62
+  visual:
+  - check: 预览弹窗布局、摘要换行与按钮焦点符合IDEA New UI规格
+    method: manual
+    reason: 弹窗居中与视觉对齐需人工评审
+  native:
+  - check: browser模式验证VFS与DOM状态，不替代主机磁盘与真实ripgrep
+    method: automated
+    reason: 平台差异由TC-IDE-PARITY-006-03承接

@@ -6618,6 +6618,38 @@ controls:
     selector: '[data-testid="code-workspace-replace-commit-error"]'
     kind: display
     optional: true       # precondition conflicts; ED-FIND-004 fail-closed
+  - id: find-match-row
+    selector: '[data-testid="code-workspace-find-match-row"]'
+    kind: interactive
+    optional: true       # ED-PARITY-006 match row with exclusion toggle
+  - id: find-row-exclude
+    selector: '[data-testid="code-workspace-find-row-exclude"]'
+    kind: interactive
+    optional: true       # ED-PARITY-006 context menu exclude option
+  - id: find-row-restore
+    selector: '[data-testid="code-workspace-find-row-restore"]'
+    kind: interactive
+    optional: true       # ED-PARITY-006 context menu restore option
+  - id: replace-summary
+    selector: '[data-testid="code-workspace-replace-summary"]'
+    kind: display
+    optional: true       # ED-PARITY-006 replace summary header
+  - id: find-replaced-notice
+    selector: '[data-testid="code-workspace-find-replaced-notice"]'
+    kind: display
+    optional: true       # ED-PARITY-006 post-commit replaced notice
+  - id: undo-confirm
+    selector: '[data-testid="code-workspace-undo-confirm"]'
+    kind: display
+    optional: true       # ED-PARITY-006 undo confirmation dialog
+  - id: undo-ok
+    selector: '[data-testid="code-workspace-undo-ok"]'
+    kind: interactive
+    optional: true       # ED-PARITY-006 undo confirmation OK button
+  - id: undo-cancel
+    selector: '[data-testid="code-workspace-undo-cancel"]'
+    kind: interactive
+    optional: true       # ED-PARITY-006 undo confirmation Cancel button
   - id: bottom-dock-terminal-tab       # dock tab ids are shared with F25.1/F25.2 panels; this owns the terminal tab id
     selector: '[data-testid="code-workspace-bottom-tab-terminal"]'
     kind: interactive

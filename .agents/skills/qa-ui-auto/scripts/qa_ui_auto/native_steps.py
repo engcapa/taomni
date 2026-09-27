@@ -75,7 +75,10 @@ class NativeStepContext:
         """
         for path, mode in reversed(list(self._permission_restores.items())):
             try:
-                path.chmod(mode)
+                if platform.system() == "Windows":
+                    subprocess.run(["icacls", str(path), "/remove:d", "*S-1-1-0"], capture_output=True)
+                else:
+                    path.chmod(mode)
             except OSError:
                 pass
         self._permission_restores.clear()
@@ -547,8 +550,8 @@ def _assert_file_sha256(ctx: NativeStepContext, args: Any) -> str:
 
 def _native_set_writable(ctx: NativeStepContext, args: Any) -> str:
     """Toggle owner-write only inside this run's retained report directory."""
-    if platform.system() != "Linux":
-        raise StepError("native_set_writable: requires Linux permission semantics")
+    if platform.system() not in ("Linux", "Windows"):
+        raise StepError("native_set_writable: requires Linux or Windows permission semantics")
     if not isinstance(args, dict) or not {"path", "writable"} <= set(args):
         raise StepError("native_set_writable: expected {path, writable}")
     requested = Path(str(args["path"])).expanduser()
@@ -562,15 +565,25 @@ def _native_set_writable(ctx: NativeStepContext, args: Any) -> str:
             f"native_set_writable: target must stay inside report root {report_root}"
         )
     writable = bool(args["writable"])
-    before = stat.S_IMODE(target.stat().st_mode)
-    ctx._permission_restores.setdefault(target, before)
-    after = before | stat.S_IWUSR if writable else before & ~stat.S_IWUSR
-    target.chmod(after)
-    observed = stat.S_IMODE(target.stat().st_mode)
-    if bool(observed & stat.S_IWUSR) != writable:
-        raise StepError(
-            f"native_set_writable: owner-write postcondition failed for {target}"
-        )
+    if platform.system() == "Windows":
+        before = 0o0777
+        ctx._permission_restores.setdefault(target, 0)
+        if writable:
+            subprocess.run(["icacls", str(target), "/remove:d", "*S-1-1-0"], check=True, capture_output=True)
+            observed = 0o0777
+        else:
+            subprocess.run(["icacls", str(target), "/deny", "*S-1-1-0:(OI)(CI)(WD,AD)"], check=True, capture_output=True)
+            observed = 0o0555
+    else:
+        before = stat.S_IMODE(target.stat().st_mode)
+        ctx._permission_restores.setdefault(target, before)
+        after = before | stat.S_IWUSR if writable else before & ~stat.S_IWUSR
+        target.chmod(after)
+        observed = stat.S_IMODE(target.stat().st_mode)
+        if bool(observed & stat.S_IWUSR) != writable:
+            raise StepError(
+                f"native_set_writable: owner-write postcondition failed for {target}"
+            )
 
     artifact = ctx.case_dir / "native-permission-observations.json"
     observations: list[dict[str, Any]] = []

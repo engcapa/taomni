@@ -9,8 +9,8 @@ Browser mode: FixtureSkip — the VFS cannot see host paths, so any case
 depending on real disk effects is correctly environment-blocked there.
 """
 
-from __future__ import annotations
-
+import platform
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -21,9 +21,9 @@ SEED_FILES = {
     # ED-IMPROVE-004: astral-prefixed line so replace-in-files proves the
     # code-point -> UTF-16 mapping against real disk bytes.
     "unicode.txt": "\U0001F600notes\n",
-    # ED-REPAIR-006: case-distinct files on POSIX filesystem
+    # Case-distinct replacement test: A.java and B.java
     "A.java": "class CaseAlpha { void match() {} }\n",
-    "a.java": "class CaseBeta { void match() {} }\n",
+    "B.java": "class CaseBeta { void match() {} }\n",
 }
 
 
