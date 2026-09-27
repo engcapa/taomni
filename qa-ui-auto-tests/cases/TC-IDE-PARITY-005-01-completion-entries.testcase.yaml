@@ -90,6 +90,8 @@ steps:
       selector: '[data-testid="keymap-cheatsheet-dialog"]'
       state: hidden
   - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: End
+  - press: ArrowLeft
   - press: Control+Space
   - wait_for: '.cm-tooltip-autocomplete li'
   - parity005_trace: {fetch: 5, resolve: 0, pending: 0}
@@ -199,47 +201,47 @@ verification:
           expectation: Actions Enter produced exactly one additional request.
         - step: 46
           expectation: All click produced exactly one additional request.
-        - step: 58
-          expectation: Closing the disabled cheat sheet and invoking Ctrl+Space from the editor produced exactly one additional request.
         - step: 60
+          expectation: Closing the disabled cheat sheet and invoking Ctrl+Space from the editor produced exactly one additional request.
+        - step: 62
           expectation: The original buffer remains intact after all entries.
-      results: [27, 38, 46, 52, 58, 60]
+      results: [27, 38, 46, 52, 60, 62]
     - id: ED-PARITY-005-V1-repeat-focus
       requirement: Repeated invocation refreshes one request per key, while Find, Search Everywhere and settings inputs retain focus and issue none.
-      actions: [61, 63, 66, 70, 73, 74, 82, 83, 94, 95]
+      actions: [63, 65, 68, 72, 75, 76, 84, 85, 96, 97]
       checkpoints:
-        - step: 65
+        - step: 67
           expectation: Two Ctrl+Space invocations each issue one fresh request.
-        - step: 68
+        - step: 70
           expectation: Alt slash adds exactly one request while the popup is open.
-        - step: 75
+        - step: 77
           expectation: Find keys issue no completion request and leave Find focused.
-        - step: 76
+        - step: 78
           expectation: The active input remains the Find query.
-        - step: 84
+        - step: 86
           expectation: Search keys issue no completion request and leave the query focused.
-        - step: 85
+        - step: 87
           expectation: The active input remains the Search Everywhere query.
-        - step: 96
+        - step: 98
           expectation: Settings keys issue no completion request and leave the font input focused.
-        - step: 97
-          expectation: The active input remains the font family setting.
         - step: 99
+          expectation: The active input remains the font family setting.
+        - step: 101
           expectation: All protected input checks leave the Java buffer unchanged.
-      results: [65, 68, 75, 76, 84, 85, 96, 97, 99]
+      results: [67, 70, 77, 78, 86, 87, 98, 99, 101]
     - id: ED-PARITY-005-V1-modifiers-composition
       requirement: Parameter-info chord does not request Basic Completion; a composing Basic key does not request completion and the committed text remains undoable.
-      actions: [108, 111, 114]
+      actions: [110, 113, 116]
       checkpoints:
-        - step: 109
+        - step: 111
           expectation: Ctrl Shift Space did not call the Basic provider.
-        - step: 112
+        - step: 114
           expectation: Ctrl Space during composition did not call the Basic provider.
-        - step: 113
-          expectation: The composition committed one space at the caret.
         - step: 115
+          expectation: The composition committed one space at the caret.
+        - step: 117
           expectation: One Undo returns the exact original buffer.
-      results: [109, 112, 113, 115]
+      results: [111, 114, 115, 117]
   visual:
     - check: Popup anchor, selected row, documentation and viewport clipping against the IDEA state.
       method: manual
