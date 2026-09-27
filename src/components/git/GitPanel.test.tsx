@@ -157,6 +157,26 @@ describe("GitPanel", () => {
     expect(useAppStore.getState().uiFontSize).toBe(12);
   });
 
+  it("drops a late snapshot for the previous repository after repoRoot switches (ED-PARITY-008)", async () => {
+    const base = await gitMocks.gitSnapshot();
+    let releaseA!: (value: GitSnapshot) => void;
+    const lateA = new Promise<GitSnapshot>((resolve) => { releaseA = resolve; });
+    gitMocks.gitSnapshot.mockImplementation(((repoRoot: string) => (
+      repoRoot === "/fx/repo-a"
+        ? lateA
+        : Promise.resolve({ ...base, repoRoot, currentBranch: "branch-of-b" })
+    )) as unknown as () => Promise<GitSnapshot>);
+    const { rerender } = render(<GitPanel repoRoot="/fx/repo-a" />);
+    rerender(<GitPanel repoRoot="/fx/repo-b" />);
+    await waitFor(() => expect(screen.getAllByText("branch-of-b").length).toBeGreaterThan(0));
+
+    await act(async () => { releaseA({ ...base, repoRoot: "/fx/repo-a", currentBranch: "branch-of-a" }); });
+
+    expect(screen.queryByText("branch-of-a")).toBeNull();
+    expect(screen.getAllByText("branch-of-b").length).toBeGreaterThan(0);
+    gitMocks.gitSnapshot.mockImplementation(async () => base);
+  });
+
   it("labels the header as workspace Git when embedded in the multi-repo manager", async () => {
     render(
       <GitPanel

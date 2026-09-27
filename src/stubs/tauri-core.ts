@@ -49,6 +49,8 @@ import {
   parity005Root,
   parity005Status,
 } from "./parity005Completion";
+import { parity008Handles, parity008Invoke } from "./parity008Git";
+import { parity009Cancel, parity009Capabilities, parity009Run } from "./parity009StructuralSearch";
 import {
   parity007CodeActionResolve,
   parity007CodeActions,
@@ -1624,7 +1626,15 @@ async function readStubWorkspaceEncodedFile(
 }
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  // ED-PARITY-008 isolated two-repository Git fixture (opt-in via localStorage).
+  if (parity008Handles(cmd, args)) return await parity008Invoke(cmd, args) as T;
   switch (cmd) {
+    case "structural_search_capabilities":
+      return parity009Capabilities() as T;
+    case "structural_search_run":
+      return await parity009Run(args?.request) as T;
+    case "structural_search_cancel":
+      return parity009Cancel((args?.requestId as string) ?? "") as T;
     case "list_sessions": {
       return loadSessions() as T;
     }

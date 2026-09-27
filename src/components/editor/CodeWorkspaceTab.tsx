@@ -506,6 +506,10 @@ import {
   type ProblemsScope,
 } from "./workspace/panels/ProblemsPanel";
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
+import { StructuralSearchPanel } from "./workspace/panels/StructuralSearchPanel";
+import { StructuralSearchDialog } from "./workspace/StructuralSearchDialog";
+import { useStructuralSearchSession } from "./workspace/useStructuralSearchSession";
+import type { StructuralMatch } from "../../lib/editor/structuralSearch";
 import { DocumentationPane } from "./workspace/panels/DocumentationPane";
 import { HierarchyPanel } from "./workspace/panels/HierarchyPanel";
 import {
@@ -8894,6 +8898,51 @@ export function CodeWorkspaceTab({
     [openFile, setStatusMessage],
   );
 
+  // ED-PARITY-009: Structural Search session (dialog + result tool window).
+  const structuralRoots = useMemo(
+    () => roots.map((root) => ({ id: root.id, name: root.name, path: root.path })),
+    [roots],
+  );
+  const structuralActiveFile = useMemo(
+    () => (activeFile?.ref.kind === "root" ? { rootId: activeFile.ref.rootId, path: activeFile.ref.path } : null),
+    [activeFile?.ref],
+  );
+  const showStructuralResults = useCallback(() => {
+    setBottomDockOpen(true);
+    setBottomDockTab("structural");
+  }, []);
+  const structuralSearch = useStructuralSearchSession({
+    roots: structuralRoots,
+    activeFile: structuralActiveFile,
+    getBuffers: () => Object.values(openFilesRef.current).flatMap((file) => (
+      file.ref.kind === "root" && !file.loading && !file.error && /\.java$/i.test(file.ref.path)
+        && structuralRoots.some((root) => root.id === (file.ref.kind === "root" ? file.ref.rootId : null))
+        ? [{ rootId: file.ref.rootId, path: file.ref.path, text: file.text }]
+        : []
+    )),
+    onShowResults: showStructuralResults,
+    onStatus: setStatusMessage,
+  });
+  const openStructuralMatch = useCallback((match: StructuralMatch, options: { preview: boolean }) => {
+    const root = rootsRef.current.find((candidate) => candidate.id === match.rootId);
+    if (!root) {
+      setStatusMessage(`Cannot open structural result outside the workspace: ${match.path}`);
+      return;
+    }
+    const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: match.path };
+    revealNonceRef.current += 1;
+    // Select the whole matched fragment, like IDEA's usage highlight.
+    setRevealTarget({
+      key: fileKey(ref),
+      line: match.start.line,
+      character: match.start.character,
+      end: { line: match.end.line, character: match.end.character },
+      nonce: revealNonceRef.current,
+      focus: !options.preview,
+    });
+    void openFile(ref, { preview: options.preview });
+  }, [openFile, setStatusMessage]);
+
   // ED-MAIN-005 / ED-REPAIR-005: read the frozen per-file preimage before the replace preview
   // can be confirmed. Validates frozen workspace instance, roots, and buffer states across
   // all async reads; aborts or fails cleanly if states change mid-read.
@@ -14406,6 +14455,13 @@ export function CodeWorkspaceTab({
       },
     },
     {
+      id: "workspace.searchStructurally",
+      title: "Search Structurally…",
+      category: "Search",
+      keywords: ["structural", "ssr", "template", "ast"],
+      run: () => structuralSearch.open(),
+    },
+    {
       id: "workspace.fileStructure",
       title: "File Structure",
       category: "Navigation",
@@ -15761,7 +15817,9 @@ export function CodeWorkspaceTab({
       // Ctrl+F as text instead of the workspace dispatcher opening the editor
       // find panel behind the dialog. The Keymap recorder keeps working
       // because it listens on window capture independently of this guard.
-      + ', [data-testid="workspace-keymap-settings-dialog"], [data-testid="keymap-cheatsheet-dialog"], [data-testid="code-workspace-undo-confirm"]',
+      + ', [data-testid="workspace-keymap-settings-dialog"], [data-testid="keymap-cheatsheet-dialog"], [data-testid="code-workspace-undo-confirm"]'
+      // ED-PARITY-009: the Structural Search dialog owns Esc/Ctrl+Enter and text input.
+      + ', [data-testid="structural-search-dialog"]',
     ));
   }, []);
 
@@ -21044,6 +21102,15 @@ export function CodeWorkspaceTab({
             ),
           },
           {
+            id: "structural",
+            label: "Structural Search",
+            icon: <Braces className="h-3.5 w-3.5" />,
+            badge: structuralSearch.result?.matches.length || undefined,
+            content: (
+              <StructuralSearchPanel session={structuralSearch} onOpenMatch={openStructuralMatch} />
+            ),
+          },
+          {
             id: "references",
             label: "References",
             icon: <ListTree className="h-3.5 w-3.5" />,
@@ -21419,6 +21486,7 @@ export function CodeWorkspaceTab({
       />
       {treeContextMenu}
       {editorContextMenu}
+      {visible ? <StructuralSearchDialog session={structuralSearch} /> : null}
       <UsagesScopeDialog
         open={!!usagesScopeDialog?.open}
         symbolHint={usagesScopeDialog?.file.subtitle ?? null}

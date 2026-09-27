@@ -151,6 +151,24 @@ export function WorkspaceChangesView({
     if (!root || !change) return null;
     return { root, change };
   }, [focusedKey, roots, snapshots]);
+  // Same order as the flat list (repository name, then path) so previous/next
+  // file navigation walks exactly the rows the user sees (ED-PARITY-008).
+  const navigableChanges = useMemo(() => buildWorkspaceFlatGroups(
+    groups.map((group) => group.root),
+    new Map(groups.map((group) => [group.root.repoRoot, group.visibleChanges] as const)),
+  ).flatMap((group) => group.changes.map((change) => ({ repoRoot: group.root.repoRoot, path: change.path }))), [groups]);
+  const focusedNavIndex = focusedKey
+    ? navigableChanges.findIndex((entry) => workspaceChangeKey(entry.repoRoot, entry.path) === focusedKey)
+    : -1;
+  const selectNavigable = (index: number) => {
+    const entry = navigableChanges[index];
+    if (entry) onSelect(entry.repoRoot, entry.path, { ctrl: false, shift: false });
+  };
+  const activeHeadOid = active ? snapshots[active.root.repoRoot]?.snapshot?.headOid ?? null : null;
+  const sideLabels = active ? {
+    old: activeHeadOid ? `HEAD ${activeHeadOid.slice(0, 8)} · ${active.change.oldPath ?? active.change.path}` : "HEAD",
+    new: `Working tree · ${active.change.path}`,
+  } : null;
   const canCommit = !busy && checkedCount > 0 && commitMessage.trim().length > 0;
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(() => new Set());
   const toggleStageFilter = (filterKey: GitStageFilter) => {
@@ -280,6 +298,14 @@ export function WorkspaceChangesView({
           selectedCount={active ? 1 : 0}
           pair={pair}
           pairLoading={pairLoading}
+          repoRoot={active?.root.repoRoot ?? null}
+          sideLabels={sideLabels}
+          fileNavigation={{
+            index: focusedNavIndex,
+            count: navigableChanges.length,
+            onPrevious: () => selectNavigable(focusedNavIndex - 1),
+            onNext: () => selectNavigable(focusedNavIndex + 1),
+          }}
           onStage={stageSelected}
           onUnstage={unstageSelected}
           onDiscard={discardSelected}
@@ -451,6 +477,9 @@ function WorkspaceFlatChangeRow({
       tabIndex={0}
       data-testid="workspace-change-row"
       data-compact="true"
+      data-repo-root={root.repoRoot}
+      data-path={change.path}
+      data-active={active ? "true" : undefined}
       aria-label={`${root.name} ${change.path} ${status.statusLabel}`}
       title={`${root.repoRoot}\n${change.path}`}
       className={`group relative w-full min-h-[28px] h-7 pl-6 pr-2 py-0.5 flex items-center gap-1.5 text-left cursor-pointer border-b border-[var(--taomni-divider)]/60 ${

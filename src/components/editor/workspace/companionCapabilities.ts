@@ -28,14 +28,18 @@ export interface StructuralQuery {
   pattern: string;
   variables: Record<string, StructuralQueryVariable>;
   scope: "file" | "module" | "workspace";
+  /** IDEA "Match case"; off compares identifiers/literals and Text filters case-insensitively. */
+  matchCase?: boolean;
   replacement?: { template: string; shortenImports: boolean; reformat: boolean };
 }
 
-/** Languages with an official SSR story AND a real local parser backend. */
-export const SSR_SUPPORTED_LANGUAGES: ReadonlySet<string> = new Set([
-  // Java becomes available once the tree-sitter-java backend lands; the
-  // schema below is already final so enabling is additive-only.
-]);
+/**
+ * Languages with an official SSR story AND a real local parser backend. Java
+ * is backed by the native tree-sitter-java matcher (src-tauri
+ * structural_search.rs, ED-PARITY-009); availability still requires the
+ * runtime capability probe to report that backend.
+ */
+export const SSR_SUPPORTED_LANGUAGES: ReadonlySet<string> = new Set(["java"]);
 
 export type StructuralSearchAvailability =
   | { available: true; backend: "tree-sitter" }

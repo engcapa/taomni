@@ -1,0 +1,177 @@
+id: TC-IDE-PARITY-009-01
+title: Search Structurally… Java template returns the three AST matches with tree navigation and highlight
+description: >-
+  ED-PARITY-009 V-009-01 (+ V-009-04 entry/focus). Opens Structural Search from the Search Everywhere
+  Actions entry, runs the default `System.out.println($arg$);` Java template In Project against the IDEA
+  F2 fixture and checks the three exact locations (comment, string, print(...) and System.err excluded),
+  the file → class → method → location tree, preview/open navigation that selects the matched range,
+  keyboard tree navigation, collapse, and Esc from Edit Query… without a new request or buffer change.
+  Browser uses the parity009_ssr Lezer-AST fixture backend; the native tree-sitter backend is
+  TC-IDE-PARITY-009-03.
+covers: [F25.6]
+tags: [code-workspace, structural-search, parity009, p2]
+modes: [browser]
+fixtures: [reset_db, parity009_ssr]
+timeout_sec: 180
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity009_root}"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+      value: Search Structurally
+  - press: Enter
+  - wait_for: '[data-testid="structural-search-dialog"]'
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-testid') === 'structural-search-template'
+      expect_truthy: true
+  - assert_attribute:
+      selector: '[data-testid="structural-search-scope-workspace"]'
+      name: aria-checked
+      equals: 'true'
+  - assert_items:
+      selector: '[data-testid="structural-search-variable-row"]'
+      attribute: data-variable
+      equals: [arg]
+  - screenshot: tc-ide-parity-009-01-dialog.png
+  - click: '[data-testid="structural-search-find"]'
+  - wait_for: '[data-testid="structural-search-panel"][data-phase="results"]'
+  - assert_text_equals:
+      selector: '[data-testid="structural-search-summary"]'
+      equals: "fragments matching template 'System.out.println($arg$);' · 3 results"
+  - assert_items:
+      selector: '[data-testid="structural-search-node"]'
+      attribute: data-kind
+      equals: [file, class, method]
+  - assert_items:
+      selector: '[data-testid="structural-search-match"]'
+      equals: ['3System.out.println("alpha");', '4System.out.println(42);', '5System.out.println(']
+  - parity009_trace: {runs: 1, last_status: ok, last_count: 3, active: 0}
+  - screenshot: tc-ide-parity-009-01-results.png
+  - click: '[data-testid="structural-search-match"][data-line="4"]'
+  - assert_text_equals:
+      selector: '[data-testid="code-workspace-editor"] .cm-activeLine'
+      equals: '    System.out.println(42);'
+  - assert_count:
+      selector: '[data-testid="code-workspace-editor"] .cm-selectionBackground'
+      min: 1
+  - press:
+      key: ArrowDown
+      selector: '[data-testid="structural-search-results"]'
+  - assert_text_equals:
+      selector: '[data-testid="code-workspace-editor"] .cm-activeLine'
+      equals: '        "beta");'
+  - press: Enter
+  - eval_readonly:
+      expression: document.activeElement?.classList.contains('cm-content') === true
+      expect_truthy: true
+  - screenshot: tc-ide-parity-009-01-highlight.png
+  - click: '[data-testid="structural-search-node"][data-kind="method"] button'
+  - assert_count:
+      selector: '[data-testid="structural-search-match"]'
+      equal: 0
+  - click: '[data-testid="structural-search-edit-query"]'
+  - wait_for: '[data-testid="structural-search-dialog"]'
+  - press: Escape
+  - assert_not_visible: '[data-testid="structural-search-dialog"]'
+  - parity009_trace: {runs: 1, active: 0}
+  - assert_count:
+      selector: '[data-editor-tab-key][data-dirty="true"]'
+      equal: 0
+verification:
+  review: reviewed
+  requirements:
+  - id: ED-PARITY-009-V1
+    requirement: Actions 入口打开 Structural Search，默认 Java 模板 In Project 返回 3 个精确 AST 位置与 file→class→method 树，排除注释/字符串/print/err。
+    actions:
+    - 7
+    - 9
+    - 10
+    - 11
+    - 17
+    checkpoints:
+    - step: 12
+      expectation: '{wait_for: ''[data-testid="structural-search-dialog"]''}'
+    - step: 13
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.activeElement?.getAttribute(''''data-testid'''')
+        === ''''structural-search-template''''''}}'
+    - step: 14
+      expectation: '{assert_attribute: {equals: ''true'', name: aria-checked, selector: ''[data-testid="structural-search-scope-workspace"]''}}'
+    - step: 15
+      expectation: '{assert_items: {attribute: data-variable, equals: [arg], selector: ''[data-testid="structural-search-variable-row"]''}}'
+    - step: 18
+      expectation: '{wait_for: ''[data-testid="structural-search-panel"][data-phase="results"]''}'
+    - step: 19
+      expectation: '{assert_text_equals: {equals: fragments matching template ''System.out.println($arg$);'' · 3 results,
+        selector: ''[data-testid="structural-search-summary"]''}}'
+    - step: 20
+      expectation: '{assert_items: {attribute: data-kind, equals: [file, class, method], selector: ''[data-testid="structural-search-node"]''}}'
+    - step: 21
+      expectation: '{assert_items: {equals: [3System.out.println("alpha");, 4System.out.println(42);, 5System.out.println(],
+        selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 22
+      expectation: '{parity009_trace: {active: 0, last_count: 3, last_status: ok, runs: 1}}'
+    results:
+    - 19
+    - 20
+    - 21
+    - 22
+  - id: ED-PARITY-009-V1-NAV
+    requirement: 点击/方向键/Enter 导航到匹配并选中范围，Enter 后焦点进入编辑器；折叠方法节点隐藏位置。
+    actions:
+    - 24
+    - 27
+    - 29
+    - 32
+    checkpoints:
+    - step: 25
+      expectation: '{assert_text_equals: {equals: ''    System.out.println(42);'', selector: ''[data-testid="code-workspace-editor"]
+        .cm-activeLine''}}'
+    - step: 26
+      expectation: '{assert_count: {min: 1, selector: ''[data-testid="code-workspace-editor"] .cm-selectionBackground''}}'
+    - step: 28
+      expectation: '{assert_text_equals: {equals: ''        "beta");'', selector: ''[data-testid="code-workspace-editor"]
+        .cm-activeLine''}}'
+    - step: 30
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.activeElement?.classList.contains(''''cm-content'''')
+        === true''}}'
+    - step: 33
+      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-match"]''}}'
+    results:
+    - 25
+    - 26
+    - 28
+    - 30
+    - 33
+  - id: ED-PARITY-009-V3-ESC
+    requirement: Edit Query… 后 Esc 关闭对话框，不发新请求，编辑器不 dirty。
+    actions:
+    - 34
+    - 36
+    checkpoints:
+    - step: 35
+      expectation: '{wait_for: ''[data-testid="structural-search-dialog"]''}'
+    - step: 37
+      expectation: '{assert_not_visible: ''[data-testid="structural-search-dialog"]''}'
+    - step: 38
+      expectation: '{parity009_trace: {active: 0, runs: 1}}'
+    - step: 39
+      expectation: '{assert_count: {equal: 0, selector: ''[data-editor-tab-key][data-dirty="true"]''}}'
+    results:
+    - 37
+    - 38
+    - 39
+  visual:
+  - check: 截图中标题、n/N 导航、两侧标签/结果树与高亮无截断遮挡；与 IDEA 参照的视觉差异单独记录于 comparison record。
+    method: manual
+    reason: 像素与视觉 parity 不能由 DOM 断言替代。
+  native:
+  - check: Browser 仅证明 renderer 入口/路由/可见结果；真实 Tauri IPC、磁盘与 provider 由对应 native case 证明。
+    method: not-applicable
+    reason: browser mode 使用受控 stub，不跨越 OS/IPC 边界。

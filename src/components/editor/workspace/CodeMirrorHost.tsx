@@ -372,6 +372,8 @@ export interface EditorRevealTarget {
   line: number;
   character: number;
   focus?: boolean;
+  /** Optional selection end; without it the reveal only places the caret. */
+  end?: { line: number; character: number };
 }
 
 export interface EditorSelectionRange {
@@ -4424,8 +4426,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     const view = viewRef.current;
     if (!view || !reveal) return;
     const pos = offsetFromLspPosition(view.state.doc, reveal);
+    const head = reveal.end ? offsetFromLspPosition(view.state.doc, reveal.end) : pos;
     view.dispatch({
-      selection: { anchor: pos },
+      selection: { anchor: pos, head },
       effects: EditorView.scrollIntoView(pos, { y: "center" }),
     });
     if (reveal.focus !== false) view.focus();

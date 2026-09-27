@@ -6352,6 +6352,11 @@ controls:
     selector: '[data-testid="code-workspace-editor-tab-strip"]'
     kind: display
     optional: true       # only with an open buffer
+  - id: editor-tab-dirty
+    selector: '[data-editor-tab-key][data-dirty="true"]'
+    kind: display
+    optional: true       # unsaved buffer marker (ED-PARITY-008/009 retained-state checks)
+    aliases: ['[data-editor-tab-key][data-active="true"][data-dirty="true"]']
   - id: editor-split-layout
     selector: '[data-testid="code-workspace-editor-split"]'
     kind: display
@@ -7447,6 +7452,106 @@ controls:
 - 智能提示设置支持 Quick Documentation 悬停延迟与默认窗格/弹出框目标、Parameter Info 自动触发与完整重载签名开关。
 - 支持 IDEA 风格 Ctrl+Tab 标签切换器（MRU 顺序、鼠标悬停预览、释放即切换）与统一动作快照投影的快捷键速查表及右键上下文菜单。
 
+### 25.6 Java Structural Search（ED-PARITY-009）🟡
+
+<!-- feature
+id: F25.6
+status: partial
+area: editor/structural-search
+components: [StructuralSearchDialog, StructuralSearchPanel, useStructuralSearchSession, CodeWorkspaceTab]
+files:
+  - src/components/editor/workspace/StructuralSearchDialog.tsx
+  - src/components/editor/workspace/panels/StructuralSearchPanel.tsx
+  - src/components/editor/workspace/useStructuralSearchSession.ts
+  - src/components/editor/workspace/companionCapabilities.ts
+  - src/lib/editor/structuralSearch.ts
+  - src/stubs/parity009StructuralSearch.ts
+  - src-tauri/src/structural_search.rs
+controls:
+  - id: structural-search-dialog
+    selector: '[data-testid="structural-search-dialog"]'
+    kind: display
+  - id: structural-search-template
+    selector: '[data-testid="structural-search-template"]'
+    kind: interactive
+  - id: structural-search-language
+    selector: '[data-testid="structural-search-language"]'
+    kind: display
+  - id: structural-search-variable-row
+    selector: '[data-testid="structural-search-variable-row"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-variable-text
+    selector: '[data-testid="structural-search-variable-text"]'
+    kind: interactive
+  - id: structural-search-variable-invert
+    selector: '[data-testid="structural-search-variable-invert"]'
+    kind: interactive
+  - id: structural-search-match-case
+    selector: '[data-testid="structural-search-match-case"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-scope-workspace
+    selector: '[data-testid="structural-search-scope-workspace"]'
+    kind: interactive
+  - id: structural-search-scope-module
+    selector: '[data-testid="structural-search-scope-module"]'
+    kind: interactive
+  - id: structural-search-scope-file
+    selector: '[data-testid="structural-search-scope-file"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-find
+    selector: '[data-testid="structural-search-find"]'
+    kind: interactive
+  - id: structural-search-cancel
+    selector: '[data-testid="structural-search-cancel"]'
+    kind: interactive
+  - id: structural-search-running
+    selector: '[data-testid="structural-search-running"]'
+    kind: display
+  - id: structural-search-error
+    selector: '[data-testid="structural-search-error"]'
+    kind: display
+  - id: structural-search-unavailable
+    selector: '[data-testid="structural-search-unavailable"]'
+    kind: display
+  - id: structural-search-panel
+    selector: '[data-testid="structural-search-panel"]'
+    kind: display
+  - id: structural-search-summary
+    selector: '[data-testid="structural-search-summary"]'
+    kind: display
+  - id: structural-search-results
+    selector: '[data-testid="structural-search-results"]'
+    kind: interactive
+  - id: structural-search-node
+    selector: '[data-testid="structural-search-node"]'
+    kind: interactive
+  - id: structural-search-match
+    selector: '[data-testid="structural-search-match"]'
+    kind: interactive
+  - id: structural-search-empty
+    selector: '[data-testid="structural-search-empty"]'
+    kind: display
+  - id: structural-search-cancelled
+    selector: '[data-testid="structural-search-cancelled"]'
+    kind: display
+  - id: structural-search-edit-query
+    selector: '[data-testid="structural-search-edit-query"]'
+    kind: interactive
+  - id: structural-search-backend
+    selector: '[data-testid="structural-search-backend"]'
+    kind: display
+  - id: bottom-tab-structural
+    selector: '[data-testid="code-workspace-bottom-tab-structural"]'
+    kind: interactive
+-->
+
+- `Search Structurally…`（Actions 入口，无默认快捷键）打开 Java 模板对话框：`$var$` 变量、Count [1,1]、Text（正则）/Invert 修饰符、Match case、In Project/Module/Current File 范围。
+- 搜索优先使用所有已加载 Java 编辑器的快照，包含非活动 dirty 缓冲，按所选范围过滤且不保存磁盘。无法读取、非 UTF-8、超过 2 MiB 或 parser 未完成时显示带路径的类型化错误，不能当作空结果；TC-IDE-PARITY-009-05/06 覆盖缓冲/范围/错误恢复与 native 零写入。
+- 原生后端为 tree-sitter-java AST 匹配（节点类型 + 叶子 token），排除注释、字符串与相似调用；无 regex 回退，不可用/无效模板/不支持的修饰符均为类型化状态。结果进入底部 “Structural Search” 工具窗：文件 → 类 → 方法 → 位置树，预览/打开并选中匹配范围；Esc/Cancel 取消并释放请求。Replace、Type/Reference/Script 修饰符与其他语言尚未实现。
+
 ## 26. Git Diff Viewport
 
 <!-- feature
@@ -7529,6 +7634,65 @@ controls:
 
 - Git Log、聚合 Workspace Git Log 和 Compare 复用 `DiffViewer` 展示文本差异；Split 模式支持拖动/键盘调整左右正文宽度，并在新视图与差异导航时从行首开始显示。
 - 横向滚动由两侧 CodeMirror 编辑器独立保留，纵向同步继续按已有开关工作；非文本和大文件保护分支不创建可操作分割控件。
+
+### 26.2 多仓库 Changes 与 diff 上下文（ED-PARITY-008）🟡
+
+<!-- feature
+id: F26.2
+status: partial
+area: git/workspace-changes
+components: [WorkspaceGitManager, WorkspaceChangesView, DiffPane, DiffViewer, GitPanel]
+files:
+  - src/components/git/WorkspaceGitManager.tsx
+  - src/components/git/WorkspaceChangesView.tsx
+  - src/components/git/shared/DiffPane.tsx
+  - src/components/git/DiffViewer.tsx
+  - src/components/git/GitPanel.tsx
+  - src/stubs/parity008Git.ts
+  - src-tauri/src/git.rs
+controls:
+  - id: workspace-git-manager
+    selector: '[data-testid="workspace-git-manager"]'
+    kind: display
+  - id: workspace-change-row
+    selector: '[data-testid="workspace-change-row"]'
+    kind: interactive
+  - id: workspace-flat-repo-header
+    selector: '[data-testid="workspace-flat-repo-header"]'
+    kind: display
+  - id: workspace-diff-title
+    selector: '[data-testid="workspace-diff-title"]'
+    kind: display
+  - id: workspace-diff-file-position
+    selector: '[data-testid="workspace-diff-file-position"]'
+    kind: display
+  - id: workspace-diff-prev-file
+    selector: '[data-testid="workspace-diff-prev-file"]'
+    kind: interactive
+  - id: workspace-diff-next-file
+    selector: '[data-testid="workspace-diff-next-file"]'
+    kind: interactive
+  - id: workspace-diff-old-label
+    selector: '[data-testid="workspace-diff-old-label"]'
+    kind: display
+  - id: workspace-diff-new-label
+    selector: '[data-testid="workspace-diff-new-label"]'
+    kind: display
+  - id: git-diff-discard
+    selector: '[data-testid="git-diff-discard"]'
+    kind: interactive
+  - id: git-diff-stage
+    selector: '[data-testid="git-diff-stage"]'
+    kind: interactive
+    optional: true
+  - id: git-diff-unstage
+    selector: '[data-testid="git-diff-unstage"]'
+    kind: interactive
+    optional: true
+-->
+
+- Workspace Git 的 Changes 按仓库分组；diff 面板显示 `HEAD <oid>` / `Working tree` 两侧标签与 `n/N files` 上一个/下一个文件导航，顺序与平铺列表一致（未跟踪文件内联计入，IDEA 另置 Unversioned 节点）。
+- 快照请求按 repoRoot 分代，diff pair 按 repoRoot+path+状态+快照版本键控：迟到响应不污染新仓库；只读快照使用 `git --no-optional-locks status`，不回写 `.git/index`。
 
 ---
 

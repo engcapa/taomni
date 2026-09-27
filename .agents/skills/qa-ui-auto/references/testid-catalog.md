@@ -200,6 +200,8 @@
 - `[data-testid="code-workspace-editor-pane"]` — display — F25.5.editor-pane
 - `[data-testid="code-workspace-editor"]` — display [optional] — F25.5.editor-host
 - `[data-testid="code-workspace-editor-tab-strip"]` — display [optional] — F25.5.editor-tab-strip
+- `[data-editor-tab-key][data-dirty="true"]` — display [optional] — F25.5.editor-tab-dirty
+  ↳ `[data-editor-tab-key][data-active="true"][data-dirty="true"]` — alias
 - `[data-testid="code-workspace-editor-split"]` — display [optional] — F25.5.editor-split-layout
 - `[data-editor-group-id="primary"] [data-testid="code-workspace-editor-tab-strip"]` — interactive [optional] — F25.5.editor-leaf-primary-tab-strip
 - `[data-editor-group-id="secondary"]` — display [optional] — F25.5.editor-leaf-secondary-pane
@@ -724,6 +726,34 @@
 - `[data-testid="db-chat-toggle"]` — interactive [optional] — F-DB-1.chat-toggle
 - `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach
 
+## editor/structural-search (F25.6)
+
+- `[data-testid="structural-search-dialog"]` — display — F25.6.structural-search-dialog
+- `[data-testid="structural-search-template"]` — interactive — F25.6.structural-search-template
+- `[data-testid="structural-search-language"]` — display — F25.6.structural-search-language
+- `[data-testid="structural-search-variable-row"]` — interactive [optional] — F25.6.structural-search-variable-row
+- `[data-testid="structural-search-variable-text"]` — interactive — F25.6.structural-search-variable-text
+- `[data-testid="structural-search-variable-invert"]` — interactive — F25.6.structural-search-variable-invert
+- `[data-testid="structural-search-match-case"]` — interactive [optional] — F25.6.structural-search-match-case
+- `[data-testid="structural-search-scope-workspace"]` — interactive — F25.6.structural-search-scope-workspace
+- `[data-testid="structural-search-scope-module"]` — interactive — F25.6.structural-search-scope-module
+- `[data-testid="structural-search-scope-file"]` — interactive [optional] — F25.6.structural-search-scope-file
+- `[data-testid="structural-search-find"]` — interactive — F25.6.structural-search-find
+- `[data-testid="structural-search-cancel"]` — interactive — F25.6.structural-search-cancel
+- `[data-testid="structural-search-running"]` — display — F25.6.structural-search-running
+- `[data-testid="structural-search-error"]` — display — F25.6.structural-search-error
+- `[data-testid="structural-search-unavailable"]` — display — F25.6.structural-search-unavailable
+- `[data-testid="structural-search-panel"]` — display — F25.6.structural-search-panel
+- `[data-testid="structural-search-summary"]` — display — F25.6.structural-search-summary
+- `[data-testid="structural-search-results"]` — interactive — F25.6.structural-search-results
+- `[data-testid="structural-search-node"]` — interactive — F25.6.structural-search-node
+- `[data-testid="structural-search-match"]` — interactive — F25.6.structural-search-match
+- `[data-testid="structural-search-empty"]` — display — F25.6.structural-search-empty
+- `[data-testid="structural-search-cancelled"]` — display — F25.6.structural-search-cancelled
+- `[data-testid="structural-search-edit-query"]` — interactive — F25.6.structural-search-edit-query
+- `[data-testid="structural-search-backend"]` — display — F25.6.structural-search-backend
+- `[data-testid="code-workspace-bottom-tab-structural"]` — interactive — F25.6.bottom-tab-structural
+
 ## git/diff (F26.1)
 
 - `[data-testid="git-panel"]` — display — F26.1.git-panel
@@ -754,6 +784,21 @@
   ↳ `.git-log-view [data-testid="git-log-list-resize-handle"]` — alias
 - `[data-testid="git-log-files-resize-handle"]` — interactive [optional] — F26.1.git-log-files-resize-handle
   ↳ `.git-log-view [data-testid="git-log-files-resize-handle"]` — alias
+
+## git/workspace-changes (F26.2)
+
+- `[data-testid="workspace-git-manager"]` — display — F26.2.workspace-git-manager
+- `[data-testid="workspace-change-row"]` — interactive — F26.2.workspace-change-row
+- `[data-testid="workspace-flat-repo-header"]` — display — F26.2.workspace-flat-repo-header
+- `[data-testid="workspace-diff-title"]` — display — F26.2.workspace-diff-title
+- `[data-testid="workspace-diff-file-position"]` — display — F26.2.workspace-diff-file-position
+- `[data-testid="workspace-diff-prev-file"]` — interactive — F26.2.workspace-diff-prev-file
+- `[data-testid="workspace-diff-next-file"]` — interactive — F26.2.workspace-diff-next-file
+- `[data-testid="workspace-diff-old-label"]` — display — F26.2.workspace-diff-old-label
+- `[data-testid="workspace-diff-new-label"]` — display — F26.2.workspace-diff-new-label
+- `[data-testid="git-diff-discard"]` — interactive — F26.2.git-diff-discard
+- `[data-testid="git-diff-stage"]` — interactive [optional] — F26.2.git-diff-stage
+- `[data-testid="git-diff-unstage"]` — interactive [optional] — F26.2.git-diff-unstage
 
 ## mail/compose (F-MAIL-1)
 

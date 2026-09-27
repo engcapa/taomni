@@ -36,6 +36,7 @@ export type BottomDockTabId =
   | "problems"
   | "analysis"
   | "search"
+  | "structural"
   | "references"
   | "call-hierarchy"
   | "type-hierarchy"

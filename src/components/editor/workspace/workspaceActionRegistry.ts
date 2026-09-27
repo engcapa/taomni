@@ -1059,6 +1059,14 @@ export const DEFAULT_WORKSPACE_ACTIONS: WorkspaceActionMetadata[] = [
     provenance: "local",
     keywords: ["replace", "substitute", "files"],
   },
+  {
+    id: "workspace.searchStructurally",
+    title: "Search Structurally…",
+    description: "Find Java code by AST template (tree-sitter parser; no text fallback)",
+    category: "Search",
+    provenance: "index",
+    keywords: ["structural", "ssr", "template", "ast", "pattern"],
+  },
 
   // --- Refactor ---
   {

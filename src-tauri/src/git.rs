@@ -2209,11 +2209,25 @@ fn detect_operation(root: &Path) -> String {
     }
 }
 
+/// Unmerged paths from the index. Uses plumbing (`ls-files --unmerged`)
+/// because porcelain `git diff` refreshes and rewrites a stale `.git/index`
+/// even with `GIT_OPTIONAL_LOCKS=0`, and this probe runs on every Git panel
+/// refresh (ED-PARITY-008-A3: viewing is not a Git write).
 fn conflicted_paths(root: &Path) -> Vec<String> {
-    run_git_in(Some(root), ["diff", "--name-only", "--diff-filter=U"])
-        .ok()
-        .map(|s| s.lines().filter_map(non_empty_string).collect())
-        .unwrap_or_default()
+    let Ok(output) = run_git_in(Some(root), ["ls-files", "--unmerged", "-z"]) else {
+        return Vec::new();
+    };
+    let mut paths: Vec<String> = Vec::new();
+    // Each record is "<mode> <object> <stage>\t<path>" terminated by NUL.
+    for record in output.split('\0') {
+        let Some((_, path)) = record.split_once('\t') else {
+            continue;
+        };
+        if !path.is_empty() && !paths.iter().any(|known| known == path) {
+            paths.push(path.to_string());
+        }
+    }
+    paths
 }
 
 fn operation_command(kind: &str) -> Result<&'static str, String> {
@@ -2244,6 +2258,12 @@ fn run_git_no_editor(root: &Path, args: Vec<String>) -> Result<String, String> {
 fn new_git_command() -> Command {
     let mut command = Command::new("git");
     no_console_window(&mut command);
+    // Reads such as `status` must not opportunistically refresh and rewrite
+    // `.git/index`: viewing Changes is not a Git write (ED-PARITY-008-A3).
+    // Commands that must modify the index still take their required lock.
+    // Porcelain `git diff` ignores this setting, so read probes that run on
+    // every refresh use plumbing instead (see `conflicted_paths`).
+    command.env("GIT_OPTIONAL_LOCKS", "0");
     command
 }
 
@@ -2332,6 +2352,53 @@ mod tests {
         let probe = probe_path(&msys_path).unwrap();
         assert!(probe.is_repo, "{probe:?}");
         assert!(probe.repo_root.is_some(), "{probe:?}");
+    }
+
+    /// ED-PARITY-008-A3: viewing Changes must not write Git state. A plain
+    /// `git status` opportunistically rewrites `.git/index` when an entry's
+    /// stat data is stale (unchanged content, newer mtime).
+    #[test]
+    fn snapshot_does_not_rewrite_index_for_stale_stat_entries() {
+        if !git_available() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        run_git_in(Some(root), ["init"]).unwrap();
+        run_git_in(Some(root), ["config", "user.name", "Parity Fixture"]).unwrap();
+        run_git_in(
+            Some(root),
+            ["config", "user.email", "fixture@example.invalid"],
+        )
+        .unwrap();
+        run_git_in(Some(root), ["config", "commit.gpgsign", "false"]).unwrap();
+        fs::write(root.join("stable.txt"), "stable\n").unwrap();
+        run_git_in(Some(root), ["add", "stable.txt"]).unwrap();
+        run_git_in(Some(root), ["commit", "-m", "baseline"]).unwrap();
+        let index = root.join(".git").join("index");
+        let before = fs::read(&index).unwrap();
+        // Same bytes, newer mtime: the index stat cache is now stale.
+        std::thread::sleep(std::time::Duration::from_millis(1_100));
+        fs::write(root.join("stable.txt"), "stable\n").unwrap();
+
+        let snapshot = snapshot(root).unwrap();
+        assert!(snapshot.changes.is_empty(), "{:?}", snapshot.changes);
+        // The Git panel's per-refresh operation/conflict probe.
+        assert!(conflicted_paths(root).is_empty());
+
+        assert_eq!(
+            fs::read(&index).unwrap(),
+            before,
+            ".git/index was rewritten by a read-only Git view"
+        );
+        // Explicit index writes still work under the optional-lock setting.
+        fs::write(root.join("stable.txt"), "changed\n").unwrap();
+        run_git_in(Some(root), ["add", "stable.txt"]).unwrap();
+        assert_ne!(
+            fs::read(&index).unwrap(),
+            before,
+            "git add must still update the index"
+        );
     }
 
     #[test]
