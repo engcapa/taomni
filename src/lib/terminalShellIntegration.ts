@@ -38,7 +38,11 @@ const SSH_CWD_INTEGRATION_INSTALL =
   " if [ -n \"$ZSH_VERSION\" ]; then typeset -ag precmd_functions 2>/dev/null; precmd_functions+=(__taomni_osc7);" +
   " elif [ -n \"$BASH_VERSION\" ]; then case \";$PROMPT_COMMAND;\" in *\";__taomni_osc7;\"*) ;;" +
   " *) PROMPT_COMMAND=\"__taomni_osc7${PROMPT_COMMAND:+;$PROMPT_COMMAND}\";; esac; fi;" +
-  " __taomni_osc7;";
+  " __taomni_osc7;" +
+  " printf '\\033]633;TaomniCwdIntegrationDone\\a';";
+
+/** OSC marker emitted only after the hidden cwd integration command completes. */
+export const CWD_INTEGRATION_DONE_MARKER = "\x1b]633;TaomniCwdIntegrationDone\x07";
 
 export const SSH_CWD_INTEGRATION_BODY =
   SSH_CWD_HISTORY_GUARD + SSH_CWD_INTEGRATION_INSTALL + SSH_CWD_HISTORY_RESTORE;
@@ -74,7 +78,7 @@ export const LOCAL_ZSH_CWD_INTEGRATION_BODY =
   " __taomni_osc7(){ printf '\\033]133;A\\033\\\\\\033]7;file://%s%s\\033\\\\' \"${HOST:-localhost}\" \"$PWD\"; };" +
   " typeset -ag precmd_functions 2>/dev/null;" +
   " case \" ${precmd_functions[*]} \" in *\" __taomni_osc7 \"*) ;; *) precmd_functions+=(__taomni_osc7);; esac;" +
-  " __taomni_osc7;" +
+  " __taomni_osc7; printf '\\033]633;TaomniCwdIntegrationDone\\a';" +
   " fi;";
 
 export function buildLocalZshCwdIntegration(): string {

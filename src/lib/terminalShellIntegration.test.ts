@@ -22,6 +22,7 @@ describe("buildSshCwdIntegration", () => {
       'PROMPT_COMMAND="__taomni_osc7${PROMPT_COMMAND:+;$PROMPT_COMMAND}"',
     );
     expect(SSH_CWD_INTEGRATION_BODY).toContain(" __taomni_osc7;");
+    expect(SSH_CWD_INTEGRATION_BODY).toContain("TaomniCwdIntegrationDone");
   });
 
   it("is idempotent for bash so reconnects don't stack the hook", () => {
@@ -73,6 +74,7 @@ describe("buildLocalZshCwdIntegration", () => {
   it("registers the zsh precmd hook and runs it once at the end", () => {
     expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).toContain("precmd_functions+=(__taomni_osc7)");
     expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).toContain(" __taomni_osc7;");
+    expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).toContain("TaomniCwdIntegrationDone");
   });
 
   it("is idempotent so a re-injection doesn't stack the hook", () => {

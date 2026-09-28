@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   createInputEchoSuppressor,
+  createOscMarkerBlankingSuppressor,
   createOsc7BlankingSuppressor,
+  createTaskExitOscParser,
   createTaskStartOutputSuppressor,
 } from "./terminalOutputFilter";
 
@@ -123,6 +125,20 @@ describe("OSC 7 blanking suppressor", () => {
   });
 });
 
+describe("private OSC marker blanking suppressor", () => {
+  const clearLine = "\r\x1b[2K";
+  const marker = "\x1b]633;TaomniCwdIntegrationDone\x07";
+
+  it("waits for the setup-specific marker instead of an earlier prompt OSC 7", () => {
+    const suppressor = createOscMarkerBlankingSuppressor(marker, 2500, 100);
+    const output = text(suppressor.filter(bytes(
+      `prompt OSC7\x1b]7;file://host/home\x1b\\ echoed setup\r\n${marker}bash$ `,
+    ), 120));
+    expect(output).toBe(`${clearLine}${marker}bash$ `);
+    expect(suppressor.done).toBe(true);
+  });
+});
+
 describe("task start output suppressor", () => {
   const clearLine = "\r\x1b[2K";
   const marker = "\x1b]633;TaomniTaskStart\x07";
@@ -158,5 +174,32 @@ describe("task start output suppressor", () => {
     // On timeout the held bytes are released rather than lost.
     expect(text(suppressor.filter(bytes(" more"), 200))).toBe("partial wrapper echo more");
     expect(suppressor.done).toBe(true);
+  });
+});
+
+describe("task exit OSC parser", () => {
+  it("extracts BEL-terminated exit markers and removes them from output", () => {
+    const parser = createTaskExitOscParser();
+    const result = parser.feed(bytes("BUILD SUCCESS\n\x1b]633;TaomniTaskExit=0\x07prompt$ "));
+
+    expect(text(result.data)).toBe("BUILD SUCCESS\nprompt$ ");
+    expect(result.exitCodes).toEqual([0]);
+  });
+
+  it("handles a marker split across chunks and ST termination", () => {
+    const parser = createTaskExitOscParser();
+    expect(text(parser.feed(bytes("output\x1b]633;TaomniTaskExit=" )).data)).toBe("output");
+    const result = parser.feed(bytes("-17\x1b\\prompt"));
+
+    expect(text(result.data)).toBe("prompt");
+    expect(result.exitCodes).toEqual([-17]);
+  });
+
+  it("preserves ordinary output that only resembles a marker", () => {
+    const parser = createTaskExitOscParser();
+    const result = parser.feed(bytes("\x1b]633;TaomniTaskExit=oops\x07"));
+
+    expect(text(result.data)).toBe("\x1b]633;TaomniTaskExit=oops\x07");
+    expect(result.exitCodes).toEqual([]);
   });
 });

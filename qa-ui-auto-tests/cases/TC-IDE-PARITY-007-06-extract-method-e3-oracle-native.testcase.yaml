@@ -54,7 +54,7 @@ steps:
     contains: int doubled = next(base);
 - screenshot: tc-ide-parity-007-06-e3-b0.png
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -71,7 +71,7 @@ steps:
 - press: ArrowRight
 - press: Shift+ArrowDown
 - press: Shift+End
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for:
     selector: '[data-testid="text-input-dialog-input"]'
     timeout_sec: 90
@@ -110,7 +110,7 @@ steps:
     artifact: parity007-oracle-e3-b2.json
 - screenshot: tc-ide-parity-007-06-e3-b2.png
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_file_contains:
     path: ${fixture.parity007_e3_sample}
     contains: (base)
@@ -121,7 +121,7 @@ steps:
     label: undo1
     artifact: parity007-oracle-e3-undo1.json
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_file_sha256:
     path: ${fixture.parity007_e3_sample}
     equals: ${fixture.parity007_e3_initial_sha}
@@ -132,7 +132,7 @@ steps:
     label: undo2-b0
     artifact: parity007-oracle-e3-undo2-b0.json
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Shift+z
+- press: Mod+Shift+z
 - parity007_java_oracle:
     scenario: e3
     expected: '13:1'
@@ -140,7 +140,7 @@ steps:
     label: redo1
     artifact: parity007-oracle-e3-redo1.json
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Shift+z
+- press: Mod+Shift+z
 - assert_file_contains:
     path: ${fixture.parity007_e3_sample}
     contains: calculateTotal(base)

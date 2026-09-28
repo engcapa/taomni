@@ -11279,7 +11279,7 @@ export function CodeWorkspaceTab({
     range: LspRange,
     diagnostics: LspDiagnostic[] = [],
     only: string[] = [],
-    options: { signal?: AbortSignal } = {},
+    options: { signal?: AbortSignal; allowCapabilityFallback?: boolean } = {},
   ): Promise<{
     actions: LspCodeAction[];
     providerActions: readonly ProviderActionV4[];
@@ -11296,7 +11296,7 @@ export function CodeWorkspaceTab({
     } | null;
   }> => {
     const caps = lspFilesRef.current[file.key]?.status?.capabilities;
-    if (caps && !caps.codeAction) {
+    if (caps && !caps.codeAction && !options.allowCapabilityFallback) {
       return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: null };
     }
     const semanticQuery = only.some((kind) => kind === "refactor" || kind.startsWith("refactor."));
@@ -14502,6 +14502,8 @@ export function CodeWorkspaceTab({
       title: "Find in Files",
       category: "Search",
       keybinding: "Ctrl+Shift+F",
+      // macOS uses Command for the workspace-wide search chord.
+      keybindings: ["Meta+Shift+F"],
       keywords: ["text", "content", "grep"],
       run: () => openFindInFiles(),
     },
@@ -14729,10 +14731,12 @@ export function CodeWorkspaceTab({
       title: "Extract Method",
       category: "Refactor",
       keybinding: "Ctrl+Alt+M",
-      keybindings: ["Mod-Alt-M", "Mod-Alt-m"],
+      // Keep the native Ctrl chord while giving macOS an explicit, parser-
+      // compatible Command alias. The action host uses '+'-delimited bindings.
+      keybindings: ["Meta+Alt+M", "Meta+Alt+m"],
       keywords: ["refactor", "extract", "method", "function"],
       when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
-        && !activeFile.library && !!activeCapabilities?.codeAction,
+        && !activeFile.library,
       run: () => void runExtractMethodRef.current(),
     },
     {
@@ -17577,8 +17581,6 @@ export function CodeWorkspaceTab({
   const runExtractMethod = useCallback(async () => {
     const file = activeFile;
     if (!file || file.loading || file.library) return;
-    const caps = lspFilesRef.current[file.key]?.status?.capabilities;
-    if (caps && !caps.codeAction) return;
     // DEC-07 repeat protection: while one Extract Method owner is alive — from
     // its first request through naming and the rename — a repeated chord is a
     // no-op. Superseding a request that has already applied would commit a
@@ -17621,7 +17623,7 @@ export function CodeWorkspaceTab({
       range,
       [],
       ["refactor.extract"],
-      { signal: requestAbort.signal },
+      { signal: requestAbort.signal, allowCapabilityFallback: true },
     );
     if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) {
       abandon();

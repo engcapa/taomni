@@ -70,7 +70,9 @@ import {
 } from "../floating-toolbar/floatingToolbarStyles";
 import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2, X } from "lucide-react";
 import {
+  createOscMarkerBlankingSuppressor,
   createOsc7BlankingSuppressor,
+  createTaskExitOscParser,
   createTaskStartOutputSuppressor,
   type InputEchoSuppressor,
 } from "../../lib/terminalOutputFilter";
@@ -111,7 +113,11 @@ import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import { extractTerminalCommand } from "../../lib/terminalCommand";
 import { normalizeLocalStartCwd } from "../../lib/terminalCwd";
 import { inferTerminalProgram } from "../../lib/terminalActivity";
-import { buildSshCwdIntegration, buildLocalZshCwdIntegration } from "../../lib/terminalShellIntegration";
+import {
+  buildSshCwdIntegration,
+  buildLocalZshCwdIntegration,
+  CWD_INTEGRATION_DONE_MARKER,
+} from "../../lib/terminalShellIntegration";
 import {
   buildInteractiveCommandInput,
   renderTerminalTask,
@@ -2463,6 +2469,7 @@ export function TerminalPanel({
       macOptionIsMeta: false,
     });
     termRef.current = term;
+    const taskExitOscParser = createTaskExitOscParser();
 
     const fitAddon = new FitAddon();
     fitAddonRef.current = fitAddon;
@@ -2719,6 +2726,16 @@ export function TerminalPanel({
     const syncAutomationState = () => {
       const panel = panelRef.current;
       if (!panel) return;
+      // Output callbacks can run before xterm has committed the final prompt
+      // row. Re-check the deferred installer from the same readiness poll so
+      // startup commands and cwd setup cannot be stranded by that ordering.
+      if (
+        connectionStateRef.current === "connected"
+        && terminalAtIdlePrompt(term)
+        && installSshCwdIntegrationRef.current
+      ) {
+        installSshCwdIntegrationRef.current();
+      }
       panel.setAttribute("data-terminal-text", getBufferText(term));
       if (
         connectionStateRef.current === "connected" &&
@@ -2796,6 +2813,14 @@ export function TerminalPanel({
           const suppressor = injectedInputEchoSuppressorRef.current;
           let filtered = suppressor ? suppressor.filter(data) : data;
           if (suppressor?.done) injectedInputEchoSuppressorRef.current = null;
+          if (filtered.length === 0) return;
+          // xterm normally consumes OSC 633, but PTY/WebView combinations can
+          // deliver a split marker before the parser handler is ready. Parse
+          // the raw stream as a fallback so task plans never wait forever for
+          // an exit event that is already visible in the terminal output.
+          const taskExit = taskExitOscParser.feed(filtered);
+          for (const exitCode of taskExit.exitCodes) onTaskExitRef.current?.(exitCode);
+          filtered = taskExit.data;
           if (filtered.length === 0) return;
           if (loggingActiveRef.current) {
             outputLogRef.current += new TextDecoder().decode(filtered);
@@ -3108,7 +3133,13 @@ export function TerminalPanel({
           // non-POSIX shell — which never emits the OSC 7 — isn't blacked out
           // for too long before output resumes.
           automationInputSettlingRef.current = true;
-          const suppressor = createOsc7BlankingSuppressor(integrationTimeoutMs);
+          // SSH/local shell integration emits a private completion marker after
+          // the one-shot setup. Matching that marker avoids mistaking a prompt's
+          // ordinary OSC 7 report for completion while the setup line is still
+          // being echoed on a laggy Windows PTY.
+          const suppressor = integrationCommand.includes("TaomniCwdIntegrationDone")
+            ? createOscMarkerBlankingSuppressor(CWD_INTEGRATION_DONE_MARKER, integrationTimeoutMs)
+            : createOsc7BlankingSuppressor(integrationTimeoutMs);
           injectedInputEchoSuppressorRef.current = suppressor;
           window.setTimeout(() => {
             if (
@@ -4644,7 +4675,7 @@ function terminalAtIdlePrompt(term: Terminal): boolean {
 
   if (text.replace(/\s+$/, "").length === 0) return false; // blank: not ready
   // Ends in a prompt terminator, optionally followed by a single space.
-  return /[$#>%][ ]?$/.test(text);
+  return /[$#>%][ \t]{0,4}$/.test(text);
 }
 
 function computeInlineGhost(

@@ -6,6 +6,7 @@ import { DEFAULT_TERMINAL_PROFILE, SYSTEM_TERMINAL_THEME } from "../../lib/termi
 import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 import { useAppStore } from "../../stores/appStore";
 import { getTerminal } from "../../lib/terminal/terminalRegistry";
+import { CWD_INTEGRATION_DONE_MARKER } from "../../lib/terminalShellIntegration";
 
 const terminalMocks = vi.hoisted(() => {
   const focus = vi.fn();
@@ -571,7 +572,7 @@ describe("TerminalPanel focus behavior", () => {
 
     await act(async () => {
       onOutput?.(
-        new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${prompt}`),
+        new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${CWD_INTEGRATION_DONE_MARKER}${prompt}`),
       );
     });
 
@@ -631,7 +632,7 @@ describe("TerminalPanel focus behavior", () => {
       // The injected command's own OSC 7 output proves it landed, so the held
       // keystrokes are delivered in order afterwards.
       await act(async () => {
-        onOutput?.(new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${prompt}`));
+        onOutput?.(new TextEncoder().encode(`\x1b]7;file://example.test/srv/project\x1b\\${CWD_INTEGRATION_DONE_MARKER}${prompt}`));
         vi.advanceTimersByTime(200);
       });
       expect((ipcMocks.writeTerminal.mock.calls as unknown[][]).some(([sessionId, encoded]) =>

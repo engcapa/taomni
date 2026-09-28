@@ -28,7 +28,7 @@ steps:
     selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
     timeout_sec: 60
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -37,7 +37,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - parity007_trace:
     requests: 1
     resolves: 1
@@ -132,7 +132,7 @@ steps:
     pending: 0
 - screenshot: tc-ide-parity-007-01-renamed.png
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -165,7 +165,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -192,7 +192,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Shift+z
+- press: Mod+Shift+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -224,7 +224,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Shift+z
+- press: Mod+Shift+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -256,9 +256,9 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -285,7 +285,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -294,7 +294,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for: '[data-testid="text-input-dialog-input"]'
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -367,7 +367,7 @@ steps:
     renames: 1
     pending: 0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -394,7 +394,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -403,7 +403,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for: '[data-testid="text-input-dialog-input"]'
 - click: '[data-testid="text-input-dialog-cancel"]'
 - wait_for:
@@ -446,7 +446,7 @@ steps:
     renames: 1
     pending: 0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -473,7 +473,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -482,7 +482,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for: '[data-testid="text-input-dialog-input"]'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'
