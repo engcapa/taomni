@@ -238,6 +238,10 @@ class WebDriverError(RuntimeError):
     pass
 
 
+def _is_stale_element_error(error: BaseException) -> bool:
+    return "stale element" in str(error).lower()
+
+
 class TauriDriverProcess:
     def __init__(self, cfg: dict, report_root: Path):
         webdriver = cfg.get("webdriver") or {}
@@ -540,7 +544,7 @@ class NativeSession:
                 self.request("POST", self.element_path(element, "/click"), {})
                 return f"clicked {selector}"
             except WebDriverError as exc:
-                if "stale element reference" in str(exc) and attempt < 2:
+                if _is_stale_element_error(exc) and attempt < 2:
                     time.sleep(0.3)
                     continue
                 if ("element not interactable" in str(exc) or "element click intercepted" in str(exc)) and attempt < 2:
@@ -590,7 +594,7 @@ class NativeSession:
                     ],
                 }]})
             except WebDriverError as exc:
-                if "stale element reference" in str(exc) and attempt < 2:
+                if _is_stale_element_error(exc) and attempt < 2:
                     last_stale = exc
                     time.sleep(0.3)
                     continue
