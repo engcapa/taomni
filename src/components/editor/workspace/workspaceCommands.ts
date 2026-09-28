@@ -122,6 +122,7 @@ export function eventLogicalKey(
 }
 
 export function parseKeybinding(value: string): ParsedKeybinding | null {
+  if (/\s/.test(value.trim())) return null;
   const parts = value.split("+").map((part) => part.trim()).filter(Boolean);
   if (parts.length === 0) return null;
   const modifiers = new Set(parts.slice(0, -1).map((part) => part.toLowerCase()));

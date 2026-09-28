@@ -82,7 +82,17 @@ steps:
   - assert_text:
       selector: '[data-testid="keymap-item-editor.basicCompletion"]'
       contains: Basic Completion
-  - click: '[data-testid="keymap-run-editor.basicCompletion"]'
+  - eval_readonly:
+      expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"keymap-run-editor.basicCompletion"]') === null
+      expect_truthy: true
+  - click: '[data-testid="keymap-cheatsheet-footer-close"]'
+  - wait_for:
+      selector: '[data-testid="keymap-cheatsheet-dialog"]'
+      state: hidden
+  - click: '[data-testid="code-workspace-editor"] .cm-line:nth-child(5)'
+  - press: End
+  - press: ArrowLeft
+  - press: Control+Space
   - wait_for: '.cm-tooltip-autocomplete li'
   - parity005_trace: {fetch: 5, resolve: 0, pending: 0}
   - press: Escape
@@ -180,56 +190,58 @@ verification:
           expectation: The original prefix remains after Escape.
       results: [19, 20, 22, 23]
     - id: ED-PARITY-005-V1-entries
-      requirement: Alternate key, Actions, All and cheat sheet entries each route one request without editing the buffer.
+      requirement: Alternate key, Actions and All entries route one request; the cheat sheet records its disabled state in the modal context, then the editor entry routes one request without editing the buffer.
       actions: [25, 31, 36, 40, 44, 48, 52]
       checkpoints:
+        - step: 52
+          expectation: The cheat sheet has no Run control while the modal has editor focus.
         - step: 27
           expectation: Alt slash produced exactly one additional request.
         - step: 38
           expectation: Actions Enter produced exactly one additional request.
         - step: 46
           expectation: All click produced exactly one additional request.
-        - step: 54
-          expectation: Cheat sheet Run produced exactly one additional request.
-        - step: 56
+        - step: 60
+          expectation: Closing the disabled cheat sheet and invoking Ctrl+Space from the editor produced exactly one additional request.
+        - step: 62
           expectation: The original buffer remains intact after all entries.
-      results: [27, 38, 46, 54, 56]
+      results: [27, 38, 46, 52, 60, 62]
     - id: ED-PARITY-005-V1-repeat-focus
       requirement: Repeated invocation refreshes one request per key, while Find, Search Everywhere and settings inputs retain focus and issue none.
-      actions: [57, 59, 62, 66, 69, 70, 78, 79, 90, 91]
+      actions: [63, 65, 68, 72, 75, 76, 84, 85, 96, 97]
       checkpoints:
-        - step: 61
+        - step: 67
           expectation: Two Ctrl+Space invocations each issue one fresh request.
-        - step: 64
+        - step: 70
           expectation: Alt slash adds exactly one request while the popup is open.
-        - step: 71
+        - step: 77
           expectation: Find keys issue no completion request and leave Find focused.
-        - step: 72
+        - step: 78
           expectation: The active input remains the Find query.
-        - step: 80
+        - step: 86
           expectation: Search keys issue no completion request and leave the query focused.
-        - step: 81
+        - step: 87
           expectation: The active input remains the Search Everywhere query.
-        - step: 92
+        - step: 98
           expectation: Settings keys issue no completion request and leave the font input focused.
-        - step: 93
+        - step: 99
           expectation: The active input remains the font family setting.
-        - step: 95
+        - step: 101
           expectation: All protected input checks leave the Java buffer unchanged.
-      results: [61, 64, 71, 72, 80, 81, 92, 93, 95]
+      results: [67, 70, 77, 78, 86, 87, 98, 99, 101]
     - id: ED-PARITY-005-V1-modifiers-composition
       requirement: Parameter-info chord does not request Basic Completion; a composing Basic key does not request completion and the committed text remains undoable.
-      actions: [104, 107, 110]
+      actions: [110, 113, 116]
       checkpoints:
-        - step: 105
-          expectation: Ctrl Shift Space did not call the Basic provider.
-        - step: 108
-          expectation: Ctrl Space during composition did not call the Basic provider.
-        - step: 109
-          expectation: The composition committed one space at the caret.
         - step: 111
+          expectation: Ctrl Shift Space did not call the Basic provider.
+        - step: 114
+          expectation: Ctrl Space during composition did not call the Basic provider.
+        - step: 115
+          expectation: The composition committed one space at the caret.
+        - step: 117
           expectation: One Undo returns the exact original buffer.
-      results: [105, 108, 109, 111]
+      results: [111, 114, 115, 117]
   visual:
     - check: Popup anchor, selected row, documentation and viewport clipping against the IDEA state.
       method: manual

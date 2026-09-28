@@ -28,7 +28,7 @@ steps:
     timeout_sec: 60
 - parity007_hold: request
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -37,7 +37,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - parity007_wait_pending: request
 - type: x
 - parity007_release: request
@@ -52,9 +52,9 @@ steps:
     equal: 0
 - assert_not_visible: '[data-testid="text-input-dialog"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -81,7 +81,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -90,7 +90,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for: '[data-testid="text-input-dialog-input"]'
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -127,7 +127,7 @@ steps:
     selector: '[data-testid="text-input-dialog"]'
     state: hidden
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -157,7 +157,7 @@ steps:
     pending: 0
 - parity007_hold: resolve
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -166,7 +166,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - parity007_wait_pending: resolve
 - type: y
 - parity007_release: resolve
@@ -175,9 +175,9 @@ steps:
     contains: became stale
 - assert_not_visible: '[data-testid="text-input-dialog"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -206,11 +206,11 @@ steps:
 - parity007_trace:
     pending: 0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+End
+- press: Mod+End
 - type: // pending
 - wait: 1
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -219,7 +219,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
     contains: save the file, then press Shift+F6
@@ -231,7 +231,7 @@ steps:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     contains: // pending
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_text:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     contains: // pending

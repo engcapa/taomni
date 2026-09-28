@@ -193,6 +193,7 @@ jobs:
         if: runner.os == 'macOS' && matrix.mode == 'native'
         run: |
           brew install krb5
+          echo "SHELL=/bin/zsh" >> "$GITHUB_ENV"
           echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
           echo "LIBGSSAPI_PREFIX=$(brew --prefix krb5)" >> "$GITHUB_ENV"
           echo "PKG_CONFIG_PATH=$(brew --prefix krb5)/lib/pkgconfig" >> "$GITHUB_ENV"

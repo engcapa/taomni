@@ -22,6 +22,7 @@ describe("buildSshCwdIntegration", () => {
       'PROMPT_COMMAND="__taomni_osc7${PROMPT_COMMAND:+;$PROMPT_COMMAND}"',
     );
     expect(SSH_CWD_INTEGRATION_BODY).toContain(" __taomni_osc7;");
+    expect(SSH_CWD_INTEGRATION_BODY).toContain("TaomniCwdIntegrationDone");
   });
 
   it("is idempotent for bash so reconnects don't stack the hook", () => {
@@ -65,7 +66,7 @@ describe("buildLocalZshCwdIntegration", () => {
 
   it("only acts under zsh so a local bash keeps the backend PROMPT_COMMAND path", () => {
     expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).toMatch(/^ if \[ -n "\$ZSH_VERSION" \]; then/);
-    expect(LOCAL_ZSH_CWD_INTEGRATION_BODY.trimEnd()).toMatch(/fi;$/);
+    expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).toMatch(/fi; printf .*TaomniCwdIntegrationDone/);
     // No bash PROMPT_COMMAND branch — that shell is already covered by the backend.
     expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).not.toContain("PROMPT_COMMAND");
   });
@@ -73,6 +74,7 @@ describe("buildLocalZshCwdIntegration", () => {
   it("registers the zsh precmd hook and runs it once at the end", () => {
     expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).toContain("precmd_functions+=(__taomni_osc7)");
     expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).toContain(" __taomni_osc7;");
+    expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).toContain("TaomniCwdIntegrationDone");
   });
 
   it("is idempotent so a re-injection doesn't stack the hook", () => {
@@ -89,4 +91,5 @@ describe("buildLocalZshCwdIntegration", () => {
   it("leads with a space as a cheap HIST_IGNORE_SPACE guard", () => {
     expect(buildLocalZshCwdIntegration()).toMatch(/^ /);
   });
+
 });

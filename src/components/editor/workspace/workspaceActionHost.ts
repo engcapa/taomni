@@ -192,24 +192,31 @@ function actionKeybindings(action: WorkspaceActionDefinition): string[] {
 function parseDefinitionKeybindings(action: WorkspaceActionDefinition): readonly Shortcut[] {
   const out: Shortcut[] = [];
   for (const pattern of actionKeybindings(action)) {
-    const parsed = parseKeybinding(pattern);
-    if (!parsed) continue;
-    // parseKeybinding gives a logical key; map back to a stroke whose `key`
-    // field carries the display identity and whose `code` is derived from it
-    // so matching stays physical-key based for letters/digits/named keys.
-    const code = logicalKeyToCode(parsed.key);
-    if (!code) continue;
-    out.push({
-      kind: "keyboard",
-      strokes: [{
+    const parts = pattern.trim().split(/\s+/);
+    if (parts.length > 2) continue;
+    const strokes: ShortcutStroke[] = [];
+    for (const part of parts) {
+      const parsed = parseKeybinding(part);
+      if (!parsed) break;
+      // Keep display identity for the UI while dispatch matches physical keys.
+      const code = logicalKeyToCode(parsed.key);
+      if (!code) break;
+      strokes.push({
         code,
         key: parsed.key.toUpperCase(),
         ctrl: parsed.ctrl,
         alt: parsed.alt,
         shift: parsed.shift,
         meta: parsed.meta,
-      }],
-    });
+      });
+    }
+    if (strokes.length !== parts.length) continue;
+    const [first, second] = strokes;
+    if (first && strokes.length === 1) {
+      out.push({ kind: "keyboard", strokes: [first] });
+    } else if (first && second && strokes.length === 2) {
+      out.push({ kind: "keyboard", strokes: [first, second] });
+    }
   }
   return out;
 }
@@ -1131,9 +1138,7 @@ export class WorkspaceActionHost {
     if (event.key === "Dead" || context.deadKey) {
       return { kind: "rejected", reason: "dead-key" };
     }
-    if (context.altGraph || event.getModifierState?.("AltGraph") === true) {
-      return { kind: "rejected", reason: "alt-graph" };
-    }
+    const altGraph = context.altGraph || event.getModifierState?.("AltGraph") === true;
 
     if (context.targetViewId !== null && !this.registeredViewIds.has(context.targetViewId)) {
       // A stale view id must never let a foreign surface consume this stroke.
@@ -1152,6 +1157,17 @@ export class WorkspaceActionHost {
         ? { focus: "editor", hasActiveFile: true, editorViewId: context.targetViewId }
         : undefined,
     });
+    const key = (event.key ?? "").toLowerCase();
+    const code = event.code ?? "";
+    const matchesBasePhysicalKey = (code.startsWith("Key") && key === code.slice(3).toLowerCase())
+      || (code.startsWith("Digit") && key === code.slice(5));
+    const isRegisteredCtrlAltShortcut = resolved.candidates.length > 0
+      && resolved.stroke.ctrl
+      && resolved.stroke.alt
+      && matchesBasePhysicalKey;
+    if (altGraph && !isRegisteredCtrlAltShortcut) {
+      return { kind: "rejected", reason: "alt-graph" };
+    }
     if (resolved.resolution === "shadowed" && resolved.reason === "chord-pending") {
       return {
         kind: "pending-chord",

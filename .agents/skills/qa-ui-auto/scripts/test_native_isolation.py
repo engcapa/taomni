@@ -220,8 +220,8 @@ class NativeIsolationTest(unittest.TestCase):
                 (root / "run" / "native-isolation.json").read_text(encoding="utf-8")
             )
             self.assertEqual(
-                evidence["tooling_sdk_registry"]["registry_path"],
-                str(registry_path),
+                Path(evidence["tooling_sdk_registry"]["registry_path"]).resolve(),
+                registry_path.resolve(),
             )
 
     def test_unrecorded_binary_never_starts_driver(self):

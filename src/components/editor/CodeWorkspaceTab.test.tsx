@@ -8401,6 +8401,24 @@ end_of_record
     await waitFor(() => {
       expect(screen.queryByTestId("code-workspace-search-everywhere")).not.toBeInTheDocument();
     });
+
+    // macOS sends the Command chord; it must open the same Files view.
+    await act(async () => {
+      fireEvent.keyDown(window, {
+        key: "N",
+        code: "KeyN",
+        metaKey: true,
+        shiftKey: true,
+      });
+    });
+    const overlay3 = await screen.findByTestId("code-workspace-search-everywhere");
+    expect(overlay3).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.keyDown(within(overlay3).getByRole("searchbox"), { key: "Escape" });
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("code-workspace-search-everywhere")).not.toBeInTheDocument();
+    });
   });
 
   describe("P0-J1 completion identity host containment", () => {

@@ -22,7 +22,7 @@ steps:
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -31,7 +31,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for: '[data-testid="text-input-dialog-input"]'
 - assert_text:
     selector: '[data-testid="text-input-dialog"]'
@@ -41,7 +41,7 @@ steps:
     selector: '[data-testid="text-input-dialog"]'
     state: hidden
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - wait: 0.5
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -69,7 +69,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -78,7 +78,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Shift+N
+- press: Mod+Shift+N
 - wait_for: '[data-testid="code-workspace-search-everywhere"]'
 - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
 - fill:
@@ -125,7 +125,7 @@ steps:
     selector: '[data-testid="text-input-dialog"]'
     state: hidden
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - wait: 0.5
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -156,7 +156,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -165,7 +165,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+/
+- press: Mod+Alt+/
 - wait_for: '[data-testid="keymap-cheatsheet-dialog"]'
 - fill:
     selector: '[data-testid="keymap-search-input"]'
@@ -211,7 +211,7 @@ steps:
     selector: '[data-testid="text-input-dialog"]'
     state: hidden
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - wait: 0.5
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -245,16 +245,16 @@ steps:
     requests: 3
     resolves: 3
     pending: 0
-- press: Control+f
+- press: Mod+f
 - wait_for: '[data-testid="code-workspace-editor-search"] input[name="search"]'
 - click: '[data-testid="code-workspace-editor-search"] input[name="search"]'
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - press: Escape
 - parity007_trace:
     requests: 3
     pending: 0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -263,12 +263,12 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+M
+- press: Mod+M
 - parity007_trace:
     requests: 3
     pending: 0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown

@@ -283,6 +283,7 @@
 - `[data-testid="code-workspace-undo-confirm-cancel"]` — interactive — F25.5.workspace-undo-confirm-cancel
 - `[data-testid="code-workspace-undo-confirm-ok"]` — interactive — F25.5.workspace-undo-confirm-ok
 - `[data-testid="code-workspace-bottom-tab-terminal"]` — interactive [optional] — F25.5.bottom-dock-terminal-tab
+- `[data-testid="code-workspace-bottom-tab-overflow-terminal"]` — interactive [optional] — F25.5.bottom-dock-overflow-terminal-tab
 - `[data-testid="code-workspace-bottom-tab-search"]` — interactive [optional] — F25.5.bottom-dock-search-tab
 - `[data-testid="code-workspace-tab-policy-settings"]` — interactive [optional] — F25.5.tab-policy-settings
 - `[data-testid="workspace-tab-policy-settings-dialog"]` — display [optional] — F25.5.tab-policy-dialog

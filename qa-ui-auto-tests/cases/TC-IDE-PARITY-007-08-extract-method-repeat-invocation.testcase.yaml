@@ -25,7 +25,7 @@ steps:
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -34,8 +34,8 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
-- press: Control+Alt+M
+- press: Mod+Alt+M
+- press: Mod+Alt+M
 - parity007_trace:
     pending: 0
 - wait_for: '[data-testid="text-input-dialog-input"]'
@@ -74,7 +74,7 @@ steps:
     selector: '[data-testid="text-input-dialog"]'
     state: hidden
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:

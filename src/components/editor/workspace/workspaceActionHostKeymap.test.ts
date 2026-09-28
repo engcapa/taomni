@@ -256,4 +256,81 @@ describe("§8.18.2 scheme-aware binding resolution", () => {
     await host.dispatchKeydown(keyEvent("Escape"));
     expect(host.hasPendingChord()).toBe(false);
   });
+
+  it("keeps a two-stroke Meta chord distinct from a single Meta save binding", async () => {
+    const save = vi.fn(async () => ({ kind: "applied" as const }));
+    const openKeymap = vi.fn(async () => ({ kind: "applied" as const }));
+    const host = makeHost([
+      {
+        id: "workspace.save",
+        title: "Save Active File",
+        category: "File",
+        keybinding: "Ctrl+S",
+        secondaryKeybindings: ["Meta+S"],
+        provenance: "local",
+        run: save,
+      },
+      {
+        id: "workspace.openKeymapCheatsheet",
+        title: "Keyboard Shortcuts (Keymap)",
+        category: "Help",
+        keybinding: "Ctrl+Alt+/",
+        secondaryKeybindings: ["Meta+K Meta+S"],
+        provenance: "local",
+        run: openKeymap,
+      },
+    ]);
+
+    const saved = await host.dispatchKeydown(keyEvent("KeyS", { meta: true }));
+    expect(saved?.id).toBe("workspace.save");
+    expect(save).toHaveBeenCalledOnce();
+    expect(openKeymap).not.toHaveBeenCalled();
+
+    const prefix = host.prepareBinding(keyEvent("KeyK", { meta: true }));
+    expect(prefix.reason).toBe("chord-pending");
+    const chord = await host.dispatchKeydown(keyEvent("KeyS", { meta: true }));
+    expect(chord?.id).toBe("workspace.openKeymapCheatsheet");
+    expect(openKeymap).toHaveBeenCalledOnce();
+  });
+
+  it("dispatches a registered Ctrl+Alt chord reported with AltGraph while preserving AltGr characters", async () => {
+    const run = vi.fn(async () => ({ kind: "applied" as const }));
+    const host = makeHost([{
+      id: "workspace.extractMethod",
+      title: "Extract Method",
+      category: "Refactor",
+      keybinding: "Ctrl+Alt+M",
+      provenance: "local",
+      run,
+    }]);
+    const shortcut = {
+      ...keyEvent("KeyM", { ctrl: true, alt: true }),
+      key: "m",
+      getModifierState: (modifier: string) => modifier === "AltGraph",
+    };
+
+    const dispatched = host.dispatchKeydownV2({
+      event: shortcut,
+      workspaceId: "ws-km",
+      targetViewId: null,
+    });
+
+    expect(dispatched.kind).toBe("executed");
+    await Promise.resolve();
+    expect(run).toHaveBeenCalledOnce();
+
+    const alternateCharacter = {
+      ...keyEvent("KeyM", { ctrl: true, alt: true }),
+      key: "µ",
+      getModifierState: (modifier: string) => modifier === "AltGraph",
+    };
+    const rejected = host.dispatchKeydownV2({
+      event: alternateCharacter,
+      workspaceId: "ws-km",
+      targetViewId: null,
+    });
+
+    expect(rejected).toEqual({ kind: "rejected", reason: "alt-graph" });
+    expect(alternateCharacter.preventDefault).not.toHaveBeenCalled();
+  });
 });

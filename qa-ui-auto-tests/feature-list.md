@@ -6684,6 +6684,10 @@ controls:
     selector: '[data-testid="code-workspace-bottom-tab-terminal"]'
     kind: interactive
     optional: true
+  - id: bottom-dock-overflow-terminal-tab
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-terminal"]'
+    kind: interactive
+    optional: true
   - id: bottom-dock-search-tab
     selector: '[data-testid="code-workspace-bottom-tab-search"]'
     kind: interactive

@@ -238,6 +238,10 @@ class WebDriverError(RuntimeError):
     pass
 
 
+def _is_stale_element_error(error: BaseException) -> bool:
+    return "stale element" in str(error).lower()
+
+
 class TauriDriverProcess:
     def __init__(self, cfg: dict, report_root: Path):
         webdriver = cfg.get("webdriver") or {}
@@ -540,7 +544,7 @@ class NativeSession:
                 self.request("POST", self.element_path(element, "/click"), {})
                 return f"clicked {selector}"
             except WebDriverError as exc:
-                if "stale element reference" in str(exc) and attempt < 2:
+                if _is_stale_element_error(exc) and attempt < 2:
                     time.sleep(0.3)
                     continue
                 if ("element not interactable" in str(exc) or "element click intercepted" in str(exc)) and attempt < 2:
@@ -590,7 +594,7 @@ class NativeSession:
                     ],
                 }]})
             except WebDriverError as exc:
-                if "stale element reference" in str(exc) and attempt < 2:
+                if _is_stale_element_error(exc) and attempt < 2:
                     last_stale = exc
                     time.sleep(0.3)
                     continue
@@ -879,6 +883,10 @@ class NativeSession:
                 raise WebDriverError(f"press_combo: unknown modifier {p!r}")
             mods.append(self.MODIFIER_MAP[p])
         final = parts[-1]
+        # Shortcut labels capitalize letters for display; only an explicit
+        # Shift modifier should change the physical key event's shift state.
+        if len(final) == 1 and final.isalpha():
+            final = final.lower()
         value = self.MODIFIER_MAP.get(final) or self.KEY_MAP.get(final) or final
         seq: list[dict[str, Any]] = [{"type": "keyDown", "value": m} for m in mods]
         seq.append({"type": "keyDown", "value": value})

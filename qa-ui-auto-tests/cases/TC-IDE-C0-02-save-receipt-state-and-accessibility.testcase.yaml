@@ -105,7 +105,9 @@ steps:
     expression: document.querySelector(".cm-content:focus")?.matches(".cm-content")
     expect_truthy: true
 - press: Control+s
-- wait: 1
+- wait_for:
+    selector: '[data-testid="code-workspace-save-observation"][data-state="saved"]'
+    timeout_sec: 15
 - assert_attribute:
     selector: '[data-testid="code-workspace-save-observation"]'
     name: data-state
@@ -159,7 +161,9 @@ steps:
     name: data-state
     equals: dirty
 - press: Control+s
-- wait: 1
+- wait_for:
+    selector: '[data-testid="code-workspace-save-observation"][data-state="saved"]'
+    timeout_sec: 15
 - assert_attribute:
     selector: '[data-testid="code-workspace-save-observation"]'
     name: data-state

@@ -112,11 +112,18 @@ jobs:
   # ── push to main / workflow_dispatch: ubuntu + windows matrix ──────────
   full-matrix:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 30 || 20 }}
+    # The full browser suite has grown beyond the original 20-minute budget.
+    # Keep enough time for every case to finish so timeout is not reported as
+    # a case failure.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            browser_workers: 4
+          - os: windows-latest
+            browser_workers: 2
     runs-on: ${{ matrix.os }}
     env:
       DEV_PROXY_ALLOW_PRIVATE: "1"
@@ -166,10 +173,10 @@ jobs:
           TAG="${{ github.event.inputs.tag }}"
           if [ -n "$TAG" ]; then
             PYTHONPATH=.agents/skills/qa-ui-auto/scripts \
-              python -m qa_ui_auto.runner --mode browser --tag "$TAG" --workers 4
+              python -m qa_ui_auto.runner --mode browser --tag "$TAG" --workers "${{ matrix.browser_workers }}"
           else
             PYTHONPATH=.agents/skills/qa-ui-auto/scripts \
-              python -m qa_ui_auto.runner --mode browser --workers 4
+              python -m qa_ui_auto.runner --mode browser --workers "${{ matrix.browser_workers }}"
           fi
       - name: Execution coverage
         if: always()

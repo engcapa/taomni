@@ -11279,7 +11279,7 @@ export function CodeWorkspaceTab({
     range: LspRange,
     diagnostics: LspDiagnostic[] = [],
     only: string[] = [],
-    options: { signal?: AbortSignal } = {},
+    options: { signal?: AbortSignal; allowCapabilityFallback?: boolean } = {},
   ): Promise<{
     actions: LspCodeAction[];
     providerActions: readonly ProviderActionV4[];
@@ -11296,7 +11296,7 @@ export function CodeWorkspaceTab({
     } | null;
   }> => {
     const caps = lspFilesRef.current[file.key]?.status?.capabilities;
-    if (caps && !caps.codeAction) {
+    if (caps && !caps.codeAction && !options.allowCapabilityFallback) {
       return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: null };
     }
     const semanticQuery = only.some((kind) => kind === "refactor" || kind.startsWith("refactor."));
@@ -14099,6 +14099,7 @@ export function CodeWorkspaceTab({
       title: "Go to File",
       category: "Navigation",
       keybinding: "Ctrl+Shift+N",
+      keybindings: ["Meta+Shift+N"],
       keywords: ["search everywhere", "file", "open"],
       run: () => openSearchEverywhere("files"),
     },
@@ -14502,6 +14503,8 @@ export function CodeWorkspaceTab({
       title: "Find in Files",
       category: "Search",
       keybinding: "Ctrl+Shift+F",
+      // macOS uses Command for the workspace-wide search chord.
+      keybindings: ["Meta+Shift+F"],
       keywords: ["text", "content", "grep"],
       run: () => openFindInFiles(),
     },
@@ -14510,6 +14513,7 @@ export function CodeWorkspaceTab({
       title: "Replace in Files",
       category: "Search",
       keybinding: "Ctrl+Shift+R",
+      keybindings: ["Meta+Shift+R"],
       keywords: ["bulk replace"],
       run: () => {
         openFindInFiles("replace");
@@ -14718,7 +14722,7 @@ export function CodeWorkspaceTab({
       title: "Refactor This…",
       category: "Refactor",
       keybinding: "Ctrl+Alt+Shift+T",
-      keybindings: ["Mod-Alt-Shift-T", "Mod-Alt-Shift-t", "Ctrl+T"],
+      keybindings: ["Meta+Alt+Shift+T", "Meta+Alt+Shift+t", "Ctrl+T"],
       keywords: ["refactor", "refactor this", "extract", "inline", "rename", "move"],
       when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
         && !activeFile.library && !!activeCapabilities?.codeAction,
@@ -14729,10 +14733,12 @@ export function CodeWorkspaceTab({
       title: "Extract Method",
       category: "Refactor",
       keybinding: "Ctrl+Alt+M",
-      keybindings: ["Mod-Alt-M", "Mod-Alt-m"],
+      // Keep the native Ctrl chord while giving macOS an explicit, parser-
+      // compatible Command alias. The action host uses '+'-delimited bindings.
+      keybindings: ["Meta+Alt+M", "Meta+Alt+m"],
       keywords: ["refactor", "extract", "method", "function"],
       when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
-        && !activeFile.library && !!activeCapabilities?.codeAction,
+        && !activeFile.library,
       run: () => void runExtractMethodRef.current(),
     },
     {
@@ -15680,7 +15686,7 @@ export function CodeWorkspaceTab({
       title: "Keyboard Shortcuts (Keymap)",
       category: "Help",
       keybinding: "Ctrl+Alt+/",
-      keybindings: ["Mod-Alt-/", "Mod-k Mod-s"],
+      keybindings: ["Meta+Alt+/", "Meta+K Meta+S"],
       keywords: ["keymap", "shortcuts", "hotkeys", "cheat sheet", "intellij"],
       run: () => setKeymapCheatSheetOpen(true),
     },
@@ -16250,9 +16256,15 @@ export function CodeWorkspaceTab({
       // then falls through to indentation when neither applies.
       if (editorEventOwner && !event.ctrlKey && !event.metaKey && !event.altKey) {
         if (logicalKey === "tab") return;
+        const activeCompletionId = targetElement?.getAttribute("aria-activedescendant");
+        const hasActiveCompletionCandidate = !!activeCompletionId
+          && !!document.getElementById(activeCompletionId)?.closest(".cm-tooltip-autocomplete");
         if (
           !event.shiftKey
-          && editorEventOwner.port.state().completionActive
+          && (
+            editorEventOwner.port.state().completionActive
+            || hasActiveCompletionCandidate
+          )
           && ["arrowup", "arrowdown", "pageup", "pagedown", "enter", "escape"].includes(logicalKey)
         ) return;
       }
@@ -17577,8 +17589,6 @@ export function CodeWorkspaceTab({
   const runExtractMethod = useCallback(async () => {
     const file = activeFile;
     if (!file || file.loading || file.library) return;
-    const caps = lspFilesRef.current[file.key]?.status?.capabilities;
-    if (caps && !caps.codeAction) return;
     // DEC-07 repeat protection: while one Extract Method owner is alive — from
     // its first request through naming and the rename — a repeated chord is a
     // no-op. Superseding a request that has already applied would commit a
@@ -17621,7 +17631,7 @@ export function CodeWorkspaceTab({
       range,
       [],
       ["refactor.extract"],
-      { signal: requestAbort.signal },
+      { signal: requestAbort.signal, allowCapabilityFallback: true },
     );
     if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) {
       abandon();

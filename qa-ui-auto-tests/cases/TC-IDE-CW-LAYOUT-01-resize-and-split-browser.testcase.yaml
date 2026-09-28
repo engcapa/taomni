@@ -90,7 +90,9 @@ steps:
     expression: Number(document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-bottom-dock-resize"]')?.getAttribute('aria-valuenow'))
       < 850
     expect_truthy: true
-- click: '[data-testid="code-workspace-bottom-tab-build"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+- wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow-build"]'
 - wait_for: '[data-testid="code-workspace-build-panel"]'
 - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
 - wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'

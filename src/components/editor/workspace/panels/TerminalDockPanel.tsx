@@ -186,7 +186,9 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
           return;
         }
         const terminal = getTerminal(id);
-        if (terminal) {
+        // The PTY can register before a login shell has reached its first
+        // prompt. Wait here so a task cannot be echoed into shell startup.
+        if (terminal && (terminal.isReady?.() ?? true)) {
           const command = instance.pendingExecution
             ? renderTerminalExecutionCommand(instance.pendingExecution, terminal.localEnvironment)
             : instance.pendingCommand;

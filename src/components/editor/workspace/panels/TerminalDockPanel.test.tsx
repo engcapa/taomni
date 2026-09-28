@@ -167,6 +167,30 @@ describe("TerminalDockPanel", () => {
     await waitFor(() => expect(runTask).toHaveBeenCalledWith("./mvnw exec:java", environment));
   });
 
+  it("waits for the registered shell to reach an idle prompt before sending a task", async () => {
+    let ready = false;
+    const runTask = vi.fn();
+    registryMocks.getTerminal.mockReturnValue({ runTask, isReady: () => ready });
+    const handle = createRef<TerminalDockHandle>();
+    render(
+      <TerminalDockPanel
+        ref={handle}
+        workspaceInstanceId="ws"
+        roots={roots}
+        defaultCwd="/repo/app"
+        active={false}
+      />,
+    );
+    handle.current?.runCommand("mvn test", "/repo/app", "test");
+    fireEvent.click(await screen.findByRole("button", { name: "ready" }));
+
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
+    expect(runTask).not.toHaveBeenCalled();
+
+    ready = true;
+    await waitFor(() => expect(runTask).toHaveBeenCalledWith("mvn test", undefined));
+  });
+
   it("renders structured workspace execution with the terminal shell", async () => {
     const runTask = vi.fn();
     registryMocks.getTerminal.mockReturnValue({
@@ -248,4 +272,3 @@ describe("TerminalDockPanel", () => {
     }
   });
 });
-
