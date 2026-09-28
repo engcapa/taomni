@@ -879,6 +879,10 @@ class NativeSession:
                 raise WebDriverError(f"press_combo: unknown modifier {p!r}")
             mods.append(self.MODIFIER_MAP[p])
         final = parts[-1]
+        # Shortcut labels capitalize letters for display; only an explicit
+        # Shift modifier should change the physical key event's shift state.
+        if len(final) == 1 and final.isalpha():
+            final = final.lower()
         value = self.MODIFIER_MAP.get(final) or self.KEY_MAP.get(final) or final
         seq: list[dict[str, Any]] = [{"type": "keyDown", "value": m} for m in mods]
         seq.append({"type": "keyDown", "value": value})

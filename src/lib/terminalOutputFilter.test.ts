@@ -6,6 +6,7 @@ import {
   createTaskExitOscParser,
   createTaskStartOutputSuppressor,
 } from "./terminalOutputFilter";
+import { CWD_INTEGRATION_DONE_MARKER } from "./terminalShellIntegration";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -122,6 +123,19 @@ describe("OSC 7 blanking suppressor", () => {
     expect(text(suppressor.filter(bytes("echoed command no osc7"), 120))).toBe(clearLine);
     expect(text(suppressor.filter(bytes("later real output"), 200))).toBe("later real output");
     expect(suppressor.done).toBe(true);
+  });
+
+  it("can hold terminal input for the full Windows Git Bash probe window", () => {
+    const suppressor = createOsc7BlankingSuppressor(4000, 100, 4000);
+    const markerSuppressor = createOscMarkerBlankingSuppressor(
+      CWD_INTEGRATION_DONE_MARKER,
+      4000,
+      100,
+      4000,
+    );
+
+    expect(suppressor.inputHoldTimeoutMs).toBe(4000);
+    expect(markerSuppressor.inputHoldTimeoutMs).toBe(4000);
   });
 });
 

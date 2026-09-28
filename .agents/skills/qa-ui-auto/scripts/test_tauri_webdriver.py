@@ -385,6 +385,23 @@ class NativeSessionPressComboTest(TestCase):
             "DELETE", session.endpoint("/actions"),
         ))
 
+    def test_capitalized_shortcut_letter_does_not_add_an_implicit_shift(self) -> None:
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+
+        self.assertEqual(
+            session._combo_actions("Control+Alt+M"),
+            [
+                {"type": "keyDown", "value": session.MODIFIER_MAP["Control"]},
+                {"type": "keyDown", "value": session.MODIFIER_MAP["Alt"]},
+                {"type": "keyDown", "value": "m"},
+                {"type": "pause", "duration": 30},
+                {"type": "keyUp", "value": "m"},
+                {"type": "keyUp", "value": session.MODIFIER_MAP["Alt"]},
+                {"type": "keyUp", "value": session.MODIFIER_MAP["Control"]},
+                {"type": "pause", "duration": 30},
+            ],
+        )
+
 
 class NativeKeysVerbTest(TestCase):
     def test_x11_chord_maps_modifiers_before_the_character(self) -> None:

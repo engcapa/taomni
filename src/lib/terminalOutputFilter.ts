@@ -1,5 +1,7 @@
 export interface InputEchoSuppressor {
   readonly done: boolean;
+  /** Maximum time terminal input should wait for this injected line to settle. */
+  readonly inputHoldTimeoutMs?: number;
   filter(data: Uint8Array, now?: number): Uint8Array;
 }
 
@@ -305,13 +307,15 @@ const OSC7_INTRODUCER = [0x1b, 0x5d, 0x37, 0x3b];
 class OscSequenceBlankingSuppressor implements InputEchoSuppressor {
   private readonly sequence: readonly number[];
   private readonly expiresAt: number;
+  readonly inputHoldTimeoutMs: number;
   private clearedLine = false;
   private matched = 0;
   private finished = false;
 
-  constructor(sequence: readonly number[], ttlMs: number, now: number) {
+  constructor(sequence: readonly number[], ttlMs: number, now: number, inputHoldTimeoutMs: number) {
     this.sequence = sequence;
     this.expiresAt = now + ttlMs;
+    this.inputHoldTimeoutMs = Math.max(0, inputHoldTimeoutMs);
   }
 
   get done(): boolean {
@@ -365,8 +369,9 @@ class OscSequenceBlankingSuppressor implements InputEchoSuppressor {
 export function createOsc7BlankingSuppressor(
   ttlMs = 1500,
   now = Date.now(),
+  inputHoldTimeoutMs = Math.min(ttlMs, 1500),
 ): InputEchoSuppressor {
-  return new OscSequenceBlankingSuppressor(OSC7_INTRODUCER, ttlMs, now);
+  return new OscSequenceBlankingSuppressor(OSC7_INTRODUCER, ttlMs, now, inputHoldTimeoutMs);
 }
 
 /** Hide an injected setup line until its private OSC completion marker arrives. */
@@ -374,11 +379,13 @@ export function createOscMarkerBlankingSuppressor(
   marker: string,
   ttlMs = 1500,
   now = Date.now(),
+  inputHoldTimeoutMs = Math.min(ttlMs, 1500),
 ): InputEchoSuppressor {
   return new OscSequenceBlankingSuppressor(
     Array.from(new TextEncoder().encode(marker)),
     ttlMs,
     now,
+    inputHoldTimeoutMs,
   );
 }
 

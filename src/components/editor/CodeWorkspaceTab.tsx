@@ -14513,6 +14513,7 @@ export function CodeWorkspaceTab({
       title: "Replace in Files",
       category: "Search",
       keybinding: "Ctrl+Shift+R",
+      keybindings: ["Meta+Shift+R"],
       keywords: ["bulk replace"],
       run: () => {
         openFindInFiles("replace");
@@ -15685,7 +15686,7 @@ export function CodeWorkspaceTab({
       title: "Keyboard Shortcuts (Keymap)",
       category: "Help",
       keybinding: "Ctrl+Alt+/",
-      keybindings: ["Mod-Alt-/", "Mod-k Mod-s"],
+      keybindings: ["Meta+Alt+/", "Meta+K Meta+S"],
       keywords: ["keymap", "shortcuts", "hotkeys", "cheat sheet", "intellij"],
       run: () => setKeymapCheatSheetOpen(true),
     },
@@ -16255,11 +16256,14 @@ export function CodeWorkspaceTab({
       // then falls through to indentation when neither applies.
       if (editorEventOwner && !event.ctrlKey && !event.metaKey && !event.altKey) {
         if (logicalKey === "tab") return;
+        const activeCompletionId = targetElement?.getAttribute("aria-activedescendant");
+        const hasActiveCompletionCandidate = !!activeCompletionId
+          && !!document.getElementById(activeCompletionId)?.closest(".cm-tooltip-autocomplete");
         if (
           !event.shiftKey
           && (
             editorEventOwner.port.state().completionActive
-            || !!targetElement?.closest(".cm-editor")?.querySelector(".cm-tooltip-autocomplete")
+            || hasActiveCompletionCandidate
           )
           && ["arrowup", "arrowdown", "pageup", "pagedown", "enter", "escape"].includes(logicalKey)
         ) return;
