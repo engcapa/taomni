@@ -766,6 +766,7 @@ export const DEFAULT_WORKSPACE_ACTIONS: WorkspaceActionMetadata[] = [
     description: "Find and open any file in the workspace",
     category: "Navigate",
     keybinding: "Ctrl+Shift+N",
+    secondaryKeybindings: ["Meta+Shift+N"],
     provenance: "local",
     keywords: ["file", "open", "find", "search"],
   },

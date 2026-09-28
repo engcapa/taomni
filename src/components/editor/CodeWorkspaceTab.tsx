@@ -14099,6 +14099,7 @@ export function CodeWorkspaceTab({
       title: "Go to File",
       category: "Navigation",
       keybinding: "Ctrl+Shift+N",
+      keybindings: ["Meta+Shift+N"],
       keywords: ["search everywhere", "file", "open"],
       run: () => openSearchEverywhere("files"),
     },
@@ -14720,7 +14721,7 @@ export function CodeWorkspaceTab({
       title: "Refactor This…",
       category: "Refactor",
       keybinding: "Ctrl+Alt+Shift+T",
-      keybindings: ["Mod-Alt-Shift-T", "Mod-Alt-Shift-t", "Ctrl+T"],
+      keybindings: ["Meta+Alt+Shift+T", "Meta+Alt+Shift+t", "Ctrl+T"],
       keywords: ["refactor", "refactor this", "extract", "inline", "rename", "move"],
       when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
         && !activeFile.library && !!activeCapabilities?.codeAction,
@@ -16256,7 +16257,10 @@ export function CodeWorkspaceTab({
         if (logicalKey === "tab") return;
         if (
           !event.shiftKey
-          && editorEventOwner.port.state().completionActive
+          && (
+            editorEventOwner.port.state().completionActive
+            || !!targetElement?.closest(".cm-editor")?.querySelector(".cm-tooltip-autocomplete")
+          )
           && ["arrowup", "arrowdown", "pageup", "pagedown", "enter", "escape"].includes(logicalKey)
         ) return;
       }

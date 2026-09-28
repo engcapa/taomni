@@ -644,7 +644,7 @@ describe("TerminalPanel focus behavior", () => {
       vi.useRealTimers();
     }
   });
-  it("releases SSH readiness when a slow Windows shell never reports OSC 7", async () => {
+  it("releases SSH readiness when a Windows cwd probe never reports OSC 7", async () => {
     const originalPlatform = window.navigator.platform;
     Object.defineProperty(window.navigator, "platform", { configurable: true, value: "Win32" });
     vi.stubGlobal("__TAURI_INTERNALS__", {});
@@ -679,22 +679,20 @@ describe("TerminalPanel focus behavior", () => {
         onOutput?.(new TextEncoder().encode(prompt));
         vi.advanceTimersByTime(120);
       });
-      expect((ipcMocks.writeTerminal.mock.calls as unknown[][]).some(([, encoded]) =>
-        typeof encoded === "string" && atob(encoded).includes("__taomni_osc7"),
-      )).toBe(true);
+      const cwdProbe = (ipcMocks.writeTerminal.mock.calls as unknown[][])
+        .map(([, encoded]) => typeof encoded === "string" ? atob(encoded) : "")
+        .find((command) => command.includes("__taomni_cwd_sync_done"));
+      expect(cwdProbe).toContain("__taomni_cwd_sync_done");
+      expect(cwdProbe).not.toContain("__taomni_osc7");
       expect(panel).not.toHaveAttribute("data-terminal-ready");
 
       await act(async () => {
-        vi.advanceTimersByTime(5_000);
-        onOutput?.(new TextEncoder().encode(" __taomni_hist_restore=;"));
+        vi.advanceTimersByTime(3_000);
       });
       expect(panel).not.toHaveAttribute("data-terminal-ready");
-      expect(term.write.mock.calls.some(([data]: [string | Uint8Array]) =>
-        (typeof data === "string" ? data : new TextDecoder().decode(data)).includes("__taomni_hist_restore"),
-      )).toBe(false);
 
       await act(async () => {
-        vi.advanceTimersByTime(25_000);
+        vi.advanceTimersByTime(1_500);
       });
       expect(panel).toHaveAttribute("data-terminal-ready", "true");
     } finally {
@@ -1958,7 +1956,8 @@ describe("TerminalPanel focus behavior", () => {
         typeof encoded === "string" ? atob(encoded) : "",
       );
       expect(writes[0]).toBe(`${startupCommand}\r`);
-      expect(writes[1]).toContain("__taomni_osc7");
+      expect(writes[1]).toContain("__taomni_cwd_sync_done");
+      expect(writes[1]).not.toContain("PROMPT_COMMAND");
     } finally {
       vi.useRealTimers();
       Object.defineProperty(window.navigator, "platform", {

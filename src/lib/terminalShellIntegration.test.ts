@@ -66,7 +66,7 @@ describe("buildLocalZshCwdIntegration", () => {
 
   it("only acts under zsh so a local bash keeps the backend PROMPT_COMMAND path", () => {
     expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).toMatch(/^ if \[ -n "\$ZSH_VERSION" \]; then/);
-    expect(LOCAL_ZSH_CWD_INTEGRATION_BODY.trimEnd()).toMatch(/fi;$/);
+    expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).toMatch(/fi; printf .*TaomniCwdIntegrationDone/);
     // No bash PROMPT_COMMAND branch — that shell is already covered by the backend.
     expect(LOCAL_ZSH_CWD_INTEGRATION_BODY).not.toContain("PROMPT_COMMAND");
   });
@@ -91,4 +91,5 @@ describe("buildLocalZshCwdIntegration", () => {
   it("leads with a space as a cheap HIST_IGNORE_SPACE guard", () => {
     expect(buildLocalZshCwdIntegration()).toMatch(/^ /);
   });
+
 });

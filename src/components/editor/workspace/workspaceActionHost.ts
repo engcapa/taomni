@@ -1131,9 +1131,7 @@ export class WorkspaceActionHost {
     if (event.key === "Dead" || context.deadKey) {
       return { kind: "rejected", reason: "dead-key" };
     }
-    if (context.altGraph || event.getModifierState?.("AltGraph") === true) {
-      return { kind: "rejected", reason: "alt-graph" };
-    }
+    const altGraph = context.altGraph || event.getModifierState?.("AltGraph") === true;
 
     if (context.targetViewId !== null && !this.registeredViewIds.has(context.targetViewId)) {
       // A stale view id must never let a foreign surface consume this stroke.
@@ -1152,6 +1150,17 @@ export class WorkspaceActionHost {
         ? { focus: "editor", hasActiveFile: true, editorViewId: context.targetViewId }
         : undefined,
     });
+    const key = (event.key ?? "").toLowerCase();
+    const code = event.code ?? "";
+    const matchesBasePhysicalKey = (code.startsWith("Key") && key === code.slice(3).toLowerCase())
+      || (code.startsWith("Digit") && key === code.slice(5));
+    const isRegisteredCtrlAltShortcut = resolved.candidates.length > 0
+      && resolved.stroke.ctrl
+      && resolved.stroke.alt
+      && matchesBasePhysicalKey;
+    if (altGraph && !isRegisteredCtrlAltShortcut) {
+      return { kind: "rejected", reason: "alt-graph" };
+    }
     if (resolved.resolution === "shadowed" && resolved.reason === "chord-pending") {
       return {
         kind: "pending-chord",

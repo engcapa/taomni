@@ -61,7 +61,8 @@ export function buildSshCwdIntegration(cwd?: string): string {
  * the SSH integration but:
  *   - never `cd`s (the local PTY already spawns in the right dir via `cmd.cwd`),
  *   - is a no-op on bash (it already works via the backend `PROMPT_COMMAND`),
- *     so injecting it on a bash login shell changes nothing.
+ *     but still emits the completion marker so the echo suppressor can release
+ *     buffered input on bash login shells.
  *
  * The trailing `__taomni_osc7` emits the real OSC 7 the blanking suppressor
  * keys on to know the injected line is done. The install is idempotent — if
@@ -78,8 +79,8 @@ export const LOCAL_ZSH_CWD_INTEGRATION_BODY =
   " __taomni_osc7(){ printf '\\033]133;A\\033\\\\\\033]7;file://%s%s\\033\\\\' \"${HOST:-localhost}\" \"$PWD\"; };" +
   " typeset -ag precmd_functions 2>/dev/null;" +
   " case \" ${precmd_functions[*]} \" in *\" __taomni_osc7 \"*) ;; *) precmd_functions+=(__taomni_osc7);; esac;" +
-  " __taomni_osc7; printf '\\033]633;TaomniCwdIntegrationDone\\a';" +
-  " fi;";
+  " __taomni_osc7;" +
+  " fi; printf '\\033]633;TaomniCwdIntegrationDone\\a';";
 
 export function buildLocalZshCwdIntegration(): string {
   return LOCAL_ZSH_CWD_INTEGRATION_BODY;

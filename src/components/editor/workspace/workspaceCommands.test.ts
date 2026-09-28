@@ -64,6 +64,23 @@ describe("workspaceCommands", () => {
     })).toBe(true);
   });
 
+  it("matches explicit Meta secondary bindings on macOS", () => {
+    const goToFile = command({
+      id: "workspace.goToFile",
+      keybinding: "Ctrl+Shift+N",
+      keybindings: ["Meta+Shift+N"],
+    });
+
+    expect(workspaceCommandMatchesKeybinding(goToFile, {
+      key: "N",
+      code: "KeyN",
+      ctrlKey: false,
+      shiftKey: true,
+      altKey: false,
+      metaKey: true,
+    })).toBe(true);
+  });
+
   it("registers commands into a host and executes by id with context gating", async () => {
     const run = vi.fn();
     const editorOnly = command({

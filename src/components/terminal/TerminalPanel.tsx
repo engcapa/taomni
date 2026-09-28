@@ -3123,7 +3123,15 @@ export function TerminalPanel({
             return true;
           }
           integrationInstalling = true;
-          const integrationTimeoutMs = /\bMINGW(?:32|64)\b/.test(getLastBufferLines(liveTerm, 3)) ? 30_000 : 4_000;
+          const isMingwShell = /\bMINGW(?:32|64)\b/.test(getLastBufferLines(liveTerm, 3));
+          // Git Bash can take long enough to echo a prompt hook that the user
+          // types into the hidden setup line. A one-shot OSC 7 probe still
+          // captures the requested cwd without modifying its prompt.
+          const useMingwCwdProbe = ssh && isMingwShell && integrationCommand.includes("TaomniCwdIntegrationDone");
+          const commandForShell = useMingwCwdProbe
+            ? (initialCwd ? buildSshInitialCwdProbe(initialCwd) : CWD_QUERY_COMMAND)
+            : integrationCommand;
+          const integrationTimeoutMs = isMingwShell && !useMingwCwdProbe ? 30_000 : 4_000;
           if (installSshCwdIntegrationRef.current === installCwdIntegration) {
             installSshCwdIntegrationRef.current = null;
           }
@@ -3137,7 +3145,7 @@ export function TerminalPanel({
           // the one-shot setup. Matching that marker avoids mistaking a prompt's
           // ordinary OSC 7 report for completion while the setup line is still
           // being echoed on a laggy Windows PTY.
-          const suppressor = integrationCommand.includes("TaomniCwdIntegrationDone")
+          const suppressor = commandForShell.includes("TaomniCwdIntegrationDone")
             ? createOscMarkerBlankingSuppressor(CWD_INTEGRATION_DONE_MARKER, integrationTimeoutMs)
             : createOsc7BlankingSuppressor(integrationTimeoutMs);
           injectedInputEchoSuppressorRef.current = suppressor;
@@ -3151,7 +3159,7 @@ export function TerminalPanel({
             automationInputSettlingRef.current = false;
             syncAutomationState();
           }, integrationTimeoutMs);
-          writeTerminal(targetSid, encodeBase64(`${integrationCommand}\r`)).catch(() => {
+          writeTerminal(targetSid, encodeBase64(`${commandForShell}\r`)).catch(() => {
             if (sessionIdRef.current === targetSid && injectedInputEchoSuppressorRef.current === suppressor) {
               integrationInstalling = false;
               installSshCwdIntegrationRef.current = installCwdIntegration;
@@ -3770,6 +3778,13 @@ export function TerminalPanel({
       tabId,
       sessionId: registeredSessionId,
       title: tabTitle,
+      isReady: () => {
+        const liveTerm = termRef.current;
+        return !!liveTerm
+          && connectionStateRef.current === "connected"
+          && !automationInputSettlingRef.current
+          && terminalAtIdlePrompt(liveTerm);
+      },
       localEnvironment: isLocal
         ? {
             platform: getAppPlatform(),

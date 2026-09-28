@@ -38,6 +38,9 @@ steps:
 - fill:
     selector: input[aria-label="Execute command"]
     value: printf 'qa-ssh-startup-command-ran\n'
+- set_check:
+    selector: '[data-testid="session-do-not-exit"]'
+    checked: true
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
 - fill:
@@ -91,12 +94,12 @@ verification:
     - 8
     - 9
     - 11
-    - 12
-    - 14
+    - 13
     - 15
-    - 17
+    - 16
     - 18
-    - 20
+    - 19
+    - 21
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -104,43 +107,44 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 13
+    - step: 14
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 16
+    - step: 17
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
-    - step: 19
+    - step: 20
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 22
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 23
       expectation: >-
         {"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf 'qa-ssh-startup-command-ran\\n'"}}
     results:
-    - 16
-    - 22
+    - 17
+    - 23
   - id: R2
     requirement: The saved startup command runs after authentication and leaves the remote shell available for interactive commands.
     actions:
-    - 23
-    - 25
-    - 27
+    - 12
+    - 24
+    - 26
     - 28
-    - 31
+    - 29
+    - 32
     checkpoints:
-    - step: 24
+    - step: 25
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
-    - step: 26
+    - step: 27
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 29
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
     - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
+    - step: 31
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec": 20}}'
-    - step: 32
+    - step: 33
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-interactive\\-ready\\r?$", "timeout_sec": 15}}'
     results:
-    - 24
-    - 30
-    - 32
+    - 25
+    - 31
+    - 33
   visual:
   - check: The startup command output and the following interactive command output are visible as separate readable terminal lines.
     method: manual

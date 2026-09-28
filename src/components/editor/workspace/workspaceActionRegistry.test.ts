@@ -10,6 +10,11 @@ describe("workspaceActionRegistry", () => {
     workspaceActionRegistry.clear();
   });
 
+  it("declares the macOS Go to File binding in the shared catalog", () => {
+    const action = DEFAULT_WORKSPACE_ACTIONS.find((candidate) => candidate.id === "workspace.goToFile");
+    expect(action?.secondaryKeybindings).toContain("Meta+Shift+N");
+  });
+
   it("registers and retrieves workspace actions with aliases", () => {
     const unregister = workspaceActionRegistry.register({
       id: "workspace.format",
@@ -209,4 +214,3 @@ describe("workspaceActionRegistry", () => {
     unsub();
   });
 });
-
