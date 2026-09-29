@@ -72,6 +72,9 @@ steps:
 - wait: 2
 - click: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"]) .cm-content'
 - press: Mod+Home
+- eval_readonly:
+    expression: document.activeElement?.className + ' | ' + document.activeElement?.closest('[data-editor-group-id]')?.getAttribute('data-editor-group-id')
+    contains: __diag_never__
 - type: SPLIT1
 - assert_text:
     selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
@@ -266,36 +269,36 @@ verification:
     - 14
     - 18
     - 19
-    - 20
-    - 23
+    - 21
     - 24
-    - 26
-    - 29
-    - 32
-    - 34
-    - 38
+    - 25
+    - 27
+    - 30
+    - 33
+    - 35
     - 39
-    - 41
-    - 43
+    - 40
+    - 42
     - 44
     - 45
-    - 47
-    - 49
-    - 52
-    - 55
-    - 58
+    - 46
+    - 48
+    - 50
+    - 53
+    - 56
     - 59
-    - 65
-    - 69
+    - 60
+    - 66
     - 70
     - 71
-    - 79
+    - 72
     - 80
     - 81
-    - 84
+    - 82
     - 85
     - 86
-    - 90
+    - 87
+    - 91
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -312,112 +315,112 @@ verification:
     - step: 16
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'').length === 2", "expect_truthy":
         true}}'
-    - step: 21
+    - step: 22
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
         .cm-editor", "contains": "SPLIT1", "timeout_sec": 30}}'
-    - step: 25
+    - step: 26
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
         .cm-editor", "contains": "XSPLIT1", "timeout_sec": 30}}'
-    - step: 27
+    - step: 28
       expectation: '{"eval_readonly": {"expression": "!document.querySelectorAll(''.cm-editor'')[0].innerText.includes(''XSPLIT1'')",
         "expect_truthy": true}}'
-    - step: 28
+    - step: 29
       expectation: '{"eval_readonly": {"expression": "!document.querySelectorAll(''.cm-editor'')[1].innerText.includes(''XSPLIT1'')",
         "expect_truthy": true}}'
-    - step: 30
+    - step: 31
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
         .cm-editor", "contains": "XSPLIT1", "timeout_sec": 30}}'
-    - step: 31
+    - step: 32
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'')[1].innerText.includes(''XSPLIT1'')",
         "expect_truthy": true}}'
-    - step: 33
+    - step: 34
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "bf93ec7aa56bdc61fc4621c86c95bd0c38cd646b171f260410d3fa06178a78db",
         "timeout_sec": 30}}'
-    - step: 35
+    - step: 36
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"] .cm-editor", "timeout_sec":
         15}}'
-    - step: 36
+    - step: 37
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'').length === 1", "expect_truthy":
         true}}'
-    - step: 37
+    - step: 38
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
         .cm-editor", "contains": "XSPLIT1", "timeout_sec": 15}}'
-    - step: 40
+    - step: 41
       expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-editor'').innerText.includes(''XSPLIT1'')",
         "expect_truthy": true}}'
-    - step: 42
+    - step: 43
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
         .cm-editor", "contains": "XSPLIT1", "timeout_sec": 30}}'
-    - step: 46
+    - step: 47
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
         .cm-editor", "contains": "TAILDIRTY", "timeout_sec": 30}}'
-    - step: 48
+    - step: 49
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 15}}'
-    - step: 50
+    - step: 51
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-editor'').innerText.includes(''TAILDIRTY'')",
         "expect_truthy": true}}'
-    - step: 51
+    - step: 52
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "bf93ec7aa56bdc61fc4621c86c95bd0c38cd646b171f260410d3fa06178a78db",
         "timeout_sec": 30}}'
-    - step: 53
+    - step: 54
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 15}}'
-    - step: 56
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor\"]"}'
     - step: 57
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor\"]"}'
+    - step: 58
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "bf93ec7aa56bdc61fc4621c86c95bd0c38cd646b171f260410d3fa06178a78db",
         "timeout_sec": 30}}'
-    - step: 60
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]", "timeout_sec": 30}}'
     - step: 61
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]", "timeout_sec": 30}}'
+    - step: 62
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "reloaded-from-disk",
         "timeout_sec": 30}}'
-    - step: 62
+    - step: 63
       expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-editor'').innerText.includes(''TAILDIRTY'')",
         "expect_truthy": true}}'
-    - step: 63
+    - step: 64
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "def2bdd6fe376421f97ec0d11cd08e6c81f5e6ee299586561ee09c9310ac8858",
         "timeout_sec": 30}}'
-    - step: 66
+    - step: 67
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]:not([data-editor-group-id=\"primary\"])",
         "timeout_sec": 15}}'
-    - step: 68
+    - step: 69
       expectation: '{"eval_readonly": {"expression": "Object.keys(localStorage).join(''|'').indexOf(''taomni.codeWorkspace.layout.v2.'')
         > -1 && Object.values(localStorage).join(''|'').indexOf(''notes.txt'') > -1", "expect_truthy": true}}'
-    - step: 72
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 73
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 74
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]", "timeout_sec": 60}}'
+    - step: 75
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'').length === 2", "expect_truthy":
         true}}'
-    - step: 76
+    - step: 77
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "reloaded-from-disk",
         "timeout_sec": 60}}'
-    - step: 77
+    - step: 78
       expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-editor'').innerText.includes(''TAILDIRTY'')",
         "expect_truthy": true}}'
-    - step: 78
+    - step: 79
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "def2bdd6fe376421f97ec0d11cd08e6c81f5e6ee299586561ee09c9310ac8858",
         "timeout_sec": 30}}'
-    - step: 82
+    - step: 83
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "RECOVERYDIRTY",
         "timeout_sec": 30}}'
-    - step: 87
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 88
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 89
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-recovery-dialog\"]", "timeout_sec": 60}}'
-    - step: 91
-      expectation: '{"assert_not_visible": "[data-testid=\"workspace-recovery-dialog\"]"}'
     - step: 92
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-recovery-dialog\"]"}'
+    - step: 93
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "RECOVERYDIRTY",
         "timeout_sec": 30}}'
-    - step: 94
+    - step: 95
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "def2bdd6fe376421f97ec0d11cd08e6c81f5e6ee299586561ee09c9310ac8858",
         "timeout_sec": 30}}'
     results:
-    - 91
     - 92
-    - 94
+    - 93
+    - 95
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
