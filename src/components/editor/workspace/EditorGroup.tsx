@@ -100,7 +100,15 @@ export interface EditorRevealTarget {
   end?: { line: number; character: number };
 }
 
+export interface EmptyEditorHint {
+  label: string;
+  /** Effective shortcut label from the keymap; omitted when unbound. */
+  shortcut?: string;
+}
+
 interface EditorGroupProps {
+  /** ED-PARITY-010 DEC-010-03: IDEA empty-editor quick tips. */
+  emptyHints?: readonly EmptyEditorHint[];
   /** Clipboard degradation notices forwarded to the workspace status bar. */
   onClipboardUnavailable?: (message: string) => void;
   /** ED-CLIP-004: typed guarded-clipboard observations for the workspace seam. */
@@ -287,6 +295,7 @@ interface EditorGroupProps {
  * presentation boundary for the center pane (M3 will grow this into multi-group).
  */
 export function EditorGroup({
+  emptyHints,
   groupId,
   workspaceInstanceId,
   visible,
@@ -1065,8 +1074,24 @@ export function EditorGroup({
               {breadcrumbsPlacement === "bottom" ? breadcrumbs : null}
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
-              No file open
+            <div
+              data-testid="code-workspace-empty-editor"
+              className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]"
+            >
+              {emptyHints && emptyHints.length > 0 ? (
+                <ul aria-label="Editor tips" className="flex flex-col gap-2">
+                  {emptyHints.map((hint) => (
+                    <li key={hint.label} data-testid="code-workspace-empty-editor-hint" className="flex items-center justify-between gap-6">
+                      <span>{hint.label}</span>
+                      {hint.shortcut && (
+                        <kbd className="rounded border border-[var(--taomni-code-border)] px-1.5 text-[11px] text-[var(--taomni-accent)]">
+                          {hint.shortcut}
+                        </kbd>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : "No file open"}
             </div>
           )}
         </div>

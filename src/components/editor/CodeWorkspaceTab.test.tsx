@@ -383,6 +383,12 @@ vi.mock("../terminal/TerminalPanel", () => ({
   ),
 }));
 
+/** ED-PARITY-010: secondary toolbar controls live behind the ⋮ "More actions" menu. */
+function toolbarControl(testId: string): HTMLElement {
+  if (!screen.queryByTestId(testId)) fireEvent.click(screen.getByTestId("code-workspace-toolbar-more"));
+  return screen.getByTestId(testId);
+}
+
 function file(
   path: string,
   text: string,
@@ -1361,7 +1367,7 @@ describe("CodeWorkspaceTab", () => {
     expect(window.localStorage.getItem("taomni.codeViewProfile.v1")).toBeNull();
 
     const appearanceKey = editorAppearanceProfileStorageKey("ws-appearance");
-    fireEvent.click(screen.getByTestId("code-workspace-zoom-in"));
+    fireEvent.click(toolbarControl("code-workspace-zoom-in"));
     let saved = JSON.parse(window.localStorage.getItem(appearanceKey) ?? "{}");
     expect(saved.profile.fontSizePx).toBe(14);
     expect(document.documentElement.style.getPropertyValue("--taomni-code-font-size")).toBe("");
@@ -1378,7 +1384,7 @@ describe("CodeWorkspaceTab", () => {
     expect(saved.profile.fontSizePx).toBe(15);
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("14");
 
-    fireEvent.click(screen.getByTestId("code-workspace-zoom-out"));
+    fireEvent.click(toolbarControl("code-workspace-zoom-out"));
     saved = JSON.parse(window.localStorage.getItem(appearanceKey) ?? "{}");
     expect(saved.profile.fontSizePx).toBe(14);
 
@@ -1676,7 +1682,7 @@ describe("CodeWorkspaceTab", () => {
     expect(screen.getByTestId("code-workspace-git-diff-peek")).toHaveTextContent("previous");
     expect(screen.getByTestId("code-workspace-git-diff-peek")).toHaveTextContent("value");
 
-    const blameToggle = screen.getByTestId("code-workspace-inline-blame-toggle");
+    const blameToggle = toolbarControl("code-workspace-inline-blame-toggle");
     expect(blameToggle).not.toBeDisabled();
     fireEvent.click(blameToggle);
     await waitFor(() => expect(gitMocks.gitBlameLines).toHaveBeenCalledWith("/repo/app", "src/main.ts", 1, 1));
@@ -1965,15 +1971,15 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() =>
       expect(screen.getByTitle("app / b.ts").closest("div")).toHaveAttribute("data-active"));
 
-    fireEvent.click(screen.getByTestId("code-workspace-nav-back"));
+    fireEvent.click(toolbarControl("code-workspace-nav-back"));
     await waitFor(() =>
       expect(screen.getByTitle("app / a.ts").closest("div")).toHaveAttribute("data-active"));
-    expect(screen.getByTestId("code-workspace-nav-back")).toBeDisabled();
+    expect(toolbarControl("code-workspace-nav-back")).toBeDisabled();
 
-    fireEvent.click(screen.getByTestId("code-workspace-nav-forward"));
+    fireEvent.click(toolbarControl("code-workspace-nav-forward"));
     await waitFor(() =>
       expect(screen.getByTitle("app / b.ts").closest("div")).toHaveAttribute("data-active"));
-    expect(screen.getByTestId("code-workspace-nav-forward")).toBeDisabled();
+    expect(toolbarControl("code-workspace-nav-forward")).toBeDisabled();
 
     // Ctrl+E preselects the previously active file; Enter flips back to it.
     fireEvent.keyDown(window, { key: "e", ctrlKey: true });
@@ -2230,7 +2236,7 @@ describe("CodeWorkspaceTab", () => {
     renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
     await waitFor(() => expect(lspMocks.lspDocumentSymbols).toHaveBeenCalled());
-    fireEvent.click(screen.getByTestId("code-workspace-right-pane-toggle"));
+    fireEvent.click(toolbarControl("code-workspace-right-pane-toggle"));
 
     expect(screen.getByRole("tab", { name: "Outline", selected: true })).toBeInTheDocument();
     const outline = await screen.findByTestId("code-workspace-outline-pane");
@@ -4087,6 +4093,8 @@ describe("CodeWorkspaceTab", () => {
 
     renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
+    // The document must be open with the provider before Alt+Enter asks it.
+    await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled());
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
     fireEvent.click(await screen.findByRole("button", { name: "Rename file" }));
 
@@ -5037,10 +5045,10 @@ describe("CodeWorkspaceTab", () => {
     await screen.findByTitle("app / src/main.ts");
     await waitFor(() => expect(lspMocks.lspDocumentHighlights).toHaveBeenCalled());
 
-    const inlayHintsToggle = screen.getByTestId("code-workspace-inlay-hints-toggle");
+    const inlayHintsToggle = toolbarControl("code-workspace-inlay-hints-toggle");
     expect(inlayHintsToggle).not.toBeDisabled();
     fireEvent.click(inlayHintsToggle);
-    await waitFor(() => expect(inlayHintsToggle).toHaveAttribute("aria-pressed", "true"));
+    await waitFor(() => expect(toolbarControl("code-workspace-inlay-hints-toggle")).toHaveAttribute("aria-pressed", "true"));
     await waitFor(() => expect(lspMocks.lspInlayHints).toHaveBeenCalled());
     expect(window.localStorage.getItem("taomni.codeWorkspace.intelligence.v1.instance-intelligence"))
       .toContain('"inlayHintsEnabled":true');
@@ -6053,7 +6061,7 @@ describe("CodeWorkspaceTab", () => {
     renderWorkspace(workspace);
     await screen.findAllByText("Program.cs");
     await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+    fireEvent.click(toolbarControl("code-workspace-split-right"));
 
     await waitFor(() => expect(
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-split").splitOrientation,
@@ -6105,7 +6113,7 @@ describe("CodeWorkspaceTab", () => {
 
     renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
-    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+    fireEvent.click(toolbarControl("code-workspace-split-right"));
     await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
 
     const panes = screen.getAllByTestId("code-workspace-editor-pane");
@@ -6240,7 +6248,7 @@ describe("CodeWorkspaceTab", () => {
     await screen.findAllByTitle("app / src/main.ts");
     await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+    fireEvent.click(toolbarControl("code-workspace-split-right"));
     await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
 
     const panes = screen.getAllByTestId("code-workspace-editor-pane");
@@ -6555,7 +6563,7 @@ describe("CodeWorkspaceTab", () => {
     ).toEqual([firstKey, secondKey]));
 
     lspMocks.lspCloseDocument.mockRejectedValueOnce(new Error("policy didClose failed"));
-    fireEvent.click(screen.getByTestId("code-workspace-tab-policy-settings"));
+    fireEvent.click(toolbarControl("code-workspace-tab-policy-settings"));
     fireEvent.change(await screen.findByTestId("workspace-tab-policy-limit"), {
       target: { value: "1" },
     });
@@ -7139,7 +7147,7 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-bookmark-history").activeKey,
     ).toBe("root:app:src/two.ts"));
-    const backButton = screen.getByTestId("code-workspace-nav-back");
+    const backButton = toolbarControl("code-workspace-nav-back");
     await waitFor(() => expect(backButton).not.toBeDisabled());
     fireEvent.click(backButton);
     await waitFor(() => expect(
@@ -7272,8 +7280,8 @@ describe("CodeWorkspaceTab", () => {
       expect(ui.editorGroups.primary.activeKey).toBe("root:app:src/main.ts");
       expect(ui.editorGroups.secondary.activeKey).toBe("root:app:src/util.ts");
     });
-    expect(screen.getByTestId("code-workspace-project-collapsed-rail")).toBeInTheDocument();
-    expect(screen.getByTestId("code-workspace-project-expand")).toBeInTheDocument();
+    // ED-PARITY-010: the Project stripe button replaces the collapsed rail.
+    expect(screen.getByTestId("code-workspace-tool-rail-project")).toHaveAttribute("aria-pressed", "false");
     expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/main.ts");
     expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/util.ts");
     expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/other.ts");
@@ -7385,15 +7393,14 @@ describe("CodeWorkspaceTab", () => {
       expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-collapse").languagePanelOpen)
         .toBe(false);
     });
-    expect(screen.getByTestId("code-workspace-project-collapsed-rail")).toBeInTheDocument();
-    expect(screen.getByTestId("code-workspace-project-expand")).toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-tool-rail-project")).toHaveAttribute("aria-pressed", "false");
 
-    fireEvent.click(screen.getByTestId("code-workspace-project-expand"));
+    fireEvent.click(screen.getByTestId("code-workspace-tool-rail-project"));
     await waitFor(() => {
       expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-collapse").languagePanelOpen)
         .toBe(true);
     });
-    expect(screen.queryByTestId("code-workspace-project-collapsed-rail")).toBeNull();
+    expect(screen.getByTestId("code-workspace-tool-rail-project")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("code-workspace-tree-collapse")).toBeInTheDocument();
   });
 
@@ -8327,17 +8334,17 @@ end_of_record
     await screen.findByTitle("app / src/Program.cs");
 
     // Split editor right
-    const splitRightBtn = screen.getByTestId("code-workspace-split-right");
+    const splitRightBtn = toolbarControl("code-workspace-split-right");
     fireEvent.click(splitRightBtn);
 
     // Sync scroll button should appear
-    const syncScrollBtn = await screen.findByTestId("code-workspace-split-sync-scroll");
-    expect(syncScrollBtn).toBeInTheDocument();
-    expect(syncScrollBtn).toHaveAttribute("aria-pressed", "false");
+    toolbarControl("code-workspace-split-sync-scroll");
+    expect(toolbarControl("code-workspace-split-sync-scroll")).toBeInTheDocument();
+    expect(toolbarControl("code-workspace-split-sync-scroll")).toHaveAttribute("aria-pressed", "false");
 
     // Click to enable synchronized scrolling
-    fireEvent.click(syncScrollBtn);
-    expect(syncScrollBtn).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(toolbarControl("code-workspace-split-sync-scroll"));
+    expect(toolbarControl("code-workspace-split-sync-scroll")).toHaveAttribute("aria-pressed", "true");
     expect(useAppStore.getState().statusMessage).toBe("Synchronized split scrolling enabled");
 
     // Toggle via command
@@ -8799,7 +8806,7 @@ end_of_record
       const rendered = renderWorkspace(workspace);
       await screen.findByTitle("app / src/main.ts");
       // Split right: the new leaf owns main.ts and becomes active…
-      fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+      fireEvent.click(toolbarControl("code-workspace-split-right"));
       await waitFor(() => expect(
         selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-switcher-reopen").splitOrientation,
       ).toBe("vertical"));
@@ -8815,7 +8822,7 @@ end_of_record
       });
 
       // Collapse the split: other.ts's owning leaf disappears entirely.
-      fireEvent.click(screen.getByTestId("code-workspace-split-close"));
+      fireEvent.click(toolbarControl("code-workspace-split-close"));
       await waitFor(() => expect(
         selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-switcher-reopen").splitOrientation,
       ).toBeNull());
@@ -12645,7 +12652,7 @@ end_of_record
         expect(heads).toContain(40);
       }, { timeout: 4000 });
 
-      fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+      fireEvent.click(toolbarControl("code-workspace-split-right"));
       await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
       const panes = screen.getAllByTestId("code-workspace-editor-pane");
       const secondView = EditorView.findFromDOM(panes[1]!.querySelector(".cm-editor")!)!;
@@ -14586,7 +14593,7 @@ end_of_record
 
       const dialog = await screen.findByTestId("refactoring-preview-dialog");
       // Switch the active view while the rename is paused on the preview.
-      fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+      fireEvent.click(toolbarControl("code-workspace-split-right"));
       await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane").length).toBeGreaterThan(1));
 
       fireEvent.click(within(dialog).getByTestId("refactoring-preview-apply"));

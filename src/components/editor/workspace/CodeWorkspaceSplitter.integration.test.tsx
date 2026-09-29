@@ -517,7 +517,7 @@ describe("CodeWorkspace project splitter integration (real react-resizable-panel
       expect(styleFlexGrow(project)).toBeCloseTo(0, 2);
     });
 
-    fireEvent.click(screen.getByTestId("code-workspace-project-expand"));
+    fireEvent.click(screen.getByTestId("code-workspace-tool-rail-project"));
     await waitFor(() => {
       // The group is 1197px wide in this harness, so the restored percentage
       // must map back to the 452px default the panel was mounted at.

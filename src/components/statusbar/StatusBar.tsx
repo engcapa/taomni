@@ -15,6 +15,7 @@ import {
   Cpu,
   Loader2,
   X,
+  Lock,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { useAppTheme } from "../../lib/appTheme";
@@ -22,7 +23,11 @@ import { writeText } from "../../lib/clipboard";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useAiStore } from "../../stores/aiStore";
-import { useCodeWorkspaceStatusStore } from "../../stores/codeWorkspaceStatusStore";
+import {
+  useCodeWorkspaceStatusStore,
+  type CodeWorkspaceNavigationSegment,
+  type CodeWorkspaceStatusSegments,
+} from "../../stores/codeWorkspaceStatusStore";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 
@@ -88,6 +93,57 @@ function CopyableText({
   );
 }
 
+/** IDEA caret widget: `line:col`, plus `(N chars[, M line breaks])` for a selection. */
+export function formatWorkspaceCursor(status: Pick<CodeWorkspaceStatusSegments, "line" | "column" | "selectionChars" | "selectionLineBreaks">): string {
+  const base = `${status.line}:${status.column}`;
+  const chars = status.selectionChars ?? 0;
+  if (chars <= 0) return base;
+  const breaks = status.selectionLineBreaks ?? 0;
+  const breakText = breaks > 0 ? `, ${breaks} line break${breaks === 1 ? "" : "s"}` : "";
+  return `${base} (${chars} char${chars === 1 ? "" : "s"}${breakText})`;
+}
+
+/** IDEA indent widget wording: `4 spaces` / `Tab`; the source stays in the tooltip. */
+export function ideaIndentationLabel(label: string): string {
+  const spaces = /^Spaces:\s*(\d+)/i.exec(label);
+  if (spaces) return `${spaces[1]} spaces`;
+  if (/^Tabs?\b/i.test(label)) return "Tab";
+  return label;
+}
+
+const SYMBOL_KIND_BADGE: Record<number, string> = {
+  5: "C", 6: "m", 7: "p", 8: "f", 9: "m", 10: "E", 11: "I", 12: "ƒ", 13: "v", 14: "c", 22: "e", 23: "S",
+};
+
+function WorkspaceNavigationBar({ segments }: { segments: readonly CodeWorkspaceNavigationSegment[] }) {
+  return (
+    <nav
+      aria-label="Navigation bar"
+      data-testid="status-bar-workspace-navbar"
+      className="flex min-w-0 items-center gap-1 overflow-hidden text-[var(--taomni-status-text)]"
+    >
+      {segments.map((segment, index) => (
+        <span key={`${index}-${segment.label}`} className="flex min-w-0 shrink items-center gap-1">
+          {index > 0 && <span aria-hidden="true" className="opacity-50">›</span>}
+          <span
+            data-testid="status-bar-workspace-navbar-segment"
+            data-kind={segment.kind}
+            className="flex min-w-0 items-center gap-0.5 truncate"
+            title={segment.label}
+          >
+            {segment.kind === "symbol" && segment.symbolKind !== undefined && SYMBOL_KIND_BADGE[segment.symbolKind] && (
+              <span className="shrink-0 rounded-full border border-current px-0.5 text-[8px] leading-3 opacity-70">
+                {SYMBOL_KIND_BADGE[segment.symbolKind]}
+              </span>
+            )}
+            <span className="truncate">{segment.label}</span>
+          </span>
+        </span>
+      ))}
+    </nav>
+  );
+}
+
 function StatusSegment({
   testId,
   title,
@@ -112,7 +168,7 @@ function StatusSegment({
   // Primary status text (not muted/slate) so language/LSP labels like "Java"
   // stay readable on the light status bar background. Font size is inherited
   // from .taomni-status so segments scale with the app UI font size.
-  const className = "flex items-center gap-1 font-medium max-w-[220px] truncate text-[var(--taomni-status-text)]"
+  const className = "flex shrink-0 items-center gap-1 font-medium max-w-[220px] truncate text-[var(--taomni-status-text)]"
     + (onClick ? " rounded px-1 hover:bg-[var(--taomni-hover)] cursor-pointer" : "");
   const common = {
     "data-testid": testId,
@@ -149,6 +205,7 @@ export function StatusBar() {
   const selectedSessionId = useSessionStore((s) => s.selectedSessionId);
   const workspaceStatus = useCodeWorkspaceStatusStore((s) => s.status);
   const workspaceActions = useCodeWorkspaceStatusStore((s) => s.actions);
+  const setWorkspaceWidgetHost = useCodeWorkspaceStatusStore((s) => s.setWidgetHost);
   const { mode, resolvedTheme } = useAppTheme();
   const [online, setOnline] = useState(navigator.onLine);
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
@@ -182,6 +239,12 @@ export function StatusBar() {
 
   return (
     <div data-testid="status-bar" className="taomni-status min-h-6 flex items-center px-2 gap-3">
+      {/* ED-PARITY-010 DEC-010-06: a focused code workspace owns the status
+          bar like IDEA — navigation bar left, editor widgets right. */}
+      {showWorkspaceSegments && workspaceStatus ? (
+        <WorkspaceNavigationBar segments={workspaceStatus.navigation ?? []} />
+      ) : (
+        <>
       <span className="flex items-center gap-1 min-w-0">
         <Eye className="w-3 h-3 shrink-0" />
         <span className="shrink-0">{t("statusBar.sessions", { count: sessions.length })}</span>
@@ -304,6 +367,8 @@ export function StatusBar() {
         </>
       )}
 
+        </>
+      )}
       <div className="flex-1" />
       {statusMessage && (
         <CopyableText text={statusMessage} className="truncate max-w-[260px]" testId="status-bar-message" />
@@ -340,20 +405,30 @@ export function StatusBar() {
 
       {showWorkspaceSegments && workspaceStatus && (
         <>
+          <span
+            ref={setWorkspaceWidgetHost}
+            data-testid="status-bar-workspace-widgets"
+            className="flex shrink-0 items-center gap-2 empty:hidden"
+          />
           <span className="taomni-divider-v h-3" />
           <StatusSegment
             testId="status-bar-workspace-cursor"
             title={`Cursor · line ${workspaceStatus.line}, column ${workspaceStatus.column}`}
           >
-            <span className="taomni-mono">Ln {workspaceStatus.line}, Col {workspaceStatus.column}</span>
+            <span className="taomni-mono">{formatWorkspaceCursor(workspaceStatus)}</span>
           </StatusSegment>
           <StatusSegment
             testId="status-bar-workspace-indentation"
             title="Indentation · click to cycle Spaces (2), Spaces (4), and Tab (4)"
             onClick={workspaceActions?.cycleIndentation}
           >
-            {workspaceStatus.indentation ?? "Spaces: 2"}
+            {ideaIndentationLabel(workspaceStatus.indentation ?? "Spaces: 2")}
           </StatusSegment>
+          {workspaceStatus.readOnly && (
+            <StatusSegment testId="status-bar-workspace-readonly" title="File is read-only">
+              <Lock className="h-3 w-3 shrink-0" aria-label="Read-only" />
+            </StatusSegment>
+          )}
           <StatusSegment
             testId="status-bar-workspace-encoding"
             title={`${workspaceStatus.encoding} · open file encoding options`}
@@ -430,6 +505,8 @@ export function StatusBar() {
         </>
       )}
 
+      {!showWorkspaceSegments && (
+        <>
       <span className="taomni-divider-v h-3 shrink-0" />
       <span
         className="flex items-center gap-1 min-w-0"
@@ -449,6 +526,8 @@ export function StatusBar() {
       <span className="min-w-0 truncate" title={t("statusBar.versionTag", { version: "0.2.0" })}>
         {t("statusBar.versionTag", { version: "0.2.0" })}
       </span>
+        </>
+      )}
     </div>
   );
 }

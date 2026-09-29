@@ -88,6 +88,7 @@
   - workspace 头部工具栏降到 IDEA 主工具栏的信息分组：项目/根、VCS 分支、运行配置 + Run/Debug、搜索、设置；缩放/换行/列选择/inlay/blame/tab policy 移入 `⋮` 或 View 菜单，SDK/Facts 状态移入状态栏 widget。
   - 编辑器状态栏段与应用状态栏分离：左侧导航栏（路径 + 类/方法），右侧 `行:列 (N chars)`、换行符、编码、缩进、只读锁；禁止截断成 `Spaces: 2 (Aut`。
 - 完成条件：A1–A4、browser/native/accessibility/IDEA comparison 证据齐全，当前端真机完成，其他端明确未验证。
+- P1 设计：[ed-parity-010-shell-design.md](ed-parity-010-shell-design.md)。
 - 验收：`ED-PARITY-010-A1`、`ED-PARITY-010-A2`、`ED-PARITY-010-A3`、`ED-PARITY-010-A4`。
 
 <a id="ed-parity-011"></a>
