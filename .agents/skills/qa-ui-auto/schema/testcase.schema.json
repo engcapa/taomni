@@ -1657,6 +1657,10 @@
             "key": {
               "type": "string"
             },
+            "macos_key": {
+              "type": "string",
+              "description": "Chord used instead of key on macOS, where the IDEA macOS keymap binds a different stroke (e.g. Meta+1 for Alt+1)."
+            },
             "selector": {
               "$ref": "#/$defs/selector"
             }

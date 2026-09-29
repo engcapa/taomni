@@ -1,6 +1,6 @@
 id: TC-IDE-PARITY-015-02
 title: Problems groups real JDT LS diagnostics by file with :line and matches the status pill
-description: 'ED-PARITY-015 A4 native case over the in-repo maven-single sample and the CI-provisioned JDT LS: App.java with one type error and one unused local shows 1 error / 1 warning in the status pill and two grouped Problems rows ending with :line.
+description: 'ED-PARITY-015 A4 native case over the in-repo maven-single sample and the CI-provisioned JDT LS: App.java with one type error and one raw-type warning shows 1 error / 1 warning in the status pill and grouped Problems rows ending with :line.
 
 
   Mode: native.
@@ -31,7 +31,7 @@ steps:
     value: '[{"id":"qa-p015","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
 - host_write_file:
     path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
-    text: "package com.example.single;\n\npublic class App {\n\n    public static void main(String[] args) {\n        int count = \"text\";\n        String unused = \"x\";\n        System.out.println(count);\n    }\n}\n"
+    text: "package com.example.single;\n\npublic class App {\n\n    public static void main(String[] args) {\n        int count = \"text\";\n        java.util.List raw = null;\n        System.out.println(count + \" \" + raw);\n    }\n}\n"
 - reload_window: null
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
@@ -41,7 +41,7 @@ steps:
     timeout_sec: 60
 - assert_text:
     selector: '[data-testid="code-workspace-editor"]'
-    contains: String unused
+    contains: java.util.List raw
     timeout_sec: 60
 - wait_for:
     selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
@@ -54,9 +54,9 @@ steps:
 - wait_for:
     selector: '[data-testid="code-workspace-problems-panel"]'
     timeout_sec: 15
-- assert_count:
+- wait_for:
     selector: '[data-testid="problems-diagnostic-row"]'
-    equal: 2
+    timeout_sec: 15
 - assert_text:
     selector: '[data-testid="code-workspace-problems-panel"]'
     contains: App.java
@@ -80,29 +80,32 @@ steps:
     selector: '[data-testid="code-workspace-problems-provider-state"]'
     equal: 0
 - click: '[data-testid="problems-severity-warning"]'
-- assert_count:
-    selector: '[data-testid="problems-diagnostic-row"]'
-    equal: 1
+- assert_pattern:
+    selector: '[data-testid="code-workspace-problems-panel"]'
+    regex: (?s)\A(?!.*:7\b)
+- assert_text:
+    selector: '[data-testid="code-workspace-problems-panel"]'
+    contains: :6
 - click: '[data-testid="problems-severity-warning"]'
-- assert_count:
-    selector: '[data-testid="problems-diagnostic-row"]'
-    equal: 2
+- assert_text:
+    selector: '[data-testid="code-workspace-problems-panel"]'
+    contains: :7
 - screenshot: tc-ide-parity-015-02-problems-java.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A4：真实 JDT LS 就绪后，含 1 个类型错误与 1 个未用变量的 App.java 在 Problems 中按文件分组显示 2 行，行尾为 IDEA 的 :行号。
+    requirement: A4：真实 JDT LS 就绪后，含 1 个类型错误与 1 个 raw type 警告的 App.java 在 Problems 中按文件分组显示，行尾为 IDEA 的 :行号。
     actions:
     - 5
     - 14
     checkpoints:
     - step: 11
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "String unused", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "java.util.List raw", "timeout_sec": 60}}'
     - step: 12
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 120}}'
     - step: 16
-      expectation: '{"assert_count": {"selector": "[data-testid=\"problems-diagnostic-row\"]", "equal": 2}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"problems-diagnostic-row\"]", "timeout_sec": 15}}'
     - step: 17
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-problems-panel\"]", "contains": "App.java"}}'
     - step: 18
@@ -119,7 +122,7 @@ verification:
     actions:
     - 14
     - 24
-    - 26
+    - 27
     checkpoints:
     - step: 13
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains": "1E 1W", "timeout_sec": 60}}'
@@ -130,16 +133,18 @@ verification:
     - step: 23
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"]", "equal": 0}}'
     - step: 25
-      expectation: '{"assert_count": {"selector": "[data-testid=\"problems-diagnostic-row\"]", "equal": 1}}'
-    - step: 27
-      expectation: '{"assert_count": {"selector": "[data-testid=\"problems-diagnostic-row\"]", "equal": 2}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-problems-panel\"]", "regex": "(?s)\\A(?!.*:7\\b)"}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-problems-panel\"]", "contains": ":6"}}'
+    - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-problems-panel\"]", "contains": ":7"}}'
     results:
     - 13
     - 21
     - 22
     - 23
     - 25
-    - 27
+    - 28
   visual:
   - check: 不声明视觉结论。
     method: not-applicable

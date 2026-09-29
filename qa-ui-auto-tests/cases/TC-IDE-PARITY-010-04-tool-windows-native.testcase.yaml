@@ -60,7 +60,9 @@ steps:
     regex: (?m)^QA_ED010_MARK\r?$
     timeout_sec: 10
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Alt+1
+- press:
+    key: Alt+1
+    macos_key: Meta+1
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed
@@ -68,12 +70,16 @@ steps:
 - wait_for:
     selector: '[data-testid="code-workspace-tree-pane"]:focus-within'
     timeout_sec: 5
-- press: Alt+1
+- press:
+    key: Alt+1
+    macos_key: Meta+1
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed
     equals: 'false'
-- press: Alt+1
+- press:
+    key: Alt+1
+    macos_key: Meta+1
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed

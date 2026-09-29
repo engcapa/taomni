@@ -1301,6 +1301,7 @@ export const DEFAULT_WORKSPACE_ACTIONS: WorkspaceActionMetadata[] = [
     description: "Show or hide the project explorer file tree",
     category: "View",
     keybinding: "Alt+1",
+    platformKeybindings: { mac: ["Meta+1", "Alt+1"] },
     provenance: "local",
     keywords: ["tree", "explorer", "sidebar", "project"],
   },

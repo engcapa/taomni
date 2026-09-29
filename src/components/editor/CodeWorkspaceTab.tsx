@@ -15036,6 +15036,8 @@ export function CodeWorkspaceTab({
       title: languagePanelOpen ? "Hide Project Tree" : "Show Project Tree",
       category: "View",
       keybinding: "Alt+1",
+      // IDEA macOS keymap: Cmd+1 activates Project (Option+1 kept as alias).
+      platformKeybindings: { mac: ["Meta+1", "Alt+1"] },
       keywords: ["project", "explorer", "files", "tree", "sidebar", "collapse"],
       run: () => handleActivateToolWindow("project"),
     },

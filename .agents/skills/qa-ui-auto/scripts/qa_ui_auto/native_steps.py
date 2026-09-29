@@ -157,9 +157,12 @@ def _press(ctx: NativeStepContext, args: Any) -> str:
         key, selector = args, None
     elif isinstance(args, dict) and "key" in args:
         key = str(args["key"])
+        # IDEA's macOS keymap binds some actions to a different stroke.
+        if platform.system() == "Darwin" and isinstance(args.get("macos_key"), str):
+            key = str(args["macos_key"])
         selector = args.get("selector")
     else:
-        raise StepError(f"press: expected string or {{key, selector?}}, got {args!r}")
+        raise StepError(f"press: expected string or {{key, macos_key?, selector?}}, got {args!r}")
     if selector:
         ctx.session.focus(selector)
     return ctx.session.press_combo(key)
