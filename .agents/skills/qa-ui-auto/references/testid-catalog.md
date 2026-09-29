@@ -325,6 +325,27 @@
 - `[data-testid="keymap-settings-ok"]` — interactive [optional] — F25.5.keymap-settings-ok
 - `[data-testid="keymap-settings-cancel"]` — interactive [optional] — F25.5.keymap-settings-cancel
 - `[data-testid="keymap-settings-apply"]` — interactive [optional] — F25.5.keymap-settings-apply
+- `[data-testid="code-workspace-toolbar-more"]` — interactive — F25.5.toolbar-more
+- `[data-testid="code-workspace-toolbar-more-menu"]` — display [optional] — F25.5.toolbar-more-menu
+- `[data-testid="code-workspace-toolbar-search"]` — interactive [optional] — F25.5.toolbar-search
+- `[data-testid="code-workspace-toolbar-settings"]` — interactive [optional] — F25.5.toolbar-settings
+- `[data-testid="code-workspace-tool-rail-left"]` — display [optional] — F25.5.tool-rail-left
+- `[data-testid="code-workspace-tool-rail-right"]` — display [optional] — F25.5.tool-rail-right
+- `[data-testid="code-workspace-tool-rail-project"]` — interactive [optional] — F25.5.tool-rail-button
+  ↳ `[data-testid="code-workspace-tool-rail-structure"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-commit"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-documentation"]` — alias
+- `[data-testid="code-workspace-tool-window-header"]` — display [optional] — F25.5.tool-window-header
+- `[data-testid="code-workspace-tool-window-title"]` — display [optional] — F25.5.tool-window-title
+- `[data-testid="code-workspace-tool-window-hide"]` — interactive [optional] — F25.5.tool-window-hide
+- `[data-testid="code-workspace-tool-window-options"]` — interactive [optional] — F25.5.tool-window-options
+- `[data-testid="code-workspace-bottom-tab-overflow-problems"]` — interactive [optional] — F25.5.bottom-tool-overflow-item
+- `[data-testid="code-workspace-terminal-dock"]` — display [optional] — F25.5.terminal-dock-panel
+  ↳ `[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]` — alias
+  ↳ `[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]` — alias
+- `header [data-testid="code-workspace-split-right"]` — display [optional] — F25.5.toolbar-split-right-in-header
+- `[data-testid="code-workspace-empty-editor"]` — display [optional] — F25.5.empty-editor-hints
+  ↳ `[data-testid="code-workspace-empty-editor-hint"]` — alias
 - `[data-testid="keymap-group-Navigation"]` — interactive [optional] — F25.5.keymap-group
 - `[data-testid="keymap-find-by-shortcut"]` — interactive [optional] — F25.5.keymap-find-by-shortcut
 - `[data-testid="keymap-shortcut-filter"]` — interactive [optional] — F25.5.keymap-shortcut-filter
@@ -935,6 +956,10 @@
 - `[data-testid="status-bar-workspace-encoding"]` — interactive [optional] — F1.7.workspace-encoding
 - `[data-testid="status-bar-workspace-eol"]` — interactive [optional] — F1.7.workspace-eol
 - `[data-testid="status-bar-workspace-cursor"]` — display [optional] — F1.7.workspace-cursor
+- `[data-testid="status-bar-workspace-navbar"]` — display [optional] — F1.7.workspace-navbar
+  ↳ `[data-testid="status-bar-workspace-navbar-segment"]` — alias
+- `[data-testid="status-bar-workspace-readonly"]` — display [optional] — F1.7.workspace-readonly
+- `[data-testid="status-bar-workspace-widgets"]` — display [optional] — F1.7.workspace-status-widgets
 - `[data-testid="status-bar-workspace-large-file"]` — display [optional] — F1.7.workspace-large-file
 
 ## main/tabs (F1.5)

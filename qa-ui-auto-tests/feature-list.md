@@ -424,7 +424,21 @@ controls:
   - id: workspace-cursor
     selector: '[data-testid="status-bar-workspace-cursor"]'
     kind: display
-    optional: true       # active Code Workspace file only (debounced caret)
+    optional: true       # active Code Workspace file only (debounced caret); IDEA `line:col (N chars)`
+  - id: workspace-navbar             # ED-PARITY-010 IDEA navigation bar
+    selector: '[data-testid="status-bar-workspace-navbar"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="status-bar-workspace-navbar-segment"]'
+  - id: workspace-readonly
+    selector: '[data-testid="status-bar-workspace-readonly"]'
+    kind: display
+    optional: true
+  - id: workspace-status-widgets     # SDK / project-facts widgets portalled by the workspace
+    selector: '[data-testid="status-bar-workspace-widgets"]'
+    kind: display
+    optional: true
   - id: workspace-large-file
     selector: '[data-testid="status-bar-workspace-large-file"]'
     kind: display
@@ -6206,6 +6220,8 @@ files:
   - src/components/editor/workspace/TabSwitcher.tsx
   - src/components/editor/workspace/KeymapSettingsDialog.tsx
   - src/components/editor/workspace/ShortcutKeyCaps.tsx
+  - src/components/editor/workspace/panels/ToolWindowRail.tsx
+  - src/components/editor/workspace/workspaceNavigationBar.ts
   - src/components/editor/workspace/KeymapMigrationNotice.tsx
   - src/components/editor/workspace/useFocusReturn.ts
   - src/components/editor/workspace/workspaceKeymapPlatform.ts
@@ -6859,6 +6875,75 @@ controls:
     selector: '[data-testid="keymap-settings-apply"]'
     kind: interactive
     optional: true
+  # ED-PARITY-010 IDEA shell: tool window rails, tool window header, toolbar ⋮, empty editor.
+  - id: toolbar-more                  # ⋮ More actions (zoom/wrap/split/back/forward/…)
+    selector: '[data-testid="code-workspace-toolbar-more"]'
+    kind: interactive
+  - id: toolbar-more-menu
+    selector: '[data-testid="code-workspace-toolbar-more-menu"]'
+    kind: display
+    optional: true
+  - id: toolbar-search
+    selector: '[data-testid="code-workspace-toolbar-search"]'
+    kind: interactive
+    optional: true
+  - id: toolbar-settings
+    selector: '[data-testid="code-workspace-toolbar-settings"]'
+    kind: interactive
+    optional: true
+  - id: tool-rail-left
+    selector: '[data-testid="code-workspace-tool-rail-left"]'
+    kind: display
+    optional: true
+  - id: tool-rail-right
+    selector: '[data-testid="code-workspace-tool-rail-right"]'
+    kind: display
+    optional: true
+  - id: tool-rail-button              # `code-workspace-tool-rail-<id>` stripe buttons
+    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-rail-structure"]'
+      - '[data-testid="code-workspace-tool-rail-commit"]'
+      - '[data-testid="code-workspace-tool-rail-documentation"]'
+  - id: tool-window-header
+    selector: '[data-testid="code-workspace-tool-window-header"]'
+    kind: display
+    optional: true
+  - id: tool-window-title
+    selector: '[data-testid="code-workspace-tool-window-title"]'
+    kind: display
+    optional: true
+  - id: tool-window-hide
+    selector: '[data-testid="code-workspace-tool-window-hide"]'
+    kind: interactive
+    optional: true
+  - id: tool-window-options
+    selector: '[data-testid="code-workspace-tool-window-options"]'
+    kind: interactive
+    optional: true
+  - id: bottom-tool-overflow-item     # "More tool windows" entry, `…-overflow-<id>`
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-problems"]'
+    kind: interactive
+    optional: true
+  - id: terminal-dock-panel
+    selector: '[data-testid="code-workspace-terminal-dock"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+      - '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+  - id: toolbar-split-right-in-header # negative probe: split is not a main-toolbar button
+    selector: 'header [data-testid="code-workspace-split-right"]'
+    kind: display
+    optional: true
+  - id: empty-editor-hints
+    selector: '[data-testid="code-workspace-empty-editor"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-empty-editor-hint"]'
   # ED-PARITY-013 Keymap tree, find-by-shortcut, row menu and recorders.
   - id: keymap-group                  # collapsible category node, `keymap-group-<category>`
     selector: '[data-testid="keymap-group-Navigation"]'

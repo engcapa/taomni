@@ -1,0 +1,154 @@
+id: TC-IDE-PARITY-010-02
+title: IDEA main toolbar, ⋮ overflow, status bar navigation/selection and empty-editor tips
+description: 'ED-PARITY-010 A1/A4 browser case: the workspace toolbar keeps IDEA''s project/VCS/run/search/settings groups with secondary editor controls behind ⋮; the status bar shows the navigation bar and `line:col (N chars)` while hiding app-level segments; an empty editor lists IDEA quick tips with live bindings; the Settings gear opens Settings.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-010
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_count:
+    selector: header [data-testid="code-workspace-split-right"]
+    equal: 0
+- assert_visible: '[data-testid="code-workspace-toolbar-search"]'
+- click: '[data-testid="code-workspace-toolbar-search"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-toolbar-more"]'
+- assert_visible: '[data-testid="code-workspace-toolbar-more-menu"] [data-testid="code-workspace-split-right"]'
+- assert_visible: '[data-testid="code-workspace-toolbar-more-menu"] [data-testid="code-workspace-zoom-reset"]'
+- press: Escape
+- assert_not_visible: '[data-testid="code-workspace-toolbar-more-menu"]'
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-navbar"]'
+    contains: README.txt
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+Home
+- press: Shift+ArrowRight
+- press: Shift+ArrowRight
+- press: Shift+ArrowRight
+- press: Shift+ArrowRight
+- press: Shift+ArrowRight
+- assert_pattern:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    regex: ^1:6 \(5 chars\)$
+- eval_readonly:
+    expression: '!document.querySelector("[data-testid" + String.fromCharCode(61) + "\"status-bar\"]").textContent.includes("X11:")'
+    expect_truthy: true
+- press: Control+F4
+- wait_for:
+    selector: '[data-testid="code-workspace-empty-editor"]'
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="code-workspace-empty-editor"]'
+    contains: Double Shift
+- assert_pattern:
+    selector: '[data-testid="code-workspace-empty-editor"]'
+    regex: Go to File\s*(Ctrl|Cmd)[+]Shift[+]N
+- click: '[data-testid="code-workspace-toolbar-settings"]'
+- wait_for:
+    selector: '[data-testid="settings-panel"]'
+    timeout_sec: 10
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1/A4：主工具栏不再平铺分屏/缩放等次要控件，⋮ 菜单承载它们并可 Esc 关闭；保留搜索入口。
+    actions:
+    - 15
+    - 19
+    - 22
+    checkpoints:
+    - step: 13
+      expectation: '{"assert_count": {"selector": "header [data-testid=\"code-workspace-split-right\"]", "equal": 0}}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-search\"]"}'
+    - step: 16
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 30}}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"] [data-testid=\"code-workspace-split-right\"]"}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"] [data-testid=\"code-workspace-zoom-reset\"]"}'
+    - step: 23
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"]"}'
+    results:
+    - 13
+    - 16
+    - 20
+    - 21
+    - 23
+  - id: R2
+    requirement: A4：状态栏导航栏显示当前文件，选区 5 字符时光标段为 `1:6 (5 chars)`，应用级 X11 等段在 workspace 激活时隐藏。
+    actions:
+    - 13
+    checkpoints:
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-navbar\"]", "contains": "README.txt"}}'
+    - step: 32
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "regex": "^1:6 \\(5 chars\\)$"}}'
+    - step: 33
+      expectation: '{"eval_readonly": {"expression": "!document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"status-bar\\\"]\").textContent.includes(\"X11:\")", "expect_truthy": true}}'
+    results:
+    - 24
+    - 32
+    - 33
+  - id: R3
+    requirement: A4/DEC-010-03：空编辑器显示 IDEA 快捷提示（Double Shift、Go to File 的真实绑定）。
+    actions:
+    - 34
+    checkpoints:
+    - step: 35
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "timeout_sec": 10}}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "contains": "Double Shift"}}'
+    - step: 37
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "regex": "Go to File\\s*(Ctrl|Cmd)[+]Shift[+]N"}}'
+    results:
+    - 36
+    - 37
+  - id: R4
+    requirement: DEC-010-04：工具栏 Settings 入口打开设置。
+    actions:
+    - 38
+    checkpoints:
+    - step: 39
+      expectation: '{"wait_for": {"selector": "[data-testid=\"settings-panel\"]", "timeout_sec": 10}}'
+    results:
+    - 39
+  visual:
+  - check: rail 图标/标签截断与选中蓝底需人工对照 IDEA idea-01-shell。
+    method: manual
+    reason: 像素与字体按 DEC-ALIGN-06 profile 另行比较。
+  native:
+  - check: 打包 WebView 中的 rail/工具窗由 TC-IDE-PARITY-010-04 覆盖。
+    method: external
+    reason: browser 不经过打包 WebView。

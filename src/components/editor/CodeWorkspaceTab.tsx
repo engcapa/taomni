@@ -1473,9 +1473,12 @@ export function CodeWorkspaceTab({
   const [baseLayoutRevision, setBaseLayoutRevision] = useState(0);
 
   const openTabPolicySettings = useCallback(() => {
-    tabPolicyTriggerRef.current = document.activeElement instanceof HTMLButtonElement
-      ? document.activeElement
-      : null;
+    const trigger = document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
+    // ED-PARITY-010: an opener inside the transient ⋮ menu disappears with it;
+    // return focus to the ⋮ anchor instead.
+    tabPolicyTriggerRef.current = trigger?.closest('[data-testid="code-workspace-toolbar-more-menu"]')
+      ? document.querySelector<HTMLButtonElement>('[data-testid="code-workspace-toolbar-more"]')
+      : trigger;
     setBaseLayoutRevision(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).layoutRevision);
     setTabPolicySettingsOpen(true);
   }, [workspaceInstanceId]);
@@ -16156,6 +16159,25 @@ export function CodeWorkspaceTab({
   const [activeKeymapSchemeId, setActiveKeymapSchemeId] = useState<string | null>(keymapStore.activeId);
   const [keymapSettingsOpen, setKeymapSettingsOpen] = useState(false);
   const [toolbarMoreOpen, setToolbarMoreOpen] = useState(false);
+  // The ⋮ menu closes on any outside press or Esc without swallowing that
+  // press, so the next toolbar/editor click still reaches its target.
+  useEffect(() => {
+    if (!toolbarMoreOpen) return;
+    const onPointer = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('[data-testid="code-workspace-toolbar-more-menu"], [data-testid="code-workspace-toolbar-more"]')) return;
+      setToolbarMoreOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setToolbarMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer, true);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointer, true);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [toolbarMoreOpen]);
   const workspaceWidgetHost = useCodeWorkspaceStatusStore((s) => s.widgetHost);
   /** Action to record a shortcut for when the dialog opens (Assign Shortcut). */
   const [keymapAssignActionId, setKeymapAssignActionId] = useState<string | null>(null);
@@ -20946,7 +20968,6 @@ export function CodeWorkspaceTab({
           />
           {toolbarMoreOpen && (
             <>
-              <div className="fixed inset-0 z-40" onMouseDown={() => setToolbarMoreOpen(false)} />
               <div
                 role="toolbar"
                 aria-label="More editor actions"

@@ -66,6 +66,7 @@ steps:
 - wait_for:
     selector: '[data-testid="workspace-editor-appearance-settings-dialog"]'
     state: detached
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - assert_text:
     selector: '[data-testid="code-workspace-zoom-reset"]'
     contains: 26px
@@ -208,18 +209,18 @@ verification:
     - 19
     - 21
     - 22
-    - 30
     - 31
     - 32
     - 33
-    - 44
+    - 34
     - 45
     - 46
     - 47
-    - 51
+    - 48
     - 52
     - 53
-    - 59
+    - 54
+    - 60
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -241,77 +242,77 @@ verification:
     - step: 23
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]", "state":
         "detached"}}'
-    - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-zoom-reset\"]", "contains": "26px"}}'
     - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
-        "name": "role", "equals": "status"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-zoom-reset\"]", "contains": "26px"}}'
     - step: 26
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
-        "name": "aria-live", "equals": "polite"}}'
+        "name": "role", "equals": "status"}}'
     - step: 27
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
-        "name": "aria-atomic", "equals": "true"}}'
+        "name": "aria-live", "equals": "polite"}}'
     - step: 28
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
-        "name": "aria-label", "equals": "Clipboard status"}}'
+        "name": "aria-atomic", "equals": "true"}}'
     - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
+        "name": "aria-label", "equals": "Clipboard status"}}'
+    - step: 30
       expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"code-workspace-clipboard-observation\")?.hasAttribute(\"data-outcome\")",
         "expect_truthy": true}}'
-    - step: 34
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-clipboard-revision=\"1\"]"}'
     - step: 35
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
-        "name": "data-operation", "equals": "copy"}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-clipboard-revision=\"1\"]"}'
     - step: 36
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
-        "name": "data-outcome", "equals": "success"}}'
+        "name": "data-operation", "equals": "copy"}}'
     - step: 37
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
-        "name": "data-system-effect", "equals": "performed"}}'
+        "name": "data-outcome", "equals": "success"}}'
     - step: 38
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
-        "name": "data-workspace-fallback", "equals": "false"}}'
+        "name": "data-system-effect", "equals": "performed"}}'
     - step: 39
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
-        "name": "data-caret-count", "equals": "1"}}'
+        "name": "data-workspace-fallback", "equals": "false"}}'
     - step: 40
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
-        "name": "data-history-exclusion", "equals": "recorded"}}'
+        "name": "data-caret-count", "equals": "1"}}'
     - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
+        "name": "data-history-exclusion", "equals": "recorded"}}'
+    - step: 42
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]", "contains":
         "system clipboard effect performed"}}'
-    - step: 42
+    - step: 43
       expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"code-workspace-clipboard-observation\")?.outerHTML.includes(\"in-memory
         virtual local filesystem\")", "expect_truthy": true}}'
-    - step: 43
+    - step: 44
       expectation: '{"eval_readonly": {"expression": "Number(document.getElementById(\"code-workspace-clipboard-observation\")?.getAttribute(\"data-payload-length\"))
         > 0", "expect_truthy": true}}'
-    - step: 48
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-clipboard-revision=\"2\"]"}'
     - step: 49
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"][data-clipboard-revision=\"2\"]"}'
+    - step: 50
       expectation: '{"eval_readonly": {"expression": "Number(document.getElementById(\"code-workspace-clipboard-observation\")?.getAttribute(\"data-caret-count\"))
         >= 2", "expect_truthy": true}}'
-    - step: 50
+    - step: 51
       expectation: '{"eval_readonly": {"expression": "Number(document.getElementById(\"code-workspace-clipboard-observation\")?.getAttribute(\"data-segment-count\"))
         >= 2", "expect_truthy": true}}'
-    - step: 55
+    - step: 56
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-clipboard-observation\"]",
         "name": "data-operation", "equals": "paste"}}'
-    - step: 56
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
-        "role", "equals": "textbox"}}'
     - step: 57
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
-        "aria-multiline", "equals": "true"}}'
+        "role", "equals": "textbox"}}'
     - step: 58
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "aria-multiline", "equals": "true"}}'
+    - step: 59
       expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelectorAll(\".cm-content\")[0]",
         "expect_truthy": true}}'
-    - step: 61
+    - step: 62
       expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelectorAll(\".cm-content\")[0]",
         "expect_truthy": true}}'
     results:
-    - 61
+    - 62
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

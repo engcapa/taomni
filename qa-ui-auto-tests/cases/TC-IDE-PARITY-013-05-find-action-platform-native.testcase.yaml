@@ -57,9 +57,12 @@ steps:
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Alt+F12
 - wait_for:
-    selector: '[data-workspace-focus="terminal"]'
-    timeout_sec: 30
-- click: '[data-workspace-focus="terminal"]'
+    selector: '[data-workspace-focus="terminal"] [data-terminal-ready="true"]'
+    timeout_sec: 60
+- click: '[data-workspace-focus="terminal"] [data-testid="terminal-pane"]'
+- eval_readonly:
+    expression: '!!document.activeElement?.closest("[data-workspace-focus"+String.fromCharCode(61)+"\"terminal\"]")'
+    expect_truthy: true
 - press: Mod+Shift+A
 - wait: 1
 - assert_count:
@@ -88,14 +91,16 @@ verification:
     requirement: A3.2：终端获得焦点时同一组合不打开 Find Action。
     actions:
     - 19
-    - 22
+    - 23
     checkpoints:
     - step: 20
-      expectation: '{"wait_for": {"selector": "[data-workspace-focus=\"terminal\"]", "timeout_sec": 30}}'
-    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-workspace-focus=\"terminal\"] [data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 22
+      expectation: '{"eval_readonly": {"expression": "!!document.activeElement?.closest(\"[data-workspace-focus\"+String.fromCharCode(61)+\"\\\"terminal\\\"]\")", "expect_truthy": true}}'
+    - step: 25
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "equal": 0}}'
     results:
-    - 24
+    - 25
   visual:
   - check: 不声明视觉结论。
     method: not-applicable

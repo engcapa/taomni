@@ -64,7 +64,7 @@ steps:
       column: 20
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 13, Col 21
+    contains: '13:21'
     timeout_sec: 10
 - type: ' '
 - wait: 10
@@ -99,7 +99,7 @@ steps:
       column: 21
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 13, Col 22
+    contains: '13:22'
     timeout_sec: 10
 - press: Backspace
 - press: Control+s
@@ -117,7 +117,7 @@ steps:
       column: 13
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 9, Col 14
+    contains: '9:14'
     timeout_sec: 10
 - wait: 2
 - native_keys:
@@ -220,8 +220,7 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
         "Java", "timeout_sec": 60}}'
     - step: 13
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        13, Col 21", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"13:21\", \"timeout_sec\": 10}}"
     - step: 17
       expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "timeout_sec": 30}}'
     - step: 20
@@ -233,14 +232,12 @@ verification:
     - step: 22
       expectation: '{"assert_not_visible": "[data-testid=\"text-input-dialog\"]"}'
     - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        13, Col 22", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"13:22\", \"timeout_sec\": 10}}"
     - step: 27
       expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java",
         "equals": "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a", "timeout_sec": 30}}'
     - step: 29
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        9, Col 14", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"9:14\", \"timeout_sec\": 10}}"
     - step: 32
       expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "timeout_sec": 30}}'
     - step: 33

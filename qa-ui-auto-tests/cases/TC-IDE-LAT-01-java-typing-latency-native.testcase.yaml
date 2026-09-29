@@ -81,7 +81,7 @@ steps:
     - Mod+End
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 55, Col 1
+    contains: '55:1'
     timeout_sec: 10
 - native_editor_performance:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
@@ -103,7 +103,7 @@ steps:
     label: java-jdt-group2
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 55, Col 125
+    contains: '55:125'
     timeout_sec: 10
 - eval_readonly:
     expression: (document.querySelector('.cm-content')?.textContent ?? '').includes('ABCDEFGHIJKLMNOPQRSTUVWXabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN')
@@ -122,7 +122,7 @@ steps:
 - wait: 0.5
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 55, Col 121
+    contains: '55:121'
     timeout_sec: 10
 - screenshot: tc-ide-lat-01-java-typing.png
 verification:
@@ -154,8 +154,7 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
         "Java", "timeout_sec": 60}}'
     - step: 15
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        55, Col 1", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"55:1\", \"timeout_sec\": 10}}"
     - step: 16
       expectation: '{"native_editor_performance": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content",
         "keys": "ABCDEFGHIJKLMNOPQRSTUVWX", "capture_text": false, "max_p95_ms": 150, "label": "java-jdt-warmup"}}'
@@ -168,16 +167,14 @@ verification:
         "keys": "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN", "capture_text": false, "max_p95_ms": 150,
         "label": "java-jdt-group2"}}'
     - step: 19
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        55, Col 125", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"55:125\", \"timeout_sec\": 10}}"
     - step: 20
       expectation: '{"eval_readonly": {"expression": "(document.querySelector(''.cm-content'')?.textContent ?? '''').includes(''ABCDEFGHIJKLMNOPQRSTUVWXabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN'')",
         "expect_truthy": true}}'
     - step: 21
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lightbulb\"]", "timeout_sec": 60}}'
     - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        55, Col 121", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"55:121\", \"timeout_sec\": 10}}"
     results:
     - 24
   visual:

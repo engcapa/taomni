@@ -74,7 +74,7 @@ steps:
 - wait: 0.5
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 11,
+    contains: '11:'
     timeout_sec: 10
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
@@ -92,7 +92,7 @@ steps:
 - wait: 0.5
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 21,
+    contains: '21:'
     timeout_sec: 10
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
@@ -109,7 +109,7 @@ steps:
     - End
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 30, Col 22
+    contains: '30:22'
     timeout_sec: 10
 - press: Alt+/
 - wait_for:
@@ -167,7 +167,7 @@ steps:
 - wait: 0.5
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 11,
+    contains: '11:'
     timeout_sec: 10
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
@@ -185,7 +185,7 @@ steps:
 - wait: 0.5
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 21,
+    contains: '21:'
     timeout_sec: 10
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
@@ -199,7 +199,7 @@ steps:
     - End
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 27, Col 38
+    contains: '27:38'
     timeout_sec: 10
 - press: Alt+/
 - wait_for:
@@ -281,14 +281,11 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
         "Java", "timeout_sec": 60}}'
     - step: 15
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        11,", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"11:\", \"timeout_sec\": 10}}"
     - step: 18
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        21,", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"21:\", \"timeout_sec\": 10}}"
     - step: 20
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        30, Col 22", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"30:22\", \"timeout_sec\": 10}}"
     - step: 22
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 90}}'
     - step: 23
@@ -312,14 +309,11 @@ verification:
       expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java",
         "equals": "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59", "timeout_sec": 30}}'
     - step: 39
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        11,", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"11:\", \"timeout_sec\": 10}}"
     - step: 42
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        21,", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"21:\", \"timeout_sec\": 10}}"
     - step: 44
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        27, Col 38", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"27:38\", \"timeout_sec\": 10}}"
     - step: 46
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 90}}'
     - step: 47

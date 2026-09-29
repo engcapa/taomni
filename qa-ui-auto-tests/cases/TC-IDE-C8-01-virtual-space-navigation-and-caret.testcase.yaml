@@ -65,6 +65,7 @@ steps:
 - wait_for:
     selector: '[data-testid="workspace-editor-appearance-settings-dialog"]'
     state: detached
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - assert_text:
     selector: '[data-testid="code-workspace-zoom-reset"]'
     contains: 26px
@@ -172,7 +173,9 @@ steps:
     expression: document.querySelector(".cm-content:focus")?.matches(".cm-content")
     expect_truthy: true
 - screenshot: tc-ide-c8-virtual-space-behavior.png
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - click: '[data-testid="code-workspace-zoom-reset"]'
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - assert_text:
     selector: '[data-testid="code-workspace-zoom-reset"]'
     contains: 13px
@@ -198,8 +201,7 @@ verification:
     - 22
     - 23
     - 24
-    - 27
-    - 32
+    - 28
     - 33
     - 34
     - 35
@@ -207,8 +209,8 @@ verification:
     - 37
     - 38
     - 39
-    - 43
-    - 47
+    - 40
+    - 44
     - 48
     - 49
     - 50
@@ -217,10 +219,10 @@ verification:
     - 53
     - 54
     - 55
-    - 57
-    - 59
-    - 61
-    - 63
+    - 56
+    - 58
+    - 60
+    - 62
     - 64
     - 65
     - 66
@@ -228,10 +230,11 @@ verification:
     - 68
     - 69
     - 70
-    - 74
+    - 71
     - 75
     - 76
-    - 80
+    - 77
+    - 82
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -253,69 +256,69 @@ verification:
     - step: 25
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]", "state":
         "detached"}}'
-    - step: 26
+    - step: 27
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-zoom-reset\"]", "contains": "26px"}}'
-    - step: 29
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
-        "role", "equals": "textbox"}}'
     - step: 30
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
-        "aria-multiline", "equals": "true"}}'
+        "role", "equals": "textbox"}}'
     - step: 31
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "aria-multiline", "equals": "true"}}'
+    - step: 32
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'
-    - step: 40
+    - step: 41
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
         \"prefixX\"", "expect_truthy": true}}'
-    - step: 41
+    - step: 42
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[1]?.textContent ===
         \"X      Z\"", "expect_truthy": true}}'
-    - step: 42
+    - step: 43
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[2]?.textContent ===
         \"lZongprefixXZ\"", "expect_truthy": true}}'
-    - step: 44
+    - step: 45
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
         \"prefixX\"", "expect_truthy": true}}'
-    - step: 45
+    - step: 46
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[1]?.textContent ===
         \"X\"", "expect_truthy": true}}'
-    - step: 46
+    - step: 47
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[2]?.textContent ===
         \"longprefixX\"", "expect_truthy": true}}'
-    - step: 56
+    - step: 57
       expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
         document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
         "contains": "[\"prefixX W\",\"X W\",\"longprefixX W\"]"}}'
-    - step: 58
+    - step: 59
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
         \"prefixX\" && document.querySelectorAll(\".cm-line\")[1]?.textContent === \"X\" && document.querySelectorAll(\".cm-line\")[2]?.textContent
         === \"longprefixX\"", "expect_truthy": true}}'
-    - step: 60
+    - step: 61
       expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
         document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
         "contains": "[\"prefixX V\",\"X V\",\"longprefixX V\"]"}}'
-    - step: 62
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
-        \"prefixX\"", "expect_truthy": true}}'
-    - step: 71
+    - step: 63
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
         \"prefixX\"", "expect_truthy": true}}'
     - step: 72
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
+        \"prefixX\"", "expect_truthy": true}}'
+    - step: 73
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[1]?.textContent ===
         \"QX\"", "expect_truthy": true}}'
-    - step: 73
+    - step: 74
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[2]?.textContent ===
         \"longprefixX\"", "expect_truthy": true}}'
-    - step: 77
+    - step: 78
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
         \"你prefixX\" && document.querySelectorAll(\".cm-line\")[1]?.textContent === \"X\"", "expect_truthy": true}}'
-    - step: 78
+    - step: 79
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'
-    - step: 81
+    - step: 84
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-zoom-reset\"]", "contains": "13px"}}'
     results:
-    - 81
+    - 84
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

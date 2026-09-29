@@ -73,7 +73,7 @@ steps:
       column: 20
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 13, Col 21
+    contains: '13:21'
     timeout_sec: 10
 - wait: 2
 - native_keys:
@@ -262,8 +262,7 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
         "Java", "timeout_sec": 60}}'
     - step: 14
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        13, Col 21", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"13:21\", \"timeout_sec\": 10}}"
     - step: 17
       expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "timeout_sec": 30}}'
     - step: 20

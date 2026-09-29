@@ -124,6 +124,14 @@ export function QuickPickOverlay<T>({
     <div
       data-testid={testId}
       className="absolute inset-0 z-40 flex justify-center bg-black/30 pt-14"
+      onKeyDown={(event) => {
+        // Esc closes even before the deferred input focus lands (or after a
+        // click moved focus onto a result row).
+        if (event.key === "Escape" && event.target !== inputRef.current) {
+          event.preventDefault();
+          onClose();
+        }
+      }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

@@ -1,0 +1,115 @@
+id: TC-IDE-PARITY-010-04-tool-windows-native
+title: Native tool window rail keeps the terminal session across hide/show
+description: 'ED-PARITY-010 A2/A3 native case: in the isolated QA app the Terminal rail button opens a real PTY; hiding the tool window with — and reopening it keeps the session output; Alt+1 toggles Project through the packaged WebView.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-010
+- native-gate
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- workspace_root
+timeout_sec: 600
+native_platforms:
+- Linux
+- macOS
+- Windows
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-ed010","name":"qa-ed010","roots":[{"id":"qa-ed010","name":"qa-ed010","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-ed010","path":"notes.txt"},"lastOpenedAt":1756500000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-bottom-tab-terminal"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+    text: echo QA_ED010_MARK
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_ED010_MARK\r?$
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-tool-window-hide"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-bottom-tab-terminal"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    timeout_sec: 10
+- assert_pattern:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_ED010_MARK\r?$
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    name: aria-pressed
+    equals: 'false'
+- press: Alt+1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    name: aria-pressed
+    equals: 'true'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A2/A3：rail 打开真实终端并输出；— 隐藏后再从 rail 打开，输出仍在。
+    actions:
+    - 10
+    - 12
+    - 14
+    - 16
+    checkpoints:
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 13
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED010_MARK\\r?$", "timeout_sec": 30}}'
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
+    - step: 18
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED010_MARK\\r?$", "timeout_sec": 10}}'
+    results:
+    - 13
+    - 15
+    - 18
+  - id: R2
+    requirement: A2：Alt+1 在打包 WebView 中切换 Project 工具窗。
+    actions:
+    - 20
+    checkpoints:
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "false"}}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+    results:
+    - 21
+    - 23
+  visual:
+  - check: 不声明视觉结论。
+    method: not-applicable
+    reason: native 只证明会话与派发。
+  native:
+  - check: Windows/Linux W3C 键盘、macOS WKWebView bridge；OS 级快捷键冲突未证明。
+    method: automated
+    reason: native runner 驱动打包 WebView。

@@ -69,7 +69,7 @@ steps:
 - click: '[data-editor-group-id="primary"] [data-testid="code-workspace-editor-tab-strip"]'
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 41, Col 1
+    contains: '41:1'
     timeout_sec: 30
 - eval_readonly:
     expression: document.querySelectorAll(".cm-scroller")[0].scrollTop > 0
@@ -81,7 +81,7 @@ steps:
 - click: '[data-editor-group-id="secondary"] [data-testid="code-workspace-editor-tab-strip"]'
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 6, Col 1
+    contains: '6:1'
     timeout_sec: 30
 - eval_readonly:
     expression: document.querySelectorAll(".cm-editor")[1].querySelectorAll(".cm-foldPlaceholder").length === 0
@@ -124,8 +124,7 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-editor\").length === 2", "expect_truthy":
         true}}'
     - step: 13
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        41, Col 1", "timeout_sec": 30}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"41:1\", \"timeout_sec\": 30}}"
     - step: 14
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-scroller\")[0].scrollTop >
         0", "expect_truthy": true}}'
@@ -133,8 +132,7 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-editor\")[0].querySelectorAll(\".cm-foldPlaceholder\").length
         >= 1", "expect_truthy": true}}'
     - step: 18
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        6, Col 1", "timeout_sec": 30}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"6:1\", \"timeout_sec\": 30}}"
     - step: 19
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-editor\")[1].querySelectorAll(\".cm-foldPlaceholder\").length
         === 0", "expect_truthy": true}}'

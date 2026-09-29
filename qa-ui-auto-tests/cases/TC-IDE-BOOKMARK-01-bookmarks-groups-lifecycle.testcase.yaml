@@ -151,6 +151,7 @@ steps:
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
     contains: Jumped to bookmark [J]
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - assert_enabled: '[data-testid="code-workspace-nav-back"]'
 - click: '[data-testid="code-workspace-nav-back"]'
 - click: '[data-testid="code-workspace-tree-file"]'
@@ -225,13 +226,13 @@ verification:
     - 57
     - 58
     - 59
-    - 62
     - 63
     - 64
-    - 66
-    - 70
-    - 72
+    - 65
+    - 67
+    - 71
     - 73
+    - 74
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -285,33 +286,33 @@ verification:
     - step: 60
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Jumped to
         bookmark [J]"}}'
-    - step: 61
+    - step: 62
       expectation: '{"assert_enabled": "[data-testid=\"code-workspace-nav-back\"]"}'
-    - step: 65
+    - step: 66
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 67
+    - step: 68
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]",
         "timeout_sec": 15}}'
-    - step: 68
+    - step: 69
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-bookmark-missing\"]", "contains":
         "Missing target"}}'
-    - step: 69
+    - step: 70
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]",
         "equal": 2}}'
-    - step: 71
+    - step: 72
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
-    - step: 74
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.txt\"]"}'
     - step: 75
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.txt\"]"}'
+    - step: 76
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"current\"]",
         "timeout_sec": 15}}'
-    - step: 76
+    - step: 77
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bookmark-item\"][data-state=\"missing\"]",
         "equal": 0}}'
     results:
-    - 74
     - 75
     - 76
+    - 77
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
