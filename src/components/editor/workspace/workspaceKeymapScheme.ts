@@ -324,8 +324,8 @@ export const KEYMAP_DEFAULTS_REVISION_KEY = `${KEYMAP_SCHEME_STORAGE_PREFIX}:def
 
 /**
  * Decide once per profile whether to tell the user that default bindings
- * changed. Only a profile that already used Code Workspace (any stored
- * `taomni.codeWorkspace.*` key) and has not seen this revision is notified;
+ * changed. Only a profile that already used Code Workspace (a saved editor
+ * layout or keymap) and has not seen this revision is notified;
  * a fresh profile records the revision silently. Storage failures never notify.
  */
 let migrationNoticeDecision: boolean | null = null;
@@ -356,7 +356,13 @@ function decideKeymapDefaultsMigrationNotice(): boolean {
     let priorWorkspaceData = false;
     for (let index = 0; index < storage.length; index += 1) {
       const name = storage.key(index);
-      if (name && name.startsWith("taomni.codeWorkspace.") && name !== KEYMAP_DEFAULTS_REVISION_KEY) {
+      // Only traces a real Code Workspace session leaves behind count: a saved
+      // editor layout or a stored keymap. Settings seeded by installers or QA
+      // (JDK paths, language servers) do not imply F12 muscle memory.
+      if (!name) continue;
+      const storedKeymap = (name === KEYMAP_SCHEMES_INDEX_KEY && (storage.getItem(name) ?? "[]") !== "[]")
+        || (name === KEYMAP_ACTIVE_SCHEME_KEY && !!storage.getItem(name));
+      if (name.startsWith("taomni.codeWorkspace.layout.v2.") || storedKeymap) {
         priorWorkspaceData = true;
         break;
       }

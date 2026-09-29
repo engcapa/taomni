@@ -138,9 +138,9 @@ steps:
 - press: Enter
 - assert_enabled: '[data-testid="keymap-settings-apply"]'
 - click: '[data-testid="keymap-scheme-reset"]'
-- assert_text:
-    selector: '[data-testid="keymap-replace-editor.replace-0"]'
-    contains: Ctrl+R
+- assert_pattern:
+    selector: '[data-testid="keymap-row-editor.replace"]'
+    regex: Ctrl[+]R
 - click: '[data-testid="keymap-settings-apply"]'
 - click: '[data-testid="keymap-settings-close"]'
 - wait_for:
@@ -171,9 +171,9 @@ steps:
     selector: '[data-testid="keymap-action-filter"]'
     value: Replace in File
 - wait_for: '[data-testid="keymap-row-editor.replace"]'
-- assert_text:
-    selector: '[data-testid="keymap-replace-editor.replace-0"]'
-    contains: Ctrl+R
+- assert_pattern:
+    selector: '[data-testid="keymap-row-editor.replace"]'
+    regex: ^(?!.*(?:Alt|Option)[+]Shift[+]R).*Ctrl[+]R
 - click: '[data-testid="keymap-scheme-delete"]'
 - assert_attribute:
     selector: '[data-testid="keymap-scheme-select"]'
@@ -192,8 +192,8 @@ steps:
 - press: Enter
 - click: '[data-testid="keymap-settings-apply"]'
 - assert_pattern:
-    selector: '[data-testid="keymap-replace-editor.replace-1"]'
-    regex: '(Alt|Option)[+]Shift[+]R'
+    selector: '[data-testid="keymap-row-editor.replace"]'
+    regex: (Alt|Option)[+]Shift[+]R
 - click: '[data-testid="keymap-settings-close"]'
 - wait_for:
     selector: '[data-testid="workspace-keymap-settings-dialog"]'
@@ -255,11 +255,11 @@ verification:
     actions: [74, 76, 97]
     checkpoints:
     - step: 75
-      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Ctrl+R\"}}"
+      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.replace\\\"]\", \"regex\": \"Ctrl[+]R\"}}"
     - step: 81
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
     - step: 96
-      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"contains\": \"Ctrl+R\"}}"
+      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.replace\\\"]\", \"regex\": \"^(?!.*(?:Alt|Option)[+]Shift[+]R).*Ctrl[+]R\"}}"
     - step: 98
       expectation: "{\"assert_attribute\": {\"selector\": \"[data-testid=\\\"keymap-scheme-select\\\"]\", \"name\": \"value\", \"equals\": \"\"}}"
     - step: 99
@@ -270,7 +270,7 @@ verification:
     actions: [104]
     checkpoints:
     - step: 107
-      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-1\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
+      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.replace\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
     - step: 112
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
     results: [107, 112]

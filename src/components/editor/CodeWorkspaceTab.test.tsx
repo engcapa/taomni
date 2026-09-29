@@ -14743,7 +14743,14 @@ end_of_record
     it("DEC-013-06: migration notice shows once for a profile with prior workspace data", async () => {
       resetKeymapDefaultsMigrationNoticeForTests();
       window.localStorage.removeItem("taomni.codeWorkspace.keymap.v3:defaults-revision");
-      window.localStorage.setItem("taomni.codeWorkspace.treeFontSize.v1", "12");
+      // Seeded settings alone (e.g. a JDK path) are not prior workspace use.
+      window.localStorage.setItem("taomni.codeWorkspace.lspJavaHome.v1", "/jdk");
+      await mountJava();
+      expect(screen.queryByTestId("keymap-migration-notice")).not.toBeInTheDocument();
+      cleanup();
+      resetKeymapDefaultsMigrationNoticeForTests();
+      window.localStorage.removeItem("taomni.codeWorkspace.keymap.v3:defaults-revision");
+      window.localStorage.setItem("taomni.codeWorkspace.layout.v2.previous-session", "{}");
       await mountJava();
       const notice = await screen.findByTestId("keymap-migration-notice");
       expect(notice).toHaveTextContent("Taomni Classic");

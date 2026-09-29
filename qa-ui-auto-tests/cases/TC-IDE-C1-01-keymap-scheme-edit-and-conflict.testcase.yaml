@@ -76,8 +76,8 @@ steps:
 - press: Enter
 - assert_visible: '[data-testid="keymap-replace-editor.replace-1"]'
 - assert_pattern:
-    selector: '[data-testid="keymap-replace-editor.replace-1"]'
-    regex: '(Alt|Option)[+]Shift[+]R'
+    selector: '[data-testid="keymap-row-editor.replace"]'
+    regex: (Alt|Option)[+]Shift[+]R
 - screenshot: tc-ide-c1-recorded.png
 - click: '[data-testid="keymap-settings-apply"]'
 - assert_disabled: '[data-testid="keymap-settings-apply"]'
@@ -153,8 +153,7 @@ verification:
     - step: 35
       expectation: '{"assert_visible": "[data-testid=\"keymap-replace-editor.replace-0\"]"}'
     - step: 36
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"keymap-replace-editor.replace-1\"]", "regex":
-        "(Alt|Option)[+]Shift[+]R"}}'
+      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.replace\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
     - step: 39
       expectation: '{"assert_disabled": "[data-testid=\"keymap-settings-apply\"]"}'
     - step: 41

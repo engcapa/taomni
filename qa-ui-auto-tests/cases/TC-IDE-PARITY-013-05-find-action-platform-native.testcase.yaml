@@ -40,10 +40,9 @@ steps:
 - wait_for:
     selector: '[data-testid="code-workspace-search-everywhere"]'
     timeout_sec: 30
-- assert_attribute:
-    selector: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
-    name: aria-selected
-    equals: 'true'
+- assert_text:
+    selector: '[data-testid="code-workspace-search-everywhere"] button[role="tab"][aria-selected="true"]'
+    contains: Actions
 - type:
     selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
     text: zzq013
@@ -79,7 +78,7 @@ verification:
     - step: 12
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 30}}'
     - step: 13
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] >> role=tab[name=\"Actions\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] button[role=\"tab\"][aria-selected=\"true\"]", "contains": "Actions"}}'
     - step: 15
       expectation: '{"eval_readonly": {"expression": "!document.querySelector(\".cm-content\").innerText.includes(\"zzq013\")", "expect_truthy": true}}'
     results:
