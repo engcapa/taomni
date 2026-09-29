@@ -6,19 +6,25 @@
 
 ## 规划规则
 
-- 所有新卡当前为 `deferred`，并标记 `p0.planning_required=true`；P1 完成 DEC/AC/V、参照和测试用例后才可转 `ready`。
+- 新卡初始为 `deferred`、`p0.planning_required=true`；完成 P1 合同后才可转 `ready`。010 已完成 P1，其余卡按各自 metadata 判断。
 - 一张卡只处理一个可演示用户结果，必须分别写清功能、交互、快捷键、视觉和保留行为。
 - `different`、`unverified` 和“入口存在”都不是匹配通过。没有真实双侧观察的维度保持未验证。
 - 当前 IDEA 参照为 Ultimate 2026.2.2 / IU-262.10315.125，窗口 1400×1000，Linux X11，深色主题；其他平台和设置组合单独记录。
 
+## 本批次交付门禁
+
+行为卡负责全部 owned paths 的 scoped typecheck、AC 与当前端必要证据；本批次 repo-wide frontend build/integration 由 ED-PARITY-019 收口，其 P1 须将该 gate 落入完整验收。010 的 native 构建仍需绑定当前源码，不能用集成归属豁免自身运行验证。
+
 ## 本批次任务
 
 ### ED-PARITY-010 Code Workspace 壳层与工具窗口布局对齐
-<!-- ide-task {"id":"ED-PARITY-010","status":"deferred","priority":"P0","size":"L","depends_on":[],"spec":"docs-feature/code-workspace-idea-alignment/alignment-design.md#ed-parity-010","acceptance":["ED-PARITY-010-A1","ED-PARITY-010-A2","ED-PARITY-010-A3","ED-PARITY-010-A4"],"required_evidence":["code-audit","browser","native","accessibility","idea-comparison"],"audit":{"date":"2026-09-29","head":"06ef13d0","finding":"实机对比显示 IDEA 的左右工具栏、编辑器标签、底部工具窗和状态层级与 Taomni 当前壳层不同；旧 shell 设计未形成当前三维 matched 证据。 2026-09-29 控件级复核：见 references/idea-control-audit-20260929.md；左右 tool rail、Alt+数字/Shift+Esc、空编辑器提示和状态栏导航栏与 IDEA 不同。"},"prior_completion":{"kind":"new-task","completed":false},"p0":{"audit_id":"LIVE-IDEA-20260928","requirements":["REQ-03","REQ-04","REQ-10"],"scenarios":["CW-SHELL-001","CW-SHELL-003","CW-SET-001"],"planning_required":true},"updated_at":"2026-09-29T09:00:00Z"} -->
+<!-- ide-task {"id":"ED-PARITY-010","status":"ready","priority":"P0","size":"L","depends_on":[],"spec":"docs-feature/code-workspace-idea-alignment/shell-layout-010-plan.md#ed-parity-010","acceptance":["ED-PARITY-010-A1","ED-PARITY-010-A2","ED-PARITY-010-A3","ED-PARITY-010-A4"],"required_evidence":["code-audit","unit","typecheck","browser","native","accessibility","idea-comparison"],"audit":{"date":"2026-09-29","head":"6763642b575f05295ceaca52d947006734e14dba","finding":"P1 已核对当前 caller/store/共享消费者；产品源码相对 06ef13d0 无变更。已补 IDEA Esc/Shift+Esc/Hide All/Last Tool 实机参照，DEC/AC/TASK/V、fixture 和测试合同见 shell-layout-010-plan.md；仅规划就绪，产品与三端证据未执行。"},"prior_completion":{"kind":"new-task","completed":false},"p0":{"audit_id":"LIVE-IDEA-20260928","requirements":["REQ-03","REQ-04","REQ-10"],"scenarios":["CW-SHELL-001","CW-SHELL-003","CW-SET-001"],"planning_required":false},"updated_at":"2026-09-29T12:44:17Z"} -->
 
 目标：按 IDEA 的空间层级重组 Project、editor、左右 tool rail、bottom tool windows、toolbar 和 status，不丢失现有 workspace、工具数据、dirty 状态和 editor leaf。
 
-参照：[总体设计](alignment-design.md#ed-parity-010) / [控件级复核 §1](references/idea-control-audit-20260929.md#shell)。
+P1 已完成，下一步为 P2 领取实现；本次没有产品 claim/owner。
+
+合同：[010 独立设计](shell-layout-010-plan.md#ed-parity-010) / [完整测试用例](shell-layout-010-plan.md#test-cases) / [IDEA 补采](references/idea-shell-010-20260929.md)。总体范围仍见 [总体设计](alignment-design.md#ed-parity-010)。
 
 ### ED-PARITY-011 编辑器表面、标签、面包屑与状态提示对齐
 <!-- ide-task {"id":"ED-PARITY-011","status":"deferred","priority":"P0","size":"M","depends_on":["ED-PARITY-010"],"spec":"docs-feature/code-workspace-idea-alignment/alignment-design.md#ed-parity-011","acceptance":["ED-PARITY-011-A1","ED-PARITY-011-A2","ED-PARITY-011-A3","ED-PARITY-011-A4"],"required_evidence":["code-audit","unit","browser","native","idea-comparison"],"audit":{"date":"2026-09-29","head":"06ef13d0","finding":"实机对比显示 IDEA 的 editor tab、breadcrumb、问题提示、代码区边界和滚动标记与 Taomni 当前 editor surface 信息密度不同。 2026-09-29 控件级复核：见 references/idea-control-audit-20260929.md；编辑区顶部两条常驻条、Go to File 打开 preview tab、无默认折叠、选区 AI 工具条遮挡代码。"},"prior_completion":{"kind":"new-task","completed":false},"p0":{"audit_id":"LIVE-IDEA-20260928","requirements":["REQ-03","REQ-04","REQ-11"],"scenarios":["CW-TAB-001","CW-TAB-002","CW-EDIT-005"],"planning_required":true},"updated_at":"2026-09-29T09:00:00Z"} -->

@@ -3,7 +3,7 @@
 ## 1. 设计摘要与范围
 
 - 类型：现有能力扩展与编辑器体验重构。
-- 设计状态：部分可实施；13 张任务卡仍需 P1 为每张卡补齐独立 DEC/AC/V 和可执行用例。
+- 设计状态：部分可实施；010 已有独立 P1 合同并可进入 P2；其余任务卡仍需 P1 补齐独立 DEC/AC/V 和用例计划。
 - 来源：2026-09-28 本机 IDEA 实机对比；2026-09-29 [控件级复核](references/idea-control-audit-20260929.md)（50 个 IDEA 状态 + 同 fixture Taomni browser 状态）；旧 `docs-feature/code-workspace-idea-parity` 总评估与 backlog。
 - 基线：Taomni HEAD `06ef13d0`（2026-09-29 复核；首轮为 `ade7da19`）；IDEA Ultimate 2026.2.2 / IU-262.10315.125，XWin keymap；Linux X11，IDEA 窗口 1400×1000，深色 UI + 浅色编辑器配色；Taomni browser preview 1400×900，浅色主题。
 - 平台：Windows、macOS、Linux Tauri 2 桌面应用。浏览器只证明 renderer 分支；IPC、磁盘、JDT LS、系统快捷键、窗口、IME 和打包 WebView 必须有 native 证据。
@@ -77,18 +77,11 @@
 <a id="ed-parity-010"></a>
 ### ED-PARITY-010
 
-- 交付：workspace chrome 与 IDEA profile 的布局和工具窗状态。
-- 主要文件：`MainLayout.tsx`、`CodeWorkspaceTab.tsx`、`BottomDock.tsx`、`codeWorkspaceStore.ts`、`workspaceLayoutPersistence.ts`、`toolWindowRegistry.ts`、相关 CSS/token。
-- 必须保留：editor leaf、dirty、工具数据、workspace owner、旧布局读取和恢复。
-- 依赖：当前有效 shell 设计；与 011 集成。
-- 2026-09-29 复核细化（[参照](references/idea-control-audit-20260929.md#shell)）：
-  - 增加 workspace 左/右 tool rail（图标 + 截断标签，选中蓝底），至少承载 Project、Commit、Structure、Terminal、Problems、Git；底部 dock 从“9 个文本 tab”改为工具窗模型，允许侧窗与底窗同时打开。
-  - 工具窗头部统一为 标题 + 子标签 + `⋮` + `—`；`Alt+数字` 再按隐藏；新增 `Shift+Esc` 隐藏当前工具窗、`Ctrl+Shift+F12` 隐藏全部。
-  - 空编辑器改为 IDEA 式快捷提示列表（显示当前 keymap 的真实绑定）。
-  - workspace 头部工具栏降到 IDEA 主工具栏的信息分组：项目/根、VCS 分支、运行配置 + Run/Debug、搜索、设置；缩放/换行/列选择/inlay/blame/tab policy 移入 `⋮` 或 View 菜单，SDK/Facts 状态移入状态栏 widget。
-  - 编辑器状态栏段与应用状态栏分离：左侧导航栏（路径 + 类/方法），右侧 `行:列 (N chars)`、换行符、编码、缩进、只读锁；禁止截断成 `Spaces: 2 (Aut`。
-- 完成条件：A1–A4、browser/native/accessibility/IDEA comparison 证据齐全，当前端真机完成，其他端明确未验证。
-- 验收：`ED-PARITY-010-A1`、`ED-PARITY-010-A2`、`ED-PARITY-010-A3`、`ED-PARITY-010-A4`。
+详细实施合同已细化至 [shell-layout-010-plan.md](shell-layout-010-plan.md#ed-parity-010)，包括 [完整测试用例](shell-layout-010-plan.md#test-cases)、DEC-010-01..07、A1..A4、T1..T6、V0..V7，以及 [IDEA 工具窗补采](references/idea-shell-010-20260929.md)。010 状态仅为 P1 ready，产品尚未实现。
+
+关键细化：工具可见但失焦时按绑定先聚焦，再按才隐藏；Esc 返回 editor 保持工具可见，Shift+Esc 隐藏当前工具，Ctrl+Shift+F12 保存/恢复之前组合，Restore Default 单独保留。010 接入现有 Commit/Log 的真实 owner，018 接续内容对齐；010 提供 toolbar/status/navigation 容器，011 接续 editor 内部表面。主文件责任与保留行为以独立合同为准。
+
+验收保留 `ED-PARITY-010-A1`、`ED-PARITY-010-A2`、`ED-PARITY-010-A3`、`ED-PARITY-010-A4`；required evidence 增补 unit/typecheck，与新状态/迁移工作一致。
 
 <a id="ed-parity-011"></a>
 ### ED-PARITY-011

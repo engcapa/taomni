@@ -20,4 +20,4 @@
 
 2026-09-29 复核另确认 6 个源码级缺陷（弹层 Esc 焦点落 `BODY`、`Ctrl+Shift+A` 未注册且输入落入编辑器、`F12` 默认值冲突、Search Everywhere 结果与查询无关、Problems 空态误导、无 provider 时单词补全冒充成员补全），已写入对应卡的首个切片。
 
-本批次尚未实施产品改动，也没有任务可以直接宣称 `ready` 或 `done`。当前 IDEA 证据只覆盖 Linux 本机窗口与隔离 Java 工程；Windows/macOS 真机、不同 DPI、真实 JDT LS 就绪状态和完整 IDEA Keymap 仍须在对应任务中分别验证。
+本批次尚未实施产品改动，010 已完成 [P1 独立设计](shell-layout-010-plan.md) 并转 `ready`，其他卡仍待规划；没有本批次产品 `done` 结论。当前 IDEA 证据只覆盖 Linux 本机窗口与隔离 Java 工程；Windows/macOS 真机、不同 DPI、真实 JDT LS 就绪状态和完整 IDEA Keymap 仍须在对应任务中分别验证。
