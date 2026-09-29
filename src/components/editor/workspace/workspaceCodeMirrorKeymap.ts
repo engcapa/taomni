@@ -920,6 +920,7 @@ export function disabledReasonLabel(reason: ActionDisabledReason | undefined): s
     case "providerOffline": return "Language server offline";
     case "conflict": return "Binding conflict";
     case "busy": return "Already running";
+    case "loading": return "File is still loading";
     case "unsupported": return "Not supported yet";
     default: return null;
   }

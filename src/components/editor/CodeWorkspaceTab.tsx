@@ -15092,17 +15092,30 @@ export function CodeWorkspaceTab({
       keybinding: "Ctrl+B",
       keybindings: ["Meta+B"],
       keywords: ["declaration", "jump", "navigate"],
-      when: (context) => {
+      // ED-PARITY-013: Ctrl+B is the navigation key now, so a blocked press
+      // must name the real reason (loading / provider not ready) instead of
+      // the generic "No selection" fallback.
+      getState: (context) => {
         const target = resolveEditorTarget(context);
-        if (context.focus === "tree" || !target.file || target.file.loading) return false;
-        const capabilities = lspFilesRef.current[target.file.key]?.status?.capabilities;
-        const languageId = lspFilesRef.current[target.file.key]?.status?.languageId
-          ?? target.file.languagePath;
+        const state = (availability: "available" | "disabled", disabledReason?: string) => ({
+          availability,
+          ...(disabledReason ? { disabledReason } : {}),
+          source: "provider" as const,
+          scope: "editor" as const,
+          freshness: "current" as const,
+          completeness: "complete" as const,
+        });
+        if (context.focus === "tree" || !target.file) return state("disabled", "noEditor");
+        if (target.file.loading) return state("disabled", "loading");
+        const status = lspFilesRef.current[target.file.key]?.status;
+        const capabilities = status?.capabilities;
+        const languageId = status?.languageId ?? target.file.languagePath;
         const isEquivalent = isDeclarationDefinitionEquivalentLanguage(languageId, target.file.path);
-        if (!capabilities) return true;
-        return isEquivalent
+        const supported = !capabilities || (isEquivalent
           ? capabilities.definition !== false
-          : (capabilities.declaration !== false || capabilities.definition !== false);
+          : (capabilities.declaration !== false || capabilities.definition !== false));
+        if (supported) return state("available");
+        return state("disabled", status?.active ? "unsupported" : "providerOffline");
       },
       run: (context) => {
         const target = resolveEditorTarget(context);
@@ -16179,6 +16192,7 @@ export function CodeWorkspaceTab({
     };
   }, [toolbarMoreOpen]);
   const workspaceWidgetHost = useCodeWorkspaceStatusStore((s) => s.widgetHost);
+  const statusNavigationHost = useCodeWorkspaceStatusStore((s) => s.navigationHost);
   /** Action to record a shortcut for when the dialog opens (Assign Shortcut). */
   const [keymapAssignActionId, setKeymapAssignActionId] = useState<string | null>(null);
   const keymapCorruptDiagnostic = keymapStore.recoveredFromCorrupt
@@ -16217,6 +16231,12 @@ export function CodeWorkspaceTab({
       onSelect: openGitManager,
     },
   ];
+  // ED-PARITY-011 DEC-011-05: tab names of files with error diagnostics.
+  const filesWithErrors = useMemo(() => new Set(
+    Object.entries(lspFiles)
+      .filter(([, state]) => state?.diagnostics?.some((diagnostic) => diagnostic.severity === 1))
+      .map(([key]) => key),
+  ), [lspFiles]);
   // ED-PARITY-010 DEC-010-03: IDEA empty-editor tips with the live bindings.
   const emptyEditorHints = [
     { label: "Search Everywhere", shortcut: "Double Shift" },
@@ -20414,6 +20434,7 @@ export function CodeWorkspaceTab({
     return (
       <EditorGroup
         emptyHints={emptyEditorHints}
+        filesWithErrors={filesWithErrors}
         onClipboardUnavailable={setStatusMessage}
         onClipboardObservation={setLatestClipboardObservation}
         groupId={groupId}
@@ -20523,6 +20544,7 @@ export function CodeWorkspaceTab({
         ) : null}
         breadcrumbs={showGroupBreadcrumbs && groupFile ? (
           <Breadcrumbs
+            variant={editorAppearanceProfile.breadcrumbs.placement === "status-bar" && statusNavigationHost ? "statusbar" : "bar"}
             pathSegments={groupBreadcrumbSegments}
             symbols={breadcrumbSymbolsByGroup[groupId] ?? []}
             position={cursorPositions[groupId] ?? { line: 0, character: 0 }}
@@ -20634,7 +20656,10 @@ export function CodeWorkspaceTab({
               current.chars === chars && current.lineBreaks === lineBreaks ? current : { chars, lineBreaks }
             ));
             setEditorCommandContextRevision((revision) => revision + 1);
-            setEditorAiSelection(!selection.empty && selection.text.trim().length >= 2 ? selection : null);
+            // ED-PARITY-011 DEC-011-07: only user-made drag/Shift selections
+            // raise the AI toolbar; Find, navigation, double-click and Select
+            // All selections do not.
+            setEditorAiSelection(!selection.empty && selection.userSelected !== false && selection.text.trim().length >= 2 ? selection : null);
           }
           if (groupFile) {
             noteCaretPosition(groupFile.key, selection.end);

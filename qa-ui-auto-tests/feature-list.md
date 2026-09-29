@@ -431,6 +431,10 @@ controls:
     optional: true
     aliases:
       - '[data-testid="status-bar-workspace-navbar-segment"]'
+  - id: workspace-navbar-host        # ED-PARITY-011 slot the active editor portals its breadcrumbs into
+    selector: '[data-testid="status-bar-workspace-navbar-host"]'
+    kind: display
+    optional: true
   - id: workspace-readonly
     selector: '[data-testid="status-bar-workspace-readonly"]'
     kind: display
@@ -6222,6 +6226,8 @@ files:
   - src/components/editor/workspace/ShortcutKeyCaps.tsx
   - src/components/editor/workspace/panels/ToolWindowRail.tsx
   - src/components/editor/workspace/workspaceNavigationBar.ts
+  - src/components/editor/workspace/fileTypeIcon.tsx
+  - src/components/editor/workspace/importFold.ts
   - src/components/editor/workspace/KeymapMigrationNotice.tsx
   - src/components/editor/workspace/useFocusReturn.ts
   - src/components/editor/workspace/workspaceKeymapPlatform.ts
@@ -6936,6 +6942,10 @@ controls:
       - '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
   - id: toolbar-split-right-in-header # negative probe: split is not a main-toolbar button
     selector: 'header [data-testid="code-workspace-split-right"]'
+    kind: display
+    optional: true
+  - id: ai-selection-toolbar         # ED-PARITY-011 DEC-011-07 user-selection-only AI toolbar
+    selector: '[data-testid="code-workspace-ai-selection-toolbar"]'
     kind: display
     optional: true
   - id: empty-editor-hints

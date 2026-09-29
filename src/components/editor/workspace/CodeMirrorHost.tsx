@@ -8,6 +8,7 @@ import {
   useState,
   type MutableRefObject,
 } from "react";
+import { importFoldRange } from "./importFold";
 import { TriangleAlert, X } from "lucide-react";
 import {
   ChangeSet,
@@ -383,6 +384,12 @@ export interface EditorSelectionRange {
   text: string;
   /** Viewport-relative rect of the selection head; null when empty/unavailable. */
   rect: { top: number; left: number; right: number; bottom: number } | null;
+  /**
+   * ED-PARITY-011 DEC-011-07: true when the user made this selection by a
+   * pointer drag or a Shift+navigation extend — not by Find, navigation,
+   * double/triple click, Select All or a programmatic jump.
+   */
+  userSelected?: boolean;
 }
 
 interface CodeMirrorHostProps {
@@ -1553,6 +1560,12 @@ const WORKSPACE_EDITOR_STYLE = EditorView.theme({
   ".cm-foldGutter .cm-gutterElement": {
     minWidth: "1.6ch",
     padding: "0 4px",
+    // ED-PARITY-011 DEC-011-06: IDEA shows fold markers on gutter hover only.
+    opacity: "0",
+    transition: "opacity 120ms",
+  },
+  ".cm-gutters:hover .cm-foldGutter .cm-gutterElement, .cm-foldGutter .cm-gutterElement:focus-within": {
+    opacity: "1",
   },
 });
 
@@ -2727,6 +2740,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     }
   };
   const lastSelectionRef = useRef<{ from: number; to: number; searchOpen: boolean } | null>(null);
+  /** Origin of the latest selection change (DEC-011-07). */
+  const selectionOriginRef = useRef<"pointer" | "keyboard" | "other">("other");
+  const pointerClickCountRef = useRef(1);
+  const shiftExtendKeyRef = useRef(false);
+  const selectionKeyTrackerCleanupRef = useRef<(() => void) | null>(null);
   const selectionEmitTimerRef = useRef<number | null>(null);
   const viewportEmitTimerRef = useRef<number | null>(null);
   const renderedDiagnosticsRef = useRef(diagnostics);
@@ -2943,6 +2961,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         empty: main.empty,
         text: main.empty ? "" : view.state.doc.sliceString(from, to),
         rect,
+        userSelected: selectionOriginRef.current !== "other",
       });
     }
     if (foldHandler) {
@@ -3146,6 +3165,18 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         completionCompartment.current.of(buildAutocompletionExtension()),
         // IDEA: typing `.` / `:` (or server trigger chars) opens the popup
         // immediately instead of waiting for activateOnTypingDelay.
+        EditorView.updateListener.of((update) => {
+          for (const tr of update.transactions) {
+            if (!tr.selection) continue;
+            selectionOriginRef.current = tr.isUserEvent("select.pointer")
+              ? (pointerClickCountRef.current > 1 ? "other" : "pointer")
+              // Workspace keyboard actions (virtual-space moves) dispatch without
+              // a userEvent; a Shift+navigation keydown marks them as user-made.
+              : shiftExtendKeyRef.current && (tr.isUserEvent("select") || !tr.annotation(Transaction.userEvent))
+                ? "keyboard"
+                : "other";
+          }
+        }),
         EditorView.updateListener.of((update) => {
           if (!update.docChanged || update.transactions.every((tr) => !tr.isUserEvent("input.type"))) {
             return;
@@ -3366,6 +3397,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           // production pointer entry equivalent to a user click before
           // CodeMirror resolves its selection position.
           mousedown(_event, view) {
+            pointerClickCountRef.current = _event.detail || 1;
+            shiftExtendKeyRef.current = false;
             if (!view.hasFocus) view.focus();
             return false;
           },
@@ -3630,6 +3663,22 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     const view = new EditorView({ state, parent: hostRef.current });
     editorLanguageByView.set(view, liveTemplateLanguageForPath(pathRef.current));
     viewRef.current = view;
+    // ED-PARITY-011 DEC-011-07: remember whether the latest key in this view
+    // was a Shift+navigation extend. Window capture sees it even when the
+    // workspace dispatcher consumes the key before CodeMirror.
+    const trackSelectionKey = (event: KeyboardEvent) => {
+      if (!(event.target instanceof Node) || !view.dom.contains(event.target)) return;
+      if (["Shift", "Control", "Alt", "Meta"].includes(event.key)) return;
+      shiftExtendKeyRef.current = event.shiftKey && !event.ctrlKey && !event.metaKey
+        && /^(Arrow(Left|Right|Up|Down)|Home|End|PageUp|PageDown)$/.test(event.key);
+    };
+    window.addEventListener("keydown", trackSelectionKey, true);
+    selectionKeyTrackerCleanupRef.current = () => window.removeEventListener("keydown", trackSelectionKey, true);
+    // ED-PARITY-011 DEC-011-06: IDEA folds the import block by default.
+    const importFold = importFoldRange(pathRef.current, view.state.doc.toString());
+    if (importFold && importFold.to <= view.state.doc.length) {
+      view.dispatch({ effects: foldEffect.of(importFold) });
+    }
     const providerRowForEvent = (event: MouseEvent): { row: HTMLLIElement; index: number } | null => {
       if (!pathRef.current.toLowerCase().endsWith(".java") || viewRef.current !== view) return null;
       const row = (event.target as HTMLElement).closest<HTMLLIElement>(
@@ -3912,6 +3961,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       view.contentDOM.removeEventListener("focusout", clipboardFocusOutGuard, true);
       pendingCompletionAcceptanceRef.current?.();
       pendingCompletionAcceptanceRef.current = null;
+      selectionKeyTrackerCleanupRef.current?.();
+      selectionKeyTrackerCleanupRef.current = null;
       view.destroy();
       viewRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);

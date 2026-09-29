@@ -39,7 +39,7 @@ steps:
     selector: '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
     timeout_sec: 60
 - terminal_input:
-    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"] .xterm-helper-textarea'
     text: echo QA_ED010_MARK
     submit: true
 - assert_pattern:

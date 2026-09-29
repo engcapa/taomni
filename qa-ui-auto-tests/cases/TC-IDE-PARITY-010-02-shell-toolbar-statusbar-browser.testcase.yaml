@@ -49,7 +49,7 @@ steps:
 - press: Escape
 - assert_not_visible: '[data-testid="code-workspace-toolbar-more-menu"]'
 - assert_text:
-    selector: '[data-testid="status-bar-workspace-navbar"]'
+    selector: '[data-testid="status-bar-workspace-navbar-host"]'
     contains: README.txt
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Mod+Home
@@ -73,7 +73,7 @@ steps:
     contains: Double Shift
 - assert_pattern:
     selector: '[data-testid="code-workspace-empty-editor"]'
-    regex: Go to File\s*(Ctrl|Cmd)[+]Shift[+]N
+    regex: Go to File\s*(Ctrl[+]Shift|Shift[+]Cmd)[+]N
 - click: '[data-testid="code-workspace-toolbar-settings"]'
 - wait_for:
     selector: '[data-testid="settings-panel"]'
@@ -112,7 +112,7 @@ verification:
     - 13
     checkpoints:
     - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-navbar\"]", "contains": "README.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-navbar-host\"]", "contains": "README.txt"}}'
     - step: 32
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "regex": "^1:6 \\(5 chars\\)$"}}'
     - step: 33
@@ -131,7 +131,7 @@ verification:
     - step: 36
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "contains": "Double Shift"}}'
     - step: 37
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "regex": "Go to File\\s*(Ctrl|Cmd)[+]Shift[+]N"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "regex": "Go to File\\s*(Ctrl[+]Shift|Shift[+]Cmd)[+]N"}}'
     results:
     - 36
     - 37

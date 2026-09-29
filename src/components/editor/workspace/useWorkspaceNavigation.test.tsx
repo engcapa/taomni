@@ -194,9 +194,9 @@ describe("useWorkspaceNavigation", () => {
     const item = { rootId: "root-1", rootName: "repo", path: "src/main.ts" };
 
     act(() => result.current.openGoToFileItem(item));
+    // ED-PARITY-011 DEC-011-04: Go to File opens a formal tab (IDEA).
     expect(openFile).toHaveBeenLastCalledWith(
       { kind: "root", rootId: "root-1", path: "src/main.ts" },
-      { preview: true },
     );
 
     act(() => result.current.openGoToFileItem(item, { split: true }));

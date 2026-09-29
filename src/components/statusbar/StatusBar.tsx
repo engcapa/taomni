@@ -206,6 +206,8 @@ export function StatusBar() {
   const workspaceStatus = useCodeWorkspaceStatusStore((s) => s.status);
   const workspaceActions = useCodeWorkspaceStatusStore((s) => s.actions);
   const setWorkspaceWidgetHost = useCodeWorkspaceStatusStore((s) => s.setWidgetHost);
+  const setNavigationHost = useCodeWorkspaceStatusStore((s) => s.setNavigationHost);
+  const navigationPortalOwner = useCodeWorkspaceStatusStore((s) => s.navigationPortalOwner);
   const { mode, resolvedTheme } = useAppTheme();
   const [online, setOnline] = useState(navigator.onLine);
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
@@ -242,7 +244,15 @@ export function StatusBar() {
       {/* ED-PARITY-010 DEC-010-06: a focused code workspace owns the status
           bar like IDEA — navigation bar left, editor widgets right. */}
       {showWorkspaceSegments && workspaceStatus ? (
-        <WorkspaceNavigationBar segments={workspaceStatus.navigation ?? []} />
+        <div
+          ref={setNavigationHost}
+          data-testid="status-bar-workspace-navbar-host"
+          className="flex h-full min-w-0 flex-1 items-center overflow-hidden"
+        >
+          {/* ED-PARITY-011: the active editor portals its interactive
+              breadcrumbs here; the read-only path is the fallback. */}
+          {!navigationPortalOwner && <WorkspaceNavigationBar segments={workspaceStatus.navigation ?? []} />}
+        </div>
       ) : (
         <>
       <span className="flex items-center gap-1 min-w-0">

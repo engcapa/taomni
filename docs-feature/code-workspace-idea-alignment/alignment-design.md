@@ -104,6 +104,7 @@
   - breadcrumb 移到状态栏导航栏并包含类/方法层级；编辑器顶部不再单独占 20px。
   - 默认折叠 import 与单行方法体（对应 IDEA Code Folding 默认值），折叠标记只在 hover/当前块显示。
   - 选区 AI 工具条按 DEC-ALIGN-08 调整。
+- P1 设计：[ed-parity-011-editor-surface-design.md](ed-parity-011-editor-surface-design.md)。
 - 验收：`ED-PARITY-011-A1`、`ED-PARITY-011-A2`、`ED-PARITY-011-A3`、`ED-PARITY-011-A4`。
 
 <a id="ed-parity-012"></a>

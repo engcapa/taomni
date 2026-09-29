@@ -124,7 +124,7 @@ function props(overrides: Partial<ComponentProps<typeof EditorGroup>> = {}): Com
 }
 
 describe("EditorGroup tabs", () => {
-  it("uses the metadata row for file details without repeating the breadcrumb path", () => {
+  it("ED-PARITY-011: the floating inspection widget keeps file details in its tooltip", () => {
     const activeFile = {
       ...file("BackupManager"),
       subtitle: "persis-g2 / persis-g2-server/src/main/java/com/deepzero/ads/persis/backup/BackupManager.java",
@@ -138,8 +138,10 @@ describe("EditorGroup tabs", () => {
     })} />);
 
     const status = screen.getByTestId("code-workspace-file-status");
-    expect(status).toHaveTextContent("12.5 KB");
-    expect(status).toHaveTextContent("2026/3/29 08:28:53");
+    expect(status).toHaveAttribute("data-role", "inspection-widget");
+    expect(status.getAttribute("title")).toBe("12.5 KB · 2026/3/29 08:28:53");
+    // No permanent row: the widget floats inside the editor surface.
+    expect(status.closest('[data-testid="code-workspace-editor"]')).not.toBeNull();
     expect(status).toHaveTextContent("Java");
     expect(status).not.toHaveTextContent(activeFile.subtitle);
   });

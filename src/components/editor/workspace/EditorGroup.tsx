@@ -17,7 +17,7 @@ import {
   Eye,
   File,
   Loader2,
-  MoreHorizontal,
+  ChevronDown,
   Pin,
   X,
 } from "lucide-react";
@@ -47,6 +47,9 @@ import type { ClipboardObservationRecord } from "./clipboardObservationContract"
 import type { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactionOwner";
 import type { EditorAppearanceExtensionProfile } from "./editorAppearanceExtension";
 import { EditorBanner } from "./EditorBanner";
+import { FileTypeIcon } from "./fileTypeIcon";
+import { createPortal } from "react-dom";
+import { useCodeWorkspaceStatusStore } from "../../../stores/codeWorkspaceStatusStore";
 import type { EditorBannerItem } from "./editorBannerModel";
 import type { EffectiveCodeStyle } from "./codeStyleModel";
 import type { FileCoverage } from "./coverageModel";
@@ -164,8 +167,10 @@ interface EditorGroupProps {
   lspStatusPill: ReactNode;
   highlightingWidget?: ReactNode;
   breadcrumbs: ReactNode;
-  breadcrumbsPlacement?: "top" | "bottom";
+  breadcrumbsPlacement?: "top" | "bottom" | "status-bar";
   editorBanners?: EditorBannerItem[];
+  /** ED-PARITY-011 DEC-011-05: files with error diagnostics (red wavy tab name). */
+  filesWithErrors?: ReadonlySet<string>;
   onDismissBanner?: (id: string) => void;
   activeSymbols?: LspDocumentSymbol[];
   stickyLinesEnabled?: boolean;
@@ -337,6 +342,7 @@ export function EditorGroup({
   breadcrumbs,
   breadcrumbsPlacement = "top",
   editorBanners = [],
+  filesWithErrors,
   onDismissBanner,
   activeSymbols,
   stickyLinesEnabled = true,
@@ -409,6 +415,24 @@ export function EditorGroup({
   isMarkdownPath,
   renderMarkdownPreview,
 }: EditorGroupProps) {
+  // ED-PARITY-011 DEC-011-02: the active group's breadcrumbs become the IDEA
+  // status-bar navigation bar; without a status bar they stay at the top.
+  // ED-PARITY-011 DEC-011-03: language-service notices are IDEA balloons;
+  // file-level conditions (read-only, encoding) keep the inline editor bar.
+  const floatingBanners = (editorBanners?.length ?? 0) > 0
+    && (editorBanners ?? []).every((banner) => banner.category === "indexing-degraded" || banner.category === "sdk-import");
+  const navigationHost = useCodeWorkspaceStatusStore((state) => state.navigationHost);
+  const setNavigationPortalOwner = useCodeWorkspaceStatusStore((state) => state.setNavigationPortalOwner);
+  const statusBarNavigation = breadcrumbsPlacement === "status-bar" && isActiveGroup && visible
+    ? navigationHost
+    : null;
+  const navigationOwnerId = `${workspaceInstanceId}:${groupId}`;
+  useEffect(() => {
+    if (!statusBarNavigation || !breadcrumbs) return undefined;
+    setNavigationPortalOwner(navigationOwnerId);
+    return () => setNavigationPortalOwner(null, navigationOwnerId);
+  }, [breadcrumbs ? 1 : 0, navigationOwnerId, setNavigationPortalOwner, statusBarNavigation]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const tabMenu = useContextMenu();
   const [gitDiffPeek, setGitDiffPeek] = useState<GitLineChange | null>(null);
   const [topLine, setTopLine] = useState(0);
@@ -729,7 +753,8 @@ export function EditorGroup({
                   data-preview={preview || undefined}
                   data-pinned={pinned || undefined}
                   data-dirty={file.dirty || undefined}
-                  className="h-full min-w-[96px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
+                  data-has-errors={filesWithErrors?.has(key) || undefined}
+                  className="relative h-full min-w-[96px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)] data-[active=true]:after:pointer-events-none data-[active=true]:after:absolute data-[active=true]:after:inset-x-1 data-[active=true]:after:inset-y-1 data-[active=true]:after:rounded-md data-[active=true]:after:border data-[active=true]:after:border-[var(--taomni-accent)]/70"
                 >
                   <button
                     type="button"
@@ -742,9 +767,13 @@ export function EditorGroup({
                     }}
                     onContextMenu={(event) => showTabMenu(event, key)}
                   >
-                    <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                    <FileTypeIcon path={file.languagePath ?? file.title} />
                     {pinned && <Pin className="h-3 w-3 shrink-0" />}
-                    <span className={`truncate ${preview ? "italic" : ""}`}>{file.title}</span>
+                    <span
+                      className={`truncate ${preview ? "italic" : ""} ${filesWithErrors?.has(key) ? "underline decoration-wavy decoration-red-500 underline-offset-2" : ""}`}
+                    >
+                      {file.title}
+                    </span>
                     {file.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
                   </button>
                   <button
@@ -787,7 +816,7 @@ export function EditorGroup({
                 })));
               }}
             >
-              <MoreHorizontal className="h-3.5 w-3.5" />
+              <ChevronDown className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -799,55 +828,12 @@ export function EditorGroup({
         <div className="h-full min-h-0 relative">
           {activeFile ? (
             <div className="absolute inset-0 flex flex-col">
-              {breadcrumbsPlacement === "top" ? breadcrumbs : null}
-              <EditorBanner banners={editorBanners} onDismiss={onDismissBanner ?? (() => {})} />
-              <div
-                data-testid="code-workspace-file-status"
-                className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-text)]"
-              >
-                {activeFoldProvenance && (
-                  <span
-                    data-testid="code-workspace-fold-provenance"
-                    data-provenance={activeFoldProvenance}
-                    className="shrink-0 rounded px-1.5 py-0.5 text-[10px] bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)]"
-                    title={`Region fold source: ${activeFoldProvenance}`}
-                  >
-                    Region: {activeFoldProvenance}
-                  </span>
-                )}
-                <div className="ml-auto flex min-w-0 items-center gap-2">
-                  <span className="shrink-0 text-[var(--taomni-code-muted)]">{formatBytes(activeFile.size)}</span>
-                  {formatMtime(activeFile.mtime) && (
-                    <span className="shrink-0 text-[var(--taomni-code-muted)]">{formatMtime(activeFile.mtime)}</span>
-                  )}
-                  {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-code-muted)]" />}
-                  {activeLspSyncing && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-code-muted)]" />}
-                  {lspStatusPill}
-                  {highlightingWidget}
-                </div>
-                {isMarkdownPath(activeFile.languagePath) && (
-                  <div className="flex items-center gap-0.5">
-                    <ModeButton
-                      label="Edit"
-                      active={activeMarkdownMode === "edit"}
-                      icon={<File className="w-3 h-3" />}
-                      onClick={() => onMarkdownModeChange("edit")}
-                    />
-                    <ModeButton
-                      label="Preview"
-                      active={activeMarkdownMode === "preview"}
-                      icon={<Eye className="w-3 h-3" />}
-                      onClick={() => onMarkdownModeChange("preview")}
-                    />
-                    <ModeButton
-                      label="Split"
-                      active={activeMarkdownMode === "split"}
-                      icon={<Columns2 className="w-3 h-3" />}
-                      onClick={() => onMarkdownModeChange("split")}
-                    />
-                  </div>
-                )}
-              </div>
+              {breadcrumbsPlacement === "top" || (breadcrumbsPlacement === "status-bar" && !statusBarNavigation)
+                ? breadcrumbs
+                : null}
+              {!floatingBanners && (
+                <EditorBanner banners={editorBanners} onDismiss={onDismissBanner ?? (() => {})} />
+              )}
               {activeFile.error && (
                 <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-[12px] text-red-500">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -883,6 +869,56 @@ export function EditorGroup({
                 </div>
               )}
               <div data-testid="code-workspace-editor" className="relative flex-1 min-h-0">
+                {floatingBanners && (
+                  <EditorBanner floating banners={editorBanners} onDismiss={onDismissBanner ?? (() => {})} />
+                )}
+                {/* ED-PARITY-011 DEC-011-01: IDEA inspection widget floats at the
+                    editor's top-right instead of a permanent status row. */}
+                <div
+                  data-testid="code-workspace-file-status"
+                  data-role="inspection-widget"
+                  title={[formatBytes(activeFile.size), formatMtime(activeFile.mtime)].filter(Boolean).join(" · ")}
+                  className="absolute right-4 top-1 z-10 flex max-w-[70%] items-center gap-1.5 rounded border border-[var(--taomni-code-border)]/60 bg-[var(--taomni-code-gutter-bg)]/90 px-1.5 py-0.5 text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-text)] shadow-sm"
+                >
+                  {activeFoldProvenance && (
+                    <span
+                      data-testid="code-workspace-fold-provenance"
+                      data-provenance={activeFoldProvenance}
+                      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)]"
+                      title={`Region fold source: ${activeFoldProvenance}`}
+                    >
+                      Region: {activeFoldProvenance}
+                    </span>
+                  )}
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-code-muted)]" />}
+                    {activeLspSyncing && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-code-muted)]" />}
+                    {lspStatusPill}
+                    {highlightingWidget}
+                  </div>
+                  {isMarkdownPath(activeFile.languagePath) && (
+                    <div className="flex items-center gap-0.5">
+                      <ModeButton
+                        label="Edit"
+                        active={activeMarkdownMode === "edit"}
+                        icon={<File className="w-3 h-3" />}
+                        onClick={() => onMarkdownModeChange("edit")}
+                      />
+                      <ModeButton
+                        label="Preview"
+                        active={activeMarkdownMode === "preview"}
+                        icon={<Eye className="w-3 h-3" />}
+                        onClick={() => onMarkdownModeChange("preview")}
+                      />
+                      <ModeButton
+                        label="Split"
+                        active={activeMarkdownMode === "split"}
+                        icon={<Columns2 className="w-3 h-3" />}
+                        onClick={() => onMarkdownModeChange("split")}
+                      />
+                    </div>
+                  )}
+                </div>
                 {gitDiffPeek && (
                   <GitDiffPeek
                     change={gitDiffPeek}
@@ -1072,6 +1108,7 @@ export function EditorGroup({
                 )}
               </div>
               {breadcrumbsPlacement === "bottom" ? breadcrumbs : null}
+              {statusBarNavigation && breadcrumbs ? createPortal(breadcrumbs, statusBarNavigation) : null}
             </div>
           ) : (
             <div

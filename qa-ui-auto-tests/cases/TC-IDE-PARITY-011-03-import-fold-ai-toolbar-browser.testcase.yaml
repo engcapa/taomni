@@ -1,0 +1,134 @@
+id: TC-IDE-PARITY-011-03
+title: Default import folding and user-selection-only AI toolbar
+description: 'ED-PARITY-011 A4 browser case: a reopened Java file shows its import block folded (IDEA default), a Find match selection does not raise the AI selection toolbar, and a Shift+Arrow extend does.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-011
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: Demo011.java
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key$="Demo011.java"]'
+    timeout_sec: 15
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- type: 'package demo;
+
+    import java.util.List;
+
+    import java.util.Map;
+
+    class Demo011 { List<String> names; Map<String, String> map; }
+
+    '
+- press: Control+s
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-active="true"]:not([data-dirty])'
+    timeout_sec: 10
+- press: Control+F4
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+N
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- type:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+    text: Demo011.java
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"] button:has-text("Demo011.java")'
+    timeout_sec: 15
+- press: Enter
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-active="true"][data-editor-tab-key$="Demo011.java"]'
+    timeout_sec: 15
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-foldPlaceholder'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="code-workspace-editor"] .cm-line:has-text("import")'
+    equal: 1
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+f
+- type:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    text: names
+- press: Enter
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: hidden
+    timeout_sec: 5
+- wait: 0.5
+- assert_count:
+    selector: '[data-testid="code-workspace-ai-selection-toolbar"]'
+    equal: 0
+- press: End
+- press: Shift+ArrowLeft
+- press: Shift+ArrowLeft
+- press: Shift+ArrowLeft
+- press: Shift+ArrowLeft
+- assert_visible: '[data-testid="code-workspace-ai-selection-toolbar"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A4/DEC-011-06：含两条 import 的 Java 文件重新打开后 import 块默认折叠为一行。
+    actions:
+    - 19
+    - 28
+    checkpoints:
+    - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-foldPlaceholder", "timeout_sec": 10}}'
+    - step: 31
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:has-text(\"import\")", "equal": 1}}'
+    results:
+    - 30
+    - 31
+  - id: R2
+    requirement: A4/DEC-011-07：Find 选中匹配后 Esc 不出现 AI 工具条；Shift+方向键扩选出现。
+    actions:
+    - 36
+    checkpoints:
+    - step: 39
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-ai-selection-toolbar\"]", "equal": 0}}'
+    - step: 45
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-ai-selection-toolbar\"]"}'
+    results:
+    - 39
+    - 45
+  visual:
+  - check: 检查 widget 与 tab 胶囊/图标需对照 IDEA idea-03/idea-29。
+    method: manual
+    reason: 像素/字体按 DEC-ALIGN-06 另行比较。
+  native:
+  - check: 本卡断言均为 renderer 行为。
+    method: not-applicable
+    reason: 无 native 专有边界。

@@ -67,6 +67,12 @@ interface CodeWorkspaceStatusStoreState {
   /** Status-bar slot where the active workspace portals its SDK/Facts widgets. */
   widgetHost: HTMLElement | null;
   setWidgetHost: (host: HTMLElement | null) => void;
+  /** Status-bar slot hosting the active editor's navigation bar (breadcrumbs). */
+  navigationHost: HTMLElement | null;
+  setNavigationHost: (host: HTMLElement | null) => void;
+  /** Editor group currently portalling its breadcrumbs into `navigationHost`. */
+  navigationPortalOwner: string | null;
+  setNavigationPortalOwner: (owner: string | null, previous?: string | null) => void;
   status: CodeWorkspaceStatusSegments | null;
   actions: CodeWorkspaceStatusActions | null;
   setStatus: (status: CodeWorkspaceStatusSegments | null) => void;
@@ -156,6 +162,17 @@ export const useCodeWorkspaceStatusStore = create<CodeWorkspaceStatusStoreState>
   widgetHost: null,
   setWidgetHost: (widgetHost) => {
     if (get().widgetHost !== widgetHost) set({ widgetHost });
+  },
+  navigationHost: null,
+  setNavigationHost: (navigationHost) => {
+    if (get().navigationHost !== navigationHost) set({ navigationHost });
+  },
+  navigationPortalOwner: null,
+  setNavigationPortalOwner: (owner, previous) => {
+    const current = get().navigationPortalOwner;
+    // Clearing only releases the slot for the owner that still holds it.
+    if (owner === null && previous !== undefined && current !== previous) return;
+    if (current !== owner) set({ navigationPortalOwner: owner });
   },
 
   setStatus: (status) => {

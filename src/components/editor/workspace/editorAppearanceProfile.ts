@@ -23,7 +23,8 @@ export interface EditorAppearanceProfile {
   };
   breadcrumbs: {
     visible: boolean;
-    placement: "top" | "bottom";
+    /** ED-PARITY-011 DEC-011-02: `status-bar` = IDEA navigation bar (default). */
+    placement: "top" | "bottom" | "status-bar";
     languages: string[];
   };
   clipboard: {
@@ -100,7 +101,7 @@ export const DEFAULT_EDITOR_APPEARANCE_PROFILE: EditorAppearanceProfile = {
   },
   breadcrumbs: {
     visible: true,
-    placement: "top",
+    placement: "status-bar",
     languages: ["*"],
   },
   clipboard: {
@@ -172,7 +173,7 @@ export function normalizeEditorAppearanceProfile(value: unknown): EditorAppearan
     },
     breadcrumbs: {
       visible: readBoolean(breadcrumbs.visible, true),
-      placement: breadcrumbs.placement === "bottom" ? "bottom" : "top",
+      placement: breadcrumbs.placement === "bottom" || breadcrumbs.placement === "top" ? breadcrumbs.placement : "status-bar",
       languages: normalizeLanguageList(breadcrumbs.languages),
     },
     clipboard: {

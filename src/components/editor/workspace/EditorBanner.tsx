@@ -5,6 +5,8 @@ import { editorBannerDismissalKey, type EditorBannerItem } from "./editorBannerM
 interface EditorBannerProps {
   banners: readonly EditorBannerItem[];
   onDismiss: (dismissalKey: string) => void;
+  /** ED-PARITY-011 DEC-011-03: IDEA balloon over the editor instead of a row. */
+  floating?: boolean;
 }
 
 function actionErrorMessage(error: unknown): string {
@@ -13,7 +15,7 @@ function actionErrorMessage(error: unknown): string {
   return "The action failed";
 }
 
-export function EditorBanner({ banners, onDismiss }: EditorBannerProps) {
+export function EditorBanner({ banners, onDismiss, floating = false }: EditorBannerProps) {
   const [runningActions, setRunningActions] = useState<Set<string>>(new Set());
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
 
@@ -47,7 +49,10 @@ export function EditorBanner({ banners, onDismiss }: EditorBannerProps) {
       aria-label="Editor notifications"
       aria-live="polite"
       data-testid="code-workspace-editor-banners"
-      className="flex flex-col border-b border-[var(--taomni-code-border)] text-[11px]"
+      data-floating={floating || undefined}
+      className={floating
+        ? "absolute bottom-3 right-4 z-20 flex w-[380px] max-w-[calc(100%-32px)] flex-col overflow-hidden rounded-md border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[11px] shadow-lg"
+        : "flex flex-col border-b border-[var(--taomni-code-border)] text-[11px]"}
     >
       {banners.map((banner) => {
         const icon = banner.category === "read-only" ? (

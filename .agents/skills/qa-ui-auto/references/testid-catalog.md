@@ -344,6 +344,7 @@
   ↳ `[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]` — alias
   ↳ `[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]` — alias
 - `header [data-testid="code-workspace-split-right"]` — display [optional] — F25.5.toolbar-split-right-in-header
+- `[data-testid="code-workspace-ai-selection-toolbar"]` — display [optional] — F25.5.ai-selection-toolbar
 - `[data-testid="code-workspace-empty-editor"]` — display [optional] — F25.5.empty-editor-hints
   ↳ `[data-testid="code-workspace-empty-editor-hint"]` — alias
 - `[data-testid="keymap-group-Navigation"]` — interactive [optional] — F25.5.keymap-group
@@ -958,6 +959,7 @@
 - `[data-testid="status-bar-workspace-cursor"]` — display [optional] — F1.7.workspace-cursor
 - `[data-testid="status-bar-workspace-navbar"]` — display [optional] — F1.7.workspace-navbar
   ↳ `[data-testid="status-bar-workspace-navbar-segment"]` — alias
+- `[data-testid="status-bar-workspace-navbar-host"]` — display [optional] — F1.7.workspace-navbar-host
 - `[data-testid="status-bar-workspace-readonly"]` — display [optional] — F1.7.workspace-readonly
 - `[data-testid="status-bar-workspace-widgets"]` — display [optional] — F1.7.workspace-status-widgets
 - `[data-testid="status-bar-workspace-large-file"]` — display [optional] — F1.7.workspace-large-file

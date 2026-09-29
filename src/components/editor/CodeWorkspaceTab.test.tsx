@@ -2172,7 +2172,7 @@ describe("CodeWorkspaceTab", () => {
     await screen.findByTitle("app / a.ts");
     // The tab strip renders while the file is still loading; wait for the
     // loaded file header (size text) before invoking the structure popup.
-    await screen.findByText("12 B");
+    await waitFor(() => expect(screen.getByTestId("code-workspace-file-status").getAttribute("title")).toContain("12 B"));
 
     fireEvent.keyDown(window, { key: "F12", ctrlKey: true });
     const popup = await screen.findByTestId("code-workspace-structure-popup");
@@ -4178,7 +4178,7 @@ describe("CodeWorkspaceTab", () => {
 
     renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
-    await screen.findByText("9 B");
+    await waitFor(() => expect(screen.getByTestId("code-workspace-file-status").getAttribute("title")).toContain("9 B"));
     await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled());
     // Wait until the LSP status is no longer idle so capabilities are in state.
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
