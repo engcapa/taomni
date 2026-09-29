@@ -64,6 +64,14 @@ steps:
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed
+    equals: 'true'
+- eval_readonly:
+    expression: document.activeElement?.closest('aside')?.dataset.testid === 'code-workspace-tree-pane'
+    expect_truthy: true
+- press: Alt+1
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    name: aria-pressed
     equals: 'false'
 - press: Alt+1
 - assert_attribute:
@@ -94,17 +102,25 @@ verification:
     - 15
     - 18
   - id: R2
-    requirement: A2：Alt+1 在打包 WebView 中切换 Project 工具窗。
+    requirement: A2：Alt+1 在打包 WebView 中按 IDEA 语义切换 Project 工具窗：已显示但编辑器有焦点时激活（焦点进项目树），激活时再按隐藏，隐藏后再按打开。
     actions:
     - 20
+    - 23
+    - 25
     checkpoints:
     - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 22
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.closest(''aside'')?.dataset.testid === ''code-workspace-tree-pane''", "expect_truthy": true}}'
+    - step: 24
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "false"}}'
-    - step: 23
+    - step: 26
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
     results:
     - 21
-    - 23
+    - 22
+    - 24
+    - 26
   visual:
   - check: 不声明视觉结论。
     method: not-applicable

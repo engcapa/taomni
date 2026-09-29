@@ -92,7 +92,7 @@ import {
   unfoldAll,
   unfoldEffect,
 } from "@codemirror/language";
-import { search, searchPanelOpen } from "@codemirror/search";
+import { gotoLine, search, searchPanelOpen } from "@codemirror/search";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import { readNativeTextResult, readTextResult, writeText } from "../../../lib/clipboard";
 import { codeViewExtensions } from "../../../lib/codeViewTheme";
@@ -269,6 +269,20 @@ export function documentTextIdentity(doc: Text): string {
  * adds the content identity and the horizontal scroll offset.
  * ED-REPAIR-009: binds the capture identity to the exact doc version.
  */
+/** Views whose file has a default import fold, keyed to that file's path. */
+const importFoldPathByView = new WeakMap<EditorView, string>();
+
+function importsExpandedIn(view: EditorView): boolean {
+  const path = importFoldPathByView.get(view);
+  const range = path ? importFoldRange(path, view.state.doc.toString()) : null;
+  if (!range) return false;
+  let folded = false;
+  foldedRanges(view.state).between(range.from, range.from + 1, (from) => {
+    if (from === range.from) folded = true;
+  });
+  return !folded;
+}
+
 export function captureEditorViewState(view: EditorView): PersistedEditorViewState {
   const selection = view.state.selection;
   const main = selection.main;
@@ -291,6 +305,7 @@ export function captureEditorViewState(view: EditorView): PersistedEditorViewSta
     folds,
     textIdentity: documentTextIdentity(view.state.doc),
     scrollLeft: view.scrollDOM?.scrollLeft ?? 0,
+    ...(importsExpandedIn(view) ? { importsExpanded: true } : {}),
   };
 }
 
@@ -375,6 +390,14 @@ export interface EditorRevealTarget {
   focus?: boolean;
   /** Optional selection end; without it the reveal only places the caret. */
   end?: { line: number; character: number };
+}
+
+/** ED-PARITY-012 DEC-012-06: one Go to Line:Column dialog request. */
+export interface GoToLineRequest {
+  current: { line: number; column: number };
+  lineCount: number;
+  apply: (target: { line: number; column: number }) => void;
+  cancel: () => void;
 }
 
 export interface EditorSelectionRange {
@@ -505,6 +528,8 @@ interface CodeMirrorHostProps {
   parameterPopup?: ParameterPopupView | null;
   onSelectionChange?: (selection: EditorSelectionRange) => void;
   onFoldProvenanceChange?: (provenance: RegionFoldingProvenance | null) => void;
+  /** ED-PARITY-012 DEC-012-06: host-rendered Go to Line:Column dialog. */
+  onGoToLineRequest?: (request: GoToLineRequest) => void;
   onViewportChange?: (range: LspRange) => void;
   /**
    * ED-IMPROVE-007: one-shot caret/selection/scroll/fold snapshot for this
@@ -2300,6 +2325,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   parameterPopup = null,
   onSelectionChange,
   onFoldProvenanceChange,
+  onGoToLineRequest,
   onViewportChange,
   initialViewState = null,
   onViewStateChange,
@@ -2806,6 +2832,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const onParameterEscapeRef = useRef(onParameterEscape);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onFoldProvenanceChangeRef = useRef(onFoldProvenanceChange);
+  const onGoToLineRequestRef = useRef(onGoToLineRequest);
   const onViewportChangeRef = useRef(onViewportChange);
   // ED-IMPROVE-007: the initial snapshot is read once at view creation; later
   // prop changes never re-apply it over the user's live caret/scroll.
@@ -2870,6 +2897,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onParameterEscapeRef.current = onParameterEscape;
   onSelectionChangeRef.current = onSelectionChange;
   onFoldProvenanceChangeRef.current = onFoldProvenanceChange;
+  onGoToLineRequestRef.current = onGoToLineRequest;
   onViewportChangeRef.current = onViewportChange;
   onExpandSelectionRef.current = onExpandSelection;
   onLightbulbRef.current = onLightbulb;
@@ -3675,9 +3703,13 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     window.addEventListener("keydown", trackSelectionKey, true);
     selectionKeyTrackerCleanupRef.current = () => window.removeEventListener("keydown", trackSelectionKey, true);
     // ED-PARITY-011 DEC-011-06: IDEA folds the import block by default.
+    // Imports the user expanded in this leaf stay expanded when it remounts.
     const importFold = importFoldRange(pathRef.current, view.state.doc.toString());
     if (importFold && importFold.to <= view.state.doc.length) {
-      view.dispatch({ effects: foldEffect.of(importFold) });
+      importFoldPathByView.set(view, pathRef.current);
+      if (initialViewStateRef.current?.importsExpanded !== true) {
+        view.dispatch({ effects: foldEffect.of(importFold) });
+      }
     }
     const providerRowForEvent = (event: MouseEvent): { row: HTMLLIElement; index: number } | null => {
       if (!pathRef.current.toLowerCase().endsWith(".java") || viewRef.current !== view) return null;
@@ -3835,6 +3867,25 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       // removed in cleanup so a remount re-binds against the fresh view.
       unregisterEditorActions = actionHost.registerActions(buildEditorHostActions({
         openReplacePanel: () => openReplacePanel(view),
+        // ED-PARITY-012 DEC-012-06: IDEA "Go to Line:Column" dialog.
+        openGoToLine: () => {
+          const request = onGoToLineRequestRef.current;
+          if (!request) return gotoLine(view);
+          const head = view.state.selection.main.head;
+          const line = view.state.doc.lineAt(head);
+          request({
+            current: { line: line.number, column: head - line.from + 1 },
+            lineCount: view.state.doc.lines,
+            apply: (target) => {
+              const targetLine = view.state.doc.line(Math.min(target.line, view.state.doc.lines));
+              const pos = Math.min(targetLine.from + target.column - 1, targetLine.to);
+              view.dispatch({ selection: { anchor: pos }, scrollIntoView: true, userEvent: "select" });
+              view.focus();
+            },
+            cancel: () => view.focus(),
+          });
+          return true;
+        },
         expandSemanticSelection: () => expandSemanticSelection(view),
         // §8.19.4 explicit Basic Completion. With a popup already open at
         // this caret, close + restart so the second explicit call re-runs the

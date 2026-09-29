@@ -345,6 +345,13 @@
   ↳ `[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]` — alias
 - `header [data-testid="code-workspace-split-right"]` — display [optional] — F25.5.toolbar-split-right-in-header
 - `[data-testid="code-workspace-ai-selection-toolbar"]` — display [optional] — F25.5.ai-selection-toolbar
+- `[data-testid="code-workspace-goto-line-dialog"]` — display [optional] — F25.5.goto-line-dialog
+- `[data-testid="code-workspace-goto-line-input"]` — interactive [optional] — F25.5.goto-line-input
+- `[data-testid="code-workspace-goto-line-ok"]` — interactive [optional] — F25.5.goto-line-ok
+- `[data-testid="code-workspace-goto-line-cancel"]` — interactive [optional] — F25.5.goto-line-cancel
+- `[data-testid="code-workspace-goto-line-error"]` — display [optional] — F25.5.goto-line-error
+- `[data-testid="code-workspace-structure-popup"]` — display [optional] — F25.5.structure-popup
+- `[data-testid="recent-locations-dialog"]` — display [optional] — F25.5.recent-locations-dialog
 - `[data-testid="code-workspace-empty-editor"]` — display [optional] — F25.5.empty-editor-hints
   ↳ `[data-testid="code-workspace-empty-editor-hint"]` — alias
 - `[data-testid="keymap-group-Navigation"]` — interactive [optional] — F25.5.keymap-group

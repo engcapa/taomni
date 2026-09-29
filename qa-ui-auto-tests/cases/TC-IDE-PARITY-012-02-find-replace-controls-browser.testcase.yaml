@@ -1,0 +1,252 @@
+id: TC-IDE-PARITY-012-02
+title: 'IDEA Find/Replace row: history, clear, multiline, filter, Exclude and Ctrl+R focus'
+description: 'ED-PARITY-012 A1/A3/A4 and DEC-012-02..05: the Find row carries history, a clear button, multiline and the inline context filter; Ctrl+R shows Replace while focus stays in Find, Tab enters Replace; Exclude keeps a match out of Replace All and one undo restores the buffer; Esc returns focus to the editor and the history dropdown offers session queries.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-012
+- find
+- focus
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: find012.txt
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-active="true"][data-editor-tab-key$="find012.txt"]'
+    timeout_sec: 15
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- type: foo bar foo baz foo
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: foo bar foo baz foo
+- press: Control+Home
+- press: Control+f
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('name') === 'search'
+    expect_truthy: true
+- assert_not_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Clear search"]'
+- type:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    text: foo
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 3
+- assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Clear search"]'
+- assert_visible: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-row button[aria-label="Filter context"]'
+- assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Search history"]'
+- assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Multiline"]'
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 2 / 3
+- press: Shift+Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 3
+- press: Control+r
+- assert_visible: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('name') === 'search'
+    expect_truthy: true
+- assert_visible: '[data-testid="code-workspace-editor-search"] button[aria-label="Exclude current match"]'
+- press: Tab
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('name') === 'replace'
+    expect_truthy: true
+- type:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+    text: qux
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Exclude current match"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 excluded
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Replace all matches"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: foo bar qux baz qux
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Multiline"]'
+- assert_visible: '[data-testid="code-workspace-editor-search"] textarea[name="search-multiline"]'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Multiline"]'
+- assert_visible: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Clear search"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 0 results
+- type:
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    text: bar
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: detached
+    timeout_sec: 5
+- &id001
+  eval_readonly:
+    expression: document.activeElement?.classList.contains('cm-content') === true
+    expect_truthy: true
+- press: Control+z
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: foo bar foo baz foo
+- press: Control+f
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Search history"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] [role="listbox"]'
+    contains: bar
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] [role="listbox"]'
+    contains: foo
+- click: '[data-testid="code-workspace-editor-search"] [role="listbox"] [role="option"]'
+- eval_readonly:
+    expression: document.querySelector('.cm-workspace-search-input').value === 'bar'
+    expect_truthy: true
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-search"]'
+    state: detached
+    timeout_sec: 5
+- *id001
+- screenshot: tc-ide-parity-012-02-find.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1：Ctrl+F 焦点在 Find 框；Enter/Shift+Enter 前后跳。
+    actions:
+    - 22
+    - 31
+    - 33
+    checkpoints:
+    - step: 23
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''name'') === ''search''", "expect_truthy": true}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "1 / 3"}}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "2 / 3"}}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "1 / 3"}}'
+    results:
+    - 23
+    - 32
+    - 34
+  - id: R2
+    requirement: A4/DEC-012-02：Find 行含历史、清除（非空才显示）、多行、行内过滤漏斗；清除后 0 results；多行切换出 textarea。
+    actions:
+    - 25
+    - 46
+    - 48
+    - 50
+    checkpoints:
+    - step: 24
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-editor-search\"] button[aria-label=\"Clear search\"]"}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] button[aria-label=\"Clear search\"]"}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-row button[aria-label=\"Filter context\"]"}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] button[aria-label=\"Search history\"]"}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] button[aria-label=\"Multiline\"]"}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] textarea[name=\"search-multiline\"]"}'
+    - step: 49
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] input[name=\"search\"]"}'
+    - step: 51
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "0 results"}}'
+    results:
+    - 27
+    - 28
+    - 47
+    - 51
+  - id: R3
+    requirement: A4/DEC-012-05：Ctrl+R 显示 Replace 行但焦点仍在 Find 框；Tab 进入 Replace。
+    actions:
+    - 35
+    - 39
+    checkpoints:
+    - step: 36
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] input[name=\"replace\"]"}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''name'') === ''search''", "expect_truthy": true}}'
+    - step: 40
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''name'') === ''replace''", "expect_truthy": true}}'
+    results:
+    - 37
+    - 40
+  - id: R4
+    requirement: A3/DEC-012-04：Exclude 排除当前匹配，Replace All 跳过它；一次 Ctrl+Z 恢复。
+    actions:
+    - 42
+    - 44
+    - 56
+    checkpoints:
+    - step: 38
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-search\"] button[aria-label=\"Exclude current match\"]"}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "1 excluded"}}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "foo bar qux baz qux"}}'
+    - step: 57
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "foo bar foo baz foo"}}'
+    results:
+    - 45
+    - 57
+  - id: R5
+    requirement: A1：Esc 关闭并把焦点交回编辑器；历史下拉含本会话查询，选中后填回。
+    actions:
+    - 53
+    - 58
+    - 59
+    - 62
+    checkpoints:
+    - step: 54
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-search\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 55
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] [role=\"listbox\"]", "contains": "bar"}}'
+    - step: 61
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] [role=\"listbox\"]", "contains": "foo"}}'
+    - step: 63
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-workspace-search-input'').value === ''bar''", "expect_truthy": true}}'
+    - step: 66
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    results:
+    - 55
+    - 60
+    - 63
+  visual:
+  - check: 对照 IDEA idea-06/07/08 检查 Find/Replace 行控件顺序与间距。
+    method: manual
+    reason: 像素与字体按 DEC-ALIGN-06 另行比较。
+  native:
+  - check: 本用例断言 renderer 焦点与键盘派发；native WebView 由保留 native 用例覆盖。
+    method: not-applicable
+    reason: browser 证据不外推 native。

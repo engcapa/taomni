@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Loader2, Search } from "lucide-react";
+import { useFocusReturn } from "./useFocusReturn";
 
 interface QuickPickOverlayProps<T> {
   open: boolean;
@@ -54,6 +55,8 @@ export function QuickPickOverlay<T>({
   onQueryChange,
   onAltEnter,
 }: QuickPickOverlayProps<T>) {
+  // DEC-ALIGN-11 / ED-PARITY-012: closing returns focus to the opener.
+  useFocusReturn(open);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +74,27 @@ export function QuickPickOverlay<T>({
     // Focus after the overlay is painted.
     const id = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(id);
+  }, [open]);
+
+  // IDEA popups close on Esc wherever focus ended up (a late editor focus
+  // restore, a WebView that dropped the deferred input focus). Keys inside the
+  // overlay keep their React handlers; another dialog on top keeps its Esc.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target && overlayRef.current?.contains(target)) return;
+      if (target?.closest("[role='dialog'], [role='alertdialog']")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onCloseRef.current();
+    };
+    window.addEventListener("keydown", closeOnEscape, true);
+    return () => window.removeEventListener("keydown", closeOnEscape, true);
   }, [open]);
 
   const results = useMemo(() => filterItems(query, items), [filterItems, items, query]);
@@ -122,6 +146,7 @@ export function QuickPickOverlay<T>({
 
   return (
     <div
+      ref={overlayRef}
       data-testid={testId}
       className="absolute inset-0 z-40 flex justify-center bg-black/30 pt-14"
       onKeyDown={(event) => {

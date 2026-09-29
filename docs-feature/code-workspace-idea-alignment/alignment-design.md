@@ -118,6 +118,7 @@
   - 首个切片（已确认缺陷）：`WorkspacePopupsHost` 的 Go to File、Recent Files、File Structure、Search Everywhere、Recent Locations、Quick Doc、Location Peek，以及 Keymap 对话框，关闭时把焦点交回打开前的编辑器 view（DEC-ALIGN-11）；当前 `CodeWorkspaceTab.tsx:21592/21607/21651` 只改 state。
   - Find 框补历史下拉、清除 `×`、多行切换、过滤漏斗；Replace 行补 Exclude、历史、多行；`Ctrl+R` 保持焦点在 Find 框；所有匹配统一高亮并在滚动条画刻度。
   - Go to Line 改为预填并全选 `行:列` 的小对话框（Enter/Esc/OK/Cancel），替换 CodeMirror 默认底部面板。
+- P1 设计：[ed-parity-012-find-focus-design.md](ed-parity-012-find-focus-design.md)。
 - 验收：`ED-PARITY-012-A1`、`ED-PARITY-012-A2`、`ED-PARITY-012-A3`、`ED-PARITY-012-A4`。
 
 <a id="ed-parity-013"></a>

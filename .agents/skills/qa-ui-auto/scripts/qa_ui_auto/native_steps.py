@@ -1936,7 +1936,23 @@ def _do_native_pointer_drag(ctx: NativeStepContext, args: Any) -> str:
         "if (!(root instanceof HTMLElement)) return null;"
         "const lines = Array.from(root.querySelectorAll('.cm-line'));"
         f"const points = {json.dumps([start, end])};"
+        # Lines are document lines: with folded ranges (e.g. the default
+        # import fold) the n-th rendered `.cm-line` is not document line n,
+        # so resolve through the CodeMirror view when it is reachable.
+        "const content = root.matches('.cm-content') ? root : root.querySelector('.cm-content');"
+        "const view = content?.cmTile?.root?.view ?? null;"
+        "const locateInView = ({line,column}) => {"
+        " const doc = view.state.doc;"
+        " if (line > doc.lines) return null;"
+        " const docLine = doc.line(line);"
+        " if (column > docLine.length) return null;"
+        " const caret = view.coordsAtPos(docLine.from + column);"
+        " if (!caret) return null;"
+        " return {x:Math.round(caret.left), y:Math.round((caret.top + caret.bottom) / 2),"
+        "  lineLength:docLine.length};"
+        "};"
         "const locate = ({line,column}) => {"
+        " if (view?.state?.doc && typeof view.coordsAtPos === 'function') return locateInView({line,column});"
         " const el = lines[line - 1];"
         " if (!(el instanceof HTMLElement) || column > (el.textContent?.length ?? 0)) return null;"
         " const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);"

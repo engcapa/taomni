@@ -191,6 +191,8 @@ export interface EditorHostActionHandlers {
    * migration channel for the previously inline keymap business bindings).
    */
   runEditorCommand(command: (view: EditorView) => boolean): boolean;
+  /** Open the IDEA Go to Line:Column dialog (ED-PARITY-012). */
+  openGoToLine?(): boolean;
   /** Live display geometry gate used before consuming PageUp/PageDown. */
   isEditorGeometryReady?(): boolean;
   /** Shared document history owner; undefined keeps standalone CM history. */
@@ -379,7 +381,11 @@ export function buildEditorHostActions(handlers: EditorHostActionHandlers) {
       secondary: ["Meta+g"],
       keywords: ["jump", "line"],
       requiresEditor: true,
-      run: async () => runViaHandlers(handlers, gotoLine),
+      // ED-PARITY-012 DEC-012-06: IDEA "Go to Line:Column" dialog when the
+      // host provides one; the CodeMirror panel is the unhosted fallback.
+      run: async () => (handlers.openGoToLine
+        ? commandResult(handlers.openGoToLine())
+        : runViaHandlers(handlers, gotoLine)),
     }),
     editorAction({
       id: "editor.completeStatement",

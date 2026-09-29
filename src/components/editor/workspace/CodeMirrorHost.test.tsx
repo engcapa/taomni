@@ -5,7 +5,7 @@ import { EditorSelection, Text } from "@codemirror/state";
 import { undoDepth } from "@codemirror/commands";
 import { startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
-import { foldedRanges } from "@codemirror/language";
+import { foldedRanges, unfoldAll } from "@codemirror/language";
 import { closeSearchPanel, openSearchPanel } from "@codemirror/search";
 import { CodeMirrorHost, documentTextIdentity } from "./CodeMirrorHost";
 import { textIdentityFromString } from "./workspaceLayoutPersistence";
@@ -115,7 +115,7 @@ describe("CodeMirrorHost search", () => {
     // Native type=search clear — no custom × button.
     fireEvent.input(search, { target: { value: "" } });
     expect(search).toHaveValue("");
-    expect(screen.getByText("0 matches")).toBeInTheDocument();
+    expect(screen.getByText("0 results")).toBeInTheDocument();
   });
 
   it("applies case, whole-word, and regular-expression search options", async () => {
@@ -163,7 +163,7 @@ describe("CodeMirrorHost search", () => {
         expect.any(Number),
       );
     });
-    expect(screen.getByText("0 matches")).toBeInTheDocument();
+    expect(screen.getByText("0 results")).toBeInTheDocument();
   });
 
   it("routes Preserve Case through the mounted replace-all workflow", async () => {
@@ -191,13 +191,20 @@ describe("CodeMirrorHost search", () => {
     });
   });
 
-  it("opens replacement mode with Ctrl+R and closes with Escape", async () => {
+  it("opens replacement mode with Ctrl+R, keeps focus in Find and closes with Escape", async () => {
     const { content } = renderEditor("alpha");
     fireEvent.keyDown(content, { key: "r", code: "KeyR", ctrlKey: true });
 
+    // ED-PARITY-012 DEC-012-05: IDEA keeps the caret in the Find field.
     const replace = await screen.findByRole("textbox", { name: "Replace" });
-    await waitFor(() => expect(replace).toHaveFocus());
-    fireEvent.keyDown(replace, { key: "Escape" });
+    const find = screen.getByRole("searchbox", { name: "Find" });
+    expect(replace).toBeVisible();
+    await waitFor(() => expect(find).toHaveFocus());
+    fireEvent.keyDown(find, { key: "Tab" });
+    expect(replace).toHaveFocus();
+    fireEvent.keyDown(replace, { key: "Tab", shiftKey: true });
+    expect(find).toHaveFocus();
+    fireEvent.keyDown(find, { key: "Escape" });
     expect(screen.queryByTestId("code-workspace-editor-search")).not.toBeInTheDocument();
   });
 
@@ -1407,6 +1414,31 @@ describe("ED-IMPROVE-007 leaf/file view snapshots", () => {
     await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
     const captured = onViewStateChange.mock.calls.at(-1)![0];
     expect(captured.folds.length).toBeGreaterThan(0);
+  });
+
+  it("ED-PARITY-012: default import fold on open; user-expanded imports stay expanded on remount", async () => {
+    const doc = "package demo;\nimport a.B;\nimport c.D;\nclass Demo {}\n";
+    const onViewStateChange = vi.fn();
+    const first = renderEditor(doc, vi.fn(), { path: "src/Demo.java", onViewStateChange });
+    const view = findView(first);
+    expect(foldedRanges(view.state).size).toBe(1);
+    unfoldAll(view);
+    expect(foldedRanges(view.state).size).toBe(0);
+    view.dispatch({ selection: { anchor: 1 } });
+    await waitFor(() => expect(onViewStateChange.mock.calls.at(-1)?.[0]?.importsExpanded).toBe(true));
+    const snapshot = onViewStateChange.mock.calls.at(-1)![0];
+    first.unmount();
+
+    const second = renderEditor(doc, vi.fn(), { path: "src/Demo.java", initialViewState: snapshot });
+    expect(foldedRanges(findView(second).state).size).toBe(0);
+    second.unmount();
+
+    // A snapshot from a view that never held the import fold keeps the default.
+    const third = renderEditor(doc, vi.fn(), {
+      path: "src/Demo.java",
+      initialViewState: { ...snapshot, importsExpanded: undefined },
+    });
+    expect(foldedRanges(findView(third).state).size).toBe(1);
   });
 
   it("clamps corrupt or out-of-range persisted offsets instead of throwing", () => {

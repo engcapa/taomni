@@ -48,6 +48,7 @@ import type { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTrans
 import type { EditorAppearanceExtensionProfile } from "./editorAppearanceExtension";
 import { EditorBanner } from "./EditorBanner";
 import { FileTypeIcon } from "./fileTypeIcon";
+import type { GoToLineRequest } from "./CodeMirrorHost";
 import { createPortal } from "react-dom";
 import { useCodeWorkspaceStatusStore } from "../../../stores/codeWorkspaceStatusStore";
 import type { EditorBannerItem } from "./editorBannerModel";
@@ -169,6 +170,8 @@ interface EditorGroupProps {
   breadcrumbs: ReactNode;
   breadcrumbsPlacement?: "top" | "bottom" | "status-bar";
   editorBanners?: EditorBannerItem[];
+  /** ED-PARITY-012 DEC-012-06: host-rendered Go to Line dialog. */
+  onGoToLineRequest?: (request: GoToLineRequest) => void;
   /** ED-PARITY-011 DEC-011-05: files with error diagnostics (red wavy tab name). */
   filesWithErrors?: ReadonlySet<string>;
   onDismissBanner?: (id: string) => void;
@@ -343,6 +346,7 @@ export function EditorGroup({
   breadcrumbsPlacement = "top",
   editorBanners = [],
   filesWithErrors,
+  onGoToLineRequest,
   onDismissBanner,
   activeSymbols,
   stickyLinesEnabled = true,
@@ -1013,6 +1017,7 @@ export function EditorGroup({
                         parameterInfoRequestNonce={parameterInfoRequestNonce}
                         parameterInfoShowFullSignatures={parameterInfoShowFullSignatures}
                         onFoldProvenanceChange={setActiveFoldProvenance}
+                        onGoToLineRequest={onGoToLineRequest}
                         codeStyle={activeCodeStyle}
                       />
                     </div>
@@ -1102,6 +1107,7 @@ export function EditorGroup({
                       parameterInfoRequestNonce={parameterInfoRequestNonce}
                       parameterInfoShowFullSignatures={parameterInfoShowFullSignatures}
                       onFoldProvenanceChange={setActiveFoldProvenance}
+                      onGoToLineRequest={onGoToLineRequest}
                       codeStyle={activeCodeStyle}
                     />
                   </div>

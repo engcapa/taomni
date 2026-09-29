@@ -299,7 +299,7 @@ steps:
     value: no-result
 - assert_text:
     selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
-    contains: 0 matches
+    contains: 0 results
 - click: '[data-testid="code-workspace-editor-search"] button[aria-label="Use regular expression"]'
 - fill:
     selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
@@ -319,7 +319,7 @@ steps:
     value: ''
 - assert_text:
     selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
-    contains: 0 matches
+    contains: 0 results
 - fill:
     selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
     value: tree
@@ -703,7 +703,7 @@ verification:
         "regex": "^$"}}'
     - step: 155
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
-        "contains": "0 matches"}}'
+        "contains": "0 results"}}'
     - step: 158
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
         "contains": "Invalid pattern"}}'
@@ -712,7 +712,7 @@ verification:
         "contains": "1 / 2"}}'
     - step: 163
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
-        "contains": "0 matches"}}'
+        "contains": "0 results"}}'
     - step: 165
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
         "contains": "1 / 2"}}'

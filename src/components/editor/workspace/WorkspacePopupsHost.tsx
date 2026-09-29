@@ -14,8 +14,15 @@ import { QuickDocPopup } from "./QuickDocPopup";
 import type { QuickDocContent } from "./referenceDocumentation";
 import { LocationPeek, type LocationPeekState } from "./LocationPeek";
 import { RecentLocationsDialog } from "./RecentLocationsDialog";
+import { useFocusReturn } from "./useFocusReturn";
 import type { NavigationHistoryFacade, NavigationLocation, WorkspaceLocationController } from "./navigationHistoryModel";
 import type { WorkspaceSemanticIndexSnapshot } from "./workspaceSemanticIndex";
+
+/** DEC-ALIGN-11: return focus when a non-QuickPick popup closes (ED-PARITY-012). */
+function FocusReturn({ active }: { active: boolean }) {
+  useFocusReturn(active);
+  return null;
+}
 
 interface WorkspacePopupsHostProps {
   searchEverywhereOpen: boolean;
@@ -125,6 +132,11 @@ export function WorkspacePopupsHost({
 }: WorkspacePopupsHostProps) {
   return (
     <>
+      {/* First in tree order: their layout effects must record the opener
+          before a popup's autoFocus moves focus into it. */}
+      <FocusReturn active={!!recentLocationsOpen} />
+      <FocusReturn active={!!quickDocOpen} />
+      <FocusReturn active={!!locationPeek} />
       <SearchEverywhere
         open={searchEverywhereOpen}
         initialMode={searchEverywhereMode}

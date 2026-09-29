@@ -449,6 +449,8 @@ import { sha256Hex } from "./workspace/projectAnalysisModel";
 import { KeymapCheatSheetDialog } from "./workspace/KeymapCheatSheetDialog";
 import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
 import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
+import { GoToLineDialog } from "./workspace/GoToLineDialog";
+import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
 import {
   BUILTIN_KEYMAP_PRESETS,
   consumeKeymapDefaultsMigrationNotice,
@@ -16172,6 +16174,8 @@ export function CodeWorkspaceTab({
   const [activeKeymapSchemeId, setActiveKeymapSchemeId] = useState<string | null>(keymapStore.activeId);
   const [keymapSettingsOpen, setKeymapSettingsOpen] = useState(false);
   const [toolbarMoreOpen, setToolbarMoreOpen] = useState(false);
+  /** ED-PARITY-012 DEC-012-06: pending Go to Line:Column dialog. */
+  const [goToLineRequest, setGoToLineRequest] = useState<GoToLineRequest | null>(null);
   // The ⋮ menu closes on any outside press or Esc without swallowing that
   // press, so the next toolbar/editor click still reaches its target.
   useEffect(() => {
@@ -20435,6 +20439,7 @@ export function CodeWorkspaceTab({
       <EditorGroup
         emptyHints={emptyEditorHints}
         filesWithErrors={filesWithErrors}
+        onGoToLineRequest={setGoToLineRequest}
         onClipboardUnavailable={setStatusMessage}
         onClipboardObservation={setLatestClipboardObservation}
         groupId={groupId}
@@ -22469,6 +22474,23 @@ export function CodeWorkspaceTab({
             if (!entry) return;
             void actionsController.host.executePrepared(entry.evaluation);
           }}
+        />
+      )}
+      {goToLineRequest && (
+        <GoToLineDialog
+          current={goToLineRequest.current}
+          lineCount={goToLineRequest.lineCount}
+          onGo={(target) => {
+            const request = goToLineRequest;
+            setGoToLineRequest(null);
+            request.apply(target);
+          }}
+          onCancel={() => {
+            const request = goToLineRequest;
+            setGoToLineRequest(null);
+            request.cancel();
+          }}
+          restoreFocusFallback={handleReturnToEditor}
         />
       )}
       {keymapMigrationNoticeOpen && !keymapSettingsOpen && (

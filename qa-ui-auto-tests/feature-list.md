@@ -6228,6 +6228,7 @@ files:
   - src/components/editor/workspace/workspaceNavigationBar.ts
   - src/components/editor/workspace/fileTypeIcon.tsx
   - src/components/editor/workspace/importFold.ts
+  - src/components/editor/workspace/GoToLineDialog.tsx
   - src/components/editor/workspace/KeymapMigrationNotice.tsx
   - src/components/editor/workspace/useFocusReturn.ts
   - src/components/editor/workspace/workspaceKeymapPlatform.ts
@@ -6946,6 +6947,34 @@ controls:
     optional: true
   - id: ai-selection-toolbar         # ED-PARITY-011 DEC-011-07 user-selection-only AI toolbar
     selector: '[data-testid="code-workspace-ai-selection-toolbar"]'
+    kind: display
+    optional: true
+  - id: goto-line-dialog             # ED-PARITY-012 DEC-012-06 Go to Line:Column dialog
+    selector: '[data-testid="code-workspace-goto-line-dialog"]'
+    kind: display
+    optional: true
+  - id: goto-line-input
+    selector: '[data-testid="code-workspace-goto-line-input"]'
+    kind: interactive
+    optional: true
+  - id: goto-line-ok
+    selector: '[data-testid="code-workspace-goto-line-ok"]'
+    kind: interactive
+    optional: true
+  - id: goto-line-cancel
+    selector: '[data-testid="code-workspace-goto-line-cancel"]'
+    kind: interactive
+    optional: true
+  - id: goto-line-error
+    selector: '[data-testid="code-workspace-goto-line-error"]'
+    kind: display
+    optional: true
+  - id: structure-popup              # File Structure (Ctrl+F12) quick-pick popup
+    selector: '[data-testid="code-workspace-structure-popup"]'
+    kind: display
+    optional: true
+  - id: recent-locations-dialog      # Recent Locations (Ctrl+Shift+E)
+    selector: '[data-testid="recent-locations-dialog"]'
     kind: display
     optional: true
   - id: empty-editor-hints
