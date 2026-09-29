@@ -6229,6 +6229,7 @@ files:
   - src/components/editor/workspace/fileTypeIcon.tsx
   - src/components/editor/workspace/importFold.ts
   - src/components/editor/workspace/GoToLineDialog.tsx
+  - src/components/editor/workspace/languageServiceReadiness.ts
   - src/components/editor/workspace/KeymapMigrationNotice.tsx
   - src/components/editor/workspace/useFocusReturn.ts
   - src/components/editor/workspace/workspaceKeymapPlatform.ts
@@ -6977,6 +6978,33 @@ controls:
     selector: '[data-testid="recent-locations-dialog"]'
     kind: display
     optional: true
+  - id: problems-provider-state      # ED-PARITY-015 typed language-service state in Problems
+    selector: '[data-testid="code-workspace-problems-provider-state"]'
+    kind: display
+    optional: true
+  - id: problems-stale
+    selector: '[data-testid="code-workspace-problems-stale"]'
+    kind: display
+    optional: true
+  - id: problems-configure
+    selector: '[data-testid="code-workspace-problems-configure"]'
+    kind: interactive
+    optional: true
+  - id: problems-retry
+    selector: '[data-testid="code-workspace-problems-retry"]'
+    kind: interactive
+    optional: true
+  - id: problems-diagnostic-line
+    selector: '[data-testid="problems-diagnostic-line"]'
+    kind: display
+    optional: true
+  - id: problems-severity-filter
+    selector: '[data-testid="problems-severity-error"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="problems-severity-warning"]'
+      - '[data-testid="problems-severity-info"]'
   - id: empty-editor-hints
     selector: '[data-testid="code-workspace-empty-editor"]'
     kind: display

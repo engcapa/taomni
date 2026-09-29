@@ -160,6 +160,7 @@
   - 首个切片（已确认缺陷）：`panels/ProblemsPanel.tsx:176` 在 provider 不可用/加载/失败时显示对应 typed 状态和“配置/重试”，不再显示 “No problems in open files”；右上检查 widget（011）与 Problems 计数同源。
   - Problems 工具窗对齐 IDEA：File（带计数）/Project Errors 标签，按文件分组，行尾 `:行号`，左侧查看/快速修复/预览按钮。
   - 弹层外观与键盘交给 020；本卡保留 provider 就绪状态机、诊断/Problems 数据和恢复。
+- P1 设计：[ed-parity-015-java-readiness-design.md](ed-parity-015-java-readiness-design.md)。
 - 验收：`ED-PARITY-015-A1`、`ED-PARITY-015-A2`、`ED-PARITY-015-A3`、`ED-PARITY-015-A4`。
 
 <a id="ed-parity-016"></a>

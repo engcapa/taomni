@@ -450,6 +450,7 @@ import { KeymapCheatSheetDialog } from "./workspace/KeymapCheatSheetDialog";
 import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
 import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
 import { GoToLineDialog } from "./workspace/GoToLineDialog";
+import { languageServiceReadiness } from "./workspace/languageServiceReadiness";
 import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
 import {
   BUILTIN_KEYMAP_PRESETS,
@@ -2712,6 +2713,7 @@ export function CodeWorkspaceTab({
     closeDocument: closeLspDocument,
     closeDocumentAndWait: closeLspDocumentAndWait,
     updateStatus: updateLspStatusForFile,
+    restartServers: restartLspServers,
   } = useWorkspaceLspSession({
     workspaceInstanceId,
     roots,
@@ -21432,6 +21434,9 @@ export function CodeWorkspaceTab({
                 fullProjectNote={activeCapabilities?.workspaceDiagnostics === true
                   ? null
                   : "On-the-fly diagnostics only — this server does not expose workspace-wide diagnostics."}
+                readiness={activeKey ? languageServiceReadiness(activeLspState) : null}
+                onConfigureLanguageService={() => openLanguageServersSettings(activeLspState?.status?.presetId)}
+                onRetryLanguageService={restartLspServers}
               />
             ),
           },

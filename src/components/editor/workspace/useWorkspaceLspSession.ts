@@ -197,6 +197,8 @@ export interface WorkspaceLspSessionController {
   closeDocumentAndWait: (file: OpenFileState) => Promise<void>;
   forgetDocument: (key: string) => void;
   updateStatus: (file: OpenFileState, status: LspDocumentStatus) => void;
+  /** Stop this workspace's language servers so they restart on the next sync. */
+  restartServers: () => void;
 }
 
 /** Centralizes the open/change/save/close lifecycle for one workspace instance. */
@@ -919,5 +921,7 @@ export function useWorkspaceLspSession({
     closeDocumentAndWait,
     forgetDocument,
     updateStatus,
+    /** ED-PARITY-015 DEC-015-05: user Retry for a failed/inactive service. */
+    restartServers: restartWorkspaceServers,
   };
 }

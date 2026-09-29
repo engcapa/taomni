@@ -352,6 +352,14 @@
 - `[data-testid="code-workspace-goto-line-error"]` — display [optional] — F25.5.goto-line-error
 - `[data-testid="code-workspace-structure-popup"]` — display [optional] — F25.5.structure-popup
 - `[data-testid="recent-locations-dialog"]` — display [optional] — F25.5.recent-locations-dialog
+- `[data-testid="code-workspace-problems-provider-state"]` — display [optional] — F25.5.problems-provider-state
+- `[data-testid="code-workspace-problems-stale"]` — display [optional] — F25.5.problems-stale
+- `[data-testid="code-workspace-problems-configure"]` — interactive [optional] — F25.5.problems-configure
+- `[data-testid="code-workspace-problems-retry"]` — interactive [optional] — F25.5.problems-retry
+- `[data-testid="problems-diagnostic-line"]` — display [optional] — F25.5.problems-diagnostic-line
+- `[data-testid="problems-severity-error"]` — interactive [optional] — F25.5.problems-severity-filter
+  ↳ `[data-testid="problems-severity-warning"]` — alias
+  ↳ `[data-testid="problems-severity-info"]` — alias
 - `[data-testid="code-workspace-empty-editor"]` — display [optional] — F25.5.empty-editor-hints
   ↳ `[data-testid="code-workspace-empty-editor-hint"]` — alias
 - `[data-testid="keymap-group-Navigation"]` — interactive [optional] — F25.5.keymap-group
