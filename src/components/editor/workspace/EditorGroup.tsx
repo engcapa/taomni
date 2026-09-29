@@ -172,6 +172,8 @@ interface EditorGroupProps {
   editorBanners?: EditorBannerItem[];
   /** ED-PARITY-012 DEC-012-06: host-rendered Go to Line dialog. */
   onGoToLineRequest?: (request: GoToLineRequest) => void;
+  /** ED-PARITY-020: member completion reached an unavailable provider. */
+  onCompletionUnavailable?: (info: { explicit: boolean }) => void;
   /** ED-PARITY-011 DEC-011-05: files with error diagnostics (red wavy tab name). */
   filesWithErrors?: ReadonlySet<string>;
   onDismissBanner?: (id: string) => void;
@@ -347,6 +349,7 @@ export function EditorGroup({
   editorBanners = [],
   filesWithErrors,
   onGoToLineRequest,
+  onCompletionUnavailable,
   onDismissBanner,
   activeSymbols,
   stickyLinesEnabled = true,
@@ -1018,6 +1021,7 @@ export function EditorGroup({
                         parameterInfoShowFullSignatures={parameterInfoShowFullSignatures}
                         onFoldProvenanceChange={setActiveFoldProvenance}
                         onGoToLineRequest={onGoToLineRequest}
+                        onCompletionUnavailable={onCompletionUnavailable}
                         codeStyle={activeCodeStyle}
                       />
                     </div>
@@ -1108,6 +1112,7 @@ export function EditorGroup({
                       parameterInfoShowFullSignatures={parameterInfoShowFullSignatures}
                       onFoldProvenanceChange={setActiveFoldProvenance}
                       onGoToLineRequest={onGoToLineRequest}
+                      onCompletionUnavailable={onCompletionUnavailable}
                       codeStyle={activeCodeStyle}
                     />
                   </div>

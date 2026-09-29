@@ -451,6 +451,7 @@ import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
 import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
 import { GoToLineDialog } from "./workspace/GoToLineDialog";
 import { languageServiceReadiness } from "./workspace/languageServiceReadiness";
+import { CodeInsightNotice, caretAnchor, type CodeInsightNoticeState } from "./workspace/CodeInsightNotice";
 import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
 import {
   BUILTIN_KEYMAP_PRESETS,
@@ -2529,6 +2530,18 @@ export function CodeWorkspaceTab({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const treePaneRef = useRef<HTMLElement | null>(null);
   const editorPaneRef = useRef<HTMLElement | null>(null);
+  /** ED-PARITY-020 DEC-020-01: caret popup for empty/unavailable code insight. */
+  const [codeInsightNotice, setCodeInsightNotice] = useState<CodeInsightNoticeState | null>(null);
+  const codeInsightNoticeSeqRef = useRef(0);
+  const showCodeInsightNotice = useCallback((message: string, action: "configure" | null = null) => {
+    codeInsightNoticeSeqRef.current += 1;
+    setCodeInsightNotice({
+      id: codeInsightNoticeSeqRef.current,
+      message,
+      action,
+      anchor: caretAnchor(editorPaneRef.current),
+    });
+  }, []);
   const inactiveEditorPaneRef = useRef<HTMLElement | null>(null);
   const terminalDockRef = useRef<TerminalDockHandle | null>(null);
   const runPanelRef = useRef<RunPanelHandle | null>(null);
@@ -9028,6 +9041,7 @@ export function CodeWorkspaceTab({
     const descriptor = lspDescriptorForFile(file);
     if (!descriptor) {
       setStatusMessage("No documentation available");
+      showCodeInsightNotice("No documentation found.");
       return;
     }
     const requestRevision = file.documentRevision;
@@ -9098,8 +9112,16 @@ export function CodeWorkspaceTab({
       }
     });
     if (outcome.state !== "ready") {
-      if (outcome.state === "unavailable") setStatusMessage("No documentation available");
-      else if (outcome.state === "failed") setStatusMessage(outcome.message);
+      if (outcome.state === "unavailable") {
+        setStatusMessage("No documentation available");
+        // DEC-020-01: a popup at the caret names why (IDEA "No documentation found.").
+        const readiness = languageServiceReadiness(lspFilesRef.current[file.key] ?? null);
+        if (readiness.kind === "ready" || readiness.kind === "idle") showCodeInsightNotice("No documentation found.");
+        else showCodeInsightNotice(`Documentation unavailable: ${readiness.message}`, readiness.action === "configure" ? "configure" : null);
+      } else if (outcome.state === "failed") {
+        setStatusMessage(outcome.message);
+        showCodeInsightNotice(outcome.message);
+      }
       return;
     }
     const payload = outcome.payload;
@@ -12100,9 +12122,13 @@ export function CodeWorkspaceTab({
       // provider progress (jdtls workDoneProgress) must not stale a produced
       // result. Every requestFailure classification already surfaced its
       // accurate status message there.
-      if (requested.requestFailure) return;
+      if (requested.requestFailure) {
+        showCodeInsightNotice(requested.requestFailure.message);
+        return;
+      }
       if (!requested.context) {
         setStatusMessage(`No ${sectionLabel} provided by the language server`);
+        showCodeInsightNotice(`No ${sectionLabel} provided by the language server`);
         return;
       }
       providerActions = requested.providerActions;
@@ -12116,6 +12142,7 @@ export function CodeWorkspaceTab({
     }
     if (!filtered.length) {
       setStatusMessage(`No ${sectionLabel} provided by the language server`);
+      showCodeInsightNotice(`No ${sectionLabel} provided by the language server`);
       return;
     }
     const sorted = [...filtered].sort((a, b) => {
@@ -12274,6 +12301,12 @@ export function CodeWorkspaceTab({
     const diagnostics = payload?.diagnostics ?? (
       lspFilesRef.current[file.key]?.diagnostics ?? []
     ).filter((item) => item.range.start.line <= line && item.range.end.line >= line);
+    // DEC-020-01: Alt+Enter with an unavailable service answers at the caret.
+    const readiness = languageServiceReadiness(lspFilesRef.current[file.key] ?? null);
+    if (readiness.kind !== "ready" && readiness.kind !== "idle") {
+      showCodeInsightNotice(`Context actions unavailable: ${readiness.message}`, readiness.action === "configure" ? "configure" : null);
+      return;
+    }
     const rect = editorPaneRef.current?.getBoundingClientRect();
     await showCodeActionsMenu(
       payload?.clientX ?? (rect?.left ?? 0) + 80,
@@ -14333,6 +14366,12 @@ export function CodeWorkspaceTab({
       when: () => !!activeFile,
       run: () => {
         if (!activeFile) return;
+        // DEC-020-01: an unavailable service answers with a caret popup.
+        const readiness = languageServiceReadiness(lspFilesRef.current[activeFile.key] ?? null);
+        if (readiness.kind !== "ready" && readiness.kind !== "idle") {
+          showCodeInsightNotice(`Parameter info unavailable: ${readiness.message}`, readiness.action === "configure" ? "configure" : null);
+          return;
+        }
         setParameterInfoRequestNonce((nonce) => nonce + 1);
       },
     },
@@ -20442,6 +20481,13 @@ export function CodeWorkspaceTab({
         emptyHints={emptyEditorHints}
         filesWithErrors={filesWithErrors}
         onGoToLineRequest={setGoToLineRequest}
+        onCompletionUnavailable={() => {
+          const readiness = languageServiceReadiness(groupFile ? lspFilesRef.current[groupFile.key] ?? null : null);
+          const reason = readiness.kind === "ready" || readiness.kind === "idle"
+            ? "the language server returned no result"
+            : readiness.message;
+          showCodeInsightNotice(`Member completion unavailable: ${reason}`, readiness.action === "configure" ? "configure" : null);
+        }}
         onClipboardUnavailable={setStatusMessage}
         onClipboardObservation={setLatestClipboardObservation}
         groupId={groupId}
@@ -22479,6 +22525,13 @@ export function CodeWorkspaceTab({
             if (!entry) return;
             void actionsController.host.executePrepared(entry.evaluation);
           }}
+        />
+      )}
+      {codeInsightNotice && (
+        <CodeInsightNotice
+          notice={codeInsightNotice}
+          onClose={() => setCodeInsightNotice(null)}
+          onConfigure={() => openLanguageServersSettings(activeLspState?.status?.presetId)}
         />
       )}
       {goToLineRequest && (

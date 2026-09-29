@@ -6230,6 +6230,7 @@ files:
   - src/components/editor/workspace/importFold.ts
   - src/components/editor/workspace/GoToLineDialog.tsx
   - src/components/editor/workspace/languageServiceReadiness.ts
+  - src/components/editor/workspace/CodeInsightNotice.tsx
   - src/components/editor/workspace/KeymapMigrationNotice.tsx
   - src/components/editor/workspace/useFocusReturn.ts
   - src/components/editor/workspace/workspaceKeymapPlatform.ts
@@ -6997,6 +6998,14 @@ controls:
   - id: problems-diagnostic-line
     selector: '[data-testid="problems-diagnostic-line"]'
     kind: display
+    optional: true
+  - id: code-insight-notice          # ED-PARITY-020 caret popup for empty/unavailable code insight
+    selector: '[data-testid="code-workspace-code-insight-notice"]'
+    kind: display
+    optional: true
+  - id: code-insight-configure
+    selector: '[data-testid="code-workspace-code-insight-configure"]'
+    kind: interactive
     optional: true
   - id: problems-severity-filter
     selector: '[data-testid="problems-severity-error"]'

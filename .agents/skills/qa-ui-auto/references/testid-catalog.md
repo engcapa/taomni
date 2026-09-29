@@ -357,6 +357,8 @@
 - `[data-testid="code-workspace-problems-configure"]` — interactive [optional] — F25.5.problems-configure
 - `[data-testid="code-workspace-problems-retry"]` — interactive [optional] — F25.5.problems-retry
 - `[data-testid="problems-diagnostic-line"]` — display [optional] — F25.5.problems-diagnostic-line
+- `[data-testid="code-workspace-code-insight-notice"]` — display [optional] — F25.5.code-insight-notice
+- `[data-testid="code-workspace-code-insight-configure"]` — interactive [optional] — F25.5.code-insight-configure
 - `[data-testid="problems-severity-error"]` — interactive [optional] — F25.5.problems-severity-filter
   ↳ `[data-testid="problems-severity-warning"]` — alias
   ↳ `[data-testid="problems-severity-info"]` — alias

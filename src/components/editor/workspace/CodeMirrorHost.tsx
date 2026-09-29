@@ -530,6 +530,8 @@ interface CodeMirrorHostProps {
   onFoldProvenanceChange?: (provenance: RegionFoldingProvenance | null) => void;
   /** ED-PARITY-012 DEC-012-06: host-rendered Go to Line:Column dialog. */
   onGoToLineRequest?: (request: GoToLineRequest) => void;
+  /** ED-PARITY-020: completion hit an unavailable provider at a member access. */
+  onCompletionUnavailable?: (info: { explicit: boolean }) => void;
   onViewportChange?: (range: LspRange) => void;
   /**
    * ED-IMPROVE-007: one-shot caret/selection/scroll/fold snapshot for this
@@ -2326,6 +2328,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onSelectionChange,
   onFoldProvenanceChange,
   onGoToLineRequest,
+  onCompletionUnavailable,
   onViewportChange,
   initialViewState = null,
   onViewStateChange,
@@ -2658,6 +2661,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       getDocumentRevision: () => getCompletionIdentityRef.current()?.documentRevision ?? -1,
       reportDiagnostic: (kind, detail) => onCompletionDiagnosticRef.current(kind, detail),
       onScopeFallback: (state) => onScopeFallbackRef.current?.(state),
+      onProviderUnavailable: (info) => onCompletionUnavailableRef.current?.(info),
       onResolveGate: (request) => presentResolveGateRef.current?.(request),
       onAcceptancePending: (cancel) => {
         pendingCompletionAcceptanceRef.current?.();
@@ -2833,6 +2837,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onFoldProvenanceChangeRef = useRef(onFoldProvenanceChange);
   const onGoToLineRequestRef = useRef(onGoToLineRequest);
+  const onCompletionUnavailableRef = useRef(onCompletionUnavailable);
   const onViewportChangeRef = useRef(onViewportChange);
   // ED-IMPROVE-007: the initial snapshot is read once at view creation; later
   // prop changes never re-apply it over the user's live caret/scroll.
@@ -2898,6 +2903,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onSelectionChangeRef.current = onSelectionChange;
   onFoldProvenanceChangeRef.current = onFoldProvenanceChange;
   onGoToLineRequestRef.current = onGoToLineRequest;
+  onCompletionUnavailableRef.current = onCompletionUnavailable;
   onViewportChangeRef.current = onViewportChange;
   onExpandSelectionRef.current = onExpandSelection;
   onLightbulbRef.current = onLightbulb;

@@ -214,6 +214,7 @@
   - 错误 tooltip：`Required type / Provided` 结构、首选修复链接 + 快捷键 + More actions。
 - 必须保留：provider snippet、一次接受/undo、resolve gate、IME、迟到响应隔离（旧 005 契约）。
 - 依赖：011（surface token）、013（快捷键显示格式）；provider 就绪由 015 负责，native provider 态需 JDT LS fixture。
+- P1 设计：[ed-parity-020-code-insight-design.md](ed-parity-020-code-insight-design.md)。
 - 验收：`ED-PARITY-020-A1`、`ED-PARITY-020-A2`、`ED-PARITY-020-A3`。
 
 <a id="ed-parity-021"></a>
