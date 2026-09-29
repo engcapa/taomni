@@ -17079,15 +17079,20 @@ export function CodeWorkspaceTab({
 
   const goToDeclaration = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
+      // Languages whose declaration is the definition (Java, Kotlin, …) go
+      // straight to the definition query. Preparing here first forced a second
+      // buffer sync inside goToDefinition, which could supersede the query and
+      // drop Ctrl+B silently (ED-PARITY-013: Ctrl+B is now the navigation key).
+      const current = openFilesRef.current[file.key] ?? file;
+      const currentLanguageId = lspFilesRef.current[current.key]?.status?.languageId
+        ?? lspDescriptorForFile(current)?.languageId
+        ?? current.languagePath;
+      if (isDeclarationDefinitionEquivalentLanguage(currentLanguageId, current.path)) {
+        return goToDefinition(current, position);
+      }
       const prepared = await prepareSemanticNavigationRequest(file);
       if (!prepared) return false;
       const { file: live, descriptor } = prepared;
-      const languageId = lspFilesRef.current[live.key]?.status?.languageId
-        ?? descriptor.languageId
-        ?? live.languagePath;
-      if (isDeclarationDefinitionEquivalentLanguage(languageId, live.path)) {
-        return goToDefinition(live, position);
-      }
       const caps = lspFilesRef.current[live.key]?.status?.capabilities;
       if (caps && caps.declaration === false) {
         if (caps.definition !== false) {
@@ -17137,7 +17142,7 @@ export function CodeWorkspaceTab({
         return false;
       }
     },
-    [beginSemanticQuery, goToDefinition, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, goToDefinition, lspDescriptorForFile, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
 
   const goToTypeDefinition = useCallback(

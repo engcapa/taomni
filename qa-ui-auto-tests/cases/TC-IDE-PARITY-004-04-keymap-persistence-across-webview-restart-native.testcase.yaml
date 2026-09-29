@@ -125,7 +125,7 @@ steps:
     timeout_sec: 5
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Control+r
-- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+- assert_visible: '[data-testid="code-workspace-editor-search"]'
 verification:
   review: reviewed
   requirements:
@@ -146,13 +146,13 @@ verification:
       expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.replace\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
     results: [49]
   - id: R3
-    requirement: "A1.5 V2：重启后 live host 同样加载了持久化 scheme——新 chord 真实执行 Replace，旧 chord Ctrl+R 不再命中该动作。"
+    requirement: "A1.5 V2：重启后 live host 同样加载了持久化 scheme——新 chord 真实执行 Replace，继承的 Ctrl+R 仍可用（ED-PARITY-013 DEC-013-12：Add 按 IDEA 追加）。"
     actions: [54, 59]
     checkpoints:
     - step: 55
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
     - step: 60
-      expectation: "{\"assert_not_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
+      expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
     results: [55, 60]
   visual:
   - check: "重启前后两张截图中 editor.replace 行的 swatch 呈现一致（Alt+Shift+R），底部动作栏与行布局无截断。"
