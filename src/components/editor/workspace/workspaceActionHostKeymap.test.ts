@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { setKeymapPlatformOverride } from "./workspaceKeymapPlatform";
 import { WorkspaceActionHost } from "./workspaceActionHost";
 import {
   createKeymapScheme,
@@ -77,7 +78,7 @@ describe("§8.18.2 scheme-aware binding resolution", () => {
 
     // Snapshot shows the effective binding so all surfaces share one truth.
     const snapshotItem = host.getSnapshot().find((item) => item.id === "editor.save");
-    expect(snapshotItem?.keybinding).toBe("Ctrl+Alt+d");
+    expect(snapshotItem?.keybinding).toBe("Ctrl+Alt+D");
   });
 
   it("keeps user-disabled actions visible in search but unavailable to dispatch", async () => {
@@ -184,7 +185,7 @@ describe("§8.18.2 scheme-aware binding resolution", () => {
     expect(notices.map((notice) => notice.consumed)).toEqual([false, false, true]);
     for (const notice of notices) {
       expect(notice.actionIds).toEqual(["workspace.find", "workspace.find2"]);
-      expect(notice.keybinding).toBe("Ctrl+f");
+      expect(notice.keybinding).toBe("Ctrl+F");
     }
   });
 
@@ -213,9 +214,10 @@ describe("§8.18.2 scheme-aware binding resolution", () => {
     for (const id of ["workspace.find", "workspace.find2"]) {
       expect(snapshot.find((item) => item.id === id)?.bindingConflicts).toHaveLength(1);
     }
-    // The display strings really do differ — this is the exact D1 fork.
+    // ED-PARITY-013 DEC-013-02: both now render through the one formatter, so
+    // the D1 display fork is gone as well as the identity fork.
     expect(snapshot.find((item) => item.id === "workspace.find")?.keybinding).toBe("Ctrl+F");
-    expect(snapshot.find((item) => item.id === "workspace.find2")?.keybinding).toBe("Ctrl+f");
+    expect(snapshot.find((item) => item.id === "workspace.find2")?.keybinding).toBe("Ctrl+F");
   });
 
   it("recognizes two-stroke chords: first stroke waits, second executes, Esc cancels", async () => {
@@ -258,6 +260,8 @@ describe("§8.18.2 scheme-aware binding resolution", () => {
   });
 
   it("keeps a two-stroke Meta chord distinct from a single Meta save binding", async () => {
+    // Meta (Cmd) aliases only exist on macOS (ED-PARITY-013 DEC-013-01).
+    setKeymapPlatformOverride("mac");
     const save = vi.fn(async () => ({ kind: "applied" as const }));
     const openKeymap = vi.fn(async () => ({ kind: "applied" as const }));
     const host = makeHost([

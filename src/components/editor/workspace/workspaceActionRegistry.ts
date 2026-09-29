@@ -7,6 +7,7 @@
  */
 
 import type { EditorView } from "@codemirror/view";
+import type { PlatformKeybindingOverrides } from "./workspaceKeymapPlatform";
 
 export type ActionCategory =
   | "Edit"
@@ -244,6 +245,8 @@ export interface WorkspaceActionMetadata {
   category: ActionCategory;
   keybinding?: string | ActionPlatformKeybindings;
   secondaryKeybindings?: string[];
+  /** Per-platform replacement sets (ED-PARITY-013 DEC-013-01). */
+  platformKeybindings?: PlatformKeybindingOverrides;
   when?: string | WhenExpr | ((context: WorkspaceActionContext) => boolean);
   provenance: ActionProvenance;
   capabilityRequirement?: string;

@@ -1,0 +1,160 @@
+id: TC-IDE-PARITY-013-01
+title: Find Action (Ctrl+Shift+A) opens Actions without editing, Alt+Enter assigns a shortcut, Esc returns focus
+description: 'ED-PARITY-013 A4.1/A1.1/A2.1 browser case. Ctrl+Shift+A used to be unbound and the following typing replaced the editor selection. It now opens Search Everywhere on the Actions tab, typing lands in its query box, the row shortcut is the shared formatter label, Alt+Enter opens the Keymap dialog straight into the Keyboard Shortcut recorder for that action, and closing everything returns focus to the editor (DEC-ALIGN-11). An unbound Ctrl+Shift+Q never changes the document (DEC-013-04).
+
+
+  Mode: browser — renderer routing and focus; native platform entries are TC-IDE-PARITY-013-05.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- keymap
+- ed-parity-013
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: &id001
+    - Browser preview uses an in-memory virtual local filesystem.
+    - Drop OS files here or download remote files to persist them in IndexedDB.
+    - The real Tauri build uses your actual OS filesystem.
+    - ''
+- press: Control+Shift+A
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- assert_attribute:
+    selector: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+    name: aria-selected
+    equals: 'true'
+- type:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    text: reformat
+- assert_attribute:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    name: value
+    equals: reformat
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- assert_pattern:
+    selector: '[data-testid="search-everywhere-shortcut-workspace.format"]'
+    regex: ^Ctrl[+](Alt|Option)[+]L$
+- assert_visible: '[data-testid="search-everywhere-assign-shortcut-hint"]'
+- press: Alt+Enter
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- assert_visible: '[data-testid="keymap-recorder"]'
+- assert_attribute:
+    selector: '[data-testid="keymap-action-filter"]'
+    name: value
+    equals: Format Document
+- press: Escape
+- wait_for:
+    selector: '[data-testid="keymap-recorder"]'
+    state: detached
+    timeout_sec: 5
+- press: Escape
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.activeElement?.classList?.contains("cm-content") === true
+    expect_truthy: true
+- press: Control+Shift+Q
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- screenshot: tc-ide-parity-013-01-find-action.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A4.1：Ctrl+Shift+A 打开 Find Action（Actions 分类）且后续键入进入搜索框，编辑器行内容不变。
+    actions:
+    - 14
+    - 17
+    checkpoints:
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 30}}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] >> role=tab[name=\"Actions\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Search actions\"]", "name": "value", "equals": "reformat"}}'
+    - step: 19
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["Browser preview uses an in-memory virtual local filesystem.", "Drop OS files here or download remote files to persist them in IndexedDB.", "The real Tauri build uses your actual OS filesystem.", ""]}}'
+    results:
+    - 16
+    - 18
+    - 19
+  - id: R2
+    requirement: A1.1/A4.3：Actions 行快捷键为统一格式化标签（Ctrl+Alt+L / mac Ctrl+Option+L），并提示 Alt+Enter 指派快捷键。
+    actions:
+    - 17
+    checkpoints:
+    - step: 20
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"search-everywhere-shortcut-workspace.format\"]", "regex": "^Ctrl[+](Alt|Option)[+]L$"}}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"search-everywhere-assign-shortcut-hint\"]"}'
+    results:
+    - 20
+    - 21
+  - id: R3
+    requirement: A2.1/DEC-013-03：Alt+Enter 打开 Keymap 对话框并直接进入该动作的 Keyboard Shortcut 录制框，过滤框预填动作标题。
+    actions:
+    - 22
+    checkpoints:
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"workspace-keymap-settings-dialog\"]"}'
+    - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"keymap-recorder\"]"}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"keymap-action-filter\"]", "name": "value", "equals": "Format Document"}}'
+    results:
+    - 24
+    - 25
+  - id: R4
+    requirement: DEC-013-10/DEC-ALIGN-11：Esc 逐层关闭录制框与对话框后焦点回到编辑器 .cm-content；未绑定的 Ctrl+Shift+Q 不修改文档。
+    actions:
+    - 26
+    - 28
+    - 31
+    checkpoints:
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"keymap-recorder\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-keymap-settings-dialog\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\") === true", "expect_truthy": true}}'
+    - step: 32
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["Browser preview uses an in-memory virtual local filesystem.", "Drop OS files here or download remote files to persist them in IndexedDB.", "The real Tauri build uses your actual OS filesystem.", ""]}}'
+    results:
+    - 30
+    - 32
+  visual:
+  - check: Find Action 行内快捷键 kbd 与分类不截断，底栏 Alt+Enter 提示可见。
+    method: manual
+    reason: 像素/字体不能由 DOM 断言代替。
+  native:
+  - check: 真实平台按键（Windows/Linux Ctrl、macOS Cmd）与终端保护由 TC-IDE-PARITY-013-05 覆盖。
+    method: external
+    reason: browser 不能证明 WebView 与系统键盘路径。

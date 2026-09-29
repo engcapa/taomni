@@ -23,6 +23,12 @@ import {
   strokesEqual,
   strokeFromKeyboardEvent,
 } from "./workspaceKeymapScheme";
+import {
+  detectKeymapPlatform,
+  formatShortcutLabel,
+  selectPlatformBindings,
+  type KeymapPlatform,
+} from "./workspaceKeymapPlatform";
 
 /** Accept KeyboardEventLike whose optional `code` falls back to `key`. */
 function strokeFromEvent(event: KeyboardEventLike): ShortcutStroke {
@@ -171,21 +177,33 @@ function normalize(stroke: ShortcutStroke): ShortcutStroke {
   return { ...stroke, key: undefined, code: logicalKeyToCode(stroke.code) ?? stroke.code };
 }
 
-function actionKeybindings(action: WorkspaceActionDefinition): string[] {
-  const primary = typeof action.keybinding === "string"
-    ? [action.keybinding]
-    : action.keybinding
+/**
+ * Definition binding strings that apply on `platform` (ED-PARITY-013
+ * DEC-013-01). A platform-specific `keybinding.{macos,windows,linux}` replaces
+ * `keybinding.default`; `platformKeybindings[platform]` replaces the whole set;
+ * Windows/Linux never keep Meta (Super/Win) bindings, macOS lists Cmd first.
+ */
+export function actionKeybindings(
+  action: Pick<WorkspaceActionDefinition, "keybinding" | "secondaryKeybindings" | "platformKeybindings">,
+  platform: KeymapPlatform = detectKeymapPlatform(),
+): string[] {
+  const keybinding = action.keybinding;
+  const primary = typeof keybinding === "string"
+    ? [keybinding]
+    : keybinding
       ? [
-          action.keybinding.default,
-          action.keybinding.macos,
-          action.keybinding.windows,
-          action.keybinding.linux,
+          (platform === "mac"
+            ? keybinding.macos
+            : platform === "windows"
+              ? keybinding.windows
+              : keybinding.linux) ?? keybinding.default,
         ]
       : [];
-  return Array.from(new Set([
-    ...primary,
-    ...(action.secondaryKeybindings ?? []),
-  ].filter((binding): binding is string => Boolean(binding))));
+  return selectPlatformBindings(
+    [...primary, ...(action.secondaryKeybindings ?? [])].filter((binding): binding is string => Boolean(binding)),
+    action.platformKeybindings,
+    platform,
+  );
 }
 
 /** Parse an action's built-in default keybinding strings into physical strokes. */
@@ -243,6 +261,12 @@ function logicalKeyToCode(logicalKey: string): string | null {  const key = logi
     pagedown: "PageDown",
     f1: "F1", f2: "F2", f3: "F3", f4: "F4", f5: "F5", f6: "F6",
     f7: "F7", f8: "F8", f9: "F9", f10: "F10", f11: "F11", f12: "F12",
+    // Named spellings used by catalog strings ("Ctrl+Period", "Alt+Insert",
+    // "Ctrl+Shift+NumpadSubtract") — previously dropped silently (ED-PARITY-013).
+    period: "Period", comma: "Comma", slash: "Slash", backslash: "Backslash",
+    minus: "Minus", equal: "Equal", insert: "Insert",
+    numpadsubtract: "NumpadSubtract", numpadadd: "NumpadAdd",
+    numpadmultiply: "NumpadMultiply", numpaddivide: "NumpadDivide",
     ",": "Comma", ".": "Period", "/": "Slash", "\\": "Backslash",
     ";": "Semicolon", "'": "Quote", "[": "BracketLeft", "]": "BracketRight",
     "-": "Minus", "=": "Equal", "`": "Backquote",
@@ -615,6 +639,7 @@ export class WorkspaceActionHost {
         category: command.category as WorkspaceActionDefinition["category"],
         keybinding: command.keybinding,
         secondaryKeybindings: command.keybindings,
+        platformKeybindings: command.platformKeybindings,
         keywords: command.keywords,
         when: command.when,
         isEnabled: command.isEnabled,
@@ -1060,13 +1085,7 @@ export class WorkspaceActionHost {
   }
 
   private formatConflictDisplay(stroke: ShortcutStroke): string {
-    return [
-      stroke.ctrl && "Ctrl",
-      stroke.alt && "Alt",
-      stroke.shift && "Shift",
-      stroke.meta && "Meta",
-      stroke.key ?? stroke.code,
-    ].filter(Boolean).join("+");
+    return formatShortcutLabel({ kind: "keyboard", strokes: [stroke] });
   }
 
   /**
@@ -1266,18 +1285,13 @@ export class WorkspaceActionHost {
     return this.search("", customContext);
   }
 
-  /** Display strings for an action's effective shortcuts (user scheme first). */
+  /**
+   * Display strings for an action's effective shortcuts (user scheme first),
+   * through the one shared formatter (ED-PARITY-013 DEC-013-02).
+   */
   effectiveKeybindingDisplay(actionId: string): string[] {
     return this.effectiveShortcuts(actionId).shortcuts
-      .map((shortcut) => shortcut.kind === "keyboard"
-        ? shortcut.strokes.map((stroke) => [
-          stroke.ctrl && "Ctrl",
-          stroke.alt && "Alt",
-          stroke.shift && "Shift",
-          stroke.meta && "Meta",
-          stroke.key ?? stroke.code,
-        ].filter(Boolean).join("+")).join(" ")
-        : `Mouse${shortcut.button}`)
+      .map((shortcut) => formatShortcutLabel(shortcut))
       .filter(Boolean);
   }
 

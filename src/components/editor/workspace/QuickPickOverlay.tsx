@@ -24,6 +24,8 @@ interface QuickPickOverlayProps<T> {
   onEnterEmpty?: (query: string) => void;
   /** Notified whenever the filter query changes. */
   onQueryChange?: (query: string) => void;
+  /** Alt+Enter on the selected item (e.g. Find Action → Assign Shortcut). */
+  onAltEnter?: (item: T) => void;
 }
 
 /**
@@ -50,6 +52,7 @@ export function QuickPickOverlay<T>({
   onPick,
   onEnterEmpty,
   onQueryChange,
+  onAltEnter,
 }: QuickPickOverlayProps<T>) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -101,6 +104,10 @@ export function QuickPickOverlay<T>({
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       setSelectedIndex(Math.max(selected - 1, 0));
+    } else if (event.key === "Enter" && event.altKey && onAltEnter) {
+      event.preventDefault();
+      const item = results[selected];
+      if (item) onAltEnter(item);
     } else if (event.key === "Enter") {
       event.preventDefault();
       const item = results[selected];

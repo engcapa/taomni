@@ -1933,13 +1933,19 @@ function signatureTooltipDom(
 function lspNavigationExtensions(
   definitionRef: MutableRefObject<(position: LspPosition) => Promise<boolean>>,
   referencesRef: MutableRefObject<(position: LspPosition) => Promise<void>>,
+  hasActionHost: () => boolean = () => false,
 ): Extension[] {
   const definitionAtSelection = (view: EditorView) => {
+    // ED-PARITY-013 DEC-013-11: with a workspace action host these keys are
+    // host-owned (F12 = Jump to Last Tool Window, Ctrl+Alt+B = Implementation),
+    // so this legacy CodeMirror binding must not act as a second dispatcher.
+    if (hasActionHost()) return false;
     const position = lspPositionFromOffset(view.state.doc, view.state.selection.main.head);
     void definitionRef.current(position);
     return true;
   };
   const referencesAtSelection = (view: EditorView) => {
+    if (hasActionHost()) return false;
     const position = lspPositionFromOffset(view.state.doc, view.state.selection.main.head);
     void referencesRef.current(position);
     return true;
@@ -3253,7 +3259,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             viewRef.current?.focus();
           },
         })),
-        ...lspNavigationExtensions(onDefinitionRef, onReferencesRef),
+        ...lspNavigationExtensions(
+          onDefinitionRef,
+          onReferencesRef,
+          () => !!workspaceActionHostRef.current && !workspaceActionHostRef.current.isDisposed(),
+        ),
         ...codeViewExtensions(),
         WORKSPACE_EDITOR_STYLE,
         LSP_EDITOR_STYLE,

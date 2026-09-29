@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { setKeymapPlatformOverride } from "./workspaceKeymapPlatform";
 import { WorkspaceActionHost, createWorkspaceActionHost } from "./workspaceActionHost";
 import type { WorkspaceActionContext } from "./workspaceActionRegistry";
 
@@ -112,10 +113,19 @@ describe("WorkspaceActionHost (N0.1)", () => {
       stopPropagation: vi.fn(),
     };
 
+    // Cmd aliases apply on macOS only (ED-PARITY-013 DEC-013-01).
+    setKeymapPlatformOverride("mac");
     const dispatched = await host.dispatchKeydown(event);
     expect(dispatched?.id).toBe("workspace.save");
     expect(event.preventDefault).toHaveBeenCalled();
     expect(run).toHaveBeenCalledTimes(1);
+
+    // Windows/Linux drop the Meta (Super/Win) alias for display and dispatch.
+    setKeymapPlatformOverride("linux");
+    const again = { ...event, preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    expect(await host.dispatchKeydown(again)).toBeNull();
+    expect(again.preventDefault).not.toHaveBeenCalled();
+    expect(host.getSnapshot().find((item) => item.id === "workspace.save")?.keybindings).toEqual(["Ctrl+S"]);
   });
 
   it("handles in-flight lock and AbortSignal", async () => {

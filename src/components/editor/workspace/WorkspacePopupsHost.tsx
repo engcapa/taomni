@@ -31,6 +31,8 @@ interface WorkspacePopupsHostProps {
   onOpenFileItem: (item: GoToFileItem) => void;
   onOpenSymbol: (symbol: GoToSymbolItem, options?: { split: boolean }) => void;
   onRunCommand: (commandId: string) => void | Promise<ActionResult>;
+  /** ED-PARITY-013 DEC-013-03: Alt+Enter on an action row = Assign Shortcut. */
+  onAssignShortcut?: (commandId: string) => void;
   onSearchText: (query: string) => void;
 
   recentFilesOpen: boolean;
@@ -86,6 +88,7 @@ export function WorkspacePopupsHost({
   onOpenFileItem,
   onOpenSymbol,
   onRunCommand,
+  onAssignShortcut,
   onSearchText,
   recentFilesOpen,
   recentEntries,
@@ -133,6 +136,7 @@ export function WorkspacePopupsHost({
         semanticIndex={semanticIndex}
         fetchSymbols={fetchWorkspaceSymbols}
         onClose={onCloseSearchEverywhere}
+        onAssignShortcut={onAssignShortcut}
         onOpenFile={onOpenFileItem}
         onOpenSymbol={(symbol, options) => void onOpenSymbol(symbol, options)}
         onRunCommand={onRunCommand}

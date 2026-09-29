@@ -446,7 +446,12 @@ import {
 import { sha256Hex } from "./workspace/projectAnalysisModel";
 import { KeymapCheatSheetDialog } from "./workspace/KeymapCheatSheetDialog";
 import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
+import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
 import {
+  BUILTIN_KEYMAP_PRESETS,
+  consumeKeymapDefaultsMigrationNotice,
+  dismissKeymapDefaultsMigrationNotice,
+  isBuiltinKeymapScheme,
   readKeymapSchemes,
   writeKeymapSchemes,
   type KeymapSchemeV3,
@@ -12548,6 +12553,97 @@ export function CodeWorkspaceTab({
     setStatusMessage("Restored default tool window layout");
   }, [handleReturnToEditor, restoreDefaultToolWindowLayout, setStatusMessage, workspaceInstanceId]);
 
+  // ED-PARITY-013 DEC-013-05: IDEA F12 / Shift+Esc / Ctrl+Shift+F12. The last
+  // tool window is the most recently opened one; Project is the fallback.
+  const lastToolWindowIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (bottomDockOpen) lastToolWindowIdRef.current = bottomDockTab;
+  }, [bottomDockOpen, bottomDockTab]);
+  useEffect(() => {
+    if (rightPaneOpen && rightPaneTab === "outline") lastToolWindowIdRef.current = "structure";
+  }, [rightPaneOpen, rightPaneTab]);
+  const hiddenToolWindowsRef = useRef<{ project: boolean; bottom: boolean; right: boolean } | null>(null);
+
+  const focusBottomDockSoon = useCallback(() => {
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(
+        '[data-testid="code-workspace-bottom-dock"] [tabindex="0"], [data-testid="code-workspace-bottom-dock"] button, [data-testid="code-workspace-bottom-dock"] input',
+      );
+      el?.focus();
+    });
+  }, []);
+
+  const jumpToLastToolWindow = useCallback(() => {
+    const toolId = lastToolWindowIdRef.current ?? "project";
+    hiddenToolWindowsRef.current = null;
+    if (toolId === "project") {
+      setLanguagePanelOpen(true);
+      requestAnimationFrame(() => treePaneRef.current?.focus());
+      return;
+    }
+    if (toolId === "structure") {
+      setRightPaneTab("outline");
+      setRightPaneOpen(true);
+      return;
+    }
+    setBottomDockTab(toolId as BottomDockTabId);
+    setBottomDockOpen(true);
+    focusBottomDockSoon();
+  }, [focusBottomDockSoon, setBottomDockOpen, setBottomDockTab, setLanguagePanelOpen, setRightPaneOpen, setRightPaneTab]);
+
+  const hideActiveToolWindow = useCallback((): boolean => {
+    const active = document.activeElement;
+    const bottomDock = document.querySelector('[data-testid="code-workspace-bottom-dock"]');
+    const rightPane = document.querySelector('[data-testid="code-workspace-right-pane"]');
+    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    let hid = false;
+    if (active && treePaneRef.current?.contains(active)) {
+      setLanguagePanelOpen(false);
+      hid = true;
+    } else if (active && bottomDock?.contains(active)) {
+      setBottomDockOpen(false);
+      hid = true;
+    } else if (active && rightPane?.contains(active)) {
+      setRightPaneOpen(false);
+      hid = true;
+    } else {
+      // Editor focus: hide the last active tool window when it is open.
+      const last = lastToolWindowIdRef.current;
+      if (last === "structure" && ui.rightPaneOpen) {
+        setRightPaneOpen(false);
+        hid = true;
+      } else if (last && last !== "project" && last !== "structure" && ui.bottomDockOpen) {
+        setBottomDockOpen(false);
+        hid = true;
+      }
+    }
+    if (hid) requestAnimationFrame(() => handleReturnToEditor());
+    return hid;
+  }, [handleReturnToEditor, setBottomDockOpen, setLanguagePanelOpen, setRightPaneOpen, workspaceInstanceId]);
+
+  const toggleAllToolWindows = useCallback(() => {
+    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    const anyOpen = ui.languagePanelOpen || ui.bottomDockOpen || ui.rightPaneOpen;
+    if (anyOpen) {
+      hiddenToolWindowsRef.current = {
+        project: ui.languagePanelOpen,
+        bottom: ui.bottomDockOpen,
+        right: ui.rightPaneOpen,
+      };
+      setLanguagePanelOpen(false);
+      setBottomDockOpen(false);
+      setRightPaneOpen(false);
+      requestAnimationFrame(() => handleReturnToEditor());
+      return;
+    }
+    const restore = hiddenToolWindowsRef.current;
+    hiddenToolWindowsRef.current = null;
+    if (!restore) return;
+    if (restore.project) setLanguagePanelOpen(true);
+    if (restore.bottom) setBottomDockOpen(true);
+    if (restore.right) setRightPaneOpen(true);
+  }, [handleReturnToEditor, setBottomDockOpen, setLanguagePanelOpen, setRightPaneOpen, workspaceInstanceId]);
+
   const toggleOutlinePane = useCallback(() => {
     if (rightPaneOpen && rightPaneTab === "outline") {
       setRightPaneOpen(false);
@@ -13951,7 +14047,8 @@ export function CodeWorkspaceTab({
       title: "Surround With…",
       category: "Edit",
       keybinding: "Ctrl+Alt+T",
-      keybindings: ["Meta+Alt+T"],
+      // IDEA XWin lists Ctrl+Alt+Shift+B first (Ctrl+Alt+T opens a terminal on many desktops).
+      keybindings: ["Ctrl+Alt+Shift+B", "Meta+Alt+T"],
       keywords: ["surround", "wrap", "try", "catch", "if", "while", "runnable"],
       when: (context) => context.focus === "editor" && !!context.hasActiveFile && !context.readOnly,
       run: () => {
@@ -14425,6 +14522,7 @@ export function CodeWorkspaceTab({
       title: "Fold All",
       category: "Edit",
       keybinding: "Ctrl+Shift+NumpadSubtract",
+      keybindings: ["Ctrl+Shift+Minus"],
       keywords: ["fold", "collapse", "all"],
       when: (context) => context.focus === "editor"
         && !!editorCommandStateFor(context),
@@ -14435,6 +14533,7 @@ export function CodeWorkspaceTab({
       title: "Unfold All",
       category: "Edit",
       keybinding: "Ctrl+Shift+NumpadAdd",
+      keybindings: ["Ctrl+Shift+Equal"],
       keywords: ["fold", "expand", "all"],
       when: (context) => context.focus === "editor"
         && !!editorCommandStateFor(context),
@@ -14588,7 +14687,9 @@ export function CodeWorkspaceTab({
       title: "Quick Documentation",
       category: "Code",
       keybinding: "Ctrl+Q",
-      keybindings: ["F1"],
+      // ED-PARITY-013: F1 is Quick Doc only in IDEA's macOS keymap; on
+      // Windows/Linux IDEA reserves it for Context Help.
+      platformKeybindings: { mac: ["Ctrl+Q", "F1"] },
       keywords: ["docs", "hover", "javadoc"],
       when: (context) => context.focus !== "tree" && context.focus !== "terminal" && !!activeFile && !activeFile.loading,
       run: () => void openQuickDocumentation(),
@@ -14788,7 +14889,8 @@ export function CodeWorkspaceTab({
       id: "workspace.aiExplainSyntax",
       title: t("codeWorkspaceAi.commandExplainSyntax"),
       category: "AI",
-      keybinding: "Ctrl+Alt+S",
+      // ED-PARITY-013 DEC-013-05: Ctrl+Alt+S is IDEA Settings; the Taomni
+      // Classic keymap scheme keeps the old binding.
       keywords: ["ai", "syntax", "grammar", "teach", "learn", "explain", "语法", "讲解"],
       when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading,
       run: () => void runEditorAiActionAtCursor("syntax"),
@@ -14878,6 +14980,54 @@ export function CodeWorkspaceTab({
       run: handleRestoreToolWindowLayout,
     },
     {
+      id: "workspace.jumpToLastToolWindow",
+      title: "Jump to Last Tool Window",
+      category: "View",
+      keybinding: "F12",
+      keywords: ["tool window", "last", "focus", "f12"],
+      when: (context) => context.focus !== "modal",
+      run: jumpToLastToolWindow,
+    },
+    {
+      id: "workspace.hideActiveToolWindow",
+      title: "Hide Active Tool Window",
+      category: "View",
+      keybinding: "Shift+Escape",
+      keywords: ["tool window", "hide", "close", "escape"],
+      when: (context) => context.focus !== "modal" && context.focus !== "completion" && context.focus !== "snippet",
+      run: () => hideActiveToolWindow(),
+    },
+    {
+      id: "workspace.hideAllToolWindows",
+      title: "Hide All Tool Windows",
+      category: "View",
+      keybinding: "Ctrl+Shift+F12",
+      keywords: ["tool windows", "hide", "maximize editor", "restore"],
+      when: (context) => context.focus !== "modal",
+      run: toggleAllToolWindows,
+    },
+    {
+      id: "workspace.findAction",
+      title: "Find Action…",
+      category: "Help",
+      keybinding: "Ctrl+Shift+A",
+      platformKeybindings: { mac: ["Meta+Shift+A", "Ctrl+Shift+A"] },
+      keywords: ["actions", "command", "palette", "find action", "assign shortcut"],
+      // The terminal owns its keys; a modal owns its own keyboard state.
+      when: (context) => context.focus !== "terminal" && context.focus !== "modal",
+      run: () => openSearchEverywhere("actions"),
+    },
+    {
+      id: "workspace.showSettings",
+      title: "Settings…",
+      category: "File",
+      keybinding: "Ctrl+Alt+S",
+      platformKeybindings: { mac: ["Meta+,", "Ctrl+Alt+S"] },
+      keywords: ["settings", "preferences", "options"],
+      when: (context) => context.focus !== "terminal" && context.focus !== "modal",
+      run: () => openSettingsSection("general"),
+    },
+    {
       id: "workspace.showProblems",
       title: "Problems",
       category: "View",
@@ -14889,6 +15039,8 @@ export function CodeWorkspaceTab({
       id: "workspace.toggleDocumentationPane",
       title: "Toggle Outline Pane",
       category: "View",
+      // IDEA Alt+7 = Structure tool window.
+      keybinding: "Alt+7",
       keywords: ["right", "outline", "structure", "symbols"],
       run: toggleOutlinePane,
     },
@@ -14941,7 +15093,8 @@ export function CodeWorkspaceTab({
       id: "workspace.gotoDefinition",
       title: "Go to Definition",
       category: "Navigation",
-      keybinding: "F12",
+      // ED-PARITY-013 DEC-013-05: F12 is IDEA Jump to Last Tool Window; Ctrl+B
+      // (Go to Declaration) routes to the definition where they coincide.
       keywords: ["declaration", "jump", "navigate"],
       when: (context) => {
         const target = resolveEditorTarget(context);
@@ -14982,6 +15135,8 @@ export function CodeWorkspaceTab({
       title: "Show Usages",
       category: "Navigation",
       keybinding: "Ctrl+Alt+F7",
+      // XWin: Ctrl+Alt+F7 switches virtual terminals on Linux.
+      platformKeybindings: { linux: ["Ctrl+Alt+7"] },
       keywords: ["usages", "popup", "lightweight"],
       when: (context) => context.focus === "editor" && !!activeFile,
       run: (context) => {
@@ -15048,6 +15203,8 @@ export function CodeWorkspaceTab({
       id: "workspace.toggleTodosPane",
       title: "Toggle TODOs / Bookmarks",
       category: "View",
+      // IDEA Alt+2 = Bookmarks tool window.
+      keybinding: "Alt+2",
       keywords: ["todo", "fixme", "bookmark", "markers"],
       run: toggleTodosPane,
     },
@@ -15455,6 +15612,8 @@ export function CodeWorkspaceTab({
       id: "workspace.openGit",
       title: "Open Git Manager",
       category: "Git",
+      // IDEA Alt+9 = Git tool window (workspace tool window lands in ED-PARITY-018).
+      keybinding: "Alt+9",
       when: () => !gitRootsLoading && !!onOpenGitManager && gitRoots.length > 0,
       run: openGitManager,
     },
@@ -15713,6 +15872,8 @@ export function CodeWorkspaceTab({
       title: "Run to Cursor",
       category: "Debug",
       keybinding: "Alt+F9",
+      // IDEA "Default for XWin" moves Run to Cursor off the window-manager key.
+      platformKeybindings: { linux: ["Shift+Alt+9"] },
       keywords: ["debug", "run", "cursor", "break"],
       when: (context) => {
         if (context.focus === "tree" || context.focus === "terminal") return false;
@@ -15852,6 +16013,9 @@ export function CodeWorkspaceTab({
     toggleSoftWrap,
     toggleTodosPane,
     jumpToMnemonicBookmark,
+    jumpToLastToolWindow,
+    hideActiveToolWindow,
+    toggleAllToolWindows,
     undoWorkspaceEdit,
     redoWorkspaceEdit,
     unsplitAllWindows,
@@ -15973,12 +16137,19 @@ export function CodeWorkspaceTab({
   const [keymapSchemes, setKeymapSchemes] = useState<KeymapSchemeV3[]>(keymapStore.schemes);
   const [activeKeymapSchemeId, setActiveKeymapSchemeId] = useState<string | null>(keymapStore.activeId);
   const [keymapSettingsOpen, setKeymapSettingsOpen] = useState(false);
+  /** Action to record a shortcut for when the dialog opens (Assign Shortcut). */
+  const [keymapAssignActionId, setKeymapAssignActionId] = useState<string | null>(null);
   const keymapCorruptDiagnostic = keymapStore.recoveredFromCorrupt
     ? "Stored keymap was corrupted; a backup was kept and defaults are active."
     : null;
   const activeKeymapScheme = useMemo(
-    () => keymapSchemes.find((scheme) => scheme.id === activeKeymapSchemeId) ?? null,
+    () => [...keymapSchemes, ...BUILTIN_KEYMAP_PRESETS].find((scheme) => scheme.id === activeKeymapSchemeId) ?? null,
     [keymapSchemes, activeKeymapSchemeId],
+  );
+  // ED-PARITY-013 DEC-013-06: one-time notice for profiles that used the
+  // pre-IDEA defaults (F12 / Ctrl+Alt+S). Decided once at mount.
+  const [keymapMigrationNoticeOpen, setKeymapMigrationNoticeOpen] = useState(
+    () => consumeKeymapDefaultsMigrationNotice(),
   );
 
   useEffect(() => {
@@ -16005,7 +16176,8 @@ export function CodeWorkspaceTab({
   // reaches this. `null` means the user deleted the active scheme and the app
   // is back on the built-in defaults.
   const applyKeymapScheme = useCallback((scheme: KeymapSchemeV3 | null) => {
-    if (scheme) {
+    // Built-in presets ship with the app: only their id becomes active.
+    if (scheme && !isBuiltinKeymapScheme(scheme.id)) {
       setKeymapSchemes((schemes) => {
         const exists = schemes.some((entry) => entry.id === scheme.id);
         return exists
@@ -18378,6 +18550,7 @@ export function CodeWorkspaceTab({
         hasSelection: request.hasSelection,
         clientX: request.clientX,
         clientY: request.clientY,
+        shortcutFor: (actionId) => host.effectiveKeybindingDisplay(actionId)[0],
         bindings: {
           "workspace.gotoDefinition": prepareBinding("workspace.gotoDefinition"),
           "workspace.gotoDeclaration": prepareBinding("workspace.gotoDeclaration"),
@@ -21593,6 +21766,12 @@ export function CodeWorkspaceTab({
         onOpenFileItem={openGoToFileItem}
         onOpenSymbol={(symbol, options) => void openWorkspaceSymbol(symbol, options)}
         onRunCommand={runSearchEverywhereCommand}
+        onAssignShortcut={(commandId) => {
+          // ED-PARITY-013 DEC-013-03: Find Action Alt+Enter = Assign Shortcut.
+          setSearchEverywhereOpen(false);
+          setKeymapAssignActionId(commandId);
+          setKeymapSettingsOpen(true);
+        }}
         onSearchText={(query) => {
           setSearchEverywhereOpen(false);
           setBottomDockOpen(true);
@@ -22112,6 +22291,19 @@ export function CodeWorkspaceTab({
           }}
         />
       )}
+      {keymapMigrationNoticeOpen && !keymapSettingsOpen && (
+        <KeymapMigrationNotice
+          onOpenKeymap={() => {
+            dismissKeymapDefaultsMigrationNotice();
+            setKeymapMigrationNoticeOpen(false);
+            setKeymapSettingsOpen(true);
+          }}
+          onDismiss={() => {
+            dismissKeymapDefaultsMigrationNotice();
+            setKeymapMigrationNoticeOpen(false);
+          }}
+        />
+      )}
       {keymapSettingsOpen && (
         <KeymapSettingsDialog
           open={true}
@@ -22123,7 +22315,13 @@ export function CodeWorkspaceTab({
           onActiveSchemeChange={setActiveKeymapSchemeId}
           onSchemesChange={(schemes) => setKeymapSchemes([...schemes])}
           onApplyScheme={applyKeymapScheme}
-          onClose={() => setKeymapSettingsOpen(false)}
+          presets={BUILTIN_KEYMAP_PRESETS}
+          assignActionId={keymapAssignActionId}
+          restoreFocusFallback={handleReturnToEditor}
+          onClose={() => {
+            setKeymapSettingsOpen(false);
+            setKeymapAssignActionId(null);
+          }}
         />
       )}
       <CodeStyleSettingsDialog

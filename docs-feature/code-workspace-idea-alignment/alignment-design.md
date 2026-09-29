@@ -129,6 +129,7 @@
   - 按 DEC-ALIGN-07 迁移默认绑定：`F12` → Jump to Last Tool Window，`Alt+0/2/7/9`、`Shift+Esc`、`Ctrl+Shift+F12`、`Ctrl+Alt+S` 按 IDEA；旧绑定作为 “VS Code compatible” 可选 scheme，已有用户 scheme 读取不变。
   - 快捷键显示统一格式化：当前平台只显示当前平台绑定（Linux/Windows 不显示 `Meta+`），键帽拆分，方向键/Enter/Space 用本地化名称，Search Everywhere、Keymap、菜单、tooltip 共享同一格式化函数。
   - Keymap UI：分组树、按快捷键查找（含第二击）、默认方案首次修改自动派生、右键 Add Keyboard/Mouse Shortcut/Remove、录制对话框含 Second stroke；关闭后焦点归还（DEC-ALIGN-11）。
+- P1 设计（DEC-013-*、细化断言、任务与用例）：[ed-parity-013-keymap-design.md](ed-parity-013-keymap-design.md)。
 - 验收：`ED-PARITY-013-A1`、`ED-PARITY-013-A2`、`ED-PARITY-013-A3`、`ED-PARITY-013-A4`。
 
 <a id="ed-parity-014"></a>

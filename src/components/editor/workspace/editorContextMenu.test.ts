@@ -103,7 +103,9 @@ describe("buildEditorContextMenuItems", () => {
       bindings,
     }));
     const expected = [
-      ["editor-context-goto-definition", "Go to Definition", "F12"],
+      // ED-PARITY-013 DEC-013-05: Go to Definition has no default key (F12 is
+      // IDEA Jump to Last Tool Window).
+      ["editor-context-goto-definition", "Go to Definition", undefined],
       ["editor-context-goto-declaration", "Go to Declaration", "Ctrl+B"],
       ["editor-context-goto-type-definition", "Go to Type Definition", "Ctrl+Shift+B"],
       ["editor-context-goto-implementation", "Go to Implementation", "Ctrl+Alt+B"],
@@ -180,6 +182,21 @@ describe("buildEditorContextMenuItems", () => {
     expect(dataBreakpoint.execute).toHaveBeenCalledTimes(1);
   });
 
+  it("ED-PARITY-013 A1.1: rows show the host's effective shortcut labels when provided", () => {
+    const labels: Record<string, string | undefined> = {
+      "workspace.gotoDefinition": "F12",
+      "workspace.gotoDeclaration": "Ctrl+Alt+Left",
+      "workspace.format": undefined,
+    };
+    const items = buildEditorContextMenuItems(baseInput({
+      shortcutFor: (actionId) => labels[actionId],
+    }));
+    expect(items.find((entry) => entry.testId === "editor-context-goto-definition")?.shortcut).toBe("F12");
+    expect(items.find((entry) => entry.testId === "editor-context-goto-declaration")?.shortcut).toBe("Ctrl+Alt+Left");
+    // A host with no binding shows none rather than the static literal.
+    expect(items.find((entry) => entry.testId === "editor-context-format")?.shortcut).toBeUndefined();
+  });
+
   it("adds the AI section only when a host supplies it and never selection-gates it", () => {
     expect(buildEditorContextMenuItems(baseInput())
       .find((i) => i.testId === "editor-context-ai-explain-syntax")).toBeUndefined();
@@ -197,7 +214,8 @@ describe("buildEditorContextMenuItems", () => {
     const syntax = items.find((i) => i.testId === "editor-context-ai-explain-syntax");
     const code = items.find((i) => i.testId === "editor-context-ai-explain-code");
     expect(syntax?.label).toBe("Explain Syntax…");
-    expect(syntax?.shortcut).toBe("Ctrl+Alt+S");
+    // Ctrl+Alt+S is IDEA Settings now; the unhosted fallback shows no key.
+    expect(syntax?.shortcut).toBeUndefined();
     expect(syntax?.disabled).toBe(false);
     expect(code?.disabled).toBe(false);
     syntax?.onClick?.();

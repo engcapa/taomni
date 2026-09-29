@@ -6,7 +6,9 @@ description: '§8.19.10 native gate case (ED-QUERY-004 A1). Enters the in-repo
 
   waits for the real JDT LS provider to report active, places the caret on
 
-  the `App` symbol in AppTest.java with physical keys, fires F12 (Go to Definition)
+  the `App` symbol in AppTest.java with physical keys, fires Ctrl+B (Go to Declaration → definition for Java;
+
+  ED-PARITY-013 moved F12 to Jump to Last Tool Window)
 
   through the production keymap, and proves cross-file open/reveal (App.java
 
@@ -111,7 +113,7 @@ steps:
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
     contains: Ln 10, Col 27
-- press: F12
+- press: Control+b
 - assert_text:
     selector: '[data-testid="code-workspace-editor-tab-strip"]'
     contains: App.java

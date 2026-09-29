@@ -64,6 +64,8 @@ interface SearchEverywhereProps {
   onOpenFile: (item: GoToFileItem, options?: { split: boolean }) => void;
   onOpenSymbol?: (item: GoToSymbolItem, options?: { split: boolean }) => void;
   onRunCommand?: (commandId: string) => void | Promise<ActionResult>;
+  /** ED-PARITY-013 DEC-013-03: Alt+Enter on an action = Assign Shortcut. */
+  onAssignShortcut?: (commandId: string) => void;
   /** Text tab: hand query to Find in Files. */
   onSearchText?: (query: string) => void;
 }
@@ -104,6 +106,7 @@ export function SearchEverywhere({
   onOpenFile,
   onOpenSymbol,
   onRunCommand,
+  onAssignShortcut,
   onSearchText,
 }: SearchEverywhereProps) {
   const [mode, setMode] = useState<SearchEverywhereMode>(initialMode);
@@ -280,7 +283,10 @@ export function SearchEverywhere({
               <span className="min-w-0 flex-1 truncate text-[var(--taomni-code-text)]">{item.value.title}</span>
               <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">{item.value.category}</span>
               {item.value.keybinding && (
-                <kbd className="shrink-0 rounded border border-[var(--taomni-code-border)] px-1 text-[10px] text-[var(--taomni-code-muted)]">
+                <kbd
+                  data-testid={`search-everywhere-shortcut-${item.value.id}`}
+                  className="shrink-0 rounded border border-[var(--taomni-code-border)] px-1 text-[10px] text-[var(--taomni-code-muted)]"
+                >
                   {item.value.keybinding}
                 </kbd>
               )}
@@ -358,6 +364,9 @@ export function SearchEverywhere({
       footer={
         <>
           <span>↑↓ select</span>
+          {(mode === "actions" || mode === "all") && onAssignShortcut && (
+            <span data-testid="search-everywhere-assign-shortcut-hint">Alt+Enter assign shortcut</span>
+          )}
           <span>
             Enter {
               mode === "actions" ? "run"
@@ -411,6 +420,11 @@ export function SearchEverywhere({
         else if (options) onOpenSymbol?.(item.value, options);
         else onOpenSymbol?.(item.value);
       }}
+      onAltEnter={onAssignShortcut
+        ? (item) => {
+          if (item.kind === "action") onAssignShortcut(item.value.id);
+        }
+        : undefined}
       onEnterEmpty={(q) => {
         if (mode === "text" && q.trim()) onSearchText?.(q.trim());
       }}

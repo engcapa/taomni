@@ -4,7 +4,7 @@ description: 'Reproduces Java definition navigation against the supplied Maven p
 
   The case is read-only: it opens JdbcDebugController.java, checks a same-file
 
-  field and an imported dependency through F12 and Ctrl+B, and keeps hover and
+  field and an imported dependency through Ctrl+B (ED-PARITY-013: F12 is Jump to Last Tool Window), and keeps hover and
 
   no-definition behavior observable. Set QA_JAVA_PROJECT_ROOT to the absolute
 
@@ -76,7 +76,7 @@ steps:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     transport: webdriver
     keys:
-    - F12
+    - Control+b
 - assert_text:
     selector: '[data-testid="code-workspace-editor"]'
     contains: ClickHouseDataSource clickHouseDataSource
@@ -95,7 +95,7 @@ steps:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     transport: webdriver
     keys:
-    - F12
+    - Control+b
 - assert_text:
     selector: '[data-testid="code-workspace-editor"]'
     contains: ClickHouseDataSource clickHouseDataSource
@@ -112,7 +112,7 @@ steps:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     transport: webdriver
     keys:
-    - F12
+    - Control+b
 - wait_for:
     selector: '[data-testid="code-workspace-editor"]'
     timeout_sec: 60

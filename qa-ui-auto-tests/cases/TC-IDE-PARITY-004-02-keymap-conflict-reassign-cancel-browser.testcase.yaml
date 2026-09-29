@@ -8,11 +8,11 @@ description: 'ED-PARITY-004 A1.1/A1.2/A1.3 browser case — the S4a/S4b sequence
   applies it so the chord has exactly one owner and the previous holder visibly
   loses it.
 
-  Correction to the P1 prose: this platform''s editor.find carries a SECOND base
-  binding (Meta+F), so after Ctrl+F is reassigned the row keeps Meta+F instead of
-  becoming literally empty. DEC-04 revokes the contested STROKE, not the whole
+  ED-PARITY-013 DEC-013-01: Meta aliases exist only on macOS, so after Ctrl+F is
+  reassigned the editor.find row shows no shortcut on Windows/Linux and keeps
+  Cmd+F on macOS. DEC-04 revokes the contested STROKE, not the whole
   binding set, so the assertions check that Ctrl+F is gone from editor.find and
-  that its unrelated Meta+F survives. A1.3''s actual target — exactly one available
+  that the platform result matches (no shortcut on Windows/Linux, Cmd+F on macOS). A1.3''s actual target — exactly one available
   candidate for the chord — is asserted by the live dispatch result.
 
   Mode: browser; conflict identity, both exits and dispatch routing are all
@@ -109,7 +109,7 @@ steps:
 - click: '[data-testid="keymap-recorder-cancel"]'
 - assert_not_visible: '[data-testid="keymap-capture-conflicts"]'
 - assert_pattern:
-    selector: '[data-testid="keymap-replace-editor.replace-0"]'
+    selector: '[data-testid="keymap-replace-editor.replace-1"]'
     regex: '(Alt|Option)[+]Shift[+]R'
 - assert_disabled: '[data-testid="keymap-settings-apply"]'
 - click: '[data-testid="keymap-settings-close"]'
@@ -150,9 +150,9 @@ steps:
     selector: '[data-testid="keymap-action-filter"]'
     value: Find in File
 - wait_for: '[data-testid="keymap-row-editor.find"]'
-- assert_pattern:
-    selector: '[data-testid="keymap-row-editor.find"]'
-    regex: '(Meta|Cmd)[+]F'
+- eval_readonly:
+    expression: '/mac/i.test(navigator.platform) ? /Cmd[+]F/.test(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"keymap-row-editor.find\"]").textContent) : !!document.querySelector("[data-testid" + String.fromCharCode(61) + "\"keymap-no-shortcut-editor.find\"]")'
+    expect_truthy: true
 - assert_count:
     selector: '[data-testid="workspace-keymap-settings-dialog"] [aria-label="conflict"]'
     equal: 0
@@ -190,7 +190,7 @@ verification:
     - step: 56
       expectation: "{\"assert_not_visible\": \"[data-testid=\\\"keymap-capture-conflicts\\\"]\"}"
     - step: 57
-      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-0\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
+      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-replace-editor.replace-1\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
     - step: 58
       expectation: "{\"assert_disabled\": \"[data-testid=\\\"keymap-settings-apply\\\"]\"}"
     - step: 63
@@ -199,7 +199,7 @@ verification:
       expectation: "{\"assert_not_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
     results: [56, 58, 63, 64]
   - id: R3
-    requirement: "A1.3 DEC-02/04：冲突仍不阻断（OK 可用、Enter 可确认）；确认并 Apply 后原占用者 editor.find 失去该 chord 并保留其无关的 Meta+F，全局不再有任何已提交冲突徽标。"
+    requirement: "A1.3 DEC-02/04：冲突仍不阻断（OK 可用、Enter 可确认）；确认并 Apply 后原占用者 editor.find 失去该 chord （Win/Linux 显示 no shortcut，macOS 保留 Cmd+F），全局不再有任何已提交冲突徽标。"
     actions: [79, 80, 28, 29]
     checkpoints:
     - step: 80
@@ -207,7 +207,7 @@ verification:
     - step: 84
       expectation: "{\"wait_for\": \"[data-testid=\\\"keymap-row-editor.find\\\"]\"}"
     - step: 85
-      expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.find\\\"]\", \"regex\": \"(Meta|Cmd)[+]F\"}}"
+      expectation: "{\"eval_readonly\": {\"expression\": \"/mac/i.test(navigator.platform) ? /Cmd[+]F/.test(document.querySelector(\\\"[data-testid\\\" + String.fromCharCode(61) + \\\"\\\\\\\"keymap-row-editor.find\\\\\\\"]\\\").textContent) : !!document.querySelector(\\\"[data-testid\\\" + String.fromCharCode(61) + \\\"\\\\\\\"keymap-no-shortcut-editor.find\\\\\\\"]\\\")\", \"expect_truthy\": true}}"
     - step: 86
       expectation: "{\"assert_count\": {\"selector\": \"[data-testid=\\\"workspace-keymap-settings-dialog\\\"] [aria-label=\\\"conflict\\\"]\", \"equal\": 0}}"
     results: [86, 85]

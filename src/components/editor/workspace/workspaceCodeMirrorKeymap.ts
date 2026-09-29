@@ -484,6 +484,8 @@ export function buildEditorHostActions(handlers: EditorHostActionHandlers) {
       title: "Find Next Match",
       category: "Edit",
       defaultKeybinding: "F3",
+      // IDEA FindNext secondary (ED-PARITY-013 DEC-013-05).
+      secondary: ["Ctrl+l"],
       keywords: ["search", "next"],
       requiresEditor: true,
       run: async () => runViaHandlers(handlers, findNext),
@@ -493,6 +495,7 @@ export function buildEditorHostActions(handlers: EditorHostActionHandlers) {
       title: "Find Previous Match",
       category: "Edit",
       defaultKeybinding: "Shift+F3",
+      secondary: ["Ctrl+Shift+l"],
       keywords: ["search", "previous"],
       requiresEditor: true,
       run: async () => runViaHandlers(handlers, findPrevious),
@@ -501,8 +504,9 @@ export function buildEditorHostActions(handlers: EditorHostActionHandlers) {
       id: "editor.selectSelectionMatches",
       title: "Select All Occurrences of Selection",
       category: "Edit",
-      defaultKeybinding: "Ctrl+Shift+l",
-      secondary: ["Meta+Shift+l"],
+      // ED-PARITY-013 DEC-013-05: Ctrl+Shift+L is IDEA Find Previous; IDEA's
+      // Select All Occurrences is workspace.editor.selectAllOccurrences.
+      defaultKeybinding: "",
       keywords: ["occurrence", "multi-caret", "selection"],
       requiresEditor: true,
       run: async () => runViaHandlers(handlers, selectSelectionMatches),

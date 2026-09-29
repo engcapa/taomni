@@ -6205,6 +6205,10 @@ files:
   - src/components/editor/workspace/useWorkspaceTreeData.ts
   - src/components/editor/workspace/TabSwitcher.tsx
   - src/components/editor/workspace/KeymapSettingsDialog.tsx
+  - src/components/editor/workspace/ShortcutKeyCaps.tsx
+  - src/components/editor/workspace/KeymapMigrationNotice.tsx
+  - src/components/editor/workspace/useFocusReturn.ts
+  - src/components/editor/workspace/workspaceKeymapPlatform.ts
   - src/components/editor/workspace/ClipboardHistoryPopup.tsx
   - src/components/editor/workspace/panels/TodosBookmarksPanel.tsx
   - src/components/editor/workspace/todoBookmarks.ts
@@ -6854,6 +6858,96 @@ controls:
   - id: keymap-settings-apply         # the only commit edge; disabled when clean
     selector: '[data-testid="keymap-settings-apply"]'
     kind: interactive
+    optional: true
+  # ED-PARITY-013 Keymap tree, find-by-shortcut, row menu and recorders.
+  - id: keymap-group                  # collapsible category node, `keymap-group-<category>`
+    selector: '[data-testid="keymap-group-Navigation"]'
+    kind: interactive
+    optional: true
+  - id: keymap-find-by-shortcut
+    selector: '[data-testid="keymap-find-by-shortcut"]'
+    kind: interactive
+    optional: true
+  - id: keymap-shortcut-filter        # records the chord to filter by
+    selector: '[data-testid="keymap-shortcut-filter"]'
+    kind: interactive
+    optional: true
+  - id: keymap-row-menu               # row context menu (Add Keyboard/Mouse, Remove, Reset)
+    selector: '[data-testid="keymap-row-menu"]'
+    kind: display
+    optional: true
+  - id: keymap-row-menu-add-keyboard
+    selector: '[data-testid="keymap-row-menu-add-keyboard"]'
+    kind: interactive
+    optional: true
+  - id: keymap-row-menu-add-mouse
+    selector: '[data-testid="keymap-row-menu-add-mouse"]'
+    kind: interactive
+    optional: true
+  - id: keymap-recorder-second-stroke
+    selector: '[data-testid="keymap-recorder-second-stroke"]'
+    kind: interactive
+    optional: true
+  - id: keymap-mouse-recorder-pad     # left click with a modifier records a mouse shortcut
+    selector: '[data-testid="keymap-mouse-recorder-pad"]'
+    kind: interactive
+    optional: true
+  - id: keymap-mouse-recorder-hint
+    selector: '[data-testid="keymap-mouse-recorder-hint"]'
+    kind: display
+    optional: true
+  - id: keymap-mouse-recorder-value
+    selector: '[data-testid="keymap-mouse-recorder-value"]'
+    kind: display
+    optional: true
+  - id: keymap-mouse-recorder-ok
+    selector: '[data-testid="keymap-mouse-recorder-ok"]'
+    kind: interactive
+    optional: true
+  - id: keymap-row-action             # further `keymap-row-<action-id>` rows used by ED-PARITY-013
+    selector: '[data-testid="keymap-row-workspace.recentFiles"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="keymap-row-workspace.goToFile"]'
+      - '[data-testid="keymap-row-workspace.gotoDefinition"]'
+  - id: keymap-add-action
+    selector: '[data-testid="keymap-add-workspace.recentFiles"]'
+    kind: interactive
+    optional: true
+  - id: keymap-replace-appended-slot  # an appended chord after the inherited default (DEC-013-12)
+    selector: '[data-testid="keymap-replace-editor.replace-1"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="keymap-replace-workspace.recentFiles-1"]'
+  - id: keymap-no-shortcut-action
+    selector: '[data-testid="keymap-no-shortcut-workspace.jumpToLastToolWindow"]'
+    kind: display
+    optional: true
+  - id: recent-files-popup
+    selector: '[data-testid="code-workspace-recent-files"]'
+    kind: display
+    optional: true
+  - id: workspace-right-pane          # Structure/Outline tool window (Alt+7)
+    selector: '[data-testid="code-workspace-right-pane"]'
+    kind: display
+    optional: true
+  - id: workspace-terminal-dock       # terminal surface that owns its keys
+    selector: '[data-workspace-focus="terminal"]'
+    kind: interactive
+    optional: true
+  - id: keymap-migration-notice       # one-time IDEA default-binding balloon
+    selector: '[data-testid="keymap-migration-notice"]'
+    kind: display
+    optional: true
+  - id: search-everywhere-action-shortcut
+    selector: '[data-testid="search-everywhere-shortcut-workspace.format"]'
+    kind: display
+    optional: true
+  - id: search-everywhere-assign-shortcut-hint
+    selector: '[data-testid="search-everywhere-assign-shortcut-hint"]'
+    kind: display
     optional: true
   # §8.20.2 W1 reference-information surfaces rendered by the workspace.
   - id: parameter-info-tooltip

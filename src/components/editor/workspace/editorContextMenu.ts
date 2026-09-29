@@ -89,17 +89,32 @@ export interface BuildEditorContextMenuInput {
   } | null;
   /** Present when AI is available — adds the Explain Syntax / Explain Code pair. */
   ai?: EditorContextMenuAiSection | null;
+  /**
+   * Effective shortcut label for an action (ED-PARITY-013 A1.1). When present
+   * every row shows the same formatted binding as Keymap/Search Everywhere,
+   * including "no shortcut"; the literals below are only the unhosted fallback.
+   */
+  shortcutFor?: (actionId: string) => string | undefined;
+}
+
+function rowShortcut(input: BuildEditorContextMenuInput, actionId: string, fallback: string | undefined): string | undefined {
+  return input.shortcutFor ? input.shortcutFor(actionId) : fallback;
 }
 
 function bindRow(
   testId: string,
   label: string,
-  shortcut: string,
+  shortcut: string | undefined,
   actionId: string,
   input: BuildEditorContextMenuInput,
 ): MenuItem {
   const binding = input.bindings[actionId];
-  return rowFromSpec({ testId, label, shortcut, binding: binding ?? { actionId, prepare: null, run: () => {} } });
+  return rowFromSpec({
+    testId,
+    label,
+    shortcut: rowShortcut(input, actionId, shortcut),
+    binding: binding ?? { actionId, prepare: null, run: () => {} },
+  });
 }
 
 /**
@@ -116,7 +131,7 @@ export function buildEditorContextMenuItems(input: BuildEditorContextMenuInput):
       rowFromSpec({
         testId: "editor-context-run-to-cursor",
         label: "Run to Cursor",
-        shortcut: "Alt+F9",
+        shortcut: rowShortcut(input, input.debug.runToCursor.actionId, "Alt+F9"),
         binding: input.debug.runToCursor,
       }),
       ...(input.debug.dataBreakpoint
@@ -138,13 +153,13 @@ export function buildEditorContextMenuItems(input: BuildEditorContextMenuInput):
       rowFromSpec({
         testId: "editor-context-ai-explain-syntax",
         label: input.ai.explainSyntaxLabel,
-        shortcut: "Ctrl+Alt+S",
+        shortcut: rowShortcut(input, input.ai.explainSyntax.actionId, undefined),
         binding: input.ai.explainSyntax,
       }),
       rowFromSpec({
         testId: "editor-context-ai-explain-code",
         label: input.ai.explainCodeLabel,
-        shortcut: "Ctrl+Alt+E",
+        shortcut: rowShortcut(input, input.ai.explainCode.actionId, "Ctrl+Alt+E"),
         binding: input.ai.explainCode,
       }),
       ...(answerLanguage
@@ -165,7 +180,7 @@ export function buildEditorContextMenuItems(input: BuildEditorContextMenuInput):
     : [];
 
   return [
-    bindRow("editor-context-goto-definition", "Go to Definition", "F12", "workspace.gotoDefinition", input),
+    bindRow("editor-context-goto-definition", "Go to Definition", undefined, "workspace.gotoDefinition", input),
     bindRow("editor-context-goto-declaration", "Go to Declaration", "Ctrl+B", "workspace.gotoDeclaration", input),
     bindRow("editor-context-goto-type-definition", "Go to Type Definition", "Ctrl+Shift+B", "workspace.gotoTypeDefinition", input),
     bindRow("editor-context-goto-implementation", "Go to Implementation", "Ctrl+Alt+B", "workspace.gotoImplementation", input),

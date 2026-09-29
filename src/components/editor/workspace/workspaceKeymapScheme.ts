@@ -8,6 +8,8 @@
  * AltGr/dead-key/IME normalization so non-US layouts resolve identically.
  */
 
+import { detectKeymapPlatform, formatShortcutLabel } from "./workspaceKeymapPlatform";
+
 export type KeymapBaseSchemeId = "idea-windows-linux" | "idea-macos";
 
 /** Physical stroke: KeyboardEvent.code identity plus modifier state. */
@@ -102,20 +104,16 @@ export function shortcutsEqual(a: Shortcut, b: Shortcut): boolean {
   return left.length === right.length && left.every((stroke, i) => strokesEqual(stroke, right[i]));
 }
 
-/** Human-readable label, e.g. Ctrl+Shift+F / ⌘⇧F. */
+/**
+ * Human-readable label, e.g. `Ctrl+Shift+F` / `Cmd+Shift+F`. Delegates to the
+ * shared platform formatter (ED-PARITY-013 DEC-013-02); `pc` resolves to the
+ * detected Windows/Linux platform, whose labels are identical.
+ */
 export function formatShortcut(shortcut: Shortcut, platform: "mac" | "pc" = "pc"): string {
-  const modOrder = (s: ShortcutStroke) => [
-    s.ctrl && (platform === "mac" ? "Ctrl" : "Ctrl"),
-    s.alt && (platform === "mac" ? "Option" : "Alt"),
-    s.shift && "Shift",
-    s.meta && (platform === "mac" ? "Cmd" : "Meta"),
-  ].filter(Boolean) as string[];
-  if (shortcut.kind === "mouse") {
-    const mods = modOrder({ ...(shortcut.modifiers), code: "", } as ShortcutStroke);
-    return [...mods, `Mouse${shortcut.button}${shortcut.clickCount > 1 ? `×${shortcut.clickCount}` : ""}`].join("+");
-  }
-  const parts = shortcut.strokes.map((stroke) => [...modOrder(stroke), stroke.key?.toUpperCase() ?? stroke.code].join("+"));
-  return parts.join(" ");
+  const resolved = platform === "mac"
+    ? "mac"
+    : (detectKeymapPlatform() === "windows" ? "windows" : "linux");
+  return formatShortcutLabel(shortcut, resolved);
 }
 
 /**
@@ -272,6 +270,130 @@ export function createKeymapScheme(input: {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Built-in presets + default-binding revision (ED-PARITY-013 DEC-013-06)
+// ---------------------------------------------------------------------------
+
+/** Id prefix of read-only schemes that ship with the app (never persisted). */
+export const BUILTIN_KEYMAP_PRESET_PREFIX = "builtin:";
+
+function presetShortcut(code: string, keyLabel: string, mods: Partial<Omit<ShortcutStroke, "code" | "key">> = {}): Shortcut {
+  return {
+    kind: "keyboard",
+    strokes: [{
+      code,
+      key: keyLabel,
+      ctrl: !!mods.ctrl,
+      alt: !!mods.alt,
+      shift: !!mods.shift,
+      meta: !!mods.meta,
+    }],
+  };
+}
+
+/**
+ * "Taomni Classic" keeps the pre-ED-PARITY-013 defaults that conflicted with
+ * IDEA: F12 = Go to Definition, Ctrl+Alt+S = AI Explain Syntax. The new IDEA
+ * owners of those keys get an explicit empty override so they cannot collide.
+ */
+export const BUILTIN_KEYMAP_PRESETS: readonly KeymapSchemeV3[] = [
+  {
+    schemaVersion: 3,
+    id: `${BUILTIN_KEYMAP_PRESET_PREFIX}taomni-classic`,
+    name: "Taomni Classic",
+    base: null,
+    readOnly: true,
+    bindings: {
+      "workspace.gotoDefinition": [presetShortcut("F12", "F12")],
+      "workspace.jumpToLastToolWindow": [],
+      "workspace.aiExplainSyntax": [presetShortcut("KeyS", "S", { ctrl: true, alt: true })],
+      "workspace.showSettings": [],
+    },
+    disabledActionIds: [],
+    updatedAt: 0,
+  },
+];
+
+export function isBuiltinKeymapScheme(id: string | null | undefined): boolean {
+  return !!id && id.startsWith(BUILTIN_KEYMAP_PRESET_PREFIX);
+}
+
+/** Revision of the built-in default bindings; 2 = IDEA-aligned (ED-PARITY-013). */
+export const KEYMAP_DEFAULTS_REVISION = 2;
+export const KEYMAP_DEFAULTS_REVISION_KEY = `${KEYMAP_SCHEME_STORAGE_PREFIX}:defaults-revision`;
+
+/**
+ * Decide once per profile whether to tell the user that default bindings
+ * changed. Only a profile that already used Code Workspace (any stored
+ * `taomni.codeWorkspace.*` key) and has not seen this revision is notified;
+ * a fresh profile records the revision silently. Storage failures never notify.
+ */
+let migrationNoticeDecision: boolean | null = null;
+
+/** The user dismissed the notice; later workspace mounts stay quiet. */
+export function dismissKeymapDefaultsMigrationNotice(): void {
+  migrationNoticeDecision = false;
+}
+
+/** Test hook: forget the per-page-load decision. */
+export function resetKeymapDefaultsMigrationNoticeForTests(): void {
+  migrationNoticeDecision = null;
+}
+
+export function consumeKeymapDefaultsMigrationNotice(): boolean {
+  // Decided once per page load so StrictMode re-renders and later workspace
+  // instances agree with the first mount.
+  if (migrationNoticeDecision === null) migrationNoticeDecision = decideKeymapDefaultsMigrationNotice();
+  return migrationNoticeDecision;
+}
+
+function decideKeymapDefaultsMigrationNotice(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const storage = window.localStorage;
+    const seen = Number(storage.getItem(KEYMAP_DEFAULTS_REVISION_KEY) ?? "0");
+    if (seen >= KEYMAP_DEFAULTS_REVISION) return false;
+    let priorWorkspaceData = false;
+    for (let index = 0; index < storage.length; index += 1) {
+      const name = storage.key(index);
+      if (name && name.startsWith("taomni.codeWorkspace.") && name !== KEYMAP_DEFAULTS_REVISION_KEY) {
+        priorWorkspaceData = true;
+        break;
+      }
+    }
+    storage.setItem(KEYMAP_DEFAULTS_REVISION_KEY, String(KEYMAP_DEFAULTS_REVISION));
+    return priorWorkspaceData;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fork an editable copy of a read-only (default or built-in) scheme on its
+ * first modification, like IDEA deriving "<name> copy". The parent's delta is
+ * copied so the fork starts from what the user was looking at.
+ */
+export function deriveEditableScheme(input: {
+  source: KeymapSchemeV3 | null;
+  defaultName: string;
+  base: KeymapBaseSchemeId;
+  id: string;
+  now?: number;
+}): KeymapSchemeV3 {
+  const fork = createKeymapScheme({
+    id: input.id,
+    name: `${input.source?.name ?? input.defaultName} (copy)`,
+    base: input.source?.base ?? input.base,
+    now: input.now,
+  });
+  if (!input.source) return fork;
+  return {
+    ...fork,
+    bindings: { ...input.source.bindings },
+    disabledActionIds: [...input.source.disabledActionIds],
+  };
+}
+
 /** Add/remove one binding for an action in a mutable draft. */
 export function setActionBindings(
   scheme: KeymapSchemeV3,
@@ -401,7 +523,8 @@ export function readKeymapSchemes(): KeymapStoreReadResult {
 
 export function writeKeymapSchemes(schemes: readonly KeymapSchemeV3[], activeId: string | null): void {
   if (typeof window === "undefined") return;
-  storageSet(KEYMAP_SCHEMES_INDEX_KEY, JSON.stringify(schemes));
+  // Built-in presets ship with the app; only their id is stored as active.
+  storageSet(KEYMAP_SCHEMES_INDEX_KEY, JSON.stringify(schemes.filter((scheme) => !isBuiltinKeymapScheme(scheme.id))));
   if (activeId) storageSet(KEYMAP_ACTIVE_SCHEME_KEY, activeId);
   else storageSet(KEYMAP_ACTIVE_SCHEME_KEY, "");
 }

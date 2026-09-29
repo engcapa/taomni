@@ -3,8 +3,8 @@
   "totals": {
     "features_with_controls": 70,
     "required": 512,
-    "covered_required": 510,
-    "shallow": 45,
+    "covered_required": 511,
+    "shallow": 44,
     "orphans": 0
   },
   "features": {
@@ -331,7 +331,7 @@
     "F25.5": {
       "required": 18,
       "covered_required": 18,
-      "shallow": 2
+      "shallow": 1
     },
     "F25.2": {
       "required": 10,
@@ -345,7 +345,7 @@
     },
     "F25.6": {
       "required": 22,
-      "covered_required": 21,
+      "covered_required": 22,
       "shallow": 1
     },
     "F26.1": {
