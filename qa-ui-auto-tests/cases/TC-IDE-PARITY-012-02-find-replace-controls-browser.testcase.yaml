@@ -46,7 +46,7 @@ steps:
 - assert_text:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     contains: foo bar foo baz foo
-- press: Control+Home
+- press: Mod+Home
 - press: Control+f
 - eval_readonly:
     expression: document.activeElement?.getAttribute('name') === 'search'

@@ -65,9 +65,9 @@ steps:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed
     equals: 'true'
-- eval_readonly:
-    expression: document.activeElement?.closest('aside')?.dataset.testid === 'code-workspace-tree-pane'
-    expect_truthy: true
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-pane"]:focus-within'
+    timeout_sec: 5
 - press: Alt+1
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
@@ -111,7 +111,7 @@ verification:
     - step: 21
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 22
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.closest(''aside'')?.dataset.testid === ''code-workspace-tree-pane''", "expect_truthy": true}}'
+      expectation: "{\"wait_for\": {\"selector\": \"[data-testid=\\\"code-workspace-tree-pane\\\"]:focus-within\", \"timeout_sec\": 5}}"
     - step: 24
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "false"}}'
     - step: 26

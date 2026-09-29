@@ -32,7 +32,7 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+End
+- press: Mod+End
 - press: ArrowUp
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
