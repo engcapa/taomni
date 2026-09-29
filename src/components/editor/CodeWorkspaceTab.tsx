@@ -451,6 +451,7 @@ import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
 import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
 import { GoToLineDialog } from "./workspace/GoToLineDialog";
 import { languageServiceReadiness } from "./workspace/languageServiceReadiness";
+import { javaSyntaxOutline } from "./workspace/javaSyntaxOutline";
 import { CodeInsightNotice, caretAnchor, type CodeInsightNoticeState } from "./workspace/CodeInsightNotice";
 import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
 import {
@@ -1350,6 +1351,18 @@ interface ExtractNamingPromptState {
   resolve: (value: string | null) => void;
 }
 
+/** ED-PARITY-014 DEC-014-03: tool windows listed beside Recent Files (IDEA switcher). */
+const RECENT_FILES_TOOL_WINDOWS = [
+  { id: "project", label: "Project", shortcut: "Alt+1" },
+  { id: "problems", label: "Problems", shortcut: "Alt+6" },
+  { id: "structure", label: "Structure", shortcut: "Alt+7" },
+  { id: "terminal", label: "Terminal", shortcut: "Alt+F12" },
+  { id: "search", label: "Find" },
+  { id: "run", label: "Run" },
+  { id: "debug", label: "Debug" },
+  { id: "todos", label: "TODO" },
+] as const;
+
 export function CodeWorkspaceTab({
   tabId,
   workspace,
@@ -1964,12 +1977,6 @@ export function CodeWorkspaceTab({
   const setRecentFilesOpen = useCallback((open: boolean) => {
     patchWorkspaceUi(workspaceInstanceId, { recentFilesOpen: open });
   }, [patchWorkspaceUi, workspaceInstanceId]);
-  const setRecentAdvanceNonce = useCallback((updater: number | ((prev: number) => number)) => {
-    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).recentAdvanceNonce;
-    patchWorkspaceUi(workspaceInstanceId, {
-      recentAdvanceNonce: typeof updater === "function" ? updater(prev) : updater,
-    });
-  }, [patchWorkspaceUi, workspaceInstanceId]);
   const setRecentEntries = useCallback((entries: RecentFileEntry[]) => {
     patchWorkspaceUi(workspaceInstanceId, { recentEntries: entries });
   }, [patchWorkspaceUi, workspaceInstanceId]);
@@ -2533,6 +2540,8 @@ export function CodeWorkspaceTab({
   /** ED-PARITY-020 DEC-020-01: caret popup for empty/unavailable code insight. */
   const [codeInsightNotice, setCodeInsightNotice] = useState<CodeInsightNoticeState | null>(null);
   const codeInsightNoticeSeqRef = useRef(0);
+  /** ED-PARITY-014 DEC-014-04: File Structure shows a syntax-only outline. */
+  const [structureSyntaxOnly, setStructureSyntaxOnly] = useState(false);
   const showCodeInsightNotice = useCallback((message: string, action: "configure" | null = null) => {
     codeInsightNoticeSeqRef.current += 1;
     setCodeInsightNotice({
@@ -12356,26 +12365,39 @@ export function CodeWorkspaceTab({
     structureFileRef.current = file.key;
     setStructureSymbols([]);
     setStructureUnavailable(null);
+    setStructureSyntaxOnly(false);
     setStructureLoading(true);
     setStructureOpen(true);
+    // ED-PARITY-014 DEC-014-04: with no provider, Java files still get a
+    // syntax-only outline from the bundled grammar, labelled as such.
+    const syntaxFallback = (reason: string) => {
+      const outline = /\.java$/i.test(file.title) ? javaSyntaxOutline(file.text) : [];
+      if (outline.length > 0) {
+        setStructureSymbols(outline);
+        setStructureSyntaxOnly(true);
+        setStructureUnavailable(null);
+      } else {
+        setStructureUnavailable(reason);
+      }
+    };
     const descriptor = lspDescriptorForFile(file);
     if (!descriptor) {
       setStructureLoading(false);
-      setStructureUnavailable("No language service for this file");
+      syntaxFallback("No language service for this file");
       return;
     }
     try {
       const result = await lspDocumentSymbols(descriptor);
       updateLspStatusForFile(file, result.status);
       if (structureFileRef.current !== file.key) return;
-      setStructureSymbols(result.symbols);
-      setStructureUnavailable(
-        result.symbols.length === 0 && !result.status.active
-          ? result.status.error ?? "Language server is not running for this file"
-          : null,
-      );
+      if (result.symbols.length === 0 && !result.status.active) {
+        syntaxFallback(result.status.error ?? "Language server is not running for this file");
+      } else {
+        setStructureSymbols(result.symbols);
+        setStructureUnavailable(null);
+      }
     } catch (err) {
-      if (structureFileRef.current === file.key) setStructureUnavailable(errorMessage(err));
+      if (structureFileRef.current === file.key) syntaxFallback(errorMessage(err));
     } finally {
       if (structureFileRef.current === file.key) setStructureLoading(false);
     }
@@ -14287,8 +14309,10 @@ export function CodeWorkspaceTab({
       category: "Navigation",
       keybinding: "Ctrl+E",
       keywords: ["previous", "history"],
+      // ED-PARITY-014 DEC-014-03: IDEA toggles "Show edited only" on a
+      // repeated Ctrl+E instead of stepping the selection.
       run: () => {
-        if (recentFilesOpen && !recentChangedOnly) setRecentAdvanceNonce((nonce) => nonce + 1);
+        if (recentFilesOpen) openRecentFiles({ changedOnly: !recentChangedOnly });
         else openRecentFiles();
       },
     },
@@ -22021,6 +22045,17 @@ export function CodeWorkspaceTab({
         recentChangedOnly={recentChangedOnly}
         onCloseRecent={() => setRecentFilesOpen(false)}
         onPickRecent={pickRecentFile}
+        onToggleRecentChangedOnly={() => openRecentFiles({ changedOnly: !recentChangedOnly })}
+        recentToolWindows={RECENT_FILES_TOOL_WINDOWS}
+        onActivateRecentToolWindow={(id) => {
+          setRecentFilesOpen(false);
+          handleActivateToolWindow(id);
+        }}
+        onOpenRecentLocationsFromRecent={() => {
+          setRecentFilesOpen(false);
+          setRecentLocationsChangedOnly(false);
+          setRecentLocationsOpen(true);
+        }}
         recentLocationsOpen={recentLocationsOpen}
         recentLocationsChangedOnly={recentLocationsChangedOnly}
         workspaceId={workspaceInstanceId}
@@ -22063,6 +22098,7 @@ export function CodeWorkspaceTab({
         structureSymbols={structureSymbols}
         structureLoading={structureLoading}
         structureUnavailable={structureUnavailable}
+        structureSyntaxOnly={structureSyntaxOnly}
         onCloseStructure={() => setStructureOpen(false)}
         onPickStructure={pickStructureSymbol}
         quickDocOpen={quickDocOpen}

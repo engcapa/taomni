@@ -357,6 +357,15 @@
 - `[data-testid="code-workspace-problems-configure"]` — interactive [optional] — F25.5.problems-configure
 - `[data-testid="code-workspace-problems-retry"]` — interactive [optional] — F25.5.problems-retry
 - `[data-testid="problems-diagnostic-line"]` — display [optional] — F25.5.problems-diagnostic-line
+- `[data-testid="code-workspace-structure-title"]` — display [optional] — F25.5.structure-title
+- `[data-testid="code-workspace-structure-syntax-only"]` — display [optional] — F25.5.structure-syntax-only
+- `[data-testid="search-everywhere-selected-path"]` — display [optional] — F25.5.search-everywhere-selected-path
+- `[data-testid="code-workspace-recent-files-tool-window-problems"]` — interactive [optional] — F25.5.recent-files-tool-window
+  ↳ `[data-testid="code-workspace-recent-files-tool-window-project"]` — alias
+- `[data-testid="code-workspace-recent-files-tool-windows"]` — display [optional] — F25.5.recent-files-tool-windows
+- `[data-testid="code-workspace-recent-files-recent-locations"]` — interactive [optional] — F25.5.recent-files-recent-locations
+- `[data-testid="code-workspace-recent-files-edited-only"]` — interactive [optional] — F25.5.recent-files-edited-only
+- `[data-testid="code-workspace-recent-files-path"]` — display [optional] — F25.5.recent-files-path
 - `[data-testid="code-workspace-code-insight-notice"]` — display [optional] — F25.5.code-insight-notice
 - `[data-testid="code-workspace-code-insight-configure"]` — interactive [optional] — F25.5.code-insight-configure
 - `[data-testid="problems-severity-error"]` — interactive [optional] — F25.5.problems-severity-filter

@@ -6231,6 +6231,7 @@ files:
   - src/components/editor/workspace/GoToLineDialog.tsx
   - src/components/editor/workspace/languageServiceReadiness.ts
   - src/components/editor/workspace/CodeInsightNotice.tsx
+  - src/components/editor/workspace/javaSyntaxOutline.ts
   - src/components/editor/workspace/KeymapMigrationNotice.tsx
   - src/components/editor/workspace/useFocusReturn.ts
   - src/components/editor/workspace/workspaceKeymapPlatform.ts
@@ -6997,6 +6998,40 @@ controls:
     optional: true
   - id: problems-diagnostic-line
     selector: '[data-testid="problems-diagnostic-line"]'
+    kind: display
+    optional: true
+  - id: structure-title              # ED-PARITY-014 File Structure titled with the file name
+    selector: '[data-testid="code-workspace-structure-title"]'
+    kind: display
+    optional: true
+  - id: structure-syntax-only
+    selector: '[data-testid="code-workspace-structure-syntax-only"]'
+    kind: display
+    optional: true
+  - id: search-everywhere-selected-path
+    selector: '[data-testid="search-everywhere-selected-path"]'
+    kind: display
+    optional: true
+  - id: recent-files-tool-window
+    selector: '[data-testid="code-workspace-recent-files-tool-window-problems"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-recent-files-tool-window-project"]'
+  - id: recent-files-tool-windows
+    selector: '[data-testid="code-workspace-recent-files-tool-windows"]'
+    kind: display
+    optional: true
+  - id: recent-files-recent-locations
+    selector: '[data-testid="code-workspace-recent-files-recent-locations"]'
+    kind: interactive
+    optional: true
+  - id: recent-files-edited-only
+    selector: '[data-testid="code-workspace-recent-files-edited-only"]'
+    kind: interactive
+    optional: true
+  - id: recent-files-path
+    selector: '[data-testid="code-workspace-recent-files-path"]'
     kind: display
     optional: true
   - id: code-insight-notice          # ED-PARITY-020 caret popup for empty/unavailable code insight

@@ -8,7 +8,7 @@ import type {
 import { SearchEverywhere } from "./SearchEverywhere";
 import type { ActionSnapshotItem } from "./workspaceActionHost";
 import type { ActionResult } from "./workspaceActionRegistry";
-import { RecentFilesPopup, type RecentFileEntry } from "./RecentFilesPopup";
+import { RecentFilesPopup, type RecentFileEntry, type RecentToolWindowEntry } from "./RecentFilesPopup";
 import { StructurePopup } from "./StructurePopup";
 import { QuickDocPopup } from "./QuickDocPopup";
 import type { QuickDocContent } from "./referenceDocumentation";
@@ -46,6 +46,10 @@ interface WorkspacePopupsHostProps {
   recentEntries: RecentFileEntry[];
   recentAdvanceNonce: number;
   recentChangedOnly?: boolean;
+  onToggleRecentChangedOnly?: () => void;
+  recentToolWindows?: readonly RecentToolWindowEntry[];
+  onActivateRecentToolWindow?: (id: string) => void;
+  onOpenRecentLocationsFromRecent?: () => void;
   onCloseRecent: () => void;
   onPickRecent: (entry: RecentFileEntry) => void;
 
@@ -62,6 +66,7 @@ interface WorkspacePopupsHostProps {
   structureSymbols: LspDocumentSymbol[];
   structureLoading: boolean;
   structureUnavailable: string | null;
+  structureSyntaxOnly?: boolean;
   onCloseStructure: () => void;
   onPickStructure: (symbol: LspDocumentSymbol) => void;
 
@@ -101,6 +106,10 @@ export function WorkspacePopupsHost({
   recentEntries,
   recentAdvanceNonce,
   recentChangedOnly = false,
+  onToggleRecentChangedOnly,
+  recentToolWindows,
+  onActivateRecentToolWindow,
+  onOpenRecentLocationsFromRecent,
   onCloseRecent,
   onPickRecent,
   recentLocationsOpen = false,
@@ -115,6 +124,7 @@ export function WorkspacePopupsHost({
   structureSymbols,
   structureLoading,
   structureUnavailable,
+  structureSyntaxOnly = false,
   onCloseStructure,
   onPickStructure,
   quickDocOpen,
@@ -159,6 +169,10 @@ export function WorkspacePopupsHost({
         entries={recentEntries}
         advanceNonce={recentAdvanceNonce}
         changedOnly={recentChangedOnly}
+        onToggleChangedOnly={onToggleRecentChangedOnly}
+        toolWindows={recentToolWindows}
+        onActivateToolWindow={onActivateRecentToolWindow}
+        onOpenRecentLocations={onOpenRecentLocationsFromRecent}
         onClose={onCloseRecent}
         onPick={onPickRecent}
       />
@@ -179,6 +193,7 @@ export function WorkspacePopupsHost({
         symbols={structureSymbols}
         loading={structureLoading}
         unavailableReason={structureUnavailable}
+        syntaxOnly={structureSyntaxOnly}
         onClose={onCloseStructure}
         onPick={onPickStructure}
       />

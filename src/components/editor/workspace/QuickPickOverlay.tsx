@@ -18,7 +18,10 @@ interface QuickPickOverlayProps<T> {
   renderItem: (item: T) => ReactNode;
   emptyText: (query: string) => string;
   header?: ReactNode;
-  footer?: ReactNode;
+  /** Static footer, or one derived from the selected result (IDEA path bar). */
+  footer?: ReactNode | ((selected: T | null) => ReactNode);
+  /** Left column beside the result list (Recent Files tool windows). */
+  aside?: ReactNode;
   onClose: () => void;
   onPick: (item: T, options?: { split: boolean }) => void;
   /** Called when Enter is pressed with no selectable results (e.g. Text search). */
@@ -49,6 +52,7 @@ export function QuickPickOverlay<T>({
   emptyText,
   header,
   footer,
+  aside,
   onClose,
   onPick,
   onEnterEmpty,
@@ -182,7 +186,13 @@ export function QuickPickOverlay<T>({
           />
           {loading && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--taomni-code-muted)]" />}
         </div>
-        <div ref={listRef} className="min-h-0 flex-1 overflow-auto py-1 text-[11px]">
+        <div className="min-h-0 flex-1 flex">
+        {aside && (
+          <div className="w-[190px] shrink-0 overflow-auto border-r border-[var(--taomni-code-border)] py-1 text-[11px]">
+            {aside}
+          </div>
+        )}
+        <div ref={listRef} className="min-h-0 min-w-0 flex-1 overflow-auto py-1 text-[11px]">
           {results.length === 0 && (
             <div className="px-3 py-2 text-[var(--taomni-code-muted)]">{emptyText(query)}</div>
           )}
@@ -200,9 +210,10 @@ export function QuickPickOverlay<T>({
             </button>
           ))}
         </div>
+        </div>
         {footer && (
-          <div className="shrink-0 flex items-center gap-3 border-t border-[var(--taomni-code-border)] px-3 py-1 text-[10px] text-[var(--taomni-code-muted)]">
-            {footer}
+          <div className="shrink-0 flex min-w-0 items-center gap-3 border-t border-[var(--taomni-code-border)] px-3 py-1 text-[10px] text-[var(--taomni-code-muted)]">
+            {typeof footer === "function" ? footer(results[selected] ?? null) : footer}
           </div>
         )}
       </div>

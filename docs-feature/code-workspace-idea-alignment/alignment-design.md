@@ -148,6 +148,7 @@
   - File Structure 标题为文件名，提供 Inherited/Anonymous/Lambdas 开关、可见性图标、预选 caret 成员；无 provider 时用已有 tree-sitter Java 解析（Structural Search 后端）给出降级大纲并标注 “syntax only”。
   - Find in Files 改为浮动弹层（结果 + 下方可编辑预览 + scope 按钮 + File mask + `Open in Find Window`），底部 Search 工具窗作为 “Open in Find Window” 的目标。
   - 项目树：根节点显示模块名/路径，External Libraries 节点（有 SDK 时），顶层文件元数据，头部改为 Locate/Expand/Collapse/`⋮`/Hide，新建类动作移入 `+` 菜单。
+- P1 设计：[ed-parity-014-navigation-design.md](ed-parity-014-navigation-design.md)。
 - 验收：`ED-PARITY-014-A1`、`ED-PARITY-014-A2`、`ED-PARITY-014-A3`、`ED-PARITY-014-A4`。
 
 <a id="ed-parity-015"></a>
