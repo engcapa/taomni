@@ -113,3 +113,35 @@
 | V3 | A3 | mock IPC，语句为 `create table t (id int)` | 点击 Explain | alert 被调用，`dbExecuteStream` 未调用 | unit | 同上 |
 | V4 | A2 | native，`mysql_required` | 输入 `SELECT * FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'mysql'`，点击 Explain | 结果页签标题 `Explain`，出现结果网格；日志 1 条 success，SQL 以 `EXPLAIN` 开头 | native | `qa-ui-auto-tests/cases/TC-DB-EXEC-004-explain-native.testcase.yaml`（P2 新增） |
 | V5 | A3 | browser，离线脚手架 | 输入 `CREATE TABLE qa_t (id INT)`，点击 Explain | 出现 `alert-dialog`，内容含 “Explain supports”；没有 Log 标签 | browser | `qa-ui-auto-tests/cases/TC-DB-EXEC-004-explain-browser.testcase.yaml`（P2 新增） |
+
+<a id="db-tx-001"></a>
+## DB-TX-001 手动提交模式
+
+- 来源 / 范围 / 参照：DBV-TX-01；MySQL/MariaDB 与 PostgreSQL（其他引擎不显示事务控件）。`主参照: merge`：开关位置和“切回自动提交时提交未决修改”取 DBeaver；未提交语句计数取 DbVisualizer（DBeaver 只显示事务日志图标，计数不直观）。
+- 当前事实：前后端都没有事务模式，所有语句自动提交；sqlx 池 `max_connections(1)`，`after_connect` 只恢复默认 schema；连接会因 `max_lifetime`（默认 30 分钟）被替换。
+- 规则：
+  - 后端每个会话持有 `TxState { manual, pending, open, generation }`（新增 `src-tauri/src/database/tx.rs`）。连接池每建立一个新连接，`generation + 1`，`pending` 与 `open` 清零；Manual 下 MySQL 新连接执行 `SET autocommit=0`。MySQL/PostgreSQL 池关闭 `max_lifetime`，避免事务中途换连接。
+  - 语句分类（去掉开头注释后看首关键字）：`COMMIT` / `ROLLBACK`（不含 `ROLLBACK TO`）/ `END` / `ABORT` 结束事务；`BEGIN` / `START TRANSACTION` 开始事务；`SELECT` / `SHOW` / `EXPLAIN` / `DESC(RIBE)` / `USE` / `SET` / `VALUES` / `TABLE` / `SAVEPOINT` / `RELEASE` 以及不含写关键字的 `WITH` 为只读；MySQL 的 `CREATE` / `ALTER` / `DROP` / `TRUNCATE` / `RENAME` / `GRANT` / `REVOKE` 隐式提交；其余为写。
+  - Manual 下成功执行后：写 → `pending + 1`；结束事务或 MySQL 隐式提交 → `pending = 0`。PostgreSQL 在没有打开的事务时，写语句前先执行 `BEGIN`。
+  - 切到 Manual：MySQL 执行 `SET autocommit=0`。切回 Auto：MySQL 执行 `SET autocommit=1`（隐式提交），PostgreSQL 有打开的事务时 `COMMIT`；`pending > 0` 时前端先确认“将提交 N 条未提交语句”。
+- 目标：编辑器工具栏（仅 MySQL/PostgreSQL）新增事务模式按钮 `data-testid="db-tx-mode"`（文字 `Auto` / `Manual`，`data-mode`），未连接时禁用。Manual 下显示 `Commit`（`db-tx-commit`）、`Rollback`（`db-tx-rollback`）和计数 `Pending: N`（`db-tx-pending`）。每条语句执行后刷新计数；提交 / 回滚后计数归零并在状态栏提示。
+- IPC：`db_tx_status` / `db_tx_set_manual` / `db_tx_commit` / `db_tx_rollback`，都返回 `{ supported, manual, pending, generation }`。
+- 保留契约：Auto 模式下执行行为不变；网格保存（`dbExecute`）在 Manual 下同样进入事务并计数；日志、遇错选择、危险确认照常。
+- 非目标：重连提示与关闭标签时回滚（DB-TX-002）；隔离级别选择；智能提交。
+- 验收：
+  - `A1` 语句分类与计数规则正确（含 MySQL 隐式提交、`ROLLBACK TO`、只读 `WITH`）。
+  - `A2` Manual 下写语句不自动提交：Rollback 后数据消失，Commit 后数据保留，计数随之变化。
+  - `A3` 新连接使 `generation` 增加并清零计数，Manual 下 MySQL 新连接仍为手动提交。
+  - `A4` 切回 Auto 时有未提交语句先确认，确认后提交；取消则保持 Manual。
+  - `A5` 不支持的引擎不显示事务控件；未连接时按钮禁用（保留 Auto 行为）。
+
+<a id="db-tx-001-test-cases"></a>
+### 测试用例
+
+| V | AC | 前置 / fixture | 操作 | 预期 | 层级 | 路径 / ID |
+|---|---|---|---|---|---|---|
+| V1 | A1 A3 | 无 | 调用 `classify` 与 `TxState` 方法 | 分类表与计数、`on_new_connection` 符合规则 | rust | `src-tauri/src/database/tx.rs` tests（P2 新增） |
+| V2 | A2 A4 | mock IPC | 切 Manual，运行 `insert …`，点 Commit / Rollback；再切回 Auto | 调用对应 IPC，显示 `Pending: 1` 后归零；切回 Auto 前弹确认，取消不调用 | unit | `DbClientTab.test.tsx` “manual commit …”（P2 新增） |
+| V3 | A5 | mock IPC，引擎 ClickHouse | 渲染工具栏 | 没有 `db-tx-mode` | unit | 同上 |
+| V4 | A2 | native，`mysql_required` | 建表 `qa_tx_t`；切 Manual；插入一行，计数 1；Rollback；`select count(*)` 为 0；再插入并 Commit，计数 0，`select count(*)` 为 1 | 与操作一致 | native | `qa-ui-auto-tests/cases/TC-DB-TX-001-manual-commit-native.testcase.yaml`（P2 新增） |
+| V5 | A5 | browser，离线脚手架 | 打开 MySQL 会话（连接失败） | `db-tx-mode` 可见、禁用、文字 `Auto`；没有 `db-tx-commit` | browser | `qa-ui-auto-tests/cases/TC-DB-TX-001-manual-commit-browser.testcase.yaml`（P2 新增） |
