@@ -160,6 +160,11 @@ export function mailSearchServer(config: MailTabInfo, folder: string, query: Mai
   );
 }
 
+/** LIST the remote folder tree (no message sync); resolves to cached folders. */
+export function mailListFolders(config: MailTabInfo): Promise<MailFolder[]> {
+  return withVaultLockedNotice(() => invoke<MailFolder[]>("mail_list_folders", { config }));
+}
+
 /** SUBSCRIBE/UNSUBSCRIBE a folder; resolves to the refreshed folder list. */
 export function mailSetFolderSubscription(
   config: MailTabInfo,

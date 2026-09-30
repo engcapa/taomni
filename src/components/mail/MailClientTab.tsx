@@ -66,6 +66,7 @@ import {
   mailDiscardRemoteDraft,
   mailStoreRemoteDraft,
   mailListDrafts,
+  mailListFolders,
   mailListCachedFolders,
   mailListCachedMessages,
   mailSaveDraft,
@@ -107,6 +108,7 @@ import {
   saveSubscribedOnly,
   visibleFolders,
 } from "../../lib/mailFolders";
+import { isEditableTarget, mailShortcutAction, type MailShortcutAction } from "../../lib/mailShortcuts";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
 import {
   DEFAULT_IDENTITY_ID,
@@ -576,6 +578,9 @@ function withSeenFlag(message: MailMessageHeader): MailMessageHeader {
 }
 
 type SpecialFolderKind = "trash" | "junk" | "archive" | "sent";
+
+/** Drag payload marker for messages dragged onto the folder tree. */
+const MAIL_DRAG_TYPE = "application/x-taomni-mail";
 
 /** Folders whose new arrivals never raise a new-mail alert. */
 const NEW_MAIL_EXCLUDED_KINDS: SpecialFolderKind[] = ["sent", "trash", "junk"];
@@ -1138,6 +1143,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   subscribedOnlyRef.current = subscribedOnly;
   const treeFolders = useMemo(() => visibleFolders(displayFolders, subscribedOnly), [displayFolders, subscribedOnly]);
   const [subscriptionsOpen, setSubscriptionsOpen] = useState(false);
+  const draggedMessagesRef = useRef<MailMessageHeader[]>([]);
+  const [dropFolder, setDropFolder] = useState<string | null>(null);
   const [subscriptionBusy, setSubscriptionBusy] = useState<string | null>(null);
   const oauthReauthRequired = isOAuthReauthRequired(error);
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
@@ -1509,6 +1516,27 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [decreaseFontSize, increaseFontSize, resetFontSize, visible]);
 
+  // Thunderbird-style list shortcuts (TASK-22); never inside inputs/editors.
+  const shortcutRef = useRef<(action: MailShortcutAction) => boolean>(() => false);
+  useEffect(() => {
+    if (!visible) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) return;
+      const action = mailShortcutAction(event);
+      if (!action) return;
+      const root = rootRef.current;
+      const target = event.target as Node | null;
+      const inTab = !target || target === document.body || Boolean(root?.contains(target));
+      if (!inTab || isEditableTarget(event.target)) return;
+      if (shortcutRef.current(action)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [visible]);
+
   useEffect(() => {
     if (!visible) return;
     const root = rootRef.current;
@@ -1784,6 +1812,24 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     foldersRef.current = next;
     if (visibleRef.current) setFolders(next);
   }, []);
+
+  /** Remote LIST on open so a new account shows every folder at once. */
+  const refreshFolderTree = useCallback(async () => {
+    try {
+      const listed = await mailListFolders(info);
+      if (listed.length === 0) return;
+      // Keep counts/watermarks a concurrent sync may have just updated.
+      const byName = new Map(foldersRef.current.map((entry) => [entry.name, entry]));
+      const next = listed.map((entry) => {
+        const known = byName.get(entry.name);
+        return known ? { ...entry, ...known, flags: entry.flags } : entry;
+      });
+      foldersRef.current = next;
+      if (visibleRef.current) setFolders(next);
+    } catch (e) {
+      console.debug("mail folder LIST failed", e);
+    }
+  }, [info]);
 
   const setSubscribedOnly = useCallback((value: boolean) => {
     setSubscribedOnlyState(value);
@@ -2330,8 +2376,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const folder = selectedFolder;
     // Catch up everything that arrived while the tab was closed, then keep
     // backfilling older history for the full local header index.
-    void syncFolderNow(folder, "sync", true).then(() => startBackfill(folder));
-  }, [info.sync.onOpen, selectedFolder, startBackfill, syncFolderNow, visible]);
+    void syncFolderNow(folder, "sync", true)
+      .then(() => refreshFolderTree())
+      .then(() => startBackfill(folder));
+  }, [info.sync.onOpen, refreshFolderTree, selectedFolder, startBackfill, syncFolderNow, visible]);
 
   // Quiet background poll: most ticks refresh selected folder (+ INBOX when
   // different) without remote LIST. Every 6th tick does a full-folder scan for
@@ -3761,6 +3809,76 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   };
 
 
+  shortcutRef.current = (action: MailShortcutAction): boolean => {
+    // Dialogs and the composer own the keyboard.
+    if (composeOpen || draftsOpen || subscriptionsOpen) return false;
+    const rows = listRows.map((row) => row.message);
+    const current = selectedMessage;
+    const index = current ? rows.findIndex((message) => messageKey(message) === messageKey(current)) : -1;
+    const go = (message: MailMessageHeader | undefined) => {
+      if (!message) return false;
+      selectMessage(message, "mailbox");
+      document.querySelector<HTMLElement>(
+        `[data-testid="mail-message-row"][data-uid="${message.uid}"]`,
+      )?.scrollIntoView?.({ block: "nearest" });
+      return true;
+    };
+    switch (action) {
+      case "next":
+        return go(index < 0 ? rows[0] : rows[index + 1]);
+      case "prev":
+        return go(index < 0 ? rows[0] : rows[index - 1]);
+      case "nextUnread":
+        return go(rows.slice(index + 1).find(isUnread) ?? rows.slice(0, Math.max(index, 0)).find(isUnread));
+      case "focusSearch":
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return true;
+      default:
+        break;
+    }
+    const targets = checkedMessages.length > 0 ? checkedMessages : current ? [current] : [];
+    if (targets.length === 0 || busyAction) return false;
+    switch (action) {
+      case "reply":
+        openReply(targets[0]);
+        return true;
+      case "replyAll":
+        openReplyAll(targets[0]);
+        return true;
+      case "forward":
+        openForward(targets[0]);
+        return true;
+      case "toggleRead":
+        if (targets.some(isUnread)) {
+          void (checkedMessages.length > 0 ? handleMarkSelectedRead() : handleMarkSingleRead(targets[0]));
+        } else {
+          void handleMarkUnread(targets);
+        }
+        return true;
+      case "star":
+        void handleToggleFlagged(targets);
+        return true;
+      case "archive":
+        void handleArchiveMessages(targets);
+        return true;
+      case "junk":
+        void handleJunkMessages(targets);
+        return true;
+      case "notJunk":
+        void handleNotJunkMessages(targets);
+        return true;
+      case "delete":
+        void handleDeleteMessages(targets);
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  const dragTargetsFor = (message: MailMessageHeader): MailMessageHeader[] =>
+    checkedMessageKeys.has(messageKey(message)) && checkedMessages.length > 0 ? checkedMessages : [message];
+
   const folderMenuItems = (folder: MailFolder): MenuItem[] => {
     const isTrashLike = folderMatchesSpecial(folder, "trash", info.specialFolders)
       || folderMatchesSpecial(folder, "junk", info.specialFolders);
@@ -4393,13 +4511,35 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                       <button
                         key={folder.name}
                         type="button"
-                        className={`w-full h-7 pr-3 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""}`}
+                        className={`w-full h-7 pr-3 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""} ${dropFolder === folder.name ? "outline outline-1 outline-[var(--taomni-accent)] -outline-offset-1" : ""}`}
                         style={{ paddingLeft: `${12 + Math.min(folderDepth(folder), 6) * 14}px` }}
                         data-active={active || undefined}
                         data-testid="mail-folder-row"
                         data-folder-name={folder.name}
                         data-unread={folder.unread ?? 0}
                         data-sync-error={folder.lastError ? "true" : undefined}
+                        data-drop-target={dropFolder === folder.name ? "true" : undefined}
+                        onDragOver={(event) => {
+                          if (!event.dataTransfer.types.includes(MAIL_DRAG_TYPE) || !isSelectable(folder)) return;
+                          const dragged = draggedMessagesRef.current;
+                          if (dragged.length === 0 || dragged.every((m) => m.folder === folder.name)) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = event.ctrlKey || event.altKey ? "copy" : "move";
+                          if (dropFolder !== folder.name) setDropFolder(folder.name);
+                        }}
+                        onDragLeave={() => {
+                          if (dropFolder === folder.name) setDropFolder(null);
+                        }}
+                        onDrop={(event) => {
+                          const dragged = draggedMessagesRef.current;
+                          if (!event.dataTransfer.types.includes(MAIL_DRAG_TYPE) || dragged.length === 0) return;
+                          event.preventDefault();
+                          setDropFolder(null);
+                          draggedMessagesRef.current = [];
+                          // Move by default; Ctrl (Option on macOS) copies, like Thunderbird.
+                          if (event.ctrlKey || event.altKey) void handleCopyMessages(dragged, folder.name);
+                          else void handleMoveMessages(dragged, folder.name);
+                        }}
                         onClick={() => handleFolderSelect(folder)}
                         onContextMenu={(event) => mailMenu.show(event, folderMenuItems(folder))}
                       >
@@ -4507,7 +4647,23 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                           key={messageKey(message)}
                           data-thread-key={threadView ? row.threadKey : undefined}
                           data-thread-depth={threadView ? row.depth : undefined}
-                          style={threadView && row.depth > 0 ? { paddingLeft: `${12 + row.depth * 16}px` } : undefined}
+                          style={{
+                            // Offscreen rows skip layout/paint (TASK-22) while
+                            // staying in the DOM for find, a11y and selection.
+                            contentVisibility: "auto",
+                            containIntrinsicSize: "auto 82px",
+                            ...(threadView && row.depth > 0 ? { paddingLeft: `${12 + row.depth * 16}px` } : {}),
+                          }}
+                          draggable
+                          onDragStart={(event) => {
+                            draggedMessagesRef.current = dragTargetsFor(message);
+                            event.dataTransfer.effectAllowed = "copyMove";
+                            event.dataTransfer.setData(MAIL_DRAG_TYPE, String(draggedMessagesRef.current.length));
+                          }}
+                          onDragEnd={() => {
+                            draggedMessagesRef.current = [];
+                            setDropFolder(null);
+                          }}
                           role="button"
                           tabIndex={0}
                           aria-pressed={active}

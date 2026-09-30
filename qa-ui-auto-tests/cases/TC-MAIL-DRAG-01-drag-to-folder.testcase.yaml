@@ -1,0 +1,92 @@
+id: TC-MAIL-DRAG-01
+title: Mail moves a message dragged onto a folder in the tree
+description: 'TASK-22 (docs-feature/mail-thunderbird-parity-design.md AC-56).
+
+  Drags the first INBOX message onto Archive in the folder tree and requires
+
+  the INBOX list to shrink by one and Archive to contain the message.
+
+  Browser mode only: WebDriver cannot drive HTML5 drag and drop in the
+
+  native WebViews; the drop handler (move, Ctrl copies) is also covered by
+
+  MailClientTab.test.tsx.
+
+  '
+covers:
+- F-MAIL-12
+tags:
+- mail
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- mail_server_assert_folder_count:
+    folder: Archive
+    equals: 8
+- drag_to:
+    from: '[data-testid="mail-message-row"]'
+    to: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Moved 1 message to Archive
+    timeout_sec: 15
+- mail_server_assert_folder_count:
+    folder: Archive
+    equals: 9
+    timeout_sec: 15
+- mail_server_assert_list_matches:
+    timeout_sec: 30
+- screenshot: mail-drag-01-moved.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 把邮件拖到文件夹树的 Archive 上完成移动：状态提示移动成功，服务器 Archive 多一封，INBOX 列表与服务器一致（AC-56）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 10
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 9
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Archive", "equals": 8}}'
+    - step: 11
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Moved 1 message to Archive", "timeout_sec": 15}}'
+    - step: 12
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Archive", "equals": 9, "timeout_sec": 15}}'
+    - step: 13
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 30}}'
+    results:
+    - 11
+    - 12
+    - 13
+  visual:
+  - check: 截图中 INBOX 列表少了被拖走的邮件。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: 仅 browser 模式；WebDriver 无法驱动原生 WebView 中的 HTML5 拖放，拖放处理由 Vitest 覆盖。
+    method: manual
+    reason: 原生拖放需人工在三端验证。

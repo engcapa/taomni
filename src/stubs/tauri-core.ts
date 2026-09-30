@@ -4039,6 +4039,10 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const config = invokeArgs?.config as { sync?: { subscribedOnly?: boolean } } | undefined;
       return stubMailSyncAll(accountId, mailStubSeed, limit, config?.sync?.subscribedOnly === true) as T;
     }
+    case "mail_list_folders": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubMailListFolders(stubMailAccountId(invokeArgs), mailStubSeed) as T;
+    }
     case "mail_set_folder_subscription": {
       const invokeArgs = args as InvokeArgs | undefined;
       return stubMailSetSubscription(

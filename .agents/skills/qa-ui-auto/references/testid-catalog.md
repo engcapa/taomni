@@ -876,6 +876,11 @@
 - `[data-testid="mail-subscribed-only-setting"]` — interactive [optional] — F-MAIL-11.subscribed-only-setting
 - `[data-testid="mail-special-folders"]` — display [optional] — F-MAIL-11.special-folders
 
+## mail/list (F-MAIL-12)
+
+- `[data-testid="mail-message-row"][aria-pressed="true"]` — interactive — F-MAIL-12.message-row-shortcuts
+- `[data-testid="mail-folder-row"][data-folder-name="Archive"]` — interactive — F-MAIL-12.folder-drop-target
+
 ## mail/organize (F-MAIL-8)
 
 - `[data-testid="mail-menu-tag"]` — interactive — F-MAIL-8.menu-tag

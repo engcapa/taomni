@@ -884,6 +884,7 @@ pub fn run() {
             mail::idle::mail_idle_start,
             mail::idle::mail_idle_stop,
             mail::folders::mail_set_folder_subscription,
+            mail::folders::mail_list_folders,
             mail::mail_list_cached_folders,
             mail::mail_list_cached_messages,
             mail::mail_get_message_body,

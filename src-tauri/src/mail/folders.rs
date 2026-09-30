@@ -190,6 +190,38 @@ pub(super) fn special_folder_override(
         .map(|folder| folder.name.clone())
 }
 
+/// LIST (+LSUB) the remote folder tree without syncing messages, so a new
+/// account shows its folders on open instead of after the first full sync.
+#[tauri::command]
+pub async fn mail_list_folders(
+    config: MailAccountConfig,
+    state: State<'_, AppState>,
+) -> Result<Vec<MailFolder>, String> {
+    let account = resolve_config(&state, config)?;
+    let account_id = account.config.session_id.clone();
+    let cache_enabled = account.config.cache.enabled;
+    let pool = std::sync::Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
+    let listed = tokio::task::spawn_blocking(move || {
+        with_imap_session(
+            &pool,
+            &account,
+            &handle,
+            super::ImapSessionOpts::default(),
+            |imap| imap.list_folders(&account.config.session_id),
+        )
+    })
+    .await
+    .map_err(|e| format!("mail list folders task failed: {e}"))??;
+    if !cache_enabled {
+        return Ok(listed);
+    }
+    with_mail_db(&state, &account_id, |db| {
+        super::sync_folder_tree(db, &account_id, &listed)?;
+        super::list_cached_folders(db, &account_id)
+    })
+}
+
 /// Subscribe or unsubscribe a folder; returns the updated cached folders.
 #[tauri::command]
 pub async fn mail_set_folder_subscription(

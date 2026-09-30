@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MailTabInfo } from "../../types";
 import type { MailFolder, MailFolderSyncResult, MailMessageBody, MailMessageHeader } from "../../lib/mail";
@@ -39,6 +39,7 @@ const mailMocks = vi.hoisted(() => ({
   mailIdleStart: vi.fn(),
   mailIdleStop: vi.fn(),
   mailSetFolderSubscription: vi.fn(),
+  mailListFolders: vi.fn(),
 }));
 
 const eventMocks = vi.hoisted(() => ({
@@ -232,6 +233,7 @@ describe("MailClientTab", () => {
     mailMocks.mailSyncFolder.mockResolvedValue(stepResult({}));
     mailMocks.mailIdleStart.mockResolvedValue(true);
     mailMocks.mailIdleStop.mockResolvedValue(true);
+    mailMocks.mailListFolders.mockResolvedValue([]);
     eventMocks.handlers.clear();
     useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
   });
@@ -998,6 +1000,63 @@ describe("MailClientTab", () => {
     await waitFor(() => expect(mailMocks.mailSetFolderSubscription).toHaveBeenCalledWith(info, "Old", true));
     await waitFor(() => expect(folderRow("Old")).not.toBeNull());
     window.localStorage.clear();
+  });
+
+  it("runs Thunderbird list shortcuts outside inputs (TASK-22)", async () => {
+    const second: MailMessageHeader = { ...message, uid: 102, messageId: "message-102@example.com", subject: "Second", dateTs: (message.dateTs ?? 0) - 60 };
+    mailMocks.mailListCachedMessages.mockResolvedValue([message, second]);
+    mailMocks.mailSetFlags.mockResolvedValue(undefined);
+    renderMailbox();
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(2));
+    const rowByUid = (uid: number) =>
+      document.querySelector(`[data-testid="mail-message-row"][data-uid="${uid}"]`) as HTMLElement;
+
+    fireEvent.click(rowByUid(101));
+    await waitFor(() => expect(rowByUid(101)).toHaveAttribute("aria-pressed", "true"));
+    fireEvent.keyDown(rowByUid(101), { key: "f" });
+    await waitFor(() => expect(rowByUid(102)).toHaveAttribute("aria-pressed", "true"));
+    fireEvent.keyDown(rowByUid(102), { key: "b" });
+    await waitFor(() => expect(rowByUid(101)).toHaveAttribute("aria-pressed", "true"));
+
+    // Typing in the search box never triggers list shortcuts.
+    const search = screen.getByTestId("mail-search-input");
+    fireEvent.keyDown(search, { key: "s" });
+    expect(mailMocks.mailSetFlags).not.toHaveBeenCalled();
+    fireEvent.keyDown(rowByUid(101), { key: "s" });
+    await waitFor(() => expect(mailMocks.mailSetFlags).toHaveBeenCalled());
+
+    fireEvent.keyDown(document.body, { key: "K", ctrlKey: true, shiftKey: true });
+    expect(document.activeElement).toBe(search);
+  });
+
+  it("moves dragged messages onto a folder and copies with Ctrl (TASK-22)", async () => {
+    const archive: MailFolder = { ...folder, name: "Archive", displayName: "Archive" };
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, archive]);
+    mailMocks.mailMoveMessages.mockResolvedValue(undefined);
+    mailMocks.mailCopyMessages.mockResolvedValue(undefined);
+    renderMailbox();
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(1));
+    const row = screen.getAllByTestId("mail-message-row")[0];
+    const target = await waitFor(() => {
+      const el = document.querySelector('[data-testid="mail-folder-row"][data-folder-name="Archive"]');
+      if (!el) throw new Error("no Archive row");
+      return el as HTMLElement;
+    });
+    const dataTransfer = { types: ["application/x-taomni-mail"], setData: vi.fn(), effectAllowed: "", dropEffect: "" };
+
+    fireEvent.dragStart(row, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    expect(target).toHaveAttribute("data-drop-target", "true");
+    // jsdom's DragEvent ignores modifier init; set it like a real Ctrl-drop.
+    const copyDrop = createEvent.drop(target, { dataTransfer });
+    Object.defineProperty(copyDrop, "ctrlKey", { value: true });
+    fireEvent(target, copyDrop);
+    await waitFor(() => expect(mailMocks.mailCopyMessages).toHaveBeenCalledWith(info, "INBOX", [101], "Archive"));
+    expect(mailMocks.mailMoveMessages).not.toHaveBeenCalled();
+
+    fireEvent.dragStart(row, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+    await waitFor(() => expect(mailMocks.mailMoveMessages).toHaveBeenCalledWith(info, "INBOX", [101], "Archive"));
   });
 
   it("waits for background sync instead of dropping a manual sync click", async () => {
