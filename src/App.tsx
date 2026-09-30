@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { MainLayout } from "./layouts/MainLayout";
 import {
   SftpDetachedWindow,
@@ -10,6 +10,13 @@ import { NotesDetachedWindow } from "./components/notes/NotesDetachedWindow";
 import { ServersDialog } from "./components/servers/ServersDialog";
 import { RdpServerApprovalBridge } from "./components/servers/RdpServerApprovalBridge";
 import { detectDetachedRoute } from "./lib/detachedSession";
+import {
+  isScreenshotOverlayWindow,
+  isScreenshotRecorderWindow,
+  openScreenshotOverlay,
+} from "./lib/screenshot";
+import { ScreenshotOverlay } from "./components/screenshot/ScreenshotOverlay";
+import { RecorderBar } from "./components/screenshot/RecorderBar";
 import { useAppTheme } from "./lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
 import { attachSftpSync } from "./lib/sftpSync";
@@ -26,6 +33,40 @@ function App() {
   const { mode, resolvedTheme } = useAppTheme();
   const uiFontFamily = useAppStore((s) => s.uiFontFamily);
   const uiFontSize = useAppStore((s) => s.uiFontSize);
+  // Track the URL hash so in-app navigations (e.g. the browser stub for
+  // `screenshot_open_overlay`) re-render the route immediately.
+  const [routeHash, setRouteHash] = useState(
+    () => (typeof location !== "undefined" ? location.hash : ""),
+  );
+  useEffect(() => {
+    const onHashChange = () => setRouteHash(location.hash);
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  // App-local screenshot hotkey: Ctrl+Shift+A (Cmd+Shift+A on macOS), the
+  // Feishu default. The OS-global hotkey is registered by the Rust backend;
+  // this is the fallback when the app window is focused (and the only path in
+  // browser preview). Editable fields keep the keystroke.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) return;
+      if (event.code !== "KeyA") return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) {
+        return;
+      }
+      // The overlay/recorder windows own their keys (ESC etc.).
+      if (isScreenshotOverlayWindow() || isScreenshotRecorderWindow()) return;
+      event.preventDefault();
+      void openScreenshotOverlay().catch((err) => {
+        console.error("[screenshot] app shortcut failed", err);
+      });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -148,6 +189,24 @@ function App() {
 
   let content: ReactNode;
   let hostsRdpApprovals = false;
+  // Screenshot tool overlay / recorder windows render standalone, outside the
+  // main layout and the vault gate (they must work even while windows hide).
+  // The URL-hash fallback also serves browser-mode QA: opening
+  // `index.html#screenshot-overlay` renders the overlay in-page with stubbed
+  // capture backends.
+  const overlayHash = routeHash;
+  if (
+    isScreenshotOverlayWindow() ||
+    overlayHash.startsWith("#screenshot-overlay")
+  ) {
+    return <ScreenshotOverlay />;
+  }
+  if (
+    isScreenshotRecorderWindow() ||
+    overlayHash.startsWith("#screenshot-recorder")
+  ) {
+    return <RecorderBar />;
+  }
   const detachedSftpId = detectDetachedSftpRoute();
   if (detachedSftpId) {
     content = <SftpDetachedWindow sessionId={detachedSftpId} />;

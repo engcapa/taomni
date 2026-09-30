@@ -5,6 +5,7 @@ import {
   HelpCircle,
   Menu,
   MessageSquare,
+  Camera,
   Inbox,
   Monitor,
   MoreHorizontal,
@@ -37,6 +38,8 @@ import { WindowControls } from "../window/WindowControls";
 import { WindowDragHandle } from "../window/WindowDragHandle";
 import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
 import { CaptureIndicators } from "../capture/CaptureIndicators";
+import { openScreenshotOverlay } from "../../lib/screenshot";
+import { useAppDialogs, formatUnknownError } from "../../lib/appDialogs";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import type { AppCommand } from "../menubar/commands";
 import { getAppPlatform } from "../../lib/runtime";
@@ -91,7 +94,25 @@ export function ControlBar({
 }: ControlBarProps) {
   const ctx = useContextMenu();
   const t = useT();
+  const dialogs = useAppDialogs();
   const [detailsRevealHovered, setDetailsRevealHovered] = useState(false);
+  const [screenshotBusy, setScreenshotBusy] = useState(false);
+
+  const handleScreenshot = async () => {
+    if (screenshotBusy) return;
+    setScreenshotBusy(true);
+    try {
+      await openScreenshotOverlay();
+    } catch (err) {
+      await dialogs.alert({
+        title: t("screenshot.tooltip"),
+        message: t("screenshot.openFailed", { error: formatUnknownError(err) }),
+        tone: "error",
+      });
+    } finally {
+      setScreenshotBusy(false);
+    }
+  };
   const {
     hasSessions,
     importJson,
@@ -273,6 +294,18 @@ export function ControlBar({
       <div className={IS_MAC ? "w-2 self-stretch shrink-0" : "w-3 self-stretch shrink-0"} />
       {/* Divider between the tab-related buttons and the main-window controls. */}
       <div aria-hidden="true" className="taomni-control-divider self-stretch shrink-0" />
+      {/* System screenshot: independent of any tab — global window chrome. */}
+      <button
+        type="button"
+        data-testid="system-screenshot"
+        aria-label={t("screenshot.tooltip")}
+        title={`${t("screenshot.tooltip")} (${IS_MAC ? "Cmd" : "Ctrl"}+Shift+A)`}
+        disabled={screenshotBusy}
+        onClick={() => void handleScreenshot()}
+        className="h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50 self-center"
+      >
+        <Camera className="w-4 h-4" />
+      </button>
       <TitleBarTrayControls />
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
     </div>

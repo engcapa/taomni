@@ -34,7 +34,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `middle_click` | selector string | Browser/native: real middle-button input; verifies tab auxiliary-click routing when paired with a close result assertion. |
 | `right_click` | same as click | Native supports selector only (W3C right button); rich click options are browser-only and fail explicitly. Use before `assert_menu_items`; `click_menu` supports an exact visible label in native mode. |
 | `hover` | selector | |
-| `drag_to` | `{from, to}` | Both selectors. |
+| `drag_to` | `{from, to, from_position?, to_position?}` | Both selectors. `from_position`/`to_position` are optional `{x, y}` pixel offsets within the elements (Playwright `source_position`/`target_position`) — use them to drag across a canvas or image at exact coordinates. |
 | `native_click` | `{selector}` | Native Linux/X11 only. Activates the exact test executable window and sends W3C pointer actions through its packaged WebKitGTK session; testcase assertions own the postcondition. |
 | `native_pointer_drag` | `{selector, from:{line,column}, to:{line,column}, modifiers?}` | Native Linux/X11 only. Resolves CodeMirror line/column positions through read-only DOM geometry, then sends a real modifier-aware W3C pointer drag to the packaged WebKitGTK session. The verb records geometry/transport only; testcase assertions own selection and edit postconditions. |
 | `native_set_writable` | `{path, writable}` | Native Linux only. Toggles owner-write permission for a path inside the current retained report root and records mode metadata; used for deterministic real-write failure/recovery evidence. |

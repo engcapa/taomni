@@ -1,0 +1,21 @@
+id: TC-SHOT-008
+title: Recorder cancel discards the recording and closes the bar
+covers:
+- F27.1
+tags:
+- screenshot
+- recording
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-recorder
+- wait_for: '[data-testid="screenshot-recorder"]'
+- assert_visible: '[data-testid="screenshot-recorder-cancel"]'
+- click: '[data-testid="screenshot-recorder-cancel"]'
+- wait_for:
+    selector: '[data-testid="system-screenshot"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__tauriStubScreenshotCalls || []).includes("screenshot_cancel_recording")

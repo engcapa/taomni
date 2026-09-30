@@ -1,0 +1,22 @@
+id: TC-SHOT-N1
+title: Native real screen capture renders in the overlay
+covers:
+- F27.1
+tags:
+- screenshot
+- native
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+# No overlay-init payload exists on the hash route, so the overlay falls
+# back to the real screenshot_capture_full backend on the runner OS.
+- wait_for:
+    selector: '[data-testid="screenshot-base-image"]'
+    timeout_sec: 30
+- eval_readonly:
+    expression: document.getElementsByTagName("img")[0].naturalWidth > 0
+- assert_visible: '[data-testid="screenshot-hint"]'

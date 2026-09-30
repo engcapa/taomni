@@ -9235,6 +9235,150 @@ controls:
 
 ---
 
+<!-- feature
+id: F27.1
+status: done
+area: screenshot/screen-record
+components: [ScreenshotOverlay, AnnotationCanvas, RecorderBar, ControlBar, screenshot.ts, screenshot (tauri)]
+files:
+  - src/components/screenshot/ScreenshotOverlay.tsx
+  - src/components/screenshot/AnnotationCanvas.tsx
+  - src/components/screenshot/RecorderBar.tsx
+  - src/lib/screenshot.ts
+  - src/components/tabbar/ControlBar.tsx
+  - src-tauri/src/screenshot/mod.rs
+  - src-tauri/src/screenshot/capture.rs
+  - src-tauri/src/screenshot/scroll.rs
+  - src-tauri/src/screenshot/record.rs
+controls:
+  - id: system-screenshot
+    selector: '[data-testid="system-screenshot"]'
+    kind: interactive
+  - id: screenshot-overlay
+    selector: '[data-testid="screenshot-overlay"]'
+    kind: display
+  - id: screenshot-base-image
+    selector: '[data-testid="screenshot-base-image"]'
+    kind: display
+  - id: screenshot-selection
+    selector: '[data-testid="screenshot-selection"]'
+    kind: display
+  - id: screenshot-size-hint
+    selector: '[data-testid="screenshot-size-hint"]'
+    kind: display
+  - id: screenshot-toolbar
+    selector: '[data-testid="screenshot-toolbar"]'
+    kind: display
+  - id: screenshot-tool-rect
+    selector: '[data-testid="screenshot-tool-rect"]'
+    kind: interactive
+  - id: screenshot-tool-ellipse
+    selector: '[data-testid="screenshot-tool-ellipse"]'
+    kind: interactive
+  - id: screenshot-tool-arrow
+    selector: '[data-testid="screenshot-tool-arrow"]'
+    kind: interactive
+  - id: screenshot-tool-line
+    selector: '[data-testid="screenshot-tool-line"]'
+    kind: interactive
+  - id: screenshot-tool-pen
+    selector: '[data-testid="screenshot-tool-pen"]'
+    kind: interactive
+  - id: screenshot-tool-text
+    selector: '[data-testid="screenshot-tool-text"]'
+    kind: interactive
+  - id: screenshot-tool-mosaic
+    selector: '[data-testid="screenshot-tool-mosaic"]'
+    kind: interactive
+  - id: screenshot-undo
+    selector: '[data-testid="screenshot-undo"]'
+    kind: interactive
+  - id: screenshot-redo
+    selector: '[data-testid="screenshot-redo"]'
+    kind: interactive
+  - id: screenshot-scroll-capture
+    selector: '[data-testid="screenshot-scroll-capture"]'
+    kind: interactive
+  - id: screenshot-record
+    selector: '[data-testid="screenshot-record"]'
+    kind: interactive
+  - id: screenshot-copy
+    selector: '[data-testid="screenshot-copy"]'
+    kind: interactive
+  - id: screenshot-save
+    selector: '[data-testid="screenshot-save"]'
+    kind: interactive
+  - id: screenshot-cancel
+    selector: '[data-testid="screenshot-cancel"]'
+    kind: interactive
+  - id: screenshot-fullscreen
+    selector: '[data-testid="screenshot-fullscreen"]'
+    kind: interactive
+  - id: screenshot-annotation-canvas
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    kind: interactive
+  - id: screenshot-hint
+    selector: '[data-testid="screenshot-hint"]'
+    kind: display
+  - id: screenshot-scroll-busy
+    selector: '[data-testid="screenshot-scroll-busy"]'
+    kind: display
+  - id: screenshot-color-red
+    selector: '[data-testid="screenshot-color-red"]'
+    kind: interactive
+  - id: screenshot-color-yellow
+    selector: '[data-testid="screenshot-color-yellow"]'
+    kind: interactive
+  - id: screenshot-color-green
+    selector: '[data-testid="screenshot-color-green"]'
+    kind: interactive
+  - id: screenshot-color-blue
+    selector: '[data-testid="screenshot-color-blue"]'
+    kind: interactive
+  - id: screenshot-color-white
+    selector: '[data-testid="screenshot-color-white"]'
+    kind: interactive
+  - id: screenshot-recorder
+    selector: '[data-testid="screenshot-recorder"]'
+    kind: display
+  - id: screenshot-recorder-timer
+    selector: '[data-testid="screenshot-recorder-timer"]'
+    kind: display
+  - id: screenshot-recorder-stop
+    selector: '[data-testid="screenshot-recorder-stop"]'
+    kind: interactive
+  - id: screenshot-recorder-preview
+    selector: '[data-testid="screenshot-recorder-preview"]'
+    kind: display
+  - id: screenshot-recorder-done
+    selector: '[data-testid="screenshot-recorder-done"]'
+    kind: interactive
+  - id: screenshot-recorder-save
+    selector: '[data-testid="screenshot-recorder-save"]'
+    kind: interactive
+  - id: screenshot-recorder-cancel
+    selector: '[data-testid="screenshot-recorder-cancel"]'
+    kind: interactive
+  - id: screenshot-record-gif
+    selector: '[data-testid="screenshot-record-gif"]'
+    kind: interactive
+    optional: true
+  - id: screenshot-record-mp4
+    selector: '[data-testid="screenshot-record-mp4"]'
+    kind: interactive
+    optional: true
+  - id: annotation-text-input
+    selector: '[data-testid="annotation-text-input"]'
+    kind: interactive
+  - id: screenshot-toast
+    selector: '[data-testid="screenshot-toast"]'
+    kind: display
+-->
+
+- 系统截图工具：ControlBar 全局截图按钮（不依附 tab）与快捷键 Ctrl+Shift+A（macOS Cmd+Shift+A）打开全屏截图 overlay；飞书式区域选择（放大镜 + 尺寸提示）、7 种标注工具、撤销/重做、复制到剪贴板、保存 PNG；滚动长截图（Enigo 滚轮注入 + 重叠检测拼接）；录屏支持 GIF / MP4（系统 ffmpeg 编码），独立录屏状态条窗口。
+- Browser 用例覆盖 UI 触发、区域选择、标注、撤销/重做、复制、保存、滚动截图、快捷键、录屏状态条；Native 用例覆盖三端真实屏幕采集、真实滚动注入与拼接、真实剪贴板路径。
+
+---
 
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >

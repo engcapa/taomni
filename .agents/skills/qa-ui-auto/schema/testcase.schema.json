@@ -1402,6 +1402,30 @@
         },
         "to": {
           "$ref": "#/$defs/selector"
+        },
+        "from_position": {
+          "$ref": "#/$defs/point",
+          "description": "Pixel offset within the 'from' element where the drag starts (Playwright source_position)."
+        },
+        "to_position": {
+          "$ref": "#/$defs/point",
+          "description": "Pixel offset within the 'to' element where the drag ends (Playwright target_position)."
+        }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
         }
       }
     },

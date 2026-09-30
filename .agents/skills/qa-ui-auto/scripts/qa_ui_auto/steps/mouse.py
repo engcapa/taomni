@@ -82,4 +82,12 @@ def step_drag_to(ctx: StepContext, args: Any) -> None:
     dst = ctx.page.locator(args["to"]).first  # type: ignore[attr-defined]
     if ctx.dry_run:
         return
-    src.drag_to(dst, force=True)
+    kwargs: dict = {"force": True}
+    # Optional pixel offsets within the elements (e.g. drag across a canvas
+    # or screenshot image). Playwright option names are source_position /
+    # target_position; the YAML uses from_position / to_position.
+    if args.get("from_position"):
+        kwargs["source_position"] = args["from_position"]
+    if args.get("to_position"):
+        kwargs["target_position"] = args["to_position"]
+    src.drag_to(dst, **kwargs)

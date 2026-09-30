@@ -1,0 +1,21 @@
+id: TC-SHOT-004
+title: App-local shortcut Control Shift A opens the screenshot overlay
+covers:
+- F27.1
+tags:
+- screenshot
+- shortcut
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- press: Control+Shift+A
+- wait_for: '[data-testid="screenshot-overlay"]'
+- assert_visible: '[data-testid="screenshot-base-image"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="system-screenshot"]'

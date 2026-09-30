@@ -1,0 +1,52 @@
+id: TC-SHOT-002
+title: Region select then annotate rectangle with undo redo and copy
+covers:
+- F27.1
+tags:
+- screenshot
+- annotate
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for: '[data-testid="screenshot-base-image"]'
+- assert_visible: '[data-testid="screenshot-hint"]'
+# Drag a region across the captured desktop image (stub is 400x300).
+- drag_to:
+    from: '[data-testid="screenshot-base-image"]'
+    to: '[data-testid="screenshot-base-image"]'
+    from_position:
+      x: 60
+      y: 60
+    to_position:
+      x: 260
+      y: 220
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_visible: '[data-testid="screenshot-selection"]'
+- assert_visible: '[data-testid="screenshot-size-hint"]'
+# Draw a red rectangle annotation inside the selection.
+- click: '[data-testid="screenshot-tool-rect"]'
+- click: '[data-testid="screenshot-color-red"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-canvas"]'
+    to: '[data-testid="screenshot-annotation-canvas"]'
+    from_position:
+      x: 80
+      y: 80
+    to_position:
+      x: 200
+      y: 160
+- wait: 1
+# Undo becomes enabled after drawing, redo after undoing.
+- assert_enabled: '[data-testid="screenshot-undo"]'
+- click: '[data-testid="screenshot-undo"]'
+- assert_enabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-redo"]'
+# Copy routes through the real copy pipeline (stubbed backend).
+- click: '[data-testid="screenshot-copy"]'
+- wait_for: '[data-testid="screenshot-toast"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__tauriStubScreenshotCalls || []).includes("screenshot_copy_image")

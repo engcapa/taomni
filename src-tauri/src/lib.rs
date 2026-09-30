@@ -31,6 +31,7 @@ mod proxy;
 mod qa_driver;
 mod rdp;
 mod sdk;
+mod screenshot;
 mod serial;
 mod servers;
 pub mod session;
@@ -132,6 +133,37 @@ async fn exit_app(app_handle: AppHandle, state: State<'_, AppState>) -> Result<(
     Ok(())
 }
 
+/// Register the OS-global screenshot hotkey (Ctrl+Shift+A, Cmd+Shift+A on
+/// macOS — the Feishu default). Best-effort: platforms that cannot grab a
+/// global hotkey (notably Wayland) log a warning and keep the app-local
+/// shortcut as the fallback.
+#[cfg(desktop)]
+fn register_screenshot_global_shortcut(app: &AppHandle) {
+    use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+    #[cfg(target_os = "macos")]
+    let modifiers = Modifiers::SUPER | Modifiers::SHIFT;
+    #[cfg(not(target_os = "macos"))]
+    let modifiers = Modifiers::CONTROL | Modifiers::SHIFT;
+    let shortcut = Shortcut::new(Some(modifiers), Code::KeyA);
+
+    if let Err(e) = app.global_shortcut().on_shortcut(shortcut, |app_handle, _shortcut, event| {
+        if event.state == ShortcutState::Pressed {
+            let app = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = crate::screenshot::open_overlay(&app, None).await {
+                    log::warn!("global screenshot shortcut failed: {e}");
+                }
+            });
+        }
+    }) {
+        log::warn!("could not register global screenshot shortcut (Ctrl+Shift+A): {e}");
+    }
+}
+
+#[cfg(not(desktop))]
+fn register_screenshot_global_shortcut(_app: &AppHandle) {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -143,7 +175,9 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
+            register_screenshot_global_shortcut(app.handle());
             let app_data = resolved_app_data_dir(app.handle())
                 .expect("failed to resolve app data dir");
 
@@ -1047,6 +1081,21 @@ pub fn run() {
             lanchat::commands::lanchat_reject_file,
             lanchat::commands::lanchat_transfer_control,
             lanchat::commands::lanchat_send_screenshot,
+            screenshot::screenshot_list_displays,
+            screenshot::screenshot_capture_full,
+            screenshot::screenshot_capture_region,
+            screenshot::screenshot_scroll_capture,
+            screenshot::screenshot_copy_image,
+            screenshot::screenshot_save_image,
+            screenshot::screenshot_save_data_url,
+            screenshot::screenshot_probe,
+            screenshot::screenshot_open_overlay,
+            screenshot::screenshot_overlay_init,
+            screenshot::screenshot_close_overlay,
+            screenshot::screenshot_start_recording,
+            screenshot::screenshot_stop_recording,
+            screenshot::screenshot_cancel_recording,
+            screenshot::screenshot_current_recording,
             lanchat::commands::lanchat_send_clipboard_image,
             lanchat::commands::lanchat_send_image_bytes,
             lanchat::commands::lanchat_send_signal,

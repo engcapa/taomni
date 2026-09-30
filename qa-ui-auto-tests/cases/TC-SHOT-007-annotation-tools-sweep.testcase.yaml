@@ -1,0 +1,86 @@
+id: TC-SHOT-007
+title: Annotation tools colors record menu fullscreen and cancel sweep
+covers:
+- F27.1
+tags:
+- screenshot
+- annotate
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for: '[data-testid="screenshot-base-image"]'
+# Fullscreen selection from the select-phase hint bar.
+- click: '[data-testid="screenshot-fullscreen"]'
+- wait_for: '[data-testid="screenshot-toolbar"]'
+# Sweep the remaining annotation tools; each must accept input.
+- click: '[data-testid="screenshot-tool-ellipse"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-canvas"]'
+    to: '[data-testid="screenshot-annotation-canvas"]'
+    from_position:
+      x: 60
+      y: 60
+    to_position:
+      x: 160
+      y: 140
+- click: '[data-testid="screenshot-tool-line"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-canvas"]'
+    to: '[data-testid="screenshot-annotation-canvas"]'
+    from_position:
+      x: 60
+      y: 160
+    to_position:
+      x: 200
+      y: 120
+- click: '[data-testid="screenshot-tool-pen"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-canvas"]'
+    to: '[data-testid="screenshot-annotation-canvas"]'
+    from_position:
+      x: 60
+      y: 180
+    to_position:
+      x: 220
+      y: 200
+- click: '[data-testid="screenshot-tool-mosaic"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-canvas"]'
+    to: '[data-testid="screenshot-annotation-canvas"]'
+    from_position:
+      x: 240
+      y: 60
+    to_position:
+      x: 340
+      y: 140
+# Text tool opens an inline editor; Enter commits the text.
+- click: '[data-testid="screenshot-tool-text"]'
+- click:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    position:
+      x: 120
+      y: 220
+- wait_for: '[data-testid="annotation-text-input"]'
+- fill:
+    selector: '[data-testid="annotation-text-input"]'
+    value: qa-shot
+- press: Enter
+- wait: 1
+# Sweep the remaining colors.
+- click: '[data-testid="screenshot-color-yellow"]'
+- click: '[data-testid="screenshot-color-green"]'
+- click: '[data-testid="screenshot-color-blue"]'
+- click: '[data-testid="screenshot-color-white"]'
+# Record dropdown exposes GIF and MP4 entries.
+- click: '[data-testid="screenshot-record"]'
+- assert_visible: '[data-testid="screenshot-record-gif"]'
+- assert_visible: '[data-testid="screenshot-record-mp4"]'
+- click: '[data-testid="screenshot-record"]'
+# Cancel closes the overlay back to the main window.
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for:
+    selector: '[data-testid="system-screenshot"]'

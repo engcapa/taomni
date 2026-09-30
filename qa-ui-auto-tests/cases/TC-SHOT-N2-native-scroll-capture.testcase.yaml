@@ -1,0 +1,36 @@
+id: TC-SHOT-N2
+title: Native scroll capture drives real input and stitches frames
+covers:
+- F27.1
+tags:
+- screenshot
+- scroll-capture
+- native
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for:
+    selector: '[data-testid="screenshot-base-image"]'
+    timeout_sec: 30
+- drag_to:
+    from: '[data-testid="screenshot-base-image"]'
+    to: '[data-testid="screenshot-base-image"]'
+    from_position:
+      x: 60
+      y: 80
+    to_position:
+      x: 400
+      y: 400
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- click: '[data-testid="screenshot-scroll-capture"]'
+- wait_for: '[data-testid="screenshot-scroll-busy"]'
+# Real backend: hides nothing on this route, injects wheel events via the
+# OS input API, captures and stitches. Must finish without an error toast.
+- wait_for:
+    selector: '[data-testid="screenshot-base-image"]'
+    timeout_sec: 90
+- assert_not_visible: '[data-testid="screenshot-scroll-busy"]'

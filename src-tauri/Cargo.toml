@@ -215,7 +215,9 @@ socket2 = { version = "0.6", features = ["all"] }
 tauri-plugin-notification = "2.4.0"
 xcap = { version = "0.9.6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
+gif = "0.13"
 tauri-plugin-dialog = "2.7.3"
+tauri-plugin-global-shortcut = "2"
 sqlparser = "0.62.0"
 scopeguard = "1.2"
 
