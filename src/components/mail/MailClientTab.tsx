@@ -4003,7 +4003,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           Test
         </button>
         <div className="relative w-[320px] max-w-[40vw]">
-          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
+          <Search className="pointer-events-none w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
             ref={searchInputRef}
             type="search"

@@ -53,7 +53,7 @@ steps:
 - click: '[data-testid="mail-sync-button"]'
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
-    contains: Synced
+    contains: new headers across
     timeout_sec: 30
 - mail_server_assert_list_matches:
     unread: true
@@ -85,7 +85,7 @@ verification:
     - step: 11
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 15
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Synced",
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "new headers across",
         "timeout_sec": 30}}'
     - step: 16
       expectation: '{"mail_server_assert_list_matches": {"unread": true, "timeout_sec": 60}}'

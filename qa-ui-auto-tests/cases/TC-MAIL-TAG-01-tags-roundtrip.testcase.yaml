@@ -1,11 +1,16 @@
 id: TC-MAIL-TAG-01
 title: Mail tags are stored as IMAP keywords and survive a full resync
-description: |
-  TASK-11 (AC-34): tagging a message "Important" stores Thunderbird's
+description: 'TASK-11 (AC-34): tagging a message "Important" stores Thunderbird''s
+
   $label1 keyword on the server; the tag dot shows in the list, the tag quick
+
   filter narrows to it, and a manual Sync (full reconcile of server flags)
+
   keeps it. Browser mode uses the stub server; native mode uses the real
+
   backend against the fake IMAP server.
+
+  '
 covers:
 - F-MAIL-8
 tags:
@@ -35,6 +40,9 @@ steps:
 - right_click: '[data-testid="mail-message-row"]'
 - click: '[data-testid="mail-menu-tag"]'
 - click: '[data-testid="mail-menu-tag-label1"]'
+- wait_for:
+    selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
+    timeout_sec: 15
 - assert_count:
     selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
     equal: 1
@@ -47,8 +55,11 @@ steps:
 - click: '[data-testid="mail-sync-button"]'
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
-    contains: Synced
+    contains: new headers across
     timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
+    timeout_sec: 15
 - assert_count:
     selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
     equal: 1
@@ -67,25 +78,27 @@ verification:
     - 9
     - 10
     - 11
-    - 13
-    - 15
+    - 14
+    - 16
     checkpoints:
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
     - step: 8
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 12
+      expectation: '{"wait_for": "tag dot"}'
+    - step: 13
       expectation: '{"assert_count": {"equal": 1}}'
-    - step: 14
+    - step: 15
       expectation: '{"assert_count": {"equal": 1}}'
-    - step: 16
-      expectation: '{"assert_text": {"contains": "Synced"}}'
     - step: 17
+      expectation: '{"assert_text": {"contains": "new headers across"}}'
+    - step: 19
       expectation: '{"assert_count": {"equal": 1}}'
     results:
-    - 12
-    - 14
-    - 17
+    - 13
+    - 15
+    - 19
   visual:
   - check: 截图中标签色点与过滤状态清晰。
     method: manual
