@@ -62,7 +62,7 @@ pub struct MailInvite {
 }
 
 /// RFC 5545 §3.1 unfolding: CRLF followed by a space/tab continues a line.
-fn unfold(ics: &str) -> Vec<String> {
+pub(super) fn unfold(ics: &str) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     for raw in ics.split('\n') {
         let line = raw.strip_suffix('\r').unwrap_or(raw);
@@ -76,7 +76,7 @@ fn unfold(ics: &str) -> Vec<String> {
 }
 
 /// `NAME;P1=a;P2="b":value` → (NAME, params, value).
-fn split_property(line: &str) -> (String, Vec<(String, String)>, String) {
+pub(super) fn split_property(line: &str) -> (String, Vec<(String, String)>, String) {
     let mut in_quotes = false;
     let mut colon = line.len();
     for (index, ch) in line.char_indices() {
@@ -104,7 +104,7 @@ fn split_property(line: &str) -> (String, Vec<(String, String)>, String) {
     (name, params, value.to_string())
 }
 
-fn unescape(value: &str) -> String {
+pub(super) fn unescape(value: &str) -> String {
     value
         .replace("\\n", "\n")
         .replace("\\N", "\n")
@@ -113,7 +113,7 @@ fn unescape(value: &str) -> String {
         .replace("\\\\", "\\")
 }
 
-fn param<'a>(params: &'a [(String, String)], key: &str) -> Option<&'a str> {
+pub(super) fn param<'a>(params: &'a [(String, String)], key: &str) -> Option<&'a str> {
     params
         .iter()
         .find(|(k, _)| k == key)
@@ -226,7 +226,7 @@ pub(super) fn invite_from_message(raw: &[u8]) -> Option<MailInvite> {
     })
 }
 
-fn escape(value: &str) -> String {
+pub(super) fn escape(value: &str) -> String {
     value
         .replace('\\', "\\\\")
         .replace(';', "\\;")
@@ -235,7 +235,7 @@ fn escape(value: &str) -> String {
 }
 
 /// RFC 5545 folding at 75 octets.
-fn fold(line: &str) -> String {
+pub(super) fn fold(line: &str) -> String {
     let mut out = String::new();
     let mut count = 0;
     for ch in line.chars() {

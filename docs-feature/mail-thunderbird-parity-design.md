@@ -769,7 +769,7 @@ macOS 和 Linux 未执行时标为未验证，不单独阻塞交付。性能基�
 | TASK-16 统一收件箱 | 已实现 | Vitest `MailUnifiedTab.test.tsx`（多账户按时间合并、同 UID 跨账户操作路由、单账户失败隔离）；TC-MAIL-UNIFIED-01 | 回复/转发经“Open account”在账户标签内完成；每账户最多合并 200 封；托管用例只有一个假服务器账户，多账户合并仅由 Vitest 覆盖 |
 | TASK-17 发件箱、稍后发送、撤销、回执 | 部分 | Vitest（AC-49/AC-50）；TC-MAIL-OUTBOX-01 | 对收到的回执请求自动应答未实现；稍后发送只在标签打开时生效（DEC-01） |
 | TASK-18 mbox、mailto、退订 | 部分 | Rust `mail::mbox`（往返）、`mail::lists`（RFC 8058 POST）；TC-MAIL-LIST-01 | AC-52 系统 `mailto:` 注册未实施（需要 deep-link 插件与三端安装注册）；Thunderbird 配置目录导入未实现 |
-| TASK-19 通讯录与 CardDAV | 未开始 | — | 等待 DEC-13（vCard/WebDAV 依赖选型） |
+| TASK-19 通讯录与 CardDAV | 部分 | Rust `mail::vcard`（2.1/3.0/4.0 解析、未建模属性往返保留）、`mail::contacts`（进程内 CardDAV 服务器：发现、上传、拉取、服务器删除、412 冲突以服务器为准、登录失败提示）；Vitest `MailAddressBookPanel.test.tsx`；TC-MAIL-CONTACTS-01（地址簿 → 自动补全，AC-61） | CardDAV 流程只在 Windows 本机测试，未连真实 Nextcloud/iCloud/Fastmail（AC-60 真机未验证）；不走会话代理；Google 需额外 OAuth scope；只同步第一个地址簿；手动 Sync |
 | TASK-20 日历邀请 | 第一期已实现 | Rust `mail::calendar`（ICS 解析、iTIP REPLY）；Vitest（AC-62/AC-63）；TC-MAIL-INVITE-01（native 断言假 SMTP 收到 `PARTSTAT=ACCEPTED`） | 带 TZID 的时间按发件人时区显示（未引入时区库）；回复不存 Sent；第二期 CalDAV 等待 DEC-14 |
 | TASK-21 POP3 | 已实现 | Rust `mail::pop3`（假 POP3 服务器，APOP、UIDL 去重、删除策略）；TC-MAIL-POP3-01 | 非 Windows 的 TLS 行为未验证 |
 | TASK-22 快捷键、拖拽、列表性能 | 已实现 | Vitest；TC-MAIL-KEYS-01、TC-MAIL-DRAG-01（browser） | 列表使用 `content-visibility` 而非虚拟列表；AC-54 帧率未测量；DRAG-01 只有 browser（native 驱动不支持拖拽） |

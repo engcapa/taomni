@@ -1391,6 +1391,8 @@ function MailSettings({
   incoming, setIncoming,
   pop3LeaveDays, setPop3LeaveDays,
   undoSendSeconds, setUndoSendSeconds,
+  cardDavUrl, setCardDavUrl,
+  cardDavUsername, setCardDavUsername,
   specialFolders, setSpecialFolders,
   desktopNotify, setDesktopNotify,
   syncIntervalMinutes, setSyncIntervalMinutes,
@@ -1447,6 +1449,8 @@ function MailSettings({
   incoming: "imap" | "pop3"; setIncoming: (v: "imap" | "pop3") => void;
   pop3LeaveDays: string; setPop3LeaveDays: (v: string) => void;
   undoSendSeconds: string; setUndoSendSeconds: (v: string) => void;
+  cardDavUrl: string; setCardDavUrl: (v: string) => void;
+  cardDavUsername: string; setCardDavUsername: (v: string) => void;
   specialFolders: Partial<Record<MailSpecialFolderKey, string>>;
   setSpecialFolders: (v: Partial<Record<MailSpecialFolderKey, string>>) => void;
   desktopNotify: boolean; setDesktopNotify: (v: boolean) => void;
@@ -1949,6 +1953,26 @@ function MailSettings({
           onChange={(e) => setUndoSendSeconds(e.target.value)}
         />
         <span className="ml-1 text-[var(--taomni-text-muted)]">seconds to cancel after Send (0 = off)</span>
+      </Field>
+
+      <Field label="CardDAV">
+        <input
+          className="taomni-input w-72"
+          value={cardDavUrl}
+          placeholder="https://carddav.example.com/ (blank = local address book)"
+          aria-label="CardDAV address book URL"
+          data-testid="mail-carddav-url"
+          onChange={(e) => setCardDavUrl(e.target.value)}
+        />
+        <input
+          className="taomni-input w-40 ml-2"
+          value={cardDavUsername}
+          placeholder="username (default: IMAP)"
+          aria-label="CardDAV username"
+          data-testid="mail-carddav-username"
+          onChange={(e) => setCardDavUsername(e.target.value)}
+        />
+        <span className="ml-1 text-[var(--taomni-text-muted)]">uses the mail password</span>
       </Field>
 
       <Field label="Cache">
@@ -2796,6 +2820,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailIncoming, setMailIncoming] = useState<"imap" | "pop3">(() => (optionString(initialOptions, "mailIncoming", "imap") === "pop3" ? "pop3" : "imap"));
   const [mailPop3LeaveDays, setMailPop3LeaveDays] = useState(() => optionString(initialOptions, "mailPop3LeaveDays", ""));
   const [mailUndoSendSeconds, setMailUndoSendSeconds] = useState(() => optionString(initialOptions, "mailUndoSendSeconds", "0"));
+  const [mailCardDavUrl, setMailCardDavUrl] = useState(() => optionString(initialOptions, "mailCardDavUrl", ""));
+  const [mailCardDavUsername, setMailCardDavUsername] = useState(() => optionString(initialOptions, "mailCardDavUsername", ""));
   const [mailSpecialFolders, setMailSpecialFolders] = useState(() => parseSpecialFolders(initialOptions.mailSpecialFolders));
   const [mailDesktopNotify, setMailDesktopNotify] = useState(() => optionBoolean(initialOptions, "mailDesktopNotify", false));
   const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
@@ -3159,6 +3185,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailIncoming,
           mailPop3LeaveDays,
           mailUndoSendSeconds,
+          mailCardDavUrl: mailCardDavUrl.trim(),
+          mailCardDavUsername: mailCardDavUsername.trim(),
           mailSpecialFolders: JSON.stringify(parseSpecialFolders(mailSpecialFolders)),
           mailDesktopNotify,
           mailSyncIntervalMinutes,
@@ -3738,6 +3766,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailIncoming(optionString(nextOptions, "mailIncoming", "imap") === "pop3" ? "pop3" : "imap");
     setMailPop3LeaveDays(optionString(nextOptions, "mailPop3LeaveDays", ""));
     setMailUndoSendSeconds(optionString(nextOptions, "mailUndoSendSeconds", "0"));
+    setMailCardDavUrl(optionString(nextOptions, "mailCardDavUrl", ""));
+    setMailCardDavUsername(optionString(nextOptions, "mailCardDavUsername", ""));
     setMailSpecialFolders(parseSpecialFolders(nextOptions.mailSpecialFolders));
     setMailDesktopNotify(optionBoolean(nextOptions, "mailDesktopNotify", false));
     setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
@@ -4859,6 +4889,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 incoming={mailIncoming} setIncoming={setMailIncoming}
                 pop3LeaveDays={mailPop3LeaveDays} setPop3LeaveDays={setMailPop3LeaveDays}
                 undoSendSeconds={mailUndoSendSeconds} setUndoSendSeconds={setMailUndoSendSeconds}
+                cardDavUrl={mailCardDavUrl} setCardDavUrl={setMailCardDavUrl}
+                cardDavUsername={mailCardDavUsername} setCardDavUsername={setMailCardDavUsername}
                 specialFolders={mailSpecialFolders} setSpecialFolders={setMailSpecialFolders}
                 desktopNotify={mailDesktopNotify} setDesktopNotify={setMailDesktopNotify}
                 syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}

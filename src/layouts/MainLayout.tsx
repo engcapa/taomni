@@ -569,6 +569,14 @@ function sessionToMailTabInfo(
     },
     specialFolders: parseSpecialFolders(opts.mailSpecialFolders),
     undoSendSeconds: mailNumberOption(opts, "mailUndoSendSeconds", 0, 0),
+    carddav: typeof opts.mailCardDavUrl === "string" && opts.mailCardDavUrl.trim()
+      ? {
+        url: opts.mailCardDavUrl.trim(),
+        username: typeof opts.mailCardDavUsername === "string" && opts.mailCardDavUsername.trim()
+          ? opts.mailCardDavUsername.trim()
+          : null,
+      }
+      : null,
     incoming: opts.mailIncoming === "pop3" ? "pop3" : "imap",
     pop3LeaveDays: opts.mailPop3LeaveDays === undefined || opts.mailPop3LeaveDays === null || String(opts.mailPop3LeaveDays).trim() === ""
       ? null

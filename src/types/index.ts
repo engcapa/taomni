@@ -333,6 +333,8 @@ export interface MailTabInfo {
   incoming?: "imap" | "pop3";
   /** POP3: delete downloaded mail from the server after N days (null = keep). */
   pop3LeaveDays?: number | null;
+  /** CardDAV address book (TASK-19); null = local address book only. */
+  carddav?: { url: string; username?: string | null } | null;
   /** Seconds a sent message can still be undone (0 = send immediately). */
   undoSendSeconds?: number;
   /** Manual special folders: sent/drafts/trash/junk/archive -> folder name. */

@@ -909,6 +909,28 @@
 - `[data-testid="mail-identities-editor"]` — display [optional] — F-MAIL-9.identities-editor
 - `[data-testid="mail-identity-add"]` — interactive [optional] — F-MAIL-9.identity-add
 
+## mail/contacts (F-MAIL-21)
+
+- `[data-testid="mail-address-book-open"]` — interactive — F-MAIL-21.address-book-open
+- `[data-testid="mail-address-book-close"]` — interactive — F-MAIL-21.address-book-close
+- `[data-testid="mail-address-book"]` — display [optional] — F-MAIL-21.address-book
+- `[data-testid="mail-contact-new"]` — interactive — F-MAIL-21.contact-new
+- `[data-testid="mail-contact-name"]` — interactive — F-MAIL-21.contact-name
+- `[data-testid="mail-contact-email"]` — interactive — F-MAIL-21.contact-email
+- `[data-testid="mail-contact-save"]` — interactive — F-MAIL-21.contact-save
+- `[data-testid="mail-contact-row"]` — display — F-MAIL-21.contact-row
+- `[data-testid="mail-contact-search"]` — interactive [optional] — F-MAIL-21.contact-search
+- `[data-testid="mail-contact-phone"]` — interactive [optional] — F-MAIL-21.contact-phone
+- `[data-testid="mail-contact-org"]` — interactive [optional] — F-MAIL-21.contact-org
+- `[data-testid="mail-contact-edit"]` — interactive [optional] — F-MAIL-21.contact-edit
+- `[data-testid="mail-contact-delete"]` — interactive [optional] — F-MAIL-21.contact-delete
+- `[data-testid="mail-contact-compose"]` — interactive [optional] — F-MAIL-21.contact-compose
+- `[data-testid="mail-carddav-sync"]` — interactive [optional] — F-MAIL-21.carddav-sync
+- `[data-testid="mail-carddav-errors"]` — display [optional] — F-MAIL-21.carddav-errors
+- `[data-testid="mail-menu-add-contact"]` — interactive [optional] — F-MAIL-21.menu-add-contact
+- `[data-testid="mail-carddav-url"]` — interactive [optional] — F-MAIL-21.carddav-url
+- `[data-testid="mail-carddav-username"]` — interactive [optional] — F-MAIL-21.carddav-username
+
 ## mail/filters (F-MAIL-19)
 
 - `[data-testid="mail-filters-open"]` — interactive — F-MAIL-19.filters-open

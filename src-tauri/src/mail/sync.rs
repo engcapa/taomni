@@ -30,7 +30,7 @@ use super::{
 pub(super) const FLAG_RECONCILE_WINDOW: usize = 500;
 /// UIDs per `UID FETCH (FLAGS)` command.
 const FLAG_FETCH_CHUNK: usize = 1000;
-const MAIL_SCHEMA_VERSION: i64 = 5;
+const MAIL_SCHEMA_VERSION: i64 = 6;
 
 /// Which work a `mail_sync_folder` call should do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -159,6 +159,9 @@ pub fn migrate_mail_tables(conn: &Connection) -> SqlResult<()> {
     )?;
     // v5: mailing-list unsubscribe (TASK-18).
     add_column_if_missing(conn, "mail_messages", "list_unsubscribe_json", "TEXT")?;
+    // v6: when this client last changed the flags (ms), so a reconcile that
+    // read the server before our STORE does not undo it.
+    add_column_if_missing(conn, "mail_messages", "flags_local_at", "INTEGER")?;
     // v4: local full-text index.
     if version < 4 {
         super::search::migrate_search_index(conn)?;
@@ -298,11 +301,22 @@ pub(super) struct AppliedStep {
 
 /// Write one step's result: messages, deletions, flag changes and the new
 /// watermark, then prune — all in one transaction.
+/// Milliseconds since the epoch (flag-change ordering).
+pub(super) fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// Apply one sync step. `started_ms` is when the step began talking to the
+/// server: flags changed locally after that are newer than what it read.
 pub(super) fn apply_folder_step(
     conn: &Connection,
     account_id: &str,
     outcome: &FolderStepOutcome,
     cache: &MailCacheSettings,
+    started_ms: i64,
 ) -> SqlResult<AppliedStep> {
     let tx = conn.unchecked_transaction()?;
     let folder_name = outcome.folder.name.as_str();
@@ -325,13 +339,20 @@ pub(super) fn apply_folder_step(
     if !outcome.flag_updates.is_empty() {
         let mut stmt = tx.prepare(
             "UPDATE mail_messages SET flags_json = ?4, updated_at = ?5
-             WHERE account_id = ?1 AND folder = ?2 AND uid = ?3 AND flags_json != ?4",
+             WHERE account_id = ?1 AND folder = ?2 AND uid = ?3 AND flags_json != ?4
+               AND COALESCE(flags_local_at, 0) < ?6",
         )?;
         let now = now_ts();
         for (uid, flags) in &outcome.flag_updates {
             let flags_json = serde_json::to_string(flags).unwrap_or_else(|_| "[]".into());
-            flags_updated +=
-                stmt.execute(params![account_id, folder_name, uid, flags_json, now])?;
+            flags_updated += stmt.execute(params![
+                account_id,
+                folder_name,
+                uid,
+                flags_json,
+                now,
+                started_ms
+            ])?;
         }
     }
     let wm = outcome.watermark;
@@ -1132,7 +1153,8 @@ mod tests {
             },
         )
         .expect("step");
-        let applied = apply_folder_step(conn, "acct", &outcome, &account.config.cache).unwrap();
+        let applied =
+            apply_folder_step(conn, "acct", &outcome, &account.config.cache, now_ms()).unwrap();
         step_result("acct", outcome, Some(applied))
     }
 
@@ -1284,6 +1306,68 @@ mod tests {
         assert!(modes.contains(&MailSyncMode::Catchup));
         assert_eq!(new_unseen, 20, "only mail after the old max is new");
         assert_eq!(cached(&conn), fake.uids("INBOX"));
+    }
+
+    /// A reconcile that read the server before a local flag change (tagging
+    /// while a background sync runs) must not undo that change; one that
+    /// started afterwards still applies another client's change.
+    #[test]
+    fn reconcile_does_not_undo_newer_local_flag_changes() {
+        let fake = FakeImap::start(false);
+        let conn = db();
+        let account = account(serde_json::json!({}));
+        let uids = fake.deliver("INBOX", 5, "msg");
+        drain(&fake, &conn, &account, MailSyncRequestMode::Auto, 50);
+        let target = uids[2];
+
+        // The reconcile reads the server (no keyword yet) ...
+        let state = load_folder_sync_state(&conn, "acct", "INBOX").unwrap();
+        let started = now_ms();
+        let mut session = fake.session();
+        let outcome = imap_sync_folder_step(
+            &mut session,
+            &account,
+            "INBOX",
+            &state,
+            &StepParams {
+                request: MailSyncRequestMode::ReconcileFull,
+                limit: 50,
+                include_bodies: false,
+                condstore: false,
+            },
+        )
+        .expect("step");
+        // ... then the user tags the message (cache + server) ...
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        super::super::update_cached_flags(
+            &conn,
+            "acct",
+            "INBOX",
+            &[target],
+            &["$label1".into()],
+            &[],
+        )
+        .unwrap();
+        fake.set_flags("INBOX", target, &["$label1"]);
+        // ... and the stale reconcile lands afterwards (it saw no keyword).
+        let mut outcome = outcome;
+        if !outcome.flag_updates.iter().any(|(uid, _)| *uid == target) {
+            outcome.flag_updates.push((target, Vec::new()));
+        }
+        apply_folder_step(&conn, "acct", &outcome, &account.config.cache, started).unwrap();
+        assert_eq!(cached_flags(&conn, target), vec!["$label1".to_string()]);
+
+        // Another client clears it later: a fresh reconcile applies that.
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        fake.set_flags("INBOX", target, &[]);
+        step(
+            &fake,
+            &conn,
+            &account,
+            MailSyncRequestMode::ReconcileFull,
+            50,
+        );
+        assert!(cached_flags(&conn, target).is_empty());
     }
 
     /// AC-04/AC-05 (R5/R6): server-side deletions and flag changes, including

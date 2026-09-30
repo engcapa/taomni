@@ -1,0 +1,116 @@
+id: TC-MAIL-CONTACTS-01
+title: Contact added to the address book is offered by the composer autocomplete
+description: 'TASK-19 (docs-feature/mail-thunderbird-parity-design.md AC-61, DEC-13).
+
+  Adds a contact in the Address book dialog, closes it, opens the composer
+
+  and types part of the address into To; the suggestion list must offer the
+
+  contact with its name. vCard import/export round-trips and CardDAV
+
+  discovery, two-way sync and conflict handling (AC-60) are covered by the
+
+  Rust tests against an in-process CardDAV server (mail::contacts, mail::vcard).
+
+  Browser mode drives the stub address book (renderer orchestration only);
+
+  native mode stores the contact in the account database and searches it
+
+  through the real backend.
+
+  '
+covers:
+- F-MAIL-21
+tags:
+- mail
+- p2
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- click: '[data-testid="mail-address-book-open"]'
+- click: '[data-testid="mail-contact-new"]'
+- fill:
+    selector: '[data-testid="mail-contact-name"]'
+    value: Zed Contact
+- fill:
+    selector: '[data-testid="mail-contact-email"]'
+    value: zed.contact@example.org
+- click: '[data-testid="mail-contact-save"]'
+- wait_for:
+    selector: '[data-testid="mail-contact-row"][data-contact-name="Zed Contact"]'
+    timeout_sec: 20
+- click: '[data-testid="mail-address-book-close"]'
+- click: '[data-testid="mail-compose-open"]'
+- fill:
+    selector: '[data-testid="mail-recipient-to"] input'
+    value: zed.con
+- wait_for:
+    selector: '[data-testid="mail-recipient-suggestion"]'
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    contains: Zed Contact
+- screenshot: mail-contacts-01-autocomplete.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 在地址簿对话框新增联系人（姓名 + 邮箱）并保存，联系人出现在列表中（TASK-19）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-contact-row\"][data-contact-name=\"Zed Contact\"]", "timeout_sec": 20}}'
+    results:
+    - 14
+  - id: R2
+    requirement: 写信时在收件人中输入地址片段，自动补全列出地址簿中的该联系人及其姓名（AC-61）。
+    actions:
+    - 15
+    - 16
+    - 17
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-recipient-suggestion\"]", "timeout_sec": 20}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-recipient-suggestions\"]", "contains": "Zed Contact"}}'
+    results:
+    - 18
+    - 19
+  visual:
+  - check: 截图中收件人下拉列出 “Zed Contact <zed.contact@example.org>”。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证联系人写入账户数据库并由后端补全查询返回；browser 仅验证渲染层；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

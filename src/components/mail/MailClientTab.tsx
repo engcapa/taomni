@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Archive,
   Ban,
+  BookUser,
   Bot,
   CalendarDays,
   CheckCircle2,
@@ -118,6 +119,8 @@ import { notifyDesktop } from "../../lib/lanNotify";
 import { formatInviteRange, hasCalendarPart, myPartstat } from "../../lib/mailInvite";
 import { filterFromMessage, mailApplyFilters, type MailFilter } from "../../lib/mailFilters";
 import { MailFiltersPanel } from "./MailFiltersPanel";
+import { MailAddressBookPanel } from "./MailAddressBookPanel";
+import { emptyAddressBookEntry, type MailAddressBookEntry } from "../../lib/mailContacts";
 import {
   isSelectable,
   isSubscribed,
@@ -1207,6 +1210,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   /** Failed actions of the last incoming filter run (AC-42), kept until the dialog is opened. */
   const [filterErrors, setFilterErrors] = useState<string[]>([]);
   const incomingFiltersRef = useRef<(() => Promise<void>) | null>(null);
+  /** Address book dialog (TASK-19); the draft pre-fills "Add sender to address book". */
+  const [addressBookOpen, setAddressBookOpen] = useState(false);
+  const [contactDraft, setContactDraft] = useState<MailAddressBookEntry | null>(null);
   /** Calendar invitation of the open message (TASK-20), keyed by message. */
   const [inviteView, setInviteView] = useState<{
     key: string;
@@ -3766,6 +3772,15 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     return result;
   };
 
+  const openContactFromMessage = (message: MailMessageHeader) => {
+    const address = message.from?.address?.trim() ?? "";
+    setContactDraft(emptyAddressBookEntry({
+      displayName: message.from?.name?.trim() || "",
+      emails: [address],
+    }));
+    setAddressBookOpen(true);
+  };
+
   const openFilterFromMessage = (message: MailMessageHeader) => {
     setFilterDraft(filterFromMessage(message));
     setFiltersOpen(true);
@@ -4467,6 +4482,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       { label: `Delete${suffix}`, icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, disabled: busyAction, onClick: () => void handleDeleteMessages(targets) },
       { label: "", separator: true },
       { label: "Create filter from message…", icon: <FilterIcon className="w-3.5 h-3.5" />, testId: "mail-menu-create-filter", onClick: () => openFilterFromMessage(message) },
+      { label: "Add sender to address book…", icon: <BookUser className="w-3.5 h-3.5" />, testId: "mail-menu-add-contact", disabled: !message.from?.address, onClick: () => openContactFromMessage(message) },
       { label: "Save as .eml", icon: <Save className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleSaveEml(message) },
       { label: "View source", icon: <Code className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleViewSource(message) },
       { label: "Print", icon: <Printer className="w-3.5 h-3.5" />, onClick: () => handlePrintMessage(message) },
@@ -5199,6 +5215,19 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   <button
                     type="button"
                     className="ml-1 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
+                    title="Address book"
+                    aria-label="Address book"
+                    data-testid="mail-address-book-open"
+                    onClick={() => {
+                      setContactDraft(null);
+                      setAddressBookOpen(true);
+                    }}
+                  >
+                    <BookUser className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="ml-1 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
                     title="Message filters"
                     aria-label="Message filters"
                     data-testid="mail-filters-open"
@@ -5818,6 +5847,31 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           <button type="button" className="taomni-btn h-7 px-2" data-testid="mail-undo-send-button" onClick={() => void handleUndoSend()}>
             Undo
           </button>
+        </div>
+      )}
+
+      {addressBookOpen && (
+        <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title="Address book"
+            icon={<BookUser className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Address book"
+            closeTestId="mail-address-book-close"
+            minWidth={420}
+            minHeight={320}
+            className="w-[min(640px,92vw)] h-[min(560px,80vh)] min-h-[340px]"
+            onClose={() => setAddressBookOpen(false)}
+          >
+            <MailAddressBookPanel
+              info={info}
+              initialDraft={contactDraft}
+              onStatus={setStatus}
+              onCompose={(entry) => {
+                setAddressBookOpen(false);
+                openCompose({ to: parseRecipientsText(entry.displayName ? `${entry.displayName} <${entry.emails[0]}>` : entry.emails[0]) });
+              }}
+            />
+          </MailDraggableDialog>
         </div>
       )}
 

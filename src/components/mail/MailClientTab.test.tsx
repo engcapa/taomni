@@ -84,6 +84,16 @@ vi.mock("../../lib/mailFilters", async (importOriginal) => ({
   ...filterMocks,
 }));
 
+const contactMocks = vi.hoisted(() => ({
+  mailListAddressBook: vi.fn(async () => []),
+  mailSaveAddressBookEntry: vi.fn(),
+}));
+
+vi.mock("../../lib/mailContacts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/mailContacts")>()),
+  ...contactMocks,
+}));
+
 vi.mock("../../lib/ipc", () => ({
   openLocalPath: vi.fn(),
   selectUploadFile: vi.fn(async () => []),
@@ -557,6 +567,26 @@ describe("MailClientTab", () => {
     expect(screen.getByTestId("mail-filter-condition-value")).toHaveValue(message.from?.address);
     expect(screen.getByTestId("mail-filter-name")).toHaveValue(`From ${message.from?.name || message.from?.address}`);
     expect(filterMocks.mailApplyFilters).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), "manual", expect.anything());
+  });
+
+  it("adds a message sender to the address book (TASK-19)", async () => {
+    contactMocks.mailSaveAddressBookEntry.mockImplementation(async (_config: unknown, entry: { displayName: string }) => ({
+      ...entry,
+      uid: "c1",
+      book: "local",
+    }));
+    renderMailbox();
+    await screen.findByText(message.subject);
+    fireEvent.contextMenu(getMessageRow());
+    fireEvent.click(await screen.findByTestId("mail-menu-add-contact"));
+    expect(await screen.findByTestId("mail-contact-editor")).toBeInTheDocument();
+    expect(screen.getByTestId("mail-contact-email")).toHaveValue(message.from?.address);
+    fireEvent.click(screen.getByTestId("mail-contact-save"));
+    await waitFor(() => expect(contactMocks.mailSaveAddressBookEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: info.sessionId }),
+      expect.objectContaining({ emails: [message.from?.address] }),
+    ));
+    expect(await screen.findByTestId("mail-address-book")).toBeInTheDocument();
   });
 
   it("keeps periodic sync running while hidden and refreshes from cache when visible", async () => {

@@ -19,6 +19,13 @@ import {
   type StubMailSearchQuery,
 } from "./mailServerStub";
 import { stubApplyFilters, stubListFilters, stubSaveFilters } from "./mailFiltersStub";
+import {
+  stubAddressBookSuggestions,
+  stubDeleteAddressBookEntry,
+  stubListAddressBook,
+  stubSaveAddressBookEntry,
+} from "./mailContactsStub";
+import type { MailAddressBookEntry } from "../lib/mailContacts";
 import type { MailFilter } from "../lib/mailFilters";
 import type { SessionConfig, SessionGroup, LocalShellOption, LocalDirectoryShortcut, IpcRunSnapshotRecord, IpcSnapshotEntry } from "../lib/ipc";
 import {
@@ -4271,8 +4278,32 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const accountId = stubMailAccountId(invokeArgs);
       const query = (invokeArgs?.query as string | undefined) ?? "";
       const limit = Math.max(1, Math.min(20, Number((invokeArgs?.limit as number | undefined) ?? 8)));
-      return stubMailContacts(accountId, query, limit) as T;
+      // Address book entries first, like the backend (TASK-19).
+      const seen = new Set<string>();
+      return [...stubAddressBookSuggestions(accountId, query, limit), ...stubMailContacts(accountId, query, limit)]
+        .filter((hit) => {
+          const key = hit.email.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, limit) as T;
     }
+    case "mail_list_address_book":
+      return stubListAddressBook(stubMailAccountId(args as InvokeArgs | undefined)) as T;
+    case "mail_save_address_book_entry": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubSaveAddressBookEntry(stubMailAccountId(invokeArgs), invokeArgs?.entry as MailAddressBookEntry) as T;
+    }
+    case "mail_delete_address_book_entry": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubDeleteAddressBookEntry(stubMailAccountId(invokeArgs), String(invokeArgs?.uid ?? "")) as T;
+    }
+    case "mail_import_vcards":
+    case "mail_export_vcards":
+      throw new Error("vCard files need the desktop app");
+    case "mail_carddav_sync":
+      throw new Error("CardDAV sync needs the desktop app");
     case "mail_test_connection": {
       return { imapOk: true, smtpOk: true, folderCount: MAIL_STUB_FOLDERS.length } as T;
     }

@@ -41,6 +41,7 @@ use crate::terminal::network::NetworkSettings;
 
 pub mod autoconfig;
 pub mod calendar;
+pub mod contacts;
 pub mod filters;
 pub mod certs;
 #[cfg(test)]
@@ -55,6 +56,7 @@ mod parts;
 mod pop3;
 pub mod search;
 mod sync;
+mod vcard;
 
 use sync::{FolderStepOutcome, FolderSyncState, StepParams};
 pub use sync::{MailFolderSyncResult, MailSyncRequestMode};
@@ -412,6 +414,9 @@ pub struct MailAccountConfig {
     /// -> server folder name); beats SPECIAL-USE and name matching.
     #[serde(default)]
     pub special_folders: HashMap<String, String>,
+    /// CardDAV address book (TASK-19); `None` = local address book only.
+    #[serde(default)]
+    pub carddav: Option<contacts::MailCardDavSettings>,
 }
 
 #[derive(Debug, Clone)]
@@ -1495,7 +1500,8 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
     )?;
     sync::migrate_mail_tables(conn)?;
     pop3::migrate_local_tables(conn)?;
-    filters::migrate_filter_tables(conn)
+    filters::migrate_filter_tables(conn)?;
+    contacts::migrate_contact_tables(conn)
 }
 
 fn with_mail_db<T>(
@@ -1855,6 +1861,7 @@ pub async fn mail_sync_folder(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let step_folder = folder.clone();
+    let started_ms = sync::now_ms();
     let result = tokio::task::spawn_blocking(move || {
         with_imap_session(
             &pool,
@@ -1890,7 +1897,7 @@ pub async fn mail_sync_folder(
         return Ok(sync::step_result(&account_id, outcome, None));
     }
     let applied = with_mail_db(&state, &account_id, |db| {
-        sync::apply_folder_step(db, &account_id, &outcome, &cache_settings)
+        sync::apply_folder_step(db, &account_id, &outcome, &cache_settings, started_ms)
     })?;
     Ok(sync::step_result(&account_id, outcome, Some(applied)))
 }
@@ -1936,6 +1943,7 @@ pub async fn mail_sync_all_folders(
         HashMap::new()
     };
 
+    let started_ms = sync::now_ms();
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let result = tokio::task::spawn_blocking(move || {
@@ -2066,7 +2074,7 @@ pub async fn mail_sync_all_folders(
         with_mail_db(&state, &account_id, |db| {
             sync_folder_tree(db, &account_id, &listed)?;
             for outcome in &outcomes {
-                sync::apply_folder_step(db, &account_id, outcome, &cache_settings)?;
+                sync::apply_folder_step(db, &account_id, outcome, &cache_settings, started_ms)?;
             }
             for failure in &failed {
                 sync::record_folder_error(db, &account_id, &failure.name, &failure.error)?;
@@ -2374,8 +2382,12 @@ pub async fn mail_search_contacts(
     limit: Option<u32>,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailContactSuggestion>, String> {
+    let limit = limit.unwrap_or(8).clamp(1, 20);
     with_mail_db(&state, &account_id, |db| {
-        search_contacts(db, &account_id, &query, limit.unwrap_or(8).clamp(1, 20))
+        // Address book entries (TASK-19) first, then collected contacts.
+        let book = contacts::address_book_suggestions(db, &account_id, &query, limit)?;
+        let collected = search_contacts(db, &account_id, &query, limit)?;
+        Ok(contacts::merge_suggestions(book, collected, limit))
     })
 }
 
@@ -5882,9 +5894,16 @@ fn mark_cached_messages_read(
         let next_flags_json = serde_json::to_string(&flags).unwrap_or_else(|_| "[]".into());
         conn.execute(
             "UPDATE mail_messages
-             SET flags_json = ?4, updated_at = ?5
+             SET flags_json = ?4, updated_at = ?5, flags_local_at = ?6
              WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
-            params![account_id, folder, *uid as i64, next_flags_json, now_ts()],
+            params![
+                account_id,
+                folder,
+                *uid as i64,
+                next_flags_json,
+                now_ts(),
+                sync::now_ms()
+            ],
         )?;
         changed += 1;
     }
@@ -5945,9 +5964,16 @@ fn update_cached_flags(
         let next_flags_json = serde_json::to_string(&flags).unwrap_or_else(|_| "[]".into());
         conn.execute(
             "UPDATE mail_messages
-             SET flags_json = ?4, updated_at = ?5
+             SET flags_json = ?4, updated_at = ?5, flags_local_at = ?6
              WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
-            params![account_id, folder, *uid as i64, next_flags_json, now_ts()],
+            params![
+                account_id,
+                folder,
+                *uid as i64,
+                next_flags_json,
+                now_ts(),
+                sync::now_ms()
+            ],
         )?;
     }
     Ok(())
@@ -6705,6 +6731,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 special_folders: HashMap::new(),
                 incoming: MailIncomingProtocol::Imap,
                 pop3_leave_days: None,
+                carddav: None,
             },
             auth_mode: MailAuthMode::Password,
             network_settings: None,
@@ -6926,6 +6953,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 special_folders: HashMap::new(),
                 incoming: MailIncomingProtocol::Imap,
                 pop3_leave_days: None,
+                carddav: None,
             },
             auth_mode: MailAuthMode::OAuth2,
             network_settings: None,
