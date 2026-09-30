@@ -22278,7 +22278,7 @@ export function CodeWorkspaceTab({
             // Mounted on first open and kept, so the commit message and
             // selection survive hiding the tool window.
             content: gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
-              <div data-testid="code-workspace-git-tool-window" className="relative h-full min-h-0">
+              <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 outline-none">
                 <WorkspaceGitManager
                   workspaceName={title}
                   roots={gitRoots}

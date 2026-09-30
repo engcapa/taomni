@@ -58,9 +58,9 @@ steps:
 - wait_for:
     selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
     timeout_sec: 10
-- eval_readonly:
-    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-bottom-dock\"]")?.contains(document.activeElement) === true
-    expect_truthy: true
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"]:focus-within'
+    timeout_sec: 5
 - press: Shift+Escape
 - wait_for:
     selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
@@ -112,7 +112,7 @@ verification:
     - step: 25
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
     - step: 26
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-bottom-dock\\\"]\")?.contains(document.activeElement) === true", "expect_truthy": true}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"]:focus-within", "timeout_sec": 5}}'
     - step: 28
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
     - step: 29

@@ -90,6 +90,7 @@ steps:
 - assert_text:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     contains: int sum = extracted(values);
+- wait: 0.8
 - press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -203,7 +204,7 @@ verification:
     - 26
     - 27
     - 33
-    - 35
+    - 36
     checkpoints:
     - step: 19
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "timeout_sec": 30}}'
@@ -229,7 +230,7 @@ verification:
       expectation: '{"parity007_trace": {"requests": 1, "resolves": 1, "prepares": 1, "renames": 1, "pending": 0}}'
     - step: 34
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "int sum = extracted(values);"}}'
-    - step: 36
+    - step: 37
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
     results:
     - 24
@@ -237,61 +238,61 @@ verification:
     - 30
     - 31
     - 34
-    - 36
+    - 37
   - id: R3
     requirement: DEC-017-04：命名会话中 Alt+Shift+O 的 Open Extract Method Dialog 把命名交给模态对话框；对话框 Esc 保留默认名，一次 Undo 撤回提取。
     actions:
-    - 68
-    - 70
-    - 73
-    - 76
-    - 80
+    - 69
+    - 71
+    - 74
+    - 77
+    - 81
     checkpoints:
-    - step: 69
+    - step: 70
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "timeout_sec": 30}}'
-    - step: 71
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-inline-rename-options\"]"}'
     - step: 72
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-inline-rename-options\"]"}'
+    - step: 73
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-inline-rename-open-dialog\"]", "contains": "Open Extract Method Dialog"}}'
-    - step: 74
-      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog-input\"]", "timeout_sec": 10}}'
     - step: 75
+      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog-input\"]", "timeout_sec": 10}}'
+    - step: 76
       expectation: '{"assert_text": {"selector": "[data-testid=\"text-input-dialog\"]", "contains": "Extract Method"}}'
-    - step: 77
-      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "state": "hidden", "timeout_sec": 10}}'
     - step: 78
+      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "state": "hidden", "timeout_sec": 10}}'
+    - step: 79
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "private static int extracted(int[] values) {"}}'
-    - step: 81
+    - step: 82
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
     results:
-    - 75
-    - 78
-    - 81
+    - 76
+    - 79
+    - 82
   - id: R2
     requirement: DEC-017-03/IDEA R6：首次 Esc 只关候选列表，第二次 Esc 结束命名并保留默认名（提取已提交，不发 rename），一次 Undo 撤回提取。
     actions:
-    - 47
-    - 49
-    - 51
-    - 56
+    - 48
+    - 50
+    - 52
+    - 57
     checkpoints:
-    - step: 48
+    - step: 49
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "timeout_sec": 30}}'
-    - step: 50
+    - step: 51
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "name": "data-list-open", "equals": "false"}}'
-    - step: 52
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "state": "detached", "timeout_sec": 10}}'
     - step: 53
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "private static int extracted(int[] values) {"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "state": "detached", "timeout_sec": 10}}'
     - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "private static int extracted(int[] values) {"}}'
+    - step: 55
       expectation: '{"parity007_trace": {"requests": 2, "resolves": 2, "prepares": 2, "renames": 1, "pending": 0}}'
-    - step: 57
+    - step: 58
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
     results:
-    - 50
-    - 53
+    - 51
     - 54
-    - 57
+    - 55
+    - 58
   visual:
   - check: 对照 IDEA Extract Method 就地模板（R2/R6/R9）。
     method: manual
