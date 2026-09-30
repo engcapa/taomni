@@ -110,6 +110,10 @@ zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2
 tungstenite = "0.29"
 tokio-tungstenite = "0.29"
 imap = "2.4.1"
+# BODYSTRUCTURE / section types; same version `imap` already uses.
+imap-proto = "=0.10.2"
+# POP3 APOP digest (already in the lockfile).
+md-5 = "=0.10.6"
 lettre = "0.11.22"
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }
 native-tls = "0.2"

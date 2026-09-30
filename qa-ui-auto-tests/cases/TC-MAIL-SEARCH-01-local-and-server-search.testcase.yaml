@@ -1,0 +1,115 @@
+id: TC-MAIL-SEARCH-01
+title: Mail search finds cached mail across folders and via the server
+description: 'TASK-08 (AC-25/AC-26/AC-27): 12 messages are delivered and synced; a
+
+  full-text search for one subject returns exactly that message from the
+
+  local index, the unread quick filter keeps it, and a server search of the
+
+  current folder returns it too. Browser mode drives the stub index/server;
+
+  native mode exercises SQLite FTS5 and IMAP UID SEARCH on the fake server.
+
+  '
+covers:
+- F-MAIL-7
+tags:
+- mail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- mail_server_deliver:
+    count: 12
+    prefix: Needle
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="mail-search-scope"]'
+    value: all
+- fill:
+    selector: '[data-testid="mail-search-input"]'
+    value: Needle 0007
+- assert_count:
+    selector: '[data-testid="mail-message-row"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="mail-message-row"]'
+    contains: Needle 0007
+- click: '[data-testid="mail-quick-filter-unread"]'
+- assert_count:
+    selector: '[data-testid="mail-message-row"][data-unread="true"]'
+    equal: 1
+- click: '[data-testid="mail-search-server"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Server search found 1 message
+    timeout_sec: 30
+- screenshot: mail-search-01.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 本地全文索引跨文件夹检索到唯一匹配邮件，未读快捷过滤保留该邮件（AC-25/AC-27）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 10
+    - 12
+    - 13
+    - 16
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 14
+      expectation: '{"assert_count": {"equal": 1}}'
+    - step: 15
+      expectation: '{"assert_text": {"contains": "Needle 0007"}}'
+    - step: 17
+      expectation: '{"assert_count": {"selector": "unread rows", "equal": 1}}'
+    results:
+    - 14
+    - 15
+    - 17
+  - id: R2
+    requirement: 服务器搜索在当前文件夹返回匹配邮件（AC-26）。
+    actions:
+    - 18
+    checkpoints:
+    - step: 19
+      expectation: '{"assert_text": {"contains": "Server search found 1 message"}}'
+    results:
+    - 19
+  visual:
+  - check: 截图中搜索框、范围、快捷过滤与结果行布局完整。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证 SQLite FTS5 trigram 索引与 IMAP UID SEARCH；browser 仅验证渲染层与桩模型；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

@@ -20,6 +20,7 @@ export type AppCommand =
   | "git"
   | "code-workspace"
   | "lan-chat"
+  | "mail-unified"
   | "settings"
   | "help"
   | "toggle-xserver"

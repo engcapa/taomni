@@ -1,0 +1,120 @@
+id: TC-MAIL-UNIFIED-01
+title: Unified mail tab shows new mail of the open accounts and deletes through the owning account
+description: 'TASK-16 (docs-feature/mail-thunderbird-parity-design.md AC-48, DEC-12).
+
+  Opens a mail account, delivers a message, opens the separate Unified mail
+
+  tab from the sidebar tools, uses Get mail, and requires the new message in
+
+  the unified list with its account badge; opening it and deleting it must
+
+  remove it from that account''s INBOX on the server. Merging several
+
+  accounts by time and routing actions to the owning account are covered by
+
+  Vitest (MailUnifiedTab.test.tsx) because the fixture serves one account.
+
+  Browser mode drives the stub server model (renderer orchestration only);
+
+  native mode uses the in-process fake IMAP server started by the
+
+  mail_server fixture.
+
+  '
+covers:
+- F-MAIL-20
+tags:
+- mail
+- p2
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- mail_server_deliver:
+    count: 1
+    prefix: Unified
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mail-unified"]'
+- wait_for: '[data-testid="mail-unified-tab"]'
+- click: '[data-testid="mail-unified-refresh"]'
+- wait_for:
+    selector: '[data-testid="mail-unified-status"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-unified-row"]'
+    contains: Unified 0001
+- click: '[data-testid="mail-unified-row"]'
+- assert_text:
+    selector: '[data-testid="mail-unified-reader"]'
+    contains: Unified 0001
+- click: '[data-testid="mail-unified-delete"]'
+- mail_server_assert_folder_count:
+    folder: INBOX
+    lacks_subject: Unified 0001
+    timeout_sec: 20
+- screenshot: mail-unified-01-after-delete.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 独立的“Unified mail”标签从侧边栏工具打开；Get mail 拉取账户新邮件后，统一列表最上方显示该新邮件（AC-48，DEC-12）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 10
+    - 11
+    - 13
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"mail-unified-tab\"]"}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-unified-status\"]", "timeout_sec": 60}}'
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-unified-row\"]", "contains": "Unified 0001"}}'
+    results:
+    - 12
+    - 15
+  - id: R2
+    requirement: 在统一视图中打开并删除邮件，操作经所属账户执行，服务器上该账户 INBOX 不再有这封邮件（AC-48）。
+    actions:
+    - 16
+    - 18
+    checkpoints:
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-unified-reader\"]", "contains": "Unified 0001"}}'
+    - step: 19
+      expectation: '{"mail_server_assert_folder_count": {"folder": "INBOX", "lacks_subject": "Unified 0001", "timeout_sec": 20}}'
+    results:
+    - 17
+    - 19
+  visual:
+  - check: 截图中统一列表显示账户徽标，阅读区为空（邮件已删除）。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实后端经假 IMAP 服务器同步、读取与删除；browser 仅验证渲染层；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

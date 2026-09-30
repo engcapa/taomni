@@ -5,7 +5,7 @@ import type { RdpOptions } from "./rdp";
 import type { ObjectStorageConfig } from "./objectStorage";
 import type { LaunchPreparation } from "../lib/sockscap";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail" | "code-workspace";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail" | "mail-unified" | "code-workspace";
 
 /** Presence state of a LAN peer (mirrors the Rust `PresenceStatus`). */
 export type LanPresence = "online" | "away" | "busy" | "offline";
@@ -272,6 +272,15 @@ export interface MailAiSettings {
   skipBodyConfirm: boolean;
 }
 
+/** A sending identity (alias) of a mail account. */
+export interface MailIdentity {
+  id: string;
+  name?: string | null;
+  email: string;
+  replyTo?: string | null;
+  signature?: string | null;
+}
+
 export interface MailTabInfo {
   sessionId: string;
   emailAddress: string;
@@ -287,6 +296,8 @@ export interface MailTabInfo {
     username?: string | null;
     password?: string;
     security: MailConnectionSecurity;
+    /** Base64 DER of a certificate trusted for this server (AC-44). */
+    trustedCert?: string | null;
   };
   smtp: {
     host: string;
@@ -295,6 +306,8 @@ export interface MailTabInfo {
     password?: string;
     security: MailConnectionSecurity;
     useImapAuth: boolean;
+    /** Base64 DER of a certificate trusted for this server (AC-44). */
+    trustedCert?: string | null;
   };
   oauth: {
     clientId?: string | null;
@@ -309,9 +322,33 @@ export interface MailTabInfo {
     onOpen: boolean;
     intervalMinutes: number;
     maxFetchPerSync: number;
+    /** IMAP IDLE push while the tab is open (TASK-12); polling stays as fallback. */
+    idle?: boolean;
+    /** Desktop notification for new mail while the tab is open. */
+    desktopNotify?: boolean;
+    /** Hide and skip unsubscribed folders (LSUB; TASK-10). */
+    subscribedOnly?: boolean;
   };
+  /** Incoming protocol: IMAP (default) or POP3 with local folders (TASK-21). */
+  incoming?: "imap" | "pop3";
+  /** POP3: delete downloaded mail from the server after N days (null = keep). */
+  pop3LeaveDays?: number | null;
+  /** CardDAV address book (TASK-19); null = local address book only. */
+  carddav?: { url: string; username?: string | null } | null;
+  /** CalDAV calendar for the agenda (TASK-20 phase 2); null = off. */
+  caldav?: { url: string; username?: string | null } | null;
+  /** Answer read receipt requests: ask (default), always or never (TASK-17). */
+  receiptPolicy?: "ask" | "always" | "never";
+  /** Seconds a sent message can still be undone (0 = send immediately). */
+  undoSendSeconds?: number;
+  /** Manual special folders: sent/drafts/trash/junk/archive -> folder name. */
+  specialFolders?: Partial<Record<"sent" | "drafts" | "trash" | "junk" | "archive", string>>;
   cache: MailCacheSettings;
   ai: MailAiSettings;
+  /** Store sent mail in the Sent folder via IMAP; null = automatic by provider. */
+  saveSentCopy?: boolean | null;
+  /** Additional sending identities (the account address is always the first). */
+  identities?: MailIdentity[];
 }
 
 export interface GitTabInfo {

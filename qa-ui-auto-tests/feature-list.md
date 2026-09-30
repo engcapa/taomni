@@ -5314,6 +5314,968 @@ controls:
 - 主题下拉整合 Match app theme、Code View 色板与 Terminal color themes，但预览统一使用邮件正文语义。
 - 底部预览展示邮件列表 + HTML 正文片段。
 
+
+---
+
+### 13.5 无缺口邮件同步与完整邮件头索引 ✅
+
+<!-- feature
+id: F-MAIL-5
+status: done
+area: mail/sync
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailSync.ts
+  - src/lib/mail.ts
+  - src/lib/quickConnect.ts
+  - src/stubs/mailServerStub.ts
+  - src-tauri/src/mail/sync.rs
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: message-count
+    selector: '[data-testid="mail-message-count"]'
+    kind: display
+  - id: message-row
+    selector: '[data-testid="mail-message-row"]'
+    kind: interactive
+  - id: folder-row
+    selector: '[data-testid="mail-folder-row"]'
+    kind: interactive
+  - id: sync-progress
+    selector: '[data-testid="mail-sync-progress"]'
+    kind: display
+    optional: true       # only visible while a multi-step catch-up is running
+  - id: backfill-progress
+    selector: '[data-testid="mail-backfill-progress"]'
+    kind: display
+    optional: true       # only visible while older history is being backfilled
+  - id: folder-sync-error
+    selector: '[data-testid="mail-folder-sync-error"]'
+    kind: display
+    optional: true       # only rendered for folders whose last sync failed
+  - id: load-more
+    selector: '[data-testid="mail-load-more"]'
+    kind: interactive
+    optional: true       # only rendered while more cached rows or older history remain
+-->
+
+- 同步按持久化的连续 UID 区间 `[sync_low_uid, sync_high_uid]` 进行：打开/重开、定时刷新与手工刷新都按“服务器 UID − 缓存 UID”集合差分批补齐，直到后端 `more=false`，关闭任意时长后重开不再漏收（设计 `docs-feature/mail-thunderbird-parity-design.md` AC-01～AC-12）。
+- 定时刷新在 catch-up 之后对最新窗口对账，手工刷新对全区间对账：服务器端删除/移动的邮件从缓存移除，已读/未读/星标以 FETCH FLAGS 为准（CONDSTORE 可用时用 `CHANGEDSINCE`）。
+- 列表只读本地缓存；缓存到底后“加载更早邮件”向服务器回补历史，选中文件夹在后台回补并显示进度。默认保留全部邮件头（0 = 不限制），按天保留时使用服务器到达时间。
+- 同一 Quick Connect 邮件地址复用同一会话缓存；`mail://user:pass@host:port?security=none&smtp=host:port` 支持口令、明文/STARTTLS 与 SMTP 端点。
+
+---
+
+### 13.6 服务器草稿、已发送副本与会话线程 ✅
+
+<!-- feature
+id: F-MAIL-6
+status: done
+area: mail/compose
+components: [MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailThreads.ts
+  - src/lib/mail.ts
+  - src/components/session/SessionEditor.tsx
+  - src/stubs/tauri-core.ts
+  - src-tauri/src/mail/outgoing.rs
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: thread-view-toggle
+    selector: '[data-testid="mail-thread-view-toggle"]'
+    kind: interactive
+  - id: thread-expand
+    selector: '[data-testid="mail-thread-expand"]'
+    kind: interactive
+    optional: true       # only rendered for conversations with more than one message
+  - id: save-sent-copy
+    selector: '[data-testid="mail-save-sent-copy"]'
+    kind: interactive
+    optional: true       # session editor mail settings; default automatic by provider
+-->
+
+- 回复/全部回复发送 `In-Reply-To` 与 `References`（转发开启新会话），Thunderbird/Gmail 可将回复归入原会话；同步时缓存每封邮件的 `In-Reply-To`/`References`（schema v3）。
+- 列表“Threads”切换按邮件头严格线程化（不按主题猜测），会话折叠为最新一封并显示数量与未读数，展开后按回复层级缩进；开关按查看者保存在 localStorage。
+- 发信成功后按账户设置把带 Bcc 的副本 APPEND 到 Sent（SPECIAL-USE 优先，找不到时按名称，缺失时创建）；Gmail/Outlook 默认不重复保存。副本失败不影响“已发送”，状态栏提示原因。
+- 手工保存草稿会把草稿 APPEND 到服务器 Drafts（`\Draft \Seen`，按 Message-ID 找回 UID 并替换旧副本）；发送或删除草稿时移除服务器副本；自动保存仍只写本地。
+
+---
+
+### 13.7 邮件搜索与快捷过滤 ✅
+
+<!-- feature
+id: F-MAIL-7
+status: done
+area: mail/search
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mail.ts
+  - src/stubs/mailServerStub.ts
+  - src-tauri/src/mail/search.rs
+controls:
+  - id: search-input
+    selector: '[data-testid="mail-search-input"]'
+    kind: interactive
+  - id: search-scope
+    selector: '[data-testid="mail-search-scope"]'
+    kind: interactive
+  - id: search-field
+    selector: '[data-testid="mail-search-field"]'
+    kind: interactive
+    optional: true       # default "All text" is exercised by the search case
+  - id: search-server
+    selector: '[data-testid="mail-search-server"]'
+    kind: interactive
+    optional: true       # only rendered while a query is entered
+  - id: quick-filter-unread
+    selector: '[data-testid="mail-quick-filter-unread"]'
+    kind: interactive
+  - id: quick-filter-flagged
+    selector: '[data-testid="mail-quick-filter-flagged"]'
+    kind: interactive
+    optional: true
+  - id: quick-filter-attachments
+    selector: '[data-testid="mail-quick-filter-attachments"]'
+    kind: interactive
+    optional: true
+  - id: message-folder
+    selector: '[data-testid="mail-message-folder"]'
+    kind: display
+    optional: true       # only for results from another folder
+-->
+
+- 搜索框查询本地 SQLite FTS5（trigram 分词，支持中文子串；少于 3 字的词回退 LIKE）覆盖整个缓存的邮件头与已缓存正文，可选“本文件夹/所有文件夹”和字段（全部/主题/发件人/收件人/正文）；用户输入按字面短语处理，不解释 FTS 语法。
+- “Server”（或 Shift+Enter）对当前文件夹执行 IMAP `UID SEARCH`（非 ASCII 用 `CHARSET UTF-8`），结果与本地结果合并，不写入缓存。
+- 快捷过滤（未读/星标/附件）同时作用于普通列表与搜索结果；跨文件夹结果显示所在文件夹。
+
+---
+
+### 13.8 标签与垃圾邮件关键字 ✅
+
+<!-- feature
+id: F-MAIL-8
+status: done
+area: mail/organize
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailTags.ts
+  - src/stubs/tauri-core.ts
+controls:
+  - id: menu-tag
+    selector: '[data-testid="mail-menu-tag"]'
+    kind: interactive
+  - id: menu-tag-label1
+    selector: '[data-testid="mail-menu-tag-label1"]'
+    kind: interactive
+  - id: message-tag
+    selector: '[data-testid="mail-message-tag"]'
+    kind: display
+  - id: quick-filter-tag
+    selector: '[data-testid="mail-quick-filter-tag"]'
+    kind: interactive
+  - id: message-junk
+    selector: '[data-testid="mail-message-junk"]'
+    kind: display
+    optional: true       # only for messages carrying $Junk without $NotJunk
+-->
+
+- 右键菜单“Tag”提供 Thunderbird 默认标签（Important/Work/Personal/To Do/Later = `$label1`～`$label5`），写入服务器 IMAP 关键字，列表行显示色点，快捷过滤与本地搜索可按标签筛选；标志对账会同步其他客户端改动的关键字。
+- “Mark as junk / Not junk”在移动之前设置 `$Junk`/`$NotJunk`（服务器不支持关键字时忽略），列表对 `$Junk` 邮件显示标记。
+
+---
+
+### 13.9 发件身份与模板 ✅
+
+<!-- feature
+id: F-MAIL-9
+status: done
+area: mail/compose
+components: [MailClientTab, SessionEditor, MailIdentitiesEditor]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailIdentities.ts
+  - src/components/session/MailIdentitiesEditor.tsx
+  - src/components/session/SessionEditor.tsx
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: compose-from
+    selector: '[data-testid="mail-compose-from"]'
+    kind: interactive
+    optional: true       # disabled until a session defines identities (quick connect has none)
+  - id: compose-save-template
+    selector: '[data-testid="mail-compose-save-template"]'
+    kind: interactive
+  - id: compose-discard
+    selector: '[data-testid="mail-compose-discard"]'
+    kind: interactive
+  - id: drafts-tab-templates
+    selector: '[data-testid="mail-drafts-tab-templates"]'
+    kind: interactive
+  - id: drafts-tab-drafts
+    selector: '[data-testid="mail-drafts-tab-drafts"]'
+    kind: interactive
+    optional: true
+  - id: template-row
+    selector: '[data-testid="mail-template-row"]'
+    kind: interactive
+  - id: identities-editor
+    selector: '[data-testid="mail-identities-editor"]'
+    kind: display
+    optional: true       # session editor; identities need a saved session
+  - id: identity-add
+    selector: '[data-testid="mail-identity-add"]'
+    kind: interactive
+    optional: true
+-->
+
+- 会话编辑器“Identities”可添加别名身份（显示名、地址、Reply-To、签名）；写信窗口“From”选择身份，发送时使用该身份的 From/Reply-To 与信封发件人；切换身份时替换未改动的签名块。
+- 回复/全部回复/转发自动选择原邮件 To/Cc 中匹配的身份（与 Thunderbird 一致），全部回复排除所有自有地址。
+- “Save as template”把当前内容另存为模板（本地草稿库，kind=template）；Drafts 对话框的 Templates 页签列出模板，点击以副本新建邮件，不修改模板本身。
+
+---
+
+### 13.10 IMAP IDLE 即时收信与系统通知 ✅
+
+<!-- feature
+id: F-MAIL-10
+status: done
+area: mail/sync
+components: [MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/components/session/SessionEditor.tsx
+  - src/lib/mail.ts
+  - src/lib/lanNotify.ts
+  - src-tauri/src/mail/idle.rs
+controls:
+  - id: idle-status
+    selector: '[data-testid="mail-idle-status"]'
+    kind: display
+  - id: idle-push-setting
+    selector: '[data-testid="mail-idle-push"]'
+    kind: interactive
+    optional: true       # session editor; quick connect uses the default (on)
+  - id: desktop-notify-setting
+    selector: '[data-testid="mail-desktop-notify"]'
+    kind: interactive
+    optional: true
+-->
+
+- 邮件标签打开期间，为 INBOX 建立独立的 IMAP IDLE 连接（每 25 分钟重发），收到 EXISTS/EXPUNGE/FETCH 后执行一次无缺口的静默补齐；服务器不支持 IDLE 或断线时按退避重连，期间仍按间隔轮询，不漏邮件。
+- 工具栏在 Sync 旁显示 “Push/Poll” 状态；关闭标签立即断开 IDLE 连接（DEC-01：不做后台收信）。
+- 会话编辑器 “New mail” 可关闭即时推送，或开启新邮件系统通知（仅在标签打开期间发送）。
+
+---
+
+### 13.11 文件夹订阅、特殊文件夹与 STATUS 快速扫描 ✅
+
+<!-- feature
+id: F-MAIL-11
+status: done
+area: mail/folders
+components: [MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailFolders.ts
+  - src/components/session/SessionEditor.tsx
+  - src-tauri/src/mail/folders.rs
+controls:
+  - id: subscriptions-open
+    selector: '[data-testid="mail-subscriptions-open"]'
+    kind: interactive
+  - id: subscriptions-dialog
+    selector: '[data-testid="mail-subscriptions-dialog"]'
+    kind: display
+  - id: subscription-row
+    selector: '[data-testid="mail-subscription-row"]'
+    kind: display
+  - id: subscription-toggle
+    selector: '[data-testid="mail-subscription-toggle"]'
+    kind: interactive
+  - id: subscribed-only
+    selector: '[data-testid="mail-subscribed-only"]'
+    kind: interactive
+  - id: subscribed-only-setting
+    selector: '[data-testid="mail-subscribed-only-setting"]'
+    kind: interactive
+    optional: true       # session editor; quick connect uses the dialog toggle
+  - id: special-folders
+    selector: '[data-testid="mail-special-folders"]'
+    kind: display
+    optional: true       # session editor
+-->
+
+- 文件夹属性按 RFC 形式保存（`\Noselect`、`\Sent`），LSUB 报告的文件夹带 `\Subscribed`（RFC 5258）；服务器没有订阅数据时视为全部已订阅。
+- 文件夹栏 “Manage folder subscriptions” 对话框调用 SUBSCRIBE/UNSUBSCRIBE；“Show only subscribed folders”（按账户保存）开启后未订阅文件夹不在树中显示，也不参与全文件夹同步（INBOX 始终保留）。
+- 会话编辑器 “Special folders” 可手动指定 Sent/Drafts/Trash/Junk/Archive，优先于 SPECIAL-USE 属性与名称匹配（中文或自定义命名）。
+- 定时的全文件夹扫描在服务器支持 CONDSTORE 时先发 `STATUS (MESSAGES UNSEEN UIDNEXT UIDVALIDITY HIGHESTMODSEQ)`，未变化的文件夹只更新计数、跳过 EXAMINE/SEARCH；手动同步始终完整对账。
+
+---
+
+### 13.12 列表快捷键、拖拽到文件夹与长列表渲染 ✅
+
+<!-- feature
+id: F-MAIL-12
+status: done
+area: mail/list
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailShortcuts.ts
+controls:
+  - id: message-row-shortcuts
+    selector: '[data-testid="mail-message-row"][aria-pressed="true"]'
+    kind: interactive
+  - id: folder-drop-target
+    selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+    kind: interactive
+-->
+
+- Thunderbird 风格快捷键（列表焦点下，输入框/编辑器内不生效）：F/B 下一封/上一封，N 下一封未读，R 回复，Shift+R 或 Ctrl/Cmd+Shift+R 全部回复，Ctrl/Cmd+L 转发，M 切换已读，S 星标，A 归档，J/Shift+J 垃圾/非垃圾，Del 删除，Ctrl/Cmd+Shift+K 聚焦搜索。Ctrl+Shift+L（聊天）与 Ctrl+Shift+S（服务器）保持全局含义。
+- 邮件行可拖到文件夹树：默认移动，按住 Ctrl（macOS 为 Option）复制；勾选多封时拖动全部勾选项。
+- 长列表的行使用 `content-visibility: auto`，屏幕外的行跳过布局和绘制，同时保留在 DOM 中（查找、无障碍与选择不受影响）；未引入虚拟列表依赖。
+
+---
+
+### 13.13 发件箱、稍后发送、撤销发送与已读回执 ✅
+
+<!-- feature
+id: F-MAIL-13
+status: done
+area: mail/compose
+components: [MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailOutbox.ts
+  - src/components/session/SessionEditor.tsx
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: compose-send-later
+    selector: '[data-testid="mail-compose-send-later"]'
+    kind: interactive
+  - id: send-later-panel
+    selector: '[data-testid="mail-send-later-panel"]'
+    kind: display
+    optional: true
+  - id: send-later-at
+    selector: '[data-testid="mail-send-later-at"]'
+    kind: interactive
+    optional: true
+  - id: send-later-confirm
+    selector: '[data-testid="mail-send-later-confirm"]'
+    kind: interactive
+  - id: compose-read-receipt
+    selector: '[data-testid="mail-compose-read-receipt"]'
+    kind: interactive
+    optional: true       # request flag only; covered by Vitest + Rust header test
+  - id: receipt-banner
+    selector: '[data-testid="mail-receipt-banner"]'
+    kind: display
+  - id: receipt-send
+    selector: '[data-testid="mail-receipt-send"]'
+    kind: interactive
+  - id: receipt-ignore
+    selector: '[data-testid="mail-receipt-ignore"]'
+    kind: interactive
+    optional: true
+  - id: receipt-policy
+    selector: '[data-testid="mail-receipt-policy"]'
+    kind: interactive
+    optional: true       # session editor
+  - id: outbox-count
+    selector: '[data-testid="mail-outbox-count"]'
+    kind: display
+  - id: drafts-tab-outbox
+    selector: '[data-testid="mail-drafts-tab-outbox"]'
+    kind: interactive
+  - id: outbox-row
+    selector: '[data-testid="mail-outbox-row"]'
+    kind: display
+  - id: outbox-state
+    selector: '[data-testid="mail-outbox-state"]'
+    kind: display
+    optional: true
+  - id: outbox-send-all
+    selector: '[data-testid="mail-outbox-send-all"]'
+    kind: interactive
+  - id: outbox-send
+    selector: '[data-testid="mail-outbox-send"]'
+    kind: interactive
+    optional: true
+  - id: undo-send
+    selector: '[data-testid="mail-undo-send"]'
+    kind: display
+    optional: true       # needs an undo window > 0 (session setting)
+  - id: undo-send-button
+    selector: '[data-testid="mail-undo-send-button"]'
+    kind: interactive
+    optional: true
+  - id: undo-send-seconds
+    selector: '[data-testid="mail-undo-send-seconds"]'
+    kind: interactive
+    optional: true
+-->
+
+- 写信窗口 “Send later” 把邮件放入本地 Outbox，可指定发送时间（留空则等待手动发送）；Drafts 对话框新增 Outbox 页签，逐封 “Send now” 或 “Send all”，工具栏 Drafts 按钮显示 Outbox 数量。
+- 发送时服务器不可达（连接失败、DNS、超时、421/45x）会自动进入 Outbox，并按 1/2/5/10/30 分钟退避重试；认证失败或地址错误仍留在写信窗口提示。
+- 会话设置 “Undo send”（秒，默认 0）开启后，点 Send 先进入 Outbox 并显示倒计时与 Undo，撤销后回到编辑状态。
+- 限制（DEC-01）：Outbox、稍后发送与重试只在该账户标签打开期间执行，UI 中有说明。
+- “Receipt” 勾选后请求已读回执（`Disposition-Notification-To`，RFC 8098）。
+- 收到回执请求时按账户设置 “Read receipts” 处理：询问（默认，阅读区提示 Send receipt / Ignore）、总是发送或从不发送。回执为 RFC 8098 `multipart/report; report-type=disposition-notification`；发送或忽略后给邮件打上 `$MDNSent`（RFC 3503），其他客户端也不再询问。自己发出的邮件和已发送文件夹中的邮件不提示。
+
+---
+
+### 13.14 mbox 导入导出、mailto 与邮件列表退订 🟡
+
+<!-- feature
+id: F-MAIL-14
+status: partial
+area: mail/lists
+components: [MailClientTab, MailMessageBodyView, MailHtmlReader]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/components/mail/MailHtmlReader.tsx
+  - src/lib/mailto.ts
+  - src-tauri/src/mail/lists.rs
+  - src-tauri/src/mail/mbox.rs
+controls:
+  - id: unsubscribe
+    selector: '[data-testid="mail-unsubscribe"]'
+    kind: interactive
+-->
+
+- 文件夹右键 “Export as mbox…” 导出 mboxrd（Thunderbird 可导入，`From - ` 分隔、`>From ` 转义，每批 50 封流式写入）；“Import messages (mbox/.eml)…” 拆分 mbox 或读取单封 .eml，经 IMAP APPEND 写入该文件夹并同步到列表。文件对话框无法由 WebDriver 驱动，导入导出由 Rust 往返测试覆盖。
+- 带 `List-Unsubscribe` 的邮件在阅读区显示 “Unsubscribe”：支持 RFC 8058 一键退订时先确认再 POST；否则优先 mailto（打开写信窗口），再退回浏览器打开 https 链接。表头在拉取时解析并缓存。
+- 阅读区（HTML 与纯文本）中的 `mailto:` 链接在应用内打开写信窗口并填好收件人、抄送、主题与正文。
+- 未完成：注册为系统 `mailto:` 默认处理程序需要引入 Tauri deep-link 插件并修改三端安装注册，尚未实施。
+
+---
+
+### 13.15 附件与大邮件 ✅
+
+<!-- feature
+id: F-MAIL-15
+status: done
+area: mail/attachments
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailAttachReminder.ts
+  - src-tauri/src/mail/parts.rs
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: attach-reminder
+    selector: '[data-testid="mail-attach-reminder"]'
+    kind: display
+  - id: attach-reminder-send
+    selector: '[data-testid="mail-attach-reminder-send"]'
+    kind: interactive
+-->
+
+- 超过正文部分拉取上限的邮件，打开时先取 `BODYSTRUCTURE`，只拉 text/plain 与 text/html 分段（完整、不截断），并列出全部附件及其 IMAP 分段号；下载时只取该分段（`BODY.PEEK[<section>]`），不再拉整封邮件。
+- 会话设置 “Attachment cache” 开启后，下载过的附件写入 `<app_data>/mail-cache/attachments/`，再次打开直接使用本地副本。
+- 发送被服务器以大小拒绝（552 / SIZE）时给出明确提示。
+- 附件提醒：正文（不含引用部分）或主题提到 “attached/附件” 而没有附件时，发送前提醒，可 “Attach…” 或 “Send anyway”。
+
+---
+
+### 13.16 账户自动配置与证书例外 🟡
+
+<!-- feature
+id: F-MAIL-16
+status: partial
+area: mail/account
+components: [SessionEditor, MailClientTab]
+files:
+  - src/components/session/SessionEditor.tsx
+  - src/components/mail/MailClientTab.tsx
+  - src-tauri/src/mail/autoconfig.rs
+  - src-tauri/src/mail/certs.rs
+controls:
+  - id: autoconfig
+    selector: '[data-testid="mail-autoconfig"]'
+    kind: interactive
+  - id: autoconfig-online
+    selector: '[data-testid="mail-autoconfig-online"]'
+    kind: interactive
+  - id: autoconfig-result
+    selector: '[data-testid="mail-autoconfig-result"]'
+    kind: display
+  - id: cert-review
+    selector: '[data-testid="mail-cert-review"]'
+    kind: interactive
+    optional: true       # only after an untrusted-certificate handshake error
+  - id: cert-dialog
+    selector: '[data-testid="mail-cert-dialog"]'
+    kind: display
+    optional: true
+  - id: cert-fingerprint
+    selector: '[data-testid="mail-cert-fingerprint"]'
+    kind: display
+    optional: true
+  - id: cert-trust
+    selector: '[data-testid="mail-cert-trust"]'
+    kind: interactive
+    optional: true
+-->
+
+- 会话编辑器 “Detect settings”：先查内置表（Gmail、Outlook、QQ、163、126、iCloud、Yahoo、Fastmail 等，离线），勾选 “Online lookup” 时再依次查询 ISPDB、`autoconfig.<domain>`、`/.well-known/autoconfig`，最后猜测 `imap./smtp.<domain>` 并探测端口；在线查询会把域名发给第三方，提示中有说明，可关闭。
+- 证书例外：握手因证书不受信任失败时，状态栏出现 “Review certificate”，对话框显示主题、签发者、有效期与 SHA-256 指纹；“Trust for this account” 把该证书设为此服务器唯一的信任锚（禁用系统根证书，放宽主机名校验），证书变化时握手失败并再次提示。保存的会话写入会话选项，Quick Connect 标签只在内存中生效。
+- 未完成：Yahoo/AOL/Fastmail 等 OAuth 需要在各厂商注册客户端 ID，尚未接入；RFC 6186 SRV 未实现（未引入 DNS 解析依赖）；Exchange Autodiscover（POX）已接入，在 Thunderbird 式查找之后尝试。证书固定的 TLS 行为已在 Windows 上用本地 TLS 服务器验证，macOS/Linux 待原生验证。
+
+---
+
+### 13.17 POP3 账户与本地文件夹 ✅
+
+<!-- feature
+id: F-MAIL-17
+status: done
+area: mail/pop3
+components: [SessionEditor, MailClientTab]
+files:
+  - src/components/session/SessionEditor.tsx
+  - src/lib/quickConnect.ts
+  - src-tauri/src/mail/pop3.rs
+  - src-tauri/src/mail/local_cmds.rs
+controls:
+  - id: incoming-protocol
+    selector: '[data-testid="mail-incoming-protocol"]'
+    kind: interactive
+    optional: true       # session editor; quick connect uses pop3://
+  - id: pop3-leave-days
+    selector: '[data-testid="mail-pop3-leave-days"]'
+    kind: interactive
+    optional: true
+-->
+
+- 会话编辑器 “Incoming” 可选 POP3（本地文件夹），Quick Connect 支持 `pop3://` / `pop3s://`（默认端口 995/110）。支持 TLS、STLS 与明文；明文且服务器提供时间戳时使用 APOP，OAuth 使用 XOAUTH2。
+- 以 `UIDL` 去重下载到本地 INBOX（每批 50 封，重复同步不产生重复邮件）；“Delete from server after N days”（空 = 保留，0 = 下载后立即删除）按下载时间在服务器执行 `DELE`。
+- 本地文件夹（INBOX/Sent/Drafts/Trash/Junk 与自建文件夹）支持移动、复制、删除、标记、搜索、重命名与 mbox 导入导出；发出的邮件副本存入本地 Sent。本地邮件不受邮件头保留策略裁剪，清空缓存会被拒绝（邮件只有本地一份）。
+
+---
+
+### 13.18 日历邀请（iTIP/iMIP） 🟡
+
+<!-- feature
+id: F-MAIL-18
+status: partial
+area: mail/calendar
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailInvite.ts
+  - src-tauri/src/mail/calendar.rs
+controls:
+  - id: invite-card
+    selector: '[data-testid="mail-invite-card"]'
+    kind: display
+  - id: invite-summary
+    selector: '[data-testid="mail-invite-summary"]'
+    kind: display
+  - id: invite-accept
+    selector: '[data-testid="mail-invite-accept"]'
+    kind: interactive
+  - id: invite-responded
+    selector: '[data-testid="mail-invite-responded"]'
+    kind: display
+  - id: invite-tentative
+    selector: '[data-testid="mail-invite-tentative"]'
+    kind: interactive
+    optional: true
+  - id: invite-decline
+    selector: '[data-testid="mail-invite-decline"]'
+    kind: interactive
+    optional: true
+  - id: invite-export
+    selector: '[data-testid="mail-invite-export"]'
+    kind: interactive
+    optional: true       # save dialog cannot be driven by WebDriver
+  - id: invite-open
+    selector: '[data-testid="mail-invite-open"]'
+    kind: interactive
+    optional: true       # opens the OS calendar app
+-->
+
+- 含 `text/calendar`（或 .ics）部分的邮件在阅读区显示邀请卡片：标题、时间、地点、组织者与参与者状态；支持 METHOD REQUEST / CANCEL / REPLY（取消的邀请显示 “Cancelled”，不提供回复）。
+- “Accept / Tentative / Decline” 向组织者发送 RFC 5546/6047 iTIP `METHOD:REPLY`（`text/calendar; method=REPLY`，保留 UID 与 SEQUENCE），卡片标记当前回复状态。
+- “Export .ics” 保存日历部分；“Open in calendar” 用系统日历应用打开。
+- 时间：UTC 与全天事件按本地时区显示；带 TZID 的时间按发件人时区的时刻加时区名显示（未内置时区数据库）。
+- 配置了 CalDAV 的账户接受/暂定时同时把事件写入日历，也可手动 “Add to calendar”（见 F-MAIL-22）。
+- 未完成：回复不写入已发送文件夹。
+
+---
+
+### 13.19 消息过滤器 ✅
+
+<!-- feature
+id: F-MAIL-19
+status: done
+area: mail/filters
+components: [MailFiltersPanel, MailClientTab]
+files:
+  - src/components/mail/MailFiltersPanel.tsx
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailFilters.ts
+  - src-tauri/src/mail/filters.rs
+controls:
+  - id: filters-open
+    selector: '[data-testid="mail-filters-open"]'
+    kind: interactive
+  - id: filters-close
+    selector: '[data-testid="mail-filters-close"]'
+    kind: interactive
+  - id: filters-panel
+    selector: '[data-testid="mail-filters-panel"]'
+    kind: display
+    optional: true
+  - id: filter-new
+    selector: '[data-testid="mail-filter-new"]'
+    kind: interactive
+  - id: filter-row
+    selector: '[data-testid="mail-filter-row"]'
+    kind: display
+  - id: filter-name
+    selector: '[data-testid="mail-filter-name"]'
+    kind: interactive
+  - id: filter-condition-field
+    selector: '[data-testid="mail-filter-condition-field"]'
+    kind: interactive
+  - id: filter-condition-op
+    selector: '[data-testid="mail-filter-condition-op"]'
+    kind: interactive
+    optional: true
+  - id: filter-condition-value
+    selector: '[data-testid="mail-filter-condition-value"]'
+    kind: interactive
+  - id: filter-action-folder
+    selector: '[data-testid="mail-filter-action-folder"]'
+    kind: interactive
+  - id: filter-save
+    selector: '[data-testid="mail-filter-save"]'
+    kind: interactive
+  - id: filter-match
+    selector: '[data-testid="mail-filter-match"]'
+    kind: interactive
+    optional: true
+  - id: filter-on-incoming
+    selector: '[data-testid="mail-filter-on-incoming"]'
+    kind: interactive
+    optional: true
+  - id: filter-add-condition
+    selector: '[data-testid="mail-filter-add-condition"]'
+    kind: interactive
+    optional: true
+  - id: filter-add-action
+    selector: '[data-testid="mail-filter-add-action"]'
+    kind: interactive
+    optional: true
+  - id: filter-action-kind
+    selector: '[data-testid="mail-filter-action-kind"]'
+    kind: interactive
+    optional: true
+  - id: filter-action-tag
+    selector: '[data-testid="mail-filter-action-tag"]'
+    kind: interactive
+    optional: true
+  - id: filter-action-address
+    selector: '[data-testid="mail-filter-action-address"]'
+    kind: interactive
+    optional: true
+  - id: filter-run-all
+    selector: '[data-testid="mail-filter-run-all"]'
+    kind: interactive
+    optional: true
+  - id: filter-run
+    selector: '[data-testid="mail-filter-run"]'
+    kind: interactive
+    optional: true
+  - id: filter-edit
+    selector: '[data-testid="mail-filter-edit"]'
+    kind: interactive
+    optional: true
+  - id: filter-delete
+    selector: '[data-testid="mail-filter-delete"]'
+    kind: interactive
+    optional: true
+  - id: filter-enabled
+    selector: '[data-testid="mail-filter-enabled"]'
+    kind: interactive
+    optional: true
+  - id: menu-create-filter
+    selector: '[data-testid="mail-menu-create-filter"]'
+    kind: interactive
+    optional: true       # message context menu
+  - id: filters-recent-errors
+    selector: '[data-testid="mail-filters-recent-errors"]'
+    kind: display
+    optional: true
+-->
+
+- 邮箱栏的漏斗按钮打开 “Message filters” 对话框（DEC-11，Thunderbird 式）：规则列表可启用/停用、上移下移（即执行顺序）、编辑、删除、对当前文件夹单独运行或全部运行，并可导出/导入 JSON。
+- 编辑器支持多条件（From/To/Cc/To 或 Cc/主题/正文/大小 KB/天数/标签/有附件；包含、不包含、是、不是、开头、结尾、正则、大于、小于；全部或任一匹配）与多动作（移动、复制、标记已读/未读、加星、加标签、删除到废纸篓、转发、停止执行后续过滤器）。邮件右键 “Create filter from message…” 预填发件人。
+- 收信过滤：标签打开期间，INBOX 同步取到新邮件后执行（DEC-01，不在后台运行）；每个文件夹记录已过滤的最高 UID，只处理之后到达的邮件，保存规则时不回溯旧邮件；UIDVALIDITY 变化后重新建立基线。POP3 账户同样适用。
+- 正文条件：正文已缓存时本地匹配，未缓存时用服务器 `UID SEARCH BODY` 判断（因此正文只支持包含/不包含）。
+- 动作失败（例如目标文件夹不存在）时邮件留在原处，错误显示在状态栏，漏斗按钮出现警示，打开对话框可看到失败明细（AC-42）。
+
+---
+
+### 13.20 统一邮件（多账户） ✅
+
+<!-- feature
+id: F-MAIL-20
+status: done
+area: mail/unified
+components: [MailUnifiedTab, Sidebar, ControlBar]
+files:
+  - src/components/mail/MailUnifiedTab.tsx
+  - src/lib/mailUnified.ts
+  - src/layouts/MainLayout.tsx
+controls:
+  - id: open-unified
+    selector: '[data-testid="sidebar-tool-mail-unified"]'
+    kind: interactive
+  - id: open-unified-menu
+    selector: '[data-testid="context-menu-item-mail-unified"]'
+    kind: interactive
+    optional: true       # app menu (Tools); macOS uses the native menu
+  - id: unified-tab
+    selector: '[data-testid="mail-unified-tab"]'
+    kind: display
+  - id: unified-refresh
+    selector: '[data-testid="mail-unified-refresh"]'
+    kind: interactive
+  - id: unified-status
+    selector: '[data-testid="mail-unified-status"]'
+    kind: display
+  - id: unified-row
+    selector: '[data-testid="mail-unified-row"]'
+    kind: interactive
+  - id: unified-reader
+    selector: '[data-testid="mail-unified-reader"]'
+    kind: display
+  - id: unified-delete
+    selector: '[data-testid="mail-unified-delete"]'
+    kind: interactive
+  - id: unified-move
+    selector: '[data-testid="mail-unified-move"]'
+    kind: interactive
+    optional: true
+  - id: unified-toggle-read
+    selector: '[data-testid="mail-unified-toggle-read"]'
+    kind: interactive
+    optional: true
+  - id: unified-toggle-star
+    selector: '[data-testid="mail-unified-toggle-star"]'
+    kind: interactive
+    optional: true
+  - id: unified-open-account
+    selector: '[data-testid="mail-unified-open-account"]'
+    kind: interactive
+    optional: true
+  - id: unified-view-inbox
+    selector: '[data-testid="mail-unified-view-inbox"]'
+    kind: interactive
+    optional: true
+  - id: unified-view-sent
+    selector: '[data-testid="mail-unified-view-sent"]'
+    kind: interactive
+    optional: true
+  - id: unified-view-drafts
+    selector: '[data-testid="mail-unified-view-drafts"]'
+    kind: interactive
+    optional: true
+  - id: unified-view-starred
+    selector: '[data-testid="mail-unified-view-starred"]'
+    kind: interactive
+    optional: true
+  - id: unified-count
+    selector: '[data-testid="mail-unified-count"]'
+    kind: display
+    optional: true
+  - id: unified-account-badge
+    selector: '[data-testid="mail-unified-account"]'
+    kind: display
+    optional: true
+  - id: unified-account-error
+    selector: '[data-testid="mail-unified-account-error"]'
+    kind: display
+    optional: true
+  - id: unified-empty
+    selector: '[data-testid="mail-unified-empty"]'
+    kind: display
+    optional: true
+-->
+
+- 独立的 “Unified Mail” 标签（DEC-12），从侧边栏 “工具”、应用菜单 Tools 或 macOS 原生菜单打开。账户来源为所有已保存的邮件会话，加上当前打开的邮件标签（Quick Connect 账户不保存会话）。
+- 视图：Inbox / Sent / Drafts / Starred。前三者按各账户的特殊文件夹（手动指定 > SPECIAL-USE > 名称）读取本地缓存，Starred 在每个账户的全部缓存文件夹中查找星标邮件；按时间合并（每账户最多 200 封），每行显示账户徽标。
+- “Get mail” 对每个账户同步该视图的文件夹，失败的账户单独列出，不影响其他账户。
+- 阅读、标记已读/未读、加星、移动（该账户的文件夹）与删除（该账户的废纸篓，没有废纸篓时永久删除）都经所属账户执行（AC-48）；回复、转发等通过 “Open account” 在账户自己的标签中进行。
+- 不在后台运行：只在标签可见时读取缓存（DEC-01）。
+
+---
+
+### 13.21 地址簿与 CardDAV 🟡
+
+<!-- feature
+id: F-MAIL-21
+status: partial
+area: mail/contacts
+components: [MailAddressBookPanel, MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailAddressBookPanel.tsx
+  - src/lib/mailContacts.ts
+  - src-tauri/src/mail/contacts.rs
+  - src-tauri/src/mail/vcard.rs
+controls:
+  - id: address-book-open
+    selector: '[data-testid="mail-address-book-open"]'
+    kind: interactive
+  - id: address-book-close
+    selector: '[data-testid="mail-address-book-close"]'
+    kind: interactive
+  - id: address-book
+    selector: '[data-testid="mail-address-book"]'
+    kind: display
+    optional: true
+  - id: contact-new
+    selector: '[data-testid="mail-contact-new"]'
+    kind: interactive
+  - id: contact-name
+    selector: '[data-testid="mail-contact-name"]'
+    kind: interactive
+  - id: contact-email
+    selector: '[data-testid="mail-contact-email"]'
+    kind: interactive
+  - id: contact-save
+    selector: '[data-testid="mail-contact-save"]'
+    kind: interactive
+  - id: contact-row
+    selector: '[data-testid="mail-contact-row"]'
+    kind: display
+  - id: contact-search
+    selector: '[data-testid="mail-contact-search"]'
+    kind: interactive
+    optional: true
+  - id: contact-phone
+    selector: '[data-testid="mail-contact-phone"]'
+    kind: interactive
+    optional: true
+  - id: contact-org
+    selector: '[data-testid="mail-contact-org"]'
+    kind: interactive
+    optional: true
+  - id: contact-edit
+    selector: '[data-testid="mail-contact-edit"]'
+    kind: interactive
+    optional: true
+  - id: contact-delete
+    selector: '[data-testid="mail-contact-delete"]'
+    kind: interactive
+    optional: true
+  - id: contact-compose
+    selector: '[data-testid="mail-contact-compose"]'
+    kind: interactive
+    optional: true
+  - id: carddav-sync
+    selector: '[data-testid="mail-carddav-sync"]'
+    kind: interactive
+    optional: true       # only with a CardDAV URL in the session
+  - id: carddav-errors
+    selector: '[data-testid="mail-carddav-errors"]'
+    kind: display
+    optional: true
+  - id: menu-add-contact
+    selector: '[data-testid="mail-menu-add-contact"]'
+    kind: interactive
+    optional: true       # message context menu
+  - id: carddav-url
+    selector: '[data-testid="mail-carddav-url"]'
+    kind: interactive
+    optional: true       # session editor
+  - id: carddav-username
+    selector: '[data-testid="mail-carddav-username"]'
+    kind: interactive
+    optional: true
+-->
+
+- 邮箱栏 “Address book” 按钮打开地址簿：联系人（姓名、多个邮箱与电话、单位、备注）增删改与搜索；邮件右键 “Add sender to address book…” 预填发件人；联系人行可直接写信。
+- vCard 2.1/3.0/4.0 导入（一个 .vcf 可含多张卡片，支持 quoted-printable 与 Apple 分组属性）与导出（vCard 3.0）；照片、地址等未建模的属性原样保留，往返不丢数据（DEC-13：自行实现，不新增依赖）。
+- 写信自动补全先列出地址簿联系人（带姓名），再列出收发历史中收集的联系人，按邮箱去重（AC-61）。
+- CardDAV：会话设置填写 CardDAV URL（服务器、principal 或地址簿地址均可，按 `/.well-known/carddav`、`current-user-principal`、`addressbook-home-set` 发现），用户名默认与 IMAP 相同，密码使用邮件密码（OAuth 账户发送 Bearer 令牌）。“Sync” 先上传本地修改（`If-Match`/`If-None-Match`，冲突时以服务器为准），再按 ETag 拉取变化（`addressbook-multiget`，不支持时逐个 GET），服务器删除的卡片同步删除（AC-60）。
+- 未完成：CardDAV 不走会话代理/跳板机；Google 通讯录需要额外 OAuth scope，未接入；CardDAV 只同步发现到的第一个地址簿；不定时自动同步（手动 Sync）。托管 UI 用例不连 CardDAV 服务器，CardDAV 流程由 Rust 进程内服务器测试覆盖，仅在 Windows 本机执行过。
+
+---
+
+### 13.22 CalDAV 议程与提醒 🟡
+
+<!-- feature
+id: F-MAIL-22
+status: partial
+area: mail/calendar
+components: [MailAgendaPanel, MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailAgendaPanel.tsx
+  - src/lib/mailCalendar.ts
+  - src-tauri/src/mail/caldav.rs
+  - src-tauri/src/mail/webdav.rs
+controls:
+  - id: agenda-open
+    selector: '[data-testid="mail-agenda-open"]'
+    kind: interactive
+  - id: agenda-close
+    selector: '[data-testid="mail-agenda-close"]'
+    kind: interactive
+    optional: true
+  - id: agenda
+    selector: '[data-testid="mail-agenda"]'
+    kind: display
+    optional: true
+  - id: agenda-event
+    selector: '[data-testid="mail-agenda-event"]'
+    kind: display
+  - id: agenda-sync
+    selector: '[data-testid="mail-agenda-sync"]'
+    kind: interactive
+    optional: true
+  - id: agenda-error
+    selector: '[data-testid="mail-agenda-error"]'
+    kind: display
+    optional: true
+  - id: agenda-empty
+    selector: '[data-testid="mail-agenda-empty"]'
+    kind: display
+    optional: true
+  - id: invite-in-calendar
+    selector: '[data-testid="mail-invite-in-calendar"]'
+    kind: display
+  - id: invite-add-calendar
+    selector: '[data-testid="mail-invite-add-calendar"]'
+    kind: interactive
+    optional: true
+  - id: invite-calendar-error
+    selector: '[data-testid="mail-invite-calendar-error"]'
+    kind: display
+    optional: true
+  - id: caldav-url
+    selector: '[data-testid="mail-caldav-url"]'
+    kind: interactive
+    optional: true       # session editor; quick connect uses ?caldav=
+  - id: caldav-username
+    selector: '[data-testid="mail-caldav-username"]'
+    kind: interactive
+    optional: true
+-->
+
+- DEC-14 最小方案：会话设置（或 Quick Connect 的 `?caldav=`）填写 CalDAV URL 后，邮箱栏出现 “Agenda” 按钮，按日期分组列出未来 14 天的事件（时间、地点、提醒）；不提供日/周/月网格。
+- 发现：`/.well-known/caldav` → `current-user-principal` → `calendar-home-set` → 第一个日历（与 CardDAV 共用 `webdav.rs`）。拉取用 `calendar-query` 时间窗（前 1 天至后 60 天）并请求服务器 `expand`，重复事件由服务器展开为 UTC 实例。
+- 接受/暂定邀请时把事件写入日历：去掉 `METHOD`，把我的 ATTENDEE 改为对应 PARTSTAT，`If-None-Match: *` 新建，已存在时 `If-Match: *` 更新（AC-64）。
+- 提醒：标签打开期间每 15 分钟同步一次，按事件 VALARM（缺省 15 分钟）在开始前弹出桌面通知并在状态栏提示（DEC-01：标签关闭后不提醒）。
+- 未完成：只读取第一个日历；不在应用内新建/编辑事件；不走会话代理；服务器不支持 `expand` 时，带 TZID 的时间按发件人时区的时刻显示（无时区库），重复事件只显示首个实例。
+
 ---
 
 ## 14. SocksCap 网络流量路由

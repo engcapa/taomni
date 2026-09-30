@@ -1,0 +1,130 @@
+id: TC-MAIL-FOLDER-01
+title: Mail unsubscribes a folder on the server and hides it with "subscribed only"
+description: 'TASK-10 (docs-feature/mail-thunderbird-parity-design.md AC-32).
+
+  Opens a mail account through Quick Connect, unsubscribes Archive in the
+
+  subscriptions dialog (the row state comes back from the server LIST/LSUB),
+
+  enables "Show only subscribed folders" and requires Archive to leave the
+
+  folder tree. Reopening the account keeps the preference and the server
+
+  subscription, so Archive stays hidden while INBOX and Sent remain.
+
+  Browser mode drives the stub server model (renderer orchestration only);
+
+  native mode runs the real Tauri backend SUBSCRIBE/UNSUBSCRIBE/LSUB against
+
+  the in-process fake IMAP server started by the mail_server fixture.
+
+  '
+covers:
+- F-MAIL-11
+tags:
+- mail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- wait_for:
+    selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+    timeout_sec: 60
+- click: '[data-testid="mail-subscriptions-open"]'
+- wait_for: '[data-testid="mail-subscriptions-dialog"]'
+- click: '[data-testid="mail-subscription-row"][data-folder-name="Archive"] [data-testid="mail-subscription-toggle"]'
+- wait_for:
+    selector: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="false"]'
+    timeout_sec: 30
+- click: '[data-testid="mail-subscribed-only"]'
+- wait_for:
+    selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+    state: detached
+    timeout_sec: 10
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="Sent"]'
+- screenshot: mail-folder-01-subscriptions.png
+- click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="mail-client-tab"]'
+    state: detached
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- wait_for:
+    selector: '[data-testid="mail-folder-row"][data-folder-name="Sent"]'
+    timeout_sec: 60
+- assert_count:
+    selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+    equal: 0
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 在订阅对话框取消订阅 Archive 后，服务器返回的订阅状态为未订阅；开启“只显示已订阅文件夹”后 Archive 离开文件夹树，INBOX/Sent 仍在（AC-32）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 11
+    - 13
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "timeout_sec": 60}}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"mail-subscriptions-dialog\"]"}'
+    - step: 12
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-subscription-row\"][data-folder-name=\"Archive\"][data-subscribed=\"false\"]", "timeout_sec": 30}}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Sent\"]"}'
+    results:
+    - 12
+    - 14
+    - 15
+  - id: R2
+    requirement: 重开账户后偏好与服务器订阅保持，Archive 仍然隐藏。
+    actions:
+    - 17
+    - 19
+    - 20
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Sent\"]", "timeout_sec": 60}}'
+    - step: 23
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "equal": 0}}'
+    results:
+    - 23
+  visual:
+  - check: 截图中订阅对话框的 Archive 未勾选、“只显示已订阅”已勾选，文件夹树不含 Archive。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实后端的 SUBSCRIBE/UNSUBSCRIBE 与 LSUB 标记；browser 仅验证渲染层；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

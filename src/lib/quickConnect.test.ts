@@ -148,3 +148,55 @@ describe("parseQuickConnectInput", () => {
     });
   });
 });
+
+describe("mail quick connect", () => {
+  it("derives a stable session id so reopening reuses the mail cache", () => {
+    const first = parseQuickConnectInput("mail://me@example.com@imap.example.com");
+    const second = parseQuickConnectInput("mail://me@example.com@imap.example.com");
+    expect(first.config.id).toBe(second.config.id);
+    expect(first.config.id).toBe("quick-mail-me@example.com@imap.example.com_993");
+    expect(first.config.port).toBe(993);
+    const options = JSON.parse(first.config.options_json);
+    expect(options.mailImapSecurity).toBe("TLS");
+    expect(options.mailSmtpHost).toBe("smtp.example.com");
+    expect(options.mailSmtpPort).toBe("465");
+    expect(options.mailHeaderLimitPerFolder).toBe("0");
+  });
+
+  it("opens POP3 accounts with pop3:// and POP3 default ports (TASK-21)", () => {
+    const tls = parseQuickConnectInput("pop3://me%40example.com@pop.example.com");
+    expect(tls.config.session_type).toBe("Mail");
+    expect(tls.config.port).toBe(995);
+    expect(tls.config.id).toBe("quick-pop3-me@example.com@pop.example.com_995");
+    const options = JSON.parse(tls.config.options_json);
+    expect(options.mailIncoming).toBe("pop3");
+    expect(options.mailSmtpHost).toBe("smtp.example.com");
+    const plain = parseQuickConnectInput("pop3://qa:pw@127.0.0.1?security=none&smtp=127.0.0.1:1025");
+    expect(plain.config.port).toBe(110);
+    expect(plain.authData).toBe("pw");
+  });
+
+  it("carries CardDAV and CalDAV URLs (TASK-19/TASK-20)", () => {
+    const parsed = parseQuickConnectInput(
+      "mail://qa:pw@127.0.0.1:1143?security=none&caldav=http://127.0.0.1:8080/&carddav=https://dav.example.com/",
+    );
+    const options = JSON.parse(parsed.config.options_json);
+    expect(options.mailCalDavUrl).toBe("http://127.0.0.1:8080/");
+    expect(options.mailCardDavUrl).toBe("https://dav.example.com/");
+    expect(JSON.parse(parseQuickConnectInput("mail://qa@imap.example.com").config.options_json).mailCalDavUrl).toBeUndefined();
+  });
+
+  it("accepts a password, plain security and an explicit SMTP endpoint", () => {
+    const parsed = parseQuickConnectInput("mail://qa:secret@127.0.0.1:1143?security=none&smtp=127.0.0.1:1025");
+    expect(parsed.authData).toBe("secret");
+    expect(parsed.config.host).toBe("127.0.0.1");
+    expect(parsed.config.port).toBe(1143);
+    expect(parsed.config.username).toBe("qa");
+    const options = JSON.parse(parsed.config.options_json);
+    expect(options.mailImapSecurity).toBe("None");
+    expect(options.mailSmtpHost).toBe("127.0.0.1");
+    expect(options.mailSmtpPort).toBe("1025");
+    expect(options.mailSmtpSecurity).toBe("None");
+    expect(parsed.config.options_json).not.toContain("secret");
+  });
+});

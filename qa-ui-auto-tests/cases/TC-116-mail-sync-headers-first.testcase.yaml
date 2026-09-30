@@ -20,7 +20,9 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="status-bar"]'
+- wait_for:
+    selector: '[data-testid="status-bar"]'
+    timeout_sec: 45
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-view"]'
 - click: '[data-testid="context-menu-item-toggle-quick-connect"]'

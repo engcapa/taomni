@@ -941,6 +941,47 @@
 - `[data-testid="git-diff-stage"]` — interactive [optional] — F26.2.git-diff-stage
 - `[data-testid="git-diff-unstage"]` — interactive [optional] — F26.2.git-diff-unstage
 
+## mail/account (F-MAIL-16)
+
+- `[data-testid="mail-autoconfig"]` — interactive — F-MAIL-16.autoconfig
+- `[data-testid="mail-autoconfig-online"]` — interactive — F-MAIL-16.autoconfig-online
+- `[data-testid="mail-autoconfig-result"]` — display — F-MAIL-16.autoconfig-result
+- `[data-testid="mail-cert-review"]` — interactive [optional] — F-MAIL-16.cert-review
+- `[data-testid="mail-cert-dialog"]` — display [optional] — F-MAIL-16.cert-dialog
+- `[data-testid="mail-cert-fingerprint"]` — display [optional] — F-MAIL-16.cert-fingerprint
+- `[data-testid="mail-cert-trust"]` — interactive [optional] — F-MAIL-16.cert-trust
+
+## mail/attachments (F-MAIL-15)
+
+- `[data-testid="mail-attach-reminder"]` — display — F-MAIL-15.attach-reminder
+- `[data-testid="mail-attach-reminder-send"]` — interactive — F-MAIL-15.attach-reminder-send
+
+## mail/calendar (F-MAIL-18)
+
+- `[data-testid="mail-invite-card"]` — display — F-MAIL-18.invite-card
+- `[data-testid="mail-invite-summary"]` — display — F-MAIL-18.invite-summary
+- `[data-testid="mail-invite-accept"]` — interactive — F-MAIL-18.invite-accept
+- `[data-testid="mail-invite-responded"]` — display — F-MAIL-18.invite-responded
+- `[data-testid="mail-invite-tentative"]` — interactive [optional] — F-MAIL-18.invite-tentative
+- `[data-testid="mail-invite-decline"]` — interactive [optional] — F-MAIL-18.invite-decline
+- `[data-testid="mail-invite-export"]` — interactive [optional] — F-MAIL-18.invite-export
+- `[data-testid="mail-invite-open"]` — interactive [optional] — F-MAIL-18.invite-open
+
+## mail/calendar (F-MAIL-22)
+
+- `[data-testid="mail-agenda-open"]` — interactive — F-MAIL-22.agenda-open
+- `[data-testid="mail-agenda-close"]` — interactive [optional] — F-MAIL-22.agenda-close
+- `[data-testid="mail-agenda"]` — display [optional] — F-MAIL-22.agenda
+- `[data-testid="mail-agenda-event"]` — display — F-MAIL-22.agenda-event
+- `[data-testid="mail-agenda-sync"]` — interactive [optional] — F-MAIL-22.agenda-sync
+- `[data-testid="mail-agenda-error"]` — display [optional] — F-MAIL-22.agenda-error
+- `[data-testid="mail-agenda-empty"]` — display [optional] — F-MAIL-22.agenda-empty
+- `[data-testid="mail-invite-in-calendar"]` — display — F-MAIL-22.invite-in-calendar
+- `[data-testid="mail-invite-add-calendar"]` — interactive [optional] — F-MAIL-22.invite-add-calendar
+- `[data-testid="mail-invite-calendar-error"]` — display [optional] — F-MAIL-22.invite-calendar-error
+- `[data-testid="mail-caldav-url"]` — interactive [optional] — F-MAIL-22.caldav-url
+- `[data-testid="mail-caldav-username"]` — interactive [optional] — F-MAIL-22.caldav-username
+
 ## mail/compose (F-MAIL-1)
 
 - `[data-testid="mail-client-tab"]` — display — F-MAIL-1.mail-client-tab
@@ -953,6 +994,27 @@
 - `[data-testid="mail-recipient-suggestions"]` — display — F-MAIL-1.recipient-suggestions
 - `[data-testid="mail-recipient-suggestion"]` — interactive — F-MAIL-1.recipient-suggestion
 - `[data-testid="mail-compose-send"]` — interactive [optional] — F-MAIL-1.compose-send
+
+## mail/compose (F-MAIL-13)
+
+- `[data-testid="mail-compose-send-later"]` — interactive — F-MAIL-13.compose-send-later
+- `[data-testid="mail-send-later-panel"]` — display [optional] — F-MAIL-13.send-later-panel
+- `[data-testid="mail-send-later-at"]` — interactive [optional] — F-MAIL-13.send-later-at
+- `[data-testid="mail-send-later-confirm"]` — interactive — F-MAIL-13.send-later-confirm
+- `[data-testid="mail-compose-read-receipt"]` — interactive [optional] — F-MAIL-13.compose-read-receipt
+- `[data-testid="mail-receipt-banner"]` — display — F-MAIL-13.receipt-banner
+- `[data-testid="mail-receipt-send"]` — interactive — F-MAIL-13.receipt-send
+- `[data-testid="mail-receipt-ignore"]` — interactive [optional] — F-MAIL-13.receipt-ignore
+- `[data-testid="mail-receipt-policy"]` — interactive [optional] — F-MAIL-13.receipt-policy
+- `[data-testid="mail-outbox-count"]` — display — F-MAIL-13.outbox-count
+- `[data-testid="mail-drafts-tab-outbox"]` — interactive — F-MAIL-13.drafts-tab-outbox
+- `[data-testid="mail-outbox-row"]` — display — F-MAIL-13.outbox-row
+- `[data-testid="mail-outbox-state"]` — display [optional] — F-MAIL-13.outbox-state
+- `[data-testid="mail-outbox-send-all"]` — interactive — F-MAIL-13.outbox-send-all
+- `[data-testid="mail-outbox-send"]` — interactive [optional] — F-MAIL-13.outbox-send
+- `[data-testid="mail-undo-send"]` — display [optional] — F-MAIL-13.undo-send
+- `[data-testid="mail-undo-send-button"]` — interactive [optional] — F-MAIL-13.undo-send-button
+- `[data-testid="mail-undo-send-seconds"]` — interactive [optional] — F-MAIL-13.undo-send-seconds
 
 ## mail/compose (F-MAIL-2)
 
@@ -990,6 +1052,116 @@
 - `[data-testid="mail-compose-attachment-chip"]` — display — F-MAIL-2.compose-attachment-chip
 - `[data-testid="mail-compose-save-draft"]` — interactive — F-MAIL-2.compose-save-draft
 
+## mail/compose (F-MAIL-6)
+
+- `[data-testid="mail-thread-view-toggle"]` — interactive — F-MAIL-6.thread-view-toggle
+- `[data-testid="mail-thread-expand"]` — interactive [optional] — F-MAIL-6.thread-expand
+- `[data-testid="mail-save-sent-copy"]` — interactive [optional] — F-MAIL-6.save-sent-copy
+
+## mail/compose (F-MAIL-9)
+
+- `[data-testid="mail-compose-from"]` — interactive [optional] — F-MAIL-9.compose-from
+- `[data-testid="mail-compose-save-template"]` — interactive — F-MAIL-9.compose-save-template
+- `[data-testid="mail-compose-discard"]` — interactive — F-MAIL-9.compose-discard
+- `[data-testid="mail-drafts-tab-templates"]` — interactive — F-MAIL-9.drafts-tab-templates
+- `[data-testid="mail-drafts-tab-drafts"]` — interactive [optional] — F-MAIL-9.drafts-tab-drafts
+- `[data-testid="mail-template-row"]` — interactive — F-MAIL-9.template-row
+- `[data-testid="mail-identities-editor"]` — display [optional] — F-MAIL-9.identities-editor
+- `[data-testid="mail-identity-add"]` — interactive [optional] — F-MAIL-9.identity-add
+
+## mail/contacts (F-MAIL-21)
+
+- `[data-testid="mail-address-book-open"]` — interactive — F-MAIL-21.address-book-open
+- `[data-testid="mail-address-book-close"]` — interactive — F-MAIL-21.address-book-close
+- `[data-testid="mail-address-book"]` — display [optional] — F-MAIL-21.address-book
+- `[data-testid="mail-contact-new"]` — interactive — F-MAIL-21.contact-new
+- `[data-testid="mail-contact-name"]` — interactive — F-MAIL-21.contact-name
+- `[data-testid="mail-contact-email"]` — interactive — F-MAIL-21.contact-email
+- `[data-testid="mail-contact-save"]` — interactive — F-MAIL-21.contact-save
+- `[data-testid="mail-contact-row"]` — display — F-MAIL-21.contact-row
+- `[data-testid="mail-contact-search"]` — interactive [optional] — F-MAIL-21.contact-search
+- `[data-testid="mail-contact-phone"]` — interactive [optional] — F-MAIL-21.contact-phone
+- `[data-testid="mail-contact-org"]` — interactive [optional] — F-MAIL-21.contact-org
+- `[data-testid="mail-contact-edit"]` — interactive [optional] — F-MAIL-21.contact-edit
+- `[data-testid="mail-contact-delete"]` — interactive [optional] — F-MAIL-21.contact-delete
+- `[data-testid="mail-contact-compose"]` — interactive [optional] — F-MAIL-21.contact-compose
+- `[data-testid="mail-carddav-sync"]` — interactive [optional] — F-MAIL-21.carddav-sync
+- `[data-testid="mail-carddav-errors"]` — display [optional] — F-MAIL-21.carddav-errors
+- `[data-testid="mail-menu-add-contact"]` — interactive [optional] — F-MAIL-21.menu-add-contact
+- `[data-testid="mail-carddav-url"]` — interactive [optional] — F-MAIL-21.carddav-url
+- `[data-testid="mail-carddav-username"]` — interactive [optional] — F-MAIL-21.carddav-username
+
+## mail/filters (F-MAIL-19)
+
+- `[data-testid="mail-filters-open"]` — interactive — F-MAIL-19.filters-open
+- `[data-testid="mail-filters-close"]` — interactive — F-MAIL-19.filters-close
+- `[data-testid="mail-filters-panel"]` — display [optional] — F-MAIL-19.filters-panel
+- `[data-testid="mail-filter-new"]` — interactive — F-MAIL-19.filter-new
+- `[data-testid="mail-filter-row"]` — display — F-MAIL-19.filter-row
+- `[data-testid="mail-filter-name"]` — interactive — F-MAIL-19.filter-name
+- `[data-testid="mail-filter-condition-field"]` — interactive — F-MAIL-19.filter-condition-field
+- `[data-testid="mail-filter-condition-op"]` — interactive [optional] — F-MAIL-19.filter-condition-op
+- `[data-testid="mail-filter-condition-value"]` — interactive — F-MAIL-19.filter-condition-value
+- `[data-testid="mail-filter-action-folder"]` — interactive — F-MAIL-19.filter-action-folder
+- `[data-testid="mail-filter-save"]` — interactive — F-MAIL-19.filter-save
+- `[data-testid="mail-filter-match"]` — interactive [optional] — F-MAIL-19.filter-match
+- `[data-testid="mail-filter-on-incoming"]` — interactive [optional] — F-MAIL-19.filter-on-incoming
+- `[data-testid="mail-filter-add-condition"]` — interactive [optional] — F-MAIL-19.filter-add-condition
+- `[data-testid="mail-filter-add-action"]` — interactive [optional] — F-MAIL-19.filter-add-action
+- `[data-testid="mail-filter-action-kind"]` — interactive [optional] — F-MAIL-19.filter-action-kind
+- `[data-testid="mail-filter-action-tag"]` — interactive [optional] — F-MAIL-19.filter-action-tag
+- `[data-testid="mail-filter-action-address"]` — interactive [optional] — F-MAIL-19.filter-action-address
+- `[data-testid="mail-filter-run-all"]` — interactive [optional] — F-MAIL-19.filter-run-all
+- `[data-testid="mail-filter-run"]` — interactive [optional] — F-MAIL-19.filter-run
+- `[data-testid="mail-filter-edit"]` — interactive [optional] — F-MAIL-19.filter-edit
+- `[data-testid="mail-filter-delete"]` — interactive [optional] — F-MAIL-19.filter-delete
+- `[data-testid="mail-filter-enabled"]` — interactive [optional] — F-MAIL-19.filter-enabled
+- `[data-testid="mail-menu-create-filter"]` — interactive [optional] — F-MAIL-19.menu-create-filter
+- `[data-testid="mail-filters-recent-errors"]` — display [optional] — F-MAIL-19.filters-recent-errors
+
+## mail/folders (F-MAIL-11)
+
+- `[data-testid="mail-subscriptions-open"]` — interactive — F-MAIL-11.subscriptions-open
+- `[data-testid="mail-subscriptions-dialog"]` — display — F-MAIL-11.subscriptions-dialog
+- `[data-testid="mail-subscription-row"]` — display — F-MAIL-11.subscription-row
+- `[data-testid="mail-subscription-toggle"]` — interactive — F-MAIL-11.subscription-toggle
+- `[data-testid="mail-subscribed-only"]` — interactive — F-MAIL-11.subscribed-only
+- `[data-testid="mail-subscribed-only-setting"]` — interactive [optional] — F-MAIL-11.subscribed-only-setting
+- `[data-testid="mail-special-folders"]` — display [optional] — F-MAIL-11.special-folders
+
+## mail/list (F-MAIL-12)
+
+- `[data-testid="mail-message-row"][aria-pressed="true"]` — interactive — F-MAIL-12.message-row-shortcuts
+- `[data-testid="mail-folder-row"][data-folder-name="Archive"]` — interactive — F-MAIL-12.folder-drop-target
+
+## mail/lists (F-MAIL-14)
+
+- `[data-testid="mail-unsubscribe"]` — interactive — F-MAIL-14.unsubscribe
+
+## mail/organize (F-MAIL-8)
+
+- `[data-testid="mail-menu-tag"]` — interactive — F-MAIL-8.menu-tag
+- `[data-testid="mail-menu-tag-label1"]` — interactive — F-MAIL-8.menu-tag-label1
+- `[data-testid="mail-message-tag"]` — display — F-MAIL-8.message-tag
+- `[data-testid="mail-quick-filter-tag"]` — interactive — F-MAIL-8.quick-filter-tag
+- `[data-testid="mail-message-junk"]` — display [optional] — F-MAIL-8.message-junk
+
+## mail/pop3 (F-MAIL-17)
+
+- `[data-testid="mail-incoming-protocol"]` — interactive [optional] — F-MAIL-17.incoming-protocol
+- `[data-testid="mail-pop3-leave-days"]` — interactive [optional] — F-MAIL-17.pop3-leave-days
+
+## mail/search (F-MAIL-7)
+
+- `[data-testid="mail-search-input"]` — interactive — F-MAIL-7.search-input
+- `[data-testid="mail-search-scope"]` — interactive — F-MAIL-7.search-scope
+- `[data-testid="mail-search-field"]` — interactive [optional] — F-MAIL-7.search-field
+- `[data-testid="mail-search-server"]` — interactive [optional] — F-MAIL-7.search-server
+- `[data-testid="mail-quick-filter-unread"]` — interactive — F-MAIL-7.quick-filter-unread
+- `[data-testid="mail-quick-filter-flagged"]` — interactive [optional] — F-MAIL-7.quick-filter-flagged
+- `[data-testid="mail-quick-filter-attachments"]` — interactive [optional] — F-MAIL-7.quick-filter-attachments
+- `[data-testid="mail-message-folder"]` — display [optional] — F-MAIL-7.message-folder
+
 ## mail/settings (F-MAIL-4)
 
 - `[data-testid="mail-appearance-settings"]` — display — F-MAIL-4.mail-appearance-settings
@@ -999,10 +1171,49 @@
 - `input[aria-label="Mail background hex"]` — interactive — F-MAIL-4.mail-background
 - `input[aria-label="Mail foreground hex"]` — interactive — F-MAIL-4.mail-foreground
 
+## mail/sync (F-MAIL-10)
+
+- `[data-testid="mail-idle-status"]` — display — F-MAIL-10.idle-status
+- `[data-testid="mail-idle-push"]` — interactive [optional] — F-MAIL-10.idle-push-setting
+- `[data-testid="mail-desktop-notify"]` — interactive [optional] — F-MAIL-10.desktop-notify-setting
+
 ## mail/sync (F-MAIL-3)
 
 - `[data-testid="mail-sync-button"]` — interactive — F-MAIL-3.sync-button
 - `[data-testid="mail-body-warming-progress"]` — display [optional] — F-MAIL-3.body-warming-progress
+
+## mail/sync (F-MAIL-5)
+
+- `[data-testid="mail-message-count"]` — display — F-MAIL-5.message-count
+- `[data-testid="mail-message-row"]` — interactive — F-MAIL-5.message-row
+- `[data-testid="mail-folder-row"]` — interactive — F-MAIL-5.folder-row
+- `[data-testid="mail-sync-progress"]` — display [optional] — F-MAIL-5.sync-progress
+- `[data-testid="mail-backfill-progress"]` — display [optional] — F-MAIL-5.backfill-progress
+- `[data-testid="mail-folder-sync-error"]` — display [optional] — F-MAIL-5.folder-sync-error
+- `[data-testid="mail-load-more"]` — interactive [optional] — F-MAIL-5.load-more
+
+## mail/unified (F-MAIL-20)
+
+- `[data-testid="sidebar-tool-mail-unified"]` — interactive — F-MAIL-20.open-unified
+- `[data-testid="context-menu-item-mail-unified"]` — interactive [optional] — F-MAIL-20.open-unified-menu
+- `[data-testid="mail-unified-tab"]` — display — F-MAIL-20.unified-tab
+- `[data-testid="mail-unified-refresh"]` — interactive — F-MAIL-20.unified-refresh
+- `[data-testid="mail-unified-status"]` — display — F-MAIL-20.unified-status
+- `[data-testid="mail-unified-row"]` — interactive — F-MAIL-20.unified-row
+- `[data-testid="mail-unified-reader"]` — display — F-MAIL-20.unified-reader
+- `[data-testid="mail-unified-delete"]` — interactive — F-MAIL-20.unified-delete
+- `[data-testid="mail-unified-move"]` — interactive [optional] — F-MAIL-20.unified-move
+- `[data-testid="mail-unified-toggle-read"]` — interactive [optional] — F-MAIL-20.unified-toggle-read
+- `[data-testid="mail-unified-toggle-star"]` — interactive [optional] — F-MAIL-20.unified-toggle-star
+- `[data-testid="mail-unified-open-account"]` — interactive [optional] — F-MAIL-20.unified-open-account
+- `[data-testid="mail-unified-view-inbox"]` — interactive [optional] — F-MAIL-20.unified-view-inbox
+- `[data-testid="mail-unified-view-sent"]` — interactive [optional] — F-MAIL-20.unified-view-sent
+- `[data-testid="mail-unified-view-drafts"]` — interactive [optional] — F-MAIL-20.unified-view-drafts
+- `[data-testid="mail-unified-view-starred"]` — interactive [optional] — F-MAIL-20.unified-view-starred
+- `[data-testid="mail-unified-count"]` — display [optional] — F-MAIL-20.unified-count
+- `[data-testid="mail-unified-account"]` — display [optional] — F-MAIL-20.unified-account-badge
+- `[data-testid="mail-unified-account-error"]` — display [optional] — F-MAIL-20.unified-account-error
+- `[data-testid="mail-unified-empty"]` — display [optional] — F-MAIL-20.unified-empty
 
 ## main (F1.2)
 

@@ -1,0 +1,100 @@
+id: TC-MAIL-THREAD-01
+title: Mail groups a reply chain into one expandable conversation
+description: 'TASK-07 (AC-24): a 4-message reply chain delivered by another client is
+
+  synced with In-Reply-To/References, collapses into one conversation row in
+
+  thread view and expands into all four messages with reply depth.
+
+  '
+covers:
+- F-MAIL-6
+- F-MAIL-5
+tags:
+- mail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- mail_server_deliver:
+    count: 4
+    prefix: Thread
+    thread: true
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- click: '[data-testid="mail-thread-view-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="mail-thread-view-toggle"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="mail-thread-expand"]'
+    contains: '4'
+- click: '[data-testid="mail-thread-expand"]'
+- assert_count:
+    selector: '[data-testid="mail-message-row"][data-thread-depth]:not([data-thread-depth="0"])'
+    min: 3
+- assert_attribute:
+    selector: '[data-testid="mail-thread-expand"]'
+    name: aria-expanded
+    equals: 'true'
+- screenshot: mail-thread-01-expanded.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 回复链在线程视图中折叠为一行并显示 4 封，展开后显示带缩进的全部回复（AC-24）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 10
+    - 12
+    - 15
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 13
+      expectation: '{"assert_attribute": {"name": "aria-pressed", "equals": "true"}}'
+    - step: 14
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-thread-expand\"]", "contains": "4"}}'
+    - step: 16
+      expectation: '{"assert_count": {"min": 3}}'
+    - step: 17
+      expectation: '{"assert_attribute": {"name": "aria-expanded", "equals": "true"}}'
+    results:
+    - 14
+    - 16
+    - 17
+  visual:
+  - check: 截图中会话回复按层级缩进、计数徽标清晰。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实后端解析 In-Reply-To/References 并缓存；browser 仅验证渲染层线程化；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

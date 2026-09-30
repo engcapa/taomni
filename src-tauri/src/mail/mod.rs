@@ -25,7 +25,7 @@ use base64::{
 };
 use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart, header::ContentType};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
-use lettre::transport::smtp::client::{Tls, TlsParameters};
+use lettre::transport::smtp::client::Tls;
 use lettre::{Message, SmtpTransport, Transport};
 use mail_parser::{Address as ParsedAddress, MessageParser, MimeHeaders, PartType};
 use native_tls::TlsConnector;
@@ -38,6 +38,31 @@ use tokio::task::JoinHandle;
 
 use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
+
+pub mod autoconfig;
+pub mod caldav;
+pub mod calendar;
+pub mod contacts;
+pub mod filters;
+pub mod certs;
+#[cfg(test)]
+mod fake_imap;
+pub mod folders;
+pub mod idle;
+pub mod lists;
+mod local_cmds;
+pub mod mbox;
+pub mod outgoing;
+mod parts;
+mod pop3;
+pub mod receipts;
+pub mod search;
+mod sync;
+mod vcard;
+mod webdav;
+
+use sync::{FolderStepOutcome, FolderSyncState, StepParams};
+pub use sync::{MailFolderSyncResult, MailSyncRequestMode};
 
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
 const DEFAULT_MESSAGE_LIMIT: usize = 200;
@@ -78,6 +103,15 @@ pub enum MailProvider {
     Outlook,
 }
 
+/// Incoming protocol of an account (TASK-21).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MailIncomingProtocol {
+    #[default]
+    Imap,
+    Pop3,
+}
+
 impl Default for MailProvider {
     fn default() -> Self {
         Self::Custom
@@ -109,6 +143,9 @@ pub struct MailServerConfig {
     pub password: Option<String>,
     #[serde(default)]
     pub security: MailConnectionSecurity,
+    /// Base64 DER of a certificate the user trusted for this server (AC-44).
+    #[serde(default)]
+    pub trusted_cert: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +161,9 @@ pub struct MailSmtpConfig {
     pub security: MailConnectionSecurity,
     #[serde(default = "default_true")]
     pub use_imap_auth: bool,
+    /// Base64 DER of a certificate the user trusted for this server (AC-44).
+    #[serde(default)]
+    pub trusted_cert: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -319,6 +359,9 @@ pub struct MailSyncSettings {
     pub interval_minutes: u32,
     #[serde(default = "default_max_fetch_per_sync")]
     pub max_fetch_per_sync: u32,
+    /// Hide and skip folders the server does not list as subscribed (LSUB).
+    #[serde(default)]
+    pub subscribed_only: bool,
 }
 
 impl Default for MailSyncSettings {
@@ -327,6 +370,7 @@ impl Default for MailSyncSettings {
             on_open: true,
             interval_minutes: default_sync_interval_minutes(),
             max_fetch_per_sync: default_max_fetch_per_sync(),
+            subscribed_only: false,
         }
     }
 }
@@ -358,6 +402,27 @@ pub struct MailAccountConfig {
     pub cache: MailCacheSettings,
     #[serde(default)]
     pub ai: MailAiSettings,
+    /// Store a copy of sent mail in the Sent folder (IMAP APPEND). `None` =
+    /// automatic: off for Gmail/Outlook (the server files it), on otherwise.
+    #[serde(default)]
+    pub save_sent_copy: Option<bool>,
+    /// IMAP (default) or POP3 with local folders.
+    #[serde(default)]
+    pub incoming: MailIncomingProtocol,
+    /// POP3: delete downloaded mail from the server after N days
+    /// (`None` = keep on the server, `0` = delete right after download).
+    #[serde(default)]
+    pub pop3_leave_days: Option<u32>,
+    /// Manual special folders (`sent`, `drafts`, `trash`, `junk`, `archive`
+    /// -> server folder name); beats SPECIAL-USE and name matching.
+    #[serde(default)]
+    pub special_folders: HashMap<String, String>,
+    /// CardDAV address book (TASK-19); `None` = local address book only.
+    #[serde(default)]
+    pub carddav: Option<contacts::MailCardDavSettings>,
+    /// CalDAV calendar for the agenda (TASK-20 phase 2); `None` = off.
+    #[serde(default)]
+    pub caldav: Option<caldav::MailCalDavSettings>,
 }
 
 #[derive(Debug, Clone)]
@@ -384,9 +449,13 @@ pub struct MailAttachmentInfo {
     pub name: Option<String>,
     pub content_type: Option<String>,
     pub size: Option<usize>,
+    /// IMAP section ("2", "1.3") for large messages listed via BODYSTRUCTURE;
+    /// downloads then fetch only that part.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MailFolder {
     pub account_id: String,
@@ -399,6 +468,21 @@ pub struct MailFolder {
     pub total: Option<u32>,
     pub unread: Option<u32>,
     pub updated_at: i64,
+    /// Lowest UID of the contiguous cached span (see `sync.rs`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync_low_uid: Option<u32>,
+    /// Highest UID of the contiguous cached span.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync_high_uid: Option<u32>,
+    /// True once the cached span reaches the oldest server message (or the
+    /// configured retention boundary), so no older backfill remains.
+    #[serde(default)]
+    pub sync_complete: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_count: Option<u32>,
+    /// Last sync error for this folder; cleared by the next successful sync.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -420,6 +504,19 @@ pub struct MailMessageHeader {
     pub snippet: Option<String>,
     pub raw_size: Option<u32>,
     pub body_cached: bool,
+    /// `In-Reply-To` message id (without angle brackets).
+    #[serde(default)]
+    pub in_reply_to: Option<String>,
+    /// `References` message ids, oldest first (without angle brackets).
+    #[serde(default)]
+    pub references: Vec<String>,
+    /// `List-Unsubscribe` of mailing-list mail (TASK-18).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub list_unsubscribe: Option<lists::MailListUnsubscribe>,
+    /// `Disposition-Notification-To` address: the sender asked for a read
+    /// receipt (RFC 8098, TASK-17).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_to: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -445,12 +542,11 @@ struct MailMessageCached {
     body_text: Option<String>,
     body_html: Option<String>,
     body_cached_at: Option<i64>,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-struct FolderSyncState {
-    max_uid: u32,
-    uid_validity: Option<u32>,
+    /// Server arrival time (IMAP INTERNALDATE); drives retention pruning.
+    internal_ts: Option<i64>,
+    /// True when `header.flags` came from a FETCH FLAGS response, so an empty
+    /// list really means "no flags" (unread) and must overwrite cached flags.
+    flags_authoritative: bool,
 }
 
 #[derive(Debug)]
@@ -481,9 +577,24 @@ pub struct MailSyncAllResult {
     pub account_id: String,
     pub folders: Vec<MailFolder>,
     pub fetched_messages: usize,
+    /// Newly arrived unseen messages across folders (excludes initial sync,
+    /// gap repair and backfill).
     pub new_messages: usize,
+    pub new_unseen_by_folder: HashMap<String, usize>,
+    pub failed_folders: Vec<MailFolderError>,
+    /// Folders whose catch-up was bounded by `limit` and needs more steps.
+    pub pending_folders: Vec<String>,
+    /// Folders a STATUS check proved unchanged (skipped by a periodic scan).
+    pub unchanged_folders: Vec<String>,
     pub cached_bodies: usize,
     pub synced_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailFolderError {
+    pub name: String,
+    pub error: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -516,6 +627,60 @@ pub struct MailSendRequest {
     pub html_body: Option<String>,
     #[serde(default)]
     pub attachments: Vec<MailSendAttachment>,
+    /// Message id this message replies to (brackets optional).
+    #[serde(default)]
+    pub in_reply_to: Option<String>,
+    /// Thread ancestry, oldest first (brackets optional).
+    #[serde(default)]
+    pub references: Vec<String>,
+    /// Local draft whose server copy (Drafts folder) should be removed after
+    /// a successful send.
+    #[serde(default)]
+    pub draft_id: Option<String>,
+    /// `From:` of a non-default identity ("Name <addr>"); `None` = account.
+    #[serde(default)]
+    pub from: Option<String>,
+    /// Reply-To of that identity (overrides the account Reply-To).
+    #[serde(default)]
+    pub reply_to: Option<String>,
+    /// Ask for a read receipt (RFC 8098 `Disposition-Notification-To`).
+    #[serde(default)]
+    pub request_read_receipt: bool,
+}
+
+/// `Disposition-Notification-To` (RFC 8098); lettre has no typed header.
+#[derive(Debug, Clone)]
+struct DispositionNotificationTo(String);
+
+impl lettre::message::header::Header for DispositionNotificationTo {
+    fn name() -> lettre::message::header::HeaderName {
+        lettre::message::header::HeaderName::new_from_ascii_str("Disposition-Notification-To")
+    }
+
+    fn parse(s: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(Self(s.trim().to_string()))
+    }
+
+    fn display(&self) -> lettre::message::header::HeaderValue {
+        lettre::message::header::HeaderValue::new(Self::name(), self.0.clone())
+    }
+}
+
+/// Queue state of a draft waiting in the local Outbox (TASK-17).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MailOutboxState {
+    /// Earliest send time (epoch seconds); `None` = wait for "Send now".
+    #[serde(default)]
+    pub send_at: Option<i64>,
+    #[serde(default)]
+    pub queued_at: i64,
+    #[serde(default)]
+    pub attempts: u32,
+    #[serde(default)]
+    pub last_error: Option<String>,
+    #[serde(default)]
+    pub read_receipt: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -537,6 +702,12 @@ pub struct MailSendAttachment {
 pub struct MailSendResult {
     pub accepted: bool,
     pub response: String,
+    /// Folder that received the copy of the sent message (IMAP APPEND).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sent_copy_folder: Option<String>,
+    /// Why no sent copy was stored, when saving one was attempted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sent_copy_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -570,6 +741,15 @@ pub struct MailDraftContext {
     pub message_id: Option<String>,
     #[serde(default)]
     pub subject: Option<String>,
+    /// Thread ancestry of the replied-to message, oldest first.
+    #[serde(default)]
+    pub references: Vec<String>,
+    /// Sending identity chosen in the composer.
+    #[serde(default)]
+    pub identity_id: Option<String>,
+    /// Present while the draft waits in the Outbox.
+    #[serde(default)]
+    pub outbox: Option<MailOutboxState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -699,21 +879,45 @@ impl ActiveImapSession {
         }
     }
 
-    fn sync_folder_incremental(
+    fn sync_folder_step(
         &mut self,
         account: &ResolvedMailAccount,
         folder: &str,
-        state: FolderSyncState,
-        limit: u32,
-        include_bodies: bool,
-    ) -> Result<(MailFolder, Vec<MailMessageCached>), String> {
+        state: &FolderSyncState,
+        params: &StepParams,
+    ) -> Result<FolderStepOutcome, String> {
         match self {
             Self::Tls { session, .. } => {
-                imap_sync_folder_incremental(session, account, folder, state, limit, include_bodies)
+                sync::imap_sync_folder_step(session, account, folder, state, params)
             }
             Self::Plain { session, .. } => {
-                imap_sync_folder_incremental(session, account, folder, state, limit, include_bodies)
+                sync::imap_sync_folder_step(session, account, folder, state, params)
             }
+        }
+    }
+
+    fn set_subscription(&mut self, folder: &str, subscribed: bool) -> Result<(), String> {
+        match self {
+            Self::Tls { session, .. } => {
+                folders::imap_set_subscription(session, folder, subscribed)
+            }
+            Self::Plain { session, .. } => {
+                folders::imap_set_subscription(session, folder, subscribed)
+            }
+        }
+    }
+
+    fn folder_status(&mut self, folder: &str, condstore: bool) -> Option<folders::FolderStatus> {
+        match self {
+            Self::Tls { session, .. } => folders::imap_folder_status(session, folder, condstore),
+            Self::Plain { session, .. } => folders::imap_folder_status(session, folder, condstore),
+        }
+    }
+
+    fn has_capability(&mut self, name: &str) -> bool {
+        match self {
+            Self::Tls { session, .. } => sync::imap_has_capability(session, name),
+            Self::Plain { session, .. } => sync::imap_has_capability(session, name),
         }
     }
 
@@ -743,6 +947,7 @@ impl ActiveImapSession {
         uid: u32,
         attachment_index: usize,
         target_path: &str,
+        section: Option<&str>,
     ) -> Result<MailDownloadAttachmentResult, String> {
         match self {
             Self::Tls { session, .. } => imap_download_attachment(
@@ -752,6 +957,7 @@ impl ActiveImapSession {
                 uid,
                 attachment_index,
                 target_path,
+                section,
             ),
             Self::Plain { session, .. } => imap_download_attachment(
                 session,
@@ -760,6 +966,7 @@ impl ActiveImapSession {
                 uid,
                 attachment_index,
                 target_path,
+                section,
             ),
         }
     }
@@ -1300,7 +1507,12 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
 
         CREATE INDEX IF NOT EXISTS idx_mail_drafts_updated
             ON mail_drafts(account_id, updated_at DESC);",
-    )
+    )?;
+    sync::migrate_mail_tables(conn)?;
+    pop3::migrate_local_tables(conn)?;
+    filters::migrate_filter_tables(conn)?;
+    contacts::migrate_contact_tables(conn)?;
+    caldav::migrate_calendar_tables(conn)
 }
 
 fn with_mail_db<T>(
@@ -1319,6 +1531,9 @@ pub async fn mail_test_connection(
     config: MailAccountConfig,
     state: State<'_, AppState>,
 ) -> Result<MailTestConnectionResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::test_connection(&state, config).await;
+    }
     let account = resolve_config(&state, config)?;
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
@@ -1611,30 +1826,135 @@ pub async fn mail_sync_headers(
     })
 }
 
+/// Sync one folder by one bounded, gap-free step (see `sync.rs`). Callers
+/// repeat while `more` is true: `auto` initialises, repairs a pre-watermark
+/// cache or fetches every message newer than the cached span; `backfill`
+/// walks older history; `reconcile*` removes server-side deletions and
+/// refreshes flags.
+#[tauri::command]
+pub async fn mail_sync_folder(
+    config: MailAccountConfig,
+    folder: Option<String>,
+    mode: Option<MailSyncRequestMode>,
+    limit: Option<u32>,
+    include_bodies: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<MailFolderSyncResult, String> {
+    if pop3::is_pop3(&config) {
+        let name = folder.clone().unwrap_or_else(|| "INBOX".into());
+        return local_cmds::sync_folder(&state, config, name.trim()).await;
+    }
+    let account = resolve_config(&state, config)?;
+    let folder = folder
+        .filter(|f| !f.trim().is_empty())
+        .unwrap_or_else(|| "INBOX".to_string());
+    let cache_enabled = account.config.cache.enabled;
+    let cache_settings = account.config.cache.clone();
+    let account_id = account.config.session_id.clone();
+    let params = StepParams {
+        request: mode.unwrap_or_default(),
+        limit: limit
+            .unwrap_or(account.config.sync.max_fetch_per_sync)
+            .clamp(1, 2000) as usize,
+        include_bodies: include_bodies.unwrap_or(false),
+        condstore: false,
+    };
+    // Without a cache there is nothing to resume from: every call is a fresh
+    // newest page.
+    let sync_state = if cache_enabled {
+        with_mail_db(&state, &account_id, |db| {
+            sync::load_folder_sync_state(db, &account_id, &folder)
+        })?
+    } else {
+        FolderSyncState::default()
+    };
+
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
+    let step_folder = folder.clone();
+    let started_ms = sync::now_ms();
+    let result = tokio::task::spawn_blocking(move || {
+        with_imap_session(
+            &pool,
+            &account,
+            &handle,
+            ImapSessionOpts::default(),
+            |imap| {
+                let params = StepParams {
+                    condstore: imap.has_capability("CONDSTORE"),
+                    ..params
+                };
+                imap.sync_folder_step(&account, &step_folder, &sync_state, &params)
+            },
+        )
+    })
+    .await
+    .map_err(|e| format!("mail sync task failed: {e}"))?;
+
+    let mut outcome = match result {
+        Ok(outcome) => outcome,
+        Err(e) => {
+            if cache_enabled {
+                let _ = with_mail_db(&state, &account_id, |db| {
+                    sync::record_folder_error(db, &account_id, &folder, &e)
+                });
+            }
+            return Err(e);
+        }
+    };
+    if !cache_enabled {
+        outcome.mode = sync::MailSyncMode::Uncached;
+        outcome.more = false;
+        return Ok(sync::step_result(&account_id, outcome, None));
+    }
+    let applied = with_mail_db(&state, &account_id, |db| {
+        sync::apply_folder_step(db, &account_id, &outcome, &cache_settings, started_ms)
+    })?;
+    Ok(sync::step_result(&account_id, outcome, Some(applied)))
+}
+
+/// Refresh the folder tree and run one catch-up (plus reconcile) step for
+/// every folder. Folders that still have work left are reported in
+/// `pendingFolders`; failures in `failedFolders` (never silently skipped).
 #[tauri::command]
 pub async fn mail_sync_all_folders(
     config: MailAccountConfig,
     limit: Option<u32>,
     include_bodies: Option<bool>,
+    full_reconcile: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<MailSyncAllResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::sync_all(&state, config).await;
+    }
     let account = resolve_config(&state, config)?;
     let cache_enabled = account.config.cache.enabled;
     let cache_settings = account.config.cache.clone();
     let account_id = account.config.session_id.clone();
     let limit = limit
         .unwrap_or(account.config.sync.max_fetch_per_sync)
-        .max(1)
-        .min(2000);
+        .clamp(1, 2000) as usize;
     let include_bodies = include_bodies.unwrap_or(false);
-    let sync_states = if cache_enabled {
+    let reconcile_mode = if full_reconcile.unwrap_or(false) {
+        MailSyncRequestMode::ReconcileFull
+    } else {
+        MailSyncRequestMode::Reconcile
+    };
+    let skip_unchanged = cache_enabled && reconcile_mode == MailSyncRequestMode::Reconcile;
+    let sync_states: HashMap<String, FolderSyncState> = if cache_enabled {
         with_mail_db(&state, &account_id, |db| {
-            cached_folder_sync_states(db, &account_id)
+            let mut states = HashMap::new();
+            for folder in list_cached_folders(db, &account_id)? {
+                let folder_state = sync::load_folder_sync_state(db, &account_id, &folder.name)?;
+                states.insert(folder.name, folder_state);
+            }
+            Ok(states)
         })?
     } else {
         HashMap::new()
     };
 
+    let started_ms = sync::now_ms();
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let result = tokio::task::spawn_blocking(move || {
@@ -1644,63 +1964,185 @@ pub async fn mail_sync_all_folders(
             &handle,
             ImapSessionOpts::default(),
             |imap| {
-                let mut folders = imap.list_folders(&account.config.session_id)?;
-                let mut messages = Vec::new();
-                let mut new_messages = 0usize;
-                for listed in folders.clone() {
-                    let folder_name = listed.name;
-                    let state = sync_states.get(&folder_name).copied().unwrap_or_default();
-                    match imap.sync_folder_incremental(
-                        &account,
-                        &folder_name,
-                        state,
-                        limit,
-                        include_bodies,
-                    ) {
-                        Ok((synced_folder, mut synced_messages)) => {
-                            let same_uid_validity = state.max_uid > 0
-                                && (state.uid_validity.is_none()
-                                    || synced_folder.uid_validity.is_none()
-                                    || state.uid_validity == synced_folder.uid_validity);
-                            if same_uid_validity {
-                                new_messages += synced_messages.len();
+                let mut listed = imap.list_folders(&account.config.session_id)?;
+                let condstore = imap.has_capability("CONDSTORE");
+                let subscribed_only = account.config.sync.subscribed_only;
+                let mut outcomes: Vec<FolderStepOutcome> = Vec::new();
+                let mut failed: Vec<MailFolderError> = Vec::new();
+                let mut pending: Vec<String> = Vec::new();
+                let mut skipped: Vec<String> = Vec::new();
+                for folder in listed.iter_mut() {
+                    if folder_is_noselect(folder)
+                        || !folders::folder_visible(folder, subscribed_only)
+                    {
+                        continue;
+                    }
+                    let name = folder.name.clone();
+                    let mut folder_state = sync_states.get(&name).cloned().unwrap_or_default();
+                    // Periodic scans: one STATUS round trip proves an idle
+                    // folder unchanged (AC-33); manual syncs always reconcile.
+                    if skip_unchanged && condstore {
+                        if let Some(status) = imap.folder_status(&name, condstore) {
+                            if folders::folder_unchanged(&folder_state, &status) {
+                                folder.total = status.messages;
+                                folder.unread = status.unseen;
+                                folder.uid_next = status.uid_next;
+                                folder.uid_validity = status.uid_validity;
+                                skipped.push(name);
+                                continue;
                             }
-                            merge_selected_folder(&mut folders, synced_folder);
-                            messages.append(&mut synced_messages);
-                        }
-                        Err(e) => {
-                            tracing::debug!(
-                                "mail incremental sync skipped folder {folder_name}: {e}"
-                            );
                         }
                     }
+                    let mut folder_outcomes = Vec::new();
+                    let mut error = None;
+                    // A repair (pre-watermark cache) is followed by the real catch-up.
+                    for _ in 0..2 {
+                        let params = StepParams {
+                            request: MailSyncRequestMode::Auto,
+                            limit,
+                            include_bodies,
+                            condstore,
+                        };
+                        match imap.sync_folder_step(&account, &name, &folder_state, &params) {
+                            Ok(outcome) => {
+                                folder_state = sync::advance_state(&folder_state, &outcome);
+                                let repaired = outcome.mode == sync::MailSyncMode::Repair
+                                    && !outcome.watermark.needs_repair;
+                                let more = outcome.more;
+                                folder_outcomes.push(outcome);
+                                if !repaired {
+                                    if more {
+                                        pending.push(name.clone());
+                                    }
+                                    break;
+                                }
+                            }
+                            Err(e) => {
+                                error = Some(e);
+                                break;
+                            }
+                        }
+                    }
+                    let caught_up = error.is_none()
+                        && folder_outcomes
+                            .last()
+                            .is_some_and(|outcome: &FolderStepOutcome| !outcome.more);
+                    if caught_up && folder_state.high.is_some() {
+                        let params = StepParams {
+                            request: reconcile_mode,
+                            limit,
+                            include_bodies,
+                            condstore,
+                        };
+                        match imap.sync_folder_step(&account, &name, &folder_state, &params) {
+                            Ok(outcome) => {
+                                if outcome.more {
+                                    pending.push(name.clone());
+                                }
+                                folder_outcomes.push(outcome);
+                            }
+                            Err(e) => error = Some(e),
+                        }
+                    }
+                    if let Some(e) = error {
+                        if is_imap_transport_error(&e) {
+                            // Let the pool reconnect and retry the whole batch.
+                            return Err(e);
+                        }
+                        failed.push(MailFolderError {
+                            name: name.clone(),
+                            error: e,
+                        });
+                    }
+                    outcomes.extend(folder_outcomes);
                 }
-                let cached_bodies = messages
-                    .iter()
-                    .filter(|m| m.body_cached_at.is_some())
-                    .count();
-                Ok((folders, messages, cached_bodies, new_messages))
+                pending.dedup();
+                Ok((listed, outcomes, failed, pending, skipped))
             },
         )
     })
     .await
     .map_err(|e| format!("mail sync all task failed: {e}"))??;
+    let (listed, outcomes, failed, pending, skipped) = result;
 
-    if cache_enabled {
-        with_mail_db(&state, &account_id, |db| {
-            cache_sync_all_result(db, &account_id, &result.0, &result.1, &cache_settings)
-        })?;
+    let mut new_unseen_by_folder: HashMap<String, usize> = HashMap::new();
+    let mut fetched_messages = 0usize;
+    let mut cached_bodies = 0usize;
+    for outcome in &outcomes {
+        fetched_messages += outcome.messages.len();
+        cached_bodies += outcome
+            .messages
+            .iter()
+            .filter(|m| m.body_cached_at.is_some())
+            .count();
+        if outcome.new_unseen > 0 {
+            *new_unseen_by_folder
+                .entry(outcome.folder.name.clone())
+                .or_default() += outcome.new_unseen;
+        }
     }
+    let folders = if cache_enabled {
+        with_mail_db(&state, &account_id, |db| {
+            sync_folder_tree(db, &account_id, &listed)?;
+            for outcome in &outcomes {
+                sync::apply_folder_step(db, &account_id, outcome, &cache_settings, started_ms)?;
+            }
+            for failure in &failed {
+                sync::record_folder_error(db, &account_id, &failure.name, &failure.error)?;
+            }
+            list_cached_folders(db, &account_id)
+        })?
+    } else {
+        let mut folders = listed;
+        for outcome in &outcomes {
+            merge_selected_folder(&mut folders, outcome.folder.clone());
+        }
+        folders
+    };
 
-    let fetched_messages = result.1.len();
     Ok(MailSyncAllResult {
         account_id,
-        folders: result.0,
+        folders,
         fetched_messages,
-        new_messages: result.3,
-        cached_bodies: result.2,
+        new_messages: new_unseen_by_folder.values().sum(),
+        new_unseen_by_folder,
+        failed_folders: failed,
+        pending_folders: pending,
+        unchanged_folders: skipped,
+        cached_bodies,
         synced_at: now_ts(),
     })
+}
+
+fn folder_is_noselect(folder: &MailFolder) -> bool {
+    folder
+        .flags
+        .iter()
+        .any(|flag| flag.to_ascii_lowercase().contains("noselect"))
+}
+
+/// Mirror the remote folder tree: upsert listed folders (metadata only) and
+/// drop cached folders the server no longer lists.
+fn sync_folder_tree(conn: &Connection, account_id: &str, listed: &[MailFolder]) -> SqlResult<()> {
+    let tx = conn.unchecked_transaction()?;
+    for folder in listed {
+        upsert_folder(&tx, folder)?;
+    }
+    let names: HashSet<&str> = listed.iter().map(|folder| folder.name.as_str()).collect();
+    let cached = list_cached_folders(&tx, account_id)?;
+    for folder in cached {
+        if !names.contains(folder.name.as_str()) {
+            tx.execute(
+                "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
+                params![account_id, folder.name],
+            )?;
+            tx.execute(
+                "DELETE FROM mail_folders WHERE account_id = ?1 AND name = ?2",
+                params![account_id, folder.name],
+            )?;
+        }
+    }
+    tx.commit()
 }
 
 #[tauri::command]
@@ -1739,6 +2181,9 @@ pub async fn mail_get_message_body(
     uid: u32,
     state: State<'_, AppState>,
 ) -> Result<MailMessageBody, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::get_body(&state, &config.session_id, folder.trim(), uid);
+    }
     let account_id = config.session_id.clone();
     if config.cache.enabled {
         let cached = with_mail_db(&state, &account_id, |db| {
@@ -1779,26 +2224,79 @@ pub async fn mail_download_attachment(
     uid: u32,
     attachment_index: usize,
     target_path: String,
+    section: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<MailDownloadAttachmentResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::download_attachment(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            uid,
+            attachment_index,
+            target_path.trim(),
+        );
+    }
     let target_path = target_path.trim().to_string();
     if target_path.is_empty() {
         return Err("attachment download path is required".into());
     }
     let account = resolve_config(&state, config)?;
+    let section = section
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    // AC-46: with the attachment cache on, a second open is a local copy.
+    let cache_path = account.config.cache.attachment_cache.then(|| {
+        let key = section
+            .clone()
+            .unwrap_or_else(|| format!("i{attachment_index}"));
+        parts::attachment_cache_path(
+            state.mail_cache_root(),
+            &crate::state::mail_db_file_stem(&account.config.session_id),
+            &folder,
+            uid,
+            &key,
+        )
+    });
+    if let Some(cached) = cache_path.as_ref().filter(|path| path.is_file()) {
+        if let Ok(bytes) = std::fs::read(cached) {
+            let path = write_attachment_file(&target_path, &bytes)?;
+            return Ok(MailDownloadAttachmentResult {
+                path,
+                name: None,
+                content_type: None,
+                size: bytes.len(),
+            });
+        }
+    }
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
+    let result = tokio::task::spawn_blocking(move || {
         with_imap_session(
             &pool,
             &account,
             &handle,
             ImapSessionOpts::default(),
-            |imap| imap.download_attachment(&account, &folder, uid, attachment_index, &target_path),
+            |imap| {
+                imap.download_attachment(
+                    &account,
+                    &folder,
+                    uid,
+                    attachment_index,
+                    &target_path,
+                    section.as_deref(),
+                )
+            },
         )
     })
     .await
-    .map_err(|e| format!("mail attachment download task failed: {e}"))?
+    .map_err(|e| format!("mail attachment download task failed: {e}"))??;
+    if let Some(cache) = cache_path {
+        if let Ok(bytes) = std::fs::read(&result.path) {
+            parts::write_cache_file(&cache, &bytes);
+        }
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -1807,14 +2305,27 @@ pub async fn mail_send_message(
     request: MailSendRequest,
     state: State<'_, AppState>,
 ) -> Result<MailSendResult, String> {
+    if pop3::is_pop3(&config) {
+        validate_send_request(&request)?;
+        return local_cmds::send(&state, config, request).await;
+    }
     let account = resolve_config(&state, config)?;
     validate_send_request(&request)?;
     let account_id = account.config.session_id.clone();
     let sent_request = request.clone();
+    let remote_draft = match request.draft_id.as_deref() {
+        Some(draft_id) => with_mail_db(&state, &account_id, |db| {
+            outgoing::remote_draft_location(db, &account_id, draft_id)
+        })?,
+        None => None,
+    };
+    let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
-    let result = tokio::task::spawn_blocking(move || send_smtp(&account, &request, &handle))
-        .await
-        .map_err(|e| format!("mail send task failed: {e}"))??;
+    let result = tokio::task::spawn_blocking(move || {
+        outgoing::send_and_store_copy(&pool, &account, &request, remote_draft, &handle)
+    })
+    .await
+    .map_err(|e| format!("mail send task failed: {e}"))??;
     if result.accepted {
         with_mail_db(&state, &account_id, |db| {
             upsert_sent_contacts(db, &account_id, &sent_request)
@@ -1882,8 +2393,12 @@ pub async fn mail_search_contacts(
     limit: Option<u32>,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailContactSuggestion>, String> {
+    let limit = limit.unwrap_or(8).clamp(1, 20);
     with_mail_db(&state, &account_id, |db| {
-        search_contacts(db, &account_id, &query, limit.unwrap_or(8).clamp(1, 20))
+        // Address book entries (TASK-19) first, then collected contacts.
+        let book = contacts::address_book_suggestions(db, &account_id, &query, limit)?;
+        let collected = search_contacts(db, &account_id, &query, limit)?;
+        Ok(contacts::merge_suggestions(book, collected, limit))
     })
 }
 
@@ -1895,6 +2410,15 @@ pub async fn mail_mark_read(
     all: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<MailMarkReadResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::mark_read(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            uids,
+            all.unwrap_or(false),
+        );
+    }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
         return Err("mail folder is required".into());
@@ -1943,6 +2467,11 @@ pub async fn mail_clear_cache(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    if with_mail_db(&state, &account_id, |db| {
+        pop3::has_local_store(db, &account_id)
+    })? {
+        return Err("This POP3 account keeps its mail only on this computer; clearing the cache would delete it.".into());
+    }
     state.mail_imap_pool.invalidate(&account_id);
     with_mail_db(&state, &account_id, |db| {
         db.execute(
@@ -1966,6 +2495,16 @@ pub async fn mail_set_flags(
     remove: Option<Vec<String>>,
     state: State<'_, AppState>,
 ) -> Result<MailFlagResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::set_flags(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            &uids,
+            &add.unwrap_or_default(),
+            &remove.unwrap_or_default(),
+        );
+    }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
         return Err("mail folder is required".into());
@@ -2021,6 +2560,16 @@ pub async fn mail_move_messages(
     target_folder: String,
     state: State<'_, AppState>,
 ) -> Result<MailMoveResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::move_or_copy(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            &uids,
+            target_folder.trim(),
+            false,
+        );
+    }
     let folder = folder.trim().to_string();
     let target_folder = target_folder.trim().to_string();
     if folder.is_empty() || target_folder.is_empty() {
@@ -2075,6 +2624,16 @@ pub async fn mail_copy_messages(
     target_folder: String,
     state: State<'_, AppState>,
 ) -> Result<MailMoveResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::move_or_copy(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            &uids,
+            target_folder.trim(),
+            true,
+        );
+    }
     let folder = folder.trim().to_string();
     let target_folder = target_folder.trim().to_string();
     if folder.is_empty() || target_folder.is_empty() {
@@ -2122,6 +2681,15 @@ pub async fn mail_delete_messages(
     all: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<MailDeleteResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::delete(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            uids,
+            all.unwrap_or(false),
+        );
+    }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
         return Err("mail folder is required".into());
@@ -2175,6 +2743,10 @@ pub async fn mail_fetch_raw(
     uid: u32,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::raw(&state, &config.session_id, folder.trim(), uid)
+            .map(|raw| String::from_utf8_lossy(&raw).to_string());
+    }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
         return Err("mail folder is required".into());
@@ -2204,6 +2776,16 @@ pub async fn mail_save_raw(
     target_path: String,
     state: State<'_, AppState>,
 ) -> Result<MailDownloadAttachmentResult, String> {
+    if pop3::is_pop3(&config) {
+        let raw = local_cmds::raw(&state, &config.session_id, folder.trim(), uid)?;
+        let path = write_attachment_file(target_path.trim(), &raw)?;
+        return Ok(MailDownloadAttachmentResult {
+            path,
+            name: None,
+            content_type: Some("message/rfc822".into()),
+            size: raw.len(),
+        });
+    }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
         return Err("mail folder is required".into());
@@ -2248,6 +2830,9 @@ pub async fn mail_create_folder(
     name: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::create_folder(&state, &config.session_id, name.trim());
+    }
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err("folder name is required".into());
@@ -2288,6 +2873,9 @@ pub async fn mail_rename_folder(
     to: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::rename_folder(&state, &config.session_id, from.trim(), to.trim());
+    }
     let from = from.trim().to_string();
     let to = to.trim().to_string();
     if from.is_empty() || to.is_empty() {
@@ -2330,6 +2918,9 @@ pub async fn mail_delete_folder(
     name: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::delete_folder(&state, &config.session_id, name.trim());
+    }
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err("folder name is required".into());
@@ -3177,57 +3768,64 @@ fn connect_imap(
     account: &ResolvedMailAccount,
     runtime: &tokio::runtime::Handle,
 ) -> Result<ActiveImapSession, String> {
+    connect_imap_with_socket(account, runtime).map(|(session, _)| session)
+}
+
+/// Connect and also return a clone of the TCP socket, so a watcher can shut
+/// the connection down from another thread (e.g. to end a blocked IDLE).
+fn connect_imap_with_socket(
+    account: &ResolvedMailAccount,
+    runtime: &tokio::runtime::Handle,
+) -> Result<(ActiveImapSession, Option<TcpStream>), String> {
     let host = account.config.imap.host.trim();
     let port = account.config.imap.port;
     let (connect_host, connect_port, forward_task) =
         mail_effective_endpoint(account, host, port, runtime)?;
-    match account.config.imap.security {
+    let stream = tcp_connect(&connect_host, connect_port)?;
+    let socket = stream.try_clone().ok();
+    let trusted = account.config.imap.trusted_cert.as_deref();
+    let pinned = trusted.is_some_and(|value| !value.trim().is_empty());
+    let session = match account.config.imap.security {
         MailConnectionSecurity::Tls => {
-            let stream = tcp_connect(&connect_host, connect_port)?;
-            let connector = TlsConnector::builder()
-                .build()
-                .map_err(|e| format!("failed to build IMAP TLS connector: {e}"))?;
-            let tls_stream = connector
-                .connect(host, stream)
-                .map_err(|e| format!("IMAP TLS handshake failed: {e}"))?;
+            let connector = certs::tls_connector(trusted)?;
+            let tls_stream = connector.connect(host, stream).map_err(|e| {
+                certs::certificate_error_hint(&format!("IMAP TLS handshake failed: {e}"), pinned)
+            })?;
             let mut client = imap::Client::new(tls_stream);
             client
                 .read_greeting()
                 .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            Ok(ActiveImapSession::Tls {
+            ActiveImapSession::Tls {
                 session: authenticate_imap_client(client, account)?,
                 forward_task,
-            })
+            }
         }
         MailConnectionSecurity::Starttls => {
-            let stream = tcp_connect(&connect_host, connect_port)?;
             let mut client = imap::Client::new(stream);
             client
                 .read_greeting()
                 .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            let connector = TlsConnector::builder()
-                .build()
-                .map_err(|e| format!("failed to build IMAP STARTTLS connector: {e}"))?;
-            let client = client
-                .secure(host, &connector)
-                .map_err(|e| format!("IMAP STARTTLS failed: {e}"))?;
-            Ok(ActiveImapSession::Tls {
+            let connector = certs::tls_connector(trusted)?;
+            let client = client.secure(host, &connector).map_err(|e| {
+                certs::certificate_error_hint(&format!("IMAP STARTTLS failed: {e}"), pinned)
+            })?;
+            ActiveImapSession::Tls {
                 session: authenticate_imap_client(client, account)?,
                 forward_task,
-            })
+            }
         }
         MailConnectionSecurity::None => {
-            let stream = tcp_connect(&connect_host, connect_port)?;
             let mut client = imap::Client::new(stream);
             client
                 .read_greeting()
                 .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            Ok(ActiveImapSession::Plain {
+            ActiveImapSession::Plain {
                 session: authenticate_imap_client(client, account)?,
                 forward_task,
-            })
+            }
         }
-    }
+    };
+    Ok((session, socket))
 }
 
 fn mail_effective_endpoint(
@@ -3378,7 +3976,7 @@ fn imap_list_folders<T: Read + Write>(
         .list(None, Some("*"))
         .map_err(|e| format!("IMAP LIST failed: {e}"))?;
     let now = now_ts();
-    Ok(names
+    let mut listed: Vec<MailFolder> = names
         .iter()
         .map(|name| {
             let raw_name = name.name().to_string();
@@ -3390,16 +3988,20 @@ fn imap_list_folders<T: Read + Write>(
                 flags: name
                     .attributes()
                     .iter()
-                    .map(|attr| format!("{attr:?}"))
+                    .map(folders::attribute_string)
                     .collect(),
                 uid_validity: None,
                 uid_next: None,
                 total: None,
                 unread: None,
                 updated_at: now,
+                ..MailFolder::default()
             }
         })
-        .collect())
+        .collect();
+    drop(names);
+    folders::mark_subscribed(&mut listed, folders::imap_subscribed_names(session));
+    Ok(listed)
 }
 
 fn imap_unread_count<T: Read + Write>(
@@ -3493,16 +4095,6 @@ fn imap_page_uids_newest_first<T: Read + Write>(
     Ok((fetch_uids, has_more))
 }
 
-fn imap_recent_uids_for_limit<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    uid_next: Option<u32>,
-    exists: u32,
-    limit: usize,
-) -> Result<Vec<u32>, String> {
-    let (uids, _) = imap_page_uids_newest_first(session, uid_next, exists, 0, limit)?;
-    Ok(uids)
-}
-
 fn imap_sync_folder<T: Read + Write>(
     session: &mut imap::Session<T>,
     account: &ResolvedMailAccount,
@@ -3527,6 +4119,7 @@ fn imap_sync_folder<T: Read + Write>(
         total: Some(mailbox.exists),
         unread,
         updated_at: now_ts(),
+        ..MailFolder::default()
     };
 
     let offset = offset as usize;
@@ -3547,66 +4140,6 @@ fn imap_sync_folder<T: Read + Write>(
             .then(b.header.uid.cmp(&a.header.uid))
     });
     Ok((folder_info, messages, has_more))
-}
-
-fn imap_sync_folder_incremental<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    account: &ResolvedMailAccount,
-    folder: &str,
-    state: FolderSyncState,
-    limit: u32,
-    include_bodies: bool,
-) -> Result<(MailFolder, Vec<MailMessageCached>), String> {
-    let mailbox = session
-        .examine(folder)
-        .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
-    let unread = imap_unread_count(session, folder);
-    let account_id = &account.config.session_id;
-    let folder_info = MailFolder {
-        account_id: account_id.clone(),
-        name: folder.to_string(),
-        display_name: decode_imap_modified_utf7(folder),
-        delimiter: None,
-        flags: mailbox.flags.iter().map(|flag| flag.to_string()).collect(),
-        uid_validity: mailbox.uid_validity,
-        uid_next: mailbox.uid_next,
-        total: Some(mailbox.exists),
-        unread,
-        updated_at: now_ts(),
-    };
-
-    let limit = limit.max(1).min(2000) as usize;
-    let same_uid_validity = state.max_uid > 0
-        && (state.uid_validity.is_none()
-            || mailbox.uid_validity.is_none()
-            || state.uid_validity == mailbox.uid_validity);
-    let mut fetch_uids = if same_uid_validity {
-        let start_uid = state.max_uid.saturating_add(1);
-        let mut uids = session
-            .uid_search(format!("UID {start_uid}:*"))
-            .map_err(|e| format!("IMAP UID SEARCH incremental failed: {e}"))?
-            .into_iter()
-            .filter(|uid| *uid > state.max_uid)
-            .collect::<Vec<_>>();
-        uids.sort_unstable();
-        uids.into_iter().take(limit).collect::<Vec<_>>()
-    } else {
-        imap_recent_uids_for_limit(session, mailbox.uid_next, mailbox.exists, limit)?
-    };
-    fetch_uids.sort_unstable();
-    if fetch_uids.is_empty() {
-        return Ok((folder_info, Vec::new()));
-    }
-
-    let mut messages =
-        imap_fetch_messages_for_uids(session, account, folder, &fetch_uids, include_bodies)?;
-    messages.sort_by(|a, b| {
-        b.header
-            .date_ts
-            .cmp(&a.header.date_ts)
-            .then(b.header.uid.cmp(&a.header.uid))
-    });
-    Ok((folder_info, messages))
 }
 
 fn imap_fetch_messages_for_uids<T: Read + Write>(
@@ -3710,8 +4243,11 @@ fn imap_fetch_body<T: Read + Write>(
         .ok_or_else(|| format!("message UID {uid} not found in {folder}"))?;
     let mut message = parse_fetch_header(&account.config.session_id, folder, fetch)
         .unwrap_or_else(|| empty_cached_message(&account.config.session_id, folder, uid));
+    let truncated = fetch.size.is_some_and(|size| size as usize > raw_limit);
     if let Some(body) = fetch.body() {
-        save_raw_message(account, folder, uid, body)?;
+        if !truncated {
+            save_raw_message(account, folder, uid, body)?;
+        }
         let parsed = parse_body_message(
             &account.config.session_id,
             folder,
@@ -3721,6 +4257,24 @@ fn imap_fetch_body<T: Read + Write>(
             raw_limit,
         );
         merge_body(&mut message, parsed);
+    }
+    if truncated {
+        // TASK-15: the partial fetch cut the message; read the text parts
+        // whole and list every attachment from BODYSTRUCTURE instead.
+        match parts::imap_fetch_large_body(session, uid) {
+            Ok(large) => {
+                if large.text.is_some() || large.html.is_some() {
+                    message.body_text = large.text;
+                    message.body_html = large.html;
+                }
+                if !large.attachments.is_empty() {
+                    message.header.has_attachments = true;
+                    message.header.attachment_count = large.attachments.len();
+                    message.header.attachments = large.attachments;
+                }
+            }
+            Err(e) => log::debug!("mail: BODYSTRUCTURE fallback failed for UID {uid}: {e}"),
+        }
     }
     Ok(message)
 }
@@ -3944,10 +4498,21 @@ fn imap_download_attachment<T: Read + Write>(
     uid: u32,
     attachment_index: usize,
     target_path: &str,
+    section: Option<&str>,
 ) -> Result<MailDownloadAttachmentResult, String> {
     session
         .examine(folder)
         .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
+    if let Some(section) = section {
+        let bytes = parts::imap_fetch_section(session, uid, section)?;
+        let path = write_attachment_file(target_path, &bytes)?;
+        return Ok(MailDownloadAttachmentResult {
+            path,
+            name: None,
+            content_type: None,
+            size: bytes.len(),
+        });
+    }
     let fetches = session
         .uid_fetch(uid.to_string(), "(UID BODY.PEEK[])")
         .map_err(|e| format!("IMAP UID FETCH attachment failed: {e}"))?;
@@ -3959,19 +4524,39 @@ fn imap_download_attachment<T: Read + Write>(
         .body()
         .ok_or_else(|| format!("message UID {uid} did not include a body"))?;
     let attachment = extract_attachment(body, attachment_index)?;
+    let path = write_attachment_file(target_path, &attachment.bytes)?;
+    Ok(MailDownloadAttachmentResult {
+        path,
+        name: attachment.name,
+        content_type: attachment.content_type,
+        size: attachment.bytes.len(),
+    })
+}
+
+/// SMTP failure text, with a hint when the server rejected the size (AC-47).
+fn smtp_send_error(error: &str) -> String {
+    let lower = error.to_ascii_lowercase();
+    let too_big = lower.contains("552")
+        || lower.contains("message size")
+        || lower.contains("too large")
+        || lower.contains("exceeds") && lower.contains("size");
+    if too_big {
+        format!(
+            "SMTP send failed: the message is larger than this server accepts (SIZE limit). Remove or shrink attachments, or share them as links. Server said: {error}"
+        )
+    } else {
+        certs::certificate_error_hint(&format!("SMTP send failed: {error}"), false)
+    }
+}
+
+fn write_attachment_file(target_path: &str, bytes: &[u8]) -> Result<String, String> {
     let path = std::path::PathBuf::from(target_path);
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("failed to create attachment folder: {e}"))?;
     }
-    std::fs::write(&path, &attachment.bytes)
-        .map_err(|e| format!("failed to write attachment: {e}"))?;
-    Ok(MailDownloadAttachmentResult {
-        path: path.to_string_lossy().to_string(),
-        name: attachment.name,
-        content_type: attachment.content_type,
-        size: attachment.bytes.len(),
-    })
+    std::fs::write(&path, bytes).map_err(|e| format!("failed to write attachment: {e}"))?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 fn parse_fetch_header(
@@ -3982,9 +4567,16 @@ fn parse_fetch_header(
     let uid = fetch.uid?;
     let header = fetch.header().unwrap_or_default();
     let parsed = MessageParser::default().parse(header);
-    let flags = fetch.flags().iter().map(|flag| flag.to_string()).collect();
+    let flags = fetch_flag_strings(fetch);
     let fallback_date = fetch.internal_date().map(|d| d.timestamp());
-    let (message_id, subject, from, to, cc, date_ts) = match parsed {
+    let list_unsubscribe = parsed.as_ref().and_then(|message| {
+        lists::parse_list_unsubscribe(
+            message.header_raw("List-Unsubscribe"),
+            message.header_raw("List-Unsubscribe-Post"),
+        )
+    });
+    let receipt_to = parsed.as_ref().and_then(receipt_request);
+    let (message_id, subject, from, to, cc, date_ts, in_reply_to, references) = match parsed {
         Some(message) => (
             message.message_id().map(clean_message_id),
             message.subject().unwrap_or("").to_string(),
@@ -3992,6 +4584,8 @@ fn parse_fetch_header(
             address_list(message.to()),
             address_list(message.cc()),
             message.date().map(|d| d.to_timestamp()).or(fallback_date),
+            header_message_ids(message.in_reply_to()).into_iter().next(),
+            header_message_ids(message.references()),
         ),
         None => (
             None,
@@ -4000,6 +4594,8 @@ fn parse_fetch_header(
             Vec::new(),
             Vec::new(),
             fallback_date,
+            None,
+            Vec::new(),
         ),
     };
     Some(MailMessageCached {
@@ -4020,11 +4616,47 @@ fn parse_fetch_header(
             snippet: None,
             raw_size: fetch.size,
             body_cached: false,
+            in_reply_to,
+            references,
+            list_unsubscribe,
+            receipt_to,
         },
         body_text: None,
         body_html: None,
         body_cached_at: None,
+        internal_ts: fallback_date,
+        flags_authoritative: true,
     })
+}
+
+/// Message ids of an `In-Reply-To` / `References` header, angle brackets
+/// stripped, in header order.
+fn header_message_ids(value: &mail_parser::HeaderValue<'_>) -> Vec<String> {
+    let raw: Vec<String> = match value {
+        mail_parser::HeaderValue::Text(text) => vec![text.to_string()],
+        mail_parser::HeaderValue::TextList(list) => list.iter().map(|t| t.to_string()).collect(),
+        _ => Vec::new(),
+    };
+    raw.iter()
+        .flat_map(|part| {
+            part.split_whitespace()
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .map(|id| clean_message_id(&id))
+        .filter(|id| !id.is_empty())
+        .collect()
+}
+
+/// FLAGS of a FETCH response as cache strings. `\Recent` is session-scoped
+/// and never persisted.
+fn fetch_flag_strings(fetch: &imap::types::Fetch) -> Vec<String> {
+    fetch
+        .flags()
+        .iter()
+        .map(|flag| flag.to_string())
+        .filter(|flag| !flag.eq_ignore_ascii_case("\\Recent"))
+        .collect()
 }
 
 fn parse_body_message(
@@ -4072,10 +4704,16 @@ fn parse_body_message(
                         .map(|s| normalize_preview(s.as_ref())),
                     raw_size,
                     body_cached: true,
+                    in_reply_to: header_message_ids(message.in_reply_to()).into_iter().next(),
+                    references: header_message_ids(message.references()),
+                    list_unsubscribe: None,
+                    receipt_to: receipt_request(&message),
                 },
                 body_text: text,
                 body_html: html,
                 body_cached_at: Some(now_ts()),
+                internal_ts: None,
+                flags_authoritative: false,
             }
         }
         None => {
@@ -4098,13 +4736,30 @@ fn parse_body_message(
                     snippet: Some(normalize_preview(&text)),
                     raw_size,
                     body_cached: true,
+                    in_reply_to: None,
+                    references: Vec::new(),
+                    list_unsubscribe: None,
+                    receipt_to: None,
                 },
                 body_text: Some(text),
                 body_html: None,
                 body_cached_at: Some(now_ts()),
+                internal_ts: None,
+                flags_authoritative: false,
             }
         }
     }
+}
+
+/// Receipt address of a read-receipt request (RFC 8098 §2.1).
+fn receipt_request(message: &mail_parser::Message<'_>) -> Option<String> {
+    let raw = message.header_raw("Disposition-Notification-To")?;
+    let address = match (raw.find('<'), raw.rfind('>')) {
+        (Some(start), Some(end)) if end > start => &raw[start + 1..end],
+        _ => raw,
+    };
+    let address = address.trim();
+    address.contains('@').then(|| address.to_string())
 }
 
 fn merge_body(target: &mut MailMessageCached, body: MailMessageCached) {
@@ -4125,6 +4780,18 @@ fn merge_body(target: &mut MailMessageCached, body: MailMessageCached) {
     }
     if target.header.date_ts.is_none() {
         target.header.date_ts = body.header.date_ts;
+    }
+    if target.header.in_reply_to.is_none() {
+        target.header.in_reply_to = body.header.in_reply_to;
+    }
+    if target.header.references.is_empty() {
+        target.header.references = body.header.references;
+    }
+    if target.header.receipt_to.is_none() {
+        target.header.receipt_to = body.header.receipt_to.clone();
+    }
+    if target.header.list_unsubscribe.is_none() {
+        target.header.list_unsubscribe = body.header.list_unsubscribe;
     }
     target.header.has_attachments = body.header.has_attachments;
     target.header.attachment_count = body.header.attachment_count;
@@ -4156,27 +4823,52 @@ fn empty_cached_message(account_id: &str, folder: &str, uid: u32) -> MailMessage
             snippet: None,
             raw_size: None,
             body_cached: false,
+            in_reply_to: None,
+            references: Vec::new(),
+            list_unsubscribe: None,
+            receipt_to: None,
         },
         body_text: None,
         body_html: None,
         body_cached_at: None,
+        internal_ts: None,
+        flags_authoritative: false,
     }
 }
 
-fn send_smtp(
+/// `References` header value: ancestry plus the direct parent, de-duplicated,
+/// oldest first, each in angle brackets.
+fn thread_references(references: &[String], in_reply_to: Option<&str>) -> String {
+    let mut ids: Vec<String> = Vec::new();
+    for id in references.iter().map(String::as_str).chain(in_reply_to) {
+        let id = clean_message_id(id);
+        if !id.is_empty() && !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
+    ids.iter()
+        .map(|id| format!("<{id}>"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn send_smtp_with(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
     runtime: &tokio::runtime::Handle,
+    options: &MessageBuildOptions,
 ) -> Result<MailSendResult, String> {
-    let message = build_send_message(account, request)?;
+    let message = build_send_message_with(account, request, options)?;
     let transport = build_smtp_transport(account, runtime)?;
     let response = transport
         .mailer
         .send(&message)
-        .map_err(|e| format!("SMTP send failed: {e}"))?;
+        .map_err(|e| smtp_send_error(&e.to_string()))?;
     Ok(MailSendResult {
         accepted: true,
         response: format!("{response:?}"),
+        sent_copy_folder: None,
+        sent_copy_error: None,
     })
 }
 
@@ -4213,16 +4905,13 @@ fn build_smtp_transport(
     if account.auth_mode == MailAuthMode::OAuth2 {
         builder = builder.authentication(vec![Mechanism::Xoauth2]);
     }
+    let trusted = account.config.smtp.trusted_cert.as_deref();
     builder = match account.config.smtp.security {
         MailConnectionSecurity::Tls => {
-            let params = TlsParameters::new(host.to_string())
-                .map_err(|e| format!("SMTP TLS parameters failed: {e}"))?;
-            builder.tls(Tls::Wrapper(params))
+            builder.tls(Tls::Wrapper(certs::smtp_tls_parameters(host, trusted)?))
         }
         MailConnectionSecurity::Starttls => {
-            let params = TlsParameters::new(host.to_string())
-                .map_err(|e| format!("SMTP STARTTLS parameters failed: {e}"))?;
-            builder.tls(Tls::Required(params))
+            builder.tls(Tls::Required(certs::smtp_tls_parameters(host, trusted)?))
         }
         MailConnectionSecurity::None => builder.tls(Tls::None),
     };
@@ -4236,21 +4925,63 @@ fn build_send_message(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
 ) -> Result<Message, String> {
-    let from = Mailbox::new(
-        account.config.display_name.clone().and_then(non_empty),
-        account
-            .config
-            .email_address
-            .parse()
-            .map_err(|e| format!("invalid from address: {e}"))?,
-    );
+    build_send_message_with(account, request, &MessageBuildOptions::default())
+}
+
+/// Knobs for the stored copies of a message (Sent copy, server draft).
+#[derive(Debug, Default)]
+pub(super) struct MessageBuildOptions {
+    /// Explicit `Message-ID` (with brackets) so the SMTP message and its
+    /// stored copy share one id and the copy can be found again.
+    pub message_id: Option<String>,
+    /// Keep the `Bcc` header (Sent copies do, like Thunderbird).
+    pub keep_bcc: bool,
+    /// Drafts may have no recipients: address the envelope to the sender.
+    pub self_envelope: bool,
+}
+
+fn build_send_message_with(
+    account: &ResolvedMailAccount,
+    request: &MailSendRequest,
+    options: &MessageBuildOptions,
+) -> Result<Message, String> {
+    let from = match request
+        .from
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
+        Some(identity) => parse_mailbox(identity)?,
+        None => Mailbox::new(
+            account.config.display_name.clone().and_then(non_empty),
+            account
+                .config
+                .email_address
+                .parse()
+                .map_err(|e| format!("invalid from address: {e}"))?,
+        ),
+    };
+    let from_address = from.email.clone();
+    let receipt_address = from_address.to_string();
     let mut builder = Message::builder()
         .from(from)
         .subject(request.subject.trim());
-    if let Some(reply_to) = account
-        .config
+    if let Some(message_id) = &options.message_id {
+        builder = builder.message_id(Some(message_id.clone()));
+    }
+    if options.keep_bcc {
+        builder = builder.keep_bcc();
+    }
+    if options.self_envelope {
+        let envelope =
+            lettre::address::Envelope::new(Some(from_address.clone()), vec![from_address])
+                .map_err(|e| format!("invalid draft envelope: {e}"))?;
+        builder = builder.envelope(envelope);
+    }
+    if let Some(reply_to) = request
         .reply_to
         .as_deref()
+        .or(account.config.reply_to.as_deref())
         .map(str::trim)
         .filter(|v| !v.is_empty())
     {
@@ -4264,6 +4995,22 @@ fn build_send_message(
     }
     for bcc in &request.bcc {
         builder = builder.bcc(parse_mailbox(bcc)?);
+    }
+    if let Some(parent) = request
+        .in_reply_to
+        .as_deref()
+        .map(clean_message_id)
+        .filter(|id| !id.is_empty())
+    {
+        builder = builder.in_reply_to(format!("<{parent}>"));
+    }
+    let references = thread_references(&request.references, request.in_reply_to.as_deref());
+    if !references.is_empty() {
+        builder = builder.references(references);
+    }
+    if request.request_read_receipt {
+        // Receipts go to the visible sender (identity), like Thunderbird.
+        builder = builder.header(DispositionNotificationTo(format!("<{receipt_address}>")));
     }
 
     let body = build_send_body_part(request)?;
@@ -4514,28 +5261,6 @@ fn cache_sync_result(
     tx.commit()
 }
 
-fn cache_sync_all_result(
-    conn: &Connection,
-    account_id: &str,
-    folders: &[MailFolder],
-    messages: &[MailMessageCached],
-    cache: &MailCacheSettings,
-) -> SqlResult<()> {
-    let tx = conn.unchecked_transaction()?;
-    for folder in folders {
-        reset_folder_if_uid_validity_changed(&tx, folder)?;
-        upsert_folder(&tx, folder)?;
-    }
-    for message in messages {
-        upsert_message(&tx, message)?;
-    }
-    for folder in folders {
-        prune_mail_cache(&tx, account_id, &folder.name, cache)?;
-    }
-    reindex_cached_contacts(&tx, account_id)?;
-    tx.commit()
-}
-
 fn reset_folder_if_uid_validity_changed(conn: &Connection, folder: &MailFolder) -> SqlResult<()> {
     let Some(next_uid_validity) = folder.uid_validity else {
         return Ok(());
@@ -4549,10 +5274,7 @@ fn reset_folder_if_uid_validity_changed(conn: &Connection, folder: &MailFolder) 
         .optional()?;
     if let Some(Some(current_uid_validity)) = current {
         if current_uid_validity as u32 != next_uid_validity {
-            conn.execute(
-                "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
-                params![folder.account_id, folder.name],
-            )?;
+            sync::reset_folder_cache(conn, &folder.account_id, &folder.name)?;
         }
     }
     Ok(())
@@ -4598,9 +5320,10 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
         "INSERT INTO mail_messages
          (account_id, folder, uid, message_id, subject, from_name, from_addr,
           to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
-          attachments_json, snippet, body_text, body_html, body_cached_at, raw_size, updated_at)
+          attachments_json, snippet, body_text, body_html, body_cached_at, raw_size, updated_at,
+          internal_ts, in_reply_to, references_json, list_unsubscribe_json, receipt_to)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-                 ?15, ?16, ?17, ?18, ?19, ?20)
+                 ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?23, ?24, ?25, ?26)
          ON CONFLICT(account_id, folder, uid) DO UPDATE SET
             message_id = COALESCE(excluded.message_id, mail_messages.message_id),
             subject = CASE WHEN excluded.subject != '' THEN excluded.subject ELSE mail_messages.subject END,
@@ -4609,7 +5332,13 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
             to_json = CASE WHEN excluded.to_json != '[]' THEN excluded.to_json ELSE mail_messages.to_json END,
             cc_json = CASE WHEN excluded.cc_json != '[]' THEN excluded.cc_json ELSE mail_messages.cc_json END,
             date_ts = COALESCE(excluded.date_ts, mail_messages.date_ts),
-            flags_json = CASE WHEN excluded.flags_json != '[]' THEN excluded.flags_json ELSE mail_messages.flags_json END,
+            flags_json = CASE WHEN ?22 = 1 OR excluded.flags_json != '[]' THEN excluded.flags_json ELSE mail_messages.flags_json END,
+            internal_ts = COALESCE(excluded.internal_ts, mail_messages.internal_ts),
+            in_reply_to = COALESCE(excluded.in_reply_to, mail_messages.in_reply_to),
+            references_json = CASE WHEN excluded.references_json != '[]'
+                                   THEN excluded.references_json ELSE mail_messages.references_json END,
+            list_unsubscribe_json = COALESCE(excluded.list_unsubscribe_json, mail_messages.list_unsubscribe_json),
+            receipt_to = COALESCE(excluded.receipt_to, mail_messages.receipt_to),
             has_attachments = CASE
                 WHEN excluded.attachments_json != '[]' OR excluded.has_attachments = 1
                 THEN excluded.has_attachments
@@ -4648,6 +5377,15 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
             message.body_cached_at,
             header.raw_size,
             now_ts(),
+            message.internal_ts,
+            message.flags_authoritative as i64,
+            header.in_reply_to,
+            serde_json::to_string(&header.references).unwrap_or_else(|_| "[]".into()),
+            header
+                .list_unsubscribe
+                .as_ref()
+                .and_then(|list| serde_json::to_string(list).ok()),
+            header.receipt_to,
         ],
     )?;
     Ok(())
@@ -5012,25 +5750,51 @@ fn prune_mail_cache(
     folder: &str,
     cache: &MailCacheSettings,
 ) -> SqlResult<()> {
+    // POP3 mail exists only locally: never prune it (TASK-21).
+    if pop3::has_local_store(conn, account_id)? {
+        return Ok(());
+    }
+    // Header pruning only ever cuts the low (oldest-UID) end so the cached span
+    // stays contiguous; `sync::apply_prune_cut` moves the watermark with it.
+    // Retention uses the server arrival time (INTERNALDATE), not the sender's
+    // `Date:` header, so a freshly delivered but back-dated message survives.
+    let mut cut: Option<u32> = None;
+    if cache.header_limit_per_folder > 0 {
+        let first_dropped: Option<u32> = conn
+            .query_row(
+                "SELECT uid FROM mail_messages
+                 WHERE account_id = ?1 AND folder = ?2
+                 ORDER BY uid DESC
+                 LIMIT 1 OFFSET ?3",
+                params![account_id, folder, cache.header_limit_per_folder],
+                |row| row.get(0),
+            )
+            .optional()?;
+        cut = first_dropped.map(|uid| uid.saturating_add(1));
+    }
     if cache.header_retention_days > 0 {
         let cutoff = now_ts() - (cache.header_retention_days as i64 * 86_400);
-        conn.execute(
-            "DELETE FROM mail_messages
-             WHERE account_id = ?1 AND folder = ?2 AND date_ts IS NOT NULL AND date_ts < ?3",
+        let (oldest_recent, max_uid): (Option<u32>, Option<u32>) = conn.query_row(
+            "SELECT
+                MIN(CASE WHEN COALESCE(internal_ts, date_ts) IS NULL
+                          OR COALESCE(internal_ts, date_ts) >= ?3 THEN uid END),
+                MAX(uid)
+             FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
             params![account_id, folder, cutoff],
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )?;
+        let retention_cut = match (oldest_recent, max_uid) {
+            (Some(uid), _) => Some(uid),
+            (None, Some(max_uid)) => Some(max_uid.saturating_add(1)),
+            (None, None) => None,
+        };
+        cut = match (cut, retention_cut) {
+            (Some(a), Some(b)) => Some(a.max(b)),
+            (a, b) => a.or(b),
+        };
     }
-    if cache.header_limit_per_folder > 0 {
-        conn.execute(
-            "DELETE FROM mail_messages
-             WHERE rowid IN (
-                SELECT rowid FROM mail_messages
-                WHERE account_id = ?1 AND folder = ?2
-                ORDER BY uid DESC
-                LIMIT -1 OFFSET ?3
-             )",
-            params![account_id, folder, cache.header_limit_per_folder],
-        )?;
+    if let Some(cut) = cut {
+        sync::apply_prune_cut(conn, account_id, folder, cut)?;
     }
     if cache.body_recent_limit == 0 {
         conn.execute(
@@ -5058,15 +5822,20 @@ fn prune_mail_cache(
 
 fn list_cached_folders(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailFolder>> {
     let mut stmt = conn.prepare(
-        "SELECT account_id, name, delimiter, flags_json, uid_validity, uid_next,
-                total, unread, updated_at
-         FROM mail_folders
-         WHERE account_id = ?1
-         ORDER BY CASE WHEN name = 'INBOX' THEN 0 ELSE 1 END, name COLLATE NOCASE",
+        "SELECT f.account_id, f.name, f.delimiter, f.flags_json, f.uid_validity, f.uid_next,
+                f.total, f.unread, f.updated_at, f.sync_low_uid, f.sync_high_uid,
+                f.sync_complete, f.last_error,
+                (SELECT COUNT(*) FROM mail_messages m
+                  WHERE m.account_id = f.account_id AND m.folder = f.name)
+         FROM mail_folders f
+         WHERE f.account_id = ?1
+         ORDER BY CASE WHEN f.name = 'INBOX' THEN 0 ELSE 1 END, f.name COLLATE NOCASE",
     )?;
     let rows = stmt.query_map(params![account_id], |row| {
         let flags_json: String = row.get(3)?;
         let name: String = row.get(1)?;
+        let complete: i64 = row.get(11)?;
+        let cached_count: i64 = row.get(13)?;
         Ok(MailFolder {
             account_id: row.get(0)?,
             display_name: decode_imap_modified_utf7(&name),
@@ -5078,41 +5847,14 @@ fn list_cached_folders(conn: &Connection, account_id: &str) -> SqlResult<Vec<Mai
             total: row.get(6)?,
             unread: row.get(7)?,
             updated_at: row.get(8)?,
+            sync_low_uid: row.get(9)?,
+            sync_high_uid: row.get(10)?,
+            sync_complete: complete != 0,
+            cached_count: Some(cached_count.max(0) as u32),
+            last_error: row.get(12)?,
         })
     })?;
     rows.collect()
-}
-
-fn cached_folder_sync_states(
-    conn: &Connection,
-    account_id: &str,
-) -> SqlResult<HashMap<String, FolderSyncState>> {
-    let mut stmt = conn.prepare(
-        "SELECT f.name, f.uid_validity, COALESCE(MAX(m.uid), 0)
-         FROM mail_folders f
-         LEFT JOIN mail_messages m
-           ON m.account_id = f.account_id AND m.folder = f.name
-         WHERE f.account_id = ?1
-         GROUP BY f.name, f.uid_validity",
-    )?;
-    let rows = stmt.query_map(params![account_id], |row| {
-        let name: String = row.get(0)?;
-        let uid_validity: Option<i64> = row.get(1)?;
-        let max_uid: i64 = row.get(2)?;
-        Ok((
-            name,
-            FolderSyncState {
-                max_uid: max_uid.max(0) as u32,
-                uid_validity: uid_validity.map(|value| value as u32),
-            },
-        ))
-    })?;
-    let mut states = HashMap::new();
-    for row in rows {
-        let (name, state) = row?;
-        states.insert(name, state);
-    }
-    Ok(states)
 }
 
 fn list_cached_messages(
@@ -5125,7 +5867,8 @@ fn list_cached_messages(
     let mut stmt = conn.prepare(
         "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
                 to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
-                attachments_json, snippet, raw_size, body_cached_at
+                attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
+                list_unsubscribe_json, receipt_to
          FROM mail_messages
          WHERE account_id = ?1 AND folder = ?2
          ORDER BY COALESCE(date_ts, 0) DESC, uid DESC
@@ -5133,6 +5876,26 @@ fn list_cached_messages(
     )?;
     let rows = stmt.query_map(params![account_id, folder, limit, offset], row_to_header)?;
     rows.collect()
+}
+
+/// One cached header.
+fn cached_header(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uid: u32,
+) -> SqlResult<Option<MailMessageHeader>> {
+    conn.query_row(
+        "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
+                to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
+                attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
+                list_unsubscribe_json, receipt_to
+         FROM mail_messages
+         WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+        params![account_id, folder, uid],
+        row_to_header,
+    )
+    .optional()
 }
 
 fn unread_cached_uids(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<Vec<u32>> {
@@ -5183,9 +5946,16 @@ fn mark_cached_messages_read(
         let next_flags_json = serde_json::to_string(&flags).unwrap_or_else(|_| "[]".into());
         conn.execute(
             "UPDATE mail_messages
-             SET flags_json = ?4, updated_at = ?5
+             SET flags_json = ?4, updated_at = ?5, flags_local_at = ?6
              WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
-            params![account_id, folder, *uid as i64, next_flags_json, now_ts()],
+            params![
+                account_id,
+                folder,
+                *uid as i64,
+                next_flags_json,
+                now_ts(),
+                sync::now_ms()
+            ],
         )?;
         changed += 1;
     }
@@ -5246,9 +6016,16 @@ fn update_cached_flags(
         let next_flags_json = serde_json::to_string(&flags).unwrap_or_else(|_| "[]".into());
         conn.execute(
             "UPDATE mail_messages
-             SET flags_json = ?4, updated_at = ?5
+             SET flags_json = ?4, updated_at = ?5, flags_local_at = ?6
              WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
-            params![account_id, folder, *uid as i64, next_flags_json, now_ts()],
+            params![
+                account_id,
+                folder,
+                *uid as i64,
+                next_flags_json,
+                now_ts(),
+                sync::now_ms()
+            ],
         )?;
     }
     Ok(())
@@ -5304,7 +6081,8 @@ fn get_cached_body(
     conn.query_row(
         "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
                 to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
-                attachments_json, snippet, raw_size, body_cached_at, body_text, body_html
+                attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
+                list_unsubscribe_json, receipt_to, body_text, body_html
          FROM mail_messages
          WHERE account_id = ?1 AND folder = ?2 AND uid = ?3
            AND body_cached_at IS NOT NULL
@@ -5312,8 +6090,8 @@ fn get_cached_body(
         params![account_id, folder, uid],
         |row| {
             let mut header = row_to_header(row)?;
-            let body_text: Option<String> = row.get(17)?;
-            let body_html: Option<String> = row.get(18)?;
+            let body_text: Option<String> = row.get(21)?;
+            let body_html: Option<String> = row.get(22)?;
             header.body_cached = true;
             Ok(MailMessageBody {
                 account_id: header.account_id,
@@ -5367,6 +6145,15 @@ fn row_to_header(row: &rusqlite::Row<'_>) -> SqlResult<MailMessageHeader> {
         snippet: row.get(14)?,
         raw_size: row.get(15)?,
         body_cached: body_cached_at.is_some(),
+        in_reply_to: row.get(17)?,
+        references: row
+            .get::<_, Option<String>>(18)?
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_default(),
+        list_unsubscribe: row
+            .get::<_, Option<String>>(19)?
+            .and_then(|json| serde_json::from_str(&json).ok()),
+        receipt_to: row.get(20)?,
     })
 }
 
@@ -5422,6 +6209,7 @@ fn attachment_info(part: &mail_parser::MessagePart<'_>) -> MailAttachmentInfo {
         name: part.attachment_name().map(ToOwned::to_owned),
         content_type,
         size,
+        section: None,
     }
 }
 
@@ -5672,12 +6460,14 @@ fn default_true() -> bool {
     true
 }
 
+/// 0 = keep every header (full local header index).
 fn default_header_retention_days() -> u32 {
-    30
+    0
 }
 
+/// 0 = no per-folder header cap.
 fn default_header_limit_per_folder() -> u32 {
-    2000
+    0
 }
 
 fn default_body_recent_limit() -> u32 {
@@ -5755,6 +6545,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 total: Some(9),
                 unread: Some(2),
                 updated_at: 1,
+                ..MailFolder::default()
             },
             MailFolder {
                 account_id: "acct".into(),
@@ -5767,6 +6558,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 total: Some(2),
                 unread: Some(0),
                 updated_at: 1,
+                ..MailFolder::default()
             },
         ];
         let selected = MailFolder {
@@ -5780,6 +6572,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             total: Some(14),
             unread: Some(4),
             updated_at: 99,
+            ..MailFolder::default()
         };
         let merged = folders_for_header_sync(base, selected);
         assert_eq!(merged.len(), 2);
@@ -5971,6 +6764,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     username: Some("sender@example.com".into()),
                     password: Some("secret".into()),
                     security: MailConnectionSecurity::Tls,
+                    trusted_cert: None,
                 },
                 smtp: MailSmtpConfig {
                     host: "smtp.example.com".into(),
@@ -5979,12 +6773,19 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     password: Some("secret".into()),
                     security: MailConnectionSecurity::Tls,
                     use_imap_auth: true,
+                    trusted_cert: None,
                 },
                 oauth: MailOAuthSettings::default(),
                 network_settings: None,
                 sync: MailSyncSettings::default(),
                 cache: MailCacheSettings::default(),
                 ai: MailAiSettings::default(),
+                save_sent_copy: None,
+                special_folders: HashMap::new(),
+                incoming: MailIncomingProtocol::Imap,
+                pop3_leave_days: None,
+                carddav: None,
+                caldav: None,
             },
             auth_mode: MailAuthMode::Password,
             network_settings: None,
@@ -6179,6 +6980,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     username: Some(email.into()),
                     password: None,
                     security: MailConnectionSecurity::Tls,
+                    trusted_cert: None,
                 },
                 smtp: MailSmtpConfig {
                     host: smtp_host.into(),
@@ -6187,6 +6989,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     password: None,
                     security: MailConnectionSecurity::Starttls,
                     use_imap_auth: true,
+                    trusted_cert: None,
                 },
                 oauth: MailOAuthSettings {
                     client_id: Some(client_id.into()),
@@ -6200,6 +7003,12 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 sync: MailSyncSettings::default(),
                 cache: MailCacheSettings::default(),
                 ai: MailAiSettings::default(),
+                save_sent_copy: None,
+                special_folders: HashMap::new(),
+                incoming: MailIncomingProtocol::Imap,
+                pop3_leave_days: None,
+                carddav: None,
+                caldav: None,
             },
             auth_mode: MailAuthMode::OAuth2,
             network_settings: None,
@@ -6479,6 +7288,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             total: Some(1),
             unread: Some(0),
             updated_at: now_ts(),
+            ..MailFolder::default()
         };
         cache_sync_result(
             &conn,
@@ -6525,10 +7335,27 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
     }
 
     #[test]
+    fn smtp_size_rejections_get_a_hint() {
+        assert!(
+            smtp_send_error("permanent error (552): 5.3.4 Message size exceeds fixed limit")
+                .contains("SIZE limit")
+        );
+        assert_eq!(
+            smtp_send_error("permanent error (550): no such user"),
+            "SMTP send failed: permanent error (550): no such user"
+        );
+    }
+
+    #[test]
     fn sent_contacts_raise_sent_source() {
         let conn = Connection::open_in_memory().unwrap();
         init_mail_tables(&conn).unwrap();
         let request = MailSendRequest {
+            in_reply_to: None,
+            references: Vec::new(),
+            draft_id: None,
+            from: None,
+            reply_to: None,
             to: vec!["Receiver <receiver@example.com>".into()],
             cc: vec![],
             bcc: vec![],
@@ -6536,6 +7363,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             text_body: Some("Body".into()),
             html_body: None,
             attachments: vec![],
+            request_read_receipt: false,
         };
 
         assert_eq!(upsert_sent_contacts(&conn, "acct", &request).unwrap(), 1);
@@ -6544,6 +7372,136 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
         assert_eq!(contacts.len(), 1);
         assert_eq!(contacts[0].name.as_deref(), Some("Receiver"));
         assert_eq!(contacts[0].source, "sent");
+    }
+
+    #[test]
+    fn build_send_message_threads_replies_and_keeps_bcc_for_copies() {
+        let request = MailSendRequest {
+            to: vec!["Receiver <receiver@example.com>".into()],
+            cc: vec![],
+            bcc: vec!["hidden@example.com".into()],
+            subject: "Re: Plan".into(),
+            text_body: Some("Reply".into()),
+            html_body: None,
+            attachments: vec![],
+            in_reply_to: Some("parent@example.com".into()),
+            references: vec!["<root@example.com>".into(), "parent@example.com".into()],
+            draft_id: None,
+            from: None,
+            reply_to: None,
+            request_read_receipt: false,
+        };
+        let account = sample_resolved_account();
+        let raw =
+            String::from_utf8(build_send_message(&account, &request).unwrap().formatted()).unwrap();
+        assert!(raw.contains("In-Reply-To: <parent@example.com>"), "{raw}");
+        assert!(
+            raw.contains("References: <root@example.com> <parent@example.com>"),
+            "{raw}"
+        );
+        assert!(
+            !raw.contains("hidden@example.com"),
+            "SMTP message omits Bcc"
+        );
+        assert!(!raw.contains("Disposition-Notification-To"), "{raw}");
+        let receipt = MailSendRequest {
+            request_read_receipt: true,
+            ..request.clone()
+        };
+        let raw =
+            String::from_utf8(build_send_message(&account, &receipt).unwrap().formatted()).unwrap();
+        assert!(
+            raw.contains("Disposition-Notification-To: <sender@example.com>"),
+            "{raw}"
+        );
+
+        let copy = build_send_message_with(
+            &account,
+            &request,
+            &MessageBuildOptions {
+                message_id: Some("<fixed@example.com>".into()),
+                keep_bcc: true,
+                self_envelope: false,
+            },
+        )
+        .unwrap();
+        let raw = String::from_utf8(copy.formatted()).unwrap();
+        assert!(raw.contains("hidden@example.com"), "Sent copy keeps Bcc");
+        assert!(raw.contains("Message-ID: <fixed@example.com>"), "{raw}");
+    }
+
+    #[test]
+    fn identity_overrides_from_and_reply_to() {
+        let request = MailSendRequest {
+            to: vec!["receiver@example.com".into()],
+            cc: vec![],
+            bcc: vec![],
+            subject: "Hi".into(),
+            text_body: Some("Body".into()),
+            html_body: None,
+            attachments: vec![],
+            in_reply_to: None,
+            references: vec![],
+            draft_id: None,
+            from: Some("Support <support@example.com>".into()),
+            reply_to: Some("help@example.com".into()),
+            request_read_receipt: false,
+        };
+        let message = build_send_message(&sample_resolved_account(), &request).unwrap();
+        let raw = String::from_utf8(message.formatted()).unwrap();
+        assert!(raw.contains("From: Support <support@example.com>"), "{raw}");
+        assert!(raw.contains("Reply-To: help@example.com"), "{raw}");
+        assert_eq!(
+            message.envelope().from().unwrap().to_string(),
+            "support@example.com"
+        );
+    }
+
+    #[test]
+    fn draft_envelope_allows_messages_without_recipients() {
+        let request = MailSendRequest {
+            to: vec![],
+            cc: vec![],
+            bcc: vec![],
+            subject: String::new(),
+            text_body: Some("half written".into()),
+            html_body: None,
+            attachments: vec![],
+            in_reply_to: None,
+            references: vec![],
+            draft_id: None,
+            from: None,
+            reply_to: None,
+            request_read_receipt: false,
+        };
+        let options = MessageBuildOptions {
+            self_envelope: true,
+            ..MessageBuildOptions::default()
+        };
+        let raw = build_send_message_with(&sample_resolved_account(), &request, &options)
+            .unwrap()
+            .formatted();
+        assert!(String::from_utf8(raw).unwrap().contains("half written"));
+    }
+
+    #[test]
+    fn parses_thread_headers_from_fetched_headers() {
+        let raw = b"Subject: Re: x
+Message-ID: <c@x>
+In-Reply-To: <b@x>
+References: <a@x>
+ <b@x>
+
+";
+        let parsed = MessageParser::default().parse(&raw[..]).unwrap();
+        assert_eq!(
+            header_message_ids(parsed.in_reply_to()),
+            vec!["b@x".to_string()]
+        );
+        assert_eq!(
+            header_message_ids(parsed.references()),
+            vec!["a@x".to_string(), "b@x".to_string()]
+        );
     }
 
     #[test]
@@ -6558,6 +7516,11 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             subject: "Hello".into(),
             text_body: Some("Plain body".into()),
             html_body: Some("<p><strong>HTML body</strong></p>".into()),
+            in_reply_to: None,
+            references: Vec::new(),
+            draft_id: None,
+            from: None,
+            reply_to: None,
             attachments: vec![MailSendAttachment {
                 path: path.to_string_lossy().into_owned(),
                 name: Some("report.txt".into()),
@@ -6565,6 +7528,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 inline: false,
                 content_id: None,
             }],
+            request_read_receipt: false,
         };
 
         let message = build_send_message(&sample_resolved_account(), &request).unwrap();
@@ -6581,6 +7545,11 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
         let path = dir.path().join("logo.png");
         std::fs::write(&path, b"png body").unwrap();
         let request = MailSendRequest {
+            in_reply_to: None,
+            references: Vec::new(),
+            draft_id: None,
+            from: None,
+            reply_to: None,
             to: vec!["Receiver <receiver@example.com>".into()],
             cc: vec![],
             bcc: vec![],
@@ -6594,6 +7563,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 inline: true,
                 content_id: Some("logo-1@inline.local".into()),
             }],
+            request_read_receipt: false,
         };
 
         let message = build_send_message(&sample_resolved_account(), &request).unwrap();
@@ -6613,6 +7583,11 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
         std::fs::write(&image_path, b"png body").unwrap();
         std::fs::write(&report_path, b"report body").unwrap();
         let request = MailSendRequest {
+            in_reply_to: None,
+            references: Vec::new(),
+            draft_id: None,
+            from: None,
+            reply_to: None,
             to: vec!["Receiver <receiver@example.com>".into()],
             cc: vec![],
             bcc: vec![],
@@ -6635,6 +7610,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     content_id: None,
                 },
             ],
+            request_read_receipt: false,
         };
 
         let message = build_send_message(&sample_resolved_account(), &request).unwrap();
@@ -6676,6 +7652,9 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     uid: Some(42),
                     message_id: Some("msg@example.com".into()),
                     subject: Some("Original".into()),
+                    references: Vec::new(),
+                    identity_id: None,
+                    outbox: None,
                 }),
                 remote_draft_folder: None,
                 remote_draft_uid: None,
@@ -6756,6 +7735,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     total: None,
                     unread: None,
                     updated_at: now_ts(),
+                    ..MailFolder::default()
                 },
             )
             .unwrap();

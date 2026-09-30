@@ -1,0 +1,131 @@
+id: TC-MAIL-FILTER-01
+title: Mail filter created in the filter dialog moves matching new mail out of the Inbox
+description: 'TASK-13 (docs-feature/mail-thunderbird-parity-design.md AC-40, DEC-11).
+
+  Creates a filter "Subject contains Filtered -> Move to Archive" in the
+
+  Message filters dialog, delivers one matching and one non-matching message,
+
+  syncs, and requires the server to hold the matching message in Archive and
+
+  only the other one in INBOX. Manual runs, failures (AC-41/AC-42), body
+
+  conditions and the rule semantics are covered by Rust and Vitest tests.
+
+  Browser mode drives the stub filter engine (renderer orchestration only);
+
+  native mode runs the Rust filter engine against the in-process fake IMAP
+
+  server started by the mail_server fixture.
+
+  '
+covers:
+- F-MAIL-19
+tags:
+- mail
+- p2
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- click: '[data-testid="mail-filters-open"]'
+- click: '[data-testid="mail-filter-new"]'
+- fill:
+    selector: '[data-testid="mail-filter-name"]'
+    value: QA archive
+- select_option:
+    selector: '[data-testid="mail-filter-condition-field"]'
+    value: subject
+- fill:
+    selector: '[data-testid="mail-filter-condition-value"]'
+    value: Filtered
+- select_option:
+    selector: '[data-testid="mail-filter-action-folder"]'
+    value: Archive
+- click: '[data-testid="mail-filter-save"]'
+- wait_for:
+    selector: '[data-testid="mail-filter-row"][data-filter-name="QA archive"]'
+    timeout_sec: 20
+- click: '[data-testid="mail-filters-close"]'
+- mail_server_deliver:
+    count: 1
+    prefix: Filtered
+- mail_server_deliver:
+    count: 1
+    prefix: Keep
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_folder_count:
+    folder: Archive
+    has_subject: Filtered 0001
+    timeout_sec: 60
+- mail_server_assert_folder_count:
+    folder: INBOX
+    has_subject: Keep 0001
+    lacks_subject: Filtered 0001
+    timeout_sec: 20
+- screenshot: mail-filter-01-after-sync.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 在“Message filters”对话框中创建多字段规则（主题包含 Filtered → 移动到 Archive）并保存，规则出现在列表中（DEC-11）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 16
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-filter-row\"][data-filter-name=\"QA archive\"]", "timeout_sec": 20}}'
+    results:
+    - 16
+  - id: R2
+    requirement: 同步到达的新邮件经收信过滤器处理：匹配的邮件在服务器上被移入 Archive，不匹配的留在 INBOX（AC-40）。
+    actions:
+    - 17
+    - 18
+    - 19
+    - 20
+    checkpoints:
+    - step: 21
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Archive", "has_subject": "Filtered 0001", "timeout_sec": 60}}'
+    - step: 22
+      expectation: '{"mail_server_assert_folder_count": {"folder": "INBOX", "has_subject": "Keep 0001", "lacks_subject": "Filtered 0001", "timeout_sec": 20}}'
+    results:
+    - 21
+    - 22
+  visual:
+  - check: 截图中 INBOX 列表不含 Filtered 0001，含 Keep 0001。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证 Rust 过滤引擎在假 IMAP 服务器上执行 UID MOVE；browser 仅验证渲染层；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。
