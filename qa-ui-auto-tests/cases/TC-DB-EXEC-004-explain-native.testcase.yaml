@@ -1,0 +1,97 @@
+id: TC-DB-EXEC-004-explain-native
+title: Native Explain runs EXPLAIN for the statement at the cursor
+description: |
+  DB-EXEC-004 V4. On a real MySQL/MariaDB session, Explain on a SELECT creates a
+  result sheet titled Explain with the plan grid, and the execution log records
+  one successful EXPLAIN statement.
+covers:
+- F-DB-1
+tags:
+- database
+- sql
+- explain
+- db-parity
+- native-boundary
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- mysql_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-db-explain-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.database.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.database.port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.database.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.database.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.database.database}
+- click: '[data-testid="db-save-in-vault"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-explain
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-pw1"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-db-explain-master
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-db-explain-master
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-explain"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-db-explain"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- wait_for:
+    selector: '[data-testid="schema-tree"]'
+    timeout_sec: 30
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT * FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'mysql'
+- click: '[data-testid="db-explain-current"]'
+- wait_for:
+    selector: '[data-testid="query-result-grid"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="result-sheet-tab"]'
+    contains: Explain
+- click: '[data-testid="result-log-tab"]'
+- assert_count:
+    selector: '[data-testid="db-execution-log-entry"][data-status="success"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="db-execution-log-entry"]'
+    contains: EXPLAIN SELECT
+- screenshot: db-exec-004-explain-native.png

@@ -1,0 +1,137 @@
+id: TC-DB-GRID-001-sort-filter-count-native
+title: Native result grid sorts on the client and shows the filtered row count
+description: |
+  DB-GRID-001 V3. On a real MySQL/MariaDB session, clicking a column header sorts
+  the result on the client (ascending, descending, then original order) and the
+  Filter rows box shows the DbVisualizer-style count shown [total]/columns.
+covers:
+- F-DB-1
+tags:
+- database
+- sql
+- grid
+- db-parity
+- native-boundary
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- mysql_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-db-grid-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.database.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.database.port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.database.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.database.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.database.database}
+- click: '[data-testid="db-save-in-vault"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-grid
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-pw1"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-db-grid-master
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-db-grid-master
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-grid"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-db-grid"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- wait_for:
+    selector: '[data-testid="schema-tree"]'
+    timeout_sec: 30
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: "SELECT 'kb' AS k, 2 AS n UNION ALL SELECT 'ka', 1 UNION ALL SELECT 'kc', 3;"
+- click: '[data-testid="db-run-all"]'
+- wait_for:
+    selector: '[data-testid="query-result-row"]:first-child'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="query-result-row"]:first-child'
+    contains: 'kb'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="query-result-row-count"]'
+    contains: '3/2'
+    timeout_sec: 30
+- click: '[data-testid="query-result-sort-header"][data-column="k"]'
+- assert_text:
+    selector: '[data-testid="query-result-row"]:first-child'
+    contains: 'ka'
+    timeout_sec: 30
+- assert_attribute:
+    selector: '[data-testid="query-result-sort-header"][data-column="k"]'
+    name: data-sort
+    equals: asc
+- click: '[data-testid="query-result-sort-header"][data-column="k"]'
+- assert_text:
+    selector: '[data-testid="query-result-row"]:first-child'
+    contains: 'kc'
+    timeout_sec: 30
+- click: '[data-testid="query-result-sort-header"][data-column="k"]'
+- assert_text:
+    selector: '[data-testid="query-result-row"]:first-child'
+    contains: 'kb'
+    timeout_sec: 30
+- assert_attribute:
+    selector: '[data-testid="query-result-sort-header"][data-column="k"]'
+    name: data-sort
+    equals: none
+- click: '[data-testid="query-result-grid"] button[aria-label="Filter rows"]'
+- fill:
+    selector: '[data-testid="query-result-grid"] input[placeholder="Filter rows"]'
+    value: kc
+- assert_text:
+    selector: '[data-testid="query-result-row-count"]'
+    contains: '1 [3]/2'
+    timeout_sec: 30
+- assert_attribute:
+    selector: '[data-testid="query-result-row-count"]'
+    name: data-filtered
+    equals: 'true'
+- fill:
+    selector: '[data-testid="query-result-grid"] input[placeholder="Filter rows"]'
+    value: ''
+- assert_text:
+    selector: '[data-testid="query-result-row-count"]'
+    contains: '3/2'
+    timeout_sec: 30
+- screenshot: db-grid-001-sort-filter-count-native.png

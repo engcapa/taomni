@@ -30,6 +30,7 @@ use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use tokio_util::sync::CancellationToken;
 
+use super::tx::TxSlot;
 use super::{
     ColumnDescription, ColumnInfo, DbConfig, DbHandle, DbObject, ForeignKeyInfo, IndexInfo,
     QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo, group_foreign_keys,
@@ -111,10 +112,44 @@ fn quote_pg_ident(ident: &str) -> String {
     format!("\"{}\"", ident.replace('"', "\"\""))
 }
 
+/// MySQL `after_connect`: restore the schema, record the new connection, and
+/// keep manual-commit sessions in `autocommit=0` across reconnects.
+async fn prepare_mysql_connection(
+    conn: &mut sqlx_mysql::MySqlConnection,
+    active_schema: &ActiveSchemaSlot,
+    tx: &TxSlot,
+) -> Result<(), SqlxError> {
+    restore_mysql_schema(conn, active_schema).await?;
+    tx.on_new_connection();
+    if tx.manual() {
+        raw_sql("SET autocommit=0").execute(&mut *conn).await?;
+    }
+    Ok(())
+}
+
+/// Run a transaction-control statement (`BEGIN`, `COMMIT`, `SET autocommit`…)
+/// on the session's single pooled MySQL connection.
+pub async fn exec_control_mysql(pool: &Pool<MySql>, sql: &'static str) -> Result<(), String> {
+    raw_sql(sql)
+        .execute(pool)
+        .await
+        .map(|_| ())
+        .map_err(|e| format!("{sql} failed: {e}"))
+}
+
+pub async fn exec_control_postgres(pool: &Pool<Postgres>, sql: &'static str) -> Result<(), String> {
+    raw_sql(sql)
+        .execute(pool)
+        .await
+        .map(|_| ())
+        .map_err(|e| format!("{sql} failed: {e}"))
+}
+
 pub async fn connect_mysql(
     config: &DbConfig,
     password: Option<&str>,
     active_schema: ActiveSchemaSlot,
+    tx: TxSlot,
 ) -> Result<DbHandle, String> {
     let mut opts = MySqlConnectOptions::new()
         .host(&config.host)
@@ -138,9 +173,12 @@ pub async fn connect_mysql(
         .max_connections(1)
         .acquire_timeout(timeout(config))
         .test_before_acquire(true)
+        // A lifetime-based reconnect would silently drop a manual transaction.
+        .max_lifetime(None)
         .after_connect(move |conn, _meta| {
             let active_schema = active_schema.clone();
-            Box::pin(async move { restore_mysql_schema(conn, &active_schema).await })
+            let tx = tx.clone();
+            Box::pin(async move { prepare_mysql_connection(conn, &active_schema, &tx).await })
         })
         .connect_with(opts)
         .await
@@ -193,6 +231,7 @@ pub async fn connect_postgres(
     config: &DbConfig,
     password: Option<&str>,
     active_schema: ActiveSchemaSlot,
+    tx: TxSlot,
 ) -> Result<DbHandle, String> {
     let mut opts = PgConnectOptions::new().host(&config.host).port(config.port);
     if let Some(user) = config.username.as_deref().filter(|u| !u.is_empty()) {
@@ -214,9 +253,15 @@ pub async fn connect_postgres(
         .max_connections(1)
         .acquire_timeout(timeout(config))
         .test_before_acquire(true)
+        .max_lifetime(None)
         .after_connect(move |conn, _meta| {
             let active_schema = active_schema.clone();
-            Box::pin(async move { restore_postgres_schema(conn, &active_schema).await })
+            let tx = tx.clone();
+            Box::pin(async move {
+                restore_postgres_schema(conn, &active_schema).await?;
+                tx.on_new_connection();
+                Ok(())
+            })
         })
         .connect_with(opts)
         .await

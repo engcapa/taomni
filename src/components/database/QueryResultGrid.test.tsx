@@ -58,6 +58,13 @@ vi.mock("../../lib/ipc", () => ({
   writeStreamOpen: vi.fn(),
 }));
 
+const confirmMock = vi.hoisted(() => vi.fn(async (_options: { title?: string; message: string }) => false));
+
+vi.mock("../../lib/appDialogs", () => ({
+  alertAppDialog: vi.fn(async () => undefined),
+  confirmAppDialog: confirmMock,
+}));
+
 vi.mock("../../lib/clipboard", () => ({
   writeText: vi.fn(),
 }));
@@ -353,5 +360,81 @@ describe("QueryResultGrid", () => {
     fireEvent.click(screen.getByTestId("query-cell-value-copy"));
 
     expect(vi.mocked(writeText)).toHaveBeenLastCalledWith(value);
+  });
+});
+
+describe("QueryResultGrid save preview", () => {
+  async function deleteFirstRowAndSubmit(props: Partial<Parameters<typeof QueryResultGrid>[0]>) {
+    render(<QueryResultGrid result={filterResult()} {...props} />);
+    fireEvent.click(screen.getByTitle("Row 1"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit grid edits" }));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+    return confirmMock.mock.calls[0][0].message;
+  }
+
+  it("previews grid SQL before applying and runs nothing when canceled", async () => {
+    const onPreviewChanges = vi.fn(async () => ({ statements: ["DELETE FROM `t` WHERE `id` = '1'"], warning: null }));
+    const onCommitChanges = vi.fn(async () => undefined);
+    const message = await deleteFirstRowAndSubmit({ onPreviewChanges, onCommitChanges });
+
+    expect(onPreviewChanges).toHaveBeenCalledWith(expect.objectContaining({ counts: { inserted: 0, updated: 0, deleted: 1 } }));
+    expect(message).toContain("SQL to execute (1):\nDELETE FROM `t` WHERE `id` = '1';");
+    expect(onCommitChanges).not.toHaveBeenCalled();
+  });
+
+  it("applies the previewed changes after confirmation", async () => {
+    confirmMock.mockResolvedValueOnce(true);
+    const onPreviewChanges = vi.fn(async () => ({ statements: ["DELETE FROM t WHERE id = '1'"], warning: "No primary key found" }));
+    const onCommitChanges = vi.fn(async () => undefined);
+    const message = await deleteFirstRowAndSubmit({ onPreviewChanges, onCommitChanges });
+
+    expect(message).toContain("⚠ No primary key found");
+    await waitFor(() => expect(onCommitChanges).toHaveBeenCalledTimes(1));
+    expect(onCommitChanges.mock.calls[0]).toEqual([expect.objectContaining({ counts: { inserted: 0, updated: 0, deleted: 1 } })]);
+  });
+
+  it("falls back to the count-only message when the preview fails", async () => {
+    const onPreviewChanges = vi.fn(async () => {
+      throw new Error("not editable");
+    });
+    const message = await deleteFirstRowAndSubmit({ onPreviewChanges, onCommitChanges: vi.fn(async () => undefined) });
+    expect(message).toBe("Apply grid changes to the database?\n\nAdded: 0\nModified: 0\nDeleted: 1");
+  });
+});
+
+describe("QueryResultGrid sorting and row count", () => {
+  const names = () =>
+    Array.from(screen.getByTestId("query-result-grid-scroll").querySelectorAll("div.flex.absolute")).map(
+      (row) => row.children[2]?.textContent,
+    );
+
+  it("cycles sorting ascending, descending, then original order on the client", () => {
+    const onRefresh = vi.fn();
+    render(<QueryResultGrid result={filterResult()} onRefresh={onRefresh} />);
+    expect(names()).toEqual(["Ann", "Anne", "Bob"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    expect(names()).toEqual(["Ann", "Bob", "Anne"]);
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    expect(names()).toEqual(["Anne", "Ann", "Bob"]);
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    expect(names()).toEqual(["Ann", "Anne", "Bob"]);
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it("shows the filtered row count as shown [total]/columns", () => {
+    render(<QueryResultGrid result={filterResult()} />);
+    const count = screen.getByTestId("query-result-row-count");
+    expect(count).toHaveTextContent("3/3");
+    expect(count).toHaveAttribute("data-filtered", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter rows" }));
+    fireEvent.change(screen.getByPlaceholderText("Filter rows"), { target: { value: "Ann" } });
+    expect(count).toHaveTextContent("2 [3]/3");
+    expect(count).toHaveAttribute("data-filtered", "true");
+
+    fireEvent.change(screen.getByPlaceholderText("Filter rows"), { target: { value: "" } });
+    expect(count).toHaveTextContent("3/3");
   });
 });
