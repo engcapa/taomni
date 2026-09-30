@@ -72,6 +72,8 @@ import {
   mailSendMessage,
   mailSetFlags,
   mailSearchContacts,
+  mailSearchMessages,
+  mailSearchServer,
   mailSyncAllFolders,
   mailSyncFolder,
   mailSyncHeaders,
@@ -86,6 +88,7 @@ import {
   type MailFolderSyncResult,
   type MailMessageBody,
   type MailMessageHeader,
+  type MailSearchField,
   type MailSyncRequestMode,
 } from "../../lib/mail";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
@@ -661,6 +664,11 @@ function threadHeadersFor(context: MailDraftContext | null | undefined): { inRep
   return { inReplyTo: context.messageId, references: context.references ?? [] };
 }
 
+function decodeFolderLabel(name: string, folders: readonly MailFolder[]): string {
+  const folder = folders.find((entry) => entry.name === name);
+  return folder ? folderLabel(folder) : name;
+}
+
 function draftWithSignature(draft: Partial<ComposeDraft>, signature: string | null | undefined): ComposeDraft {
   const base = { ...emptyComposeDraft(), ...draft };
   if (!signature?.trim()) return base;
@@ -964,6 +972,16 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [checkedMessageKeys, setCheckedMessageKeys] = useState<Set<string>>(() => new Set());
   const [body, setBody] = useState<MailMessageBody | null>(null);
   const [query, setQuery] = useState("");
+  const [searchScope, setSearchScope] = useState<"folder" | "all">("folder");
+  const [searchField, setSearchField] = useState<MailSearchField>("all");
+  const [quickFilters, setQuickFilters] = useState<{ unread: boolean; flagged: boolean; attachments: boolean }>({
+    unread: false,
+    flagged: false,
+    attachments: false,
+  });
+  const [searchResults, setSearchResults] = useState<MailMessageHeader[] | null>(null);
+  const [serverSearching, setServerSearching] = useState(false);
+  const searchSeqRef = useRef(0);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingFolders, setLoadingFolders] = useState(false);
@@ -1163,19 +1181,96 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     ));
   }, [visible]);
 
+  const quickFilterActive = quickFilters.unread || quickFilters.flagged || quickFilters.attachments;
+  const searchActive = query.trim().length > 0;
+
+  // Local full-text search over the whole cached index (not just loaded rows).
+  useEffect(() => {
+    const text = query.trim();
+    const seq = searchSeqRef.current + 1;
+    searchSeqRef.current = seq;
+    if (!text || !info.cache.enabled) {
+      setSearchResults(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void mailSearchMessages(info.sessionId, {
+        text,
+        folder: searchScope === "folder" ? selectedFolder : null,
+        field: searchField,
+        unreadOnly: quickFilters.unread,
+        flaggedOnly: quickFilters.flagged,
+        withAttachments: quickFilters.attachments,
+        limit: 1000,
+      })
+        .then((results) => {
+          if (searchSeqRef.current === seq) setSearchResults(results);
+        })
+        .catch((e) => {
+          if (searchSeqRef.current === seq) {
+            setSearchResults(null);
+            console.debug("mail local search failed", e);
+          }
+        });
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [info.cache.enabled, info.sessionId, query, quickFilters, searchField, searchScope, selectedFolder]);
+
+  const runServerSearch = useCallback(async () => {
+    const text = query.trim();
+    if (!text) return;
+    const folder = selectedFolderRef.current;
+    const seq = searchSeqRef.current;
+    setServerSearching(true);
+    setError(null);
+    try {
+      const results = await mailSearchServer(info, folder, {
+        text,
+        field: searchField,
+        unreadOnly: quickFilters.unread,
+        flaggedOnly: quickFilters.flagged,
+        limit: 200,
+      });
+      if (searchSeqRef.current !== seq) return;
+      setSearchResults((current) => {
+        const byKey = new Map<string, MailMessageHeader>();
+        for (const message of current ?? []) byKey.set(messageKey(message), message);
+        for (const message of results) byKey.set(messageKey(message), message);
+        return sortMessages(Array.from(byKey.values()));
+      });
+      setStatus(`Server search found ${results.length} message${results.length === 1 ? "" : "s"} in ${folder}`);
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+    } finally {
+      setServerSearching(false);
+    }
+  }, [info, query, quickFilters.flagged, quickFilters.unread, searchField]);
+
   const filteredMessages = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return messages;
-    return messages.filter((message) => {
-      const haystack = [
-        message.subject,
-        addressLabel(message.from),
-        message.snippet ?? "",
-        ...message.to.map(addressLabel),
-      ].join(" ").toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [messages, query]);
+    let base: MailMessageHeader[];
+    if (q && searchResults) {
+      base = searchResults;
+    } else if (q) {
+      // Cache disabled (or index not ready): filter the loaded rows.
+      base = messages.filter((message) => {
+        const haystack = [
+          message.subject,
+          addressLabel(message.from),
+          message.snippet ?? "",
+          ...message.to.map(addressLabel),
+        ].join(" ").toLowerCase();
+        return haystack.includes(q);
+      });
+    } else {
+      base = messages;
+    }
+    if (!quickFilterActive) return base;
+    return base.filter((message) =>
+      (!quickFilters.unread || isUnread(message))
+      && (!quickFilters.flagged || isFlagged(message))
+      && (!quickFilters.attachments || message.hasAttachments));
+  }, [messages, query, quickFilterActive, quickFilters, searchResults]);
   const listRows = useMemo<MailThreadRow[]>(() => {
     if (threadView) return flattenMailThreads(buildMailThreads(filteredMessages), expandedThreads);
     return filteredMessages.map((message) => ({
@@ -3755,11 +3850,74 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
             ref={searchInputRef}
             type="search"
             className="taomni-input h-7 w-full pl-7 text-[12px]"
-            placeholder="Search cached headers"
-            aria-label="Search cached mail headers"
+            placeholder={searchScope === "all" ? "Search all folders" : "Search this folder"}
+            aria-label="Search mail"
+            data-testid="mail-search-input"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && event.shiftKey) {
+                event.preventDefault();
+                void runServerSearch();
+              }
+            }}
           />
+        </div>
+        <select
+          className="taomni-input h-7 text-[12px] w-[92px]"
+          value={searchField}
+          aria-label="Search field"
+          data-testid="mail-search-field"
+          onChange={(event) => setSearchField(event.target.value as MailSearchField)}
+        >
+          <option value="all">All text</option>
+          <option value="subject">Subject</option>
+          <option value="sender">From</option>
+          <option value="recipients">To/Cc</option>
+          <option value="body">Body</option>
+        </select>
+        <select
+          className="taomni-input h-7 text-[12px] w-[96px]"
+          value={searchScope}
+          aria-label="Search scope"
+          data-testid="mail-search-scope"
+          onChange={(event) => setSearchScope(event.target.value === "all" ? "all" : "folder")}
+        >
+          <option value="folder">This folder</option>
+          <option value="all">All folders</option>
+        </select>
+        {searchActive && (
+          <button
+            type="button"
+            className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5 text-[12px]"
+            data-testid="mail-search-server"
+            onClick={() => void runServerSearch()}
+            disabled={serverSearching}
+            title="Search the current folder on the server (Shift+Enter)"
+          >
+            {serverSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+            Server
+          </button>
+        )}
+        <div className="flex items-center gap-0.5" role="group" aria-label="Quick filter" data-testid="mail-quick-filter">
+          {([
+            ["unread", "Unread", MailOpen],
+            ["flagged", "Starred", Star],
+            ["attachments", "Attachments", Paperclip],
+          ] as const).map(([key, label, Icon]) => (
+            <button
+              key={key}
+              type="button"
+              className={`taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center ${quickFilters[key] ? "text-[var(--taomni-accent)]" : ""}`}
+              aria-pressed={quickFilters[key]}
+              aria-label={`Show only ${label.toLowerCase()}`}
+              title={`Show only ${label.toLowerCase()}`}
+              data-testid={`mail-quick-filter-${key}`}
+              onClick={() => setQuickFilters((current) => ({ ...current, [key]: !current[key] }))}
+            >
+              <Icon className="w-3.5 h-3.5" />
+            </button>
+          ))}
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -4015,7 +4173,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   </div>
                 ) : filteredMessages.length === 0 ? (
                   <div className="h-28 flex items-center justify-center px-4 text-center text-[12px] text-[var(--taomni-text-muted)]">
-                    {query ? "No cached messages match the search." : "No cached messages. Run Sync to refresh all folders."}
+                    {query || quickFilterActive ? "No messages match the search or filter." : "No cached messages. Run Sync to refresh all folders."}
                   </div>
                 ) : (
                   <>
@@ -4082,6 +4240,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                                 <span className={`min-w-0 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "text-[var(--taomni-text-muted)]"}`}>
                                   {addressLabel(message.from) || "(unknown)"}
                                 </span>
+                                {message.folder !== selectedFolder && (
+                                  <span
+                                    className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-[10px] text-[var(--taomni-text-muted)]"
+                                    data-testid="mail-message-folder"
+                                  >
+                                    {decodeFolderLabel(message.folder, displayFolders)}
+                                  </span>
+                                )}
                                 {message.hasAttachments && <Paperclip className="w-3 h-3 text-[var(--taomni-text-muted)] shrink-0" />}
                                 {message.bodyCached && <FileText className="w-3 h-3 text-[var(--taomni-accent)] shrink-0" />}
                               </div>
@@ -4094,7 +4260,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                         </div>
                       );
                     })}
-                    {!query.trim() && (hasMoreMessages || loadingMoreMessages) && (
+                    {!query.trim() && !quickFilterActive && (hasMoreMessages || loadingMoreMessages) && (
                       <div className="p-2">
                         <button
                           type="button"

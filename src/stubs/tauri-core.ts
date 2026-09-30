@@ -6,10 +6,12 @@ import {
   stubMailFindHeader,
   stubMailListCached,
   stubMailListFolders,
+  stubMailSearch,
   stubMailSyncAll,
   stubMailSyncFolder,
   stubMailUpdateCachedFlags,
   type Seed as MailStubSeed,
+  type StubMailSearchQuery,
 } from "./mailServerStub";
 import type { SessionConfig, SessionGroup, LocalShellOption, LocalDirectoryShortcut, IpcRunSnapshotRecord, IpcSnapshotEntry } from "../lib/ipc";
 import {
@@ -4072,6 +4074,25 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         stubMailExpunge(accountId, mailStubSeed, drafted.remoteDraftFolder, drafted.remoteDraftUid);
       }
       return { accepted: true, response: "browser-preview accepted", sentCopyFolder: "Sent" } as T;
+    }
+    case "mail_search_messages": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubMailSearch(
+        stubMailAccountId(invokeArgs),
+        mailStubSeed,
+        (invokeArgs?.query as StubMailSearchQuery | undefined) ?? {},
+        "cache",
+      ) as T;
+    }
+    case "mail_search_server": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubMailSearch(
+        stubMailAccountId(invokeArgs),
+        mailStubSeed,
+        (invokeArgs?.query as StubMailSearchQuery | undefined) ?? {},
+        "server",
+        (invokeArgs?.folder as string | undefined) ?? "INBOX",
+      ) as T;
     }
     case "mail_store_remote_draft": {
       const invokeArgs = args as InvokeArgs | undefined;

@@ -5281,6 +5281,56 @@ controls:
 - 列表“Threads”切换按邮件头严格线程化（不按主题猜测），会话折叠为最新一封并显示数量与未读数，展开后按回复层级缩进；开关按查看者保存在 localStorage。
 - 发信成功后按账户设置把带 Bcc 的副本 APPEND 到 Sent（SPECIAL-USE 优先，找不到时按名称，缺失时创建）；Gmail/Outlook 默认不重复保存。副本失败不影响“已发送”，状态栏提示原因。
 - 手工保存草稿会把草稿 APPEND 到服务器 Drafts（`\Draft \Seen`，按 Message-ID 找回 UID 并替换旧副本）；发送或删除草稿时移除服务器副本；自动保存仍只写本地。
+
+---
+
+### 13.7 邮件搜索与快捷过滤 ✅
+
+<!-- feature
+id: F-MAIL-7
+status: done
+area: mail/search
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mail.ts
+  - src/stubs/mailServerStub.ts
+  - src-tauri/src/mail/search.rs
+controls:
+  - id: search-input
+    selector: '[data-testid="mail-search-input"]'
+    kind: interactive
+  - id: search-scope
+    selector: '[data-testid="mail-search-scope"]'
+    kind: interactive
+  - id: search-field
+    selector: '[data-testid="mail-search-field"]'
+    kind: interactive
+    optional: true       # default "All text" is exercised by the search case
+  - id: search-server
+    selector: '[data-testid="mail-search-server"]'
+    kind: interactive
+    optional: true       # only rendered while a query is entered
+  - id: quick-filter-unread
+    selector: '[data-testid="mail-quick-filter-unread"]'
+    kind: interactive
+  - id: quick-filter-flagged
+    selector: '[data-testid="mail-quick-filter-flagged"]'
+    kind: interactive
+    optional: true
+  - id: quick-filter-attachments
+    selector: '[data-testid="mail-quick-filter-attachments"]'
+    kind: interactive
+    optional: true
+  - id: message-folder
+    selector: '[data-testid="mail-message-folder"]'
+    kind: display
+    optional: true       # only for results from another folder
+-->
+
+- 搜索框查询本地 SQLite FTS5（trigram 分词，支持中文子串；少于 3 字的词回退 LIKE）覆盖整个缓存的邮件头与已缓存正文，可选“本文件夹/所有文件夹”和字段（全部/主题/发件人/收件人/正文）；用户输入按字面短语处理，不解释 FTS 语法。
+- “Server”（或 Shift+Enter）对当前文件夹执行 IMAP `UID SEARCH`（非 ASCII 用 `CHARSET UTF-8`），结果与本地结果合并，不写入缓存。
+- 快捷过滤（未读/星标/附件）同时作用于普通列表与搜索结果；跨文件夹结果显示所在文件夹。
 ---
 
 ## 14. SocksCap 网络流量路由

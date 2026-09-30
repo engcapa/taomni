@@ -132,6 +132,32 @@ export interface MailFolderSyncResult {
   syncedAt: number;
 }
 
+export type MailSearchField = "all" | "subject" | "sender" | "recipients" | "body";
+
+export interface MailSearchQuery {
+  text: string;
+  /** null searches every cached folder. */
+  folder?: string | null;
+  field?: MailSearchField;
+  unreadOnly?: boolean;
+  flaggedOnly?: boolean;
+  withAttachments?: boolean;
+  keyword?: string | null;
+  limit?: number;
+}
+
+/** Search the local full-text index (all cached headers, cached bodies). */
+export function mailSearchMessages(accountId: string, query: MailSearchQuery): Promise<MailMessageHeader[]> {
+  return invoke<MailMessageHeader[]>("mail_search_messages", { accountId, query });
+}
+
+/** IMAP SEARCH in one server folder (mail whose body is not cached). */
+export function mailSearchServer(config: MailTabInfo, folder: string, query: MailSearchQuery): Promise<MailMessageHeader[]> {
+  return withVaultLockedNotice(() =>
+    invoke<MailMessageHeader[]>("mail_search_server", { config, folder, query }),
+  );
+}
+
 export interface MailSyncFolderOptions {
   mode?: MailSyncRequestMode;
   limit?: number;

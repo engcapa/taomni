@@ -855,6 +855,17 @@
 - `[data-testid="mail-thread-expand"]` — interactive [optional] — F-MAIL-6.thread-expand
 - `[data-testid="mail-save-sent-copy"]` — interactive [optional] — F-MAIL-6.save-sent-copy
 
+## mail/search (F-MAIL-7)
+
+- `[data-testid="mail-search-input"]` — interactive — F-MAIL-7.search-input
+- `[data-testid="mail-search-scope"]` — interactive — F-MAIL-7.search-scope
+- `[data-testid="mail-search-field"]` — interactive [optional] — F-MAIL-7.search-field
+- `[data-testid="mail-search-server"]` — interactive [optional] — F-MAIL-7.search-server
+- `[data-testid="mail-quick-filter-unread"]` — interactive — F-MAIL-7.quick-filter-unread
+- `[data-testid="mail-quick-filter-flagged"]` — interactive [optional] — F-MAIL-7.quick-filter-flagged
+- `[data-testid="mail-quick-filter-attachments"]` — interactive [optional] — F-MAIL-7.quick-filter-attachments
+- `[data-testid="mail-message-folder"]` — display [optional] — F-MAIL-7.message-folder
+
 ## mail/settings (F-MAIL-4)
 
 - `[data-testid="mail-appearance-settings"]` — display — F-MAIL-4.mail-appearance-settings

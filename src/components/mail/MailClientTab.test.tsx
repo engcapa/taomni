@@ -30,6 +30,8 @@ const mailMocks = vi.hoisted(() => ({
   mailSendMessage: vi.fn(),
   mailSetFlags: vi.fn(),
   mailSearchContacts: vi.fn(),
+  mailSearchMessages: vi.fn(),
+  mailSearchServer: vi.fn(),
   mailSyncAllFolders: vi.fn(),
   mailSyncFolder: vi.fn(),
   mailSyncHeaders: vi.fn(),
@@ -811,6 +813,39 @@ describe("MailClientTab", () => {
     expect(request.inReplyTo).toBe("parent@x");
     expect(request.references).toEqual(["root@x"]);
     expect(await screen.findByText(/copy saved to Sent/)).toBeInTheDocument();
+  });
+
+  it("searches the whole local index and the server (AC-25/AC-26)", async () => {
+    const hit: MailMessageHeader = { ...uncachedMessage, uid: 7, folder: "Archive", subject: "Budget from archive" };
+    const serverHit: MailMessageHeader = { ...uncachedMessage, uid: 8, subject: "Budget only on server" };
+    mailMocks.mailSearchMessages.mockResolvedValue([hit]);
+    mailMocks.mailSearchServer.mockResolvedValue([serverHit]);
+
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.change(screen.getByTestId("mail-search-scope"), { target: { value: "all" } });
+    fireEvent.change(screen.getByTestId("mail-search-input"), { target: { value: "budget" } });
+
+    expect(await screen.findByText("Budget from archive")).toBeInTheDocument();
+    expect(mailMocks.mailSearchMessages).toHaveBeenLastCalledWith(info.sessionId, expect.objectContaining({
+      text: "budget",
+      folder: null,
+      field: "all",
+    }));
+    expect(screen.getByTestId("mail-message-folder")).toHaveTextContent("Archive");
+
+    fireEvent.click(screen.getByTestId("mail-search-server"));
+    expect(await screen.findByText("Budget only on server")).toBeInTheDocument();
+    expect(mailMocks.mailSearchServer).toHaveBeenCalledWith(info, "INBOX", expect.objectContaining({ text: "budget" }));
+  });
+
+  it("quick filters narrow the list to unread messages", async () => {
+    mailMocks.mailListCachedMessages.mockResolvedValue([message, { ...uncachedMessage, flags: [] }]);
+    renderMailbox();
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(2));
+    fireEvent.click(screen.getByTestId("mail-quick-filter-unread"));
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(1));
+    expect(screen.getByTestId("mail-message-row")).toHaveAttribute("data-unread", "true");
   });
 
   it("skips overlapping periodic sync ticks while a sync is still running", async () => {

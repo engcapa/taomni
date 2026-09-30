@@ -55,6 +55,22 @@ class FakeMailServerTest(unittest.TestCase):
         self.assertEqual(self.server.state.count("INBOX"), 4)
         client.logout()
 
+    def test_text_and_header_search(self) -> None:
+        uids = self.server.state.deliver("INBOX", 3, prefix="Needle", thread=True)
+        client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
+        client.login("qa", "x")
+        client.select("INBOX", readonly=True)
+        typ, data = client.uid("SEARCH", "TEXT", '"Needle"', "TEXT", '"0002"')
+        self.assertEqual(data, [str(uids[1]).encode()])
+        typ, data = client.uid("SEARCH", "SUBJECT", '"needle"', "UNSEEN")
+        self.assertEqual(data, [" ".join(str(uid) for uid in uids).encode()])
+        raw = self.server.state.folders["INBOX"].messages[uids[2]].raw.decode()
+        self.assertIn("In-Reply-To:", raw)
+        message_id = next(line.split(":", 1)[1].strip() for line in raw.splitlines() if line.startswith("Message-ID:"))
+        typ, data = client.uid("SEARCH", "HEADER", "Message-ID", f'"{message_id}"')
+        self.assertEqual(data, [str(uids[2]).encode()])
+        client.logout()
+
     def test_append_and_smtp(self) -> None:
         client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
         client.login("qa", "x")

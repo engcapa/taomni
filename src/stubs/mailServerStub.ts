@@ -221,6 +221,52 @@ export function stubMailSyncAll(accountId: string, seed: Seed, limit: number) {
   };
 }
 
+export interface StubMailSearchQuery {
+  text?: string;
+  folder?: string | null;
+  unreadOnly?: boolean;
+  flaggedOnly?: boolean;
+  withAttachments?: boolean;
+  limit?: number;
+}
+
+/** Browser model of the local FTS index (cache) or IMAP SEARCH (server). */
+export function stubMailSearch(
+  accountId: string,
+  seed: Seed,
+  query: StubMailSearchQuery,
+  source: "cache" | "server",
+  serverFolder?: string,
+) {
+  const state = account(accountId, seed);
+  const terms = (query.text ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+  const folders = source === "server"
+    ? [serverFolder ?? "INBOX"]
+    : query.folder ? [query.folder] : [...state.folders.keys()];
+  const hits: StubMailHeader[] = [];
+  for (const name of folders) {
+    const entry = folderState(state, name);
+    const rows = source === "server" ? entry.server : entry.cache;
+    for (const message of rows.values()) {
+      const haystack = [
+        message.subject,
+        message.from?.name,
+        message.from?.address,
+        message.snippet,
+        ...message.to.map((to) => `${to.name} ${to.address}`),
+      ].join(" ").toLowerCase();
+      if (!terms.every((term) => haystack.includes(term))) continue;
+      if (query.unreadOnly && !isUnseen(message)) continue;
+      if (query.flaggedOnly && !message.flags.some((flag) => flag.toLowerCase() === "\\flagged")) continue;
+      if (query.withAttachments && !message.hasAttachments) continue;
+      hits.push({ ...message });
+    }
+  }
+  return hits
+    .sort((a, b) => (b.dateTs - a.dateTs) || (b.uid - a.uid))
+    .slice(0, Math.max(1, query.limit ?? 500));
+}
+
 /** Browser model of IMAP APPEND (Sent copies, server drafts). */
 export function stubMailAppend(accountId: string, seed: Seed, folderName: string, message: Partial<StubMailHeader>): number {
   const state = account(accountId, seed);

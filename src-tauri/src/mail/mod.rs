@@ -42,6 +42,7 @@ use crate::terminal::network::NetworkSettings;
 #[cfg(test)]
 mod fake_imap;
 pub mod outgoing;
+pub mod search;
 mod sync;
 
 use sync::{FolderStepOutcome, FolderSyncState, StepParams};
@@ -4443,14 +4444,6 @@ fn thread_references(references: &[String], in_reply_to: Option<&str>) -> String
         .map(|id| format!("<{id}>"))
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-fn send_smtp(
-    account: &ResolvedMailAccount,
-    request: &MailSendRequest,
-    runtime: &tokio::runtime::Handle,
-) -> Result<MailSendResult, String> {
-    send_smtp_with(account, request, runtime, &MessageBuildOptions::default())
 }
 
 fn send_smtp_with(

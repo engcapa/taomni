@@ -171,6 +171,68 @@ def _in(uid: int, ranges: list[tuple[int, int]]) -> bool:
     return any(lo <= uid <= hi for lo, hi in ranges)
 
 
+def _search_tokens(text: str) -> list[str]:
+    tokens, index = [], 0
+    while index < len(text):
+        if text[index].isspace():
+            index += 1
+        elif text[index] == '"':
+            value, rest = _first_arg(text[index:])
+            tokens.append(value)
+            index = len(text) - len(rest)
+        else:
+            end = index
+            while end < len(text) and not text[end].isspace():
+                end += 1
+            tokens.append(text[index:end])
+            index = end
+    return tokens
+
+
+def _search_keys(folder: FakeFolder, text: str) -> list[int]:
+    """AND of TEXT/BODY/SUBJECT/FROM/TO/UNSEEN/SEEN/FLAGGED/KEYWORD/ALL keys."""
+    tokens = _search_tokens(text)
+    checks = []
+    index = 0
+    while index < len(tokens):
+        key = tokens[index].upper()
+        if key == "CHARSET":
+            index += 2
+            continue
+        if key in {"TEXT", "BODY", "SUBJECT", "FROM", "TO", "KEYWORD"} and index + 1 < len(tokens):
+            checks.append((key, tokens[index + 1].lower()))
+            index += 2
+            continue
+        checks.append((key, ""))
+        index += 1
+
+    def matches(message: FakeMessage) -> bool:
+        raw = message.raw.decode("utf-8", "replace")
+        head, _, body = raw.partition("\r\n\r\n")
+        headers = {}
+        for line in head.splitlines():
+            name, _, value = line.partition(":")
+            headers[name.strip().lower()] = value.strip().lower()
+        for key, value in checks:
+            if key == "TEXT" and value not in raw.lower():
+                return False
+            if key == "BODY" and value not in body.lower():
+                return False
+            if key in {"SUBJECT", "FROM", "TO"} and value not in headers.get(key.lower(), ""):
+                return False
+            if key == "UNSEEN" and "\\Seen" in message.flags:
+                return False
+            if key == "SEEN" and "\\Seen" not in message.flags:
+                return False
+            if key == "FLAGGED" and "\\Flagged" not in message.flags:
+                return False
+            if key == "KEYWORD" and value not in {flag.lower() for flag in message.flags}:
+                return False
+        return True
+
+    return [uid for uid, message in sorted(folder.messages.items()) if matches(message)]
+
+
 def _quote(name: str) -> str:
     return '"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
@@ -257,7 +319,7 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                         ranges = _uid_ranges(criteria[4:].strip(), maximum)
                         hits = [uid for uid in sorted(folder.messages) if _in(uid, ranges)]
                     else:
-                        hits = []
+                        hits = _search_keys(folder, re.sub(r"^(UID )?SEARCH\s*", "", rest, flags=re.I))
                     out.append(("* SEARCH" + "".join(f" {uid}" for uid in hits) + "\r\n").encode())
                 elif upper.startswith("UID FETCH"):
                     folder = state.folders[selected or "INBOX"]
