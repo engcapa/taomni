@@ -3,7 +3,8 @@
 - IDEA：Ultimate 2026.2.2 / IU-262.10315.125，Linux X11，默认 keymap、Source Code Pro 16（各卡同一 profile）。
 - Taomni：叠加分支 `feat/ed-parity-019-closure`（010→022 全部卡），`qa-ui-auto-platforms.yml` 三端 browser + native。
   - 组合运行 36663758184（head 1e4f7ce9）：browser Linux/Windows/macOS 各 59/59；native Linux 23/24、Windows 17/18、macOS 9/10，唯一失败为 019-01 发现的编辑器 tab 缺 `role=tab`（已修 4c5b34b1）。
-  - 修复后复跑 36666050627（head 4c5b34b1）：见 §2。
+  - 修复后复跑 36666050627（head 4c5b34b1）：browser 三端 59/59，native 除 019-01 外全部通过（019-01 R1/R2 已通过，R3 的 `text=` 定位器在 native 不可用）。
+  - 用例修正后 native 复跑 36667919152（head 6b472647）：019-01 在 Linux、Windows、macOS 均通过。
 
 ## 1. 各卡对照汇总（A1）
 
