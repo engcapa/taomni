@@ -1,12 +1,18 @@
 id: TC-MAIL-SEND-01
 title: Mail stores server drafts and a Sent copy through IMAP APPEND
-description: |
-  TASK-06 (docs-feature/mail-thunderbird-parity-design.md AC-20/AC-21):
+description: 'TASK-06 (docs-feature/mail-thunderbird-parity-design.md AC-20/AC-21):
+
   composing a message and saving it stores a copy in the server Drafts
+
   folder; sending it removes that server draft and appends the sent message
+
   to the Sent folder so other clients see both. Browser mode drives the stub
+
   server model; native mode uses the fake IMAP/SMTP server and the real
+
   lettre + IMAP APPEND path.
+
+  '
 covers:
 - F-MAIL-6
 - F-MAIL-2
@@ -22,11 +28,11 @@ fixtures:
 timeout_sec: 150
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="status-bar"]'
-- click: '[data-testid="app-main-menu"]'
-- hover: '[data-testid="context-menu-item-view"]'
-- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-- wait_for: '[data-testid="quick-connect"]'
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
 - fill:
     selector: '[data-testid="qc-input"]'
     value: ${fixture.mail_quick_connect}
@@ -74,46 +80,45 @@ verification:
     requirement: 手工保存草稿后服务器 Drafts 出现一份副本（AC-21）。
     actions:
     - 1
+    - 2
     - 3
-    - 4
     - 5
-    - 7
+    - 6
     - 8
     - 10
+    - 11
     - 12
     - 13
     - 14
-    - 15
-    - 16
     checkpoints:
-    - step: 9
+    - step: 7
       expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
-    - step: 11
+    - step: 9
       expectation: '{"wait_for": "[data-testid=\"mail-compose-dialog\"]"}'
-    - step: 17
+    - step: 15
       expectation: '{"assert_text": {"contains": "Draft saved to Drafts"}}'
-    - step: 18
+    - step: 16
       expectation: '{"mail_server_assert_folder_count": {"folder": "Drafts", "equals": 1}}'
     results:
-    - 17
-    - 18
+    - 15
+    - 16
   - id: R2
     requirement: 发送后服务器 Sent 收到副本、服务器草稿被移除（AC-20/AC-21）。
     actions:
-    - 19
+    - 17
     checkpoints:
-    - step: 20
+    - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached"}}'
-    - step: 21
+    - step: 19
       expectation: '{"assert_text": {"contains": "copy saved to Sent"}}'
-    - step: 22
+    - step: 20
       expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1}}'
-    - step: 23
+    - step: 21
       expectation: '{"mail_server_assert_folder_count": {"folder": "Drafts", "equals": 0}}'
     results:
+    - 19
+    - 20
     - 21
-    - 22
-    - 23
   visual:
   - check: 截图中状态栏显示已保存 Sent 副本，写信窗口已关闭。
     method: manual

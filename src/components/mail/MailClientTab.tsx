@@ -42,6 +42,7 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  Tag,
   Trash2,
   X,
   ZoomIn,
@@ -92,6 +93,14 @@ import {
   type MailSyncRequestMode,
 } from "../../lib/mail";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
+import {
+  JUNK_KEYWORD,
+  MAIL_TAGS,
+  NOT_JUNK_KEYWORD,
+  isJunk,
+  messageTags,
+  toggleKeywordPlan,
+} from "../../lib/mailTags";
 import {
   countNewMail,
   folderHasMoreToLoad,
@@ -979,6 +988,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     flagged: false,
     attachments: false,
   });
+  const [tagFilter, setTagFilter] = useState<string>("");
   const [searchResults, setSearchResults] = useState<MailMessageHeader[] | null>(null);
   const [serverSearching, setServerSearching] = useState(false);
   const searchSeqRef = useRef(0);
@@ -1181,7 +1191,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     ));
   }, [visible]);
 
-  const quickFilterActive = quickFilters.unread || quickFilters.flagged || quickFilters.attachments;
+  const quickFilterActive = quickFilters.unread || quickFilters.flagged || quickFilters.attachments || Boolean(tagFilter);
   const searchActive = query.trim().length > 0;
 
   // Local full-text search over the whole cached index (not just loaded rows).
@@ -1201,6 +1211,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         unreadOnly: quickFilters.unread,
         flaggedOnly: quickFilters.flagged,
         withAttachments: quickFilters.attachments,
+        keyword: tagFilter || null,
         limit: 1000,
       })
         .then((results) => {
@@ -1214,7 +1225,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         });
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [info.cache.enabled, info.sessionId, query, quickFilters, searchField, searchScope, selectedFolder]);
+  }, [info.cache.enabled, info.sessionId, query, quickFilters, searchField, searchScope, selectedFolder, tagFilter]);
 
   const runServerSearch = useCallback(async () => {
     const text = query.trim();
@@ -1269,8 +1280,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     return base.filter((message) =>
       (!quickFilters.unread || isUnread(message))
       && (!quickFilters.flagged || isFlagged(message))
-      && (!quickFilters.attachments || message.hasAttachments));
-  }, [messages, query, quickFilterActive, quickFilters, searchResults]);
+      && (!quickFilters.attachments || message.hasAttachments)
+      && (!tagFilter || message.flags.some((flag) => flag.toLowerCase() === tagFilter.toLowerCase())));
+  }, [messages, query, quickFilterActive, quickFilters, searchResults, tagFilter]);
   const listRows = useMemo<MailThreadRow[]>(() => {
     if (threadView) return flattenMailThreads(buildMailThreads(filteredMessages), expandedThreads);
     return filteredMessages.map((message) => ({
@@ -3125,6 +3137,44 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setStatus(allFlagged ? "Removed star" : `Starred ${unique.length} message${unique.length === 1 ? "" : "s"}`);
   });
 
+  const handleToggleKeyword = (targets: MailMessageHeader[], keyword: string, label: string) => runMailAction(async () => {
+    const unique = dedupeMessages(targets);
+    if (unique.length === 0) return;
+    const plan = toggleKeywordPlan(unique, keyword);
+    for (const [folder, group] of groupMessagesByFolder(unique)) {
+      const uids = group.map((message) => message.uid);
+      await mailSetFlags(info, folder, uids, plan.add, plan.remove);
+      applyFlagsLocally(folder, uids, plan.add, plan.remove, 0);
+    }
+    setStatus(plan.enable ? `Tagged ${unique.length} as ${label}` : `Removed tag ${label}`);
+  });
+
+  const handleClearTags = (targets: MailMessageHeader[]) => runMailAction(async () => {
+    const unique = dedupeMessages(targets).filter((message) => messageTags(message).length > 0);
+    const remove = MAIL_TAGS.map((tag) => tag.keyword);
+    for (const [folder, group] of groupMessagesByFolder(unique)) {
+      const uids = group.map((message) => message.uid);
+      await mailSetFlags(info, folder, uids, [], remove);
+      applyFlagsLocally(folder, uids, [], remove, 0);
+    }
+    setStatus("Removed tags");
+  });
+
+  /** Train the server's junk filter via $Junk/$NotJunk; unsupported keywords are not fatal. */
+  const setJunkKeywords = async (targets: MailMessageHeader[], junk: boolean) => {
+    const add = [junk ? JUNK_KEYWORD : NOT_JUNK_KEYWORD];
+    const remove = [junk ? NOT_JUNK_KEYWORD : JUNK_KEYWORD];
+    for (const [folder, group] of groupMessagesByFolder(dedupeMessages(targets))) {
+      const uids = group.map((message) => message.uid);
+      try {
+        await mailSetFlags(info, folder, uids, add, remove);
+        applyFlagsLocally(folder, uids, add, remove, 0);
+      } catch (e) {
+        console.debug("mail: junk keyword not accepted by the server", e);
+      }
+    }
+  };
+
   const handleMarkUnread = (targets: MailMessageHeader[]) => runMailAction(async () => {
     const unique = dedupeMessages(targets).filter((message) => !isUnread(message));
     if (unique.length === 0) {
@@ -3182,12 +3232,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       setError("No Junk folder found for this account.");
       return;
     }
+    await setJunkKeywords(targets, true);
     const moved = await moveTargetsTo(targets, target);
     setStatus(moved > 0 ? `Moved ${moved} message${moved === 1 ? "" : "s"} to Junk` : "Already in Junk");
   });
 
   const handleNotJunkMessages = (targets: MailMessageHeader[]) => runMailAction(async () => {
     const target = resolveInboxFolder();
+    await setJunkKeywords(targets, false);
     const moved = await moveTargetsTo(targets, target);
     setStatus(moved > 0 ? `Moved ${moved} message${moved === 1 ? "" : "s"} to Inbox` : "Already in Inbox");
   });
@@ -3461,6 +3513,24 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         icon: <Star className="w-3.5 h-3.5" />,
         disabled: busyAction,
         onClick: () => void handleToggleFlagged(targets),
+      },
+      {
+        label: `Tag${suffix}`,
+        icon: <Tag className="w-3.5 h-3.5" />,
+        testId: "mail-menu-tag",
+        openOnClick: true,
+        children: [
+          ...MAIL_TAGS.map((tag) => ({
+            label: tag.label,
+            testId: `mail-menu-tag-${tag.keyword.replace("$", "")}`,
+            checked: targets.every((target) => messageTags(target).some((entry) => entry.keyword === tag.keyword)),
+            icon: <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: tag.color }} />,
+            disabled: busyAction,
+            onClick: () => void handleToggleKeyword(targets, tag.keyword, tag.label),
+          })),
+          { label: "", separator: true },
+          { label: "Remove all tags", disabled: busyAction, onClick: () => void handleClearTags(targets) },
+        ],
       },
       { label: "Mark folder read", icon: <MailOpen className="w-3.5 h-3.5" />, disabled: markingRead, onClick: () => void handleMarkFolderRead(message.folder) },
       { label: "", separator: true },
@@ -3918,6 +3988,18 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               <Icon className="w-3.5 h-3.5" />
             </button>
           ))}
+          <select
+            className="taomni-input h-7 text-[12px] w-[92px] ml-0.5"
+            value={tagFilter}
+            aria-label="Filter by tag"
+            data-testid="mail-quick-filter-tag"
+            onChange={(event) => setTagFilter(event.target.value)}
+          >
+            <option value="">Any tag</option>
+            {MAIL_TAGS.map((tag) => (
+              <option key={tag.keyword} value={tag.keyword}>{tag.label}</option>
+            ))}
+          </select>
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -4233,8 +4315,25 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                               </button>
                             )}
                             <div className="min-w-0 flex-1">
-                              <div className={`min-w-0 text-[14px] leading-5 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "font-medium text-[var(--taomni-text-muted)]"}`}>
-                                {message.subject || "(no subject)"}
+                              <div className="min-w-0 flex items-center gap-1.5">
+                                {isJunk(message) && (
+                                  <span title="Junk" data-testid="mail-message-junk" className="shrink-0 text-[var(--taomni-text-muted)]">
+                                    <Ban className="w-3 h-3" />
+                                  </span>
+                                )}
+                                <div className={`min-w-0 text-[14px] leading-5 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "font-medium text-[var(--taomni-text-muted)]"}`}>
+                                  {message.subject || "(no subject)"}
+                                </div>
+                                {messageTags(message).map((tag) => (
+                                  <span
+                                    key={tag.keyword}
+                                    className="shrink-0 inline-block w-2 h-2 rounded-full"
+                                    style={{ background: tag.color }}
+                                    title={tag.label}
+                                    data-testid="mail-message-tag"
+                                    data-tag={tag.keyword}
+                                  />
+                                ))}
                               </div>
                               <div className="mt-1 flex items-center gap-1.5 text-[12px] leading-4">
                                 <span className={`min-w-0 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "text-[var(--taomni-text-muted)]"}`}>

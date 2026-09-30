@@ -298,6 +298,36 @@ export function stubMailClearCache(accountId: string) {
   }
 }
 
+/** Browser model of UID MOVE/COPY and delete (STORE \Deleted + EXPUNGE). */
+export function stubMailTransfer(
+  accountId: string,
+  seed: Seed,
+  folderName: string,
+  uids: number[],
+  target: string | null,
+  keepSource: boolean,
+): number {
+  const state = account(accountId, seed);
+  const source = folderState(state, folderName);
+  const dest = target ? folderState(state, target) : null;
+  let count = 0;
+  for (const uid of uids) {
+    const message = source.server.get(uid);
+    if (!message) continue;
+    count += 1;
+    if (dest) {
+      const newUid = dest.uidNext;
+      dest.uidNext += 1;
+      dest.server.set(newUid, { ...message, folder: target!, uid: newUid });
+    }
+    if (!keepSource) {
+      source.server.delete(uid);
+      source.cache.delete(uid);
+    }
+  }
+  return count;
+}
+
 export function stubMailUpdateCachedFlags(accountId: string, folder: string, uids: number[], add: string[], remove: string[]) {
   const state = accounts.get(accountId);
   const entry = state?.folders.get(folder);

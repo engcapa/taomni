@@ -1,11 +1,16 @@
 id: TC-MAIL-SEARCH-01
 title: Mail search finds cached mail across folders and via the server
-description: |
-  TASK-08 (AC-25/AC-26/AC-27): 12 messages are delivered and synced; a
+description: 'TASK-08 (AC-25/AC-26/AC-27): 12 messages are delivered and synced; a
+
   full-text search for one subject returns exactly that message from the
+
   local index, the unread quick filter keeps it, and a server search of the
+
   current folder returns it too. Browser mode drives the stub index/server;
+
   native mode exercises SQLite FTS5 and IMAP UID SEARCH on the fake server.
+
+  '
 covers:
 - F-MAIL-7
 tags:
@@ -20,11 +25,11 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="status-bar"]'
-- click: '[data-testid="app-main-menu"]'
-- hover: '[data-testid="context-menu-item-view"]'
-- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-- wait_for: '[data-testid="quick-connect"]'
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
 - fill:
     selector: '[data-testid="qc-input"]'
     value: ${fixture.mail_quick_connect}
@@ -67,40 +72,39 @@ verification:
     requirement: 本地全文索引跨文件夹检索到唯一匹配邮件，未读快捷过滤保留该邮件（AC-25/AC-27）。
     actions:
     - 1
+    - 2
     - 3
-    - 4
     - 5
-    - 7
-    - 8
-    - 11
+    - 6
+    - 9
+    - 10
     - 12
-    - 14
-    - 15
-    - 18
+    - 13
+    - 16
     checkpoints:
-    - step: 10
+    - step: 8
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 13
+    - step: 11
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 16
+    - step: 14
       expectation: '{"assert_count": {"equal": 1}}'
-    - step: 17
+    - step: 15
       expectation: '{"assert_text": {"contains": "Needle 0007"}}'
-    - step: 19
+    - step: 17
       expectation: '{"assert_count": {"selector": "unread rows", "equal": 1}}'
     results:
-    - 16
+    - 14
+    - 15
     - 17
-    - 19
   - id: R2
     requirement: 服务器搜索在当前文件夹返回匹配邮件（AC-26）。
     actions:
-    - 20
+    - 18
     checkpoints:
-    - step: 21
+    - step: 19
       expectation: '{"assert_text": {"contains": "Server search found 1 message"}}'
     results:
-    - 21
+    - 19
   visual:
   - check: 截图中搜索框、范围、快捷过滤与结果行布局完整。
     method: manual

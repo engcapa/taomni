@@ -855,6 +855,14 @@
 - `[data-testid="mail-thread-expand"]` — interactive [optional] — F-MAIL-6.thread-expand
 - `[data-testid="mail-save-sent-copy"]` — interactive [optional] — F-MAIL-6.save-sent-copy
 
+## mail/organize (F-MAIL-8)
+
+- `[data-testid="mail-menu-tag"]` — interactive — F-MAIL-8.menu-tag
+- `[data-testid="mail-menu-tag-label1"]` — interactive — F-MAIL-8.menu-tag-label1
+- `[data-testid="mail-message-tag"]` — display — F-MAIL-8.message-tag
+- `[data-testid="mail-quick-filter-tag"]` — interactive — F-MAIL-8.quick-filter-tag
+- `[data-testid="mail-message-junk"]` — display [optional] — F-MAIL-8.message-junk
+
 ## mail/search (F-MAIL-7)
 
 - `[data-testid="mail-search-input"]` — interactive — F-MAIL-7.search-input

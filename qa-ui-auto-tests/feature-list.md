@@ -5331,6 +5331,41 @@ controls:
 - 搜索框查询本地 SQLite FTS5（trigram 分词，支持中文子串；少于 3 字的词回退 LIKE）覆盖整个缓存的邮件头与已缓存正文，可选“本文件夹/所有文件夹”和字段（全部/主题/发件人/收件人/正文）；用户输入按字面短语处理，不解释 FTS 语法。
 - “Server”（或 Shift+Enter）对当前文件夹执行 IMAP `UID SEARCH`（非 ASCII 用 `CHARSET UTF-8`），结果与本地结果合并，不写入缓存。
 - 快捷过滤（未读/星标/附件）同时作用于普通列表与搜索结果；跨文件夹结果显示所在文件夹。
+
+---
+
+### 13.8 标签与垃圾邮件关键字 ✅
+
+<!-- feature
+id: F-MAIL-8
+status: done
+area: mail/organize
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailTags.ts
+  - src/stubs/tauri-core.ts
+controls:
+  - id: menu-tag
+    selector: '[data-testid="mail-menu-tag"]'
+    kind: interactive
+  - id: menu-tag-label1
+    selector: '[data-testid="mail-menu-tag-label1"]'
+    kind: interactive
+  - id: message-tag
+    selector: '[data-testid="mail-message-tag"]'
+    kind: display
+  - id: quick-filter-tag
+    selector: '[data-testid="mail-quick-filter-tag"]'
+    kind: interactive
+  - id: message-junk
+    selector: '[data-testid="mail-message-junk"]'
+    kind: display
+    optional: true       # only for messages carrying $Junk without $NotJunk
+-->
+
+- 右键菜单“Tag”提供 Thunderbird 默认标签（Important/Work/Personal/To Do/Later = `$label1`～`$label5`），写入服务器 IMAP 关键字，列表行显示色点，快捷过滤与本地搜索可按标签筛选；标志对账会同步其他客户端改动的关键字。
+- “Mark as junk / Not junk”在移动之前设置 `$Junk`/`$NotJunk`（服务器不支持关键字时忽略），列表对 `$Junk` 邮件显示标记。
 ---
 
 ## 14. SocksCap 网络流量路由

@@ -2714,6 +2714,11 @@ def _do_mail_server_assert_list_matches(ctx: NativeStepContext, args: Any) -> st
             and (not args.get("unread") or observed.get("unreadRows") == server_unread)
         ):
             return f"list matches server: {server} messages, {server_unread} unread"
+        if isinstance(observed, dict) and observed.get("hasMore") == "true":
+            # Like a user scrolling to the end: load the next cached page.
+            ctx.session.execute(
+                "document.querySelector('[data-testid=\"mail-load-more\"]:not([disabled])')?.click(); return true;"
+            )
         time.sleep(0.5)
     raise StepError(
         f"mail_server_assert_list_matches: server={server} unread={server_unread} ui={observed!r}"

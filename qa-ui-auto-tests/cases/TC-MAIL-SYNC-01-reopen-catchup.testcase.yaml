@@ -1,14 +1,22 @@
 id: TC-MAIL-SYNC-01
 title: Mail catches up every message delivered while the tab was closed
-description: |
-  Regression for the "mail missing after the session was closed" issue
+description: 'Regression for the "mail missing after the session was closed" issue
+
   (docs-feature/mail-thunderbird-parity-design.md R1/AC-01). Opens a mail
+
   account through Quick Connect, closes the tab, delivers 450 messages to the
+
   server (more than two catch-up batches of 200), reopens the same account and
-  requires the fully loaded list to equal the server's message count.
+
+  requires the fully loaded list to equal the server''s message count.
+
   Browser mode drives the stub server model (renderer orchestration only);
+
   native mode runs the real Tauri backend against the in-process fake IMAP
+
   server started by the mail_server fixture.
+
+  '
 covers:
 - F-MAIL-5
 tags:
@@ -23,11 +31,11 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="status-bar"]'
-- click: '[data-testid="app-main-menu"]'
-- hover: '[data-testid="context-menu-item-view"]'
-- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-- wait_for: '[data-testid="quick-connect"]'
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
 - fill:
     selector: '[data-testid="qc-input"]'
     value: ${fixture.mail_quick_connect}
@@ -61,30 +69,29 @@ verification:
     requirement: 标签关闭期间到达的 450 封邮件在重开后全部出现在列表中，列表数量与服务器完全一致且无更多待加载项（AC-01/AC-02）。
     actions:
     - 1
+    - 2
     - 3
-    - 4
     - 5
-    - 7
+    - 6
     - 8
     - 10
     - 12
+    - 13
     - 14
-    - 15
-    - 16
     checkpoints:
-    - step: 9
+    - step: 7
       expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
-    - step: 11
+    - step: 9
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 13
+    - step: 11
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
-    - step: 18
+    - step: 16
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 120}}'
-    - step: 19
+    - step: 17
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-message-row\"]", "min": 450}}'
     results:
-    - 18
-    - 19
+    - 16
+    - 17
   visual:
   - check: 截图中邮件列表、文件夹与计数显示完整，无同步进度残留或遮挡。
     method: manual

@@ -140,5 +140,10 @@ def mail_server_assert_list_matches(ctx: StepContext, args: Any) -> None:
             and (not args.get("unread") or last.get("unreadRows") == last.get("serverUnread"))
         ):
             return
+        if isinstance(last, dict) and last.get("hasMore") == "true":
+            # Like a user scrolling to the end: load the next cached page.
+            ctx.page.evaluate(  # type: ignore[attr-defined]
+                "() => document.querySelector('[data-testid=\"mail-load-more\"]:not([disabled])')?.click()"
+            )
         time.sleep(0.25)
     raise StepError(f"mail_server_assert_list_matches: list does not match server: {last!r}")

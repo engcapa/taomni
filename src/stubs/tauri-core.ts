@@ -9,6 +9,7 @@ import {
   stubMailSearch,
   stubMailSyncAll,
   stubMailSyncFolder,
+  stubMailTransfer,
   stubMailUpdateCachedFlags,
   type Seed as MailStubSeed,
   type StubMailSearchQuery,
@@ -4074,6 +4075,32 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         stubMailExpunge(accountId, mailStubSeed, drafted.remoteDraftFolder, drafted.remoteDraftUid);
       }
       return { accepted: true, response: "browser-preview accepted", sentCopyFolder: "Sent" } as T;
+    }
+    case "mail_set_flags": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uids = Array.isArray(invokeArgs?.uids) ? (invokeArgs?.uids as unknown[]).map(Number) : [];
+      const add = Array.isArray(invokeArgs?.add) ? (invokeArgs?.add as string[]) : [];
+      const remove = Array.isArray(invokeArgs?.remove) ? (invokeArgs?.remove as string[]) : [];
+      const updated = stubMailUpdateCachedFlags(stubMailAccountId(invokeArgs), folder, uids, add, remove);
+      return { folder, updated } as T;
+    }
+    case "mail_move_messages":
+    case "mail_copy_messages":
+    case "mail_delete_messages": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uids = Array.isArray(invokeArgs?.uids) ? (invokeArgs?.uids as unknown[]).map(Number) : [];
+      const target = (invokeArgs?.targetFolder as string | undefined) ?? null;
+      const count = stubMailTransfer(
+        stubMailAccountId(invokeArgs),
+        mailStubSeed,
+        folder,
+        uids,
+        cmd === "mail_delete_messages" ? null : target,
+        cmd === "mail_copy_messages",
+      );
+      return (cmd === "mail_delete_messages" ? { folder, deleted: count } : { folder, target, count }) as T;
     }
     case "mail_search_messages": {
       const invokeArgs = args as InvokeArgs | undefined;

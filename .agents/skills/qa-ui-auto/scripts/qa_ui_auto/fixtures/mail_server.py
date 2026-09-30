@@ -36,7 +36,7 @@ def setup(ctx: Any) -> None:
     values["mail_imap_port"] = str(server.imap_port)
     values["mail_smtp_port"] = str(server.smtp_port)
     values["mail_quick_connect"] = (
-        f"mail://qa:qa-pass@127.0.0.1:{server.imap_port}"
+        f"mail://qa%40example.com:qa-pass@127.0.0.1:{server.imap_port}"
         f"?security=none&smtp=127.0.0.1:{server.smtp_port}"
     )
 
