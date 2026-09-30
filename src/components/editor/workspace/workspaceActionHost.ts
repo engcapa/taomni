@@ -31,7 +31,7 @@ import {
 } from "./workspaceKeymapPlatform";
 
 /** Accept KeyboardEventLike whose optional `code` falls back to `key`. */
-function strokeFromEvent(event: KeyboardEventLike): ShortcutStroke {
+function strokeFromEvent(event: Omit<KeyboardEventLike, "preventDefault" | "stopPropagation">): ShortcutStroke {
   // jsdom/fireEvent produce `code: ""` (not undefined) for unspecified codes;
   // map `key` to its physical code fallback so matching against definition strokes succeeds.
   const rawCode = event.code && event.code.length > 0 ? event.code : undefined;
@@ -1046,6 +1046,25 @@ export class WorkspaceActionHost {
 
   private normalizeStrokeRef(stroke: ShortcutStroke): ShortcutStroke {
     return { ...stroke, key: undefined };
+  }
+
+  /**
+   * Pure check (no chord state change): does any enabled workspace action bind
+   * this event as a single stroke? The app shell asks this before claiming a
+   * chord the IDE keymap also owns (macOS Cmd+1 Project vs Cmd+1 app tab).
+   */
+  claimsSingleStroke(event: Omit<KeyboardEventLike, "preventDefault" | "stopPropagation">): boolean {
+    if (this.disposed) return false;
+    const wanted = normalize(strokeFromEvent(event));
+    for (const actionId of this.actions.keys()) {
+      if (this.isActionUserDisabled(actionId)) continue;
+      const { shortcuts } = this.effectiveShortcuts(actionId);
+      for (const shortcut of shortcuts) {
+        if (shortcut.kind !== "keyboard" || shortcut.strokes.length !== 1) continue;
+        if (strokesEqual(normalize(shortcut.strokes[0]), wanted)) return true;
+      }
+    }
+    return false;
   }
 
   private strokeStartsChord(stroke: ShortcutStroke): boolean {

@@ -37,6 +37,7 @@ import { CodeWorkspaceTab, type CodeWorkspaceGitManagerPayload } from "../compon
 import type { WorkspaceCommandRegistration } from "../components/editor/workspace/workspaceCommands";
 import { resolveShellShortcutRoute } from "../components/editor/workspace/shellShortcutRouter";
 import { decideWorkspaceGitSync } from "../lib/workspaceGitManagerSync";
+import { shellKeyClaimed } from "../lib/shellKeyClaims";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
@@ -3690,7 +3691,9 @@ export function MainLayout() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const tabIndex = macCommandDigitIndex(event);
-      if (tabIndex !== null) {
+      // A focused surface that binds the same chord (Code Workspace Cmd+1
+      // Project on macOS) keeps it; its own keymap dispatches the action.
+      if (tabIndex !== null && !shellKeyClaimed(event)) {
         event.preventDefault();
         event.stopPropagation();
 

@@ -128,6 +128,30 @@ describe("WorkspaceActionHost (N0.1)", () => {
     expect(host.getSnapshot().find((item) => item.id === "workspace.save")?.keybindings).toEqual(["Ctrl+S"]);
   });
 
+  it("claims only single strokes it binds on the active platform (Cmd+1 on macOS)", () => {
+    const host = new WorkspaceActionHost({ workspaceId: "ws-1", getContext: () => ({ focus: "editor" }) });
+    host.registerAction({
+      id: "workspace.toggleProjectTree",
+      title: "Project",
+      category: "View",
+      provenance: "local",
+      keybinding: "Alt+1",
+      platformKeybindings: { mac: ["Meta+1", "Alt+1"] },
+      run: async () => ({ kind: "applied" as const }),
+    });
+    const cmd1 = { key: "1", code: "Digit1", ctrlKey: false, altKey: false, shiftKey: false, metaKey: true };
+    const cmd2 = { ...cmd1, key: "2", code: "Digit2" };
+    try {
+      setKeymapPlatformOverride("mac");
+      expect(host.claimsSingleStroke(cmd1)).toBe(true);
+      expect(host.claimsSingleStroke(cmd2)).toBe(false);
+      setKeymapPlatformOverride("linux");
+      expect(host.claimsSingleStroke(cmd1)).toBe(false);
+    } finally {
+      setKeymapPlatformOverride(null);
+    }
+  });
+
   it("handles in-flight lock and AbortSignal", async () => {
     const ctx: WorkspaceActionContext = { focus: "editor" };
     const host = new WorkspaceActionHost({

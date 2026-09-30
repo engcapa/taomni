@@ -153,6 +153,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { selectFilePath } from "../../lib/ipc";
 import { loadCodeViewProfile } from "../../lib/codeViewProfile";
+import { registerShellKeyClaim } from "../../lib/shellKeyClaims";
 import { useAppStore } from "../../stores/appStore";
 import {
   createEditorGroup,
@@ -16371,6 +16372,15 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     actionsController.host.setKeymapScheme(activeKeymapScheme);
   }, [actionsController.host, activeKeymapScheme]);
+
+  // IDEA's macOS keymap binds Cmd+1..0 to tool windows; the app shell's Cmd+N
+  // tab switch yields those strokes while focus is inside this workspace.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    const host = actionsController.host;
+    return registerShellKeyClaim(root, (event) => host.claimsSingleStroke(event));
+  }, [actionsController.host, visible]);
 
   // §8.19.2: one workspace-root mouse dispatcher; unbound gestures (text
   // selection, editing) pass through untouched. Re-attach only when the
