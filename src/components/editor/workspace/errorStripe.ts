@@ -129,10 +129,12 @@ class ErrorStripeView implements PluginValue {
   update(update: ViewUpdate): void {
     const sourcesChanged = update.startState.field(errorStripeSourcesField, false)
       !== update.state.field(errorStripeSourcesField, false);
-    if (sourcesChanged || update.geometryChanged) {
+    if (sourcesChanged) {
       this.cancel();
       this.render();
-    } else if (update.docChanged || update.heightChanged) {
+    } else if (update.docChanged || update.heightChanged || update.geometryChanged) {
+      // Geometry changes on most keystrokes too (height map re-measure);
+      // rebuilding every mark then cost a full doc scan plus DOM churn per key.
       // Typing never pays for the TODO scan per keystroke; marks settle
       // shortly after the burst (the typing-latency budget stays intact).
       this.cancel();

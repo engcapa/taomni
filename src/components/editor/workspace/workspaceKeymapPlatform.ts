@@ -29,9 +29,26 @@ export function setKeymapPlatformOverride(platform: KeymapPlatform | null): void
   platformOverride = platform;
 }
 
+/**
+ * Detection result keyed by the navigator fingerprint it was computed from.
+ * Every binding lookup defaults its platform argument to this function, so it
+ * runs thousands of times per keystroke/render; the regex work is cached.
+ */
+let detectedPlatform: { rawPlatform: string; rawAgent: string; platform: KeymapPlatform } | null = null;
+
 export function detectKeymapPlatform(): KeymapPlatform {
   if (platformOverride) return platformOverride;
   if (typeof navigator === "undefined") return "linux";
+  const rawPlatform = navigator.platform ?? "";
+  const rawAgent = navigator.userAgent ?? "";
+  const cached = detectedPlatform;
+  if (cached && cached.rawPlatform === rawPlatform && cached.rawAgent === rawAgent) return cached.platform;
+  const platform = detectKeymapPlatformUncached();
+  detectedPlatform = { rawPlatform, rawAgent, platform };
+  return platform;
+}
+
+function detectKeymapPlatformUncached(): KeymapPlatform {
   const fingerprint = `${navigator.platform ?? ""} ${navigator.userAgent ?? ""}`.toLowerCase();
   if (/mac|iphone|ipad/.test(navigator.platform?.toLowerCase() ?? "")) return "mac";
   if (/win/.test(navigator.platform?.toLowerCase() ?? "")) return "windows";

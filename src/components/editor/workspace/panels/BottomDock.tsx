@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -39,6 +40,20 @@ interface BottomDockProps {
   railHost?: HTMLElement | null;
   onRestoreLayout?: () => void;
 }
+
+/**
+ * Hidden tool windows stay mounted (terminals, search results and debugger
+ * state survive), but they do not re-render while hidden: the workspace shell
+ * re-renders on caret moves and LSP results, and re-rendering every mounted
+ * tool per update cost tens of milliseconds per keystroke on WebKitGTK. A
+ * hidden panel catches up with the latest props when it is shown again.
+ */
+export const KeepAliveToolPanel = memo(
+  function KeepAliveToolPanel({ children }: { active: boolean; children: ReactNode }) {
+    return <>{children}</>;
+  },
+  (previous, next) => !previous.active && !next.active,
+);
 
 export const BOTTOM_DOCK_HEADER_HEIGHT = 50;
 /** IDEA-style tool window header height when the tab strip lives on the rail. */
@@ -506,17 +521,20 @@ export function BottomDock({
         className="min-h-0 overflow-hidden"
         style={{ height: open ? Math.max(0, effectiveHeight - (railHost ? RAIL_MODE_HEADER_HEIGHT : BOTTOM_DOCK_HEADER_HEIGHT)) : 0 }}
       >
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            role="tabpanel"
-            aria-label={tab.label}
-            hidden={tab.id !== active?.id}
-            className="h-full min-h-0"
-          >
-            {tab.content}
-          </div>
-        ))}
+        {tabs.map((tab) => {
+          const panelActive = open && tab.id === active?.id;
+          return (
+            <div
+              key={tab.id}
+              role="tabpanel"
+              aria-label={tab.label}
+              hidden={tab.id !== active?.id}
+              className="h-full min-h-0"
+            >
+              <KeepAliveToolPanel active={panelActive}>{tab.content}</KeepAliveToolPanel>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

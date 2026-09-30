@@ -2,7 +2,7 @@
  * Project tree body: roots, hierarchical/flat entries, and loose files.
  * Presentation + expand/open callbacks only — load/mutate logic stays in the shell.
  */
-import { Fragment, type MouseEvent, type ReactNode } from "react";
+import { Fragment, memo, type MouseEvent, type ReactNode } from "react";
 import "./ProjectTree.css";
 import {
   ChevronDown,
@@ -398,7 +398,11 @@ function renderEntries(
   });
 }
 
-export function ProjectTree(props: ProjectTreeProps) {
+/**
+ * Memoized: the workspace shell re-renders per caret move; with stable
+ * handlers (useLatestHandlers) the tree only re-renders when its data changes.
+ */
+export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
   const {
     roots,
     looseFiles,
@@ -538,4 +542,4 @@ export function ProjectTree(props: ProjectTreeProps) {
       )}
     </>
   );
-}
+});

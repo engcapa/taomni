@@ -1,5 +1,6 @@
 import {
   Fragment,
+  startTransition,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -519,8 +520,9 @@ import {
   type ResourceCleanupHandlers,
   type ResourceCleanupOutcome,
 } from "./workspace/workspaceResourceRecoveryCoordinator";
-import { BottomDock, BOTTOM_DOCK_MIN_HEIGHT, BOTTOM_DOCK_MAX_HEIGHT } from "./workspace/panels/BottomDock";
+import { BottomDock, BOTTOM_DOCK_MIN_HEIGHT, BOTTOM_DOCK_MAX_HEIGHT, KeepAliveToolPanel } from "./workspace/panels/BottomDock";
 import { ToolWindowRail, type ToolWindowRailItem } from "./workspace/panels/ToolWindowRail";
+import { useLatestHandlers } from "./workspace/useLatestHandlers";
 import { workspaceNavigationSegments } from "./workspace/workspaceNavigationBar";
 import {
   ReferencesPanel,
@@ -1786,6 +1788,8 @@ export function CodeWorkspaceTab({
   const tryGrantTreeFocusRef = useRef<(intent: TreeOpenIntent, canonicalKey: string) => boolean>(() => false);
 
   const [editorCommandContextRevision, setEditorCommandContextRevision] = useState(0);
+  /** Selection-derived action-context flags last published (see onSelectionChange). */
+  const editorCommandSignatureRef = useRef<string | null>(null);
   const registerEditorCommandPort = useCallback((
     groupId: EditorGroupId,
     registration: EditorCommandPortRegistration,
@@ -2314,25 +2318,28 @@ export function CodeWorkspaceTab({
   // Editor keys whose library sources are being fetched (drives the button spinner).
   const [downloadingSourcesKeys, setDownloadingSourcesKeys] = useState<string[]>([]);
   const [activeSelectionStats, setActiveSelectionStats] = useState({ chars: 0, lineBreaks: 0 });
-  const [cursorPositions, setCursorPositions] = useState<Record<EditorGroupId, LspPosition>>({
+  const [cursorPositions, setCursorPositionsNow] = useState<Record<EditorGroupId, LspPosition>>({
     primary: { line: 0, character: 0 },
     secondary: { line: 0, character: 0 },
   });
-  const [viewportRanges, setViewportRanges] = useState<Record<EditorGroupId, LspRange | null>>({
+  /** Latest caret per group for callbacks that must not change identity per caret move. */
+  const cursorPositionsRef = useRef(cursorPositions);
+  cursorPositionsRef.current = cursorPositions;
+  const [viewportRanges, setViewportRangesNow] = useState<Record<EditorGroupId, LspRange | null>>({
     primary: null,
     secondary: null,
   });
   const [syncSplitScroll, setSyncSplitScroll] = useState(false);
   const syncScrollOriginGroupIdRef = useRef<EditorGroupId | null>(null);
-  const [highlightsByGroup, setHighlightsByGroup] = useState<Record<EditorGroupId, LspDocumentHighlight[]>>({
+  const [highlightsByGroup, setHighlightsByGroupNow] = useState<Record<EditorGroupId, LspDocumentHighlight[]>>({
     primary: [],
     secondary: [],
   });
-  const [inlayHintsByGroup, setInlayHintsByGroup] = useState<Record<EditorGroupId, LspInlayHint[]>>({
+  const [inlayHintsByGroup, setInlayHintsByGroupNow] = useState<Record<EditorGroupId, LspInlayHint[]>>({
     primary: [],
     secondary: [],
   });
-  const [semanticTokensByGroup, setSemanticTokensByGroup] = useState<Record<EditorGroupId, LspSemanticToken[]>>({
+  const [semanticTokensByGroup, setSemanticTokensByGroupNow] = useState<Record<EditorGroupId, LspSemanticToken[]>>({
     primary: [],
     secondary: [],
   });
@@ -2377,10 +2384,31 @@ export function CodeWorkspaceTab({
     workspaceLspSessionManagerRef.current?.setCompletionPreferences(intelligencePreferences.completion);
   }, [intelligencePreferences.completion]);
   const [intelligenceSettingsOpen, setIntelligenceSettingsOpen] = useState(false);
-  const [breadcrumbSymbolsByGroup, setBreadcrumbSymbolsByGroup] = useState<Record<EditorGroupId, LspDocumentSymbol[]>>({
+  const [breadcrumbSymbolsByGroup, setBreadcrumbSymbolsByGroupNow] = useState<Record<EditorGroupId, LspDocumentSymbol[]>>({
     primary: [],
     secondary: [],
   });
+  // Caret, viewport and provider results arrive between keystrokes and
+  // re-render the whole workspace shell. Render them as transitions so React
+  // yields to typing (WebKitGTK input stalled behind these renders).
+  const setCursorPositions = useCallback((update: Parameters<typeof setCursorPositionsNow>[0]) => {
+    startTransition(() => setCursorPositionsNow(update));
+  }, []);
+  const setViewportRanges = useCallback((update: Parameters<typeof setViewportRangesNow>[0]) => {
+    startTransition(() => setViewportRangesNow(update));
+  }, []);
+  const setHighlightsByGroup = useCallback((update: Parameters<typeof setHighlightsByGroupNow>[0]) => {
+    startTransition(() => setHighlightsByGroupNow(update));
+  }, []);
+  const setInlayHintsByGroup = useCallback((update: Parameters<typeof setInlayHintsByGroupNow>[0]) => {
+    startTransition(() => setInlayHintsByGroupNow(update));
+  }, []);
+  const setSemanticTokensByGroup = useCallback((update: Parameters<typeof setSemanticTokensByGroupNow>[0]) => {
+    startTransition(() => setSemanticTokensByGroupNow(update));
+  }, []);
+  const setBreadcrumbSymbolsByGroup = useCallback((update: Parameters<typeof setBreadcrumbSymbolsByGroupNow>[0]) => {
+    startTransition(() => setBreadcrumbSymbolsByGroupNow(update));
+  }, []);
   const [navigationBarActiveByGroup, setNavigationBarActiveByGroup] = useState<Record<EditorGroupId, boolean>>({
     primary: false,
     secondary: false,
@@ -7562,7 +7590,7 @@ export function CodeWorkspaceTab({
     }
     let requestSequence = 0;
     try {
-      const position = cursorPositions[activeEditorGroupId] ?? editorSelectionRef.current.start;
+      const position = cursorPositionsRef.current[activeEditorGroupId] ?? editorSelectionRef.current.start;
       const fileKey = file.key;
       const docRevision = openFilesRef.current[fileKey]?.documentRevision ?? 0;
       const lspGen = lspSessionGeneration();
@@ -7637,7 +7665,6 @@ export function CodeWorkspaceTab({
   }, [
     activeEditorGroupId,
     activeFile,
-    cursorPositions,
     lspSessionGeneration,
     projectAnalysisSnapshot?.projectFingerprint,
     lspDescriptorForFile,
@@ -13379,7 +13406,7 @@ export function CodeWorkspaceTab({
       return;
     }
 
-    const cursor = cursorPositions[activeEditorGroupId] ?? { line: 0, character: 0 };
+    const cursor = cursorPositionsRef.current[activeEditorGroupId] ?? { line: 0, character: 0 };
     const currentLine = cursor.line + 1;
     const currentColumn = cursor.character + 1;
 
@@ -13439,7 +13466,6 @@ export function CodeWorkspaceTab({
     activeEditorGroupId,
     activeFile,
     currentDiagnosticsForFile,
-    cursorPositions,
     diagnosticScopeForFile,
     displayDiagnosticsFor,
     inspectionPathForFileKey,
@@ -15624,7 +15650,7 @@ export function CodeWorkspaceTab({
       keywords: ["breakpoint", "toggle breakpoint", "debug"],
       when: () => !!activeFile && !activeFile.library,
       run: () => {
-        const cursor = cursorPositions[activeEditorGroupId];
+        const cursor = cursorPositionsRef.current[activeEditorGroupId];
         const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
         toggleActiveBreakpointRef.current(line);
       },
@@ -15637,7 +15663,7 @@ export function CodeWorkspaceTab({
       keybindings: ["Mod-Shift-F8"],
       keywords: ["breakpoint", "manage breakpoints", "condition", "log", "debug"],
       run: () => {
-        const cursor = cursorPositions[activeEditorGroupId];
+        const cursor = cursorPositionsRef.current[activeEditorGroupId];
         const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
         editActiveBreakpointRef.current(line);
       },
@@ -16371,6 +16397,16 @@ export function CodeWorkspaceTab({
   const [keymapMigrationNoticeOpen, setKeymapMigrationNoticeOpen] = useState(
     () => consumeKeymapDefaultsMigrationNotice(),
   );
+
+  // Stable handler identities let the memoized project tree skip the
+  // per-caret-move workspace re-render.
+  const projectTreeHandlers = useLatestHandlers({
+    onToggleRoot: toggleRoot,
+    onToggleDir: toggleDir,
+    onSelect: setSelected,
+    onOpenFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean }) => { void requestTreeOpen(ref, options); },
+    onContextMenu: showTreeContextMenu,
+  });
 
   // ED-PARITY-010 DEC-010-01: IDEA tool window stripes. The bottom-dock tools
   // render their own buttons into `bottomRailHost` (same testids as before).
@@ -21076,7 +21112,17 @@ export function CodeWorkspaceTab({
             setActiveSelectionStats((current) => (
               current.chars === chars && current.lineBreaks === lineBreaks ? current : { chars, lineBreaks }
             ));
-            setEditorCommandContextRevision((revision) => revision + 1);
+            // The action context only reads selection-derived flags; bump its
+            // revision when one of them changed instead of re-rendering the
+            // whole workspace for every caret move.
+            const commandState = activeEditorCommandState();
+            const commandSignature = commandState
+              ? `${commandState.hasSelection}|${commandState.caretCount}|${commandState.readOnly}|${commandState.composing}|${commandState.occurrenceSessionActive}`
+              : "none";
+            if (commandSignature !== editorCommandSignatureRef.current) {
+              editorCommandSignatureRef.current = commandSignature;
+              setEditorCommandContextRevision((revision) => revision + 1);
+            }
             // ED-PARITY-011 DEC-011-07: only user-made drag/Shift selections
             // raise the AI toolbar; Find, navigation, double-click and Select
             // All selections do not.
@@ -21695,11 +21741,7 @@ export function CodeWorkspaceTab({
                   activeKey={activeKey}
                   openFiles={openFiles}
                   gitChangeByRootPath={gitChangeByRootPath}
-                  onToggleRoot={toggleRoot}
-                  onToggleDir={toggleDir}
-                  onSelect={setSelected}
-                  onOpenFile={(ref, options) => { void requestTreeOpen(ref, options); }}
-                  onContextMenu={showTreeContextMenu}
+                  {...projectTreeHandlers}
                 />
               </FileTreePane>
             </div>
@@ -21776,6 +21818,7 @@ export function CodeWorkspaceTab({
                 </button>
               </div>
               <div role="tabpanel" className="min-h-0 flex-1">
+                <KeepAliveToolPanel active={rightPaneOpen}>
                 {rightPaneTab === "outline" ? (
                   <OutlinePane
                     symbols={breadcrumbSymbolsByGroup[activeEditorGroupId] ?? []}
@@ -21804,6 +21847,7 @@ export function CodeWorkspaceTab({
                     }}
                   />
                 )}
+                </KeepAliveToolPanel>
               </div>
             </aside>
           </Panel>

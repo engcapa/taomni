@@ -20,9 +20,9 @@ import {
   type Shortcut,
   type ShortcutStroke,
   shortcutIdentity,
-  strokesEqual,
   strokeFromKeyboardEvent,
 } from "./workspaceKeymapScheme";
+import { getLocale } from "../../../lib/i18n";
 import {
   detectKeymapPlatform,
   formatShortcutLabel,
@@ -206,10 +206,58 @@ export function actionKeybindings(
   );
 }
 
+/**
+ * Parsed default shortcuts per registered definition object. Keyboard
+ * dispatch and every rendered shortcut label resolve through here, so the
+ * string parsing must not rerun per keystroke or per render.
+ */
+const definitionShortcutCache = new WeakMap<
+  WorkspaceActionDefinition,
+  { platform: KeymapPlatform; shortcuts: readonly Shortcut[] }
+>();
+
 /** Parse an action's built-in default keybinding strings into physical strokes. */
 function parseDefinitionKeybindings(action: WorkspaceActionDefinition): readonly Shortcut[] {
+  const platform = detectKeymapPlatform();
+  const cached = definitionShortcutCache.get(action);
+  if (cached && cached.platform === platform) return cached.shortcuts;
+  // Command adapters are recreated whenever the workspace re-registers its
+  // commands; their binding strings rarely change, so reuse the parse.
+  const signature = definitionBindingSignature(action, platform);
+  let shortcuts = definitionShortcutsBySignature.get(signature);
+  if (!shortcuts) {
+    shortcuts = parseDefinitionKeybindingsUncached(action, platform);
+    if (definitionShortcutsBySignature.size >= 4096) definitionShortcutsBySignature.clear();
+    definitionShortcutsBySignature.set(signature, shortcuts);
+  }
+  definitionShortcutCache.set(action, { platform, shortcuts });
+  return shortcuts;
+}
+
+const definitionShortcutsBySignature = new Map<string, readonly Shortcut[]>();
+
+function definitionBindingSignature(action: WorkspaceActionDefinition, platform: KeymapPlatform): string {
+  const keybinding = action.keybinding;
+  const primary = typeof keybinding === "string"
+    ? keybinding
+    : keybinding
+      ? `${keybinding.default ?? ""}\u0002${keybinding.macos ?? ""}\u0002${keybinding.windows ?? ""}\u0002${keybinding.linux ?? ""}`
+      : "";
+  const overrides = action.platformKeybindings;
+  return [
+    platform,
+    primary,
+    (action.secondaryKeybindings ?? []).join("\u0002"),
+    overrides ? `${overrides.windows?.join("\u0002") ?? "-"}\u0003${overrides.linux?.join("\u0002") ?? "-"}\u0003${overrides.mac?.join("\u0002") ?? "-"}` : "",
+  ].join("\u0001");
+}
+
+function parseDefinitionKeybindingsUncached(
+  action: WorkspaceActionDefinition,
+  platform: KeymapPlatform,
+): readonly Shortcut[] {
   const out: Shortcut[] = [];
-  for (const pattern of actionKeybindings(action)) {
+  for (const pattern of actionKeybindings(action, platform)) {
     const parts = pattern.trim().split(/\s+/);
     if (parts.length > 2) continue;
     const strokes: ShortcutStroke[] = [];
@@ -239,39 +287,68 @@ function parseDefinitionKeybindings(action: WorkspaceActionDefinition): readonly
   return out;
 }
 
+const LOGICAL_KEY_CODES: Readonly<Record<string, string>> = {
+  arrowleft: "ArrowLeft",
+  arrowright: "ArrowRight",
+  arrowup: "ArrowUp",
+  arrowdown: "ArrowDown",
+  enter: "Enter",
+  numpadenter: "Enter",
+  escape: "Escape",
+  tab: "Tab",
+  space: "Space",
+  backspace: "Backspace",
+  delete: "Delete",
+  home: "Home",
+  end: "End",
+  pageup: "PageUp",
+  pagedown: "PageDown",
+  f1: "F1", f2: "F2", f3: "F3", f4: "F4", f5: "F5", f6: "F6",
+  f7: "F7", f8: "F8", f9: "F9", f10: "F10", f11: "F11", f12: "F12",
+  // Named spellings used by catalog strings ("Ctrl+Period", "Alt+Insert",
+  // "Ctrl+Shift+NumpadSubtract") — previously dropped silently (ED-PARITY-013).
+  period: "Period", comma: "Comma", slash: "Slash", backslash: "Backslash",
+  minus: "Minus", equal: "Equal", insert: "Insert",
+  numpadsubtract: "NumpadSubtract", numpadadd: "NumpadAdd",
+  numpadmultiply: "NumpadMultiply", numpaddivide: "NumpadDivide",
+  ",": "Comma", ".": "Period", "/": "Slash", "\\": "Backslash",
+  ";": "Semicolon", "'": "Quote", "[": "BracketLeft", "]": "BracketRight",
+  "-": "Minus", "=": "Equal", "`": "Backquote",
+};
+
 /** Map a normalized logical key to the most common KeyboardEvent.code. */
-function logicalKeyToCode(logicalKey: string): string | null {  const key = logicalKey.toLowerCase();
+function logicalKeyToCode(logicalKey: string): string | null {
+  const key = logicalKey.toLowerCase();
   if (/^[a-z]$/.test(key)) return `Key${key.toUpperCase()}`;
   if (/^[0-9]$/.test(key)) return `Digit${key}`;
-  const named: Record<string, string> = {
-    arrowleft: "ArrowLeft",
-    arrowright: "ArrowRight",
-    arrowup: "ArrowUp",
-    arrowdown: "ArrowDown",
-    enter: "Enter",
-    numpadenter: "Enter",
-    escape: "Escape",
-    tab: "Tab",
-    space: "Space",
-    backspace: "Backspace",
-    delete: "Delete",
-    home: "Home",
-    end: "End",
-    pageup: "PageUp",
-    pagedown: "PageDown",
-    f1: "F1", f2: "F2", f3: "F3", f4: "F4", f5: "F5", f6: "F6",
-    f7: "F7", f8: "F8", f9: "F9", f10: "F10", f11: "F11", f12: "F12",
-    // Named spellings used by catalog strings ("Ctrl+Period", "Alt+Insert",
-    // "Ctrl+Shift+NumpadSubtract") — previously dropped silently (ED-PARITY-013).
-    period: "Period", comma: "Comma", slash: "Slash", backslash: "Backslash",
-    minus: "Minus", equal: "Equal", insert: "Insert",
-    numpadsubtract: "NumpadSubtract", numpadadd: "NumpadAdd",
-    numpadmultiply: "NumpadMultiply", numpaddivide: "NumpadDivide",
-    ",": "Comma", ".": "Period", "/": "Slash", "\\": "Backslash",
-    ";": "Semicolon", "'": "Quote", "[": "BracketLeft", "]": "BracketRight",
-    "-": "Minus", "=": "Equal", "`": "Backquote",
-  };
-  return named[key] ?? null;
+  return Object.prototype.hasOwnProperty.call(LOGICAL_KEY_CODES, key) ? LOGICAL_KEY_CODES[key]! : null;
+}
+
+/**
+ * Exact identity of `strokesEqual` (code + modifiers compared with `===`), so a
+ * map keyed by it returns precisely the strokes the linear scan matched.
+ */
+function strokeMatchKey(stroke: ShortcutStroke): string {
+  return `${stroke.code}\u0000${String(stroke.ctrl)}\u0000${String(stroke.alt)}\u0000${String(stroke.shift)}\u0000${String(stroke.meta)}`;
+}
+
+interface IndexedBinding {
+  actionId: string;
+  source: ResolvedBindingSource;
+}
+
+/**
+ * Keyboard lookup tables derived from the effective keymap. Rebuilt only when
+ * the host generation, keymap scheme or platform changes; entries keep the
+ * action registration order the previous linear scans produced.
+ */
+interface BindingIndex {
+  generation: number;
+  scheme: KeymapSchemeV3 | null;
+  platform: KeymapPlatform;
+  single: Map<string, IndexedBinding[]>;
+  chord: Map<string, IndexedBinding[]>;
+  chordPrefixes: Set<string>;
 }
 
 function defaultDisabledReason(context: WorkspaceActionContext): ActionDisabledReason {
@@ -422,6 +499,14 @@ export class WorkspaceActionHost {
   private pendingChordStroke: ShortcutStroke | null = null;
   private chordTimer: ReturnType<typeof setTimeout> | null = null;
   private onChordStateChange?: (pending: boolean) => void;
+  private bindingIndexCache: BindingIndex | null = null;
+  private displayCache: {
+    generation: number;
+    scheme: KeymapSchemeV3 | null;
+    platform: KeymapPlatform;
+    locale: string;
+    labels: Map<string, string[]>;
+  } | null = null;
 
   constructor(options: WorkspaceActionHostOptions) {
     this.workspaceId = options.workspaceId;
@@ -972,28 +1057,19 @@ export class WorkspaceActionHost {
     const candidates: Candidate[] = [];
     let sawEnabledCandidate = false;
 
-    for (const [actionId] of this.actions) {
-      const { shortcuts, source } = this.effectiveShortcuts(actionId);
-      for (const shortcut of shortcuts) {
-        if (shortcut.kind !== "keyboard") continue;
-        let matched = false;
-        if (secondStroke && shortcut.strokes.length === 2) {
-          matched = strokesEqual(normalize(shortcut.strokes[0]), normalize(secondStroke))
-            && strokesEqual(normalize(shortcut.strokes[1]), normalize(stroke));
-        } else if (!secondStroke && shortcut.strokes.length === 1) {
-          matched = strokesEqual(normalize(shortcut.strokes[0]), normalize(stroke));
-        }
-        if (!matched) continue;
-        const evaluation = this.prepareWithContext(actionId, context, "keyboard");
-        candidates.push({
-          actionId,
-          evaluation,
-          contextSpecificity: evaluation.state.availability === "available" ? 1 : 0,
-          source,
-        });
-        if (evaluation.state.availability === "available") sawEnabledCandidate = true;
-        break;
-      }
+    const index = this.bindingIndex();
+    const matches = secondStroke
+      ? index.chord.get(`${strokeMatchKey(normalize(secondStroke))}\u0001${strokeMatchKey(normalize(stroke))}`)
+      : index.single.get(strokeMatchKey(normalize(stroke)));
+    for (const { actionId, source } of matches ?? []) {
+      const evaluation = this.prepareWithContext(actionId, context, "keyboard");
+      candidates.push({
+        actionId,
+        evaluation,
+        contextSpecificity: evaluation.state.availability === "available" ? 1 : 0,
+        source,
+      });
+      if (evaluation.state.availability === "available") sawEnabledCandidate = true;
     }
 
     if (candidates.length === 0) {
@@ -1055,28 +1131,56 @@ export class WorkspaceActionHost {
    */
   claimsSingleStroke(event: Omit<KeyboardEventLike, "preventDefault" | "stopPropagation">): boolean {
     if (this.disposed) return false;
-    const wanted = normalize(strokeFromEvent(event));
-    for (const actionId of this.actions.keys()) {
-      if (this.isActionUserDisabled(actionId)) continue;
-      const { shortcuts } = this.effectiveShortcuts(actionId);
-      for (const shortcut of shortcuts) {
-        if (shortcut.kind !== "keyboard" || shortcut.strokes.length !== 1) continue;
-        if (strokesEqual(normalize(shortcut.strokes[0]), wanted)) return true;
-      }
-    }
-    return false;
+    const matches = this.bindingIndex().single.get(strokeMatchKey(normalize(strokeFromEvent(event))));
+    return !!matches?.some(({ actionId }) => !this.isActionUserDisabled(actionId));
   }
 
   private strokeStartsChord(stroke: ShortcutStroke): boolean {
-    const wanted = this.normalizeStrokeRef(stroke);
+    return this.bindingIndex().chordPrefixes.has(strokeMatchKey(this.normalizeStrokeRef(stroke)));
+  }
+
+  /** Effective keymap lookup tables, rebuilt when bindings can have changed. */
+  private bindingIndex(): BindingIndex {
+    const platform = detectKeymapPlatform();
+    const cached = this.bindingIndexCache;
+    if (
+      cached
+      && cached.generation === this.generation
+      && cached.scheme === this.keymapScheme
+      && cached.platform === platform
+    ) return cached;
+    const single = new Map<string, IndexedBinding[]>();
+    const chord = new Map<string, IndexedBinding[]>();
+    const chordPrefixes = new Set<string>();
+    const add = (map: Map<string, IndexedBinding[]>, key: string, entry: IndexedBinding) => {
+      const bucket = map.get(key);
+      if (!bucket) map.set(key, [entry]);
+      else if (!bucket.some((existing) => existing.actionId === entry.actionId)) bucket.push(entry);
+    };
     for (const actionId of this.actions.keys()) {
-      const { shortcuts } = this.effectiveShortcuts(actionId);
+      const { shortcuts, source } = this.effectiveShortcuts(actionId);
       for (const shortcut of shortcuts) {
-        if (shortcut.kind !== "keyboard" || shortcut.strokes.length !== 2) continue;
-        if (strokesEqual(normalize(shortcut.strokes[0]), wanted)) return true;
+        if (shortcut.kind !== "keyboard") continue;
+        const [first, second] = shortcut.strokes;
+        if (shortcut.strokes.length === 1 && first) {
+          add(single, strokeMatchKey(normalize(first)), { actionId, source });
+        } else if (shortcut.strokes.length === 2 && first && second) {
+          const firstKey = strokeMatchKey(normalize(first));
+          chordPrefixes.add(firstKey);
+          add(chord, `${firstKey}\u0001${strokeMatchKey(normalize(second))}`, { actionId, source });
+        }
       }
     }
-    return false;
+    const next: BindingIndex = {
+      generation: this.generation,
+      scheme: this.keymapScheme,
+      platform,
+      single,
+      chord,
+      chordPrefixes,
+    };
+    this.bindingIndexCache = next;
+    return next;
   }
 
   /**
@@ -1309,9 +1413,28 @@ export class WorkspaceActionHost {
    * through the one shared formatter (ED-PARITY-013 DEC-013-02).
    */
   effectiveKeybindingDisplay(actionId: string): string[] {
-    return this.effectiveShortcuts(actionId).shortcuts
-      .map((shortcut) => formatShortcutLabel(shortcut))
+    // Rails, menus and tooltips ask for these labels on every render; cache
+    // them until the bindings, platform or UI locale change.
+    const platform = detectKeymapPlatform();
+    const locale = getLocale();
+    let cache = this.displayCache;
+    if (
+      !cache
+      || cache.generation !== this.generation
+      || cache.scheme !== this.keymapScheme
+      || cache.platform !== platform
+      || cache.locale !== locale
+    ) {
+      cache = { generation: this.generation, scheme: this.keymapScheme, platform, locale, labels: new Map() };
+      this.displayCache = cache;
+    }
+    const cached = cache.labels.get(actionId);
+    if (cached) return [...cached];
+    const labels = this.effectiveShortcuts(actionId).shortcuts
+      .map((shortcut) => formatShortcutLabel(shortcut, platform, locale))
       .filter(Boolean);
+    cache.labels.set(actionId, labels);
+    return [...labels];
   }
 
   getSnapshot(
