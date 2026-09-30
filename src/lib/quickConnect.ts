@@ -186,7 +186,7 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
 }
 
 /**
- * `mail://user[:password]@imap-host[:port][?security=tls|starttls|none&smtp=host[:port]&smtpSecurity=...]`
+ * `mail://user[:password]@imap-host[:port][?security=tls|starttls|none&smtp=host[:port]&smtpSecurity=...&carddav=url&caldav=url]`
  *
  * The session id is derived from account + server so reopening the same
  * target reuses its local mail cache (gap-free catch-up instead of a fresh
@@ -229,6 +229,8 @@ function mailQuickConnect(target: string, now: number): ParsedQuickConnect {
       options_json: JSON.stringify({
         mailSignature: "",
         ...(pop3 ? { mailIncoming: "pop3" } : {}),
+        ...(params.get("carddav")?.trim() ? { mailCardDavUrl: params.get("carddav")!.trim() } : {}),
+        ...(params.get("caldav")?.trim() ? { mailCalDavUrl: params.get("caldav")!.trim() } : {}),
         mailImapSecurity: security,
         mailSmtpHost: smtpHost,
         mailSmtpPort: String(smtpPort),

@@ -40,6 +40,7 @@ use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 
 pub mod autoconfig;
+pub mod caldav;
 pub mod calendar;
 pub mod contacts;
 pub mod filters;
@@ -57,6 +58,7 @@ mod pop3;
 pub mod search;
 mod sync;
 mod vcard;
+mod webdav;
 
 use sync::{FolderStepOutcome, FolderSyncState, StepParams};
 pub use sync::{MailFolderSyncResult, MailSyncRequestMode};
@@ -417,6 +419,9 @@ pub struct MailAccountConfig {
     /// CardDAV address book (TASK-19); `None` = local address book only.
     #[serde(default)]
     pub carddav: Option<contacts::MailCardDavSettings>,
+    /// CalDAV calendar for the agenda (TASK-20 phase 2); `None` = off.
+    #[serde(default)]
+    pub caldav: Option<caldav::MailCalDavSettings>,
 }
 
 #[derive(Debug, Clone)]
@@ -1501,7 +1506,8 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
     sync::migrate_mail_tables(conn)?;
     pop3::migrate_local_tables(conn)?;
     filters::migrate_filter_tables(conn)?;
-    contacts::migrate_contact_tables(conn)
+    contacts::migrate_contact_tables(conn)?;
+    caldav::migrate_calendar_tables(conn)
 }
 
 fn with_mail_db<T>(
@@ -6732,6 +6738,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 incoming: MailIncomingProtocol::Imap,
                 pop3_leave_days: None,
                 carddav: None,
+                caldav: None,
             },
             auth_mode: MailAuthMode::Password,
             network_settings: None,
@@ -6954,6 +6961,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 incoming: MailIncomingProtocol::Imap,
                 pop3_leave_days: None,
                 carddav: None,
+                caldav: None,
             },
             auth_mode: MailAuthMode::OAuth2,
             network_settings: None,

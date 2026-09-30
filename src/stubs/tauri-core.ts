@@ -26,6 +26,7 @@ import {
   stubSaveAddressBookEntry,
 } from "./mailContactsStub";
 import type { MailAddressBookEntry } from "../lib/mailContacts";
+import { stubAddInviteToCalendar, stubCalDavSync, stubListAgenda } from "./mailCalendarStub";
 import type { MailFilter } from "../lib/mailFilters";
 import type { SessionConfig, SessionGroup, LocalShellOption, LocalDirectoryShortcut, IpcRunSnapshotRecord, IpcSnapshotEntry } from "../lib/ipc";
 import {
@@ -4304,6 +4305,24 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       throw new Error("vCard files need the desktop app");
     case "mail_carddav_sync":
       throw new Error("CardDAV sync needs the desktop app");
+    case "mail_list_agenda": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubListAgenda(stubMailAccountId(invokeArgs), Number(invokeArgs?.days ?? 14)) as T;
+    }
+    case "mail_caldav_sync": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const config = invokeArgs?.config as { caldav?: { url?: string } | null } | undefined;
+      return stubCalDavSync(stubMailAccountId(invokeArgs), config?.caldav?.url ?? "") as T;
+    }
+    case "mail_add_invite_to_calendar": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uid = Number(invokeArgs?.uid ?? 0);
+      const accountId = stubMailAccountId(invokeArgs);
+      const invite = stubMailFindHeader(accountId, mailStubSeed, folder, uid)?.invite;
+      if (!invite) throw new Error("this message has no calendar invitation");
+      return stubAddInviteToCalendar(accountId, invite, (invokeArgs?.partstat as string | null | undefined) ?? null) as T;
+    }
     case "mail_test_connection": {
       return { imapOk: true, smtpOk: true, folderCount: MAIL_STUB_FOLDERS.length } as T;
     }

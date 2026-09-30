@@ -120,7 +120,7 @@ pub(super) fn param<'a>(params: &'a [(String, String)], key: &str) -> Option<&'a
         .map(|(_, v)| v.as_str())
 }
 
-fn parse_time(value: &str, params: &[(String, String)]) -> Option<MailInviteTime> {
+pub(super) fn parse_time(value: &str, params: &[(String, String)]) -> Option<MailInviteTime> {
     let value = value.trim();
     let date_only = param(params, "VALUE") == Some("DATE") || value.len() == 8;
     let digits =

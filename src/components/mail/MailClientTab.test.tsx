@@ -94,6 +94,17 @@ vi.mock("../../lib/mailContacts", async (importOriginal) => ({
   ...contactMocks,
 }));
 
+const calendarMocks = vi.hoisted(() => ({
+  mailAddInviteToCalendar: vi.fn(),
+  mailCalDavSync: vi.fn(async () => ({ collection: "c", events: 0, errors: [] })),
+  mailListAgenda: vi.fn(async () => []),
+}));
+
+vi.mock("../../lib/mailCalendar", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/mailCalendar")>()),
+  ...calendarMocks,
+}));
+
 vi.mock("../../lib/ipc", () => ({
   openLocalPath: vi.fn(),
   selectUploadFile: vi.fn(async () => []),
@@ -1141,6 +1152,34 @@ describe("MailClientTab", () => {
     ));
     expect(await screen.findByTestId("mail-invite-responded")).toHaveTextContent("tentative");
     expect(screen.getByTestId("mail-invite-card")).toHaveAttribute("data-partstat", "TENTATIVE");
+  });
+
+  it("writes an accepted invitation into the CalDAV calendar (AC-64)", async () => {
+    const invited: MailMessageHeader = {
+      ...message,
+      attachments: [{ name: "invite.ics", contentType: "text/calendar", size: 420 }],
+    };
+    mailMocks.mailListCachedMessages.mockResolvedValue([invited]);
+    mailMocks.mailGetMessageBody.mockResolvedValue({ ...messageBody, attachments: invited.attachments });
+    mailMocks.mailGetInvite.mockResolvedValue({
+      method: "REQUEST",
+      uid: "evt-1",
+      sequence: 0,
+      summary: "Planning",
+      organizer: { email: "boss@example.com", partstat: "ACCEPTED" },
+      attendees: [],
+      ics: "",
+    });
+    mailMocks.mailRespondInvite.mockResolvedValue({ partstat: "ACCEPTED", sentTo: "boss@example.com" });
+    calendarMocks.mailAddInviteToCalendar.mockResolvedValue({ href: "/cal/evt-1.ics", created: true });
+    render(<MailClientTab tabId="mail-tab" info={{ ...info, caldav: { url: "https://dav.example/" } }} visible />);
+    fireEvent.click(await screen.findByTestId("mail-invite-accept"));
+    await waitFor(() => expect(calendarMocks.mailAddInviteToCalendar).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: info.sessionId }), invited.folder, invited.uid, "ACCEPTED",
+    ));
+    expect(await screen.findByTestId("mail-invite-in-calendar")).toBeInTheDocument();
+    expect(screen.queryByTestId("mail-invite-add-calendar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mail-agenda-open")).toBeInTheDocument();
   });
 
   it("shows a cancelled meeting without reply buttons (AC-63)", async () => {

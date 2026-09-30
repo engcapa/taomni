@@ -150,6 +150,31 @@ class FakeMailServerTest(unittest.TestCase):
         self.assertEqual(data[0].split(), [str(uids[0]).encode(), str(uids[1]).encode()])
         client.logout()
 
+    def test_caldav_discovery_put_and_report(self) -> None:
+        import http.client
+
+        def request(method: str, path: str, body: str = "", headers: dict | None = None):
+            conn = http.client.HTTPConnection("127.0.0.1", self.server.caldav_port, timeout=5)
+            conn.request(method, path, body=body.encode(), headers=headers or {})
+            response = conn.getresponse()
+            data = response.read().decode()
+            conn.close()
+            return response.status, dict(response.getheaders()), data
+
+        status, headers, _ = request("PROPFIND", "/.well-known/caldav")
+        self.assertEqual((status, headers.get("Location")), (301, "/dav/"))
+        status, _, body = request("PROPFIND", "/dav/principals/qa/")
+        self.assertEqual(status, 207)
+        self.assertIn("<c:calendar-home-set><d:href>/dav/calendars/qa/</d:href>", body)
+        ics = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nSUMMARY:A & B\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+        path = "/dav/calendars/qa/work/x.ics"
+        self.assertEqual(request("PUT", path, ics, {"If-None-Match": "*"})[0], 201)
+        self.assertEqual(request("PUT", path, ics, {"If-None-Match": "*"})[0], 412)
+        status, _, body = request("REPORT", "/dav/calendars/qa/work/", "<c:calendar-query/>")
+        self.assertEqual(status, 207)
+        self.assertIn("SUMMARY:A &amp; B", body)
+        self.assertTrue(self.server.state.caldav_contains("SUMMARY:A & B"))
+
     def test_subjects(self) -> None:
         self.server.state.deliver("Archive", 2, prefix="Moved")
         self.assertEqual(self.server.state.subjects("Archive"), ["Moved 0001", "Moved 0002"])

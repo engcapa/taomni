@@ -826,6 +826,21 @@
 - `[data-testid="mail-invite-export"]` — interactive [optional] — F-MAIL-18.invite-export
 - `[data-testid="mail-invite-open"]` — interactive [optional] — F-MAIL-18.invite-open
 
+## mail/calendar (F-MAIL-22)
+
+- `[data-testid="mail-agenda-open"]` — interactive — F-MAIL-22.agenda-open
+- `[data-testid="mail-agenda-close"]` — interactive [optional] — F-MAIL-22.agenda-close
+- `[data-testid="mail-agenda"]` — display [optional] — F-MAIL-22.agenda
+- `[data-testid="mail-agenda-event"]` — display — F-MAIL-22.agenda-event
+- `[data-testid="mail-agenda-sync"]` — interactive [optional] — F-MAIL-22.agenda-sync
+- `[data-testid="mail-agenda-error"]` — display [optional] — F-MAIL-22.agenda-error
+- `[data-testid="mail-agenda-empty"]` — display [optional] — F-MAIL-22.agenda-empty
+- `[data-testid="mail-invite-in-calendar"]` — display — F-MAIL-22.invite-in-calendar
+- `[data-testid="mail-invite-add-calendar"]` — interactive [optional] — F-MAIL-22.invite-add-calendar
+- `[data-testid="mail-invite-calendar-error"]` — display [optional] — F-MAIL-22.invite-calendar-error
+- `[data-testid="mail-caldav-url"]` — interactive [optional] — F-MAIL-22.caldav-url
+- `[data-testid="mail-caldav-username"]` — interactive [optional] — F-MAIL-22.caldav-username
+
 ## mail/compose (F-MAIL-1)
 
 - `[data-testid="mail-client-tab"]` — display — F-MAIL-1.mail-client-tab

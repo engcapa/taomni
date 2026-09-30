@@ -2714,6 +2714,22 @@ def _do_mail_server_assert_idle_clients(ctx: NativeStepContext, args: Any) -> st
     raise StepError(f"mail_server_assert_idle_clients: {count} IDLE clients, expected {expected}")
 
 
+@_verb("mail_server_assert_caldav_contains")
+def _do_mail_server_assert_caldav_contains(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    text = args.get("text")
+    if not isinstance(text, str) or not text:
+        raise StepError("mail_server_assert_caldav_contains: expected {text: str, timeout_sec?}")
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 20))
+    while time.time() < deadline:
+        if state.caldav_contains(text):
+            return f"fake CalDAV holds a resource containing {text!r}"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_caldav_contains: no CalDAV resource contains {text!r} "
+                    f"({len(state.caldav)} stored)")
+
+
 @_verb("mail_server_assert_smtp_contains")
 def _do_mail_server_assert_smtp_contains(ctx: NativeStepContext, args: Any) -> str:
     args = args if isinstance(args, dict) else {}

@@ -12,6 +12,8 @@ the real Tauri app syncs against it.
 
 from __future__ import annotations
 
+import html
+import http.server
 import re
 import select
 import socketserver
@@ -20,6 +22,7 @@ import time
 from dataclasses import dataclass, field
 from email.utils import format_datetime
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 
 @dataclass
@@ -115,6 +118,9 @@ class FakeMailState:
         self.idle_waiters: list[threading.Event] = []
         # Folders missing from LSUB; everything else is subscribed.
         self.unsubscribed: set[str] = set()
+        # CalDAV resources: href -> (etag, iCalendar text).
+        self.caldav: dict[str, tuple[str, str]] = {}
+        self.caldav_etag = 0
 
     def idle_clients(self) -> int:
         """Connections currently in IDLE (AC-37: zero after the tab closes)."""
@@ -146,6 +152,11 @@ class FakeMailState:
                 entry.messages[uid] = FakeMessage(raw=raw, internal_ts=int(time.time()) + index, modseq=modseq)
                 uids.append(uid)
             return uids
+
+    def caldav_contains(self, text: str) -> bool:
+        """Some CalDAV resource on the fake server contains ``text``."""
+        with self.lock:
+            return any(text in ics for _, ics in self.caldav.values())
 
     def smtp_contains(self, text: str) -> bool:
         """Some message accepted over SMTP contains ``text`` (e.g. an iTIP REPLY)."""
@@ -670,25 +681,126 @@ class _SmtpServer(socketserver.ThreadingTCPServer):
         self.state = state
 
 
+class _CalDavHandler(http.server.BaseHTTPRequestHandler):
+    """Minimal CalDAV (RFC 4791) for the agenda: well-known redirect,
+    principal / calendar-home-set discovery, PUT and a REPORT that returns
+    every stored resource (no expansion; fixture events are UTC)."""
+
+    server: "_CalDavServer"
+    protocol_version = "HTTP/1.1"
+    HOME = "/dav/calendars/qa/"
+    CALENDAR = "/dav/calendars/qa/work/"
+
+    def log_message(self, *args: Any) -> None:  # keep test output quiet
+        return
+
+    def _reply(self, status: int, body: str = "", headers: dict[str, str] | None = None) -> None:
+        data = body.encode("utf-8")
+        self.send_response(status)
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _multistatus(self, responses: list[tuple[str, str]]) -> None:
+        items = "".join(
+            f"<d:response><d:href>{href}</d:href><d:propstat><d:prop>{props}</d:prop>"
+            f"<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
+            for href, props in responses
+        )
+        self._reply(207, f'<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
+                         f'xmlns:c="urn:ietf:params:xml:ns:caldav">{items}</d:multistatus>',
+                    {"Content-Type": "application/xml; charset=utf-8"})
+
+    def _body(self) -> str:
+        length = int(self.headers.get("Content-Length") or 0)
+        return self.rfile.read(length).decode("utf-8", "replace") if length else ""
+
+    def do_PROPFIND(self) -> None:  # noqa: N802 - WebDAV verb
+        self._body()
+        path = self.path
+        if path == "/.well-known/caldav":
+            self._reply(301, "", {"Location": "/dav/"})
+        elif path == "/dav/":
+            self._multistatus([(path, "<d:resourcetype><d:collection/></d:resourcetype>"
+                                      "<d:current-user-principal><d:href>/dav/principals/qa/</d:href>"
+                                      "</d:current-user-principal>")])
+        elif path == "/dav/principals/qa/":
+            self._multistatus([(path, "<d:resourcetype><d:principal/></d:resourcetype>"
+                                      f"<c:calendar-home-set><d:href>{self.HOME}</d:href></c:calendar-home-set>")])
+        elif path == self.HOME:
+            self._multistatus([
+                (self.HOME, "<d:resourcetype><d:collection/></d:resourcetype>"),
+                (self.CALENDAR, "<d:resourcetype><d:collection/><c:calendar/></d:resourcetype>"),
+            ])
+        elif path == self.CALENDAR:
+            self._multistatus([(path, "<d:resourcetype><d:collection/><c:calendar/></d:resourcetype>")])
+        else:
+            self._reply(404)
+
+    def do_REPORT(self) -> None:  # noqa: N802 - CalDAV verb
+        self._body()
+        with self.server.state.lock:
+            stored = dict(self.server.state.caldav)
+        self._multistatus([
+            (href, f"<d:getetag>\"{etag}\"</d:getetag><c:calendar-data>"
+                   f"{html.escape(ics, quote=False)}</c:calendar-data>")
+            for href, (etag, ics) in stored.items()
+        ])
+
+    def do_PUT(self) -> None:  # noqa: N802
+        ics = self._body()
+        with self.server.state.lock:
+            exists = self.path in self.server.state.caldav
+            if self.headers.get("If-None-Match") == "*" and exists:
+                self._reply(412)
+                return
+            self.server.state.caldav_etag += 1
+            etag = f"c{self.server.state.caldav_etag}"
+            self.server.state.caldav[self.path] = (etag, ics)
+        self._reply(204 if exists else 201, "", {"ETag": f"\"{etag}\""})
+
+    def do_GET(self) -> None:  # noqa: N802
+        with self.server.state.lock:
+            entry = self.server.state.caldav.get(self.path)
+        if entry is None:
+            self._reply(404)
+        else:
+            self._reply(200, entry[1], {"ETag": f"\"{entry[0]}\"", "Content-Type": "text/calendar"})
+
+
+class _CalDavServer(http.server.ThreadingHTTPServer):
+    daemon_threads = True
+
+    def __init__(self, state: FakeMailState):
+        super().__init__(("127.0.0.1", 0), _CalDavHandler)
+        self.state = state
+
+
 class FakeMailServer:
     def __init__(self) -> None:
         self.state = FakeMailState()
         self._imap = _ImapServer(self.state)
         self._smtp = _SmtpServer(self.state)
         self._pop3 = _Pop3Server(self.state)
+        self._caldav = _CalDavServer(self.state)
         self.imap_port = self._imap.server_address[1]
         self.smtp_port = self._smtp.server_address[1]
         self.pop3_port = self._pop3.server_address[1]
+        self.caldav_port = self._caldav.server_address[1]
         self._threads = [
             threading.Thread(target=self._imap.serve_forever, daemon=True),
             threading.Thread(target=self._smtp.serve_forever, daemon=True),
             threading.Thread(target=self._pop3.serve_forever, daemon=True),
+            threading.Thread(target=self._caldav.serve_forever, daemon=True),
         ]
         for thread in self._threads:
             thread.start()
 
     def stop(self) -> None:
-        for server in (self._imap, self._smtp, self._pop3):
+        for server in (self._imap, self._smtp, self._pop3, self._caldav):
             server.shutdown()
             server.server_close()
 

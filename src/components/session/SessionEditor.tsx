@@ -1393,6 +1393,8 @@ function MailSettings({
   undoSendSeconds, setUndoSendSeconds,
   cardDavUrl, setCardDavUrl,
   cardDavUsername, setCardDavUsername,
+  calDavUrl, setCalDavUrl,
+  calDavUsername, setCalDavUsername,
   specialFolders, setSpecialFolders,
   desktopNotify, setDesktopNotify,
   syncIntervalMinutes, setSyncIntervalMinutes,
@@ -1451,6 +1453,8 @@ function MailSettings({
   undoSendSeconds: string; setUndoSendSeconds: (v: string) => void;
   cardDavUrl: string; setCardDavUrl: (v: string) => void;
   cardDavUsername: string; setCardDavUsername: (v: string) => void;
+  calDavUrl: string; setCalDavUrl: (v: string) => void;
+  calDavUsername: string; setCalDavUsername: (v: string) => void;
   specialFolders: Partial<Record<MailSpecialFolderKey, string>>;
   setSpecialFolders: (v: Partial<Record<MailSpecialFolderKey, string>>) => void;
   desktopNotify: boolean; setDesktopNotify: (v: boolean) => void;
@@ -1973,6 +1977,26 @@ function MailSettings({
           onChange={(e) => setCardDavUsername(e.target.value)}
         />
         <span className="ml-1 text-[var(--taomni-text-muted)]">uses the mail password</span>
+      </Field>
+
+      <Field label="CalDAV">
+        <input
+          className="taomni-input w-72"
+          value={calDavUrl}
+          placeholder="https://caldav.example.com/ (blank = no agenda)"
+          aria-label="CalDAV calendar URL"
+          data-testid="mail-caldav-url"
+          onChange={(e) => setCalDavUrl(e.target.value)}
+        />
+        <input
+          className="taomni-input w-40 ml-2"
+          value={calDavUsername}
+          placeholder="username (default: IMAP)"
+          aria-label="CalDAV username"
+          data-testid="mail-caldav-username"
+          onChange={(e) => setCalDavUsername(e.target.value)}
+        />
+        <span className="ml-1 text-[var(--taomni-text-muted)]">agenda, accepted invitations and reminders</span>
       </Field>
 
       <Field label="Cache">
@@ -2822,6 +2846,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailUndoSendSeconds, setMailUndoSendSeconds] = useState(() => optionString(initialOptions, "mailUndoSendSeconds", "0"));
   const [mailCardDavUrl, setMailCardDavUrl] = useState(() => optionString(initialOptions, "mailCardDavUrl", ""));
   const [mailCardDavUsername, setMailCardDavUsername] = useState(() => optionString(initialOptions, "mailCardDavUsername", ""));
+  const [mailCalDavUrl, setMailCalDavUrl] = useState(() => optionString(initialOptions, "mailCalDavUrl", ""));
+  const [mailCalDavUsername, setMailCalDavUsername] = useState(() => optionString(initialOptions, "mailCalDavUsername", ""));
   const [mailSpecialFolders, setMailSpecialFolders] = useState(() => parseSpecialFolders(initialOptions.mailSpecialFolders));
   const [mailDesktopNotify, setMailDesktopNotify] = useState(() => optionBoolean(initialOptions, "mailDesktopNotify", false));
   const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
@@ -3187,6 +3213,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailUndoSendSeconds,
           mailCardDavUrl: mailCardDavUrl.trim(),
           mailCardDavUsername: mailCardDavUsername.trim(),
+          mailCalDavUrl: mailCalDavUrl.trim(),
+          mailCalDavUsername: mailCalDavUsername.trim(),
           mailSpecialFolders: JSON.stringify(parseSpecialFolders(mailSpecialFolders)),
           mailDesktopNotify,
           mailSyncIntervalMinutes,
@@ -3768,6 +3796,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailUndoSendSeconds(optionString(nextOptions, "mailUndoSendSeconds", "0"));
     setMailCardDavUrl(optionString(nextOptions, "mailCardDavUrl", ""));
     setMailCardDavUsername(optionString(nextOptions, "mailCardDavUsername", ""));
+    setMailCalDavUrl(optionString(nextOptions, "mailCalDavUrl", ""));
+    setMailCalDavUsername(optionString(nextOptions, "mailCalDavUsername", ""));
     setMailSpecialFolders(parseSpecialFolders(nextOptions.mailSpecialFolders));
     setMailDesktopNotify(optionBoolean(nextOptions, "mailDesktopNotify", false));
     setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
@@ -4891,6 +4921,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 undoSendSeconds={mailUndoSendSeconds} setUndoSendSeconds={setMailUndoSendSeconds}
                 cardDavUrl={mailCardDavUrl} setCardDavUrl={setMailCardDavUrl}
                 cardDavUsername={mailCardDavUsername} setCardDavUsername={setMailCardDavUsername}
+                calDavUrl={mailCalDavUrl} setCalDavUrl={setMailCalDavUrl}
+                calDavUsername={mailCalDavUsername} setCalDavUsername={setMailCalDavUsername}
                 specialFolders={mailSpecialFolders} setSpecialFolders={setMailSpecialFolders}
                 desktopNotify={mailDesktopNotify} setDesktopNotify={setMailDesktopNotify}
                 syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}

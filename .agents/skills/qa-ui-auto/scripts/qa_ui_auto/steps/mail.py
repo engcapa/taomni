@@ -137,6 +137,24 @@ def mail_server_assert_idle_clients(ctx: StepContext, args: Any) -> None:
     raise StepError(f"mail_server_assert_idle_clients: {count} IDLE clients, expected {expected}")
 
 
+@verb("mail_server_assert_caldav_contains")
+def mail_server_assert_caldav_contains(ctx: StepContext, args: Any) -> None:
+    """The stub calendar holds an event whose summary or UID contains ``text``."""
+    args = args if isinstance(args, dict) else {}
+    text = args.get("text")
+    if not isinstance(text, str) or not text:
+        raise StepError("mail_server_assert_caldav_contains: expected {text: str, timeout_sec?}")
+    if ctx.dry_run:
+        return
+    _require_control(ctx)
+    deadline = time.time() + float(args.get("timeout_sec", 10))
+    while time.time() < deadline:
+        if ctx.page.evaluate(f"(text) => {_CONTROL}.caldavContains(text)", text):  # type: ignore[attr-defined]
+            return
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_caldav_contains: no calendar event contains {text!r}")
+
+
 @verb("mail_server_assert_smtp_contains")
 def mail_server_assert_smtp_contains(ctx: StepContext, args: Any) -> None:
     """Some message the stub "sent" contains ``text`` (e.g. an iTIP REPLY)."""

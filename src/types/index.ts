@@ -335,6 +335,8 @@ export interface MailTabInfo {
   pop3LeaveDays?: number | null;
   /** CardDAV address book (TASK-19); null = local address book only. */
   carddav?: { url: string; username?: string | null } | null;
+  /** CalDAV calendar for the agenda (TASK-20 phase 2); null = off. */
+  caldav?: { url: string; username?: string | null } | null;
   /** Seconds a sent message can still be undone (0 = send immediately). */
   undoSendSeconds?: number;
   /** Manual special folders: sent/drafts/trash/junk/archive -> folder name. */

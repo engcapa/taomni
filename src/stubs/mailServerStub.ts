@@ -8,6 +8,7 @@
 // only; real IMAP behavior is covered by the Rust tests and native cases.
 
 import { emit } from "./tauri-event";
+import { stubAgendaTexts } from "./mailCalendarStub";
 
 type StubMailHeader = {
   accountId: string;
@@ -443,6 +444,7 @@ export interface StubMailQaControl {
   idleClients: () => number;
   smtpContains: (text: string) => boolean;
   subjects: (accountId: string, folder: string) => string[];
+  caldavContains: (text: string) => boolean;
 }
 
 function stubInvite(summary: string, uid: string): StubMailInvite {
@@ -518,6 +520,9 @@ export function installStubMailQaControl(seed: Seed): void {
     },
     smtpContains(text) {
       return sentTexts.some((sent) => sent.includes(text));
+    },
+    caldavContains(text) {
+      return stubAgendaTexts().some((value) => value.includes(text));
     },
     subjects(accountId, folderName) {
       return [...folderState(account(accountId, seed), folderName).server.values()].map((message) => message.subject);

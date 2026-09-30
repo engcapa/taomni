@@ -577,6 +577,14 @@ function sessionToMailTabInfo(
           : null,
       }
       : null,
+    caldav: typeof opts.mailCalDavUrl === "string" && opts.mailCalDavUrl.trim()
+      ? {
+        url: opts.mailCalDavUrl.trim(),
+        username: typeof opts.mailCalDavUsername === "string" && opts.mailCalDavUsername.trim()
+          ? opts.mailCalDavUsername.trim()
+          : null,
+      }
+      : null,
     incoming: opts.mailIncoming === "pop3" ? "pop3" : "imap",
     pop3LeaveDays: opts.mailPop3LeaveDays === undefined || opts.mailPop3LeaveDays === null || String(opts.mailPop3LeaveDays).trim() === ""
       ? null

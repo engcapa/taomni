@@ -120,6 +120,16 @@ import { formatInviteRange, hasCalendarPart, myPartstat } from "../../lib/mailIn
 import { filterFromMessage, mailApplyFilters, type MailFilter } from "../../lib/mailFilters";
 import { MailFiltersPanel } from "./MailFiltersPanel";
 import { MailAddressBookPanel } from "./MailAddressBookPanel";
+import { MailAgendaPanel } from "./MailAgendaPanel";
+import {
+  agendaKey,
+  agendaTimeLabel,
+  dueReminders,
+  mailAddInviteToCalendar,
+  mailCalDavSync,
+  mailListAgenda,
+  type MailAgendaEvent,
+} from "../../lib/mailCalendar";
 import { emptyAddressBookEntry, type MailAddressBookEntry } from "../../lib/mailContacts";
 import {
   isSelectable,
@@ -1213,6 +1223,11 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   /** Address book dialog (TASK-19); the draft pre-fills "Add sender to address book". */
   const [addressBookOpen, setAddressBookOpen] = useState(false);
   const [contactDraft, setContactDraft] = useState<MailAddressBookEntry | null>(null);
+  /** CalDAV agenda (DEC-14): dialog, cache revision and reminder bookkeeping. */
+  const [agendaOpen, setAgendaOpen] = useState(false);
+  const [agendaRevision, setAgendaRevision] = useState(0);
+  const agendaEventsRef = useRef<MailAgendaEvent[]>([]);
+  const remindedRef = useRef<Set<string>>(new Set());
   /** Calendar invitation of the open message (TASK-20), keyed by message. */
   const [inviteView, setInviteView] = useState<{
     key: string;
@@ -1221,6 +1236,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     responding?: MailInviteReply;
     responded?: string;
     error?: string;
+    /** CalDAV write of the invitation (TASK-20 phase 2). */
+    calendar?: "adding" | "added";
+    calendarError?: string;
   } | null>(null);
   const [certReview, setCertReview] = useState<{
     protocol: "imap" | "smtp";
@@ -1512,6 +1530,53 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     };
     // selectedMessage is identified by selectedInviteKey.
   }, [selectedInviteKey]);
+
+  // DEC-14: reminders for CalDAV events while this tab is open (DEC-01).
+  const caldavUrl = info.caldav?.url ?? "";
+  const onAgendaChanged = useCallback((events: MailAgendaEvent[]) => {
+    agendaEventsRef.current = events;
+  }, []);
+  useEffect(() => {
+    if (!caldavUrl) return;
+    let cancelled = false;
+    const refresh = async (sync: boolean) => {
+      try {
+        if (sync) await mailCalDavSync(inviteInfoRef.current);
+        const events = await mailListAgenda(inviteInfoRef.current.sessionId, 2);
+        if (!cancelled) agendaEventsRef.current = events;
+      } catch (e) {
+        console.debug("mail agenda refresh failed", e);
+      }
+    };
+    void refresh(false);
+    const firstSync = window.setTimeout(() => void refresh(true), 5_000);
+    const syncTimer = window.setInterval(() => void refresh(true), 15 * 60_000);
+    const reminderTimer = window.setInterval(() => {
+      for (const event of dueReminders(agendaEventsRef.current, Date.now(), remindedRef.current)) {
+        remindedRef.current.add(agendaKey(event));
+        const when = agendaTimeLabel(event);
+        setStatus(`Reminder: ${event.summary || "event"} at ${when}`);
+        void notifyDesktop(
+          `Reminder: ${event.summary || "Event"}`,
+          event.location ? `${when} · ${event.location}` : when,
+        );
+      }
+    }, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(firstSync);
+      window.clearInterval(syncTimer);
+      window.clearInterval(reminderTimer);
+    };
+  }, [caldavUrl]);
+  useEffect(() => {
+    if (!caldavUrl || agendaRevision === 0) return;
+    void mailListAgenda(inviteInfoRef.current.sessionId, 2)
+      .then((events) => {
+        agendaEventsRef.current = events;
+      })
+      .catch(() => undefined);
+  }, [agendaRevision, caldavUrl]);
   const activeRecipientSuggestions = useMemo<RecipientSuggestion[]>(() => {
     const { field, query: recipientQuery, suggestions } = recipientSearch;
     if (!field || !recipientQuery.trim()) return [];
@@ -4180,6 +4245,21 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     );
   };
 
+  /** DEC-14: put the invitation (with my reply) into the CalDAV calendar. */
+  const addInviteToCalendar = async (message: MailMessageHeader, partstat?: string) => {
+    const key = messageKey(message);
+    setInviteView((current) => (current?.key === key ? { ...current, calendar: "adding", calendarError: undefined } : current));
+    try {
+      const written = await mailAddInviteToCalendar(info, message.folder, message.uid, partstat);
+      setInviteView((current) => (current?.key === key ? { ...current, calendar: "added" } : current));
+      setAgendaRevision((value) => value + 1);
+      setStatus(written.created ? "Added to your calendar" : "Updated in your calendar");
+    } catch (e) {
+      const calendarError = mailClientErrorMessage(e);
+      setInviteView((current) => (current?.key === key ? { ...current, calendar: undefined, calendarError } : current));
+    }
+  };
+
   /** AC-62: Accept / Tentative / Decline sends an iTIP REPLY to the organizer. */
   const handleRespondInvite = async (message: MailMessageHeader, response: MailInviteReply) => {
     const key = messageKey(message);
@@ -4188,6 +4268,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       const result = await mailRespondInvite(info, message.folder, message.uid, response);
       setInviteView((current) => (current?.key === key ? { ...current, responding: undefined, responded: result.partstat } : current));
       setStatus(`Invitation reply (${result.partstat.toLowerCase()}) sent to ${result.sentTo}`);
+      if (info.caldav && response !== "decline") await addInviteToCalendar(message, result.partstat);
     } catch (e) {
       const error = mailClientErrorMessage(e);
       setInviteView((current) => (current?.key === key ? { ...current, responding: undefined, error } : current));
@@ -4295,13 +4376,28 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               <ExternalLink className="w-3 h-3" /> Open in calendar
             </button>
           )}
+          {info.caldav && invite.method === "REQUEST" && !cancelled && view.calendar !== "added" && (
+            <button
+              type="button"
+              className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+              data-testid="mail-invite-add-calendar"
+              disabled={view.calendar === "adding"}
+              onClick={() => void addInviteToCalendar(message, view.responded)}
+            >
+              {view.calendar === "adding" ? <Loader2 className="w-3 h-3 animate-spin" /> : <CalendarDays className="w-3 h-3" />} Add to calendar
+            </button>
+          )}
           {view.responded && (
             <span className="text-[var(--taomni-text-muted)]" data-testid="mail-invite-responded">
               Reply sent ({view.responded.toLowerCase()})
             </span>
           )}
+          {view.calendar === "added" && (
+            <span className="text-[var(--taomni-text-muted)]" data-testid="mail-invite-in-calendar">In your calendar</span>
+          )}
         </div>
         {view.error && <div className="mt-1 text-red-500" data-testid="mail-invite-error">{view.error}</div>}
+        {view.calendarError && <div className="mt-1 text-red-500" data-testid="mail-invite-calendar-error">{view.calendarError}</div>}
       </div>
     );
   };
@@ -5225,6 +5321,18 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   >
                     <BookUser className="w-3.5 h-3.5" />
                   </button>
+                  {info.caldav && (
+                    <button
+                      type="button"
+                      className="ml-1 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
+                      title="Agenda"
+                      aria-label="Agenda"
+                      data-testid="mail-agenda-open"
+                      onClick={() => setAgendaOpen(true)}
+                    >
+                      <CalendarDays className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="ml-1 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
@@ -5847,6 +5955,28 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           <button type="button" className="taomni-btn h-7 px-2" data-testid="mail-undo-send-button" onClick={() => void handleUndoSend()}>
             Undo
           </button>
+        </div>
+      )}
+
+      {agendaOpen && info.caldav && (
+        <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title="Agenda"
+            icon={<CalendarDays className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Agenda"
+            closeTestId="mail-agenda-close"
+            minWidth={380}
+            minHeight={300}
+            className="w-[min(560px,92vw)] h-[min(520px,80vh)] min-h-[320px]"
+            onClose={() => setAgendaOpen(false)}
+          >
+            <MailAgendaPanel
+              info={info}
+              revision={agendaRevision}
+              onStatus={setStatus}
+              onChanged={onAgendaChanged}
+            />
+          </MailDraggableDialog>
         </div>
       )}
 

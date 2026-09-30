@@ -176,6 +176,16 @@ describe("mail quick connect", () => {
     expect(plain.authData).toBe("pw");
   });
 
+  it("carries CardDAV and CalDAV URLs (TASK-19/TASK-20)", () => {
+    const parsed = parseQuickConnectInput(
+      "mail://qa:pw@127.0.0.1:1143?security=none&caldav=http://127.0.0.1:8080/&carddav=https://dav.example.com/",
+    );
+    const options = JSON.parse(parsed.config.options_json);
+    expect(options.mailCalDavUrl).toBe("http://127.0.0.1:8080/");
+    expect(options.mailCardDavUrl).toBe("https://dav.example.com/");
+    expect(JSON.parse(parseQuickConnectInput("mail://qa@imap.example.com").config.options_json).mailCalDavUrl).toBeUndefined();
+  });
+
   it("accepts a password, plain security and an explicit SMTP endpoint", () => {
     const parsed = parseQuickConnectInput("mail://qa:secret@127.0.0.1:1143?security=none&smtp=127.0.0.1:1025");
     expect(parsed.authData).toBe("secret");

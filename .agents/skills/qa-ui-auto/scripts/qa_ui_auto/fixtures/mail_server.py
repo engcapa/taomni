@@ -29,6 +29,10 @@ def setup(ctx: Any) -> None:
         values["mail_quick_connect"] = "mail://qa%40example.com@imap.example.com:993"
         # The stub server model is protocol-agnostic; POP3 renders the same.
         values["mail_pop3_quick_connect"] = "pop3://qa%40example.com@pop.example.com:995"
+        # The stub agenda only needs a CalDAV URL to be configured.
+        values["mail_caldav_quick_connect"] = (
+            "mail://qa%40example.com@imap.example.com:993?caldav=https://caldav.example.com/"
+        )
         return
     if mail_fake_server.ACTIVE is not None:
         mail_fake_server.ACTIVE.stop()
@@ -44,6 +48,9 @@ def setup(ctx: Any) -> None:
     values["mail_pop3_quick_connect"] = (
         f"pop3://qa%40example.com:qa-pass@127.0.0.1:{server.pop3_port}"
         f"?security=none&smtp=127.0.0.1:{server.smtp_port}"
+    )
+    values["mail_caldav_quick_connect"] = (
+        f"{values['mail_quick_connect']}&caldav=http://127.0.0.1:{server.caldav_port}/"
     )
 
 

@@ -5770,7 +5770,8 @@ controls:
 - “Accept / Tentative / Decline” 向组织者发送 RFC 5546/6047 iTIP `METHOD:REPLY`（`text/calendar; method=REPLY`，保留 UID 与 SEQUENCE），卡片标记当前回复状态。
 - “Export .ics” 保存日历部分；“Open in calendar” 用系统日历应用打开。
 - 时间：UTC 与全天事件按本地时区显示；带 TZID 的时间按发件人时区的时刻加时区名显示（未内置时区数据库）。
-- 未完成：CalDAV 同步与应用内日历视图（TASK-20 第二阶段，待 DEC-14 决策）；回复不写入已发送文件夹。
+- 配置了 CalDAV 的账户接受/暂定时同时把事件写入日历，也可手动 “Add to calendar”（见 F-MAIL-22）。
+- 未完成：回复不写入已发送文件夹。
 
 ---
 
@@ -6072,6 +6073,74 @@ controls:
 - 写信自动补全先列出地址簿联系人（带姓名），再列出收发历史中收集的联系人，按邮箱去重（AC-61）。
 - CardDAV：会话设置填写 CardDAV URL（服务器、principal 或地址簿地址均可，按 `/.well-known/carddav`、`current-user-principal`、`addressbook-home-set` 发现），用户名默认与 IMAP 相同，密码使用邮件密码（OAuth 账户发送 Bearer 令牌）。“Sync” 先上传本地修改（`If-Match`/`If-None-Match`，冲突时以服务器为准），再按 ETag 拉取变化（`addressbook-multiget`，不支持时逐个 GET），服务器删除的卡片同步删除（AC-60）。
 - 未完成：CardDAV 不走会话代理/跳板机；Google 通讯录需要额外 OAuth scope，未接入；CardDAV 只同步发现到的第一个地址簿；不定时自动同步（手动 Sync）。托管 UI 用例不连 CardDAV 服务器，CardDAV 流程由 Rust 进程内服务器测试覆盖，仅在 Windows 本机执行过。
+
+---
+
+### 13.22 CalDAV 议程与提醒 🟡
+
+<!-- feature
+id: F-MAIL-22
+status: partial
+area: mail/calendar
+components: [MailAgendaPanel, MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailAgendaPanel.tsx
+  - src/lib/mailCalendar.ts
+  - src-tauri/src/mail/caldav.rs
+  - src-tauri/src/mail/webdav.rs
+controls:
+  - id: agenda-open
+    selector: '[data-testid="mail-agenda-open"]'
+    kind: interactive
+  - id: agenda-close
+    selector: '[data-testid="mail-agenda-close"]'
+    kind: interactive
+    optional: true
+  - id: agenda
+    selector: '[data-testid="mail-agenda"]'
+    kind: display
+    optional: true
+  - id: agenda-event
+    selector: '[data-testid="mail-agenda-event"]'
+    kind: display
+  - id: agenda-sync
+    selector: '[data-testid="mail-agenda-sync"]'
+    kind: interactive
+    optional: true
+  - id: agenda-error
+    selector: '[data-testid="mail-agenda-error"]'
+    kind: display
+    optional: true
+  - id: agenda-empty
+    selector: '[data-testid="mail-agenda-empty"]'
+    kind: display
+    optional: true
+  - id: invite-in-calendar
+    selector: '[data-testid="mail-invite-in-calendar"]'
+    kind: display
+  - id: invite-add-calendar
+    selector: '[data-testid="mail-invite-add-calendar"]'
+    kind: interactive
+    optional: true
+  - id: invite-calendar-error
+    selector: '[data-testid="mail-invite-calendar-error"]'
+    kind: display
+    optional: true
+  - id: caldav-url
+    selector: '[data-testid="mail-caldav-url"]'
+    kind: interactive
+    optional: true       # session editor; quick connect uses ?caldav=
+  - id: caldav-username
+    selector: '[data-testid="mail-caldav-username"]'
+    kind: interactive
+    optional: true
+-->
+
+- DEC-14 最小方案：会话设置（或 Quick Connect 的 `?caldav=`）填写 CalDAV URL 后，邮箱栏出现 “Agenda” 按钮，按日期分组列出未来 14 天的事件（时间、地点、提醒）；不提供日/周/月网格。
+- 发现：`/.well-known/caldav` → `current-user-principal` → `calendar-home-set` → 第一个日历（与 CardDAV 共用 `webdav.rs`）。拉取用 `calendar-query` 时间窗（前 1 天至后 60 天）并请求服务器 `expand`，重复事件由服务器展开为 UTC 实例。
+- 接受/暂定邀请时把事件写入日历：去掉 `METHOD`，把我的 ATTENDEE 改为对应 PARTSTAT，`If-None-Match: *` 新建，已存在时 `If-Match: *` 更新（AC-64）。
+- 提醒：标签打开期间每 15 分钟同步一次，按事件 VALARM（缺省 15 分钟）在开始前弹出桌面通知并在状态栏提示（DEC-01：标签关闭后不提醒）。
+- 未完成：只读取第一个日历；不在应用内新建/编辑事件；不走会话代理；服务器不支持 `expand` 时，带 TZID 的时间按发件人时区的时刻显示（无时区库），重复事件只显示首个实例。
 
 ---
 
