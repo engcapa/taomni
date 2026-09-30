@@ -6765,6 +6765,88 @@ controls:
   - id: debug-panel
     selector: '[data-testid="debug-panel"]'
     kind: display
+  - id: debug-toolbar-resume          # ED-PARITY-025 IDEA TopToolbar3 (Rerun…Mute, More)
+    selector: '[data-testid="debug-continue"]'
+    kind: interactive
+    optional: true       # enabled while a debug session is suspended
+  - id: debug-subtab-console
+    selector: '[data-testid="debug-subtab-console"]'
+    kind: interactive
+    optional: true
+  - id: debug-console-output
+    selector: '[data-testid="debug-console-output"]'
+    kind: display
+    optional: true
+  - id: debug-frames-list              # ED-PARITY-025 IDEA Frames view (method:line, Class (package))
+    selector: '[data-testid="debug-frames-list"]'
+    kind: display
+    optional: true       # frames exist only while suspended
+  - id: debug-thread-select            # ED-PARITY-025 IDEA thread combo
+    selector: '[data-testid="debug-thread-select"]'
+    kind: display
+    optional: true
+  - id: debug-variables-tree           # ED-PARITY-025 merged watches + variables tree
+    selector: '[data-testid="debug-variables-tree"]'
+    kind: display
+    optional: true
+  - id: debug-watch-input              # Evaluate expression (Enter) or add a watch (Ctrl+Shift+Enter)
+    selector: '[data-testid="debug-watch-input"]'
+    kind: interactive
+    optional: true
+  - id: debug-evaluate-inline-result
+    selector: '[data-testid="debug-evaluate-inline-result"]'
+    kind: display
+    optional: true       # rendered after an Enter evaluation while suspended
+  - id: debug-breakpoint-popup         # ED-PARITY-025 IDEA breakpoint balloon
+    selector: '[data-testid="debug-breakpoint-popup"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoint-popup-title"]'
+      - '[data-testid="debug-breakpoint-popup-log-stack"]'
+      - '[data-testid="debug-breakpoint-popup-log-message"]:checked'
+  - id: debug-breakpoint-popup-condition
+    selector: '[data-testid="debug-breakpoint-popup-condition"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoint-popup-condition"]:focus'
+  - id: debug-breakpoint-popup-actions
+    selector: '[data-testid="debug-breakpoint-popup-done"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoint-popup-more"]'
+  - id: debug-gutter-menu              # IDEA Add Breakpoint / Conditional / Logging menu
+    selector: '[data-testid="debug-gutter-menu-add-conditional"]'
+    kind: interactive
+    optional: true
+  - id: debug-breakpoints-dialog       # ED-PARITY-025 IDEA View Breakpoints dialog
+    selector: '[data-testid="debug-breakpoints-dialog"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoints-dialog-condition"]'
+      - '[data-testid="debug-breakpoints-dialog-enabled-2"]:checked'
+      - '[data-testid="debug-breakpoints-dialog-remove-once-hit"]:checked'
+  - id: debug-breakpoints-dialog-tree
+    selector: '[data-testid="debug-breakpoints-dialog-tree"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoints-dialog-line"]'
+      - '[data-testid="debug-breakpoints-dialog-line"][data-breakpoint-line="7"]'
+  - id: debug-breakpoints-dialog-properties
+    selector: '[data-testid="debug-breakpoints-dialog-suspend"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoints-dialog-log-stack"]'
+      - '[data-testid="debug-breakpoints-dialog-remove-once-hit"]'
+  - id: debug-breakpoints-dialog-done
+    selector: '[data-testid="debug-breakpoints-dialog-done"]'
+    kind: interactive
+    optional: true
   - id: debug-stop
     selector: '[data-testid="debug-stop"]'
     kind: interactive

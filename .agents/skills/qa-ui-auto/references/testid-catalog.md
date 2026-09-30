@@ -589,6 +589,34 @@
 - `[data-testid^="tests-rerun-"]` — interactive [optional] — F25.1.tests-rerun
 - `[data-testid^="tests-failure-details-"]` — interactive [optional] — F25.1.tests-failure-details
 - `[data-testid="debug-panel"]` — display — F25.1.debug-panel
+- `[data-testid="debug-continue"]` — interactive [optional] — F25.1.debug-toolbar-resume
+- `[data-testid="debug-subtab-console"]` — interactive [optional] — F25.1.debug-subtab-console
+- `[data-testid="debug-console-output"]` — display [optional] — F25.1.debug-console-output
+- `[data-testid="debug-frames-list"]` — display [optional] — F25.1.debug-frames-list
+- `[data-testid="debug-thread-select"]` — display [optional] — F25.1.debug-thread-select
+- `[data-testid="debug-variables-tree"]` — display [optional] — F25.1.debug-variables-tree
+- `[data-testid="debug-watch-input"]` — interactive [optional] — F25.1.debug-watch-input
+- `[data-testid="debug-evaluate-inline-result"]` — display [optional] — F25.1.debug-evaluate-inline-result
+- `[data-testid="debug-breakpoint-popup"]` — display [optional] — F25.1.debug-breakpoint-popup
+  ↳ `[data-testid="debug-breakpoint-popup-title"]` — alias
+  ↳ `[data-testid="debug-breakpoint-popup-log-stack"]` — alias
+  ↳ `[data-testid="debug-breakpoint-popup-log-message"]:checked` — alias
+- `[data-testid="debug-breakpoint-popup-condition"]` — interactive [optional] — F25.1.debug-breakpoint-popup-condition
+  ↳ `[data-testid="debug-breakpoint-popup-condition"]:focus` — alias
+- `[data-testid="debug-breakpoint-popup-done"]` — interactive [optional] — F25.1.debug-breakpoint-popup-actions
+  ↳ `[data-testid="debug-breakpoint-popup-more"]` — alias
+- `[data-testid="debug-gutter-menu-add-conditional"]` — interactive [optional] — F25.1.debug-gutter-menu
+- `[data-testid="debug-breakpoints-dialog"]` — display [optional] — F25.1.debug-breakpoints-dialog
+  ↳ `[data-testid="debug-breakpoints-dialog-condition"]` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-enabled-2"]:checked` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-remove-once-hit"]:checked` — alias
+- `[data-testid="debug-breakpoints-dialog-tree"]` — interactive [optional] — F25.1.debug-breakpoints-dialog-tree
+  ↳ `[data-testid="debug-breakpoints-dialog-line"]` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-line"][data-breakpoint-line="7"]` — alias
+- `[data-testid="debug-breakpoints-dialog-suspend"]` — interactive [optional] — F25.1.debug-breakpoints-dialog-properties
+  ↳ `[data-testid="debug-breakpoints-dialog-log-stack"]` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-remove-once-hit"]` — alias
+- `[data-testid="debug-breakpoints-dialog-done"]` — interactive [optional] — F25.1.debug-breakpoints-dialog-done
 - `[data-testid="debug-stop"]` — interactive [optional] — F25.1.debug-stop
 - `.taomni-debug-current-line` — display [optional] — F25.1.debug-current-line
 - `[data-testid="debug-active-configuration"]` — interactive [optional] — F25.1.debug-active-configuration

@@ -1231,7 +1231,16 @@ import {
   type JavaMainClassOption,
   type JavaMainClassResolution,
 } from "../../lib/editor/dap";
-import type { DebugStackFrame } from "./workspace/dapDebugModel";
+import { effectiveSuspend, type DebugBreakpoint, type DebugStackFrame } from "./workspace/dapDebugModel";
+import {
+  breakpointMasterKeys,
+  breakpointRefKey,
+  breakpointTooltipLines,
+  masterOf,
+} from "./workspace/debugBreakpointProperties";
+import { BreakpointPopup, GutterBreakpointMenu } from "./workspace/panels/debug/BreakpointPopup";
+import { BreakpointsDialog } from "./workspace/panels/debug/BreakpointsDialog";
+import { EvaluateExpressionDialog } from "./workspace/panels/debug/EvaluateExpressionDialog";
 import type { EditorRevealTarget } from "./workspace/EditorGroup";
 import { LspMessageRequestDialog } from "./workspace/LspMessageRequestDialog";
 import { useWorkspaceLspClientEvents } from "./workspace/useWorkspaceLspClientEvents";
@@ -2420,7 +2429,15 @@ export function CodeWorkspaceTab({
   });
   /** Latest caret per group for callbacks that must not change identity per caret move. */
   const cursorPositionsRef = useRef(cursorPositions);
-  cursorPositionsRef.current = cursorPositions;
+  // Keyboard actions (Ctrl+F8, Ctrl+Shift+F8…) read the caret right after
+  // the keys that moved it, while the state itself commits in a transition.
+  // The editor callback writes this ref synchronously; a render only
+  // replaces it when the committed state actually changed.
+  const committedCursorPositionsRef = useRef(cursorPositions);
+  if (committedCursorPositionsRef.current !== cursorPositions) {
+    committedCursorPositionsRef.current = cursorPositions;
+    cursorPositionsRef.current = cursorPositions;
+  }
   const [viewportRanges, setViewportRangesNow] = useState<Record<EditorGroupId, LspRange | null>>({
     primary: null,
     secondary: null,
@@ -2718,6 +2735,13 @@ export function CodeWorkspaceTab({
   const recompileActiveFileRef = useRef<() => void>(() => {});
   const toggleActiveBreakpointRef = useRef<(line: number) => void>(() => {});
   const editActiveBreakpointRef = useRef<(line: number) => void>(() => {});
+  /** IDEA Ctrl+Shift+F8: popup on a caret breakpoint, else the Breakpoints dialog. */
+  const viewBreakpointsAtCaretRef = useRef<(line: number) => void>(() => {});
+  const openEvaluateDialogRef = useRef<(expression?: string) => void>(() => {});
+  const showDebugExecutionPointRef = useRef<() => void>(() => {});
+  const addActiveBreakpointRef = useRef<(line: number, options: Partial<DebugBreakpoint>) => void>(() => {});
+  const toggleActiveBreakpointEnabledRef = useRef<(line: number) => void>(() => {});
+  const toggleTemporaryBreakpointRef = useRef<(line: number) => void>(() => {});
   const debugRef = useRef<ReturnType<typeof useCodeDebugSession> | null>(null);
   const lastTrackedBufferTextRef = useRef<Record<string, string>>({});
   const restoreRunRef = useRef<{
@@ -15744,8 +15768,99 @@ export function CodeWorkspaceTab({
       run: () => {
         const cursor = cursorPositionsRef.current[activeEditorGroupId];
         const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
-        editActiveBreakpointRef.current(line);
+        viewBreakpointsAtCaretRef.current(line);
       },
+    },
+    {
+      id: "workspace.toggleTemporaryBreakpoint",
+      title: "Toggle Temporary Line Breakpoint",
+      category: "Debug",
+      keybinding: "Ctrl+Alt+Shift+F8",
+      keywords: ["breakpoint", "temporary", "remove once hit", "debug"],
+      when: () => !!activeFile && !activeFile.library,
+      run: () => {
+        const cursor = cursorPositionsRef.current[activeEditorGroupId];
+        const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
+        toggleTemporaryBreakpointRef.current(line);
+      },
+    },
+    {
+      id: "workspace.toggleBreakpointEnabled",
+      title: "Toggle Breakpoint Enabled",
+      category: "Debug",
+      keywords: ["breakpoint", "enable", "disable", "debug"],
+      when: () => !!activeFile && !activeFile.library,
+      run: () => {
+        const cursor = cursorPositionsRef.current[activeEditorGroupId];
+        const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
+        toggleActiveBreakpointEnabledRef.current(line);
+      },
+    },
+    {
+      id: "workspace.debug.resume",
+      title: "Resume Program",
+      category: "Debug",
+      keybinding: "F9",
+      keywords: ["debug", "resume", "continue"],
+      when: (context) => context.focus !== "terminal" && debugRef.current?.state?.status === "stopped",
+      run: () => { void debugRef.current?.step("continue"); },
+    },
+    {
+      id: "workspace.debug.stepOver",
+      title: "Step Over",
+      category: "Debug",
+      keybinding: "F8",
+      keywords: ["debug", "step", "next"],
+      when: (context) => context.focus !== "terminal" && debugRef.current?.state?.status === "stopped",
+      run: () => { void debugRef.current?.step("stepOver"); },
+    },
+    {
+      id: "workspace.debug.stepInto",
+      title: "Step Into",
+      category: "Debug",
+      keybinding: "F7",
+      keywords: ["debug", "step", "into"],
+      when: (context) => context.focus !== "terminal" && debugRef.current?.state?.status === "stopped",
+      run: () => { void debugRef.current?.step("stepIn"); },
+    },
+    {
+      id: "workspace.debug.stepOut",
+      title: "Step Out",
+      category: "Debug",
+      keybinding: "Shift+F8",
+      keywords: ["debug", "step", "out", "return"],
+      when: (context) => context.focus !== "terminal" && debugRef.current?.state?.status === "stopped",
+      run: () => { void debugRef.current?.step("stepOut"); },
+    },
+    {
+      id: "workspace.debug.stop",
+      title: "Stop",
+      category: "Debug",
+      keybinding: "Ctrl+F2",
+      keywords: ["debug", "stop", "terminate"],
+      when: (context) => {
+        const status = debugRef.current?.state?.status;
+        return context.focus !== "terminal" && !!status && status !== "terminated";
+      },
+      run: () => debugRef.current?.terminate(),
+    },
+    {
+      id: "workspace.debug.evaluateExpression",
+      title: "Evaluate Expression…",
+      category: "Debug",
+      keybinding: "Alt+F8",
+      keywords: ["debug", "evaluate", "expression", "inspect"],
+      when: (context) => context.focus !== "terminal" && debugRef.current?.state?.status === "stopped",
+      run: () => openEvaluateDialogRef.current(),
+    },
+    {
+      id: "workspace.debug.showExecutionPoint",
+      title: "Show Execution Point",
+      category: "Debug",
+      keybinding: "Alt+F10",
+      keywords: ["debug", "execution point", "current line"],
+      when: () => debugRef.current?.state?.status === "stopped",
+      run: () => showDebugExecutionPointRef.current(),
     },
     {
       id: "workspace.toggleMuteBreakpoints",
@@ -16348,7 +16463,9 @@ export function CodeWorkspaceTab({
       // ED-PARITY-009: the Structural Search dialog owns Esc/Ctrl+Enter and text input.
       + ', [data-testid="structural-search-dialog"]'
       // ED-PARITY-017: the in-place naming session owns Esc/Enter/Shift+F6/Alt+Shift+O.
-      + ', [data-testid="code-workspace-inline-rename"]',
+      + ', [data-testid="code-workspace-inline-rename"]'
+      // Debugger popups/dialogs own their fields, Esc and Delete.
+      + ', [data-testid="debug-breakpoint-popup"], [data-testid="debug-breakpoints-dialog"], [data-testid="debug-evaluate-dialog"]',
     ));
   }, []);
 
@@ -20161,24 +20278,81 @@ export function CodeWorkspaceTab({
     if (activeFileAbsPath) debug.toggleBreakpoint(normalizeFsPath(activeFileAbsPath), line);
   }, [activeFileAbsPath, debug]);
 
+  /** IDEA's breakpoint balloon (gutter right-click / Ctrl+Shift+F8 on a breakpoint). */
+  const [breakpointPopup, setBreakpointPopup] = useState<{
+    path: string;
+    line: number;
+    anchor: { x: number; y: number };
+    expanded: boolean;
+  } | null>(null);
+  /** IDEA's View Breakpoints dialog, optionally opened on one breakpoint. */
+  const [breakpointsDialog, setBreakpointsDialog] = useState<{ initial: { path: string; line: number } | null } | null>(null);
+  /** IDEA's Evaluate dialog (Alt+F8). */
+  const [evaluateDialog, setEvaluateDialog] = useState<{ expression: string } | null>(null);
+  const [gutterMenu, setGutterMenu] = useState<{ path: string; line: number; x: number; y: number } | null>(null);
+
+  /** The caret row's gutter, where IDEA anchors the keyboard-opened popup. */
+  const caretGutterAnchor = useCallback((): { x: number; y: number } => {
+    const scope = rootRef.current ?? document;
+    const row = scope.querySelector<HTMLElement>(".cm-editor.cm-focused .cm-activeLineGutter")
+      ?? scope.querySelector<HTMLElement>(".cm-editor .cm-activeLineGutter")
+      ?? scope.querySelector<HTMLElement>(".cm-editor .cm-activeLine");
+    const rect = row?.getBoundingClientRect();
+    if (rect && (rect.width > 0 || rect.height > 0)) return { x: rect.left, y: rect.bottom };
+    return { x: Math.round(window.innerWidth / 3), y: Math.round(window.innerHeight / 3) };
+  }, []);
+
+  const openBreakpointPopup = useCallback((
+    path: string,
+    line: number,
+    anchor?: { x: number; y: number },
+    expanded = false,
+  ) => {
+    setGutterMenu(null);
+    setBreakpointPopup({ path, line, anchor: anchor ?? caretGutterAnchor(), expanded });
+  }, [caretGutterAnchor]);
+
   /**
-   * Right-click a breakpoint gutter (or Ctrl+Shift+F8): create the breakpoint if
-   * needed and open the Debug panel's breakpoints view, where condition, hit
-   * count and log message are edited in one place — IDEA's breakpoint dialog,
-   * rather than a chain of modal prompts.
+   * Right-click a breakpoint (or Ctrl+Shift+F8 on its line): create it if
+   * needed and open IDEA's breakpoint balloon next to the gutter.
    */
-  const editActiveBreakpoint = useCallback((line: number) => {
+  const editActiveBreakpoint = useCallback((line: number, anchor?: { x: number; y: number }) => {
     if (!activeFileAbsPath) return;
     const key = normalizeFsPath(activeFileAbsPath);
     if (!(debug.breakpoints[key] ?? []).some((bp) => bp.line === line)) {
       debug.toggleBreakpoint(key, line);
     }
-    setEditingBreakpoint({ path: key, line });
-    setBottomDockTab("debug");
-    setBottomDockOpen(true);
-  }, [activeFileAbsPath, debug, setBottomDockOpen, setBottomDockTab]);
+    openBreakpointPopup(key, line, anchor);
+  }, [activeFileAbsPath, debug, openBreakpointPopup]);
   toggleActiveBreakpointRef.current = toggleActiveBreakpoint;
   editActiveBreakpointRef.current = editActiveBreakpoint;
+  viewBreakpointsAtCaretRef.current = (line: number) => {
+    const key = activeFileAbsPath ? normalizeFsPath(activeFileAbsPath) : null;
+    if (key && (debug.breakpoints[key] ?? []).some((bp) => bp.line === line)) {
+      openBreakpointPopup(key, line);
+      return;
+    }
+    setBreakpointPopup(null);
+    setBreakpointsDialog({ initial: null });
+  };
+  addActiveBreakpointRef.current = (line, options) => {
+    if (activeFileAbsPath) debug.addBreakpoint(normalizeFsPath(activeFileAbsPath), line, options);
+  };
+  toggleActiveBreakpointEnabledRef.current = (line) => {
+    if (activeFileAbsPath) debug.toggleBreakpointEnabled(normalizeFsPath(activeFileAbsPath), line);
+  };
+  // IDEA Ctrl+Alt+Shift+F8: remove an existing breakpoint, else add a
+  // Remove-once-hit one.
+  toggleTemporaryBreakpointRef.current = (line) => {
+    if (!activeFileAbsPath) return;
+    const key = normalizeFsPath(activeFileAbsPath);
+    if ((debug.breakpoints[key] ?? []).some((bp) => bp.line === line)) debug.removeBreakpoint(key, line);
+    else debug.addBreakpoint(key, line, { temporary: true });
+  };
+  openEvaluateDialogRef.current = (expression?: string) => {
+    const selected = expression ?? editorSelectionRef.current.text?.trim() ?? "";
+    setEvaluateDialog({ expression: selected.includes("\n") ? "" : selected });
+  };
 
   /**
    * Make-before-launch (Phase 3): save every dirty Java / build file in the
@@ -20728,6 +20902,11 @@ export function CodeWorkspaceTab({
     debugRevealRef.current = key;
     openDebugFrame({ path: loc.path, line: loc.line });
   }, [debug.currentLocation, debug.state?.status, openDebugFrame]);
+  showDebugExecutionPointRef.current = () => {
+    const state = debug.state;
+    const frame = state?.frames.find((candidate) => candidate.id === state.selectedFrameId) ?? state?.frames[0];
+    if (frame && (frame.path || frame.sourceReference > 0)) openDebugFrame(frame);
+  };
 
   // Real Java debugging drives the DAP kernel over Tauri IPC, which the browser
   // dev-preview stubs cannot provide (there is no JVM / java-debug adapter). Gate
@@ -20904,6 +21083,7 @@ export function CodeWorkspaceTab({
       const list = debug.breakpoints[key] ?? debug.breakpoints[groupFileAbsPath] ?? [];
       const runtime = debug.breakpointRuntime[key] ?? debug.breakpointRuntime[groupFileAbsPath] ?? {};
       const muted = debug.breakpointsMuted;
+      const masters = breakpointMasterKeys(debug.breakpoints);
       return list.map((bp) => {
         const enabled = bp.enabled !== false && !muted;
         const state = runtime[bp.line];
@@ -20911,9 +21091,14 @@ export function CodeWorkspaceTab({
         return {
           line: bp.line,
           conditional: !!(bp.condition || bp.hitCondition),
-          logpoint: !!bp.logMessage,
+          suspend: effectiveSuspend(bp),
           enabled,
+          muted,
           verified,
+          bound: debugSessionActive && state?.status === "verified",
+          temporary: !!bp.temporary,
+          dependent: !!masterOf(bp, debug.breakpoints) || masters.has(breakpointRefKey(key, bp.line)),
+          tooltip: breakpointTooltipLines(bp, key, { muted, map: debug.breakpoints }).join("\n"),
         };
       });
     })();
@@ -21048,16 +21233,32 @@ export function CodeWorkspaceTab({
         onToggleBreakpoint={(line) => {
           if (groupFileAbsPath) debug.toggleBreakpoint(normalizeFsPath(groupFileAbsPath), line);
         }}
-        onEditBreakpoint={(line) => {
+        onEditBreakpoint={(line, anchor) => {
           if (!groupFileAbsPath) return;
           const key = normalizeFsPath(groupFileAbsPath);
           if (!(debug.breakpoints[key] ?? []).some((bp) => bp.line === line)) {
             debug.toggleBreakpoint(key, line);
           }
-          setEditingBreakpoint({ path: key, line });
-          setBottomDockTab("debug");
-          setBottomDockOpen(true);
+          openBreakpointPopup(key, line, anchor);
         }}
+        breakpointGutterActions={groupFileAbsPath ? {
+          toggleEnabled: (line) => debug.toggleBreakpointEnabled(normalizeFsPath(groupFileAbsPath), line),
+          add: (line, kind, anchor) => {
+            const key = normalizeFsPath(groupFileAbsPath);
+            if (kind === "temporary") {
+              debug.addBreakpoint(key, line, { temporary: true });
+              return;
+            }
+            // IDEA Shift+click: a non-suspending breakpoint that logs its hit,
+            // with the full property popup open.
+            debug.addBreakpoint(key, line, { suspend: false, logHitMessage: true });
+            openBreakpointPopup(key, line, anchor, true);
+          },
+          openMenu: (line, anchor) => {
+            setBreakpointPopup(null);
+            setGutterMenu({ path: normalizeFsPath(groupFileAbsPath), line, x: anchor.x, y: anchor.y });
+          },
+        } : undefined}
         debugStep={groupId === activeEditorGroupId && debugSessionActive ? debug.step : null}
         debugRunToCursor={groupId === activeEditorGroupId && debugSessionActive ? debugRunToCursorLine : null}
         debugStop={groupId === activeEditorGroupId && debugSessionActive ? debug.terminate : null}
@@ -21224,6 +21425,10 @@ export function CodeWorkspaceTab({
           }
           if (groupFile) {
             noteCaretPosition(groupFile.key, selection.end);
+          }
+          const syncCursor = cursorPositionsRef.current[groupId];
+          if (!syncCursor || syncCursor.line !== selection.end.line || syncCursor.character !== selection.end.character) {
+            cursorPositionsRef.current = { ...cursorPositionsRef.current, [groupId]: selection.end };
           }
           setCursorPositions((current) => {
             const prev = current[groupId];
@@ -21815,6 +22020,13 @@ export function CodeWorkspaceTab({
           onOpenLocation={(path, line, column) => openDebugFrame({ path, line, column })}
           editingBreakpoint={editingBreakpoint}
           onEditingBreakpointChange={setEditingBreakpoint}
+          onViewBreakpoints={() => setBreakpointsDialog({ initial: null })}
+          onEvaluateExpression={(expression) => openEvaluateDialogRef.current(expression ?? "")}
+          onRunToCursor={debug.state?.status === "stopped" && activeFileAbsPath ? () => {
+            const cursor = cursorPositionsRef.current[activeEditorGroupId];
+            const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
+            debugRunToCursorLine(line);
+          } : null}
           runtimeAvailable={debugRuntimeAvailable}
           configurations={activeRunConfigurations
             .filter((configuration) => configuration.kind !== "module")
@@ -23376,6 +23588,62 @@ export function CodeWorkspaceTab({
         <DapAdapterGuideDialog
           open={true}
           onClose={() => setDapGuideOpen(false)}
+        />
+      )}
+      {breakpointPopup && (() => {
+        const target = debug.breakpoints[breakpointPopup.path]?.find((bp) => bp.line === breakpointPopup.line);
+        if (!target) return null;
+        return (
+          <BreakpointPopup
+            key={`${breakpointPopup.path}:${breakpointPopup.line}`}
+            path={breakpointPopup.path}
+            breakpoint={target}
+            anchor={breakpointPopup.anchor}
+            expanded={breakpointPopup.expanded}
+            otherBreakpoints={Object.entries(debug.breakpoints).flatMap(([path, list]) => (
+              list.map((bp) => ({ path, line: bp.line }))
+            ))}
+            onChange={(options) => debug.setBreakpointOptions(breakpointPopup.path, breakpointPopup.line, options)}
+            onMore={() => {
+              setBreakpointPopup(null);
+              setBreakpointsDialog({ initial: { path: breakpointPopup.path, line: breakpointPopup.line } });
+            }}
+            onClose={() => setBreakpointPopup(null)}
+          />
+        );
+      })()}
+      {gutterMenu && (
+        <GutterBreakpointMenu
+          menu={gutterMenu}
+          onClose={() => setGutterMenu(null)}
+          onAdd={(kind) => {
+            const { path, line, x, y } = gutterMenu;
+            setGutterMenu(null);
+            if (kind === "plain") {
+              debug.addBreakpoint(path, line);
+            } else if (kind === "conditional") {
+              debug.addBreakpoint(path, line);
+              openBreakpointPopup(path, line, { x, y });
+            } else {
+              debug.addBreakpoint(path, line, { suspend: false, logHitMessage: true });
+              openBreakpointPopup(path, line, { x, y }, true);
+            }
+          }}
+        />
+      )}
+      {breakpointsDialog && (
+        <BreakpointsDialog
+          debug={debug}
+          initial={breakpointsDialog.initial}
+          onOpenBreakpoint={(path, line) => openDebugFrame({ path, line })}
+          onClose={() => setBreakpointsDialog(null)}
+        />
+      )}
+      {evaluateDialog && (
+        <EvaluateExpressionDialog
+          debug={debug}
+          initialExpression={evaluateDialog.expression}
+          onClose={() => setEvaluateDialog(null)}
         />
       )}
       {newJavaClassDialogState && (
