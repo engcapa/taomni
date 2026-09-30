@@ -79,7 +79,13 @@ steps:
 - fill:
     selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
     value: Editor Appearance Settings
-- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance Settings'
+- assert_text:
+    selector: '[data-testid="search-everywhere-selected-path"]'
+    contains: Editor Appearance Settings
+    timeout_sec: 10
+- press:
+    key: Enter
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
 - wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
 - fill:
     selector: '[data-testid="workspace-editor-appearance-font-size-px"]'
@@ -166,42 +172,42 @@ verification:
   - id: R3
     requirement: A2 缩放与主题：编辑器 200%（13→26px）+ 高对比主题生效；缩放下快捷键与焦点返回仍工作。
     actions:
-    - 23
-    - 25
+    - 24
     - 26
     - 27
-    - 32
+    - 28
+    - 33
     checkpoints:
-    - step: 24
+    - step: 25
       expectation: '{"wait_for": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]"}'
-    - step: 29
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-editor-color-scheme=\"high-contrast\"]", "timeout_sec": 10}}'
     - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-editor-color-scheme=\"high-contrast\"]", "timeout_sec": 10}}'
+    - step: 31
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''.cm-content'')).fontSize", "contains": "26px"}}'
-    - step: 33
+    - step: 34
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 15}}'
-    - step: 36
+    - step: 37
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content:focus", "timeout_sec": 5}}'
     results:
-    - 29
     - 30
-    - 33
-    - 36
+    - 31
+    - 34
+    - 37
   - id: R4
     requirement: A2 窗口恢复：重载后重新进入 workspace，外观（26px、高对比）与活动编辑器 tab 恢复。
     actions:
-    - 37
+    - 38
     checkpoints:
-    - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-editor-color-scheme=\"high-contrast\"]", "timeout_sec": 60}}'
     - step: 41
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''.cm-content'')).fontSize", "contains": "26px"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-editor-color-scheme=\"high-contrast\"]", "timeout_sec": 60}}'
     - step: 42
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''.cm-content'')).fontSize", "contains": "26px"}}'
+    - step: 43
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"] [role=\"tab\"][aria-selected=\"true\"]"}'
     results:
-    - 40
     - 41
     - 42
+    - 43
   visual:
   - check: 三端截图对照缩放与高对比。
     method: manual
