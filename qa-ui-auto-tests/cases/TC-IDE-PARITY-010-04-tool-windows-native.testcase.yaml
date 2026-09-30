@@ -68,6 +68,9 @@ steps:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed
     equals: 'true'
+- eval_readonly:
+    expression: (document.activeElement?.tagName ?? 'none') + '|' + (document.activeElement?.getAttribute('data-testid') ?? '') + '|' + String(document.activeElement?.className ?? '').slice(0, 30) + '|pressed:' + document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tool-rail-project"]')?.getAttribute('aria-pressed') + '|nav:' + navigator.platform
+    contains: DIAG-NEVER
 - wait_for:
     selector: '[data-testid="code-workspace-tree-pane"]:focus-within'
     timeout_sec: 5
@@ -114,22 +117,22 @@ verification:
     requirement: A2：Alt+1 在打包 WebView 中按 IDEA 语义切换 Project 工具窗：已显示但编辑器有焦点时激活（焦点进项目树），激活时再按隐藏，隐藏后再按打开。
     actions:
     - 20
-    - 23
-    - 25
+    - 24
+    - 26
     checkpoints:
     - step: 21
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
-    - step: 22
+    - step: 23
       expectation: "{\"wait_for\": {\"selector\": \"[data-testid=\\\"code-workspace-tree-pane\\\"]:focus-within\", \"timeout_sec\": 5}}"
-    - step: 24
+    - step: 25
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "false"}}'
-    - step: 26
+    - step: 27
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
     results:
     - 21
-    - 22
-    - 24
-    - 26
+    - 23
+    - 25
+    - 27
   visual:
   - check: 不声明视觉结论。
     method: not-applicable
