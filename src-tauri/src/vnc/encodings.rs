@@ -3,20 +3,10 @@ use std::io::Read;
 
 use crate::vnc::limits::DecodeLimits;
 
-/// A decoded framebuffer rectangle, in destination RGBA32.
-///
-/// `Copy` rectangles are resolved against the framebuffer inside the decoder,
-/// so what we emit upstream is always pixel data.
-#[derive(Debug)]
-pub enum DecodedRect {
-    Pixels {
-        x: u16,
-        y: u16,
-        w: u16,
-        h: u16,
-        rgba: Vec<u8>,
-    },
-}
+// Pixel decoders write straight into a caller-owned, tightly packed RGBA
+// scratch block of `w*h*4` bytes (stride `w*4`). The RFB connection then blits
+// that block into the authoritative framebuffer once per server rectangle, so
+// no per-tile allocation or per-tile relay message is produced.
 
 #[derive(Debug)]
 pub struct DecodedCursor {
@@ -63,102 +53,52 @@ fn read_u32_be<R: Read>(r: &mut R) -> std::io::Result<u32> {
     Ok(u32::from_be_bytes(b))
 }
 
+fn check_scratch(out: &[u8], w: u16, h: u16) -> Result<(), String> {
+    if out.len() != usize::from(w) * usize::from(h) * 4 {
+        return Err("decoder scratch buffer does not match the rectangle".into());
+    }
+    Ok(())
+}
+
+/// Fill a sub-rectangle of a packed RGBA block with one colour.
+fn fill_block(
+    out: &mut [u8],
+    stride_px: usize,
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+    colour: [u8; 4],
+) {
+    for row in y..y + h {
+        let start = (row * stride_px + x) * 4;
+        for pixel in out[start..start + w * 4].chunks_exact_mut(4) {
+            pixel.copy_from_slice(&colour);
+        }
+    }
+}
+
 // ── Raw encoding (type 0) ──────────────────────────────────────────
 
-/// Read a Raw-encoded rectangle from the stream: `w*h` PIXEL units of 4 bytes
-/// each (per the RGBA32 pixel format we negotiate). Alpha byte is forced to
-/// 0xFF because many servers leave it at 0.
-pub fn read_raw<R: Read>(r: &mut R, x: u16, y: u16, w: u16, h: u16) -> Result<DecodedRect, String> {
-    read_raw_with_limits(r, x, y, w, h, &DecodeLimits::default())
-}
-
-pub fn read_raw_with_limits<R: Read>(
-    r: &mut R,
-    x: u16,
-    y: u16,
-    w: u16,
-    h: u16,
-    limits: &DecodeLimits,
-) -> Result<DecodedRect, String> {
-    let bytes = limits.rectangle_bytes(w, h).map_err(|e| e.to_string())?;
-    let mut rgba = vec![0u8; bytes];
-    r.read_exact(&mut rgba)
+/// Read a Raw-encoded rectangle: `w*h` PIXEL units of 4 bytes each (per the
+/// RGBA32 pixel format we negotiate). Alpha is forced to 0xFF because many
+/// servers leave it at 0.
+pub fn decode_raw_into<R: Read>(r: &mut R, w: u16, h: u16, out: &mut [u8]) -> Result<(), String> {
+    check_scratch(out, w, h)?;
+    r.read_exact(out)
         .map_err(|e| format!("raw: read pixels: {}", e))?;
-    for pixel in rgba.chunks_exact_mut(4) {
+    for pixel in out.chunks_exact_mut(4) {
         pixel[3] = 255;
     }
-    Ok(DecodedRect::Pixels { x, y, w, h, rgba })
+    Ok(())
 }
 
-// ── CopyRect encoding (type 1) ─────────────────────────────────────
-
-/// Read the 4-byte CopyRect payload (src_x, src_y) and resolve it against the
-/// framebuffer, returning a Pixels rectangle that contains the copied region
-/// so downstream consumers do not need to understand the framebuffer.
-pub fn read_copyrect<R: Read>(
-    r: &mut R,
-    dst_x: u16,
-    dst_y: u16,
-    w: u16,
-    h: u16,
-    fb: &[u8],
-    fb_w: u16,
-    fb_h: u16,
-) -> Result<DecodedRect, String> {
+/// Read the 4-byte CopyRect payload (src_x, src_y). The copy itself runs
+/// against the framebuffer.
+pub fn read_copyrect_source<R: Read>(r: &mut R) -> Result<(u16, u16), String> {
     let src_x = read_u16_be(r).map_err(|e| format!("copyrect: src_x: {}", e))?;
     let src_y = read_u16_be(r).map_err(|e| format!("copyrect: src_y: {}", e))?;
-
-    let fb_w = fb_w as usize;
-    let fb_h = fb_h as usize;
-    let w_us = w as usize;
-    let h_us = h as usize;
-
-    let bytes = w_us
-        .checked_mul(h_us)
-        .and_then(|pixels| pixels.checked_mul(4))
-        .ok_or_else(|| "copyrect: byte count overflow".to_string())?;
-    if fb_w == 0
-        || fb_h == 0
-        || src_x as usize >= fb_w
-        || src_y as usize >= fb_h
-        || (src_x as usize)
-            .checked_add(w_us)
-            .is_none_or(|end| end > fb_w)
-        || (src_y as usize)
-            .checked_add(h_us)
-            .is_none_or(|end| end > fb_h)
-        || (dst_x as usize)
-            .checked_add(w_us)
-            .is_none_or(|end| end > fb_w)
-        || (dst_y as usize)
-            .checked_add(h_us)
-            .is_none_or(|end| end > fb_h)
-    {
-        return Err("copyrect: source or destination is outside framebuffer".into());
-    }
-    let mut rgba = vec![0u8; bytes];
-    for row in 0..h_us {
-        let sy = src_y as usize + row;
-        if sy >= fb_h {
-            break;
-        }
-        let src_start = (sy * fb_w + src_x as usize) * 4;
-        // Row length constrained by both the requested width and the fb edge.
-        let avail_cols = fb_w.saturating_sub(src_x as usize).min(w_us);
-        let src_end = src_start + avail_cols * 4;
-        let dst_start = row * w_us * 4;
-        let dst_end = dst_start + avail_cols * 4;
-        if src_end <= fb.len() && dst_end <= rgba.len() {
-            rgba[dst_start..dst_end].copy_from_slice(&fb[src_start..src_end]);
-        }
-    }
-    Ok(DecodedRect::Pixels {
-        x: dst_x,
-        y: dst_y,
-        w,
-        h,
-        rgba,
-    })
+    Ok((src_x, src_y))
 }
 
 // ── Hextile encoding (type 5) ──────────────────────────────────────
@@ -183,46 +123,42 @@ impl HextileState {
     }
 }
 
-/// Read a Hextile-encoded rectangle from the stream, tile-by-tile.
-///
-/// Unlike the previous decoder, this implementation:
-///   - reads exactly as many bytes as the server sent (no heuristics),
-///   - carries bg/fg across tiles per the RFB spec,
-///   - applies the five subencoding flags correctly.
-pub fn read_hextile<R: Read>(
+/// Decode a Hextile rectangle tile-by-tile into `out`. Reads exactly the
+/// bytes the server sent, carries bg/fg across tiles and applies the five
+/// subencoding flags.
+pub fn decode_hextile_into<R: Read>(
     r: &mut R,
-    rect_x: u16,
-    rect_y: u16,
     rect_w: u16,
     rect_h: u16,
     state: &mut HextileState,
-) -> Result<Vec<DecodedRect>, String> {
-    let mut results: Vec<DecodedRect> = Vec::new();
+    out: &mut [u8],
+) -> Result<(), String> {
+    check_scratch(out, rect_w, rect_h)?;
+    let stride = usize::from(rect_w);
+    let mut tile_raw = [0u8; 16 * 16 * 4];
 
-    let mut tile_y = rect_y;
-    while tile_y < rect_y + rect_h {
-        let tile_h = 16u16.min(rect_y + rect_h - tile_y);
-        let mut tile_x = rect_x;
-        while tile_x < rect_x + rect_w {
-            let tile_w = 16u16.min(rect_x + rect_w - tile_x);
+    let mut tile_y = 0u16;
+    while tile_y < rect_h {
+        let tile_h = 16u16.min(rect_h - tile_y);
+        let mut tile_x = 0u16;
+        while tile_x < rect_w {
+            let tile_w = 16u16.min(rect_w - tile_x);
+            let (tx, ty) = (usize::from(tile_x), usize::from(tile_y));
+            let (tw, th) = (usize::from(tile_w), usize::from(tile_h));
             let subenc = read_u8(r).map_err(|e| format!("hextile: subenc: {}", e))?;
-            let pixel_count = tile_w as usize * tile_h as usize;
-            let byte_count = pixel_count * 4;
 
             if subenc & HEXTILE_RAW != 0 {
-                let mut rgba = vec![0u8; byte_count];
-                r.read_exact(&mut rgba)
+                let bytes = &mut tile_raw[..tw * th * 4];
+                r.read_exact(bytes)
                     .map_err(|e| format!("hextile: raw tile pixels: {}", e))?;
-                for pixel in rgba.chunks_exact_mut(4) {
-                    pixel[3] = 255;
+                for (row, chunk) in bytes.chunks_exact(tw * 4).enumerate() {
+                    let start = ((ty + row) * stride + tx) * 4;
+                    let dst = &mut out[start..start + tw * 4];
+                    dst.copy_from_slice(chunk);
+                    for pixel in dst.chunks_exact_mut(4) {
+                        pixel[3] = 255;
+                    }
                 }
-                results.push(DecodedRect::Pixels {
-                    x: tile_x,
-                    y: tile_y,
-                    w: tile_w,
-                    h: tile_h,
-                    rgba,
-                });
                 tile_x += tile_w;
                 continue;
             }
@@ -238,11 +174,7 @@ pub fn read_hextile<R: Read>(
                 state.fg[3] = 255;
             }
 
-            // Fill the tile with the background colour.
-            let mut tile_pixels = vec![0u8; byte_count];
-            for i in 0..pixel_count {
-                tile_pixels[i * 4..(i + 1) * 4].copy_from_slice(&state.bg);
-            }
+            fill_block(out, stride, tx, ty, tw, th, state.bg);
 
             if subenc & HEXTILE_ANY_SUBRECTS != 0 {
                 let n_subrects =
@@ -258,34 +190,27 @@ pub fn read_hextile<R: Read>(
                     } else {
                         state.fg
                     };
-                    let xy = read_u8(r).map_err(|e| format!("hextile: sr xy: {}", e))?;
-                    let wh = read_u8(r).map_err(|e| format!("hextile: sr wh: {}", e))?;
-                    let sx = (xy >> 4) as usize;
-                    let sy = (xy & 0x0F) as usize;
-                    let sw = ((wh >> 4) as usize) + 1;
-                    let sh = ((wh & 0x0F) as usize) + 1;
-                    for r2 in sy..(sy + sh).min(tile_h as usize) {
-                        for c in sx..(sx + sw).min(tile_w as usize) {
-                            let idx = (r2 * tile_w as usize + c) * 4;
-                            tile_pixels[idx..idx + 4].copy_from_slice(&colour);
-                        }
+                    let mut geometry = [0u8; 2];
+                    r.read_exact(&mut geometry)
+                        .map_err(|e| format!("hextile: sr geometry: {}", e))?;
+                    let sx = (geometry[0] >> 4) as usize;
+                    let sy = (geometry[0] & 0x0F) as usize;
+                    let sw = ((geometry[1] >> 4) as usize) + 1;
+                    let sh = ((geometry[1] & 0x0F) as usize) + 1;
+                    if sx >= tw || sy >= th {
+                        continue;
                     }
+                    let w = sw.min(tw - sx);
+                    let h = sh.min(th - sy);
+                    fill_block(out, stride, tx + sx, ty + sy, w, h, colour);
                 }
             }
-
-            results.push(DecodedRect::Pixels {
-                x: tile_x,
-                y: tile_y,
-                w: tile_w,
-                h: tile_h,
-                rgba: tile_pixels,
-            });
             tile_x += tile_w;
         }
         tile_y += tile_h;
     }
 
-    Ok(results)
+    Ok(())
 }
 
 // ── ZRLE encoding (type 16) ────────────────────────────────────────
@@ -299,6 +224,8 @@ pub struct ZrleDecoder {
     buf: Vec<u8>,
     /// Read cursor into `buf`.
     pos: usize,
+    /// Reused compressed-body buffer.
+    compressed: Vec<u8>,
 }
 
 impl ZrleDecoder {
@@ -307,6 +234,7 @@ impl ZrleDecoder {
             inflater: Decompress::new(/* zlib */ true),
             buf: Vec::new(),
             pos: 0,
+            compressed: Vec::new(),
         }
     }
 }
@@ -317,36 +245,17 @@ impl Default for ZrleDecoder {
     }
 }
 
-/// Read a ZRLE rectangle from the stream. Uses `dec` to preserve zlib state
+/// Decode a ZRLE rectangle into `out`. Uses `dec` to preserve zlib state
 /// across calls, per RFB 7.7.6.
-pub fn read_zrle<R: Read>(
+pub fn decode_zrle_into<R: Read>(
     r: &mut R,
-    rect_x: u16,
-    rect_y: u16,
-    rect_w: u16,
-    rect_h: u16,
-    dec: &mut ZrleDecoder,
-) -> Result<Vec<DecodedRect>, String> {
-    read_zrle_with_limits(
-        r,
-        rect_x,
-        rect_y,
-        rect_w,
-        rect_h,
-        dec,
-        &DecodeLimits::default(),
-    )
-}
-
-pub fn read_zrle_with_limits<R: Read>(
-    r: &mut R,
-    rect_x: u16,
-    rect_y: u16,
     rect_w: u16,
     rect_h: u16,
     dec: &mut ZrleDecoder,
     limits: &DecodeLimits,
-) -> Result<Vec<DecodedRect>, String> {
+    out: &mut [u8],
+) -> Result<(), String> {
+    check_scratch(out, rect_w, rect_h)?;
     let zlib_len_raw = read_u32_be(r).map_err(|e| format!("zrle: len: {}", e))?;
     let zlib_len = limits
         .compressed_bytes(zlib_len_raw)
@@ -354,29 +263,72 @@ pub fn read_zrle_with_limits<R: Read>(
     let _rect_bytes = limits
         .rectangle_bytes(rect_w, rect_h)
         .map_err(|e| e.to_string())?;
-    let mut compressed = vec![0u8; zlib_len];
-    r.read_exact(&mut compressed)
-        .map_err(|e| format!("zrle: body: {}", e))?;
+    let mut compressed = std::mem::take(&mut dec.compressed);
+    compressed.clear();
+    compressed.resize(zlib_len, 0);
+    let read = r.read_exact(&mut compressed);
+    if let Err(e) = read {
+        dec.compressed = compressed;
+        return Err(format!("zrle: body: {}", e));
+    }
+    let inflated = inflate_into(dec, &compressed, limits);
+    dec.compressed = compressed;
+    inflated?;
 
-    // Feed the newly-arrived bytes into the persistent inflater, growing the
-    // buffer as we go. The inflater's internal state is preserved across
-    // rectangles — RFB keeps a single zlib stream per session.
-    //
-    // Subtle point: it is NOT enough to stop as soon as the input slice has
-    // been fully consumed. miniz_oxide buffers input internally, so
-    // `consumed_in == compressed.len()` can mean "bytes copied into the
-    // inflater's internal ring" rather than "all output bytes emitted". If
-    // the output buffer also happened to fill on that same call, queued
-    // bytes are left behind and the tile decoder below then runs off the end
-    // with `eof cpixel`. Drain the inflater with an extra empty-input call
-    // before returning.
+    let stride = usize::from(rect_w);
+    let mut tile_y = 0u16;
+    while tile_y < rect_h {
+        let tile_h = 64u16.min(rect_h - tile_y);
+        let mut tile_x = 0u16;
+        while tile_x < rect_w {
+            let tile_w = 64u16.min(rect_w - tile_x);
+            zrle_decode_tile(
+                &dec.buf,
+                &mut dec.pos,
+                out,
+                stride,
+                usize::from(tile_x),
+                usize::from(tile_y),
+                usize::from(tile_w),
+                usize::from(tile_h),
+            )?;
+            tile_x += tile_w;
+        }
+        tile_y += tile_h;
+    }
+
+    // Compact the buffer once we've cleared enough of it to avoid unbounded growth.
+    if dec.pos >= dec.buf.len() {
+        dec.buf.clear();
+        dec.pos = 0;
+    } else if dec.pos > 1 << 20 {
+        dec.buf.drain(..dec.pos);
+        dec.pos = 0;
+    }
+
+    Ok(())
+}
+
+/// Feed the newly-arrived bytes into the persistent inflater. It is NOT
+/// enough to stop as soon as the input slice has been fully consumed:
+/// miniz_oxide buffers input internally, so queued output must be drained with
+/// an extra empty-input call before the tile decoder runs (otherwise it hits
+/// `eof cpixel`).
+fn inflate_into(
+    dec: &mut ZrleDecoder,
+    compressed: &[u8],
+    limits: &DecodeLimits,
+) -> Result<(), String> {
+    // Most rectangles expand 2-6x; grow in large steps to keep the number of
+    // inflate calls small.
+    let step = (compressed.len().saturating_mul(4)).clamp(64 * 1024, 8 * 1024 * 1024);
     let mut src_consumed = 0usize;
     loop {
         let current_len = dec.buf.len();
         let next_len = current_len
-            .checked_add(64 * 1024)
+            .checked_add(step)
             .ok_or_else(|| "zrle: output size overflow".to_string())?;
-        if next_len > limits.max_decompressed_rect_bytes {
+        if next_len > limits.max_decompressed_rect_bytes.saturating_add(dec.pos) {
             return Err("zrle: decompressed output exceeds configured limit".into());
         }
         dec.buf.resize(next_len, 0);
@@ -417,70 +369,59 @@ pub fn read_zrle_with_limits<R: Read>(
             break;
         }
     }
-
-    // Now decode tiles from `dec.buf`, advancing `dec.pos`.
-    let mut results: Vec<DecodedRect> = Vec::new();
-    let mut tile_y = rect_y;
-    while tile_y < rect_y + rect_h {
-        let tile_h = 64u16.min(rect_y + rect_h - tile_y);
-        let mut tile_x = rect_x;
-        while tile_x < rect_x + rect_w {
-            let tile_w = 64u16.min(rect_x + rect_w - tile_x);
-            let pixels = zrle_read_tile(&dec.buf, &mut dec.pos, tile_w, tile_h)?;
-            results.push(DecodedRect::Pixels {
-                x: tile_x,
-                y: tile_y,
-                w: tile_w,
-                h: tile_h,
-                rgba: pixels,
-            });
-            tile_x += tile_w;
-        }
-        tile_y += tile_h;
-    }
-
-    // Compact the buffer once we've cleared enough of it to avoid unbounded growth.
-    if dec.pos >= dec.buf.len() {
-        dec.buf.clear();
-        dec.pos = 0;
-    } else if dec.pos > 1 << 20 {
-        dec.buf.drain(..dec.pos);
-        dec.pos = 0;
-    }
-
-    Ok(results)
+    Ok(())
 }
 
-/// Read one ZRLE tile from the already-inflated byte slice.
+/// Decode one ZRLE tile from the inflated byte slice into `out`.
 ///
 /// ZRLE uses **CPIXEL** — the compact form of the negotiated pixel format.
-/// With our RGBA32 format (R@0, G@8, B@16, A@24, little-endian, true-colour,
-/// max=255/255/255) the spec says the CPIXEL is 3 bytes (the colour bytes,
-/// dropping the zero-padding byte). We send R@0 G@8 B@16 so CPIXEL is `[R, G, B]`.
-fn zrle_read_tile(buf: &[u8], pos: &mut usize, w: u16, h: u16) -> Result<Vec<u8>, String> {
-    let pixel_count = w as usize * h as usize;
-    let mut rgba = vec![0u8; pixel_count * 4];
+/// With our RGBA32 format (R@0, G@8, B@16, depth 24, true-colour) the CPIXEL
+/// is 3 bytes `[R, G, B]`.
+#[allow(clippy::too_many_arguments)]
+fn zrle_decode_tile(
+    buf: &[u8],
+    pos: &mut usize,
+    out: &mut [u8],
+    stride: usize,
+    tx: usize,
+    ty: usize,
+    w: usize,
+    h: usize,
+) -> Result<(), String> {
+    let pixel_count = w * h;
 
     let subenc = *buf
         .get(*pos)
         .ok_or_else(|| "zrle: eof subenc".to_string())?;
     *pos += 1;
 
+    let row_start = |row: usize| ((ty + row) * stride + tx) * 4;
+
     if subenc == 0 {
         // Raw CPIXEL stream.
-        for i in 0..pixel_count {
-            let c = read_cpixel(buf, pos)?;
-            rgba[i * 4..i * 4 + 4].copy_from_slice(&c);
+        let bytes = pixel_count * 3;
+        let src = buf
+            .get(*pos..*pos + bytes)
+            .ok_or_else(|| "zrle: eof cpixel".to_string())?;
+        for row in 0..h {
+            let start = row_start(row);
+            let dst = &mut out[start..start + w * 4];
+            let src_row = &src[row * w * 3..(row + 1) * w * 3];
+            for (pixel, cpixel) in dst.chunks_exact_mut(4).zip(src_row.chunks_exact(3)) {
+                pixel[0] = cpixel[0];
+                pixel[1] = cpixel[1];
+                pixel[2] = cpixel[2];
+                pixel[3] = 255;
+            }
         }
-        return Ok(rgba);
+        *pos += bytes;
+        return Ok(());
     }
 
     if subenc == 1 {
         let c = read_cpixel(buf, pos)?;
-        for i in 0..pixel_count {
-            rgba[i * 4..i * 4 + 4].copy_from_slice(&c);
-        }
-        return Ok(rgba);
+        fill_block(out, stride, tx, ty, w, h, c);
+        return Ok(());
     }
 
     if (2..=16).contains(&subenc) {
@@ -497,84 +438,81 @@ fn zrle_read_tile(buf: &[u8], pos: &mut usize, w: u16, h: u16) -> Result<Vec<u8>
         } else {
             4
         };
+        let mask = (1u8 << bpp) - 1;
+        let pixels_in_byte = 8 / bpp;
         // Each row is packed independently: the partial trailing byte of a row
         // is padded, and the next row starts on a fresh byte.
-        for row in 0..h as usize {
-            let mut col = 0usize;
-            while col < w as usize {
-                let byte = *buf
-                    .get(*pos)
-                    .ok_or_else(|| "zrle: eof packed".to_string())?;
-                *pos += 1;
-                let pixels_in_byte = 8 / bpp;
-                for slot in 0..pixels_in_byte {
-                    if col >= w as usize {
-                        break;
-                    }
-                    let shift = 8 - (slot + 1) * bpp;
-                    let mask = (1u8 << bpp) - 1;
-                    let idx = ((byte >> shift) & mask) as usize;
-                    let colour = if idx < palette_size {
-                        palette[idx]
-                    } else {
-                        [0, 0, 0, 255]
-                    };
-                    let px = (row * w as usize + col) * 4;
-                    rgba[px..px + 4].copy_from_slice(&colour);
-                    col += 1;
-                }
+        let row_bytes = w.div_ceil(pixels_in_byte);
+        for row in 0..h {
+            let packed = buf
+                .get(*pos..*pos + row_bytes)
+                .ok_or_else(|| "zrle: eof packed".to_string())?;
+            *pos += row_bytes;
+            let start = row_start(row);
+            for col in 0..w {
+                let byte = packed[col / pixels_in_byte];
+                let shift = 8 - ((col % pixels_in_byte) + 1) * bpp;
+                let idx = ((byte >> shift) & mask) as usize;
+                let colour = if idx < palette_size {
+                    palette[idx]
+                } else {
+                    [0, 0, 0, 255]
+                };
+                out[start + col * 4..start + col * 4 + 4].copy_from_slice(&colour);
             }
         }
-        return Ok(rgba);
+        return Ok(());
     }
 
-    if subenc == 128 {
-        // Plain RLE over CPIXEL.
-        let mut filled = 0usize;
-        while filled < pixel_count {
-            let colour = read_cpixel(buf, pos)?;
-            let run_len = read_zrle_run_length(buf, pos)?;
-            let take = run_len.min(pixel_count - filled);
-            for _ in 0..take {
-                rgba[filled * 4..filled * 4 + 4].copy_from_slice(&colour);
-                filled += 1;
-            }
-        }
-        return Ok(rgba);
-    }
-
-    if (130..=255).contains(&subenc) {
-        // Palette RLE. 2..=127 colours; indices of 127 means single pixel,
-        // indices with the high bit set have a run length trailer.
-        let palette_size = (subenc - 128) as usize;
-        let mut palette = vec![[0u8; 4]; palette_size];
-        for slot in palette.iter_mut() {
+    if subenc == 128 || (130..=255).contains(&subenc) {
+        // Plain RLE over CPIXEL (128) or palette RLE (130..=255): 2..=127
+        // colours; indices with the high bit set carry a run length.
+        let palette_size = if subenc == 128 {
+            0
+        } else {
+            (subenc - 128) as usize
+        };
+        let mut palette = [[0u8; 4]; 128];
+        for slot in palette.iter_mut().take(palette_size) {
             *slot = read_cpixel(buf, pos)?;
         }
         let mut filled = 0usize;
         while filled < pixel_count {
-            let idx_byte = *buf
-                .get(*pos)
-                .ok_or_else(|| "zrle: eof paletteRLE idx".to_string())?;
-            *pos += 1;
-            let pal_idx = (idx_byte & 0x7F) as usize;
-            let colour = if pal_idx < palette_size {
-                palette[pal_idx]
+            let (colour, run_len) = if subenc == 128 {
+                let colour = read_cpixel(buf, pos)?;
+                (colour, read_zrle_run_length(buf, pos)?)
             } else {
-                [0, 0, 0, 255]
+                let idx_byte = *buf
+                    .get(*pos)
+                    .ok_or_else(|| "zrle: eof paletteRLE idx".to_string())?;
+                *pos += 1;
+                let pal_idx = (idx_byte & 0x7F) as usize;
+                let colour = if pal_idx < palette_size {
+                    palette[pal_idx]
+                } else {
+                    [0, 0, 0, 255]
+                };
+                let run = if idx_byte & 0x80 != 0 {
+                    read_zrle_run_length(buf, pos)?
+                } else {
+                    1
+                };
+                (colour, run)
             };
-            let run_len = if idx_byte & 0x80 != 0 {
-                read_zrle_run_length(buf, pos)?
-            } else {
-                1
-            };
-            let take = run_len.min(pixel_count - filled);
-            for _ in 0..take {
-                rgba[filled * 4..filled * 4 + 4].copy_from_slice(&colour);
-                filled += 1;
+            let mut take = run_len.min(pixel_count - filled);
+            while take > 0 {
+                let row = filled / w;
+                let col = filled % w;
+                let span = take.min(w - col);
+                let start = row_start(row) + col * 4;
+                for pixel in out[start..start + span * 4].chunks_exact_mut(4) {
+                    pixel.copy_from_slice(&colour);
+                }
+                filled += span;
+                take -= span;
             }
         }
-        return Ok(rgba);
+        return Ok(());
     }
 
     Err(format!("zrle: unsupported subencoding {}", subenc))
@@ -767,9 +705,10 @@ mod tests {
         // 2x1 pixels, alpha bytes left at 0 by the server.
         let bytes: Vec<u8> = vec![10, 20, 30, 0, 40, 50, 60, 0];
         let mut cur = Cursor::new(bytes);
-        let rect = read_raw(&mut cur, 0, 0, 2, 1).unwrap();
-        let DecodedRect::Pixels { rgba, .. } = rect;
+        let mut rgba = vec![0u8; 8];
+        decode_raw_into(&mut cur, 2, 1, &mut rgba).unwrap();
         assert_eq!(rgba, vec![10, 20, 30, 255, 40, 50, 60, 255]);
+        assert!(decode_raw_into(&mut Cursor::new(vec![0u8; 8]), 3, 1, &mut rgba).is_err());
     }
 
     #[test]
@@ -829,26 +768,10 @@ mod tests {
     }
 
     #[test]
-    fn copyrect_emits_fb_window_as_pixels() {
-        // 4x1 framebuffer, copying the last 2 pixels into the first 2 slots.
-        let fb: Vec<u8> = vec![
-            1, 1, 1, 255, // (0,0)
-            2, 2, 2, 255, // (1,0)
-            3, 3, 3, 255, // (2,0)
-            4, 4, 4, 255, // (3,0)
-        ];
-        // src_x=2, src_y=0
-        let mut payload = Cursor::new(vec![0u8, 2, 0, 0]);
-        let rect = read_copyrect(&mut payload, 0, 0, 2, 1, &fb, 4, 1).unwrap();
-        let DecodedRect::Pixels { rgba, .. } = rect;
-        assert_eq!(rgba, vec![3, 3, 3, 255, 4, 4, 4, 255]);
-    }
-
-    #[test]
-    fn copyrect_rejects_out_of_bounds_source() {
-        let fb = vec![0u8; 4 * 4];
-        let mut payload = Cursor::new(vec![0u8, 4, 0, 0]);
-        assert!(read_copyrect(&mut payload, 0, 0, 1, 1, &fb, 4, 1).is_err());
+    fn copyrect_source_reads_exactly_four_bytes() {
+        let mut payload = Cursor::new(vec![0u8, 2, 0, 3, 9]);
+        assert_eq!(read_copyrect_source(&mut payload).unwrap(), (2, 3));
+        assert_eq!(payload.position(), 4);
     }
 
     #[test]
@@ -858,11 +781,10 @@ mod tests {
         // 2x1 rect, exactly one tile
         let mut cur = Cursor::new(&payload);
         let mut st = HextileState::new();
-        let out = read_hextile(&mut cur, 0, 0, 2, 1, &mut st).unwrap();
-        assert_eq!(out.len(), 1);
-        let DecodedRect::Pixels { rgba, .. } = &out[0];
+        let mut rgba = vec![0u8; 8];
+        decode_hextile_into(&mut cur, 2, 1, &mut st, &mut rgba).unwrap();
         // Alpha forced to 255.
-        assert_eq!(rgba, &vec![255, 0, 0, 255, 0, 255, 0, 255]);
+        assert_eq!(rgba, vec![255, 0, 0, 255, 0, 255, 0, 255]);
         // No trailing bytes consumed from the cursor.
         assert_eq!(cur.position() as usize, payload.len());
     }
@@ -872,22 +794,38 @@ mod tests {
         // Two 16x1 tiles. First tile sets bg to red, no subrects. Second tile
         // has no bg flag and no subrects — should still paint red.
         let mut payload = Vec::new();
-        // Tile 1: BG specified, red, no subrects.
         payload.push(HEXTILE_BG_SPECIFIED);
         payload.extend_from_slice(&[255, 0, 0, 0]);
-        // Tile 2: no flags — reuse bg.
         payload.push(0);
         let mut cur = Cursor::new(&payload);
         let mut st = HextileState::new();
-        let out = read_hextile(&mut cur, 0, 0, 32, 1, &mut st).unwrap();
-        assert_eq!(out.len(), 2);
-        for rect in &out {
-            let DecodedRect::Pixels { rgba, .. } = rect;
-            // Every pixel should be red.
-            for p in rgba.chunks_exact(4) {
-                assert_eq!(p, &[255, 0, 0, 255]);
-            }
+        let mut rgba = vec![0u8; 32 * 4];
+        decode_hextile_into(&mut cur, 32, 1, &mut st, &mut rgba).unwrap();
+        for p in rgba.chunks_exact(4) {
+            assert_eq!(p, &[255, 0, 0, 255]);
         }
+    }
+
+    #[test]
+    fn hextile_subrects_paint_inside_their_tile_with_stride() {
+        // 20x2 rect = tiles (16x2) and (4x2). Tile 2: bg blue, one fg subrect
+        // at (1,1) size 2x1 in green; subrects must land at x=17..19, y=1.
+        let mut payload = vec![HEXTILE_BG_SPECIFIED];
+        payload.extend_from_slice(&[0, 0, 0, 0]);
+        payload.push(HEXTILE_BG_SPECIFIED | HEXTILE_FG_SPECIFIED | HEXTILE_ANY_SUBRECTS);
+        payload.extend_from_slice(&[0, 0, 255, 0]);
+        payload.extend_from_slice(&[0, 255, 0, 0]);
+        payload.push(1);
+        payload.extend_from_slice(&[0x11, 0x10]);
+        let mut st = HextileState::new();
+        let mut rgba = vec![0u8; 20 * 2 * 4];
+        decode_hextile_into(&mut Cursor::new(&payload), 20, 2, &mut st, &mut rgba).unwrap();
+        let px = |x: usize, y: usize| &rgba[(y * 20 + x) * 4..(y * 20 + x) * 4 + 4];
+        assert_eq!(px(16, 0), &[0, 0, 255, 255]);
+        assert_eq!(px(17, 1), &[0, 255, 0, 255]);
+        assert_eq!(px(18, 1), &[0, 255, 0, 255]);
+        assert_eq!(px(19, 1), &[0, 0, 255, 255]);
+        assert_eq!(px(15, 1), &[0, 0, 0, 255]);
     }
 
     #[test]
@@ -908,9 +846,16 @@ mod tests {
 
         let mut cur = Cursor::new(&payload);
         let mut dec = ZrleDecoder::new();
-        let out = read_zrle(&mut cur, 0, 0, 64, 64, &mut dec).unwrap();
-        assert_eq!(out.len(), 1);
-        let DecodedRect::Pixels { rgba, .. } = &out[0];
+        let mut rgba = vec![0u8; 64 * 64 * 4];
+        decode_zrle_into(
+            &mut cur,
+            64,
+            64,
+            &mut dec,
+            &DecodeLimits::default(),
+            &mut rgba,
+        )
+        .unwrap();
         assert_eq!(rgba.len(), 64 * 64 * 4);
         for p in rgba.chunks_exact(4) {
             assert_eq!(p, &[255, 0, 0, 255]);
@@ -937,8 +882,16 @@ mod tests {
 
         let mut cur = Cursor::new(&payload);
         let mut dec = ZrleDecoder::new();
-        let out = read_zrle(&mut cur, 0, 0, 16, 16, &mut dec).unwrap();
-        let DecodedRect::Pixels { rgba, .. } = &out[0];
+        let mut rgba = vec![0u8; 16 * 16 * 4];
+        decode_zrle_into(
+            &mut cur,
+            16,
+            16,
+            &mut dec,
+            &DecodeLimits::default(),
+            &mut rgba,
+        )
+        .unwrap();
         assert_eq!(rgba.len(), 16 * 16 * 4);
         for p in rgba.chunks_exact(4) {
             assert_eq!(p, &[0, 255, 0, 255]);
@@ -988,16 +941,31 @@ mod tests {
         payload1.extend_from_slice(&rect1);
         let mut cur1 = Cursor::new(&payload1);
         let mut dec = ZrleDecoder::new();
-        let out1 = read_zrle(&mut cur1, 0, 0, 64, 64, &mut dec).unwrap();
-        let DecodedRect::Pixels { rgba, .. } = &out1[0];
+        let mut rgba = vec![0u8; 64 * 64 * 4];
+        decode_zrle_into(
+            &mut cur1,
+            64,
+            64,
+            &mut dec,
+            &DecodeLimits::default(),
+            &mut rgba,
+        )
+        .unwrap();
         assert_eq!(rgba[0..4], [255, 0, 0, 255]);
 
         let mut payload2 = Vec::new();
         payload2.extend_from_slice(&(rect2.len() as u32).to_be_bytes());
         payload2.extend_from_slice(&rect2);
         let mut cur2 = Cursor::new(&payload2);
-        let out2 = read_zrle(&mut cur2, 0, 64, 64, 64, &mut dec).unwrap();
-        let DecodedRect::Pixels { rgba, .. } = &out2[0];
+        decode_zrle_into(
+            &mut cur2,
+            64,
+            64,
+            &mut dec,
+            &DecodeLimits::default(),
+            &mut rgba,
+        )
+        .unwrap();
         assert_eq!(rgba[0..4], [0, 0, 255, 255]);
     }
 
@@ -1065,14 +1033,22 @@ mod tests {
 
         let mut cur = Cursor::new(&payload);
         let mut dec = ZrleDecoder::new();
-        let out = read_zrle(&mut cur, 0, 0, rect_w, rect_h, &mut dec).unwrap();
-        assert_eq!(out.len() as u16, tiles_x * tiles_y);
-        for rect in &out {
-            let DecodedRect::Pixels { rgba, .. } = rect;
-            assert_eq!(rgba.len(), tile_w as usize * tile_h as usize * 4);
-            for p in rgba.chunks_exact(4) {
-                assert_eq!(p, &[0x12, 0x34, 0x56, 255]);
-            }
+        let mut rgba = vec![0u8; rect_w as usize * rect_h as usize * 4];
+        decode_zrle_into(
+            &mut cur,
+            rect_w,
+            rect_h,
+            &mut dec,
+            &DecodeLimits::default(),
+            &mut rgba,
+        )
+        .unwrap();
+        assert_eq!(
+            dec.pos, 0,
+            "every inflated byte of the {tiles_x}x{tiles_y} tiles is consumed"
+        );
+        for p in rgba.chunks_exact(4) {
+            assert_eq!(p, &[0x12, 0x34, 0x56, 255]);
         }
     }
 }

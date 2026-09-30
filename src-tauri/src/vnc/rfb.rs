@@ -8,9 +8,10 @@ use crate::vnc::clipboard::{
     parse_extended_body_with_limits,
 };
 use crate::vnc::encodings::{
-    self, DecodedCursor, DecodedPointerPosition, DecodedRect, ENCODING_DESKTOP_SIZE,
-    ENCODING_POINTER_POS, ENCODING_RICH_CURSOR, ENCODING_X_CURSOR, HextileState, ZrleDecoder,
+    self, DecodedCursor, DecodedPointerPosition, ENCODING_DESKTOP_SIZE, ENCODING_POINTER_POS,
+    ENCODING_RICH_CURSOR, ENCODING_X_CURSOR, HextileState, ZrleDecoder,
 };
+use crate::vnc::framebuffer::{FbRect, Framebuffer, SharedFramebuffer};
 use crate::vnc::limits::DecodeLimits;
 use crate::vnc::policy::VncSecurityPolicy;
 
@@ -79,7 +80,15 @@ pub struct RfbConnection {
     pub height: u16,
     pub name: String,
     pub security_type: Option<u8>,
-    pub framebuffer: Vec<u8>,
+    /// Authoritative RGBA framebuffer shared with the relay, which reads the
+    /// newest pixels of damaged regions when the WebView is ready.
+    framebuffer: SharedFramebuffer,
+    /// Reused per-rectangle decode target (`w*h*4`).
+    scratch: Vec<u8>,
+    /// Userspace read buffer for the plaintext runtime stream. Decoders issue
+    /// many 1-4 byte reads; without it each was a socket syscall.
+    read_buffer: ReadBuffer,
+    stats: RuntimeStats,
     limits: DecodeLimits,
     security_policy: VncSecurityPolicy,
     pending_security: Option<PendingSecurity>,
@@ -199,7 +208,10 @@ impl RfbConnection {
             height: 0,
             name: String::new(),
             security_type: None,
-            framebuffer: Vec::new(),
+            framebuffer: Framebuffer::empty().shared(),
+            scratch: Vec::new(),
+            read_buffer: ReadBuffer::new(RUNTIME_READ_BUFFER_BYTES),
+            stats: RuntimeStats::default(),
             limits,
             security_policy,
             pending_security,
@@ -661,11 +673,8 @@ impl RfbConnection {
         self.name = String::from_utf8_lossy(&name_bytes).to_string();
 
         // Allocate framebuffer (RGBA 32-bit) only after applying hard limits.
-        let fb_size = self
-            .limits
-            .framebuffer_bytes(self.width, self.height)
-            .map_err(|e| e.to_string())?;
-        self.framebuffer = vec![0u8; fb_size];
+        let framebuffer = Framebuffer::new(self.width, self.height, &self.limits)?;
+        *self.lock_framebuffer()? = framebuffer;
 
         Ok(ServerInit {
             width: self.width,
@@ -756,10 +765,36 @@ impl RfbConnection {
     /// pixels change or while the viewer is hidden. Runtime cancellation closes
     /// the socket explicitly, so remove the handshake timeout before entering
     /// the long-lived read loop.
-    pub fn enter_runtime_mode(&self) -> Result<(), String> {
+    pub fn enter_runtime_mode(&mut self) -> Result<(), String> {
         self.stream
             .set_read_timeout(None)
-            .map_err(|e| format!("clear VNC runtime read timeout failed: {e}"))
+            .map_err(|e| format!("clear VNC runtime read timeout failed: {e}"))?;
+        // Handshake reads stay unbuffered so no byte meant for a sub-protocol
+        // (RA2, TLS bridge) is consumed early. From here on every read goes
+        // through `read_exact`/`RfbStreamReader`, so buffering is safe.
+        if self.secure_io.is_none() {
+            self.read_buffer.enabled = true;
+        }
+        Ok(())
+    }
+
+    /// Counters for the session-information view and performance evidence.
+    pub fn runtime_stats(&self) -> RuntimeStats {
+        RuntimeStats {
+            wire_bytes: self.read_buffer.total,
+            ..self.stats
+        }
+    }
+
+    /// Handle to the authoritative framebuffer for relay-side extraction.
+    pub fn framebuffer(&self) -> SharedFramebuffer {
+        self.framebuffer.clone()
+    }
+
+    fn lock_framebuffer(&self) -> Result<std::sync::MutexGuard<'_, Framebuffer>, String> {
+        self.framebuffer
+            .lock()
+            .map_err(|_| "VNC framebuffer lock poisoned".to_string())
     }
 
     /// Split out an independent writer so input events can be sent while the
@@ -859,7 +894,9 @@ impl RfbConnection {
             return Err("framebuffer update contains too many rectangles".into());
         }
 
-        let mut decoded: Vec<DecodedRect> = Vec::with_capacity(num_rects);
+        let update_started = std::time::Instant::now();
+        let wire_before = self.read_buffer.total;
+        let mut damage: Vec<FbRect> = Vec::with_capacity(num_rects.min(64));
         let mut cursor = None;
         let mut pointer_pos = None;
         for _ in 0..num_rects {
@@ -895,93 +932,30 @@ impl RfbConnection {
                 }
             }
 
+            let rect = FbRect::new(x, y, w, h);
             match encoding {
-                0 => {
-                    let limits = self.limits;
-                    let rect = self.decode_via_reader(|reader| {
-                        encodings::read_raw_with_limits(reader, x, y, w, h, &limits)
-                    })?;
-                    self.write_to_fb(&rect);
-                    decoded.push(rect);
+                0 | 5 | 16 => {
+                    self.stats.last_encoding = Some(encoding);
+                    self.decode_pixels(encoding, w, h)?;
+                    self.lock_framebuffer()?.blit(rect, &self.scratch)?;
+                    damage.push(rect);
                 }
                 1 => {
-                    // CopyRect resolves against the framebuffer inside the
-                    // decoder, so borrow it explicitly before handing off the
-                    // reader.
-                    let Self {
-                        stream,
-                        secure_io,
-                        framebuffer,
-                        width,
-                        height,
-                        ..
-                    } = self;
-                    let rect = {
-                        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut());
-                        encodings::read_copyrect(
-                            &mut reader,
-                            x,
-                            y,
-                            w,
-                            h,
-                            framebuffer,
-                            *width,
-                            *height,
-                        )?
-                    };
-                    self.write_to_fb(&rect);
-                    decoded.push(rect);
-                }
-                5 => {
-                    let Self {
-                        stream,
-                        secure_io,
-                        hextile_state,
-                        ..
-                    } = self;
-                    let rects = {
-                        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut());
-                        encodings::read_hextile(&mut reader, x, y, w, h, hextile_state)?
-                    };
-                    for r in &rects {
-                        self.write_to_fb(r);
-                    }
-                    decoded.extend(rects);
-                }
-                16 => {
-                    let limits = self.limits;
-                    let Self {
-                        stream,
-                        secure_io,
-                        zrle_decoder,
-                        ..
-                    } = self;
-                    let rects = {
-                        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut());
-                        encodings::read_zrle_with_limits(
-                            &mut reader,
-                            x,
-                            y,
-                            w,
-                            h,
-                            zrle_decoder,
-                            &limits,
-                        )?
-                    };
-                    for r in &rects {
-                        self.write_to_fb(r);
-                    }
-                    decoded.extend(rects);
+                    self.stats.last_encoding.get_or_insert(1);
+                    let (src_x, src_y) =
+                        self.decode_via_reader(|reader| encodings::read_copyrect_source(reader))?;
+                    self.lock_framebuffer()?.copy_rect(src_x, src_y, rect)?;
+                    damage.push(rect);
                 }
                 ENCODING_DESKTOP_SIZE => {
                     // DesktopSize pseudo-encoding: no payload, just a resize.
-                    let size = self
-                        .limits
-                        .framebuffer_bytes(w, h)
-                        .map_err(|e| e.to_string())?;
+                    // Rectangles decoded earlier in this update refer to the
+                    // old geometry; the relay repaints the whole new surface.
+                    self.lock_framebuffer()?.resize(w, h, &self.limits)?;
                     self.width = w;
                     self.height = h;
-                    self.framebuffer = vec![0u8; size];
+                    damage.clear();
+                    damage.push(FbRect::new(0, 0, w, h));
                 }
                 ENCODING_RICH_CURSOR => {
                     cursor = Some(self.decode_via_reader(|reader| {
@@ -1005,11 +979,42 @@ impl RfbConnection {
             }
         }
 
+        self.stats.updates += 1;
+        self.stats.last_update_wire_bytes = self.read_buffer.total - wire_before;
+        self.stats.last_update_micros = update_started.elapsed().as_micros() as u64;
+        self.stats.last_update_started_at = Some(update_started);
+        self.stats.last_update_finished_at = Some(std::time::Instant::now());
         Ok(ServerMessage::FramebufferUpdate {
-            rects: decoded,
+            rects: damage,
             cursor,
             pointer_pos,
         })
+    }
+
+    /// Decode one pixel rectangle into `self.scratch` (resized to `w*h*4`).
+    fn decode_pixels(&mut self, encoding: i32, w: u16, h: u16) -> Result<(), String> {
+        let bytes = self
+            .limits
+            .rectangle_bytes(w, h)
+            .map_err(|e| e.to_string())?;
+        let limits = self.limits;
+        let Self {
+            stream,
+            secure_io,
+            read_buffer,
+            scratch,
+            hextile_state,
+            zrle_decoder,
+            ..
+        } = self;
+        scratch.resize(bytes, 0);
+        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut(), read_buffer);
+        match encoding {
+            0 => encodings::decode_raw_into(&mut reader, w, h, scratch),
+            5 => encodings::decode_hextile_into(&mut reader, w, h, hextile_state, scratch),
+            16 => encodings::decode_zrle_into(&mut reader, w, h, zrle_decoder, &limits, scratch),
+            other => Err(format!("unsupported pixel encoding {other}")),
+        }
     }
 
     /// Run a decoder closure over a temporary `impl Read` view of the stream.
@@ -1019,9 +1024,12 @@ impl RfbConnection {
         f: impl FnOnce(&mut RfbStreamReader<'_>) -> Result<T, String>,
     ) -> Result<T, String> {
         let Self {
-            stream, secure_io, ..
+            stream,
+            secure_io,
+            read_buffer,
+            ..
         } = self;
-        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut());
+        let mut reader = RfbStreamReader::new(stream, secure_io.as_mut(), read_buffer);
         f(&mut reader)
     }
 
@@ -1030,7 +1038,7 @@ impl RfbConnection {
     fn read_exact(&mut self, buf: &mut [u8]) -> std::io::Result<()> {
         match self.secure_io.as_mut() {
             Some(io) => io.read_exact(&mut self.stream, buf),
-            None => self.stream.read_exact(buf),
+            None => self.read_buffer.read_exact(&mut self.stream, buf),
         }
     }
 
@@ -1072,29 +1080,101 @@ impl RfbConnection {
             .map_err(|e| format!("read i32: {}", e))?;
         Ok(i32::from_be_bytes(buf))
     }
+}
 
-    /// Write a decoded pixel rect into the framebuffer. Used so subsequent
-    /// Hextile/CopyRect rects can reference prior pixel state.
-    fn write_to_fb(&mut self, rect: &DecodedRect) {
-        let DecodedRect::Pixels { x, y, w, h, rgba } = rect;
-        let fb_w = self.width as usize;
-        let src_w = *w as usize;
-        for row in 0..*h as usize {
-            let fb_start = ((*y as usize + row) * fb_w + *x as usize) * 4;
-            let src_start = row * src_w * 4;
-            let len = src_w * 4;
-            if fb_start + len <= self.framebuffer.len() && src_start + len <= rgba.len() {
-                self.framebuffer[fb_start..fb_start + len]
-                    .copy_from_slice(&rgba[src_start..src_start + len]);
-            }
+const RUNTIME_READ_BUFFER_BYTES: usize = 256 * 1024;
+
+/// Runtime counters. `wire_bytes` counts plaintext RFB bytes read after
+/// `enter_runtime_mode` (TLS/RA2 framing overhead excluded).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RuntimeStats {
+    pub wire_bytes: u64,
+    pub updates: u64,
+    pub last_encoding: Option<i32>,
+    /// Bytes and time from the first rectangle header to the end of the last
+    /// FramebufferUpdate; large updates approximate the line speed.
+    pub last_update_wire_bytes: u64,
+    pub last_update_micros: u64,
+    pub last_update_started_at: Option<std::time::Instant>,
+    pub last_update_finished_at: Option<std::time::Instant>,
+}
+
+pub fn encoding_name(encoding: i32) -> &'static str {
+    match encoding {
+        0 => "Raw",
+        1 => "CopyRect",
+        5 => "Hextile",
+        16 => "ZRLE",
+        _ => "Unknown",
+    }
+}
+
+/// Userspace read-ahead for the plaintext RFB stream. Disabled during the
+/// handshake; `enter_runtime_mode` turns it on.
+pub(crate) struct ReadBuffer {
+    data: Box<[u8]>,
+    start: usize,
+    end: usize,
+    enabled: bool,
+    /// Bytes read from the socket while enabled.
+    total: u64,
+}
+
+impl ReadBuffer {
+    fn new(capacity: usize) -> Self {
+        Self {
+            data: vec![0u8; capacity].into_boxed_slice(),
+            start: 0,
+            end: 0,
+            enabled: false,
+            total: 0,
         }
     }
 
-    /// Snapshot of the full framebuffer (RGBA). Currently unused externally;
-    /// kept for future server-side caching / re-attach support.
-    #[allow(dead_code)]
-    pub fn take_full_frame(&self) -> Vec<u8> {
-        self.framebuffer.clone()
+    fn read_exact(&mut self, stream: &mut TcpStream, dst: &mut [u8]) -> std::io::Result<()> {
+        if !self.enabled {
+            return stream.read_exact(dst);
+        }
+        let mut offset = 0;
+        let buffered = self.end - self.start;
+        if buffered > 0 {
+            let n = buffered.min(dst.len());
+            dst[..n].copy_from_slice(&self.data[self.start..self.start + n]);
+            self.start += n;
+            offset = n;
+        }
+        while offset < dst.len() {
+            let remaining = dst.len() - offset;
+            // Large payloads (compressed ZRLE bodies, Raw rectangles) bypass
+            // the buffer and land directly in the destination.
+            if remaining >= self.data.len() {
+                stream.read_exact(&mut dst[offset..])?;
+                self.total += remaining as u64;
+                return Ok(());
+            }
+            self.start = 0;
+            self.end = loop {
+                match stream.read(&mut self.data) {
+                    Ok(0) => {
+                        return Err(Error::new(
+                            ErrorKind::UnexpectedEof,
+                            "VNC server closed the connection",
+                        ));
+                    }
+                    Ok(n) => {
+                        self.total += n as u64;
+                        break n;
+                    }
+                    Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+                    Err(error) => return Err(error),
+                }
+            };
+            let n = self.end.min(remaining);
+            dst[offset..offset + n].copy_from_slice(&self.data[..n]);
+            self.start = n;
+            offset += n;
+        }
+        Ok(())
     }
 }
 
@@ -1104,33 +1184,36 @@ impl RfbConnection {
 pub(crate) struct RfbStreamReader<'a> {
     stream: &'a mut TcpStream,
     secure_io: Option<&'a mut RsaAesIo>,
+    read_buffer: &'a mut ReadBuffer,
 }
 
 impl<'a> RfbStreamReader<'a> {
-    fn new(stream: &'a mut TcpStream, secure_io: Option<&'a mut RsaAesIo>) -> Self {
-        Self { stream, secure_io }
+    fn new(
+        stream: &'a mut TcpStream,
+        secure_io: Option<&'a mut RsaAesIo>,
+        read_buffer: &'a mut ReadBuffer,
+    ) -> Self {
+        Self {
+            stream,
+            secure_io,
+            read_buffer,
+        }
     }
 }
 
 impl<'a> Read for RfbStreamReader<'a> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         // Decoders all rely on `read_exact`; this path is just a fallback so
-        // generic `Read` combinators keep working. AES-EAX frames are
-        // message-oriented and only expose read_exact, so we saturate the
-        // requested buffer rather than return a partial read.
-        match self.secure_io.as_mut() {
-            Some(io) => {
-                io.read_exact(self.stream, buf)?;
-                Ok(buf.len())
-            }
-            None => self.stream.read(buf),
-        }
+        // generic `Read` combinators keep working. Saturate the requested
+        // buffer rather than return a partial read.
+        self.read_exact(buf)?;
+        Ok(buf.len())
     }
 
     fn read_exact(&mut self, buf: &mut [u8]) -> std::io::Result<()> {
         match self.secure_io.as_mut() {
             Some(io) => io.read_exact(self.stream, buf),
-            None => self.stream.read_exact(buf),
+            None => self.read_buffer.read_exact(self.stream, buf),
         }
     }
 }
@@ -1289,8 +1372,11 @@ impl RsaAesIo {
             }
 
             let n = (buf.len() - offset).min(self.read_buf.len());
-            for dst in &mut buf[offset..offset + n] {
-                *dst = self.read_buf.pop_front().expect("buffer length checked");
+            for (dst, src) in buf[offset..offset + n]
+                .iter_mut()
+                .zip(self.read_buf.drain(..n))
+            {
+                *dst = src;
             }
             offset += n;
         }
@@ -1622,7 +1708,8 @@ fn increment_le(counter: &mut [u8; 16]) {
 #[derive(Debug)]
 pub enum ServerMessage {
     FramebufferUpdate {
-        rects: Vec<DecodedRect>,
+        /// Damaged framebuffer regions; pixels live in `RfbConnection::framebuffer()`.
+        rects: Vec<FbRect>,
         cursor: Option<DecodedCursor>,
         pointer_pos: Option<DecodedPointerPosition>,
     },
@@ -1857,7 +1944,7 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let client = TcpStream::connect(address).unwrap();
         let (_server, _) = listener.accept().unwrap();
-        let connection = RfbConnection::new_stream(
+        let mut connection = RfbConnection::new_stream(
             client,
             Duration::from_secs(2),
             DecodeLimits::default(),
@@ -1871,8 +1958,68 @@ mod tests {
             connection.stream.read_timeout().unwrap(),
             Some(Duration::from_secs(2))
         );
+        assert!(!connection.read_buffer.enabled);
         connection.enter_runtime_mode().unwrap();
         assert_eq!(connection.stream.read_timeout().unwrap(), None);
+        assert!(connection.read_buffer.enabled);
+    }
+
+    #[test]
+    fn buffered_runtime_reads_decode_many_small_hextile_tiles() {
+        // 32x16 Hextile rectangle = two tiles, each "bg specified" (5 bytes):
+        // many tiny reads that the runtime buffer must serve exactly, followed
+        // by a Raw rectangle whose body bypasses the buffer.
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut update = vec![0, 0, 0, 2];
+            for value in [0u16, 0, 32, 16] {
+                update.extend_from_slice(&value.to_be_bytes());
+            }
+            update.extend_from_slice(&5i32.to_be_bytes());
+            update.extend_from_slice(&[0x02, 9, 8, 7, 0]);
+            update.extend_from_slice(&[0x02, 1, 2, 3, 0]);
+            for value in [0u16, 16, 1, 1] {
+                update.extend_from_slice(&value.to_be_bytes());
+            }
+            update.extend_from_slice(&0i32.to_be_bytes());
+            update.extend_from_slice(&[4, 5, 6, 0]);
+            stream.write_all(&update).unwrap();
+        });
+        let stream = TcpStream::connect(address).unwrap();
+        let mut connection = RfbConnection::new_stream(
+            stream,
+            Duration::from_secs(2),
+            DecodeLimits::default(),
+            VncSecurityPolicy::AllowNone,
+            8,
+            None,
+            None,
+        )
+        .unwrap();
+        connection.width = 32;
+        connection.height = 17;
+        connection.framebuffer = Framebuffer::new(32, 17, &DecodeLimits::default())
+            .unwrap()
+            .shared();
+        connection.enter_runtime_mode().unwrap();
+        match connection.read_server_message().unwrap() {
+            ServerMessage::FramebufferUpdate { rects, .. } => {
+                assert_eq!(
+                    rects,
+                    vec![FbRect::new(0, 0, 32, 16), FbRect::new(0, 16, 1, 1)]
+                );
+            }
+            other => panic!("expected framebuffer update, got {other:?}"),
+        }
+        let fb = connection.framebuffer();
+        let fb = fb.lock().unwrap();
+        let relay = fb.relay_frame(FbRect::new(15, 0, 2, 1)).unwrap();
+        assert_eq!(&relay[12..], &[9, 8, 7, 255, 1, 2, 3, 255]);
+        let raw = fb.relay_frame(FbRect::new(0, 16, 1, 1)).unwrap();
+        assert_eq!(&raw[12..], &[4, 5, 6, 255]);
+        server.join().unwrap();
     }
 
     #[test]
@@ -1913,7 +2060,9 @@ mod tests {
         .unwrap();
         connection.width = 800;
         connection.height = 600;
-        connection.framebuffer = vec![0; 800 * 600 * 4];
+        connection.framebuffer = Framebuffer::new(800, 600, &DecodeLimits::default())
+            .unwrap()
+            .shared();
 
         match connection.read_server_message().unwrap() {
             ServerMessage::FramebufferUpdate {
@@ -1973,7 +2122,9 @@ mod tests {
         .unwrap();
         connection.width = 800;
         connection.height = 600;
-        connection.framebuffer = vec![0; 800 * 600 * 4];
+        connection.framebuffer = Framebuffer::new(800, 600, &DecodeLimits::default())
+            .unwrap()
+            .shared();
 
         match connection.read_server_message().unwrap() {
             ServerMessage::FramebufferUpdate {

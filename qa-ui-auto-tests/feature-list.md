@@ -2605,7 +2605,7 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 - RFB 18 TLS 使用匿名密码套件，能够加密传输但不验证服务器身份；`RequireEncryption` 继续 fail closed，VeNCrypt/X509 TLS 和证书校验仍未实现
 
 ### 9.3 编码与画面 ✅
-- 解码器：Raw（0）、CopyRect（1）、Hextile（5）、ZRLE（16，单一持久 zlib 流）
+- 解码器：Raw（0）、CopyRect（1）、Hextile（5）、ZRLE（16，单一持久 zlib 流）；运行期读缓冲，整矩形解码进后端权威帧缓冲，relay 按 damage 合并（≤16 矩形/帧），WebView 绘制完成即发送最新像素，解码完成立即请求下一增量更新（VNC-PERF-001/002）
 - 伪编码：DesktopSize（-223）接收；窗口变化仅调整本地 fit，不宣称或发送 SetDesktopSize；丢帧恢复时才请求全量刷新
 - ZRLE 单 zlib 状态贯穿整个 session，已修复历史的 "zrle: eof cpixel" 间歇性断连
 - 像素格式 `set_pixel_format_rgba()` 协商成 little-endian RGBA，前端按位图直接渲染
@@ -2647,7 +2647,23 @@ controls:
   - id: scale-toggle
     selector: '[data-testid="vnc-scale-toggle"]'
     kind: interactive
-    optional: true          # inside the floating toolbar
+    optional: true          # inside the floating toolbar; Scale to 100% / Scale Automatically
+  - id: send-ctrl-alt-del
+    selector: '[data-testid="vnc-send-cad"]'
+    kind: interactive
+    optional: true          # connected, not view-only (VNC-INPUT-002)
+  - id: fullscreen
+    selector: '[data-testid="vnc-fullscreen"]'
+    kind: interactive
+    optional: true          # connected tab sessions (VNC-SESS-001 / DEC-VNC-10)
+  - id: session-menu
+    selector: '[data-testid="vnc-session-menu"]'
+    kind: interactive
+    optional: true          # connected; same menu as F8 (VNC-SESS-001)
+  - id: session-info
+    selector: '[data-testid="vnc-session-info"]'
+    kind: display
+    optional: true          # Session Information dialog (VNC-SESS-002)
   - id: reconnect
     selector: '[data-testid="vnc-reconnect"]'
     kind: interactive
@@ -2670,7 +2686,10 @@ controls:
     optional: true
 -->
 
-- Canvas 画面渲染 + fit / 1:1 缩放
+- Canvas 画面渲染；RealVNC 对齐缩放：自动（只缩小）/ 适应窗口 / 适应宽度 / 适应高度 / 25–400%，100% 为一个远端像素对应一个设备像素，可保持宽高比（VNC-VIEW-001）
+- F8 会话菜单与工具栏菜单按钮：关闭连接、全屏、发送 F8、发送 Ctrl+Alt+Del、Ctrl/Alt 锁定、缩放、刷新屏幕、会话信息（VNC-SESS-001、VNC-INPUT-002）
+- 会话信息：桌面名、尺寸、像素格式、请求/最近编码、线路速度、更新/帧速率、协议、安全、连接类型（VNC-SESS-002）
+- 鼠标：右键即时发送；滚轮按刻度累积、Shift+滚轮水平；后退键映射按键 8；失焦不再把远端指针移到 (0,0)（VNC-INPUT-001）
 - 浮动 `FloatingToolbar`：可拖拽 / 折叠 / 位置持久化
 - 内嵌 `CaptureToolbar`：可见区域 PNG / 全帧 PNG / GIF 录制（与终端共用截图链路）
 - 断开提示 + Reconnect、错误分类（区分用户主动断开 / 服务端断开 / 网络异常）

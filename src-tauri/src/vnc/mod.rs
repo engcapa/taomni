@@ -1,7 +1,10 @@
 pub mod clipboard;
 pub mod encodings;
 pub mod error;
+pub mod framebuffer;
 pub mod limits;
+#[cfg(test)]
+mod live_bench;
 pub mod policy;
 pub mod queue;
 pub mod rfb;

@@ -1916,6 +1916,10 @@
 - `[data-testid="vnc-panel"]` — display — F9.6.panel-root
 - `[data-testid="vnc-canvas"]` — display — F9.6.canvas
 - `[data-testid="vnc-scale-toggle"]` — interactive [optional] — F9.6.scale-toggle
+- `[data-testid="vnc-send-cad"]` — interactive [optional] — F9.6.send-ctrl-alt-del
+- `[data-testid="vnc-fullscreen"]` — interactive [optional] — F9.6.fullscreen
+- `[data-testid="vnc-session-menu"]` — interactive [optional] — F9.6.session-menu
+- `[data-testid="vnc-session-info"]` — display [optional] — F9.6.session-info
 - `[data-testid="vnc-reconnect"]` — interactive [optional] — F9.6.reconnect
 - `[data-testid="session-vnc-policies"]` — display [optional] — F9.6.policy-settings
 - `[data-testid="session-vnc-security-policy"]` — interactive [optional] — F9.6.security-policy

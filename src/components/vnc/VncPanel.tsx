@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import {
   vncConnect,
   vncDisconnect,
@@ -14,8 +14,15 @@ import {
   keyEventToKeysym,
   mapClientToFramebuffer,
   mouseButtonMask,
+  computeVncDisplaySize,
+  normalizeVncScaling,
+  VncWheelAccumulator,
+  VNC_KEYSYM,
 } from "../../lib/vnc";
-import type { WsOutgoing } from "../../lib/vnc";
+import type { VncScaling, VncSessionStats, WsOutgoing } from "../../lib/vnc";
+import { buildVncSessionMenuItems } from "./vncSessionMenu";
+import { VncSessionInfoDialog } from "./VncSessionInfoDialog";
+import { useContextMenu } from "../ContextMenu";
 import {
   VncPointerScheduler,
   type VncPointerState,
@@ -23,7 +30,16 @@ import {
 import { useVncStore } from "../../stores/vncStore";
 import { isEditableTarget, isTerminalFocused } from "../../lib/terminal/keyboardGuards";
 import { useAppStore } from "../../stores/appStore";
-import { ExternalLink, Maximize, Maximize2, Minimize, Minimize2, RefreshCw } from "lucide-react";
+import {
+  ExternalLink,
+  Maximize,
+  Maximize2,
+  Menu as MenuIcon,
+  Minimize,
+  Minimize2,
+  RefreshCw,
+  ShieldAlert,
+} from "lucide-react";
 import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
 import { CaptureMenuButton } from "../capture/CaptureMenuButton";
 import { TabActions } from "../tabbar/TabActionSlot";
@@ -51,6 +67,8 @@ export interface VncPanelProps {
   securityPolicy?: "require-encryption" | "prefer-encryption" | "legacy-compatible" | "allow-none";
   viewOnly?: boolean;
   clipboardPolicy?: "disabled" | "client-to-server" | "server-to-client" | "bidirectional";
+  /** Initial viewer scaling ("auto", "fit", "fit-width", "fit-height" or a percentage). */
+  initialScaling?: VncScaling | string;
   visible: boolean;
   onDetach?: () => void;
   detachedWindowControls?: {
@@ -60,8 +78,9 @@ export interface VncPanelProps {
   };
 }
 
-type ScaleMode = "fit" | "one";
 const PASTE_KEY_DELAY_MS = 120;
+/** Upper bound a middle click waits for an in-flight clipboard sync (X11 paste). */
+const MIDDLE_CLICK_CLIPBOARD_WAIT_MS = 150;
 const MAX_PENDING_RECTS = 4096;
 const MAX_PENDING_FRAME_BYTES = 128 * 1024 * 1024;
 const CLIPBOARD_SYNC_INTERVAL_MS = 750;
@@ -124,6 +143,7 @@ export default function VncPanel({
   securityPolicy,
   viewOnly = false,
   clipboardPolicy = "bidirectional",
+  initialScaling = "auto",
   visible,
   onDetach,
   detachedWindowControls,
@@ -177,13 +197,27 @@ export default function VncPanel({
   // without re-binding.
   const extClipboardSupportedRef = useRef<boolean>(false);
   const cursorShapeReceivedRef = useRef(false);
-  const [scaleMode, setScaleMode] = useState<ScaleMode>("fit");
+  const [scaling, setScaling] = useState<VncScaling>(() => normalizeVncScaling(initialScaling));
+  const [preserveAspect, setPreserveAspect] = useState(true);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [devicePixelRatio, setDevicePixelRatio] = useState(() => window.devicePixelRatio || 1);
+  const [fullScreen, setFullScreen] = useState(false);
+  const [ctrlLatched, setCtrlLatched] = useState(false);
+  const [altLatched, setAltLatched] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [sessionStats, setSessionStats] = useState<VncSessionStats | null>(null);
+  const wheelAccumulatorRef = useRef(new VncWheelAccumulator());
+  // True once the WebView delivers pointerrawupdate for this canvas.
+  const rawPointerMovesRef = useRef(false);
   const [remoteCursorCss, setRemoteCursorCss] = useState("none");
   const allowClipboardSend = clipboardPolicy === "bidirectional" || clipboardPolicy === "client-to-server";
   const allowClipboardReceive = clipboardPolicy === "bidirectional" || clipboardPolicy === "server-to-client";
 
-  const store = useVncStore();
-  const conn = store.connections[tabId];
+  // Actions are stable; subscribe to this tab's connection only so another
+  // session's state change does not re-render this canvas.
+  const store = useMemo(() => useVncStore.getState(), []);
+  const conn = useVncStore((s) => s.connections[tabId]);
+  const sessionMenu = useContextMenu();
 
   const sendWs = useCallback((msg: WsOutgoing) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -202,6 +236,106 @@ export default function VncPanel({
   const requestFullRefresh = useCallback(() => {
     sendWsBinary(encodeWsRefresh());
   }, [sendWsBinary]);
+
+  // ── Session menu actions (F8 menu / toolbar) ──────────────────────
+  const latchedKeysymsRef = useRef(new Set<number>());
+
+  const setKeyLatched = useCallback((keysym: number, latched: boolean) => {
+    if (latched === latchedKeysymsRef.current.has(keysym)) return;
+    if (latched) latchedKeysymsRef.current.add(keysym);
+    else latchedKeysymsRef.current.delete(keysym);
+    sendWsBinary(encodeWsKey(latched, keysym));
+    if (keysym === VNC_KEYSYM.controlL) setCtrlLatched(latched);
+    if (keysym === VNC_KEYSYM.altL) setAltLatched(latched);
+  }, [sendWsBinary]);
+
+  const sendKeyCombo = useCallback((keysyms: number[]) => {
+    if (viewOnly) return;
+    // Modifiers already latched by the Ctrl/Alt menu items stay held.
+    const pressed = keysyms.filter((keysym) => !latchedKeysymsRef.current.has(keysym));
+    pressed.forEach((keysym) => sendWsBinary(encodeWsKey(true, keysym)));
+    [...pressed].reverse().forEach((keysym) => sendWsBinary(encodeWsKey(false, keysym)));
+  }, [sendWsBinary, viewOnly]);
+
+  const sendCtrlAltDel = useCallback(() => {
+    sendKeyCombo([VNC_KEYSYM.controlL, VNC_KEYSYM.altL, VNC_KEYSYM.delete]);
+  }, [sendKeyCombo]);
+
+  const canFullScreen = Boolean(detachedWindowControls)
+    || (typeof document !== "undefined" && typeof document.documentElement?.requestFullscreen === "function");
+
+  const toggleFullScreen = useCallback(() => {
+    if (detachedWindowControls) {
+      detachedWindowControls.onToggleOsFullscreen();
+      return;
+    }
+    const container = containerRef.current;
+    if (!container) return;
+    if (document.fullscreenElement === container) {
+      void document.exitFullscreen?.().catch(() => {});
+    } else {
+      void container.requestFullscreen?.().catch(() => {});
+    }
+  }, [detachedWindowControls]);
+
+  useEffect(() => {
+    const onChange = () => setFullScreen(document.fullscreenElement === containerRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const closeConnection = useCallback(() => {
+    suppressReconnectRef.current = true;
+    if (reconnectTimerRef.current !== null) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    latchedKeysymsRef.current.clear();
+    setCtrlLatched(false);
+    setAltLatched(false);
+    const sid = sessionIdRef.current;
+    sessionIdRef.current = null;
+    if (sid) void vncDisconnect(sid).catch(() => {});
+    wsRef.current?.close();
+    wsRef.current = null;
+    store.setDisconnected(tabId, tr("vnc.closedConnection"));
+  }, [store, tabId]);
+
+  const openSessionMenu = useCallback((x?: number, y?: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const left = x ?? (rect ? rect.left + rect.width / 2 - 110 : 100);
+    const top = y ?? (rect ? rect.top + Math.max(40, rect.height / 4) : 100);
+    sessionMenu.showAt(left, top, buildVncSessionMenuItems(
+      {
+        fullScreen: detachedWindowControls ? detachedWindowControls.osFullscreen : fullScreen,
+        canFullScreen,
+        viewOnly,
+        ctrlLatched,
+        altLatched,
+        scaling,
+        preserveAspect,
+      },
+      {
+        toggleFullScreen,
+        sendF8: () => sendKeyCombo([VNC_KEYSYM.f8]),
+        sendCtrlAltDel,
+        toggleCtrl: () => setKeyLatched(VNC_KEYSYM.controlL, !latchedKeysymsRef.current.has(VNC_KEYSYM.controlL)),
+        toggleAlt: () => setKeyLatched(VNC_KEYSYM.altL, !latchedKeysymsRef.current.has(VNC_KEYSYM.altL)),
+        setScaling,
+        togglePreserveAspect: () => setPreserveAspect((value) => !value),
+        refreshScreen: requestFullRefresh,
+        showSessionInfo: () => setInfoOpen(true),
+        closeConnection,
+      },
+      tr,
+    ));
+  }, [
+    altLatched, canFullScreen, closeConnection, ctrlLatched, detachedWindowControls, fullScreen,
+    preserveAspect, requestFullRefresh, scaling, sendCtrlAltDel, sendKeyCombo, sessionMenu,
+    setKeyLatched, toggleFullScreen, viewOnly,
+  ]);
+  const openSessionMenuRef = useRef(openSessionMenu);
+  openSessionMenuRef.current = openSessionMenu;
 
   const syncLocalClipboardToServer = useCallback(
     (reason: string, force = false): Promise<void> => {
@@ -284,6 +418,7 @@ export default function VncPanel({
     lastPointerSentRef.current = null;
     cursorShapeReceivedRef.current = false;
     setRemoteCursorCss("none");
+    setSessionStats(null);
     if (reconnectStableTimerRef.current !== null) {
       window.clearTimeout(reconnectStableTimerRef.current);
       reconnectStableTimerRef.current = null;
@@ -459,6 +594,18 @@ export default function VncPanel({
                 if (!cursorShapeReceivedRef.current) {
                   setRemoteCursorCss("default");
                 }
+                break;
+              case "stats":
+                setSessionStats({
+                  requested_encoding: msg.requested_encoding,
+                  last_encoding: msg.last_encoding,
+                  pixel_format: msg.pixel_format,
+                  wire_kbps: msg.wire_kbps,
+                  line_kbps: msg.line_kbps,
+                  updates_per_sec: msg.updates_per_sec,
+                  frames_per_sec: msg.frames_per_sec,
+                  update_ms: msg.update_ms,
+                });
                 break;
             }
           }
@@ -758,17 +905,31 @@ export default function VncPanel({
     };
 
     const releaseAllInput = () => {
-      pressedKeysymsRef.current.forEach((keysym) => sendWsBinary(encodeWsKey(false, keysym)));
+      pressedKeysymsRef.current.forEach((keysym) => {
+        // Keys latched from the session menu stay down until toggled off.
+        if (!latchedKeysymsRef.current.has(keysym)) sendWsBinary(encodeWsKey(false, keysym));
+      });
       pressedKeysymsRef.current.clear();
-      sendWsBinary(encodeWsPointer(0, 0, 0));
+      const last = lastPointerSentRef.current;
+      if (last && last.buttons !== 0) {
+        sendWsBinary(encodeWsPointer(last.x, last.y, 0));
+        lastPointerSentRef.current = { ...last, buttons: 0 };
+      }
     };
 
     const handleKey = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
-      if (viewOnly || isEditableTarget(e.target, activeEl))
+      if (isEditableTarget(e.target, activeEl))
         return;
       if (!isTerminalFocused(containerRef.current, activeEl))
         return;
+      if (viewOnly) {
+        if (e.key === "F8" && e.type === "keydown" && !e.repeat) {
+          e.preventDefault();
+          openSessionMenuRef.current();
+        }
+        return;
+      }
 
       const pendingPaste = pasteInFlightRef.current;
       if (pendingPaste && e.type === "keyup") {
@@ -783,6 +944,16 @@ export default function VncPanel({
           e.preventDefault();
           return;
         }
+      }
+
+      // F8 opens the session menu, as in RealVNC Viewer ("Send F8" in the
+      // menu delivers the key itself).
+      if (e.key === "F8" && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        if (e.type === "keydown" && !e.repeat) {
+          openSessionMenuRef.current();
+        }
+        return;
       }
 
       // Intercept Ctrl/Meta + V so the remote clipboard is updated before the
@@ -845,9 +1016,11 @@ export default function VncPanel({
       const fbHeight = conn?.height ?? 0;
       if (!canvas) return null;
       const rect = canvas.getBoundingClientRect();
-      return mapClientToFramebuffer(clientX, clientY, rect, fbWidth, fbHeight, scaleMode);
+      // The canvas element is always sized to the scaled desktop (no
+      // letterboxing inside it), so its box maps 1:1 onto the framebuffer.
+      return mapClientToFramebuffer(clientX, clientY, rect, fbWidth, fbHeight, "one");
     },
-    [conn?.width, conn?.height, scaleMode],
+    [conn?.width, conn?.height],
   );
 
   const sendPointerNow = useCallback(
@@ -883,7 +1056,6 @@ export default function VncPanel({
         return;
       }
       e.preventDefault();
-      void syncLocalClipboardToServer("pointer");
       const mapped = getFbCoords(e.clientX, e.clientY);
       if (!mapped) return;
       const allowOutside = ((e.type === "pointerup" || e.type === "pointercancel")
@@ -895,14 +1067,50 @@ export default function VncPanel({
       const pointer = { x, y, buttons };
 
       if (e.type === "pointermove") {
+        // Chromium (WebView2) delivers moves earlier as pointerrawupdate;
+        // once those arrive, the frame-aligned pointermove is a duplicate.
+        if (rawPointerMovesRef.current) return;
         pointerScheduler().move(pointer);
         return;
       }
 
       pointerScheduler().sendNow(pointer);
     },
-    [viewOnly, conn?.status, getFbCoords, pointerScheduler, syncLocalClipboardToServer],
+    [viewOnly, conn?.status, getFbCoords, pointerScheduler],
   );
+
+  // VNC-PERF-005: pointermove is aligned to the next animation frame, which
+  // costs Chromium-based WebViews one to two frames of pointer latency.
+  // pointerrawupdate is dispatched as soon as input arrives; WebKit has no
+  // such event and keeps the pointermove path.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || viewOnly || conn?.status !== "connected" || !("onpointerrawupdate" in window)) {
+      rawPointerMovesRef.current = false;
+      return;
+    }
+    const onRawUpdate = (event: Event) => {
+      const e = event as PointerEvent;
+      if (delayedPointerDownRef.current?.pointerId === e.pointerId) return;
+      const mapped = getFbCoords(e.clientX, e.clientY);
+      if (!mapped) return;
+      if (!mapped.inside && e.buttons === 0) return;
+      rawPointerMovesRef.current = true;
+      pointerScheduler().move({ x: mapped.x, y: mapped.y, buttons: mouseButtonMask(e) });
+    };
+    canvas.addEventListener("pointerrawupdate", onRawUpdate);
+    return () => {
+      canvas.removeEventListener("pointerrawupdate", onRawUpdate);
+      rawPointerMovesRef.current = false;
+    };
+  }, [viewOnly, conn?.status, getFbCoords, pointerScheduler]);
+
+  // Push a fresh local clipboard when the pointer enters the desktop, so a
+  // paste click right after copying elsewhere sees the new content.
+  const handlePointerEnter = useCallback(() => {
+    if (viewOnly || conn?.status !== "connected") return;
+    void syncLocalClipboardToServer("enter", true);
+  }, [viewOnly, conn?.status, syncLocalClipboardToServer]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -914,7 +1122,11 @@ export default function VncPanel({
       } catch {
         // Pointer capture can fail if the event was already cancelled.
       }
-      if (!viewOnly && conn?.status === "connected" && (e.button === 1 || e.button === 2)) {
+      // Right clicks go out immediately like RealVNC Viewer. The clipboard is
+      // synced on pointer enter / focus instead of delaying the click; only a
+      // middle click (X11 paste) waits briefly for a sync that is in flight.
+      const pendingClipboardSync = clipboardSyncPromiseRef.current;
+      if (!viewOnly && conn?.status === "connected" && e.button === 1 && pendingClipboardSync) {
         e.preventDefault();
         const { x, y } = mapped;
         const delayed: DelayedPointerDown = {
@@ -925,8 +1137,10 @@ export default function VncPanel({
         delayedPointerDownRef.current = delayed;
         pointerSchedulerRef.current?.cancelPending();
         void (async () => {
-          await syncLocalClipboardToServer("button", true);
-          await new Promise((resolve) => window.setTimeout(resolve, PASTE_KEY_DELAY_MS));
+          await Promise.race([
+            pendingClipboardSync,
+            new Promise((resolve) => window.setTimeout(resolve, MIDDLE_CLICK_CLIPBOARD_WAIT_MS)),
+          ]);
           if (destroyedRef.current || delayedPointerDownRef.current !== delayed) return;
           sendPointerNow(delayed.down);
           if (delayed.up) {
@@ -967,36 +1181,76 @@ export default function VncPanel({
     [getFbCoords, handlePointer],
   );
 
-  const handleWheel = useCallback(
-    (e: React.WheelEvent<HTMLCanvasElement>) => {
-      if (viewOnly || conn?.status !== "connected") return;
+  // Wheel: a native non-passive listener so preventDefault stops the page (or
+  // the scrolling container) from scrolling. Deltas accumulate into detents;
+  // each detent is an immediate press+release that keeps held buttons.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || viewOnly || conn?.status !== "connected") return;
+    const accumulator = wheelAccumulatorRef.current;
+    accumulator.reset();
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const mapped = getFbCoords(e.clientX, e.clientY);
       if (!mapped?.inside) return;
-      const { x, y } = mapped;
-      const wheelButton = e.deltaY < 0 ? 8 : 16;
-      sendWsBinary(encodeWsPointer(x, y, wheelButton));
-      setTimeout(() => sendWsBinary(encodeWsPointer(x, y, 0)), 50);
-    },
-    [viewOnly, conn?.status, getFbCoords, sendWsBinary],
+      const steps = accumulator.push(
+        e.shiftKey && e.deltaX === 0 ? e.deltaY : e.deltaX,
+        e.shiftKey && e.deltaX === 0 ? 0 : e.deltaY,
+        e.deltaMode,
+      );
+      if (steps.length === 0) return;
+      pointerSchedulerRef.current?.cancelPending();
+      const held = mouseButtonMask(e);
+      for (const step of steps) {
+        sendWsBinary(encodeWsPointer(mapped.x, mapped.y, held | step));
+        sendWsBinary(encodeWsPointer(mapped.x, mapped.y, held));
+      }
+      lastPointerSentRef.current = { x: mapped.x, y: mapped.y, buttons: held };
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel);
+  }, [viewOnly, conn?.status, getFbCoords, sendWsBinary]);
+
+  // ── Viewport tracking for scaling ─────────────────────────────────
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const update = () => {
+      setViewportSize({ width: container.clientWidth, height: container.clientHeight });
+      setDevicePixelRatio(window.devicePixelRatio || 1);
+    };
+    update();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(container);
+    window.addEventListener("resize", update);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  const displaySize = computeVncDisplaySize(
+    scaling,
+    conn?.width ?? 0,
+    conn?.height ?? 0,
+    viewportSize.width,
+    viewportSize.height,
+    devicePixelRatio,
+    preserveAspect,
   );
 
   // ── Canvas CSS size for scaling ───────────────────────────────────
-  const canvasStyle: React.CSSProperties =
-    scaleMode === "fit"
-      ? {
-          width: "100%",
-          height: "100%",
-          objectFit: "contain",
-          cursor: conn?.status === "connected" ? remoteCursorCss : "default",
-        }
-      : {
-          width: conn?.width ?? 0,
-          height: conn?.height ?? 0,
-          cursor: conn?.status === "connected" ? remoteCursorCss : "default",
-          maxWidth: "none",
-          maxHeight: "none",
-        };
+  const canvasStyle: React.CSSProperties = {
+    width: displaySize.width,
+    height: displaySize.height,
+    flex: "none",
+    // Center when smaller than the viewport; scroll from the top-left edge
+    // when larger (auto margins collapse to 0 in an overflowing flex box).
+    margin: "auto",
+    cursor: conn?.status === "connected" ? remoteCursorCss : "default",
+    maxWidth: "none",
+    maxHeight: "none",
+  };
 
   // ── Render ───────────────────────────────────────────────────────
   const showCanvas = conn?.status === "connected";
@@ -1032,10 +1286,12 @@ export default function VncPanel({
       ref={containerRef}
       className="vnc-container"
       data-testid="vnc-panel"
+      data-vnc-scaling={String(scaling)}
       style={{
         width: "100%",
         height: "100%",
-        overflow: scaleMode === "one" ? "auto" : "hidden",
+        overflow: displaySize.scrolls ? "auto" : "hidden",
+        display: "flex",
         backgroundColor: "#1a1a2e",
         position: "relative",
       }}
@@ -1046,14 +1302,53 @@ export default function VncPanel({
           menu (main window) or the detached capture button. */}
       <TabActions active={visible}>
         {showCanvas && (
-          <button
-            data-testid="vnc-scale-toggle"
-            onClick={() => setScaleMode((m) => (m === "fit" ? "one" : "fit"))}
-            style={FT_ICON_BUTTON_STYLE}
-            title={scaleMode === "fit" ? t("vnc.scaleToggleOne") : t("vnc.scaleToggleFit")}
-          >
-            {scaleMode === "fit" ? <Maximize size={14} /> : <Minimize size={14} />}
-          </button>
+          <>
+            {!viewOnly && (
+              <button
+                data-testid="vnc-send-cad"
+                onClick={sendCtrlAltDel}
+                style={FT_ICON_BUTTON_STYLE}
+                title={t("vnc.sendCtrlAltDel")}
+                aria-label={t("vnc.sendCtrlAltDel")}
+              >
+                <ShieldAlert size={14} />
+              </button>
+            )}
+            <button
+              data-testid="vnc-scale-toggle"
+              onClick={() => setScaling((current) => (current === "auto" ? 100 : "auto"))}
+              style={FT_ICON_BUTTON_STYLE}
+              title={scaling === "auto" ? t("vnc.scaleTo100") : t("vnc.scaleAutomatically")}
+              aria-label={scaling === "auto" ? t("vnc.scaleTo100") : t("vnc.scaleAutomatically")}
+              aria-pressed={scaling !== "auto"}
+            >
+              {scaling === "auto" ? <Maximize size={14} /> : <Minimize size={14} />}
+            </button>
+            {!detachedWindowControls && canFullScreen && (
+              <button
+                data-testid="vnc-fullscreen"
+                onClick={toggleFullScreen}
+                style={FT_ICON_BUTTON_STYLE}
+                title={fullScreen ? t("vnc.exitFullScreen") : t("vnc.fullScreen")}
+                aria-label={fullScreen ? t("vnc.exitFullScreen") : t("vnc.fullScreen")}
+              >
+                {fullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </button>
+            )}
+            <button
+              data-testid="vnc-session-menu"
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                openSessionMenu(rect.left, rect.bottom + 4);
+              }}
+              style={FT_ICON_BUTTON_STYLE}
+              title={t("vnc.sessionMenu")}
+              aria-label={t("vnc.sessionMenu")}
+              aria-haspopup="menu"
+            >
+              <MenuIcon size={14} />
+            </button>
+          </>
         )}
           {onDetach && (
             <>
@@ -1176,8 +1471,9 @@ export default function VncPanel({
         onPointerMove={handlePointer}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onPointerEnter={handlePointerEnter}
         onContextMenu={(e) => e.preventDefault()}
-        onWheel={handleWheel}
+        onAuxClick={(e) => e.preventDefault()}
         style={{
           display: showCanvas ? "block" : "none",
           ...canvasStyle,
@@ -1186,6 +1482,34 @@ export default function VncPanel({
         }}
         tabIndex={0}
       />
+      {sessionMenu.render}
+      {infoOpen && (
+        <VncSessionInfoDialog
+          info={{
+            desktopName: conn?.name ?? "",
+            device: `${host}:${port}`,
+            width: conn?.width ?? 0,
+            height: conn?.height ?? 0,
+            protocol: conn?.protocol ?? "",
+            security: conn?.security ?? "",
+            encrypted: conn?.encrypted ?? false,
+            proxied: networkSettingsUsesTunnel(networkSettingsJson),
+            stats: sessionStats,
+          }}
+          onClose={() => setInfoOpen(false)}
+        />
+      )}
     </div>
   );
+}
+
+function networkSettingsUsesTunnel(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  try {
+    const settings = JSON.parse(raw) as { proxy_kind?: string; jump_host?: string; jump_session_id?: string };
+    const proxy = settings.proxy_kind && settings.proxy_kind !== "none";
+    return Boolean(proxy || settings.jump_host || settings.jump_session_id);
+  } catch {
+    return false;
+  }
 }

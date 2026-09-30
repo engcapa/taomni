@@ -23,12 +23,13 @@ use crate::vnc::clipboard::{
     SUPPORTED_ACTIONS, build_caps_body, build_notify_body, build_provide_body, build_request_body,
 };
 use crate::vnc::encodings::{
-    DecodedCursor, DecodedRect, ENCODING_DESKTOP_SIZE, ENCODING_POINTER_POS, ENCODING_RICH_CURSOR,
+    DecodedCursor, ENCODING_DESKTOP_SIZE, ENCODING_POINTER_POS, ENCODING_RICH_CURSOR,
     ENCODING_X_CURSOR,
 };
+use crate::vnc::framebuffer::{Damage, FbRect, SharedFramebuffer};
 use crate::vnc::policy::{VncClipboardPolicy, VncSecurityPolicy};
 use crate::vnc::queue::{FrameQueueReceiver, FrameQueueSender, QueuedWsOutgoing};
-use crate::vnc::rfb::{RfbConnection, RfbWriter, ServerMessage};
+use crate::vnc::rfb::{RfbConnection, RfbWriter, RuntimeStats, ServerMessage, encoding_name};
 
 /// Deadline for the frontend to complete its WebSocket upgrade after we bind.
 const WS_ACCEPT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -157,7 +158,24 @@ enum WsOutgoingText {
     },
     #[serde(rename = "pointer_pos")]
     PointerPos { x: u16, y: u16 },
+    /// Once-per-second counters for the Session Information view.
+    #[serde(rename = "stats")]
+    Stats {
+        requested_encoding: &'static str,
+        last_encoding: &'static str,
+        pixel_format: &'static str,
+        wire_kbps: u64,
+        line_kbps: Option<u64>,
+        updates_per_sec: f32,
+        frames_per_sec: f32,
+        update_ms: f32,
+    },
 }
+
+/// Pixel format requested by `set_pixel_format_rgba`.
+const PIXEL_FORMAT_LABEL: &str = "depth 24 (32 bpp) little-endian rgb888";
+const REQUESTED_ENCODING_LABEL: &str = "ZRLE";
+const STATS_INTERVAL: Duration = Duration::from_secs(1);
 
 // ── Public session handle ───────────────────────────────────────────
 
@@ -232,6 +250,199 @@ pub(crate) async fn dial_vnc_transport(
 struct ServerClipboardCaps {
     formats: u32,
     actions: u32,
+}
+
+/// How long after the last frontend ACK the relay keeps pipelining update
+/// requests. A hidden or stalled WebView stops acknowledging, so the server
+/// goes quiet instead of the relay decoding updates nobody will paint.
+const FRAME_STREAM_GRACE: Duration = Duration::from_secs(1);
+
+/// Update pacing between the RFB server, the authoritative framebuffer and
+/// the WebView. The relay requests the next incremental update as soon as one
+/// is decoded (like RealVNC Viewer) and, independently, sends the WebView the
+/// newest pixels of all accumulated damage whenever it has painted the
+/// previous frame. Slow painting therefore never drops pixels or triggers a
+/// full-refresh storm; it only coalesces more damage into the next frame.
+struct FrameFlow {
+    damage: Damage,
+    frontend_ready: bool,
+    last_ack: Instant,
+    request_deferred: bool,
+    frames_sent: u64,
+}
+
+impl FrameFlow {
+    fn new() -> Self {
+        Self {
+            damage: Damage::default(),
+            frontend_ready: true,
+            last_ack: Instant::now(),
+            request_deferred: false,
+            frames_sent: 0,
+        }
+    }
+
+    fn streaming(&self) -> bool {
+        self.frontend_ready || self.last_ack.elapsed() < FRAME_STREAM_GRACE
+    }
+}
+
+type SharedFrameFlow = Arc<std::sync::Mutex<FrameFlow>>;
+
+/// Rolling one-second window over the reader's runtime counters.
+struct StatsWindow {
+    started: Instant,
+    wire_bytes: u64,
+    updates: u64,
+    frames: u64,
+    update_micros: u64,
+    line_kbps: Option<u64>,
+    initialized: bool,
+    /// Back-to-back updates (gap below `BURST_GAP`) merged into one transfer.
+    burst: Option<(Instant, Instant, u64)>,
+}
+
+/// Updates separated by less than this are one server transfer for the
+/// line-speed estimate; a single pipelined update can start with bytes the
+/// kernel already buffered, which overstates the speed of short samples.
+const BURST_GAP: Duration = Duration::from_millis(30);
+const LINE_SPEED_MIN_BYTES: u64 = 256 * 1024;
+
+impl StatsWindow {
+    fn new() -> Self {
+        Self {
+            started: Instant::now(),
+            wire_bytes: 0,
+            updates: 0,
+            frames: 0,
+            update_micros: 0,
+            line_kbps: None,
+            initialized: false,
+            burst: None,
+        }
+    }
+
+    fn close_burst(&mut self) {
+        if let Some((start, end, bytes)) = self.burst.take() {
+            let micros = end.duration_since(start).as_micros() as u64;
+            if bytes >= LINE_SPEED_MIN_BYTES && micros > 0 {
+                let sample = bytes * 8 * 1000 / micros;
+                self.line_kbps = Some(match self.line_kbps {
+                    Some(previous) => (previous * 3 + sample) / 4,
+                    None => sample,
+                });
+            }
+        }
+    }
+
+    fn observe(&mut self, stats: RuntimeStats, frames_sent: u64) -> Option<String> {
+        if !self.initialized {
+            self.initialized = true;
+            self.wire_bytes = stats.wire_bytes;
+            self.updates = stats.updates.saturating_sub(1);
+            self.frames = frames_sent.saturating_sub(1);
+        }
+        self.update_micros += stats.last_update_micros;
+        if let (Some(start), Some(end)) =
+            (stats.last_update_started_at, stats.last_update_finished_at)
+        {
+            match self.burst {
+                Some((burst_start, burst_end, bytes))
+                    if start.saturating_duration_since(burst_end) < BURST_GAP =>
+                {
+                    self.burst = Some((burst_start, end, bytes + stats.last_update_wire_bytes));
+                }
+                _ => {
+                    self.close_burst();
+                    self.burst = Some((start, end, stats.last_update_wire_bytes));
+                }
+            }
+        }
+        let elapsed = self.started.elapsed();
+        if elapsed < STATS_INTERVAL {
+            return None;
+        }
+        let seconds = elapsed.as_secs_f32();
+        let updates = stats.updates.saturating_sub(self.updates);
+        let frames = frames_sent.saturating_sub(self.frames);
+        let message = WsOutgoingText::Stats {
+            requested_encoding: REQUESTED_ENCODING_LABEL,
+            last_encoding: stats.last_encoding.map(encoding_name).unwrap_or("-"),
+            pixel_format: PIXEL_FORMAT_LABEL,
+            wire_kbps: (stats.wire_bytes.saturating_sub(self.wire_bytes) as f32 * 8.0
+                / 1000.0
+                / seconds) as u64,
+            line_kbps: self.line_kbps,
+            updates_per_sec: updates as f32 / seconds,
+            frames_per_sec: frames as f32 / seconds,
+            update_ms: if updates > 0 {
+                self.update_micros as f32 / 1000.0 / updates as f32
+            } else {
+                0.0
+            },
+        };
+        self.started = Instant::now();
+        self.wire_bytes = stats.wire_bytes;
+        self.updates = stats.updates;
+        self.frames = frames_sent;
+        self.update_micros = 0;
+        serde_json::to_string(&message).ok()
+    }
+}
+
+/// Serialize the pending damage as one relay frame if the WebView is ready.
+/// Returns true when a frame boundary was queued.
+fn flush_frame(
+    flow: &SharedFrameFlow,
+    framebuffer: &SharedFramebuffer,
+    ws_out: &FrameQueueSender,
+) -> bool {
+    let rects = {
+        let Ok(mut flow) = flow.lock() else {
+            return false;
+        };
+        if !flow.frontend_ready || flow.damage.is_empty() {
+            return false;
+        }
+        flow.frontend_ready = false;
+        flow.frames_sent += 1;
+        flow.damage.take()
+    };
+    let frames: Vec<Vec<u8>> = match framebuffer.lock() {
+        Ok(fb) => rects
+            .into_iter()
+            .filter_map(|rect| fb.relay_frame(rect))
+            .collect(),
+        Err(_) => return false,
+    };
+    for frame in frames {
+        let _ = ws_out.push_rect(frame);
+    }
+    if ws_out.finish_frame().unwrap_or(false) {
+        // Either an undelivered older frame was replaced (after a Refresh or
+        // resize marked the WebView ready early) or this frame exceeded the
+        // queue budget. The pixels of the lost frame are unknown here, so
+        // repaint the whole surface with the next frame.
+        damage_full_framebuffer(flow, framebuffer);
+        if !ws_out.has_pending_frame()
+            && let Ok(mut flow) = flow.lock()
+        {
+            // Nothing is in flight, so no ACK will arrive to release the
+            // next frame.
+            flow.frontend_ready = true;
+        }
+    }
+    true
+}
+
+fn damage_full_framebuffer(flow: &SharedFrameFlow, framebuffer: &SharedFramebuffer) {
+    let size = framebuffer
+        .lock()
+        .map(|fb| (fb.width(), fb.height()))
+        .unwrap_or((0, 0));
+    if let Ok(mut flow) = flow.lock() {
+        flow.damage.add(FbRect::new(0, 0, size.0, size.1));
+    }
 }
 
 // ── Main entry point ────────────────────────────────────────────────
@@ -525,14 +736,16 @@ async fn run_relay(
     // dedicated blocking worker and bridge decoded messages through a bounded
     // channel so no Tokio executor thread is stalled by a slow server.
     let initial_framebuffer_size = (rfb.width, rfb.height);
+    let framebuffer = rfb.framebuffer();
+    let flow: SharedFrameFlow = Arc::new(std::sync::Mutex::new(FrameFlow::new()));
     let (server_message_tx, mut server_message_rx) =
-        mpsc::channel::<Result<(ServerMessage, u16, u16), String>>(2);
+        mpsc::channel::<Result<(ServerMessage, u16, u16, RuntimeStats), String>>(2);
     let cancel_reader = cancel.clone();
     let rfb_reader = tokio::task::spawn_blocking(move || {
         while !cancel_reader.is_cancelled() {
             let result = rfb
                 .read_server_message()
-                .map(|message| (message, rfb.width, rfb.height));
+                .map(|message| (message, rfb.width, rfb.height, rfb.runtime_stats()));
             let should_stop = result.is_err();
             if server_message_tx.blocking_send(result).is_err() || should_stop {
                 break;
@@ -546,11 +759,14 @@ async fn run_relay(
     let server_caps_read = server_clip_caps.clone();
     let latest_clipboard_read = latest_local_clipboard.clone();
     let writer_for_caps = writer.clone();
+    let flow_read = flow.clone();
+    let framebuffer_read = framebuffer.clone();
     let mut vnc_read = tokio::spawn(async move {
         let mut published_framebuffer_size = initial_framebuffer_size;
         let mut framebuffer_generation = 0u64;
+        let mut window = StatsWindow::new();
         while let Some(result) = server_message_rx.recv().await {
-            let (msg, fb_width, fb_height) = match result {
+            let (msg, fb_width, fb_height, stats) = match result {
                 Ok(value) => value,
                 Err(message) => {
                     let error = crate::vnc::error::VncError::classify(message);
@@ -574,6 +790,14 @@ async fn run_relay(
                     if (fb_width, fb_height) != published_framebuffer_size {
                         framebuffer_generation = framebuffer_generation.saturating_add(1);
                         published_framebuffer_size = (fb_width, fb_height);
+                        // Frames of the old geometry are obsolete; the WebView
+                        // also drops whatever it had queued on desktop_size.
+                        ws_out.clear_frames();
+                        if let Ok(mut flow) = flow_read.lock() {
+                            flow.damage.clear();
+                            flow.frontend_ready = true;
+                            flow.last_ack = Instant::now();
+                        }
                         let json = serde_json::to_string(&WsOutgoingText::DesktopSize {
                             width: fb_width,
                             height: fb_height,
@@ -582,16 +806,27 @@ async fn run_relay(
                         .unwrap();
                         let _ = ws_out.send_critical_control(json);
                     }
+                    let request_now = {
+                        match flow_read.lock() {
+                            Ok(mut flow) => {
+                                for rect in rects {
+                                    flow.damage.add(rect);
+                                }
+                                let streaming = flow.streaming();
+                                flow.request_deferred = !streaming;
+                                streaming
+                            }
+                            Err(_) => true,
+                        }
+                    };
                     {
                         let mut writer = rfb_writer_for_read.lock().await;
                         writer.set_framebuffer_size(fb_width, fb_height);
-                    }
-                    for rect in rects {
-                        let DecodedRect::Pixels { x, y, w, h, rgba } = rect;
-                        let mut frame = Vec::with_capacity(12 + rgba.len());
-                        frame.extend_from_slice(&make_frame_header(x, y, w, h));
-                        frame.extend_from_slice(&rgba);
-                        let _ = ws_out.push_rect(frame);
+                        // Pipeline the next incremental request immediately so
+                        // server encoding overlaps relay and WebView painting.
+                        if request_now {
+                            let _ = writer.request_update(true);
+                        }
                     }
                     if let Some(cursor) = cursor {
                         match serialize_cursor(cursor) {
@@ -611,8 +846,10 @@ async fn run_relay(
                         .unwrap();
                         let _ = ws_out.send_control(json);
                     }
-                    if ws_out.finish_frame().unwrap_or(false) {
-                        let _ = rfb_writer_for_read.lock().await.request_update(false);
+                    flush_frame(&flow_read, &framebuffer_read, &ws_out);
+                    let frames_sent = flow_read.lock().map(|flow| flow.frames_sent).unwrap_or(0);
+                    if let Some(json) = window.observe(stats, frames_sent) {
+                        let _ = ws_out.send_control(json);
                     }
                 }
                 ServerMessage::Bell => {
@@ -652,6 +889,9 @@ async fn run_relay(
     let server_caps_ctrl = server_clip_caps.clone();
     let latest_clipboard_ctrl = latest_local_clipboard.clone();
     let dispatch_limits = crate::vnc::limits::DecodeLimits::default();
+    let flow_ctrl = flow.clone();
+    let framebuffer_ctrl = framebuffer.clone();
+    let ws_out_ctrl = ws_out_tx.clone();
     let mut vnc_ctrl = tokio::spawn(async move {
         let mut deferred_ctrl: Option<VncControl> = None;
         let mut last_pointer_buttons = 0u8;
@@ -679,7 +919,25 @@ async fn run_relay(
                 continue;
             }
             let result = match ctrl {
-                VncControl::Ack => rfb_ctrl.lock().await.request_update(true),
+                VncControl::Ack => {
+                    // The WebView painted the previous frame: hand it the
+                    // accumulated damage and resume the request pipeline if a
+                    // hidden period paused it.
+                    let deferred = match flow_ctrl.lock() {
+                        Ok(mut flow) => {
+                            flow.frontend_ready = true;
+                            flow.last_ack = Instant::now();
+                            std::mem::take(&mut flow.request_deferred)
+                        }
+                        Err(_) => false,
+                    };
+                    flush_frame(&flow_ctrl, &framebuffer_ctrl, &ws_out_ctrl);
+                    if deferred {
+                        rfb_ctrl.lock().await.request_update(true)
+                    } else {
+                        Ok(())
+                    }
+                }
                 VncControl::Key { down, keysym } => {
                     rfb_ctrl.lock().await.send_key_event(down, keysym)
                 }
@@ -755,7 +1013,19 @@ async fn run_relay(
                         }
                     }
                 }
-                VncControl::Refresh => rfb_ctrl.lock().await.request_update(false),
+                VncControl::Refresh => {
+                    // The WebView lost pixels (or the user asked to refresh):
+                    // repaint from the authoritative framebuffer right away and
+                    // also ask the server for a full update.
+                    if let Ok(mut flow) = flow_ctrl.lock() {
+                        flow.frontend_ready = true;
+                        flow.last_ack = Instant::now();
+                        flow.request_deferred = false;
+                    }
+                    damage_full_framebuffer(&flow_ctrl, &framebuffer_ctrl);
+                    flush_frame(&flow_ctrl, &framebuffer_ctrl, &ws_out_ctrl);
+                    rfb_ctrl.lock().await.request_update(false)
+                }
                 VncControl::Disconnect => {
                     cl_cancel.cancel();
                     Ok(())
@@ -1338,6 +1608,31 @@ mod tests {
     }
 
     #[test]
+    fn stats_window_merges_back_to_back_updates_into_one_line_speed_sample() {
+        let mut window = StatsWindow::new();
+        let t0 = Instant::now();
+        let update = |start_ms: u64, end_ms: u64, bytes: u64, updates: u64| RuntimeStats {
+            wire_bytes: 0,
+            updates,
+            last_encoding: Some(16),
+            last_update_wire_bytes: bytes,
+            last_update_micros: (end_ms - start_ms) * 1000,
+            last_update_started_at: Some(t0 + Duration::from_millis(start_ms)),
+            last_update_finished_at: Some(t0 + Duration::from_millis(end_ms)),
+        };
+        // Two halves of one 1 MB transfer 10 ms apart, then a later small update.
+        window.observe(update(0, 40, 500_000, 1), 1);
+        window.observe(update(50, 100, 500_000, 2), 1);
+        assert!(window.line_kbps.is_none(), "burst still open");
+        window.observe(update(600, 601, 1_000, 3), 2);
+        // 1_000_000 bytes over 100 ms = 80_000 kbit/s.
+        assert_eq!(window.line_kbps, Some(80_000));
+        // A lone small transfer never produces a sample.
+        window.observe(update(2_000, 2_001, 1_000, 4), 3);
+        assert_eq!(window.line_kbps, Some(80_000));
+    }
+
+    #[test]
     fn desktop_size_notification_carries_a_monotonic_generation() {
         let json = serde_json::to_string(&WsOutgoingText::DesktopSize {
             width: 2560,
@@ -1432,6 +1727,152 @@ mod tests {
         let _ = release_tx.send(());
         server.await.unwrap();
     }
+
+    /// Minimal RFB 3.8 server for relay tests: None security, 4x2 desktop.
+    /// Sends one Raw update, then waits for the client's *next* update request
+    /// (proving the relay pipelines requests without a WebView ACK), then
+    /// resizes to 2x2 with a DesktopSize rect followed by a Raw rect.
+    fn start_pipeline_fixture() -> (u16, std::thread::JoinHandle<Vec<u8>>) {
+        use std::io::{Read as _, Write as _};
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+                .unwrap();
+            stream.write_all(b"RFB 003.008\n").unwrap();
+            let mut banner = [0u8; 12];
+            stream.read_exact(&mut banner).unwrap();
+            stream.write_all(&[1, 1]).unwrap();
+            let mut chosen = [0u8; 1];
+            stream.read_exact(&mut chosen).unwrap();
+            stream.write_all(&0u32.to_be_bytes()).unwrap();
+            let mut shared = [0u8; 1];
+            stream.read_exact(&mut shared).unwrap();
+            let mut init = Vec::new();
+            init.extend_from_slice(&4u16.to_be_bytes());
+            init.extend_from_slice(&2u16.to_be_bytes());
+            init.extend_from_slice(&[32, 24, 0, 1, 0, 255, 0, 255, 0, 255, 0, 8, 16, 0, 0, 0]);
+            init.extend_from_slice(&4u32.to_be_bytes());
+            init.extend_from_slice(b"test");
+            stream.write_all(&init).unwrap();
+
+            // Client setup: SetPixelFormat, SetEncodings, first (full) request.
+            let mut pixel_format = [0u8; 20];
+            stream.read_exact(&mut pixel_format).unwrap();
+            let mut encodings = [0u8; 4];
+            stream.read_exact(&mut encodings).unwrap();
+            let count = u16::from_be_bytes([encodings[2], encodings[3]]) as usize;
+            let mut list = vec![0u8; count * 4];
+            stream.read_exact(&mut list).unwrap();
+            let mut first_request = [0u8; 10];
+            stream.read_exact(&mut first_request).unwrap();
+
+            let raw_rect = |x: u16, y: u16, w: u16, h: u16, value: u8| {
+                let mut rect = Vec::new();
+                for field in [x, y, w, h] {
+                    rect.extend_from_slice(&field.to_be_bytes());
+                }
+                rect.extend_from_slice(&0i32.to_be_bytes());
+                for _ in 0..(w as usize * h as usize) {
+                    rect.extend_from_slice(&[value, value, value, 0]);
+                }
+                rect
+            };
+            let mut first = vec![0, 0, 0, 1];
+            first.extend_from_slice(&raw_rect(0, 0, 4, 2, 7));
+            stream.write_all(&first).unwrap();
+
+            // The relay must ask for the next incremental update on its own.
+            let mut next_request = [0u8; 10];
+            stream.read_exact(&mut next_request).unwrap();
+
+            let mut resized = vec![0, 0, 0, 2];
+            for field in [0u16, 0, 2, 2] {
+                resized.extend_from_slice(&field.to_be_bytes());
+            }
+            resized.extend_from_slice(&ENCODING_DESKTOP_SIZE.to_be_bytes());
+            resized.extend_from_slice(&raw_rect(0, 0, 2, 2, 9));
+            stream.write_all(&resized).unwrap();
+
+            let mut rest = Vec::new();
+            let _ = stream.read_to_end(&mut rest);
+            next_request.to_vec()
+        });
+        (port, handle)
+    }
+
+    #[tokio::test]
+    async fn relay_pipelines_requests_and_repaints_after_desktop_size() {
+        let (port, server) = start_pipeline_fixture();
+        let session = spawn_vnc_relay(
+            "127.0.0.1".into(),
+            port,
+            None,
+            None,
+            None,
+            VncSecurityPolicy::AllowNone,
+            false,
+            VncClipboardPolicy::Disabled,
+        )
+        .await
+        .unwrap();
+        let (mut client, _) = connect_async(ws_request(
+            session.ws_port,
+            "/vnc",
+            &format!("taomni-vnc.{}", session.ws_token),
+            "tauri://localhost",
+        ))
+        .await
+        .unwrap();
+
+        let mut texts = Vec::new();
+        let mut frames: Vec<Vec<Vec<u8>>> = vec![Vec::new()];
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        while frames.iter().filter(|frame| !frame.is_empty()).count() < 2 {
+            let message = tokio::time::timeout_at(deadline, client.next())
+                .await
+                .expect("relay frames before timeout")
+                .expect("socket open")
+                .expect("valid message");
+            match message {
+                Message::Text(text) => texts.push(text.to_string()),
+                Message::Binary(bytes) if bytes.is_empty() => frames.push(Vec::new()),
+                Message::Binary(bytes) => frames.last_mut().unwrap().push(bytes.to_vec()),
+                _ => {}
+            }
+        }
+        // No ACK was sent, yet the server saw an incremental request.
+        let _ = client.close(None).await;
+        drop(session);
+        let next_request = tokio::task::spawn_blocking(move || server.join().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(next_request[0], 3, "FramebufferUpdateRequest");
+        assert_eq!(next_request[1], 1, "incremental");
+
+        assert!(
+            texts
+                .iter()
+                .any(|text| text.contains("\"type\":\"connected\""))
+        );
+        assert!(
+            texts
+                .iter()
+                .any(|text| text.contains("\"type\":\"desktop_size\"")
+                    && text.contains("\"width\":2")),
+            "desktop_size notification: {texts:?}"
+        );
+        let painted: Vec<&Vec<Vec<u8>>> = frames.iter().filter(|frame| !frame.is_empty()).collect();
+        // First frame: one 4x2 rect of value 7.
+        assert_eq!(painted[0].len(), 1);
+        assert_eq!(&painted[0][0][..8], &[0, 0, 0, 0, 0, 4, 0, 2]);
+        assert!(painted[0][0][12..].chunks(4).all(|px| px == [7, 7, 7, 255]));
+        // After the resize the whole new 2x2 surface is repainted.
+        assert_eq!(&painted[1][0][..8], &[0, 0, 0, 0, 0, 2, 0, 2]);
+        assert!(painted[1][0][12..].chunks(4).all(|px| px == [9, 9, 9, 255]));
+    }
 }
 
 fn is_authorized_origin(origin: &str) -> bool {
@@ -1451,14 +1892,4 @@ fn is_authorized_origin(origin: &str) -> bool {
         );
     }
     false
-}
-
-fn make_frame_header(x: u16, y: u16, w: u16, h: u16) -> [u8; 12] {
-    let mut hdr = [0u8; 12];
-    hdr[0..2].copy_from_slice(&x.to_be_bytes());
-    hdr[2..4].copy_from_slice(&y.to_be_bytes());
-    hdr[4..6].copy_from_slice(&w.to_be_bytes());
-    hdr[6..8].copy_from_slice(&h.to_be_bytes());
-    // bytes 8-11 reserved (zero)
-    hdr
 }

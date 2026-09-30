@@ -5,7 +5,15 @@ const mocks = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 
 import {
+  VNC_WHEEL_DOWN,
+  VNC_WHEEL_LEFT,
+  VNC_WHEEL_RIGHT,
+  VNC_WHEEL_UP,
+  VncWheelAccumulator,
   codePointToKeysym,
+  computeVncDisplaySize,
+  mouseButtonMask,
+  normalizeVncScaling,
   encodeWsKey,
   encodeWsPointer,
   encodeWsRefresh,
@@ -247,5 +255,88 @@ describe("VNC pointer coordinates", () => {
       1080,
       "fit",
     )).toBeNull();
+  });
+});
+
+describe("VNC viewer scaling (RealVNC Scaling options)", () => {
+  it("auto shrinks to fit but never enlarges past one device pixel per remote pixel", () => {
+    // 1680x1050 desktop, 1200x800 CSS viewport, DPR 1.25.
+    const shrink = computeVncDisplaySize("auto", 1680, 1050, 1200, 800, 1.25);
+    expect(shrink.width).toBeLessThanOrEqual(1200);
+    expect(shrink.height).toBeLessThanOrEqual(800);
+    expect(shrink.width / shrink.height).toBeCloseTo(1680 / 1050, 2);
+    expect(shrink.scrolls).toBe(false);
+
+    const small = computeVncDisplaySize("auto", 800, 600, 1600, 1000, 1.25);
+    expect(small).toEqual({ width: 640, height: 480, scrolls: false });
+  });
+
+  it("maps 100% to device pixels and scrolls when larger than the viewport", () => {
+    expect(computeVncDisplaySize(100, 1680, 1050, 1000, 700, 1.25)).toEqual({
+      width: 1344,
+      height: 840,
+      scrolls: true,
+    });
+    expect(computeVncDisplaySize(50, 1680, 1050, 1000, 700, 1)).toEqual({
+      width: 840,
+      height: 525,
+      scrolls: false,
+    });
+  });
+
+  it("fits window, width and height in both directions and can stretch", () => {
+    expect(computeVncDisplaySize("fit", 800, 600, 1600, 900, 1)).toEqual({ width: 1200, height: 900, scrolls: false });
+    expect(computeVncDisplaySize("fit", 800, 600, 1600, 900, 1, false)).toEqual({ width: 1600, height: 900, scrolls: false });
+    expect(computeVncDisplaySize("fit-width", 800, 600, 400, 200, 1)).toEqual({ width: 400, height: 300, scrolls: true });
+    expect(computeVncDisplaySize("fit-height", 800, 600, 400, 300, 1)).toEqual({ width: 400, height: 300, scrolls: false });
+  });
+
+  it("normalizes persisted scaling values", () => {
+    expect(normalizeVncScaling("fit-width")).toBe("fit-width");
+    expect(normalizeVncScaling("150")).toBe(150);
+    expect(normalizeVncScaling(5)).toBe("auto");
+    expect(normalizeVncScaling("stretch")).toBe("auto");
+  });
+});
+
+describe("VNC wheel and buttons", () => {
+  it("turns one mouse notch into one wheel step and accumulates trackpad deltas", () => {
+    const wheel = new VncWheelAccumulator();
+    expect(wheel.push(0, 100, 0)).toEqual([VNC_WHEEL_DOWN]);
+    expect(wheel.push(0, -100, 0)).toEqual([VNC_WHEEL_UP]);
+    const trackpad = Array.from({ length: 9 }, () => wheel.push(0, 12, 0)).flat();
+    expect(trackpad).toEqual([VNC_WHEEL_DOWN]);
+    expect(wheel.push(-250, 0, 0)).toEqual([VNC_WHEEL_LEFT, VNC_WHEEL_LEFT]);
+    // Line-mode deltas (Firefox): three lines are one detent.
+    expect(new VncWheelAccumulator().push(3, 0, 1)).toEqual([VNC_WHEEL_RIGHT]);
+  });
+
+  it("caps a single event so a huge delta does not scroll for seconds", () => {
+    const wheel = new VncWheelAccumulator();
+    expect(wheel.push(0, 100_000, 0)).toHaveLength(10);
+    expect(wheel.push(0, 0, 0)).toEqual([]);
+  });
+
+  it("maps the back button to RFB button 8", () => {
+    const back = new MouseEvent("pointerdown", { buttons: 1 | 8 });
+    expect(mouseButtonMask(back)).toBe(0x81);
+    expect(mouseButtonMask(new MouseEvent("pointerdown", { buttons: 2 | 4 }))).toBe(4 | 2);
+  });
+
+  it("accepts relay stats and rejects malformed counters", () => {
+    const stats = {
+      type: "stats",
+      requested_encoding: "ZRLE",
+      last_encoding: "ZRLE",
+      pixel_format: "depth 24 (32 bpp) little-endian rgb888",
+      wire_kbps: 12000,
+      line_kbps: null,
+      updates_per_sec: 3.5,
+      frames_per_sec: 3,
+      update_ms: 12.5,
+    };
+    expect(parseWsMessage(JSON.stringify(stats))).toEqual(stats);
+    expect(parseWsMessage(JSON.stringify({ ...stats, wire_kbps: -1 }))).toBeNull();
+    expect(parseWsMessage(JSON.stringify({ ...stats, last_encoding: 7 }))).toBeNull();
   });
 });

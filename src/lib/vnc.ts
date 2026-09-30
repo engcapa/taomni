@@ -213,6 +213,7 @@ export type WsIncoming =
       rtf?: string;
     }
   | { type: "ext_clipboard_support"; available: boolean }
+  | ({ type: "stats" } & VncSessionStats)
   | {
       type: "cursor";
       visible: boolean;
@@ -222,6 +223,31 @@ export type WsIncoming =
       height: number;
       png_base64: string;
     };
+
+/** Once-per-second relay counters shown by Session Information. */
+export interface VncSessionStats {
+  requested_encoding: string;
+  last_encoding: string;
+  pixel_format: string;
+  wire_kbps: number;
+  line_kbps: number | null;
+  updates_per_sec: number;
+  frames_per_sec: number;
+  update_ms: number;
+}
+
+function validStats(msg: Record<string, unknown>): boolean {
+  const shortText = (value: unknown) => typeof value === "string" && value.length <= 128;
+  const finite = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0;
+  return shortText(msg.requested_encoding)
+    && shortText(msg.last_encoding)
+    && shortText(msg.pixel_format)
+    && finite(msg.wire_kbps)
+    && (msg.line_kbps === null || finite(msg.line_kbps))
+    && finite(msg.updates_per_sec)
+    && finite(msg.frames_per_sec)
+    && finite(msg.update_ms);
+}
 
 /** Parse and minimally validate an incoming WS text message. */
 export function parseWsMessage(data: string): WsIncoming | null {
@@ -274,6 +300,8 @@ export function parseWsMessage(data: string): WsIncoming | null {
           : null;
       case "ext_clipboard_support":
         return typeof msg.available === "boolean" ? value as WsIncoming : null;
+      case "stats":
+        return validStats(msg) ? value as WsIncoming : null;
       case "cursor": {
         if (typeof msg.visible !== "boolean") return null;
         if (msg.visible === false) {
@@ -476,14 +504,167 @@ export function keyEventToKeysym(e: KeyboardEvent): number {
   }
 }
 
-/** Map mouse buttons to RFB button mask. */
+/**
+ * Map mouse buttons to the 8-bit RFB button mask: bits 0-2 left/middle/right,
+ * 3-6 wheel up/down/left/right, bit 7 the "back" (X1) button. The forward (X2)
+ * button has no slot without the ExtendedMouseButtons extension.
+ */
 export function mouseButtonMask(e: MouseEvent | PointerEvent): number {
   let mask = 0;
   if (e.buttons & 1) mask |= 1; // left
   if (e.buttons & 2) mask |= 4; // right
   if (e.buttons & 4) mask |= 2; // middle
+  if (e.buttons & 8) mask |= 0x80; // back
   return mask;
 }
+
+/** RFB wheel "buttons": one press+release pair per detent. */
+export const VNC_WHEEL_UP = 0x08;
+export const VNC_WHEEL_DOWN = 0x10;
+export const VNC_WHEEL_LEFT = 0x20;
+export const VNC_WHEEL_RIGHT = 0x40;
+
+/** Pixel delta that counts as one wheel detent (Chromium/WebKit report 100 per notch). */
+export const VNC_WHEEL_PIXELS_PER_STEP = 100;
+const VNC_WHEEL_LINES_PER_STEP = 3;
+const VNC_WHEEL_MAX_STEPS_PER_EVENT = 10;
+
+/**
+ * Accumulates DOM wheel deltas into discrete RFB wheel steps, the way RealVNC
+ * Viewer applies its 120-unit ScrollWheelThreshold: a mouse notch is one step,
+ * a trackpad's many small deltas add up instead of each firing a click.
+ */
+export class VncWheelAccumulator {
+  private x = 0;
+  private y = 0;
+
+  /** Returns the wheel button masks to press+release, in order. */
+  push(deltaX: number, deltaY: number, deltaMode: number): number[] {
+    const unit = deltaMode === 1
+      ? VNC_WHEEL_PIXELS_PER_STEP / VNC_WHEEL_LINES_PER_STEP
+      : deltaMode === 2
+        ? VNC_WHEEL_PIXELS_PER_STEP
+        : 1;
+    if (Number.isFinite(deltaX)) this.x += deltaX * unit;
+    if (Number.isFinite(deltaY)) this.y += deltaY * unit;
+    const steps: number[] = [];
+    const drain = (value: number, negative: number, positive: number): number => {
+      let remaining = value;
+      while (Math.abs(remaining) >= VNC_WHEEL_PIXELS_PER_STEP && steps.length < VNC_WHEEL_MAX_STEPS_PER_EVENT) {
+        steps.push(remaining < 0 ? negative : positive);
+        remaining -= Math.sign(remaining) * VNC_WHEEL_PIXELS_PER_STEP;
+      }
+      // Drop backlog beyond the per-event cap instead of scrolling for seconds.
+      return Math.abs(remaining) >= VNC_WHEEL_PIXELS_PER_STEP ? 0 : remaining;
+    };
+    this.y = drain(this.y, VNC_WHEEL_UP, VNC_WHEEL_DOWN);
+    this.x = drain(this.x, VNC_WHEEL_LEFT, VNC_WHEEL_RIGHT);
+    return steps;
+  }
+
+  reset(): void {
+    this.x = 0;
+    this.y = 0;
+  }
+}
+
+/**
+ * Viewer scaling, mirroring RealVNC Viewer's Scaling options: "auto" shrinks
+ * the desktop to fit and never enlarges it, "fit"/"fit-width"/"fit-height"
+ * scale in both directions, and a number is a fixed percentage where 100 maps
+ * one remote pixel to one device pixel.
+ */
+export type VncScaling = "auto" | "fit" | "fit-width" | "fit-height" | number;
+
+export const VNC_SCALE_PERCENTAGES = [25, 50, 75, 100, 125, 150, 200, 300, 400] as const;
+
+export function normalizeVncScaling(value: unknown): VncScaling {
+  if (value === "auto" || value === "fit" || value === "fit-width" || value === "fit-height") {
+    return value;
+  }
+  const percent = typeof value === "string" ? Number(value) : value;
+  if (typeof percent === "number" && Number.isFinite(percent) && percent >= 10 && percent <= 800) {
+    return Math.round(percent);
+  }
+  return "auto";
+}
+
+export interface VncDisplaySize {
+  /** CSS pixel size of the canvas element. */
+  width: number;
+  height: number;
+  /** Whether the container must scroll to reveal the whole desktop. */
+  scrolls: boolean;
+}
+
+/** Compute the CSS size of the desktop canvas for a scaling mode. */
+export function computeVncDisplaySize(
+  scaling: VncScaling,
+  framebufferWidth: number,
+  framebufferHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  devicePixelRatio: number,
+  preserveAspect = true,
+): VncDisplaySize {
+  const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
+  if (framebufferWidth <= 0 || framebufferHeight <= 0) {
+    return { width: 0, height: 0, scrolls: false };
+  }
+  const vw = Math.max(1, viewportWidth);
+  const vh = Math.max(1, viewportHeight);
+  // One remote pixel per device pixel.
+  const nativeWidth = framebufferWidth / dpr;
+  const nativeHeight = framebufferHeight / dpr;
+  const fitScaleX = vw / nativeWidth;
+  const fitScaleY = vh / nativeHeight;
+
+  let scaleX: number;
+  let scaleY: number;
+  switch (scaling) {
+    case "auto": {
+      const scale = Math.min(1, fitScaleX, fitScaleY);
+      scaleX = scale;
+      scaleY = scale;
+      if (!preserveAspect && (fitScaleX < 1 || fitScaleY < 1)) {
+        scaleX = Math.min(1, fitScaleX);
+        scaleY = Math.min(1, fitScaleY);
+      }
+      break;
+    }
+    case "fit":
+      if (preserveAspect) {
+        scaleX = Math.min(fitScaleX, fitScaleY);
+        scaleY = scaleX;
+      } else {
+        scaleX = fitScaleX;
+        scaleY = fitScaleY;
+      }
+      break;
+    case "fit-width":
+      scaleX = fitScaleX;
+      scaleY = preserveAspect ? fitScaleX : 1;
+      break;
+    case "fit-height":
+      scaleY = fitScaleY;
+      scaleX = preserveAspect ? fitScaleY : 1;
+      break;
+    default:
+      scaleX = scaling / 100;
+      scaleY = scaleX;
+  }
+  const width = Math.max(1, Math.round(nativeWidth * scaleX));
+  const height = Math.max(1, Math.round(nativeHeight * scaleY));
+  return { width, height, scrolls: width > vw + 0.5 || height > vh + 0.5 };
+}
+
+/** X11 keysyms used by the session menu's special-key actions. */
+export const VNC_KEYSYM = {
+  controlL: 0xffe3,
+  altL: 0xffe9,
+  delete: 0xffff,
+  f8: 0xffc5,
+} as const;
 
 export interface VncViewportRect {
   left: number;
