@@ -44,6 +44,9 @@ steps:
 - vault_first_run: qa-native-gate-password
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
+    key: taomni.codeWorkspace.refactorOptions.v1
+    value: '{"mode":"dialog"}'
+- seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-jrdr","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
 - reload_window: null
@@ -237,130 +240,130 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 6
     - 7
-    - 13
-    - 16
-    - 19
+    - 8
+    - 14
+    - 17
     - 20
-    - 24
-    - 26
-    - 29
+    - 21
+    - 25
+    - 27
     - 30
     - 31
-    - 36
+    - 32
     - 37
     - 38
     - 39
     - 40
     - 41
-    - 48
-    - 50
-    - 53
+    - 42
+    - 49
+    - 51
     - 54
-    - 61
-    - 64
-    - 70
+    - 55
+    - 62
+    - 65
     - 71
     - 72
+    - 73
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 8
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 10
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
+    - step: 11
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "public
         class QuickFixTarget", "timeout_sec": 60}}'
-    - step: 11
+    - step: 12
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
         "Java", "timeout_sec": 60}}'
-    - step: 14
+    - step: 15
       expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"9:14\", \"timeout_sec\": 10}}"
-    - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "timeout_sec": 30}}'
     - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "timeout_sec": 30}}'
+    - step: 19
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"text-input-dialog-input\"]", "name": "value",
         "equals": "QuickFixTarget"}}'
-    - step: 21
-      expectation: '{"wait_for": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "timeout_sec": 60}}'
     - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "timeout_sec": 60}}'
+    - step: 23
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "contains": "QaDelTarget",
         "timeout_sec": 10}}'
-    - step: 23
+    - step: 24
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "contains": "1
         resource operation", "timeout_sec": 10}}'
-    - step: 25
+    - step: 26
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "class QaDelTarget",
         "timeout_sec": 30}}'
-    - step: 27
+    - step: 28
       expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaDelTarget.java",
         "contains": "class QaDelTarget", "timeout_sec": 30}}'
-    - step: 32
+    - step: 33
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 34
+    - step: 35
       expectation: '{"assert_not_visible": "[data-testid=\"refactor-recovery-review\"]"}'
-    - step: 42
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 43
-      expectation: '{"wait_for": {"selector": "[data-testid=\"refactor-recovery-review\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 44
+      expectation: '{"wait_for": {"selector": "[data-testid=\"refactor-recovery-review\"]", "timeout_sec": 60}}'
+    - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactor-recovery-review\"]", "contains": "Gone.java",
         "timeout_sec": 10}}'
-    - step: 45
+    - step: 46
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactor-recovery-review\"]", "contains": "does
         not exist", "timeout_sec": 10}}'
-    - step: 46
+    - step: 47
       expectation: '{"assert_disabled": "[data-testid=\"refactor-recovery-restore\"]"}'
-    - step: 49
+    - step: 50
       expectation: '{"wait_for": {"selector": "[data-testid=\"refactor-recovery-dismiss-confirm\"]", "timeout_sec":
         10}}'
-    - step: 51
-      expectation: '{"assert_not_visible": "[data-testid=\"refactor-recovery-dismiss-confirm\"]"}'
     - step: 52
+      expectation: '{"assert_not_visible": "[data-testid=\"refactor-recovery-dismiss-confirm\"]"}'
+    - step: 53
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactor-recovery-review\"]", "contains": "Gone.java",
         "timeout_sec": 10}}'
-    - step: 55
+    - step: 56
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Abandoned
         refactor recovery", "timeout_sec": 30}}'
-    - step: 56
+    - step: 57
       expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.refactor.recovery.v2:qa-jrdr-abandon'')",
         "contains": "user-dismissed"}}'
-    - step: 57
+    - step: 58
       expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QaDelTarget.java",
         "contains": "class QaDelTarget", "timeout_sec": 30}}'
-    - step: 58
-      expectation: '{"wait_for": {"selector": "[data-testid=\"refactor-recovery-review\"]", "timeout_sec": 60}}'
     - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"refactor-recovery-review\"]", "timeout_sec": 60}}'
+    - step: 60
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactor-recovery-review\"]", "contains": "MixOld.java",
         "timeout_sec": 10}}'
-    - step: 62
-      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 30}}'
     - step: 63
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 30}}'
+    - step: 64
       expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog\"]", "contains": "Restore pre-refactor
         content", "timeout_sec": 10}}'
-    - step: 65
+    - step: 66
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Refactor recovery
         complete", "timeout_sec": 60}}'
-    - step: 66
+    - step: 67
       expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/MixOld.java",
         "equals": "3533c9cac826533ea8dd12c771268366d3901f2d14fb43fd1d9a70dd794444c1", "timeout_sec": 30}}'
-    - step: 67
-      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.refactor.recovery.v2:qa-jrdr-mixed'')",
-        "contains": "rolled-back"}}'
     - step: 68
       expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.refactor.recovery.v2:qa-jrdr-mixed'')",
+        "contains": "rolled-back"}}'
+    - step: 69
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.refactor.recovery.v2:qa-jrdr-mixed'')",
         "contains": "reversedMoves"}}'
-    - step: 73
+    - step: 74
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 75
+    - step: 76
       expectation: '{"assert_not_visible": "[data-testid=\"refactor-recovery-review\"]"}'
     results:
-    - 73
-    - 75
+    - 74
+    - 76
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

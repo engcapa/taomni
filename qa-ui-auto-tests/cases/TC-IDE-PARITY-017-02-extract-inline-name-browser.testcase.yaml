@@ -1,0 +1,302 @@
+id: TC-IDE-PARITY-017-02
+title: Extract Method names the new method in place; Esc keeps the default name
+description: 'ED-PARITY-017 A1/A3 browser case on the controlled parity007 Java provider: Extract Method commits directly and opens the in-place naming session on the extracted method (no naming dialog); Enter renames call and declaration; undo removes the rename then the extraction; Esc twice keeps the default name.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- refactor
+- parity007
+- ed-parity-017
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity007_extract
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Mod+Alt+M
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    timeout_sec: 30
+- assert_attribute:
+    selector: '[data-testid="code-workspace-inline-rename"]'
+    name: data-kind
+    equals: extract
+- eval_readonly:
+    expression: document.activeElement?.value
+    contains: extracted
+- assert_text:
+    selector: .cm-inline-rename-target
+    contains: extracted
+- assert_text:
+    selector: '[data-testid="code-workspace-inline-rename-hint"]'
+    contains: Press Alt+Shift+O to show options popup
+- assert_count:
+    selector: '[data-testid="text-input-dialog"]'
+    equal: 0
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: int sum = extracted(values);
+- fill:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    value: sumOf
+- press: Enter
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename"]'
+    state: detached
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: int sum = sumOf(values);
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: private static int sumOf(int[] values) {
+- parity007_trace:
+    requests: 1
+    resolves: 1
+    prepares: 1
+    renames: 1
+    pending: 0
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+z
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: int sum = extracted(values);
+- press: Mod+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: &id001
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Mod+Alt+M
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    timeout_sec: 30
+- press: Escape
+- assert_attribute:
+    selector: '[data-testid="code-workspace-inline-rename"]'
+    name: data-list-open
+    equals: 'false'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename"]'
+    state: detached
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: private static int extracted(int[] values) {
+- parity007_trace:
+    requests: 2
+    resolves: 2
+    prepares: 2
+    renames: 1
+    pending: 0
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press: Mod+Alt+M
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    timeout_sec: 30
+- press: Alt+Shift+O
+- wait_for: '[data-testid="code-workspace-inline-rename-options"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-inline-rename-open-dialog"]'
+    contains: Open Extract Method Dialog
+- click: '[data-testid="code-workspace-inline-rename-open-dialog"]'
+- wait_for:
+    selector: '[data-testid="text-input-dialog-input"]'
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="text-input-dialog"]'
+    contains: Extract Method
+- press: Escape
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: private static int extracted(int[] values) {
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1/DEC-017-02：Ctrl+Alt+M 直达提取后在新方法名上打开行内命名（默认名、加框、IDEA 提示），不弹命名对话框；Enter 提交新名同时改调用处与声明，Undo 先撤命名再撤提取。
+    actions:
+    - 18
+    - 26
+    - 27
+    - 33
+    - 35
+    checkpoints:
+    - step: 19
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "timeout_sec": 30}}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "name": "data-kind", "equals": "extract"}}'
+    - step: 21
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.value", "contains": "extracted"}}'
+    - step: 22
+      expectation: '{"assert_text": {"selector": ".cm-inline-rename-target", "contains": "extracted"}}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-inline-rename-hint\"]", "contains": "Press Alt+Shift+O to show options popup"}}'
+    - step: 24
+      expectation: '{"assert_count": {"selector": "[data-testid=\"text-input-dialog\"]", "equal": 0}}'
+    - step: 25
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "int sum = extracted(values);"}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "int sum = sumOf(values);"}}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "private static int sumOf(int[] values) {"}}'
+    - step: 31
+      expectation: '{"parity007_trace": {"requests": 1, "resolves": 1, "prepares": 1, "renames": 1, "pending": 0}}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "int sum = extracted(values);"}}'
+    - step: 36
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
+    results:
+    - 24
+    - 29
+    - 30
+    - 31
+    - 34
+    - 36
+  - id: R3
+    requirement: DEC-017-04：命名会话中 Alt+Shift+O 的 Open Extract Method Dialog 把命名交给模态对话框；对话框 Esc 保留默认名，一次 Undo 撤回提取。
+    actions:
+    - 68
+    - 70
+    - 73
+    - 76
+    - 80
+    checkpoints:
+    - step: 69
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "timeout_sec": 30}}'
+    - step: 71
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-inline-rename-options\"]"}'
+    - step: 72
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-inline-rename-open-dialog\"]", "contains": "Open Extract Method Dialog"}}'
+    - step: 74
+      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog-input\"]", "timeout_sec": 10}}'
+    - step: 75
+      expectation: '{"assert_text": {"selector": "[data-testid=\"text-input-dialog\"]", "contains": "Extract Method"}}'
+    - step: 77
+      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "state": "hidden", "timeout_sec": 10}}'
+    - step: 78
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "private static int extracted(int[] values) {"}}'
+    - step: 81
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
+    results:
+    - 75
+    - 78
+    - 81
+  - id: R2
+    requirement: DEC-017-03/IDEA R6：首次 Esc 只关候选列表，第二次 Esc 结束命名并保留默认名（提取已提交，不发 rename），一次 Undo 撤回提取。
+    actions:
+    - 47
+    - 49
+    - 51
+    - 56
+    checkpoints:
+    - step: 48
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "timeout_sec": 30}}'
+    - step: 50
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "name": "data-list-open", "equals": "false"}}'
+    - step: 52
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 53
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "private static int extracted(int[] values) {"}}'
+    - step: 54
+      expectation: '{"parity007_trace": {"requests": 2, "resolves": 2, "prepares": 2, "renames": 1, "pending": 0}}'
+    - step: 57
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
+    results:
+    - 50
+    - 53
+    - 54
+    - 57
+  visual:
+  - check: 对照 IDEA Extract Method 就地模板（R2/R6/R9）。
+    method: manual
+    reason: IDEA 模板位于调用处，Taomni 位于声明名（different）。
+  native:
+  - check: browser 使用受控 provider。
+    method: not-applicable
+    reason: 真实 JDT LS 提取由 TC-IDE-PARITY-007-03 证明。

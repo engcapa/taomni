@@ -17,6 +17,9 @@ timeout_sec: 420
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.codeWorkspace.refactorOptions.v1
+    value: '{"mode":"dialog"}'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -290,39 +293,39 @@ verification:
   - id: ED-PARITY-007-V3-04-entries
     requirement: Search Everywhere Actions and the keymap cheat sheet run the same direct Extract Method transaction as the editor chord.
     actions:
-    - 39
+    - 40
     checkpoints:
-    - step: 41
+    - step: 42
       expectation: The Actions entry lists the Extract Method command.
-    - step: 44
+    - step: 45
       expectation: The Actions entry produced the extracted B1 on the buffer.
-    - step: 50
+    - step: 51
       expectation: Undo after the Escape path returns the initial B0.
-    - step: 66
+    - step: 67
       expectation: The cheat sheet lists and runs the Extract Method action.
-    - step: 77
+    - step: 78
       expectation: All three entries left no pending provider response (one request and one resolve per entry).
     results:
-    - 41
-    - 44
-    - 50
-    - 66
-    - 77
+    - 42
+    - 45
+    - 51
+    - 67
+    - 78
   - id: ED-PARITY-007-V3-04-protection
     requirement: The chord is not dispatched from the Find input, requires both modifiers, and never opens a menu for a partial chord.
     actions:
-    - 78
+    - 79
     checkpoints:
-    - step: 83
+    - step: 84
       expectation: Ctrl+Alt+M inside the Find query issues no request.
-    - step: 95
+    - step: 96
       expectation: Ctrl+M without Alt issues no request.
-    - step: 107
+    - step: 108
       expectation: Alt+M without Ctrl issues no request and opens no menu.
     results:
-    - 83
-    - 95
-    - 107
+    - 84
+    - 96
+    - 108
   visual:
   - check: Candidate menu anchor at the selection and the dialog chrome against the IDEA reference.
     method: manual

@@ -180,6 +180,7 @@
 - 主要文件：code action adapter、workspace edit transaction、preview surface、recovery ledger、shared consumers。
 - 必须保留：dirty、外部修改、partial effect、owner/generation 和实际磁盘结果。
 - 2026-09-29 复核细化（[参照](references/idea-control-audit-20260929.md#code-insight)）：IDEA 的 `Shift+F6` 为行内重命名（名称加框、候选名列表、注释/文本出现开关、`Alt+Shift+O` 选项提示），Extract Method 直接插入并进入行内命名，Esc 两次零修改撤回；本卡以此为交互目标，跨文件 preview 仍需补采 IDEA 参照。
+- P1 设计：[ed-parity-017-refactor-inline-design.md](ed-parity-017-refactor-inline-design.md)。
 - 验收：`ED-PARITY-017-A1`、`ED-PARITY-017-A2`、`ED-PARITY-017-A3`。
 
 <a id="ed-parity-018"></a>

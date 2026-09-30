@@ -6328,6 +6328,70 @@ controls:
     selector: '[data-testid="refactoring-preview-cancel"]'
     kind: interactive
     optional: true       # cancel leaves every affected file unchanged (ED-PARITY-007-05)
+  - id: refactoring-preview-row
+    selector: '[data-testid="refactoring-preview-row"]'
+    kind: display
+    optional: true       # one usage row with its path (ED-PARITY-017-01/03)
+  - id: refactoring-preview-before
+    selector: '[data-testid="refactoring-preview-before"]'
+    kind: display
+    optional: true       # real preimage line(s) of a usage (ED-PARITY-017 DEC-017-05)
+  - id: refactoring-preview-after
+    selector: '[data-testid="refactoring-preview-after"]'
+    kind: display
+    optional: true       # real postimage line(s) of a usage (ED-PARITY-017 DEC-017-05)
+  - id: refactoring-preview-source-unavailable
+    selector: '[data-testid="refactoring-preview-source-unavailable"]'
+    kind: display
+    optional: true       # typed notice when a usage's source text cannot be read
+  - id: inline-rename-session
+    selector: '[data-testid="code-workspace-inline-rename"]'
+    kind: display
+    optional: true       # ED-PARITY-017 in-place naming session (data-kind, data-list-open)
+  - id: inline-rename-target-mark
+    selector: '.cm-inline-rename-target'
+    kind: display
+    optional: true       # CodeMirror box around the symbol being named
+  - id: inline-rename-input
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    kind: interactive
+    optional: true       # name input over the boxed symbol; Enter/Esc/Shift+F6/Alt+Shift+O
+  - id: inline-rename-suggestions
+    selector: '[data-testid="code-workspace-inline-rename-suggestions"]'
+    kind: display
+    optional: true       # name suggestion listbox
+  - id: inline-rename-suggestion
+    selector: '[data-testid="code-workspace-inline-rename-suggestion"]'
+    kind: display
+    optional: true       # one suggestion (arrow keys pick it into the input)
+  - id: inline-rename-hint
+    selector: '[data-testid="code-workspace-inline-rename-hint"]'
+    kind: display
+    optional: true       # IDEA hint line (Shift+F6 dialog / Alt+Shift+O options)
+  - id: inline-rename-error
+    selector: '[data-testid="code-workspace-inline-rename-error"]'
+    kind: display
+    optional: true       # provider or local name error; the session stays open
+  - id: inline-rename-options
+    selector: '[data-testid="code-workspace-inline-rename-options"]'
+    kind: display
+    optional: true       # Alt+Shift+O options popup
+  - id: inline-rename-option-comments
+    selector: '[data-testid="code-workspace-inline-rename-option-comments"]'
+    kind: display
+    optional: true       # disabled: LSP rename has no comments/strings option
+  - id: inline-rename-option-comments-reason
+    selector: '[data-testid="code-workspace-inline-rename-option-comments-reason"]'
+    kind: display
+    optional: true       # typed unavailable reason
+  - id: inline-rename-option-modal
+    selector: '[data-testid="code-workspace-inline-rename-option-modal"]'
+    kind: interactive
+    optional: true       # "Specify refactoring options in modal dialogs" preference (data-checked)
+  - id: inline-rename-open-dialog
+    selector: '[data-testid="code-workspace-inline-rename-open-dialog"]'
+    kind: interactive
+    optional: true       # hands the typed name to the Rename / Extract Method dialog
   - id: intention-candidate-item        # frozen provider candidate rows
     selector: '[data-testid^="code-workspace-intention-"]'
     kind: interactive

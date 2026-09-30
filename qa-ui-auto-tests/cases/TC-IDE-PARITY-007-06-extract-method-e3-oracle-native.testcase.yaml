@@ -25,6 +25,9 @@ steps:
 - vault_first_run: qa-parity007-password
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
+    key: taomni.codeWorkspace.refactorOptions.v1
+    value: '{"mode":"dialog"}'
+- seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id": "qa-parity007-e3-native", "name": "parity007-e3", "roots": [{"id": "parity007", "name": "parity007", "path": "${fixture.parity007_e3_root}", "kind": "folder"}], "looseFiles": [], "lastActiveFile":
       {"kind": "root", "rootId": "parity007", "path": "src/main/java/parity007/ExtractSample.java"}, "lastOpenedAt": 1756100000000, "isGitRepo": false}]'
@@ -156,27 +159,27 @@ verification:
   - id: ED-PARITY-007-V4-4-e3
     requirement: 'The E3 side-effect sample keeps next(base) called exactly once after the extraction and the rename: every fresh JVM prints exactly 13:1, including after undo and redo.'
     actions:
-    - 12
+    - 13
     checkpoints:
-    - step: 12
+    - step: 13
       expectation: The unmodified E3 sample prints exactly 13:1 with exit 0.
-    - step: 37
+    - step: 38
       expectation: The default-name extraction prints exactly 13:1 (no double next(base) call).
-    - step: 44
+    - step: 45
       expectation: After naming calculateTotal the program still prints exactly 13:1.
-    - step: 49
+    - step: 50
       expectation: The first undo keeps the program printing 13:1.
-    - step: 53
+    - step: 54
       expectation: The second undo restores the exact initial bytes and prints 13:1.
-    - step: 60
+    - step: 61
       expectation: Redo restores the renamed method and prints 13:1.
     results:
-    - 12
-    - 37
-    - 44
-    - 49
-    - 53
-    - 60
+    - 13
+    - 38
+    - 45
+    - 50
+    - 54
+    - 61
   visual:
   - check: Real WebView rendering of the E3 extraction states.
     method: manual

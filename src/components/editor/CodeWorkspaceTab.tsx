@@ -415,6 +415,15 @@ import {
   type WorkspaceEditPreview,
 } from "./workspace/workspaceEditPreview";
 import { RefactoringPreviewDialog } from "./workspace/RefactoringPreviewDialog";
+import { EditorView } from "@codemirror/view";
+import { InlineRenamePopup, type InlineRenameAnchor } from "./workspace/InlineRenamePopup";
+import {
+  inlineRenameNameError,
+  showInlineRenameMarks,
+  suggestInlineRenameNames,
+  type InlineRenameRange,
+} from "./workspace/inlineRename";
+import { readRefactorOptionsMode, writeRefactorOptionsMode } from "./workspace/refactorOptions";
 import { RefactorRecoveryReviewDialog } from "./workspace/RefactorRecoveryReviewDialog";
 import {
   buildRefactorPlan,
@@ -1331,6 +1340,25 @@ type RenameSymbolAtResult = {
   /** The provider refused the name before any write; the caller may retry. */
   retryable?: boolean;
 };
+
+/** ED-PARITY-017: outcome of one in-place naming session. */
+type InlineNameResult =
+  | { kind: "commit"; name: string }
+  | { kind: "cancel" }
+  | { kind: "dialog"; value: string };
+
+interface InlineRenameRequest {
+  id: number;
+  kind: "rename" | "extract";
+  fileKey: string;
+  view: EditorView;
+  anchor: InlineRenameAnchor;
+  initialValue: string;
+  suggestions: string[];
+  initialError: string | null;
+  languageId: string | null;
+  resolve: (result: InlineNameResult) => void;
+}
 
 /**
  * ED-PARITY-007 DEC-07: shell-side extension of the pure Extract session. The
@@ -9934,8 +9962,21 @@ export function CodeWorkspaceTab({
       confirmWorkspaceEdit: allowPreview && options.preview
         ? (preview: WorkspaceEditPreview, edit: LspWorkspaceEdit) => {
             if (preview.usages.length > 0) {
-              return new Promise<boolean | LspWorkspaceEdit>((resolve) => {
+              return (async () => {
+                // ED-PARITY-017 DEC-017-05: real preimage text per affected file.
+                const sourceTexts: Record<string, string | null> = {};
+                for (const path of new Set(preview.usages.map((usage) => usage.path))) {
+                  try {
+                    const snapshot = await readWorkspaceEditPathSnapshot(path.replace(/^file:\/\//, ""));
+                    sourceTexts[path] = snapshot?.exists && typeof snapshot.text === "string" ? snapshot.text : null;
+                  } catch {
+                    sourceTexts[path] = null;
+                  }
+                }
+                return sourceTexts;
+              })().then((sourceTexts) => new Promise<boolean | LspWorkspaceEdit>((resolve) => {
                 setRefactoringPreviewModal({
+                  sourceTexts,
                   title: options.label?.trim() || preview.label || "Review workspace changes",
                   preview: {
                     ...preview,
@@ -9945,7 +9986,7 @@ export function CodeWorkspaceTab({
                   plan: options.plan && "operations" in options.plan ? options.plan : undefined,
                   resolve,
                 });
-              });
+              }));
             }
             return confirmAppDialog({
               title: options.label?.trim() || "Review workspace changes",
@@ -16173,7 +16214,9 @@ export function CodeWorkspaceTab({
       // because it listens on window capture independently of this guard.
       + ', [data-testid="workspace-keymap-settings-dialog"], [data-testid="keymap-cheatsheet-dialog"], [data-testid="code-workspace-undo-confirm"]'
       // ED-PARITY-009: the Structural Search dialog owns Esc/Ctrl+Enter and text input.
-      + ', [data-testid="structural-search-dialog"]',
+      + ', [data-testid="structural-search-dialog"]'
+      // ED-PARITY-017: the in-place naming session owns Esc/Enter/Shift+F6/Alt+Shift+O.
+      + ', [data-testid="code-workspace-inline-rename"]',
     ));
   }, []);
 
@@ -17462,6 +17505,143 @@ export function CodeWorkspaceTab({
   goToTypeDefinitionRef.current = goToTypeDefinition;
   goToImplementationRef.current = goToImplementation;
 
+  // ---------------------------------------------------------------------------
+  // ED-PARITY-017 DEC-017-01..04: in-place naming for Rename / Extract Method
+  // ---------------------------------------------------------------------------
+  const [inlineRename, setInlineRename] = useState<InlineRenameRequest | null>(null);
+  const inlineRenameRef = useRef<InlineRenameRequest | null>(null);
+  const [refactorModalOptions, setRefactorModalOptions] = useState(() => readRefactorOptionsMode() === "dialog");
+
+  const finishInlineRename = useCallback((request: InlineRenameRequest, result: InlineNameResult) => {
+    if (inlineRenameRef.current !== request) return;
+    inlineRenameRef.current = null;
+    setInlineRename(null);
+    try {
+      showInlineRenameMarks(request.view, null);
+    } catch {
+      // The view may already be destroyed (tab closed during the session).
+    }
+    // Focus returns to the editor at the untouched caret (DEC-017-03).
+    if (request.view.dom.isConnected) request.view.focus();
+    request.resolve(result);
+  }, []);
+
+  const activeEditorViewFor = useCallback((fileKey: string): EditorView | null => {
+    const root = rootRef.current;
+    const groupId = activeEditorGroupIdRef.current;
+    const host = root?.querySelector<HTMLElement>(
+      `[data-testid="code-workspace-editor-pane"][data-editor-group-id="${CSS.escape(groupId)}"] [data-testid="code-workspace-editor"] .cm-editor`,
+    );
+    const view = host ? EditorView.findFromDOM(host) : null;
+    const live = openFilesRef.current[fileKey];
+    if (!view || !live || view.state.doc.toString() !== live.text) return null;
+    return view;
+  }, []);
+
+  /**
+   * Open the in-place naming session over `range`. Resolves `dialog` when the
+   * editor view cannot host it (no view, moved document) so the caller falls
+   * back to the modal prompt instead of silently doing nothing.
+   */
+  const promptInlineName = useCallback(async (input: {
+    fileKey: string;
+    kind: "rename" | "extract";
+    range: LspRange;
+    defaultName: string;
+    initialValue?: string;
+    error?: string | null;
+  }): Promise<InlineNameResult> => {
+    const view = activeEditorViewFor(input.fileKey);
+    if (!view) return { kind: "dialog", value: input.initialValue ?? input.defaultName };
+    const doc = view.state.doc;
+    const offset = (position: LspPosition) => {
+      const line = doc.line(Math.min(Math.max(position.line + 1, 1), doc.lines));
+      return Math.min(line.from + position.character, line.to);
+    };
+    const target: InlineRenameRange = { from: offset(input.range.start), to: offset(input.range.end) };
+    if (target.to <= target.from) return { kind: "dialog", value: input.initialValue ?? input.defaultName };
+    if (inlineRenameRef.current) finishInlineRename(inlineRenameRef.current, { kind: "cancel" });
+    view.dispatch({ effects: EditorView.scrollIntoView(target.from, { y: "nearest" }) });
+    await new Promise<void>((resolve) => { window.requestAnimationFrame(() => resolve()); });
+    const coords = view.coordsAtPos(target.from);
+    if (!coords) return { kind: "dialog", value: input.initialValue ?? input.defaultName };
+    const style = window.getComputedStyle(view.contentDOM);
+    const anchor: InlineRenameAnchor = {
+      left: coords.left,
+      top: coords.top,
+      height: Math.max(12, coords.bottom - coords.top),
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+    };
+    showInlineRenameMarks(view, { target, occurrences: [] });
+    const live = openFilesRef.current[input.fileKey];
+    const descriptor = live ? lspDescriptorForFile(live) : null;
+    return new Promise<InlineNameResult>((resolve) => {
+      const request: InlineRenameRequest = {
+        id: Date.now(),
+        kind: input.kind,
+        fileKey: input.fileKey,
+        view,
+        anchor,
+        initialValue: input.initialValue ?? input.defaultName,
+        suggestions: suggestInlineRenameNames(input.defaultName),
+        initialError: input.error ?? null,
+        languageId: descriptor?.languageId
+          ?? (/\.java$/i.test(live?.ref.path ?? "") ? "java" : null),
+        resolve,
+      };
+      inlineRenameRef.current = request;
+      setRefactorModalOptions(readRefactorOptionsMode() === "dialog");
+      setInlineRename(request);
+      // Other occurrences in this file are boxed when the provider can answer
+      // document highlights; the session never waits for them.
+      const caps = lspFilesRef.current[input.fileKey]?.status?.capabilities;
+      if (input.kind === "rename" && descriptor && caps?.documentHighlight) {
+        void lspDocumentHighlights(descriptor, input.range.start)
+          .then((result) => {
+            if (inlineRenameRef.current !== request) return;
+            const occurrences = result.highlights
+              .map((highlight) => ({ from: offset(highlight.range.start), to: offset(highlight.range.end) }))
+              .filter((range) => range.to > range.from);
+            showInlineRenameMarks(view, { target, occurrences });
+          })
+          .catch(() => {});
+      }
+    });
+  }, [activeEditorViewFor, finishInlineRename, lspDescriptorForFile]);
+
+  // The session belongs to one editor document; switching files ends it.
+  useEffect(() => {
+    const request = inlineRenameRef.current;
+    if (request && request.fileKey !== activeKey) finishInlineRename(request, { kind: "cancel" });
+  }, [activeKey, finishInlineRename]);
+
+  /** DEC-017-01: in-place naming by default, the modal prompt as the option / fallback. */
+  const promptSymbolName = useCallback(async (input: {
+    file: OpenFileState;
+    kind: "rename" | "extract";
+    range: LspRange | null;
+    defaultName: string;
+    initialValue?: string;
+    error?: string | null;
+    dialog: (initialValue: string) => Promise<string | null>;
+  }): Promise<string | null> => {
+    if (readRefactorOptionsMode() === "dialog" || !input.range) {
+      return input.dialog(input.initialValue ?? input.defaultName);
+    }
+    const result = await promptInlineName({
+      fileKey: input.file.key,
+      kind: input.kind,
+      range: input.range,
+      defaultName: input.defaultName,
+      initialValue: input.initialValue,
+      error: input.error,
+    });
+    if (result.kind === "commit") return result.name;
+    if (result.kind === "dialog") return input.dialog(result.value);
+    return null;
+  }, [promptInlineName]);
+
   const renameSymbolAt = useCallback(async (
     file: OpenFileState,
     position: LspPosition,
@@ -17470,7 +17650,7 @@ export function CodeWorkspaceTab({
       label?: string;
       confirmLabel?: string;
       /** Caller-owned prompt (Extract Method naming); defaults to the Rename dialog. */
-      promptName?: (defaultName: string) => Promise<string | null>;
+      promptName?: (defaultName: string, range: LspRange | null) => Promise<string | null>;
       /** Re-checked after every await; false aborts without writing. */
       isCurrent?: () => boolean;
     } = {},
@@ -17522,13 +17702,29 @@ export function CodeWorkspaceTab({
           }
           return line.slice(position.character).match(/^[A-Za-z0-9_$]+/)?.[0] ?? "";
         })();
+      const nameRange: LspRange | null = prepared.range ?? (() => {
+        const line = live.text.split("\n")[position.line] ?? "";
+        const before = line.slice(0, position.character).match(/[A-Za-z0-9_$]*$/)?.[0] ?? "";
+        const after = line.slice(position.character).match(/^[A-Za-z0-9_$]*/)?.[0] ?? "";
+        if (!before && !after) return null;
+        return {
+          start: { line: position.line, character: position.character - before.length },
+          end: { line: position.line, character: position.character + after.length },
+        };
+      })();
       const nextName = options.promptName
-        ? await options.promptName(defaultName)
-        : await promptAppDialog({
-            title: options.title ?? "Rename Symbol",
-            label: options.label ?? "New name",
-            initialValue: defaultName,
-            confirmLabel: options.confirmLabel ?? "Rename",
+        ? await options.promptName(defaultName, nameRange)
+        : await promptSymbolName({
+            file: live,
+            kind: "rename",
+            range: nameRange,
+            defaultName,
+            dialog: (initialValue) => promptAppDialog({
+              title: options.title ?? "Rename Symbol",
+              label: options.label ?? "New name",
+              initialValue,
+              confirmLabel: options.confirmLabel ?? "Rename",
+            }),
           });
       if (!isCurrent()) {
         semanticIndex.abandonBuild(buildToken);
@@ -17685,6 +17881,7 @@ export function CodeWorkspaceTab({
     applyLspWorkspaceEdit,
     ensureWorkspaceSemanticDocumentsSynced,
     lspDescriptorForFile,
+    promptSymbolName,
     semanticIndex.beginBuild,
     semanticIndex.abandonBuild,
     semanticIndex.failBuild,
@@ -17697,8 +17894,42 @@ export function CodeWorkspaceTab({
   const renameSymbolAtCursor = useCallback(async () => {
     const file = activeFile;
     if (!file || file.loading) return;
-    await renameSymbolAt(file, editorSelectionRef.current.start);
-  }, [activeFile, renameSymbolAt]);
+    const position = editorSelectionRef.current.start;
+    if (readRefactorOptionsMode() === "dialog") {
+      await renameSymbolAt(file, position);
+      return;
+    }
+    // DEC-017-03: a provider rejection reopens the in-place session with the
+    // rejected name and the real error, so the user can correct and retry
+    // without anything having been written.
+    let retry: { value: string; error: string } | null = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      let submitted: string | null = null;
+      const carried: { value: string; error: string } | null = retry;
+      const live = openFilesRef.current[file.key] ?? file;
+      const outcome = await renameSymbolAt(live, position, {
+        promptName: async (defaultName, range) => {
+          submitted = await promptSymbolName({
+            file: live,
+            kind: "rename",
+            range,
+            defaultName,
+            initialValue: carried?.value,
+            error: carried?.error,
+            dialog: (initialValue) => promptAppDialog({
+              title: "Rename Symbol",
+              label: "New name",
+              initialValue,
+              confirmLabel: "Rename",
+            }),
+          });
+          return submitted;
+        },
+      });
+      if (outcome.status !== "failed" || !outcome.retryable || !submitted) return;
+      retry = { value: submitted, error: outcome.message ?? "Rename failed" };
+    }
+  }, [activeFile, promptSymbolName, renameSymbolAt]);
   renameSymbolRef.current = renameSymbolAtCursor;
 
   // ---------------------------------------------------------------------------
@@ -17931,13 +18162,22 @@ export function CodeWorkspaceTab({
           label: "Method name",
           confirmLabel: "Rename",
           isCurrent: () => ownerMatches() && receiptMatches(),
-          promptName: async (defaultName) => {
+          promptName: async (defaultName, range) => {
             if (replayed) return replayed;
-            const value = await promptExtractName(session.id, {
-              title: "Extract Method",
-              label: "Method name",
-              confirmLabel: "Rename",
+            // ED-PARITY-017: in-place naming on the extracted method; Escape
+            // keeps the provider default name (the extraction stays committed).
+            const value = await promptSymbolName({
+              file: attemptFile,
+              kind: "extract",
+              range,
+              defaultName,
               initialValue: proposed ?? defaultName,
+              dialog: (initialValue) => promptExtractName(session.id, {
+                title: "Extract Method",
+                label: "Method name",
+                confirmLabel: "Rename",
+                initialValue,
+              }),
             });
             if (value && value !== defaultName) proposed = value;
             return value;
@@ -17978,6 +18218,7 @@ export function CodeWorkspaceTab({
     extractOwnerSnapshot,
     finishExtractSession,
     promptExtractName,
+    promptSymbolName,
     renameSymbolAt,
     revealNavLocation,
     semanticIndex.current,
@@ -19886,6 +20127,7 @@ export function CodeWorkspaceTab({
     preview: WorkspaceEditPreview;
     originalEdit: LspWorkspaceEdit;
     plan?: RefactorPlanV3;
+    sourceTexts?: Record<string, string | null>;
     resolve: (filtered: LspWorkspaceEdit | boolean) => void;
   } | null>(null);
 
@@ -22515,6 +22757,25 @@ export function CodeWorkspaceTab({
           );
         }}
       />
+      {inlineRename && (
+        <InlineRenamePopup
+          key={inlineRename.id}
+          kind={inlineRename.kind}
+          anchor={inlineRename.anchor}
+          initialValue={inlineRename.initialValue}
+          suggestions={inlineRename.suggestions}
+          initialError={inlineRename.initialError}
+          validate={(name) => inlineRenameNameError(name, inlineRename.languageId)}
+          modalOptions={refactorModalOptions}
+          onCommit={(name) => finishInlineRename(inlineRename, { kind: "commit", name })}
+          onCancel={() => finishInlineRename(inlineRename, { kind: "cancel" })}
+          onOpenDialog={(value) => finishInlineRename(inlineRename, { kind: "dialog", value })}
+          onToggleModalOptions={(modal) => {
+            writeRefactorOptionsMode(modal ? "dialog" : "editor");
+            setRefactorModalOptions(modal);
+          }}
+        />
+      )}
       {refactoringPreviewModal && (
         <RefactoringPreviewDialog
           open={true}
@@ -22522,6 +22783,7 @@ export function CodeWorkspaceTab({
           preview={refactoringPreviewModal.preview}
           originalEdit={refactoringPreviewModal.originalEdit}
           plan={refactoringPreviewModal.plan}
+          sourceTexts={refactoringPreviewModal.sourceTexts}
           onConfirm={(filteredEdit) => {
             refactoringPreviewModal.resolve(filteredEdit);
             setRefactoringPreviewModal(null);
