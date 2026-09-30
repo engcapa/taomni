@@ -216,3 +216,20 @@
 | V3 | A1 A3 | native，`mysql_required` | Manual，插入一行（Pending 1）；执行 `KILL CONNECTION_ID()`；再执行计数查询 | 出现 `alert-dialog` 含 `uncommitted`；Pending 0；计数 `count-0` | native | `qa-ui-auto-tests/cases/TC-DB-TX-002-reconnect-close-native.testcase.yaml`（P2 新增） |
 | V4 | A2 | 同上 | 再插入一行（Pending 1）后关闭数据库标签；重新打开会话计数 | 状态栏含 `Rolled back 1`；重新打开后 `count-0` 且模式为 Auto | native | 同上 |
 | — | — | browser | — | 浏览器预览不能建立连接，Manual 模式不可用；不设 browser 用例 | — | — |
+
+<a id="db-gate-001"></a>
+## DB-GATE-001 第一批集成门槛
+
+- 来源 / 范围：第一批全部卡（DB-EXEC-001..004、DB-TX-001/002、DB-EDIT-001、DB-GRID-001）。`主参照: taomni`（本仓门槛）。
+- 规则：在最终 head 上执行全仓 `pnpm build`、`qa_ui_auto.lint` 与 `audit --gate`、数据库相关 Rust 单测，以及第一批全部 browser / native 用例在 Linux / Windows / macOS 的一次选定运行。
+- 验收：
+  - `A1` build、qa lint、audit gate、`cargo test --lib database::` 通过。
+  - `A2` 第一批 13 个用例在三端全部通过（同一 run、同一 head）。
+
+<a id="db-gate-001-test-cases"></a>
+### 测试用例
+
+| V | AC | 前置 / fixture | 操作 | 预期 | 层级 | 路径 / ID |
+|---|---|---|---|---|---|---|
+| V1 | A1 | 本机 | `pnpm build`；`python -m qa_ui_auto.lint`；`python -m qa_ui_auto.audit --gate`；`cargo test --lib database::` | 全部通过 | build / qa-lint / rust | 本机命令 |
+| V2 | A2 | GitHub `qa-ui-auto-platforms.yml`，`scope=selected` | `case_ids=TC-DB-EXEC-*,TC-DB-TX-*,TC-DB-EDIT-*,TC-DB-GRID-*` | 6 个 job 全部成功，每个用例 passed | browser / native | `qa-ui-auto-platforms.yml` |
