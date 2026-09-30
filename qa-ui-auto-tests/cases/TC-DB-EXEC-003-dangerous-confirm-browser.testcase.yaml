@@ -1,0 +1,73 @@
+id: TC-DB-EXEC-003-dangerous-confirm-browser
+title: DROP asks for confirmation; Cancel runs nothing and Execute runs the statement
+description: |
+  DB-EXEC-003 V4. In the offline MySQL scaffold, running DROP TABLE opens the
+  danger confirmation listing the statement. Cancel leaves no Log tab (nothing
+  ran); running again and choosing Execute runs it (it fails because browser
+  preview has no database), producing one FAILED log entry.
+covers:
+- F-DB-1
+tags:
+- database
+- sql
+- dangerous-statement
+- db-parity
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: db-host.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '3306'
+- fill:
+    selector: input[aria-label="Database username"]
+    value: qa_user
+- fill:
+    selector: input[aria-label="Database name"]
+    value: qa_db
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-exec-danger
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-exec-danger"]'
+- open_session:
+    name: qa-db-exec-danger
+    double_click: true
+- wait_for: '[data-testid="db-connection-error-banner"]'
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: DROP TABLE qa_db_exec003_t;
+- click: '[data-testid="db-run-all"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: '[DROP] DROP TABLE qa_db_exec003_t'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_count:
+    selector: '[data-testid="result-log-tab"]'
+    equal: 0
+- click: '[data-testid="db-run-all"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="db-execution-log"]'
+- assert_count:
+    selector: '[data-testid="db-execution-log-entry"][data-status="failed"]'
+    equal: 1
+- screenshot: db-exec-003-dangerous-confirm-browser.png

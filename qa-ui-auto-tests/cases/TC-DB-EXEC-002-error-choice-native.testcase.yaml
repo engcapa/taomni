@@ -1,0 +1,104 @@
+id: TC-DB-EXEC-002-error-choice-native
+title: Native failed middle statement can be skipped and the run continues
+description: |
+  DB-EXEC-002 V5. Against a real MySQL/MariaDB session, the second of three
+  statements references a missing table. The "Statement failed" choice appears;
+  Skip continues so the third statement succeeds and the log shows
+  SUCCESS / FAILED / SUCCESS.
+covers:
+- F-DB-1
+tags:
+- database
+- sql
+- execution-log
+- db-parity
+- native-boundary
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- mysql_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-db-exec-choice-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.database.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.database.port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.database.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.database.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.database.database}
+- click: '[data-testid="db-save-in-vault"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-exec-choice
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-pw1"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-db-exec-choice-master
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-db-exec-choice-master
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-exec-choice"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-db-exec-choice"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- wait_for:
+    selector: '[data-testid="schema-tree"]'
+    timeout_sec: 30
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT 1 AS a; SELECT * FROM qa_db_missing_table_x; SELECT 3 AS c;
+- click: '[data-testid="db-run-all"]'
+- wait_for:
+    selector: '[data-testid="choice-dialog"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="choice-dialog-message"]'
+    contains: Statement 2 of 3 failed
+- click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="db-execution-log"]'
+    timeout_sec: 60
+- assert_count:
+    selector: '[data-testid="db-execution-log-entry"][data-status="success"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="db-execution-log-entry"][data-status="failed"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="db-execution-log-entry"][data-status="failed"]'
+    contains: skipped, run continued
+- screenshot: db-exec-002-error-choice-native.png

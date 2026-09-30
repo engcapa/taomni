@@ -1,0 +1,79 @@
+id: TC-DB-EXEC-001-execution-log-browser
+title: Execution log records a failed statement and the statements that did not run
+description: |
+  DB-EXEC-001 V4. Opens the offline MySQL session scaffold (browser preview has
+  no database, so every statement fails), runs two statements with the Run
+  toolbar button, answers Stop in the DB-EXEC-002 error prompt, and verifies the
+  Log tab becomes active with one FAILED and one NOT RUN entry plus a summary. Success paths are covered by the native case
+  TC-DB-EXEC-001-execution-log-native.
+covers:
+- F-DB-1
+tags:
+- database
+- sql
+- execution-log
+- db-parity
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: db-host.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '3306'
+- fill:
+    selector: input[aria-label="Database username"]
+    value: qa_user
+- fill:
+    selector: input[aria-label="Database name"]
+    value: qa_db
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-exec-log
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-exec-log"]'
+- open_session:
+    name: qa-db-exec-log
+    double_click: true
+- wait_for: '[data-testid="db-connection-error-banner"]'
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT 1 AS a; SELECT 2 AS b;
+- click: '[data-testid="db-run-all"]'
+- wait_for: '[data-testid="choice-dialog"]'
+- click: '[data-testid="choice-dialog-cancel"]'
+- wait_for: '[data-testid="db-execution-log"]'
+- assert_attribute:
+    selector: '[data-testid="result-log-tab"]'
+    name: data-active
+    equals: 'true'
+- assert_count:
+    selector: '[data-testid="db-execution-log-entry"][data-status="failed"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="db-execution-log-entry"][data-status="not-run"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="db-execution-log-summary"]'
+    contains: 'Failed: 1'
+- assert_text:
+    selector: '[data-testid="db-execution-log-summary"]'
+    contains: 'Not run: 1'
+- click: '[data-testid="result-sheet-tab"]'
+- assert_not_visible: '[data-testid="db-execution-log"]'
+- screenshot: db-exec-001-execution-log-browser.png

@@ -63,6 +63,7 @@ import {
 } from "../../lib/sqlDialect";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { alertAppDialog, confirmAppDialog } from "../../lib/appDialogs";
+import { gridChangeConfirmMessage, type GridChangePreview } from "../../lib/dbGridChanges";
 
 const ROW_HEIGHT = 26;
 const OVERSCAN = 12;
@@ -97,6 +98,8 @@ interface QueryResultGridProps {
   onRefresh?: (mode: QueryRefreshMode) => void;
   onCancel?: () => void;
   onCommitChanges?: (payload: QueryGridCommitPayload) => Promise<void>;
+  /** Generates the DML shown in the save confirmation before it runs. */
+  onPreviewChanges?: (payload: QueryGridCommitPayload) => Promise<GridChangePreview>;
   onGeneratedSqlSync?: (sql: string, mode: QueryGeneratedSqlSyncMode) => void;
   onGeneratedSqlQuery?: (sql: string, request?: DbResultSqlRewriteRequest) => void | Promise<void>;
   onStatus?: (message: string) => void;
@@ -1217,6 +1220,7 @@ export function QueryResultGrid({
   onRefresh,
   onCancel,
   onCommitChanges,
+  onPreviewChanges,
   onGeneratedSqlSync,
   onGeneratedSqlQuery,
   onStatus,
@@ -1479,6 +1483,7 @@ export function QueryResultGrid({
   }, [rowMatchesFilter, rows, sorts]);
 
   const orderedRows = useMemo(() => order.map((index) => rows[index]), [order, rows]);
+  const rowsFiltered = orderedRows.length < rows.length;
   const selectedRows = useMemo(
     () => orderedRows.filter((row) => selectedIds.has(row.id) && row.status !== "deleted"),
     [orderedRows, selectedIds],
@@ -1834,9 +1839,17 @@ export function QueryResultGrid({
         original: row.original ? [...row.original] : null,
       }));
     if (changes.length === 0) return;
+    const payload: QueryGridCommitPayload = { columns: result.columns, changes, counts: changeCounts };
+    let preview: GridChangePreview | null = null;
+    try {
+      preview = onPreviewChanges ? await onPreviewChanges(payload) : null;
+    } catch {
+      // Not previewable (e.g. not a simple SELECT); the submit reports why.
+      preview = null;
+    }
     const ok = await confirmAppDialog({
       title: "Apply grid changes",
-      message: `Apply grid changes to the database?\n\nAdded: ${changeCounts.inserted}\nModified: ${changeCounts.updated}\nDeleted: ${changeCounts.deleted}`,
+      message: gridChangeConfirmMessage(changeCounts, preview),
       confirmLabel: "Apply",
       danger: changeCounts.deleted > 0,
     });
@@ -1850,7 +1863,7 @@ export function QueryResultGrid({
     }
     setSubmittingChanges(true);
     try {
-      await onCommitChanges({ columns: result.columns, changes, counts: changeCounts });
+      await onCommitChanges(payload);
       const keptRows = rows.filter((row) => row.status !== "deleted");
       setRows(
         keptRows.map((row, index) => ({
@@ -2489,6 +2502,15 @@ export function QueryResultGrid({
           <ToolButton title="List view" active={viewMode === "list"} onClick={() => setViewMode("list")} icon={<List className="w-3.5 h-3.5" />} />
           <ToolButton title="Chart view" active={viewMode === "chart"} onClick={() => setViewMode("chart")} icon={<BarChart3 className="w-3.5 h-3.5" />} />
         </div>
+        {/* DbVisualizer-style count: shown [total]/columns while client filters hide rows. */}
+        <span
+          data-testid="query-result-row-count"
+          data-filtered={rowsFiltered ? "true" : "false"}
+          className="px-1 text-[10px] tabular-nums text-[var(--taomni-text-muted)]"
+          title={rowsFiltered ? "Rows shown [total rows] / columns" : "Rows / columns"}
+        >
+          {rowsFiltered ? `${orderedRows.length} [${rows.length}]` : rows.length}/{visibleColumnIndexes.length}
+        </span>
         {(pendingChangeCount > 0 || localNotice) && (
           <span className="max-w-[320px] truncate px-1 text-[10px] text-[var(--taomni-text-muted)]" title={localNotice}>
             {pendingChangeCount > 0
@@ -2612,6 +2634,9 @@ export function QueryResultGrid({
                     <button
                       type="button"
                       className="min-w-0 flex flex-1 items-center gap-1 bg-transparent p-0 text-left"
+                      data-testid="query-result-sort-header"
+                      data-column={col.name}
+                      data-sort={columnSort?.dir ?? "none"}
                       onClick={(event) => toggleSort(columnIndex, event.shiftKey)}
                     >
                       <span className="truncate flex-1">{col.name}</span>
@@ -2664,6 +2689,7 @@ export function QueryResultGrid({
                 return (
                   <div
                     key={row.id}
+                    data-testid="query-result-row"
                     className="flex absolute left-0 right-0"
                     style={{
                       top,

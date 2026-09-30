@@ -1,0 +1,4 @@
+interface:
+  display_name: "DB 会话双参照对齐"
+  short_description: "统筹 SQL 与 HBase 会话向 DBeaver（CE/PRO）与 DbVisualizer 取长对齐：P0 产卡、P1 规划、P2 开发、P3 验收"
+  default_prompt: "使用 $db-client-parity 按指定阶段推进数据库会话对 DBeaver 与 DbVisualizer 的取长对齐，允许重构界面和交互，按最小充分验证交付。"

@@ -3770,6 +3770,26 @@ controls:
     selector: '[data-testid="confirm-dialog-confirm"]'
     kind: interactive
     optional: true
+  - id: choice-dialog              # same ConfirmDialog module, three-way choice variant
+    selector: '[data-testid="choice-dialog"]'
+    kind: display
+    optional: true
+  - id: choice-dialog-message
+    selector: '[data-testid="choice-dialog-message"]'
+    kind: display
+    optional: true
+  - id: choice-dialog-primary
+    selector: '[data-testid="choice-dialog-primary"]'
+    kind: interactive
+    optional: true
+  - id: choice-dialog-secondary
+    selector: '[data-testid="choice-dialog-secondary"]'
+    kind: interactive
+    optional: true
+  - id: choice-dialog-cancel
+    selector: '[data-testid="choice-dialog-cancel"]'
+    kind: interactive
+    optional: true
   - id: alert-dialog
     selector: '[data-testid="alert-dialog"]'
     kind: display
@@ -4332,6 +4352,38 @@ controls:
     selector: '[data-testid="query-result-grid"]'
     kind: display
     optional: true
+  - id: query-result-row-1
+    selector: '[data-testid="query-result-grid"] button[title="Row 1"]'
+    kind: interactive
+    optional: true       # row-number button selects the first clean row
+  - id: query-result-delete-row
+    selector: '[data-testid="query-result-grid"] button[aria-label="Delete row"]'
+    kind: interactive
+    optional: true
+  - id: query-result-submit-edits
+    selector: '[data-testid="query-result-grid"] button[aria-label="Submit grid edits"]'
+    kind: interactive
+    optional: true       # DB-EDIT-001: confirmation lists the SQL and a no-primary-key warning
+  - id: query-result-row
+    selector: '[data-testid="query-result-row"]'
+    kind: display
+    optional: true       # one per rendered table-view row, in display order
+  - id: query-result-sort-header
+    selector: '[data-testid="query-result-sort-header"]'
+    kind: interactive
+    optional: true       # DB-GRID-001: column header sort (asc → desc → none); data-column, data-sort
+  - id: query-result-row-count
+    selector: '[data-testid="query-result-row-count"]'
+    kind: display
+    optional: true       # DB-GRID-001: rows/columns, or shown [total]/columns with data-filtered="true"
+  - id: query-result-filter-toggle
+    selector: '[data-testid="query-result-grid"] button[aria-label="Filter rows"]'
+    kind: interactive
+    optional: true
+  - id: query-result-filter-input
+    selector: '[data-testid="query-result-grid"] input[placeholder="Filter rows"]'
+    kind: interactive
+    optional: true       # client-side cross-column substring filter
   - id: query-result-generated-sql
     selector: '[data-testid="query-result-generated-sql"]'
     kind: display
@@ -4484,6 +4536,55 @@ controls:
     selector: '[data-testid="db-connection-error-banner"]'
     kind: display
     optional: true       # connection failed; editor and Query Library remain mounted
+  # DB parity batch 1 (docs-feature/db-client-parity/batch1-plan.md).
+  - id: run-all
+    selector: '[data-testid="db-run-all"]'
+    kind: interactive
+    optional: true       # toolbar Run (all statements / selection) inside a SQL tab
+  - id: explain-current
+    selector: '[data-testid="db-explain-current"]'
+    kind: interactive
+    optional: true       # DB-EXEC-004: EXPLAIN the statement at the cursor
+  - id: result-log-tab
+    selector: '[data-testid="result-log-tab"]'
+    kind: interactive
+    optional: true       # DB-EXEC-001: appears after the first run in a query panel
+  - id: execution-log
+    selector: '[data-testid="db-execution-log"]'
+    kind: display
+    optional: true       # DB-EXEC-001: per-statement status table with run summary
+  - id: execution-log-run
+    selector: '[data-testid="db-execution-log-run"]'
+    kind: display
+    optional: true       # one group per Run click, newest first
+  - id: execution-log-entry
+    selector: '[data-testid="db-execution-log-entry"]'
+    kind: display
+    optional: true       # one row per statement; data-status = success/failed/cancelled/skipped/not-run
+  - id: execution-log-summary
+    selector: '[data-testid="db-execution-log-summary"]'
+    kind: display
+    optional: true
+  - id: result-sheet-tab
+    selector: '[data-testid="result-sheet-tab"]'
+    kind: interactive
+    optional: true       # one tab per executed statement with a result sheet
+  - id: tx-mode
+    selector: '[data-testid="db-tx-mode"]'
+    kind: interactive
+    optional: true       # DB-TX-001: Auto / Manual commit toggle (MySQL / PostgreSQL only); data-mode = auto|manual
+  - id: tx-commit
+    selector: '[data-testid="db-tx-commit"]'
+    kind: interactive
+    optional: true       # Manual mode only
+  - id: tx-rollback
+    selector: '[data-testid="db-tx-rollback"]'
+    kind: interactive
+    optional: true       # Manual mode only
+  - id: tx-pending
+    selector: '[data-testid="db-tx-pending"]'
+    kind: display
+    optional: true       # "Pending: N" statements since the last commit / rollback
   # Shared tab actions — chat / detach.
   - id: chat-toggle
     selector: '[data-testid="db-chat-toggle"]'

@@ -30,10 +30,14 @@ import {
   RefreshCw,
   Trash2,
   Crosshair,
+  ListTree,
+  ScrollText,
   Check,
   ChevronDown,
   Languages,
   Pencil,
+  GitCommitHorizontal,
+  Undo2,
 } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import {
@@ -43,6 +47,10 @@ import {
   dbExecute,
   dbExecuteStream,
   dbCancel,
+  dbTxCommit,
+  dbTxRollback,
+  dbTxSetManual,
+  dbTxStatus,
   dbAppendHistory,
   dbClearHistory,
   dbDeleteHistory,
@@ -67,6 +75,7 @@ import {
   type DbQueryWorkspaceTab,
   type DbSavedQuery,
   type DbSqlHistoryEntry,
+  type DbTxStatus,
 } from "../../lib/ipc";
 import { SchemaTree, type SchemaTreeSelectedObject } from "./SchemaTree";
 import { QueryLibraryPanel } from "./QueryLibraryPanel";
@@ -103,7 +112,20 @@ import {
 } from "../../lib/ai/answerLanguage";
 import { buildDbAiPrompt, truncateStatement } from "../../lib/database/dbAiPrompts";
 import { registerQueryTab } from "../../lib/queryRegistry";
+import { alertAppDialog, choiceAppDialog, confirmAppDialog } from "../../lib/appDialogs";
+import { dangerousConfirmationMessage } from "../../lib/sqlDangerousStatements";
+import { explainSqlFor } from "../../lib/sqlExplain";
+import { buildGridChangeStatements, gridChangePreview, type GridChangePreview } from "../../lib/dbGridChanges";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
+import { ExecutionLogView } from "./ExecutionLogView";
+import {
+  type ExecutionLogRun,
+  createExecutionRun,
+  finishExecutionRun,
+  patchExecutionEntry,
+  prependExecutionRun,
+  replaceExecutionRun,
+} from "../../lib/dbExecutionLog";
 import { splitSqlStatementRanges, sqlStatementRangesForExecution, type SqlStatementRange } from "../../lib/sqlStatements";
 import { writeText } from "../../lib/clipboard";
 import { createDbMetadataCache } from "../../lib/dbMetadataCache";
@@ -117,9 +139,7 @@ import {
 } from "../../lib/databaseTabLimit";
 import {
   asSqlEngine,
-  quoteIdent as dialectQuoteIdent,
   qualifiedName as dialectQualifiedName,
-  sqlLiteral as dialectSqlLiteral,
   setDefaultSchemaSql,
   selectStatement as dialectSelectStatement,
 } from "../../lib/sqlDialect";
@@ -211,6 +231,10 @@ interface PanelState {
   displayName: string | null;
   dirty: boolean;
   createdAt: number;
+  /** In-memory execution log, newest run first (not persisted). */
+  log: ExecutionLogRun[];
+  /** The Log tab is shown instead of the active result sheet. */
+  logActive: boolean;
 }
 
 interface QueryWorkspacePanelCache {
@@ -307,6 +331,15 @@ function formatDurationMs(durationMs: number | null | undefined): string | null 
   return `${Math.round(ms / 1000)} s`;
 }
 
+function successMessage(summary: QueryExecutionSummary): string {
+  if (summary.hasResultSet) {
+    const rows = summary.rowCount ?? 0;
+    return `${rows} row${rows === 1 ? "" : "s"} fetched`;
+  }
+  const affected = summary.rowsAffected ?? 0;
+  return affected === 0 ? "OK. No rows were affected" : `${affected} row${affected === 1 ? "" : "s"} affected`;
+}
+
 function hashSqlText(sql: string): string {
   let hash = 0x811c9dc5;
   for (let i = 0; i < sql.length; i += 1) {
@@ -396,10 +429,6 @@ async function writeTextFile(path: string, text: string): Promise<void> {
   }
 }
 
-function quoteIdent(engine: string, ident: string): string {
-  return dialectQuoteIdent(asSqlEngine(engine), ident);
-}
-
 function qualifiedName(engine: string, schema: string | null, table: string, catalog?: string | null): string {
   return dialectQualifiedName(asSqlEngine(engine), { catalog, schema, name: table });
 }
@@ -445,20 +474,6 @@ function parseEditableSelectTarget(sql: string): { schema: string | null; table:
     : { schema: null, table: unquoteIdent(match[1]) };
 }
 
-function sqlLiteral(value: string | null): string {
-  return dialectSqlLiteral(value);
-}
-
-function whereForColumns(engine: string, columns: string[], allColumns: string[], values: (string | null)[]): string {
-  const clauses = columns.map((column) => {
-    const index = allColumns.findIndex((name) => name === column);
-    const value = index >= 0 ? values[index] : null;
-    const ident = quoteIdent(engine, column);
-    return value === null ? `${ident} IS NULL` : `${ident} = ${sqlLiteral(value)}`;
-  });
-  return clauses.length > 0 ? clauses.join(" AND ") : "1 = 0";
-}
-
 function newPanel(patch: Partial<PanelState> = {}): PanelState {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `panel-${Date.now()}-${Math.random()}`,
@@ -471,6 +486,8 @@ function newPanel(patch: Partial<PanelState> = {}): PanelState {
     displayName: null,
     dirty: false,
     createdAt: Date.now(),
+    log: [],
+    logActive: false,
     ...patch,
   };
 }
@@ -601,6 +618,8 @@ export default function DbClientTab({
   // accumulates in one editor, instead of scattering across panels.
   const echoPanelIdRef = useRef<string | null>(null);
   const timersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  /** Set when the user cancels, so the failing statement is logged as cancelled. */
+  const cancelRequestedRef = useRef<Record<string, boolean>>({});
   const panelsRef = useRef<PanelState[]>(panels);
   const tabLimitRef = useRef(tabLimit);
   const activePanelIdRef = useRef(activePanelId);
@@ -695,13 +714,85 @@ export default function DbClientTab({
       });
     return () => {
       cancelled = true;
-      void dbDisconnect(runtimeSessionId).catch(() => undefined);
+      // DB-TX-002: roll back uncommitted manual-commit work before closing.
+      const tx = txStatusRef.current;
+      const pending = tx?.manual ? tx.pending : 0;
+      const disconnect = () => dbDisconnect(runtimeSessionId).catch(() => undefined);
+      if (pending > 0) {
+        void dbTxRollback(runtimeSessionId).catch(() => undefined).then(disconnect);
+        setStatusMessage(`Rolled back ${pending} uncommitted statement(s) when the database tab closed.`);
+      } else {
+        void disconnect();
+      }
       setTabDbConn(tabId, null);
       setTabDbSelectedObjects(tabId, null);
       Object.values(timersRef.current).forEach(clearInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  const [txStatus, setTxStatus] = useState<DbTxStatus | null>(null);
+  const txStatusRef = useRef<DbTxStatus | null>(null);
+  const applyTxStatus = useCallback((next: DbTxStatus | null) => {
+    const previous = txStatusRef.current;
+    txStatusRef.current = next;
+    setTxStatus(next);
+    // DB-TX-002: a new physical connection drops the open transaction.
+    if (previous?.manual && previous.pending > 0 && next && next.generation > previous.generation) {
+      const message = `The database connection was re-established. ${previous.pending} uncommitted statement(s) were lost.`;
+      setStatusMessage(message);
+      void alertAppDialog({ title: "Connection re-established", message });
+    }
+  }, [setStatusMessage]);
+  const txAvailable = supportsManualCommit(info.engine);
+
+  const refreshTxStatus = useCallback(async () => {
+    if (!connectionSessionId || !txAvailable) return;
+    try {
+      applyTxStatus(await dbTxStatus(connectionSessionId));
+    } catch {
+      // Status is advisory; the next statement refreshes it again.
+    }
+  }, [applyTxStatus, connectionSessionId, txAvailable]);
+
+  useEffect(() => {
+    applyTxStatus(null);
+    void refreshTxStatus();
+  }, [applyTxStatus, refreshTxStatus]);
+
+  const toggleTxMode = useCallback(async () => {
+    const current = txStatusRef.current;
+    if (!connectionSessionId || !current?.supported) return;
+    const manual = !current.manual;
+    if (!manual && current.pending > 0) {
+      const confirmed = await confirmAppDialog({
+        title: "Switch to auto-commit",
+        message: `${current.pending} pending statement(s) will be committed.`,
+        confirmLabel: "Commit and switch",
+      });
+      if (!confirmed) return;
+    }
+    try {
+      applyTxStatus(await dbTxSetManual(connectionSessionId, manual));
+      setStatusMessage(manual ? "Manual commit: changes stay pending until Commit." : "Auto-commit enabled.");
+    } catch (err) {
+      setStatusMessage(`Transaction mode change failed: ${String(err)}`);
+    }
+  }, [applyTxStatus, connectionSessionId, setStatusMessage]);
+
+  const endTransaction = useCallback(
+    async (commit: boolean) => {
+      if (!connectionSessionId) return;
+      const pending = txStatusRef.current?.pending ?? 0;
+      try {
+        applyTxStatus(await (commit ? dbTxCommit : dbTxRollback)(connectionSessionId));
+        setStatusMessage(`${commit ? "Committed" : "Rolled back"} ${pending} pending statement(s).`);
+      } catch (err) {
+        setStatusMessage(`${commit ? "Commit" : "Rollback"} failed: ${String(err)}`);
+      }
+    },
+    [applyTxStatus, connectionSessionId, setStatusMessage],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -1234,6 +1325,8 @@ export default function DbClientTab({
         origin?: SqlStatementSourceRef["origin"];
         historyId?: string;
         parentSheetId?: string;
+        /** Overrides the default "Result N" title (e.g. "Explain"). */
+        sheetTitle?: string;
       } = {},
     ) => {
       const trimmed = sqlText.trim();
@@ -1242,6 +1335,19 @@ export default function DbClientTab({
       if (panel?.sheets.some((sheet) => sheet.running)) return;
       const statementRanges = statementRangesForRun(sqlText, options.context);
       if (statementRanges.length === 0) return;
+      const dangerMessage = dangerousConfirmationMessage(statementRanges.map((range) => range.sql));
+      if (dangerMessage) {
+        const confirmed = await confirmAppDialog({
+          title: "Confirm dangerous statements",
+          message: dangerMessage,
+          confirmLabel: "Execute",
+          danger: true,
+        });
+        if (!confirmed) {
+          setStatusMessage("Run canceled: dangerous statements were not executed.");
+          return;
+        }
+      }
       // Record in-memory history per executable statement (newest first, dedup consecutive).
       const panelHistory = historyRef.current[panelId] ?? [];
       const nextHistory = [...panelHistory];
@@ -1253,12 +1359,36 @@ export default function DbClientTab({
       historyRef.current[panelId] = nextHistory.slice(0, MAX_HISTORY);
 
       const baseOrdinal = panel?.sheets.length ?? 0;
+      let run = createExecutionRun(statementRanges.map((range) => range.sql), Date.now());
+      const publishRun = (next: ExecutionLogRun, logActive?: boolean) => {
+        run = next;
+        setPanels((prev) =>
+          prev.map((p) =>
+            p.id === panelId
+              ? {
+                  ...p,
+                  log: p.log.some((candidate) => candidate.id === next.id)
+                    ? replaceExecutionRun(p.log, next)
+                    : prependExecutionRun(p.log, next),
+                  logActive: logActive ?? p.logActive,
+                }
+              : p,
+          ),
+        );
+      };
+      // Read through a closure: the flag is flipped asynchronously by cancelQuery.
+      const cancelRequested = () => cancelRequestedRef.current[panelId] === true;
+      cancelRequestedRef.current[panelId] = false;
+      let skipAllErrors = false;
+      publishRun(run);
       for (const [index, statement] of statementRanges.entries()) {
         const sourceRef = sourceRefForRange(panelId, statement, options.origin ?? "editor", {
           historyId: options.historyId,
           parentSheetId: options.parentSheetId,
         });
         const sheet = newResultSheet(statement.sql, baseOrdinal + index + 1, rowLimit, sourceRef);
+        if (options.sheetTitle) sheet.title = options.sheetTitle;
+        const entryId = run.entries[index].id;
         setPanels((prev) =>
           prev.map((p) => {
             if (p.id !== panelId) return p;
@@ -1267,15 +1397,46 @@ export default function DbClientTab({
               ...p,
               sheets,
               activeSheetId: sheet.id,
+              // A run starts on its results; a Log opened mid-run stays open.
+              logActive: index === 0 ? false : p.logActive,
             };
           }),
         );
+        publishRun(patchExecutionEntry(run, entryId, { status: "running", startedAt: sheet.createdAt, sheetId: sheet.id }));
         const summary = await streamQueryIntoSheet(panelId, sheet.id, statement.sql, rowLimit);
+        const cancelled = !summary.ok && cancelRequested();
+        publishRun(
+          patchExecutionEntry(run, entryId, {
+            status: summary.ok ? "success" : cancelled ? "cancelled" : "failed",
+            durationMs: summary.durationMs,
+            rowCount: summary.hasResultSet ? summary.rowCount : null,
+            rowsAffected: summary.rowsAffected,
+            message: summary.ok ? successMessage(summary) : summary.error,
+          }),
+        );
         await appendSqlHistory(statement.sql, sheet.createdAt, summary, panelId);
-        if (!summary.ok) break;
+        if (summary.ok) continue;
+        const hasMore = index < statementRanges.length - 1;
+        if (cancelled || !hasMore) break;
+        if (!skipAllErrors) {
+          const choice = await choiceAppDialog({
+            title: "Statement failed",
+            message: `Statement ${index + 1} of ${statementRanges.length} failed:\n${summary.error ?? "Unknown error"}\n\nSkip continues with the next statement. Skip all also ignores later errors in this run.`,
+            primaryLabel: "Skip all",
+            secondaryLabel: "Skip",
+            cancelLabel: "Stop",
+          });
+          if (choice === null) break;
+          if (choice === "primary") skipAllErrors = true;
+        }
+        publishRun(patchExecutionEntry(run, entryId, { message: `${summary.error ?? "Unknown error"} (skipped, run continued)` }));
       }
+      const finished = finishExecutionRun(run, Date.now());
+      const needsAttention = finished.entries.some((entry) => entry.status === "failed" || entry.status === "cancelled");
+      publishRun(finished, needsAttention ? true : undefined);
+      if (txStatusRef.current?.manual) await refreshTxStatus();
     },
-    [appendSqlHistory, rowLimit, statementRangesForRun, streamQueryIntoSheet, tabLimit],
+    [appendSqlHistory, refreshTxStatus, rowLimit, setStatusMessage, statementRangesForRun, streamQueryIntoSheet, tabLimit],
   );
 
   const insertQueryFromOutside = useCallback(
@@ -1419,6 +1580,11 @@ export default function DbClientTab({
   }, [visible, info.engine, info.host, captureDbFrame, setStatusMessage]);
 
   const cancelQuery = useCallback((panelId?: string) => {
+    for (const panel of panelsRef.current) {
+      if ((!panelId || panel.id === panelId) && panel.sheets.some((sheet) => sheet.running)) {
+        cancelRequestedRef.current[panel.id] = true;
+      }
+    }
     setPanels((prev) =>
       prev.map((p) =>
         panelId && p.id !== panelId
@@ -1465,9 +1631,10 @@ export default function DbClientTab({
     [patchSheet, rowLimit, streamQueryIntoSheet],
   );
 
-  const commitGridChanges = useCallback(
+  /** Generate the DML for grid edits so it can be previewed, then executed. */
+  const prepareGridChanges = useCallback(
     async (panelId: string, sheetId: string, payload: QueryGridCommitPayload) => {
-      const panel = panels.find((p) => p.id === panelId);
+      const panel = panelsRef.current.find((p) => p.id === panelId);
       const sheet = panel?.sheets.find((candidate) => candidate.id === sheetId);
       if (!panel || !sheet) throw new Error("Result sheet is no longer available.");
       const target = parseEditableSelectTarget(sheet.sql);
@@ -1485,46 +1652,38 @@ export default function DbClientTab({
       } catch {
         described = [];
       }
-      const resultColumnNames = payload.columns.map((column) => column.name);
-      const primaryKeys = described
-        .filter((column) => column.primaryKey && resultColumnNames.includes(column.name))
-        .map((column) => column.name);
-      const whereColumns = primaryKeys.length > 0 ? primaryKeys : resultColumnNames;
-      const statements: string[] = [];
-      for (const change of payload.changes) {
-        if (change.status === "inserted") {
-          const cols = resultColumnNames.map((name) => quoteIdent(info.engine, name)).join(", ");
-          const values = change.values.map(sqlLiteral).join(", ");
-          statements.push(`INSERT INTO ${tableName} (${cols}) VALUES (${values})`);
-        } else if (change.status === "updated") {
-          if (!change.original) continue;
-          const assignments = resultColumnNames
-            .map((name, index) =>
-              change.values[index] === change.original?.[index]
-                ? null
-                : `${quoteIdent(info.engine, name)} = ${sqlLiteral(change.values[index])}`,
-            )
-            .filter((value): value is string => Boolean(value));
-          if (assignments.length === 0) continue;
-          const where = whereForColumns(info.engine, whereColumns, resultColumnNames, change.original);
-          statements.push(`UPDATE ${tableName} SET ${assignments.join(", ")} WHERE ${where}`);
-        } else if (change.status === "deleted") {
-          if (!change.original) continue;
-          const where = whereForColumns(info.engine, whereColumns, resultColumnNames, change.original);
-          statements.push(`DELETE FROM ${tableName} WHERE ${where}`);
-        }
-      }
+      return buildGridChangeStatements({
+        engine: info.engine,
+        tableName,
+        columns: payload.columns.map((column) => column.name),
+        primaryKeys: described.filter((column) => column.primaryKey).map((column) => column.name),
+        changes: payload.changes,
+      });
+    },
+    [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache],
+  );
+
+  const previewGridChanges = useCallback(
+    async (panelId: string, sheetId: string, payload: QueryGridCommitPayload): Promise<GridChangePreview> =>
+      gridChangePreview(await prepareGridChanges(panelId, sheetId, payload)),
+    [prepareGridChanges],
+  );
+
+  const commitGridChanges = useCallback(
+    async (panelId: string, sheetId: string, payload: QueryGridCommitPayload) => {
+      const { statements } = await prepareGridChanges(panelId, sheetId, payload);
       if (statements.length === 0) return;
       for (const sql of statements) {
         if (!connectionSessionId) throw new Error("Database connection is still starting.");
         await dbExecute(connectionSessionId, sql);
       }
+      if (txStatusRef.current?.manual) await refreshTxStatus();
       setStatusMessage(
         `Submitted grid changes: ${payload.counts.inserted} added, ${payload.counts.updated} modified, ${payload.counts.deleted} deleted.`,
       );
       await refreshSheet(panelId, sheetId, "clearView");
     },
-    [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache, panels, refreshSheet, setStatusMessage],
+    [connectionSessionId, prepareGridChanges, refreshSheet, refreshTxStatus, setStatusMessage],
   );
 
   const onSchemaLoaded = useCallback((tables: Map<string, string[]>) => {
@@ -2287,6 +2446,18 @@ export default function DbClientTab({
     return { panelId: panel.id, doc, range };
   };
 
+  const explainCurrentStatement = async (panelId: string = activePanel.id) => {
+    const action = currentEditorStatement(panelId);
+    if (!action) return;
+    const plan = explainSqlFor(info.engine, action.range.sql);
+    if (!plan.ok) {
+      setStatusMessage(plan.reason);
+      await alertAppDialog({ title: "Explain not available", message: plan.reason });
+      return;
+    }
+    await runQuery(action.panelId, plan.sql, { sheetTitle: "Explain" });
+  };
+
   const toggleStatementPanel = () => {
     if (statementAction?.panelId === activePanel.id) {
       setStatementAction(null);
@@ -2784,7 +2955,13 @@ export default function DbClientTab({
                   void runQuery(activePanel.id, payload.sql, { context: payload.context });
                 }}
                 onRunCurrent={runCurrentStatement}
+                onExplain={() => void explainCurrentStatement()}
                 onCancel={() => cancelQuery(activePanel.id)}
+                txAvailable={txAvailable}
+                txStatus={txStatus}
+                onToggleTx={() => void toggleTxMode()}
+                onCommitTx={() => void endTransaction(true)}
+                onRollbackTx={() => void endTransaction(false)}
                 onFormat={() => formatPanel(activePanel)}
                 onToggleStatement={toggleStatementPanel}
                 onToggleHistory={toggleHistoryPanel}
@@ -2859,12 +3036,14 @@ export default function DbClientTab({
                   <ResultArea
                     panel={activePanel}
                     sqlEngine={info.engine}
-                    onSheetSelect={(sheetId) => patchPanel(activePanel.id, { activeSheetId: sheetId })}
+                    onSheetSelect={(sheetId) => patchPanel(activePanel.id, { activeSheetId: sheetId, logActive: false })}
+                    onShowLog={() => patchPanel(activePanel.id, { logActive: true })}
                     onSheetClose={(sheetId) => closeResultSheet(activePanel.id, sheetId)}
                     onCloseSheets={(sheetIds) => closeResultSheets(activePanel.id, sheetIds)}
                     onTabChange={(sheetId, tab) => patchSheet(activePanel.id, sheetId, { resultTab: tab })}
                     onRefreshSheet={(sheetId, mode) => void refreshSheet(activePanel.id, sheetId, mode)}
                     onCommitGridChanges={(sheetId, payload) => commitGridChanges(activePanel.id, sheetId, payload)}
+                    onPreviewGridChanges={(sheetId, payload) => previewGridChanges(activePanel.id, sheetId, payload)}
                     onGeneratedSqlSync={(sheetId, sql, mode) =>
                       syncGeneratedSqlFromSheet(activePanel.id, sheetId, sql, mode)
                     }
@@ -2885,6 +3064,11 @@ export default function DbClientTab({
   );
 }
 
+/** Engines whose sessions support the manual-commit toolbar (DB-TX-001). */
+function supportsManualCommit(engine: string): boolean {
+  return engine === "MySQL" || engine === "PostgreSQL";
+}
+
 function EditorToolbar({
   engine,
   schemas,
@@ -2898,7 +3082,13 @@ function EditorToolbar({
   onRun,
   onRunSelection,
   onRunCurrent,
+  onExplain,
   onCancel,
+  txAvailable,
+  txStatus,
+  onToggleTx,
+  onCommitTx,
+  onRollbackTx,
   onFormat,
   onToggleStatement,
   onToggleHistory,
@@ -2922,7 +3112,13 @@ function EditorToolbar({
   onRun: () => void;
   onRunSelection: () => void;
   onRunCurrent: () => void;
+  onExplain: () => void;
   onCancel: () => void;
+  txAvailable: boolean;
+  txStatus: DbTxStatus | null;
+  onToggleTx: () => void;
+  onCommitTx: () => void;
+  onRollbackTx: () => void;
   onFormat: () => void;
   onToggleStatement: () => void;
   onToggleHistory: () => void;
@@ -2936,6 +3132,7 @@ function EditorToolbar({
 }) {
   const t = useT();
   const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const txManual = txStatus?.manual === true;
   const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
   const input = "taomni-input h-6 w-[68px] text-[11px]";
   return (
@@ -2943,7 +3140,7 @@ function EditorToolbar({
       className="h-8 shrink-0 flex items-center gap-1 px-2"
       style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
     >
-      <button type="button" className={btn} onClick={onRun} disabled={running} title={runAllTitle}>
+      <button type="button" className={btn} onClick={onRun} disabled={running} title={runAllTitle} data-testid="db-run-all">
         <Play className="w-3.5 h-3.5" style={{ color: "#62d36f" }} /> Run
       </button>
       <button type="button" className={btn} onClick={onRunSelection} disabled={running} title={runSelectionTitle}>
@@ -2959,9 +3156,54 @@ function EditorToolbar({
       >
         <Crosshair className="w-3.5 h-3.5" /> Current
       </button>
+      <button
+        type="button"
+        className={btn}
+        onClick={onExplain}
+        disabled={running}
+        title="Explain the statement at the cursor"
+        data-testid="db-explain-current"
+      >
+        <ListTree className="w-3.5 h-3.5" /> Explain
+      </button>
       <button type="button" className={btn} onClick={onCancel} disabled={!running} title="Cancel query">
         <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} /> Cancel
       </button>
+      {txAvailable && (
+        <>
+          <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
+          <button
+            type="button"
+            className={btn}
+            onClick={onToggleTx}
+            disabled={running || !txStatus?.supported}
+            title={txManual ? "Manual commit (click for auto-commit)" : "Auto-commit (click for manual commit)"}
+            data-testid="db-tx-mode"
+            data-mode={txManual ? "manual" : "auto"}
+            aria-pressed={txManual}
+          >
+            {txManual ? "Manual" : "Auto"}
+          </button>
+          {txManual && (
+            <>
+              <button type="button" className={btn} onClick={onCommitTx} disabled={running} title="Commit" data-testid="db-tx-commit">
+                <GitCommitHorizontal className="w-3.5 h-3.5" /> Commit
+              </button>
+              <button type="button" className={btn} onClick={onRollbackTx} disabled={running} title="Rollback" data-testid="db-tx-rollback">
+                <Undo2 className="w-3.5 h-3.5" /> Rollback
+              </button>
+              <span
+                className="text-[11px] tabular-nums"
+                style={{ color: txStatus && txStatus.pending > 0 ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
+                title="Statements executed since the last commit or rollback"
+                data-testid="db-tx-pending"
+              >
+                Pending: {txStatus?.pending ?? 0}
+              </span>
+            </>
+          )}
+        </>
+      )}
       <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
       <button type="button" className={btn} onClick={onFormat} title="Format SQL">
         <Sparkles className="w-3.5 h-3.5" /> Format
@@ -3270,19 +3512,23 @@ function ResultArea({
   onTabChange,
   onRefreshSheet,
   onCommitGridChanges,
+  onPreviewGridChanges,
   onGeneratedSqlSync,
   onGeneratedSqlQuery,
   onCancel,
   onStatus,
+  onShowLog,
 }: {
   panel: PanelState;
   sqlEngine: string;
+  onShowLog: () => void;
   onSheetSelect: (sheetId: string) => void;
   onSheetClose: (sheetId: string) => void;
   onCloseSheets: (sheetIds: string[]) => void;
   onTabChange: (sheetId: string, tab: ResultSubTab) => void;
   onRefreshSheet: (sheetId: string, mode: QueryRefreshMode) => void;
   onCommitGridChanges: (sheetId: string, payload: QueryGridCommitPayload) => Promise<void>;
+  onPreviewGridChanges: (sheetId: string, payload: QueryGridCommitPayload) => Promise<GridChangePreview>;
   onGeneratedSqlSync: (sheetId: string, sql: string, mode: QueryGeneratedSqlSyncMode) => void;
   onGeneratedSqlQuery: (
     sheetId: string,
@@ -3294,8 +3540,11 @@ function ResultArea({
 }) {
   const t = useT();
   const sheetMenu = useContextMenu();
-  const sheet = activeSheet(panel);
+  const showingLog = panel.logActive && panel.log.length > 0;
+  const sheet = showingLog ? null : activeSheet(panel);
   const tab = "h-6 px-3 text-[11px] inline-flex items-center";
+  const latestRun = panel.log[0] ?? null;
+  const latestRunHasFailure = !!latestRun?.entries.some((entry) => entry.status === "failed" || entry.status === "cancelled");
   const waitingForFirstResult =
     !!sheet?.running &&
     sheet.result !== null &&
@@ -3357,8 +3606,32 @@ function ResultArea({
         className="h-7 shrink-0 flex items-end gap-1 px-1 overflow-hidden"
         style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
       >
+        {panel.log.length > 0 && (
+          <button
+            type="button"
+            data-testid="result-log-tab"
+            data-active={showingLog ? "true" : "false"}
+            className="h-6 shrink-0 px-2 inline-flex items-center gap-1 text-[11px]"
+            style={{
+              background: showingLog ? "var(--taomni-tab-active)" : "var(--taomni-tab-inactive)",
+              color: showingLog ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
+              border: "1px solid var(--taomni-tab-border)",
+              borderBottom: showingLog ? "1px solid var(--taomni-tab-active)" : "1px solid var(--taomni-divider)",
+              borderTopLeftRadius: 4,
+              borderTopRightRadius: 4,
+            }}
+            onClick={onShowLog}
+            title="Execution log"
+          >
+            <ScrollText className="w-3 h-3" />
+            Log
+            {latestRunHasFailure && <span className="text-[10px]" style={{ color: "#d9534f" }}>●</span>}
+          </button>
+        )}
         {panel.sheets.length === 0 ? (
-          <span className="px-2 pb-1 text-[11px] text-[var(--taomni-text-muted)]">Result sheets</span>
+          panel.log.length === 0 && (
+            <span className="px-2 pb-1 text-[11px] text-[var(--taomni-text-muted)]">Result sheets</span>
+          )
         ) : (
           panel.sheets.map((resultSheet) => {
             const active = resultSheet.id === sheet?.id;
@@ -3437,7 +3710,9 @@ function ResultArea({
         </div>
       )}
       <div className="flex-1 min-h-0 flex flex-col">
-        {!sheet ? (
+        {showingLog ? (
+          <ExecutionLogView runs={panel.log} onSelectSheet={onSheetSelect} />
+        ) : !sheet ? (
           <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
             Run a query to create a result sheet.
           </div>
@@ -3458,6 +3733,7 @@ function ResultArea({
                 onRefresh={(mode) => onRefreshSheet(sheet.id, mode)}
                 onCancel={onCancel}
                 onCommitChanges={(payload) => onCommitGridChanges(sheet.id, payload)}
+                onPreviewChanges={(payload) => onPreviewGridChanges(sheet.id, payload)}
                 onGeneratedSqlSync={(sql, mode) => onGeneratedSqlSync(sheet.id, sql, mode)}
                 onGeneratedSqlQuery={(sql, rewriteRequest) => onGeneratedSqlQuery(sheet.id, sql, rewriteRequest)}
                 onStatus={onStatus}

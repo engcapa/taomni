@@ -686,6 +686,14 @@
 - `[data-testid="sql-editor"]` — display [optional] — F-DB-1.sql-editor
 - `[data-testid="sql-completion-status"]` — display [optional] — F-DB-1.sql-completion-status
 - `[data-testid="query-result-grid"]` — display [optional] — F-DB-1.query-result-grid
+- `[data-testid="query-result-grid"] button[title="Row 1"]` — interactive [optional] — F-DB-1.query-result-row-1
+- `[data-testid="query-result-grid"] button[aria-label="Delete row"]` — interactive [optional] — F-DB-1.query-result-delete-row
+- `[data-testid="query-result-grid"] button[aria-label="Submit grid edits"]` — interactive [optional] — F-DB-1.query-result-submit-edits
+- `[data-testid="query-result-row"]` — display [optional] — F-DB-1.query-result-row
+- `[data-testid="query-result-sort-header"]` — interactive [optional] — F-DB-1.query-result-sort-header
+- `[data-testid="query-result-row-count"]` — display [optional] — F-DB-1.query-result-row-count
+- `[data-testid="query-result-grid"] button[aria-label="Filter rows"]` — interactive [optional] — F-DB-1.query-result-filter-toggle
+- `[data-testid="query-result-grid"] input[placeholder="Filter rows"]` — interactive [optional] — F-DB-1.query-result-filter-input
 - `[data-testid="query-result-generated-sql"]` — display [optional] — F-DB-1.query-result-generated-sql
 - `[data-testid="query-result-generated-sql-copy"]` — interactive [optional] — F-DB-1.query-result-generated-sql-copy
 - `[data-testid="query-result-generated-sql-query"]` — interactive [optional] — F-DB-1.query-result-generated-sql-query
@@ -724,6 +732,18 @@
 - `[data-testid="db-tab-limit"]` — interactive [optional] — F-DB-1.tab-limit
 - `[data-testid="db-run-current-statement"]` — interactive [optional] — F-DB-1.run-current-statement
 - `[data-testid="db-connection-error-banner"]` — display [optional] — F-DB-1.connection-error-banner
+- `[data-testid="db-run-all"]` — interactive [optional] — F-DB-1.run-all
+- `[data-testid="db-explain-current"]` — interactive [optional] — F-DB-1.explain-current
+- `[data-testid="result-log-tab"]` — interactive [optional] — F-DB-1.result-log-tab
+- `[data-testid="db-execution-log"]` — display [optional] — F-DB-1.execution-log
+- `[data-testid="db-execution-log-run"]` — display [optional] — F-DB-1.execution-log-run
+- `[data-testid="db-execution-log-entry"]` — display [optional] — F-DB-1.execution-log-entry
+- `[data-testid="db-execution-log-summary"]` — display [optional] — F-DB-1.execution-log-summary
+- `[data-testid="result-sheet-tab"]` — interactive [optional] — F-DB-1.result-sheet-tab
+- `[data-testid="db-tx-mode"]` — interactive [optional] — F-DB-1.tx-mode
+- `[data-testid="db-tx-commit"]` — interactive [optional] — F-DB-1.tx-commit
+- `[data-testid="db-tx-rollback"]` — interactive [optional] — F-DB-1.tx-rollback
+- `[data-testid="db-tx-pending"]` — display [optional] — F-DB-1.tx-pending
 - `[data-testid="db-chat-toggle"]` — interactive [optional] — F-DB-1.chat-toggle
 - `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach
 
@@ -1715,6 +1735,11 @@
 - `[data-testid="confirm-dialog-message"]` — display [optional] — F-Confirm-1.confirm-dialog-message
 - `[data-testid="confirm-dialog-cancel"]` — interactive [optional] — F-Confirm-1.confirm-dialog-cancel
 - `[data-testid="confirm-dialog-confirm"]` — interactive [optional] — F-Confirm-1.confirm-dialog-confirm
+- `[data-testid="choice-dialog"]` — display [optional] — F-Confirm-1.choice-dialog
+- `[data-testid="choice-dialog-message"]` — display [optional] — F-Confirm-1.choice-dialog-message
+- `[data-testid="choice-dialog-primary"]` — interactive [optional] — F-Confirm-1.choice-dialog-primary
+- `[data-testid="choice-dialog-secondary"]` — interactive [optional] — F-Confirm-1.choice-dialog-secondary
+- `[data-testid="choice-dialog-cancel"]` — interactive [optional] — F-Confirm-1.choice-dialog-cancel
 - `[data-testid="alert-dialog"]` — display [optional] — F-Confirm-1.alert-dialog
 - `[data-testid="alert-dialog-message"]` — display [optional] — F-Confirm-1.alert-dialog-message
 - `[data-testid="alert-dialog-ok"]` — interactive [optional] — F-Confirm-1.alert-dialog-ok
