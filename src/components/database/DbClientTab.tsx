@@ -104,7 +104,8 @@ import {
 } from "../../lib/ai/answerLanguage";
 import { buildDbAiPrompt, truncateStatement } from "../../lib/database/dbAiPrompts";
 import { registerQueryTab } from "../../lib/queryRegistry";
-import { choiceAppDialog } from "../../lib/appDialogs";
+import { choiceAppDialog, confirmAppDialog } from "../../lib/appDialogs";
+import { dangerousConfirmationMessage } from "../../lib/sqlDangerousStatements";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
 import { ExecutionLogView } from "./ExecutionLogView";
 import {
@@ -1270,6 +1271,19 @@ export default function DbClientTab({
       if (panel?.sheets.some((sheet) => sheet.running)) return;
       const statementRanges = statementRangesForRun(sqlText, options.context);
       if (statementRanges.length === 0) return;
+      const dangerMessage = dangerousConfirmationMessage(statementRanges.map((range) => range.sql));
+      if (dangerMessage) {
+        const confirmed = await confirmAppDialog({
+          title: "Confirm dangerous statements",
+          message: dangerMessage,
+          confirmLabel: "Execute",
+          danger: true,
+        });
+        if (!confirmed) {
+          setStatusMessage("Run canceled: dangerous statements were not executed.");
+          return;
+        }
+      }
       // Record in-memory history per executable statement (newest first, dedup consecutive).
       const panelHistory = historyRef.current[panelId] ?? [];
       const nextHistory = [...panelHistory];
@@ -1355,7 +1369,7 @@ export default function DbClientTab({
       const needsAttention = finished.entries.some((entry) => entry.status === "failed" || entry.status === "cancelled");
       publishRun(finished, needsAttention ? true : undefined);
     },
-    [appendSqlHistory, rowLimit, statementRangesForRun, streamQueryIntoSheet, tabLimit],
+    [appendSqlHistory, rowLimit, setStatusMessage, statementRangesForRun, streamQueryIntoSheet, tabLimit],
   );
 
   const insertQueryFromOutside = useCallback(

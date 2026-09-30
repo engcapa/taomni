@@ -4517,6 +4517,10 @@ controls:
     selector: '[data-testid="db-execution-log"]'
     kind: display
     optional: true       # DB-EXEC-001: per-statement status table with run summary
+  - id: execution-log-run
+    selector: '[data-testid="db-execution-log-run"]'
+    kind: display
+    optional: true       # one group per Run click, newest first
   - id: execution-log-entry
     selector: '[data-testid="db-execution-log-entry"]'
     kind: display

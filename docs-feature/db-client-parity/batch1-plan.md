@@ -62,3 +62,29 @@
 | V3 | A5 | mock IPC：最后一条失败 / 单条失败 | Run | 不调用 choice | unit | 同上 |
 | V4 | A1 A2 A4 | browser，离线脚手架（每条语句都会失败） | 3 条语句 Run；在第一个对话框点 Skip，第二个点 Stop | 日志 failed / failed / not-run，汇总含 `Failed: 2` | browser | `qa-ui-auto-tests/cases/TC-DB-EXEC-002-error-choice-browser.testcase.yaml`（P2 新增） |
 | V5 | A1 A2 | native，`mysql_required` | `SELECT 1; SELECT * FROM qa_db_missing_table_x; SELECT 3;`，对话框点 Skip | 日志 success / failed / success；结果页签 3 个 | native | `qa-ui-auto-tests/cases/TC-DB-EXEC-002-error-choice-native.testcase.yaml`（P2 新增） |
+
+<a id="db-exec-003"></a>
+## DB-EXEC-003 危险语句执行前确认
+
+- 来源 / 范围 / 参照：DBV-EXEC-03；全部 SQL 引擎；`主参照: dbeaver`（“Execute drop queries” 确认）。DbVisualizer 未观察到对应确认。
+- 当前事实：`runQuery` 直接执行所有语句；`commitGridChanges` 的 DML 走 `dbExecute`，已有自己的确认框（不在本卡范围）。
+- 规则（新增 `src/lib/sqlDangerousStatements.ts`）：去掉注释和字符串字面量后判断：以 `DROP` 或 `TRUNCATE` 开头；`DELETE` 且没有 `WHERE`；`UPDATE` 且没有 `WHERE`。已知限制：子查询里的 WHERE 会被当作有 WHERE。
+- 目标：Run / Selection / Current / 历史重跑触发的运行里只要含危险语句，先弹出 `confirm-dialog`（危险样式）：标题 “Confirm dangerous statements”，列出前 10 条危险语句（超出显示 “… and N more”），按钮 Execute / Cancel。取消时整次运行一条都不执行，不产生日志和结果页签，状态栏提示已取消。
+- 保留契约：不含危险语句的运行不弹框；网格保存的 DML 不经过本确认（由 DB-EDIT-001 负责预览）。
+- 验收：
+  - `A1` DROP / TRUNCATE / 无 WHERE 的 DELETE、UPDATE 被识别，带 WHERE 的 DELETE / UPDATE 与普通 SELECT 不被识别；注释和字符串里的关键字不影响判断。
+  - `A2` 含危险语句的运行先弹确认框并列出这些语句。
+  - `A3` 取消后没有任何语句执行，也不新增日志运行和结果页签。
+  - `A4` 确认后整次运行照常执行（DB-EXEC-001/002 行为保留）。
+  - `A5` 不含危险语句的运行不弹框（保留）。
+
+<a id="db-exec-003-test-cases"></a>
+### 测试用例
+
+| V | AC | 前置 / fixture | 操作 | 预期 | 层级 | 路径 / ID |
+|---|---|---|---|---|---|---|
+| V1 | A1 | 无 | 对一组语句调用检测函数 | DROP / TRUNCATE / `DELETE FROM t` / `UPDATE t SET a=1` 命中；`DELETE FROM t WHERE id=1`、`SELECT 'drop table'`、`-- drop` 注释不命中 | unit | `src/lib/sqlDangerousStatements.test.ts`（P2 新增） |
+| V2 | A2 A3 | mock IPC，confirm 返回 false | `select 1;\ndrop table t` Run | confirm 被调用且消息含 `drop table t`；`dbExecuteStream` 未调用；无 Log 标签 | unit | `DbClientTab.test.tsx` “dangerous …”（P2 新增） |
+| V3 | A4 A5 | confirm 返回 true / 普通语句 | 分别 Run | 确认后两条都执行；普通运行不调用 confirm | unit | 同上 |
+| V4 | A2 A3 A4 | browser，离线脚手架 | 输入 `DROP TABLE qa_x;` Run → Cancel；再次 Run → Execute | 第一次后无 Log 标签；第二次后 Log 有 1 条 failed（浏览器无数据库） | browser | `qa-ui-auto-tests/cases/TC-DB-EXEC-003-dangerous-confirm-browser.testcase.yaml`（P2 新增） |
+| V5 | A2 A3 A4 | native，`mysql_required` | 建表 → Run `DROP TABLE` → Cancel → 查询该表成功 → 再 Run `DROP TABLE` → Execute | 取消后表仍可查询；确认后 DROP 成功 | native | `qa-ui-auto-tests/cases/TC-DB-EXEC-003-dangerous-confirm-native.testcase.yaml`（P2 新增） |

@@ -1145,6 +1145,37 @@ describe("DbClientTab error choice", () => {
     expect(ipcMock.dbExecuteStream).toHaveBeenCalledTimes(3);
   });
 
+  it("confirms dangerous statements and runs nothing when canceled", async () => {
+    failWhen(() => false);
+    dialogMock.confirm.mockResolvedValueOnce(false);
+    await runDoc("select 1;\ndrop table t");
+
+    await waitFor(() => expect(dialogMock.confirm).toHaveBeenCalledTimes(1));
+    expect(dialogMock.confirm.mock.calls[0][0]).toMatchObject({ title: "Confirm dangerous statements", danger: true });
+    expect(dialogMock.confirm.mock.calls[0][0].message).toContain("[DROP] drop table t");
+    await act(async () => undefined);
+    expect(ipcMock.dbExecuteStream).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("result-log-tab")).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId("result-sheet-tab")).toHaveLength(0);
+  });
+
+  it("runs the whole script after confirming dangerous statements and skips the prompt for safe runs", async () => {
+    failWhen(() => false);
+    dialogMock.confirm.mockResolvedValueOnce(true);
+    await runDoc("select 1;\ndelete from t");
+
+    await waitFor(() => expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(2));
+    await waitFor(() => expect(ipcMock.dbExecuteStream).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByTestId("result-log-tab"));
+    await waitFor(() => expect(statuses()).toEqual(["success", "success"]));
+
+    cleanup();
+    vi.clearAllMocks();
+    await runDoc("select 1;\ndelete from t where id = 1");
+    await waitFor(() => expect(ipcMock.dbExecuteStream).toHaveBeenCalledTimes(2));
+    expect(dialogMock.confirm).not.toHaveBeenCalled();
+  });
+
   it("does not ask when the last statement fails", async () => {
     failWhen((sql) => sql.startsWith("bad"));
     await runDoc("select 1;\nbad 2");
