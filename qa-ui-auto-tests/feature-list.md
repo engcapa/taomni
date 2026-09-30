@@ -5706,7 +5706,7 @@ controls:
 
 - 会话编辑器 “Detect settings”：先查内置表（Gmail、Outlook、QQ、163、126、iCloud、Yahoo、Fastmail 等，离线），勾选 “Online lookup” 时再依次查询 ISPDB、`autoconfig.<domain>`、`/.well-known/autoconfig`，最后猜测 `imap./smtp.<domain>` 并探测端口；在线查询会把域名发给第三方，提示中有说明，可关闭。
 - 证书例外：握手因证书不受信任失败时，状态栏出现 “Review certificate”，对话框显示主题、签发者、有效期与 SHA-256 指纹；“Trust for this account” 把该证书设为此服务器唯一的信任锚（禁用系统根证书，放宽主机名校验），证书变化时握手失败并再次提示。保存的会话写入会话选项，Quick Connect 标签只在内存中生效。
-- 未完成：Yahoo/AOL/Fastmail 等 OAuth 需要在各厂商注册客户端 ID，尚未接入；RFC 6186 SRV 与 Exchange Autodiscover 未实现（未引入 DNS 解析依赖）。证书固定的 TLS 行为已在 Windows 上用本地 TLS 服务器验证，macOS/Linux 待原生验证。
+- 未完成：Yahoo/AOL/Fastmail 等 OAuth 需要在各厂商注册客户端 ID，尚未接入；RFC 6186 SRV 未实现（未引入 DNS 解析依赖）；Exchange Autodiscover（POX）已接入，在 Thunderbird 式查找之后尝试。证书固定的 TLS 行为已在 Windows 上用本地 TLS 服务器验证，macOS/Linux 待原生验证。
 
 ---
 

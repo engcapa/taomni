@@ -764,7 +764,7 @@ macOS 和 Linux 未执行时标为未验证，不单独阻塞交付。性能基�
 | TASK-11 标签与垃圾邮件 | 已实现 | Vitest `mailTags.test.ts`；TC-MAIL-TAG-01 | 本地垃圾邮件识别不在范围内 |
 | TASK-12 IDLE 与桌面通知 | 已实现 | Rust `mail::idle`（假 IMAP 服务器）；TC-MAIL-IDLE-01（含关闭后 IDLE 连接数为 0） | QRESYNC/VANISHED 未实现（可选项；删除对账沿用 P0 路径） |
 | TASK-13 过滤器 | 已实现 | Rust `mail::filters`（条件/动作语义、存储与 UID 水位、服务器 BODY 搜索走假 IMAP）；Vitest `MailFiltersPanel.test.tsx`、`MailClientTab.test.tsx`（AC-40/AC-42）；TC-MAIL-FILTER-01 | 转发以附件形式发出；正文条件只支持包含/不包含（未缓存正文用服务器 SEARCH）；收信过滤只在标签打开期间运行（DEC-01） |
-| TASK-14 自动配置与证书例外 | 部分 | Rust `mail::autoconfig`、`mail::certs`（本地 TLS 服务器）；TC-MAIL-AUTOCONF-01 | Exchange Autodiscover、RFC 6186 SRV 未实现；Yahoo/AOL/Fastmail OAuth 需厂商客户端 ID；证书固定仅在 Windows 验证 |
+| TASK-14 自动配置与证书例外 | 部分 | Rust `mail::autoconfig`、`mail::certs`（本地 TLS 服务器）；TC-MAIL-AUTOCONF-01 | RFC 6186 SRV 未实现（Exchange Autodiscover POX 已实现，Rust 解析测试覆盖，未连真实 Exchange 验证）；Yahoo/AOL/Fastmail OAuth 需厂商客户端 ID；证书固定仅在 Windows 验证 |
 | TASK-15 附件与大邮件 | 已实现 | Rust `mail::parts`（假服务器端到端）；Vitest；TC-MAIL-ATTACH-01 | AC-45 内存峰值未测量 |
 | TASK-16 统一收件箱 | 已实现 | Vitest `MailUnifiedTab.test.tsx`（多账户按时间合并、同 UID 跨账户操作路由、单账户失败隔离）；TC-MAIL-UNIFIED-01 | 回复/转发经“Open account”在账户标签内完成；每账户最多合并 200 封；托管用例只有一个假服务器账户，多账户合并仅由 Vitest 覆盖 |
 | TASK-17 发件箱、稍后发送、撤销、回执 | 已实现 | Vitest（AC-49/AC-50，回执询问/总是/从不）；Rust `mail::receipts`（RFC 8098 MDN）、`mail::sync`（回执请求头缓存）；TC-MAIL-OUTBOX-01、TC-MAIL-RECEIPT-01 | 稍后发送与回执只在标签打开时处理（DEC-01）；DSN（投递状态通知）未实现 |

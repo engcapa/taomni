@@ -26,7 +26,7 @@ pub struct MailServerGuess {
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct MailAutoconfig {
-    /// "builtin" | "ispdb" | "provider" | "well-known" | "guess".
+    /// "builtin" | "ispdb" | "provider" | "well-known" | "autodiscover" | "guess".
     pub source: String,
     /// "gmail" | "outlook" | "custom" (OAuth presets exist for the first two).
     pub provider: String,
@@ -184,6 +184,120 @@ pub(super) fn parse_client_config(xml: &str, email: &str, source: &str) -> Optio
     })
 }
 
+/// Exchange Autodiscover (POX) security: `Encryption` wins (`SSL` = implicit
+/// TLS, `TLS` = STARTTLS); otherwise `SSL on` means TLS on the implicit ports.
+fn autodiscover_security(encryption: &str, ssl: &str, port: u16) -> &'static str {
+    match encryption.trim().to_ascii_uppercase().as_str() {
+        "SSL" => "TLS",
+        "TLS" => "STARTTLS",
+        "NONE" => "None",
+        _ if ssl.trim().eq_ignore_ascii_case("off") => "None",
+        _ if matches!(port, 993 | 465 | 995) => "TLS",
+        _ => "STARTTLS",
+    }
+}
+
+/// Parse an Autodiscover (Outlook POX, responseschema/2006a) response.
+fn parse_autodiscover(xml: &str) -> Option<MailAutoconfig> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut in_protocol = false;
+    let mut field = String::new();
+    // (type, server, port, ssl, encryption)
+    let mut entry = (
+        String::new(),
+        String::new(),
+        0u16,
+        String::new(),
+        String::new(),
+    );
+    let mut imap: Option<MailServerGuess> = None;
+    let mut smtp: Option<MailServerGuess> = None;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(tag)) => {
+                let name = String::from_utf8_lossy(tag.local_name().as_ref()).to_string();
+                if name == "Protocol" {
+                    in_protocol = true;
+                    entry = Default::default();
+                } else {
+                    field = name;
+                }
+            }
+            Ok(Event::Text(text)) if in_protocol => {
+                let value = text.decode().map(|v| v.to_string()).unwrap_or_default();
+                match field.as_str() {
+                    "Type" => entry.0 = value.trim().to_ascii_uppercase(),
+                    "Server" => entry.1 = value.trim().to_string(),
+                    "Port" => entry.2 = value.trim().parse().unwrap_or(0),
+                    "SSL" => entry.3 = value,
+                    "Encryption" => entry.4 = value,
+                    _ => {}
+                }
+            }
+            Ok(Event::End(tag)) => {
+                let name = String::from_utf8_lossy(tag.local_name().as_ref()).to_string();
+                if name == "Protocol" {
+                    in_protocol = false;
+                    let (kind, host, port, ssl, encryption) = &entry;
+                    if !host.is_empty() {
+                        let default_port = if kind == "IMAP" { 993 } else { 587 };
+                        let port = if *port == 0 { default_port } else { *port };
+                        let guess =
+                            server(host, port, autodiscover_security(encryption, ssl, port));
+                        match kind.as_str() {
+                            "IMAP" if imap.is_none() => imap = Some(guess),
+                            "SMTP" if smtp.is_none() => smtp = Some(guess),
+                            _ => {}
+                        }
+                    }
+                }
+                field.clear();
+            }
+            Ok(Event::Eof) | Err(_) => break,
+            _ => {}
+        }
+    }
+    let (imap, smtp) = (imap?, smtp?);
+    let host = imap.host.to_ascii_lowercase();
+    let provider = if host.ends_with("office365.com") || host.ends_with("outlook.com") {
+        "outlook"
+    } else {
+        "custom"
+    };
+    Some(MailAutoconfig {
+        source: "autodiscover".into(),
+        provider: provider.into(),
+        imap,
+        smtp,
+    })
+}
+
+async fn fetch_autodiscover(
+    client: &reqwest::Client,
+    url: &str,
+    email: &str,
+) -> Option<MailAutoconfig> {
+    let escaped = email
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+    let body = format!(
+        r#"<?xml version="1.0" encoding="utf-8"?><Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/requestschema/2006"><Request><EMailAddress>{escaped}</EMailAddress><AcceptableResponseSchema>http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a</AcceptableResponseSchema></Request></Autodiscover>"#
+    );
+    let response = client
+        .post(url)
+        .header("Content-Type", "text/xml; charset=utf-8")
+        .body(body)
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    parse_autodiscover(&response.text().await.ok()?)
+}
+
 async fn fetch_config(
     client: &reqwest::Client,
     url: &str,
@@ -262,6 +376,15 @@ pub async fn mail_autoconfig(
                 return Ok(Some(found));
             }
         }
+        // Exchange Autodiscover (TASK-14), like Thunderbird after its own lookups.
+        for url in [
+            format!("https://autodiscover.{domain}/autodiscover/autodiscover.xml"),
+            format!("https://{domain}/autodiscover/autodiscover.xml"),
+        ] {
+            if let Some(found) = fetch_autodiscover(&client, &url, &email).await {
+                return Ok(Some(found));
+            }
+        }
     }
     let guessed = tokio::task::spawn_blocking(move || {
         let imap = [
@@ -292,6 +415,35 @@ pub async fn mail_autoconfig(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_exchange_autodiscover() {
+        let xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006">
+  <Response xmlns="http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a">
+    <Account>
+      <AccountType>email</AccountType>
+      <Action>settings</Action>
+      <Protocol><Type>EXCH</Type><Server>ex.example.com</Server></Protocol>
+      <Protocol><Type>IMAP</Type><Server>outlook.office365.com</Server><Port>993</Port><SSL>on</SSL></Protocol>
+      <Protocol><Type>SMTP</Type><Server>smtp.office365.com</Server><Port>587</Port><Encryption>TLS</Encryption></Protocol>
+    </Account>
+  </Response>
+</Autodiscover>"#;
+        let found = parse_autodiscover(xml).unwrap();
+        assert_eq!(found.source, "autodiscover");
+        assert_eq!(found.provider, "outlook");
+        assert_eq!(found.imap, server("outlook.office365.com", 993, "TLS"));
+        assert_eq!(found.smtp, server("smtp.office365.com", 587, "STARTTLS"));
+        assert_eq!(autodiscover_security("", "off", 143), "None");
+        assert_eq!(autodiscover_security("", "on", 587), "STARTTLS");
+        assert_eq!(autodiscover_security("SSL", "", 587), "TLS");
+        let imap_only = xml.replace("<Type>SMTP</Type>", "<Type>POP3</Type>");
+        assert!(
+            parse_autodiscover(&imap_only).is_none(),
+            "needs both servers"
+        );
+    }
 
     #[test]
     fn builtin_table_covers_common_providers() {
