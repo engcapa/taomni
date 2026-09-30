@@ -5888,6 +5888,101 @@ controls:
 
 ---
 
+### 13.20 统一邮件（多账户） ✅
+
+<!-- feature
+id: F-MAIL-20
+status: done
+area: mail/unified
+components: [MailUnifiedTab, Sidebar, ControlBar]
+files:
+  - src/components/mail/MailUnifiedTab.tsx
+  - src/lib/mailUnified.ts
+  - src/layouts/MainLayout.tsx
+controls:
+  - id: open-unified
+    selector: '[data-testid="sidebar-tool-mail-unified"]'
+    kind: interactive
+  - id: open-unified-menu
+    selector: '[data-testid="context-menu-item-mail-unified"]'
+    kind: interactive
+    optional: true       # app menu (Tools); macOS uses the native menu
+  - id: unified-tab
+    selector: '[data-testid="mail-unified-tab"]'
+    kind: display
+  - id: unified-refresh
+    selector: '[data-testid="mail-unified-refresh"]'
+    kind: interactive
+  - id: unified-status
+    selector: '[data-testid="mail-unified-status"]'
+    kind: display
+  - id: unified-row
+    selector: '[data-testid="mail-unified-row"]'
+    kind: interactive
+  - id: unified-reader
+    selector: '[data-testid="mail-unified-reader"]'
+    kind: display
+  - id: unified-delete
+    selector: '[data-testid="mail-unified-delete"]'
+    kind: interactive
+  - id: unified-move
+    selector: '[data-testid="mail-unified-move"]'
+    kind: interactive
+    optional: true
+  - id: unified-toggle-read
+    selector: '[data-testid="mail-unified-toggle-read"]'
+    kind: interactive
+    optional: true
+  - id: unified-toggle-star
+    selector: '[data-testid="mail-unified-toggle-star"]'
+    kind: interactive
+    optional: true
+  - id: unified-open-account
+    selector: '[data-testid="mail-unified-open-account"]'
+    kind: interactive
+    optional: true
+  - id: unified-view-inbox
+    selector: '[data-testid="mail-unified-view-inbox"]'
+    kind: interactive
+    optional: true
+  - id: unified-view-sent
+    selector: '[data-testid="mail-unified-view-sent"]'
+    kind: interactive
+    optional: true
+  - id: unified-view-drafts
+    selector: '[data-testid="mail-unified-view-drafts"]'
+    kind: interactive
+    optional: true
+  - id: unified-view-starred
+    selector: '[data-testid="mail-unified-view-starred"]'
+    kind: interactive
+    optional: true
+  - id: unified-count
+    selector: '[data-testid="mail-unified-count"]'
+    kind: display
+    optional: true
+  - id: unified-account-badge
+    selector: '[data-testid="mail-unified-account"]'
+    kind: display
+    optional: true
+  - id: unified-account-error
+    selector: '[data-testid="mail-unified-account-error"]'
+    kind: display
+    optional: true
+  - id: unified-empty
+    selector: '[data-testid="mail-unified-empty"]'
+    kind: display
+    optional: true
+-->
+
+- 独立的 “Unified Mail” 标签（DEC-12），从侧边栏 “工具”、应用菜单 Tools 或 macOS 原生菜单打开。账户来源为所有已保存的邮件会话，加上当前打开的邮件标签（Quick Connect 账户不保存会话）。
+- 视图：Inbox / Sent / Drafts / Starred。前三者按各账户的特殊文件夹（手动指定 > SPECIAL-USE > 名称）读取本地缓存，Starred 在每个账户的全部缓存文件夹中查找星标邮件；按时间合并（每账户最多 200 封），每行显示账户徽标。
+- “Get mail” 对每个账户同步该视图的文件夹，失败的账户单独列出，不影响其他账户。
+- 阅读、标记已读/未读、加星、移动（该账户的文件夹）与删除（该账户的废纸篓，没有废纸篓时永久删除）都经所属账户执行（AC-48）；回复、转发等通过 “Open account” 在账户自己的标签中进行。
+- 不在后台运行：只在标签可见时读取缓存（DEC-01）。
+
+---
+
 ## 14. SocksCap 网络流量路由
 
 ### 14.1 SocksCap 控制面板 🟡

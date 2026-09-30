@@ -795,6 +795,7 @@ const dict = {
     welcome: "Welcome",
     settings: "Settings",
     lanChat: "LAN Chat",
+    mailUnified: "Unified Mail",
     sshTunnels: "SSH tunnels",
     networkTools: "Network tools",
     packages: "Packages",

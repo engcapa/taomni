@@ -14,6 +14,7 @@ import {
   Shield,
   FileText,
   MessageSquare,
+  Inbox,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { SessionTree } from "./SessionTree";
@@ -270,6 +271,12 @@ function ToolsPanel({ onCommand }: { onCommand?: (command: AppCommand) => void }
       label: t("menu.codeWorkspace"),
       icon: <FileText className="w-4 h-4 shrink-0" />,
       testId: "sidebar-tool-code-workspace",
+    },
+    {
+      id: "mail-unified",
+      label: t("tabs.mailUnified"),
+      icon: <Inbox className="w-4 h-4 shrink-0" />,
+      testId: "sidebar-tool-mail-unified",
     },
     {
       id: "lan-chat",

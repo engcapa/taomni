@@ -766,7 +766,7 @@ macOS 和 Linux 未执行时标为未验证，不单独阻塞交付。性能基�
 | TASK-13 过滤器 | 已实现 | Rust `mail::filters`（条件/动作语义、存储与 UID 水位、服务器 BODY 搜索走假 IMAP）；Vitest `MailFiltersPanel.test.tsx`、`MailClientTab.test.tsx`（AC-40/AC-42）；TC-MAIL-FILTER-01 | 转发以附件形式发出；正文条件只支持包含/不包含（未缓存正文用服务器 SEARCH）；收信过滤只在标签打开期间运行（DEC-01） |
 | TASK-14 自动配置与证书例外 | 部分 | Rust `mail::autoconfig`、`mail::certs`（本地 TLS 服务器）；TC-MAIL-AUTOCONF-01 | Exchange Autodiscover、RFC 6186 SRV 未实现；Yahoo/AOL/Fastmail OAuth 需厂商客户端 ID；证书固定仅在 Windows 验证 |
 | TASK-15 附件与大邮件 | 已实现 | Rust `mail::parts`（假服务器端到端）；Vitest；TC-MAIL-ATTACH-01 | AC-45 内存峰值未测量 |
-| TASK-16 统一收件箱 | 未开始 | — | 等待 DEC-12（入口形式） |
+| TASK-16 统一收件箱 | 已实现 | Vitest `MailUnifiedTab.test.tsx`（多账户按时间合并、同 UID 跨账户操作路由、单账户失败隔离）；TC-MAIL-UNIFIED-01 | 回复/转发经“Open account”在账户标签内完成；每账户最多合并 200 封；托管用例只有一个假服务器账户，多账户合并仅由 Vitest 覆盖 |
 | TASK-17 发件箱、稍后发送、撤销、回执 | 部分 | Vitest（AC-49/AC-50）；TC-MAIL-OUTBOX-01 | 对收到的回执请求自动应答未实现；稍后发送只在标签打开时生效（DEC-01） |
 | TASK-18 mbox、mailto、退订 | 部分 | Rust `mail::mbox`（往返）、`mail::lists`（RFC 8058 POST）；TC-MAIL-LIST-01 | AC-52 系统 `mailto:` 注册未实施（需要 deep-link 插件与三端安装注册）；Thunderbird 配置目录导入未实现 |
 | TASK-19 通讯录与 CardDAV | 未开始 | — | 等待 DEC-13（vCard/WebDAV 依赖选型） |

@@ -1010,6 +1010,29 @@
 - `[data-testid="mail-folder-sync-error"]` — display [optional] — F-MAIL-5.folder-sync-error
 - `[data-testid="mail-load-more"]` — interactive [optional] — F-MAIL-5.load-more
 
+## mail/unified (F-MAIL-20)
+
+- `[data-testid="sidebar-tool-mail-unified"]` — interactive — F-MAIL-20.open-unified
+- `[data-testid="context-menu-item-mail-unified"]` — interactive [optional] — F-MAIL-20.open-unified-menu
+- `[data-testid="mail-unified-tab"]` — display — F-MAIL-20.unified-tab
+- `[data-testid="mail-unified-refresh"]` — interactive — F-MAIL-20.unified-refresh
+- `[data-testid="mail-unified-status"]` — display — F-MAIL-20.unified-status
+- `[data-testid="mail-unified-row"]` — interactive — F-MAIL-20.unified-row
+- `[data-testid="mail-unified-reader"]` — display — F-MAIL-20.unified-reader
+- `[data-testid="mail-unified-delete"]` — interactive — F-MAIL-20.unified-delete
+- `[data-testid="mail-unified-move"]` — interactive [optional] — F-MAIL-20.unified-move
+- `[data-testid="mail-unified-toggle-read"]` — interactive [optional] — F-MAIL-20.unified-toggle-read
+- `[data-testid="mail-unified-toggle-star"]` — interactive [optional] — F-MAIL-20.unified-toggle-star
+- `[data-testid="mail-unified-open-account"]` — interactive [optional] — F-MAIL-20.unified-open-account
+- `[data-testid="mail-unified-view-inbox"]` — interactive [optional] — F-MAIL-20.unified-view-inbox
+- `[data-testid="mail-unified-view-sent"]` — interactive [optional] — F-MAIL-20.unified-view-sent
+- `[data-testid="mail-unified-view-drafts"]` — interactive [optional] — F-MAIL-20.unified-view-drafts
+- `[data-testid="mail-unified-view-starred"]` — interactive [optional] — F-MAIL-20.unified-view-starred
+- `[data-testid="mail-unified-count"]` — display [optional] — F-MAIL-20.unified-count
+- `[data-testid="mail-unified-account"]` — display [optional] — F-MAIL-20.unified-account-badge
+- `[data-testid="mail-unified-account-error"]` — display [optional] — F-MAIL-20.unified-account-error
+- `[data-testid="mail-unified-empty"]` — display [optional] — F-MAIL-20.unified-empty
+
 ## main (F1.2)
 
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail

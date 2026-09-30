@@ -58,6 +58,7 @@ import { FileBrowser, type SftpPendingUploadRequest } from "../components/filebr
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
 import { MailClientTab } from "../components/mail/MailClientTab";
+import { MailUnifiedTab } from "../components/mail/MailUnifiedTab";
 import { sessionToObjectStorageConfig, objectStorageHasVaultSecret } from "../lib/objectStorage";
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { useSftpStore } from "../stores/sftpStore";
@@ -3495,6 +3496,44 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
+  /** Unified mail across every saved mail account (TASK-16, DEC-12). */
+  const openUnifiedMailTab = useCallback(() => {
+    const existing = tabsRef.current.find((tab) => tab.type === "mail-unified");
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    addTab({
+      id: "mail-unified",
+      type: "mail-unified",
+      title: t("tabs.mailUnified"),
+      closable: true,
+    });
+  }, [addTab, setActiveTab]);
+
+  // Saved mail sessions plus every open mail tab (quick-connect accounts are
+  // not saved); an open tab's info wins because it carries its credentials.
+  const unifiedMailAccounts = useMemo(() => {
+    const byId = new Map<string, MailTabInfo>();
+    for (const session of sessions) {
+      if (session.session_type !== "Mail") continue;
+      byId.set(session.id, sessionToMailTabInfo(
+        session,
+        passwordRefFromOptions(session) ?? undefined,
+        mailSmtpPasswordRefFromOptions(session) ?? undefined,
+      ));
+    }
+    for (const tab of tabs) {
+      if (tab.type === "mail" && tab.mail) byId.set(tab.mail.sessionId, tab.mail);
+    }
+    return [...byId.values()];
+  }, [sessions, tabs]);
+
+  const openMailAccountById = useCallback((sessionId: string) => {
+    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    if (session) openQueuedSession(session);
+  }, [openQueuedSession]);
+
   // Initialize LanChat at app startup (not only when the tab opens) so roster,
   // unread, and desktop notifications work even while the tab is closed.
   useEffect(() => {
@@ -3624,6 +3663,9 @@ export function MainLayout() {
         break;
       case "lan-chat":
         openLanChatTab();
+        break;
+      case "mail-unified":
+        openUnifiedMailTab();
         break;
       case "help":
         setShowAbout(true);
@@ -4546,6 +4588,16 @@ export function MainLayout() {
 
                 {activeTab?.type === "lan-chat" && <LanChatGate />}
 
+                {tabs.some((tab) => tab.type === "mail-unified") && (
+                  <div className="absolute inset-0" style={{ display: activeTab?.type === "mail-unified" ? "block" : "none" }}>
+                    <MailUnifiedTab
+                      accounts={unifiedMailAccounts}
+                      visible={activeTab?.type === "mail-unified"}
+                      onOpenAccount={openMailAccountById}
+                    />
+                  </div>
+                )}
+
                 {/* VNC tabs — always mounted so connection survives tab switches */}
                 {vncTabs.map((tab) => {
                   const vnc = tab.vnc;
@@ -4754,6 +4806,7 @@ export function MainLayout() {
                   activeTab.type !== "redis" &&
                   activeTab.type !== "hbase-shell" &&
                   activeTab.type !== "mail" &&
+                  activeTab.type !== "mail-unified" &&
                   activeTab.type !== "settings" &&
                   activeTab.type !== "git" &&
                   activeTab.type !== "nettools" &&
