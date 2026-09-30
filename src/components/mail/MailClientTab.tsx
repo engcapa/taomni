@@ -71,6 +71,7 @@ import {
   mailSetFlags,
   mailSearchContacts,
   mailSyncAllFolders,
+  mailSyncFolder,
   mailSyncHeaders,
   mailTestConnection,
   type MailAddress,
@@ -80,9 +81,18 @@ import {
   type MailDraftAttachment,
   type MailDraftContext,
   type MailFolder,
+  type MailFolderSyncResult,
   type MailMessageBody,
   type MailMessageHeader,
+  type MailSyncRequestMode,
 } from "../../lib/mail";
+import {
+  countNewMail,
+  folderHasMoreToLoad,
+  mergeFolderMeta,
+  mergeSyncedMessages,
+  runFolderSyncLoop,
+} from "../../lib/mailSync";
 import { RecipientField } from "./RecipientField";
 import { RichMailEditor } from "./RichMailEditor";
 import { MailMessageBodyView } from "./MailMessageBodyView";
@@ -526,6 +536,9 @@ function withSeenFlag(message: MailMessageHeader): MailMessageHeader {
 
 type SpecialFolderKind = "trash" | "junk" | "archive" | "sent";
 
+/** Folders whose new arrivals never raise a new-mail alert. */
+const NEW_MAIL_EXCLUDED_KINDS: SpecialFolderKind[] = ["sent", "trash", "junk"];
+
 const SPECIAL_FOLDER_MATCHERS: Record<SpecialFolderKind, { flag: string; names: string[] }> = {
   trash: { flag: "trash", names: ["trash", "deleted", "已删除", "已刪除", "垃圾桶", "废件箱", "廢件匣"] },
   junk: { flag: "junk", names: ["junk", "spam", "bulk", "垃圾邮件", "垃圾郵件"] },
@@ -612,40 +625,13 @@ function mergeMessagePages(current: MailMessageHeader[], next: MailMessageHeader
   return sortMessages(Array.from(byKey.values()));
 }
 
-function folderHasMoreMessages(folders: readonly MailFolder[], folderName: string, loadedCount: number): boolean {
-  const total = folders.find((folder) => folder.name === folderName)?.total;
-  return typeof total === "number" && total > loadedCount;
+/** Headers per gap-free catch-up step (the loop repeats until caught up). */
+function catchupStepSize(info: MailTabInfo): number {
+  return Math.max(20, Math.min(500, info.sync.maxFetchPerSync || 200));
 }
 
-/**
- * Decide whether a quiet-poll header result should rewrite the visible message
- * list, and compute hasMore from the post-merge loaded count (not just the
- * poll page size). Exported for unit tests of the shipped quiet-poll path.
- */
-export function applyQuietPollMessages(
-  selectedFolderNow: string,
-  polledFolder: string,
-  currentMessages: readonly MailMessageHeader[],
-  polledMessages: readonly MailMessageHeader[],
-  folders: readonly MailFolder[],
-  hasMoreFromServer: boolean,
-): { applyMessages: boolean; messages: MailMessageHeader[]; hasMore: boolean } {
-  if (selectedFolderNow !== polledFolder) {
-    return {
-      applyMessages: false,
-      messages: currentMessages.slice() as MailMessageHeader[],
-      hasMore: false,
-    };
-  }
-  const previousForFolder = currentMessages.filter((message) => message.folder === polledFolder);
-  const messages = mergeMessagePages(previousForFolder, polledMessages.slice());
-  // Quiet poll always uses offset=0, so server hasMore is true whenever the
-  // mailbox is larger than the batch — even if the UI already paged to the end.
-  // Prefer post-merge loaded count (+ folder total). Only trust server hasMore
-  // when the merge did not already exceed the quiet page (fresh/short lists).
-  const hasMore = folderHasMoreMessages(folders, polledFolder, messages.length)
-    || (hasMoreFromServer && messages.length <= polledMessages.length);
-  return { applyMessages: true, messages, hasMore };
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function draftWithSignature(draft: Partial<ComposeDraft>, signature: string | null | undefined): ComposeDraft {
@@ -959,6 +945,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [bodyCache, setBodyCache] = useState<Map<string, MailMessageBody>>(() => new Map());
   const [bodyLoadingKey, setBodyLoadingKey] = useState<string | null>(null);
   const [bodyWarming, setBodyWarming] = useState<BodyWarmState>({ active: false, done: 0, total: 0 });
+  const [syncProgress, setSyncProgress] = useState<{ folder: string; fetched: number; remaining: number } | null>(null);
+  const [backfillProgress, setBackfillProgress] = useState<{ folder: string; cached: number; total: number } | null>(null);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -987,6 +975,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const visibleRef = useRef(visible);
   const pendingCacheRefreshRef = useRef(false);
   const initialSyncDoneRef = useRef(false);
+  /** Bumped by user-driven syncs; stale catch-up loops stop at their next step. */
+  const syncGenerationRef = useRef(0);
+  const backfillSeqRef = useRef(0);
   const contactIndexAccountRef = useRef<string | null>(null);
   const contactSearchSeqRef = useRef(0);
   const bodyCacheRef = useRef<Map<string, MailMessageBody>>(new Map());
@@ -1023,6 +1014,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const oauthReauthRequired = isOAuthReauthRequired(error);
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
   const batchSize = useMemo(() => refreshBatchSize(info), [info.sync.maxFetchPerSync]);
+  const catchupBatchSize = useMemo(() => catchupStepSize(info), [info.sync.maxFetchPerSync]);
   const defaultMailDomain = useMemo(
     () => extractDefaultMailDomain([info.emailAddress, info.imap.username, info.smtp.username]),
     [info.emailAddress, info.imap.username, info.smtp.username],
@@ -1352,7 +1344,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   }, [info.sessionId, updateSelectedFolder]);
 
-  const loadCachedMessages = useCallback(async (folder: string, offset = 0, append = false, quiet = false) => {
+  const loadCachedMessages = useCallback(async (
+    folder: string,
+    offset = 0,
+    append = false,
+    quiet = false,
+    limitOverride?: number,
+  ) => {
     if (!visibleRef.current) {
       pendingCacheRefreshRef.current = true;
       return { page: [] as MailMessageHeader[], hasMore: false };
@@ -1365,16 +1363,24 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
     setError(null);
     try {
-      const cached = await mailListCachedMessages(info.sessionId, folder, pageSize + 1, offset);
+      const limit = Math.max(pageSize, limitOverride ?? pageSize);
+      const cached = await mailListCachedMessages(info.sessionId, folder, limit + 1, offset);
       if (!visibleRef.current) {
         pendingCacheRefreshRef.current = true;
         return { page: [] as MailMessageHeader[], hasMore: false };
       }
-      const page = cached.slice(0, pageSize);
+      const page = cached.slice(0, limit);
       const loadedCount = offset + page.length;
-      const hasMore = cached.length > pageSize || folderHasMoreMessages(foldersRef.current, folder, loadedCount);
+      const hasMore = folderHasMoreToLoad(
+        foldersRef.current.find((entry) => entry.name === folder),
+        loadedCount,
+        cached.length > limit,
+      );
       setHasMoreMessages(hasMore);
-      setMessages((current) => append ? mergeMessagePages(current, page) : sortMessages(page));
+      // Update the ref synchronously: concurrent sync steps merge against it.
+      const next = append ? mergeMessagePages(messagesRef.current, page) : sortMessages(page);
+      messagesRef.current = next;
+      setMessages(next);
       if (!quiet) {
         setStatus(
           append
@@ -1522,140 +1528,225 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   }, [fetchBodyForMessage, info.cache.bodyRecentLimit, info.cache.enabled, info.sessionId]);
 
-  const syncFolder = useCallback(async (
-    folder = selectedFolder,
-    quiet = false,
-    options: SyncFolderOptions = {},
-  ) => {
-    const indicator = options.indicator ?? "sync";
-    const append = options.append ?? false;
-    const offset = Math.max(0, options.offset ?? 0);
-    const limit = Math.max(1, options.limit ?? (offset > 0 ? pageSize : batchSize));
-    const includeBodies = options.includeBodies ?? false;
-    const refreshFolders = options.refreshFolders ?? true;
+  const isNewMailExcludedFolder = useCallback((folder: MailFolder) =>
+    NEW_MAIL_EXCLUDED_KINDS.some((kind) => folderMatchesSpecial(folder, kind))
+    || /draft|草稿/i.test(`${folder.name} ${folderLabel(folder)}`), []);
 
-    if (syncInFlightRef.current) {
-      if (indicator !== "none" && visibleRef.current) {
-        setStatus("Mail sync already running");
+  const isNewMailExcludedName = useCallback((name: string) => {
+    const folder = foldersRef.current.find((entry) => entry.name === name);
+    return folder ? isNewMailExcludedFolder(folder) : false;
+  }, [isNewMailExcludedFolder]);
+
+  const notifyNewMail = useCallback((count: number) => {
+    if (count <= 0) return;
+    pushMailNew(
+      tabId,
+      info.sessionId,
+      info.displayName?.trim() || info.emailAddress || info.sessionId,
+      count,
+    );
+  }, [info.displayName, info.emailAddress, info.sessionId, pushMailNew, tabId]);
+
+  const applySyncedFolder = useCallback((folder: MailFolder) => {
+    const next = mergeFolderMeta(foldersRef.current, folder);
+    foldersRef.current = next;
+    if (visibleRef.current) setFolders(next);
+  }, []);
+
+  /** Reload the visible list from the cache, keeping the loaded depth. */
+  const reloadVisibleFromCache = useCallback(async (folder: string) => {
+    if (!visibleRef.current) {
+      pendingCacheRefreshRef.current = true;
+      return;
+    }
+    if (selectedFolderRef.current !== folder) return;
+    const loaded = messagesRef.current.filter((message) => message.folder === folder).length;
+    await loadCachedMessages(folder, 0, false, true, Math.max(pageSize, loaded));
+  }, [loadCachedMessages, pageSize]);
+
+  /**
+   * Run gap-free sync steps for one folder until the backend reports no more
+   * work (bounded by maxSteps). New headers appear as each step lands; the
+   * visible list is then reloaded from the cache so deletions and flag
+   * changes from other clients show up too.
+   */
+  const runFolderSync = useCallback(async (folder: string, options: {
+    mode?: MailSyncRequestMode;
+    indicator?: SyncIndicator;
+    maxSteps?: number;
+  } = {}) => {
+    const generation = syncGenerationRef.current;
+    const indicator = options.indicator ?? "none";
+    let changed = false;
+    try {
+      const loop = await runFolderSyncLoop({
+        mode: options.mode ?? "auto",
+        maxSteps: options.maxSteps ?? 40,
+        isCancelled: () => syncGenerationRef.current !== generation,
+        step: (mode) => mailSyncFolder(info, folder, { mode, limit: catchupBatchSize, includeBodies: false }),
+        onStep: (result, progress) => {
+          if (result.fetched > 0 || result.vanished > 0 || result.flagsUpdated > 0) changed = true;
+          applySyncedFolder(result.folder);
+          if (!visibleRef.current) {
+            pendingCacheRefreshRef.current = true;
+            return;
+          }
+          const merged = mergeSyncedMessages(
+            selectedFolderRef.current,
+            folder,
+            messagesRef.current,
+            result.messages,
+            sortMessages,
+          );
+          if (merged) {
+            messagesRef.current = merged;
+            setMessages(merged);
+          }
+          if (result.uidValidityReset) {
+            setStatus(`${folderLabel(result.folder)} was rebuilt on the server; resynced`);
+          }
+          if (indicator !== "none" && result.more) {
+            setSyncProgress({ folder, fetched: progress.fetched, remaining: progress.remaining });
+          }
+        },
+      });
+      if (changed && info.cache.enabled) await reloadVisibleFromCache(folder);
+      return loop;
+    } finally {
+      if (indicator !== "none" && visibleRef.current) setSyncProgress(null);
+    }
+  }, [applySyncedFolder, catchupBatchSize, info, reloadVisibleFromCache]);
+
+  /**
+   * Fetch older history for the selected folder in the background (full
+   * header index). Yields to user-triggered syncs and stops on folder switch,
+   * tab hide or unmount; the next open resumes from the stored watermark.
+   */
+  const startBackfill = useCallback((folder: string) => {
+    const meta = foldersRef.current.find((entry) => entry.name === folder);
+    if (!info.cache.enabled || !meta || meta.syncComplete || meta.syncHighUid == null) return;
+    const seq = backfillSeqRef.current + 1;
+    backfillSeqRef.current = seq;
+    const active = () =>
+      backfillSeqRef.current === seq && visibleRef.current && selectedFolderRef.current === folder;
+    void (async () => {
+      try {
+        for (let round = 0; round < 1000; round += 1) {
+          if (!active()) return;
+          if (syncInFlightRef.current) {
+            await delay(800);
+            continue;
+          }
+          syncInFlightRef.current = true;
+          let result: MailFolderSyncResult;
+          try {
+            result = await mailSyncFolder(info, folder, { mode: "backfill", limit: catchupBatchSize });
+          } finally {
+            syncInFlightRef.current = false;
+          }
+          applySyncedFolder(result.folder);
+          if (!active()) return;
+          const cached = result.folder.cachedCount ?? 0;
+          const total = result.folder.total ?? cached;
+          if (!result.more) {
+            setBackfillProgress(null);
+            setHasMoreMessages(folderHasMoreToLoad(
+              result.folder,
+              messagesRef.current.filter((message) => message.folder === folder).length,
+              false,
+            ));
+            return;
+          }
+          setBackfillProgress({ folder, cached, total });
+          setHasMoreMessages(true);
+          await delay(200);
+        }
+      } catch (e) {
+        console.debug("mail history backfill paused", e);
+      } finally {
+        if (backfillSeqRef.current === seq && visibleRef.current) setBackfillProgress(null);
       }
+    })();
+  }, [applySyncedFolder, catchupBatchSize, info]);
+
+  /**
+   * Open / folder-select sync: catch the folder (and INBOX) up completely,
+   * however long the tab was closed.
+   */
+  const syncFolderNow = useCallback(async (
+    folder: string,
+    indicator: SyncIndicator = "sync",
+    notify = false,
+  ) => {
+    if (syncInFlightRef.current) {
+      if (indicator !== "none" && visibleRef.current) setStatus("Mail sync already running");
       return null;
     }
     syncInFlightRef.current = true;
-
-    if (indicator === "more") {
-      setLoadingMoreMessages(true);
-    } else if (indicator === "sync") {
-      setSyncing(true);
-    }
-    if (!quiet && indicator !== "none") setStatus(null);
+    syncGenerationRef.current += 1;
+    if (indicator === "sync") setSyncing(true);
     if (indicator !== "none") setError(null);
-
     try {
-      const result = await mailSyncHeaders(info, folder, {
-        limit,
-        offset,
-        includeBodies,
-        refreshFolders,
-      });
-      if (!visibleRef.current) {
-        pendingCacheRefreshRef.current = true;
-        return result;
+      const primary = await runFolderSync(folder, { indicator });
+      let fetched = primary.fetched;
+      let newUnseen = isNewMailExcludedName(folder) ? 0 : primary.newUnseen;
+      if (folder.trim().toUpperCase() !== "INBOX") {
+        try {
+          const inbox = await runFolderSync("INBOX");
+          fetched += inbox.fetched;
+          newUnseen += inbox.newUnseen;
+        } catch (e) {
+          console.debug("mail INBOX catch-up failed", e);
+        }
       }
-      foldersRef.current = result.folders;
-      setFolders(result.folders);
-      updateSelectedFolder(result.folder);
-      setMessages((current) => mergeMessagePages(
-        current.filter((message) => message.folder === result.folder),
-        result.messages,
-      ));
-      setHasMoreMessages(
-        result.hasMore
-        || folderHasMoreMessages(result.folders, result.folder, offset + result.messages.length),
-      );
-      if (indicator !== "none") {
-        setStatus(
-          append
-            ? result.fetchedMessages > 0 ? `Loaded ${result.fetchedMessages} older messages` : "No more messages"
-            : `Synced ${result.fetchedMessages} headers`,
-        );
+      if (notify) notifyNewMail(newUnseen);
+      if (indicator !== "none" && visibleRef.current) {
+        setStatus(fetched > 0 ? `Synced ${fetched} headers` : "Mailbox up to date");
       }
-      return result;
+      return primary;
     } catch (e) {
-      if (indicator !== "none") setError(mailClientErrorMessage(e));
+      if (visibleRef.current) {
+        if (indicator !== "none") setError(mailClientErrorMessage(e));
+        // Surface the folder failure recorded by the backend.
+        void loadCachedFolders();
+      }
       return null;
     } finally {
       syncInFlightRef.current = false;
-      if (indicator === "more") {
-        if (visibleRef.current) setLoadingMoreMessages(false);
-      } else if (indicator === "sync") {
-        if (visibleRef.current) setSyncing(false);
-      }
+      if (indicator === "sync" && visibleRef.current) setSyncing(false);
     }
-  }, [batchSize, info, pageSize, selectedFolder, updateSelectedFolder]);
+  }, [isNewMailExcludedName, loadCachedFolders, notifyNewMail, runFolderSync]);
 
-  /** Quiet background poll: selected folder (+ INBOX when different), no LIST. */
+  /** Quiet background poll: catch up the selected folder and INBOX, reconcile flags. */
   const quietPollSelectedAndInbox = useCallback(async () => {
     if (syncInFlightRef.current) return;
     syncInFlightRef.current = true;
-    // Snapshot at start; folder switches can happen during awaits (loadCachedMessages
-    // does not take syncInFlightRef).
     const activeFolder = selectedFolderRef.current;
-    const alsoInbox = activeFolder.trim().toUpperCase() !== "INBOX";
     try {
-      const selectedResult = await mailSyncHeaders(info, activeFolder, {
-        limit: batchSize,
-        includeBodies: false,
-        refreshFolders: false,
-      });
-      let folders = selectedResult.folders;
-      if (alsoInbox) {
+      const selected = await runFolderSync(activeFolder, { maxSteps: 10 });
+      let newUnseen = isNewMailExcludedName(activeFolder) ? 0 : selected.newUnseen;
+      if (activeFolder.trim().toUpperCase() !== "INBOX") {
         try {
-          const inboxResult = await mailSyncHeaders(info, "INBOX", {
-            limit: batchSize,
-            includeBodies: false,
-            refreshFolders: false,
-          });
-          // Merge INBOX metadata into the folder tree without switching the UI
-          // selection away from the active folder.
-          const byName = new Map(folders.map((f) => [f.name, f]));
-          for (const f of inboxResult.folders) {
-            byName.set(f.name, f);
-          }
-          folders = Array.from(byName.values());
+          newUnseen += (await runFolderSync("INBOX", { maxSteps: 10 })).newUnseen;
         } catch (e) {
           // Selected-folder refresh already succeeded; inbox is best-effort.
           console.debug("quiet INBOX poll failed", e);
         }
       }
-      if (!visibleRef.current) {
-        pendingCacheRefreshRef.current = true;
-        return;
+      if (info.cache.enabled) {
+        try {
+          await runFolderSync(activeFolder, { mode: "reconcile", maxSteps: 3 });
+        } catch (e) {
+          console.debug("quiet mail reconcile failed", e);
+        }
       }
-      // Always refresh folder badges/metadata from the poll.
-      foldersRef.current = folders;
-      setFolders(folders);
-
-      // Only rewrite the message list if the user is still on the folder we polled.
-      const applied = applyQuietPollMessages(
-        selectedFolderRef.current,
-        selectedResult.folder,
-        messagesRef.current,
-        selectedResult.messages,
-        folders,
-        selectedResult.hasMore,
-      );
-      if (!applied.applyMessages) {
-        return;
-      }
-      messagesRef.current = applied.messages;
-      setMessages(applied.messages);
-      setHasMoreMessages(applied.hasMore);
+      notifyNewMail(newUnseen);
     } catch (e) {
       console.debug("quiet mail poll failed", e);
     } finally {
       syncInFlightRef.current = false;
     }
-  }, [batchSize, info]);
+  }, [info.cache.enabled, isNewMailExcludedName, notifyNewMail, runFolderSync]);
 
   const syncAllFolders = useCallback(async (
     quiet = false,
@@ -1664,7 +1755,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const indicator = options.indicator ?? "sync";
     const limit = Math.max(1, options.limit ?? batchSize);
     const includeBodies = options.includeBodies ?? false;
-    const activeBeforeSync = selectedFolder;
+    const activeBeforeSync = selectedFolderRef.current;
 
     if (syncInFlightRef.current) {
       if (indicator !== "none" && visibleRef.current) {
@@ -1681,35 +1772,45 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     if (indicator !== "none") setError(null);
 
     try {
-      const result = await mailSyncAllFolders(info, { limit, includeBodies });
-      const newMessages = result.newMessages ?? 0;
-      if (indicator === "none" && newMessages > 0) {
-        pushMailNew(
-          tabId,
-          info.sessionId,
-          info.displayName?.trim() || info.emailAddress || info.sessionId,
-          newMessages,
-        );
+      // Manual sync reconciles every cached message; periodic scans only the newest window.
+      const result = await mailSyncAllFolders(info, { limit, includeBodies, fullReconcile: !quiet });
+      foldersRef.current = result.folders;
+      let newMessages = countNewMail(result.newUnseenByFolder, result.folders, isNewMailExcludedFolder);
+      const pending = (result.pendingFolders ?? [])
+        .slice()
+        .sort((a, b) => Number(b === activeBeforeSync) - Number(a === activeBeforeSync))
+        .slice(0, 6);
+      for (const name of pending) {
+        try {
+          const loop = await runFolderSync(name, { maxSteps: 20 });
+          if (!isNewMailExcludedName(name)) newMessages += loop.newUnseen;
+        } catch (e) {
+          console.debug(`mail catch-up for ${name} failed`, e);
+        }
       }
+      if (indicator === "none") notifyNewMail(newMessages);
       if (!visibleRef.current) {
         pendingCacheRefreshRef.current = true;
         return result;
       }
-      foldersRef.current = result.folders;
-      setFolders(result.folders);
-      const nextFolder = result.folders.some((folder) => folder.name === activeBeforeSync)
+      setFolders(foldersRef.current);
+      const nextFolder = foldersRef.current.some((folder) => folder.name === activeBeforeSync)
         ? activeBeforeSync
-        : result.folders[0]?.name ?? activeBeforeSync;
+        : foldersRef.current[0]?.name ?? activeBeforeSync;
       if (nextFolder !== activeBeforeSync) {
         updateSelectedFolder(nextFolder);
       }
-      await loadCachedMessages(nextFolder, 0, false, quiet || indicator === "none");
+      const loaded = messagesRef.current.filter((message) => message.folder === nextFolder).length;
+      await loadCachedMessages(nextFolder, 0, false, quiet || indicator === "none", Math.max(pageSize, loaded));
+      const failed = result.failedFolders ?? [];
       if (indicator !== "none") {
         setStatus(
-          `Synced ${result.fetchedMessages} new headers across ${result.folders.length} folders`,
+          `Synced ${result.fetchedMessages} new headers across ${result.folders.length} folders`
+          + (failed.length > 0 ? `; ${failed.length} folder${failed.length === 1 ? "" : "s"} failed` : ""),
         );
       }
-      void warmRecentBodies(result.folders, nextFolder);
+      void warmRecentBodies(foldersRef.current, nextFolder);
+      startBackfill(nextFolder);
       return result;
     } catch (e) {
       if (indicator !== "none") setError(mailClientErrorMessage(e));
@@ -1720,7 +1821,19 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         if (visibleRef.current) setSyncing(false);
       }
     }
-  }, [batchSize, info, loadCachedMessages, pushMailNew, selectedFolder, tabId, updateSelectedFolder, warmRecentBodies]);
+  }, [
+    batchSize,
+    info,
+    isNewMailExcludedFolder,
+    isNewMailExcludedName,
+    loadCachedMessages,
+    notifyNewMail,
+    pageSize,
+    runFolderSync,
+    startBackfill,
+    updateSelectedFolder,
+    warmRecentBodies,
+  ]);
 
   const loadBody = useCallback(async (message: MailMessageHeader) => {
     const key = messageKey(message);
@@ -1944,12 +2057,11 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   useEffect(() => {
     if (!visible || !info.sync.onOpen || initialSyncDoneRef.current) return;
     initialSyncDoneRef.current = true;
-    void syncFolder(selectedFolder, true, {
-      limit: batchSize,
-      includeBodies: false,
-      indicator: "sync",
-    });
-  }, [batchSize, info.sync.onOpen, selectedFolder, syncFolder, visible]);
+    const folder = selectedFolder;
+    // Catch up everything that arrived while the tab was closed, then keep
+    // backfilling older history for the full local header index.
+    void syncFolderNow(folder, "sync", true).then(() => startBackfill(folder));
+  }, [info.sync.onOpen, selectedFolder, startBackfill, syncFolderNow, visible]);
 
   // Quiet background poll: most ticks refresh selected folder (+ INBOX when
   // different) without remote LIST. Every 6th tick does a full-folder scan for
@@ -2041,7 +2153,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   }, [messages]);
 
   const handleFolderSelect = (folder: MailFolder) => {
+    const changed = folder.name !== selectedFolderRef.current;
     updateSelectedFolder(folder.name);
+    if (changed) {
+      backfillSeqRef.current += 1;
+      setBackfillProgress(null);
+      void syncFolderNow(folder.name, "none").then(() => startBackfill(folder.name));
+    }
     setSelectedMessageKey(null);
     setCheckedMessageKeys(new Set());
     setBody(null);
@@ -2095,18 +2213,51 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const loadMoreMessages = useCallback(async () => {
     if (query.trim() || loadingMessages || loadingMoreMessages || !hasMoreMessages) return;
-    const result = await syncFolder(selectedFolder, true, {
-      limit: pageSize,
-      offset: messages.length,
-      includeBodies: false,
-      append: true,
-      indicator: "more",
-    });
-    if (!result) {
-      await loadCachedMessages(selectedFolder, messages.length, true);
+    const folder = selectedFolder;
+    const loaded = messages.length;
+    if (!info.cache.enabled) {
+      // No cache to page: fall back to server offset paging.
+      setLoadingMoreMessages(true);
+      try {
+        const result = await mailSyncHeaders(info, folder, { limit: pageSize, offset: loaded, refreshFolders: false });
+        const merged = mergeSyncedMessages(selectedFolderRef.current, folder, messagesRef.current, result.messages, sortMessages);
+        if (merged) {
+          messagesRef.current = merged;
+          setMessages(merged);
+        }
+        setHasMoreMessages(result.hasMore);
+      } catch (e) {
+        setError(mailClientErrorMessage(e));
+      } finally {
+        setLoadingMoreMessages(false);
+      }
+      return;
+    }
+    // Cache first; only when the cache is exhausted backfill older history.
+    const { page } = await loadCachedMessages(folder, loaded, true);
+    if (page.length > 0) return;
+    const meta = foldersRef.current.find((entry) => entry.name === folder);
+    if (!meta || meta.syncComplete || syncInFlightRef.current) {
+      if (meta?.syncComplete) setHasMoreMessages(false);
+      return;
+    }
+    syncInFlightRef.current = true;
+    setLoadingMoreMessages(true);
+    try {
+      const result = await mailSyncFolder(info, folder, { mode: "backfill", limit: pageSize });
+      applySyncedFolder(result.folder);
+      await loadCachedMessages(folder, loaded, true);
+      if (!result.more && result.fetched === 0) setStatus("No more messages");
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+    } finally {
+      syncInFlightRef.current = false;
+      setLoadingMoreMessages(false);
     }
   }, [
+    applySyncedFolder,
     hasMoreMessages,
+    info,
     loadCachedMessages,
     loadingMessages,
     loadingMoreMessages,
@@ -2114,7 +2265,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     pageSize,
     query,
     selectedFolder,
-    syncFolder,
   ]);
 
   const handleMessageListScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
@@ -3250,7 +3400,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const activeFolder = displayFolders.find((folder) => folder.name === selectedFolder) ?? displayFolders[0];
   const cacheLine = info.cache.enabled
-    ? `${info.cache.headerRetentionDays}d headers, ${info.cache.bodyRecentLimit} recent bodies`
+    ? `${info.cache.headerRetentionDays > 0 ? `${info.cache.headerRetentionDays}d` : "all"} headers, ${info.cache.bodyRecentLimit} recent bodies`
     : "cache off";
   const renderReaderSurface = (message: MailMessageHeader | null, popup = false) => {
     const currentBody = message
@@ -3458,6 +3608,29 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           Sync
         </button>
+        {syncProgress && (
+          <span
+            className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+            data-testid="mail-sync-progress"
+            data-folder={syncProgress.folder}
+            title={`Catching up ${syncProgress.folder}`}
+          >
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Catching up {syncProgress.fetched}
+            {syncProgress.remaining > 0 ? ` / ${syncProgress.fetched + syncProgress.remaining}` : ""}
+          </span>
+        )}
+        {backfillProgress && (
+          <span
+            className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+            data-testid="mail-backfill-progress"
+            data-folder={backfillProgress.folder}
+            title={`Downloading older headers of ${backfillProgress.folder}`}
+          >
+            <Loader2 className="w-3 h-3 animate-spin" />
+            History {backfillProgress.cached}/{backfillProgress.total}
+          </span>
+        )}
         {bodyWarming.active && (
           <span
             className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
@@ -3666,11 +3839,25 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                         className={`w-full h-7 pr-3 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""}`}
                         style={{ paddingLeft: `${12 + Math.min(folderDepth(folder), 6) * 14}px` }}
                         data-active={active || undefined}
+                        data-testid="mail-folder-row"
+                        data-folder-name={folder.name}
+                        data-unread={folder.unread ?? 0}
+                        data-sync-error={folder.lastError ? "true" : undefined}
                         onClick={() => handleFolderSelect(folder)}
                         onContextMenu={(event) => mailMenu.show(event, folderMenuItems(folder))}
                       >
                         <span className="text-[var(--taomni-text-muted)]">{folderIcon(folder)}</span>
                         <span className="min-w-0 flex-1 truncate" title={label === folder.name ? folder.name : `${label} (${folder.name})`}>{label}</span>
+                        {folder.lastError && (
+                          <span
+                            className="text-[var(--taomni-warning,#d97706)]"
+                            data-testid="mail-folder-sync-error"
+                            title={`Sync failed: ${folder.lastError}`}
+                            aria-label={`Sync failed: ${folder.lastError}`}
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                          </span>
+                        )}
                         {folder.unread !== null && folder.unread !== undefined && folder.unread > 0 && (
                           <span className="text-[11px] text-[var(--taomni-accent)]">{folder.unread}</span>
                         )}
@@ -3710,7 +3897,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   />
                   <span className="text-[12px] font-semibold truncate" title={activeFolder?.name}>{folderLabel(activeFolder)}</span>
                 </div>
-                <span className="text-[11px] text-[var(--taomni-text-muted)]">
+                <span
+                  className="text-[11px] text-[var(--taomni-text-muted)]"
+                  data-testid="mail-message-count"
+                  data-count={messages.length}
+                  data-has-more={hasMoreMessages ? "true" : "false"}
+                >
                   {loadingMessages ? "Loading" : `${filteredMessages.length}/${messages.length}${!query.trim() && hasMoreMessages ? "+" : ""}`}
                 </span>
               </div>
@@ -3739,6 +3931,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                           role="button"
                           tabIndex={0}
                           aria-pressed={active}
+                          data-testid="mail-message-row"
+                          data-uid={message.uid}
+                          data-unread={unread ? "true" : "false"}
+                          data-flagged={isFlagged(message) ? "true" : "false"}
                           className={`w-full min-h-[82px] px-3 py-2.5 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] cursor-pointer ${active ? "bg-[var(--taomni-selected)]" : ""}`}
                           onClick={() => selectMessage(message, "mailbox")}
                           onDoubleClick={() => openMessageTab(message)}
@@ -3785,6 +3981,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                           className="taomni-btn h-7 w-full inline-flex items-center justify-center gap-1.5 text-[12px]"
                           onClick={() => void loadMoreMessages()}
                           disabled={loadingMoreMessages}
+                          data-testid="mail-load-more"
                         >
                           {loadingMoreMessages ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           Load older messages

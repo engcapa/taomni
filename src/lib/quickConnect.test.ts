@@ -148,3 +148,32 @@ describe("parseQuickConnectInput", () => {
     });
   });
 });
+
+describe("mail quick connect", () => {
+  it("derives a stable session id so reopening reuses the mail cache", () => {
+    const first = parseQuickConnectInput("mail://me@example.com@imap.example.com");
+    const second = parseQuickConnectInput("mail://me@example.com@imap.example.com");
+    expect(first.config.id).toBe(second.config.id);
+    expect(first.config.id).toBe("quick-mail-me@example.com@imap.example.com_993");
+    expect(first.config.port).toBe(993);
+    const options = JSON.parse(first.config.options_json);
+    expect(options.mailImapSecurity).toBe("TLS");
+    expect(options.mailSmtpHost).toBe("smtp.example.com");
+    expect(options.mailSmtpPort).toBe("465");
+    expect(options.mailHeaderLimitPerFolder).toBe("0");
+  });
+
+  it("accepts a password, plain security and an explicit SMTP endpoint", () => {
+    const parsed = parseQuickConnectInput("mail://qa:secret@127.0.0.1:1143?security=none&smtp=127.0.0.1:1025");
+    expect(parsed.authData).toBe("secret");
+    expect(parsed.config.host).toBe("127.0.0.1");
+    expect(parsed.config.port).toBe(1143);
+    expect(parsed.config.username).toBe("qa");
+    const options = JSON.parse(parsed.config.options_json);
+    expect(options.mailImapSecurity).toBe("None");
+    expect(options.mailSmtpHost).toBe("127.0.0.1");
+    expect(options.mailSmtpPort).toBe("1025");
+    expect(options.mailSmtpSecurity).toBe("None");
+    expect(parsed.config.options_json).not.toContain("secret");
+  });
+});

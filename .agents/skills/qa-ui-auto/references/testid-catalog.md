@@ -863,6 +863,16 @@
 - `[data-testid="mail-sync-button"]` — interactive — F-MAIL-3.sync-button
 - `[data-testid="mail-body-warming-progress"]` — display [optional] — F-MAIL-3.body-warming-progress
 
+## mail/sync (F-MAIL-5)
+
+- `[data-testid="mail-message-count"]` — display — F-MAIL-5.message-count
+- `[data-testid="mail-message-row"]` — interactive — F-MAIL-5.message-row
+- `[data-testid="mail-folder-row"]` — interactive — F-MAIL-5.folder-row
+- `[data-testid="mail-sync-progress"]` — display [optional] — F-MAIL-5.sync-progress
+- `[data-testid="mail-backfill-progress"]` — display [optional] — F-MAIL-5.backfill-progress
+- `[data-testid="mail-folder-sync-error"]` — display [optional] — F-MAIL-5.folder-sync-error
+- `[data-testid="mail-load-more"]` — interactive [optional] — F-MAIL-5.load-more
+
 ## main (F1.2)
 
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail

@@ -5195,6 +5195,56 @@ controls:
 - 主题下拉整合 Match app theme、Code View 色板与 Terminal color themes，但预览统一使用邮件正文语义。
 - 底部预览展示邮件列表 + HTML 正文片段。
 
+
+---
+
+### 13.5 无缺口邮件同步与完整邮件头索引 ✅
+
+<!-- feature
+id: F-MAIL-5
+status: done
+area: mail/sync
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailSync.ts
+  - src/lib/mail.ts
+  - src/lib/quickConnect.ts
+  - src/stubs/mailServerStub.ts
+  - src-tauri/src/mail/sync.rs
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: message-count
+    selector: '[data-testid="mail-message-count"]'
+    kind: display
+  - id: message-row
+    selector: '[data-testid="mail-message-row"]'
+    kind: interactive
+  - id: folder-row
+    selector: '[data-testid="mail-folder-row"]'
+    kind: interactive
+  - id: sync-progress
+    selector: '[data-testid="mail-sync-progress"]'
+    kind: display
+    optional: true       # only visible while a multi-step catch-up is running
+  - id: backfill-progress
+    selector: '[data-testid="mail-backfill-progress"]'
+    kind: display
+    optional: true       # only visible while older history is being backfilled
+  - id: folder-sync-error
+    selector: '[data-testid="mail-folder-sync-error"]'
+    kind: display
+    optional: true       # only rendered for folders whose last sync failed
+  - id: load-more
+    selector: '[data-testid="mail-load-more"]'
+    kind: interactive
+    optional: true       # only rendered while more cached rows or older history remain
+-->
+
+- 同步按持久化的连续 UID 区间 `[sync_low_uid, sync_high_uid]` 进行：打开/重开、定时刷新与手工刷新都按“服务器 UID − 缓存 UID”集合差分批补齐，直到后端 `more=false`，关闭任意时长后重开不再漏收（设计 `docs-feature/mail-thunderbird-parity-design.md` AC-01～AC-12）。
+- 定时刷新在 catch-up 之后对最新窗口对账，手工刷新对全区间对账：服务器端删除/移动的邮件从缓存移除，已读/未读/星标以 FETCH FLAGS 为准（CONDSTORE 可用时用 `CHANGEDSINCE`）。
+- 列表只读本地缓存；缓存到底后“加载更早邮件”向服务器回补历史，选中文件夹在后台回补并显示进度。默认保留全部邮件头（0 = 不限制），按天保留时使用服务器到达时间。
+- 同一 Quick Connect 邮件地址复用同一会话缓存；`mail://user:pass@host:port?security=none&smtp=host:port` 支持口令、明文/STARTTLS 与 SMTP 端点。
 ---
 
 ## 14. SocksCap 网络流量路由

@@ -29,6 +29,7 @@ import {
 import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
 import { ensureVaultReady } from "../../lib/vaultGate";
+import { MAIL_HEADER_LIMITS_EXPLICIT_KEY, mailHeaderLimitOption } from "../../lib/mailSync";
 import {
   selectFilePath,
   selectFolderPath,
@@ -1809,6 +1810,8 @@ function MailSettings({
           className="taomni-input w-20 ml-1"
           value={headerLimitPerFolder}
           aria-label="Mail header limit per folder"
+          placeholder="0"
+          title="0 keeps every header (full local index)"
           onChange={(e) => setHeaderLimitPerFolder(e.target.value)}
         />
         <span className="ml-3 text-[var(--taomni-text-muted)]">Days</span>
@@ -1816,8 +1819,11 @@ function MailSettings({
           className="taomni-input w-16 ml-1"
           value={headerRetentionDays}
           aria-label="Mail header retention days"
+          placeholder="0"
+          title="0 keeps headers of any age; otherwise by server arrival time"
           onChange={(e) => setHeaderRetentionDays(e.target.value)}
         />
+        <span className="ml-1 text-[11px] text-[var(--taomni-text-muted)]">0 = all</span>
         <span className="ml-3 text-[var(--taomni-text-muted)]">Bodies</span>
         <input
           className="taomni-input w-16 ml-1"
@@ -2604,8 +2610,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailOauthStatus, setMailOauthStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [mailCacheEnabled, setMailCacheEnabled] = useState(() => optionBoolean(initialOptions, "mailCacheEnabled", true));
   const [mailSaveDirectory, setMailSaveDirectory] = useState(() => optionString(initialOptions, "mailSaveDirectory", ""));
-  const [mailHeaderRetentionDays, setMailHeaderRetentionDays] = useState(() => optionString(initialOptions, "mailHeaderRetentionDays", "30"));
-  const [mailHeaderLimitPerFolder, setMailHeaderLimitPerFolder] = useState(() => optionString(initialOptions, "mailHeaderLimitPerFolder", "2000"));
+  const [mailHeaderRetentionDays, setMailHeaderRetentionDays] = useState(() => String(mailHeaderLimitOption(initialOptions, "mailHeaderRetentionDays", 30)));
+  const [mailHeaderLimitPerFolder, setMailHeaderLimitPerFolder] = useState(() => String(mailHeaderLimitOption(initialOptions, "mailHeaderLimitPerFolder", 2000)));
   const [mailBodyRecentLimit, setMailBodyRecentLimit] = useState(() => optionString(initialOptions, "mailBodyRecentLimit", "200"));
   const [mailBodyMaxBytes, setMailBodyMaxBytes] = useState(() => optionString(initialOptions, "mailBodyMaxBytes", "262144"));
   const [mailAttachmentCache, setMailAttachmentCache] = useState(() => optionBoolean(initialOptions, "mailAttachmentCache", false));
@@ -2959,6 +2965,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailSaveDirectory,
           mailHeaderRetentionDays,
           mailHeaderLimitPerFolder,
+          [MAIL_HEADER_LIMITS_EXPLICIT_KEY]: true,
           mailBodyRecentLimit,
           mailBodyMaxBytes,
           mailAttachmentCache,
@@ -3527,8 +3534,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailOauthStatus(null);
     setMailCacheEnabled(optionBoolean(nextOptions, "mailCacheEnabled", true));
     setMailSaveDirectory(optionString(nextOptions, "mailSaveDirectory", ""));
-    setMailHeaderRetentionDays(optionString(nextOptions, "mailHeaderRetentionDays", "30"));
-    setMailHeaderLimitPerFolder(optionString(nextOptions, "mailHeaderLimitPerFolder", "2000"));
+    setMailHeaderRetentionDays(String(mailHeaderLimitOption(nextOptions, "mailHeaderRetentionDays", 30)));
+    setMailHeaderLimitPerFolder(String(mailHeaderLimitOption(nextOptions, "mailHeaderLimitPerFolder", 2000)));
     setMailBodyRecentLimit(optionString(nextOptions, "mailBodyRecentLimit", "200"));
     setMailBodyMaxBytes(optionString(nextOptions, "mailBodyMaxBytes", "262144"));
     setMailAttachmentCache(optionBoolean(nextOptions, "mailAttachmentCache", false));

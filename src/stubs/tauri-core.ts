@@ -1,3 +1,14 @@
+import {
+  installStubMailQaControl,
+  stubMailClearCache,
+  stubMailFindHeader,
+  stubMailListCached,
+  stubMailListFolders,
+  stubMailSyncAll,
+  stubMailSyncFolder,
+  stubMailUpdateCachedFlags,
+  type Seed as MailStubSeed,
+} from "./mailServerStub";
 import type { SessionConfig, SessionGroup, LocalShellOption, LocalDirectoryShortcut, IpcRunSnapshotRecord, IpcSnapshotEntry } from "../lib/ipc";
 import {
   isSshSession,
@@ -1379,22 +1390,6 @@ function stubMailAccountId(args?: InvokeArgs): string {
   return ((args?.accountId as string | undefined) ?? config?.sessionId ?? "stub-mail").trim() || "stub-mail";
 }
 
-function stubMailFolderList(accountId: string) {
-  const now = Math.floor(Date.now() / 1000);
-  return MAIL_STUB_FOLDERS.map((folder) => ({
-    accountId,
-    name: folder.name,
-    displayName: folder.displayName,
-    delimiter: "/",
-    flags: [],
-    uidValidity: 1,
-    uidNext: 100,
-    total: folder.total,
-    unread: folder.unread,
-    updatedAt: now,
-  }));
-}
-
 function stubMailMessages(accountId: string, folder: string) {
   const now = Math.floor(Date.now() / 1000);
   const inbox = [
@@ -1469,8 +1464,17 @@ function stubMailMessages(accountId: string, folder: string) {
   return inbox;
 }
 
+const mailStubSeed: MailStubSeed = (accountId) => ({
+  meta: MAIL_STUB_FOLDERS.map((folder) => ({ name: folder.name, displayName: folder.displayName })),
+  messages: (folder) => stubMailMessages(accountId, folder),
+});
+
+if (typeof window !== "undefined") installStubMailQaControl(mailStubSeed);
+
 function stubMailBody(accountId: string, folder: string, uid: number) {
-  const header = stubMailMessages(accountId, folder).find((message) => message.uid === uid) ?? stubMailMessages(accountId, folder)[0];
+  const header = stubMailFindHeader(accountId, mailStubSeed, folder, uid)
+    ?? stubMailMessages(accountId, folder).find((message) => message.uid === uid)
+    ?? stubMailMessages(accountId, folder)[0];
   const html = uid === 89
     ? `<h2>Ops Digest</h2><p>The reader sanitizes HTML and blocks tracking images.</p><p><img src="https://example.com/tracker.png" alt="tracker"></p><table><tr><td>Queue</td><td>Healthy</td></tr></table>`
     : null;
@@ -3972,7 +3976,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     // ---------- Mail client commands (browser preview stubs) ----------
     case "mail_list_cached_folders": {
-      return stubMailFolderList(stubMailAccountId(args as InvokeArgs | undefined)) as T;
+      return stubMailListFolders(stubMailAccountId(args as InvokeArgs | undefined), mailStubSeed) as T;
     }
     case "mail_list_cached_messages": {
       const invokeArgs = args as InvokeArgs | undefined;
@@ -3980,7 +3984,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
       const limit = Math.max(0, Number((invokeArgs?.limit as number | undefined) ?? 200));
       const offset = Math.max(0, Number((invokeArgs?.offset as number | undefined) ?? 0));
-      return stubMailMessages(accountId, folder).slice(offset, offset + limit) as T;
+      return stubMailListCached(accountId, mailStubSeed, folder, limit, offset) as T;
     }
     case "mail_sync_headers": {
       const invokeArgs = args as InvokeArgs | undefined;
@@ -3993,7 +3997,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return {
         accountId,
         folder,
-        folders: stubMailFolderList(accountId),
+        folders: stubMailListFolders(accountId, mailStubSeed),
         messages: page,
         fetchedMessages: page.length,
         cachedBodies: page.filter((message) => message.bodyCached).length,
@@ -4003,18 +4007,19 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         hasMore: offset + page.length < messages.length,
       } as T;
     }
+    case "mail_sync_folder": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const folder = ((invokeArgs?.folder as string | null | undefined) ?? "INBOX") || "INBOX";
+      const mode = (invokeArgs?.mode as string | null | undefined) ?? "auto";
+      const limit = Math.max(1, Number((invokeArgs?.limit as number | null | undefined) ?? 200));
+      return stubMailSyncFolder(accountId, mailStubSeed, folder, mode, limit) as T;
+    }
     case "mail_sync_all_folders": {
       const invokeArgs = args as InvokeArgs | undefined;
       const accountId = stubMailAccountId(invokeArgs);
-      const folders = stubMailFolderList(accountId);
-      const messages = folders.flatMap((folder) => stubMailMessages(accountId, folder.name));
-      return {
-        accountId,
-        folders,
-        fetchedMessages: messages.length,
-        cachedBodies: messages.filter((message) => message.bodyCached).length,
-        syncedAt: Math.floor(Date.now() / 1000),
-      } as T;
+      const limit = Math.max(1, Number((invokeArgs?.limit as number | null | undefined) ?? 50));
+      return stubMailSyncAll(accountId, mailStubSeed, limit) as T;
     }
     case "mail_get_message_body": {
       const invokeArgs = args as InvokeArgs | undefined;
@@ -4031,8 +4036,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "mail_mark_read": {
       const invokeArgs = args as InvokeArgs | undefined;
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
-      const uids = Array.isArray(invokeArgs?.uids) ? invokeArgs?.uids as unknown[] : [];
+      const uids = Array.isArray(invokeArgs?.uids) ? (invokeArgs?.uids as unknown[]).map(Number) : [];
       const all = Boolean(invokeArgs?.all);
+      stubMailUpdateCachedFlags(stubMailAccountId(invokeArgs), folder, uids, ["\\Seen"], []);
       return { folder, marked: all ? 1 : uids.length } as T;
     }
     case "mail_send_message": {
@@ -4099,6 +4105,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "mail_clear_cache": {
+      stubMailClearCache(stubMailAccountId(args as InvokeArgs | undefined));
       return undefined as T;
     }
     case "db_append_history": {

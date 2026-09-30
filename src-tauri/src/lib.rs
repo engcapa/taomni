@@ -876,6 +876,7 @@ pub fn run() {
             mail::mail_oauth_device_complete,
             mail::mail_sync_headers,
             mail::mail_sync_all_folders,
+            mail::mail_sync_folder,
             mail::mail_list_cached_folders,
             mail::mail_list_cached_messages,
             mail::mail_get_message_body,

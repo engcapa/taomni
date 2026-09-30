@@ -165,7 +165,12 @@ def _run_browser_case_inner(payload: dict) -> dict:
                 if verb not in STEP_REGISTRY:
                     raise StepError(f"unknown verb: {verb}")
                 # Resolve placeholders to ensure ${cfg.x.y} / ${env.X} all bind.
-                cfg_mod.resolve(args, cfg=cfg, env=env)
+                # ${fixture.*} only binds after fixtures ran (as in native dry-run).
+                try:
+                    cfg_mod.resolve(args, cfg=cfg, env=env)
+                except KeyError as e:
+                    if "fixture value not set" not in str(e):
+                        raise
             result["status"] = "passed"
             result["duration_sec"] = time.time() - started
             return result

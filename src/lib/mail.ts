@@ -25,6 +25,14 @@ export interface MailFolder {
   total?: number | null;
   unread?: number | null;
   updatedAt: number;
+  /** Contiguous cached UID span (gap-free sync watermark). */
+  syncLowUid?: number | null;
+  syncHighUid?: number | null;
+  /** True when no older history remains to backfill. */
+  syncComplete?: boolean;
+  cachedCount?: number | null;
+  /** Last sync error for this folder; cleared by the next successful sync. */
+  lastError?: string | null;
 }
 
 export interface MailMessageHeader {
@@ -74,13 +82,56 @@ export interface MailSyncResult {
   hasMore: boolean;
 }
 
+export interface MailFolderError {
+  name: string;
+  error: string;
+}
+
 export interface MailSyncAllResult {
   accountId: string;
   folders: MailFolder[];
   fetchedMessages: number;
+  /** New unseen mail across folders (never initial sync, repair or backfill). */
   newMessages?: number;
+  newUnseenByFolder?: Record<string, number>;
+  failedFolders?: MailFolderError[];
+  /** Folders whose catch-up needs more steps (call mailSyncFolder). */
+  pendingFolders?: string[];
   cachedBodies: number;
   syncedAt: number;
+}
+
+export type MailSyncRequestMode = "auto" | "catchup" | "backfill" | "reconcile" | "reconcileFull";
+export type MailSyncMode =
+  | "initial"
+  | "repair"
+  | "catchup"
+  | "backfill"
+  | "reconcile"
+  | "reconcileFull"
+  | "uncached";
+
+export interface MailFolderSyncResult {
+  accountId: string;
+  folder: MailFolder;
+  mode: MailSyncMode;
+  messages: MailMessageHeader[];
+  fetched: number;
+  newUnseen: number;
+  vanished: number;
+  flagsUpdated: number;
+  remainingNew: number;
+  /** Call again to finish the requested work. */
+  more: boolean;
+  syncComplete: boolean;
+  uidValidityReset: boolean;
+  syncedAt: number;
+}
+
+export interface MailSyncFolderOptions {
+  mode?: MailSyncRequestMode;
+  limit?: number;
+  includeBodies?: boolean;
 }
 
 export interface MailSyncOptions {
@@ -290,11 +341,29 @@ export function mailSyncHeaders(
 
 export function mailSyncAllFolders(
   config: MailTabInfo,
-  options: Pick<MailSyncOptions, "limit" | "includeBodies"> = {},
+  options: Pick<MailSyncOptions, "limit" | "includeBodies"> & { fullReconcile?: boolean } = {},
 ): Promise<MailSyncAllResult> {
   return withVaultLockedNotice(() =>
     invoke<MailSyncAllResult>("mail_sync_all_folders", {
       config,
+      limit: options.limit ?? null,
+      includeBodies: options.includeBodies ?? null,
+      fullReconcile: options.fullReconcile ?? null,
+    }),
+  );
+}
+
+/** One gap-free sync step for a folder; repeat while `result.more`. */
+export function mailSyncFolder(
+  config: MailTabInfo,
+  folder: string,
+  options: MailSyncFolderOptions = {},
+): Promise<MailFolderSyncResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailFolderSyncResult>("mail_sync_folder", {
+      config,
+      folder,
+      mode: options.mode ?? null,
       limit: options.limit ?? null,
       includeBodies: options.includeBodies ?? null,
     }),

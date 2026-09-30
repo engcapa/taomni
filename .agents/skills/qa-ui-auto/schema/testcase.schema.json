@@ -84,7 +84,8 @@
           "parity006_replace",
           "parity008_git",
           "parity009_ssr",
-          "parity007_extract"
+          "parity007_extract",
+          "mail_server"
         ]
       },
       "uniqueItems": true
@@ -1046,6 +1047,92 @@
               "type": "string"
             }
           }
+        },
+        "mail_server_deliver": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            },
+            "prefix": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "mail_server_expunge_newest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "mail_server_set_flags_newest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "flags"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            },
+            "flags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "mail_server_assert_list_matches": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "folder": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unread": {
+                  "type": "boolean"
+                },
+                "timeout_sec": {
+                  "type": "number",
+                  "minimum": 1
+                }
+              }
+            }
+          ]
         }
       }
     },

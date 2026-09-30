@@ -2627,6 +2627,82 @@ def _find_quiet(ctx: NativeStepContext, selector: str) -> bool:
         return False
 
 
+def _mail_server() -> Any:
+    from . import mail_fake_server
+
+    server = mail_fake_server.ACTIVE
+    if server is None:
+        raise StepError("mail_server_*: the mail_server fixture is not active")
+    return server
+
+
+def _mail_args(args: Any, name: str, *, need_count: bool = True) -> tuple[str, int]:
+    args = args if isinstance(args, dict) else {}
+    count = args.get("count", 0)
+    if need_count and (not isinstance(count, int) or count < 1):
+        raise StepError(f"{name}: expected {{count: positive int, folder?}}")
+    return str(args.get("folder") or "INBOX"), int(count or 0)
+
+
+@_verb("mail_server_deliver")
+def _do_mail_server_deliver(ctx: NativeStepContext, args: Any) -> str:
+    folder, count = _mail_args(args, "mail_server_deliver")
+    uids = _mail_server().state.deliver(folder, count, prefix=str(args.get("prefix") or "QA"))
+    return f"delivered {len(uids)} to {folder} (uids {uids[0]}..{uids[-1]})"
+
+
+@_verb("mail_server_expunge_newest")
+def _do_mail_server_expunge_newest(ctx: NativeStepContext, args: Any) -> str:
+    folder, count = _mail_args(args, "mail_server_expunge_newest")
+    state = _mail_server().state
+    uids = state.newest_uids(folder, count)
+    state.expunge(folder, uids)
+    return f"expunged {uids} from {folder}"
+
+
+@_verb("mail_server_set_flags_newest")
+def _do_mail_server_set_flags_newest(ctx: NativeStepContext, args: Any) -> str:
+    folder, count = _mail_args(args, "mail_server_set_flags_newest")
+    flags = args.get("flags")
+    if not isinstance(flags, list):
+        raise StepError("mail_server_set_flags_newest: flags must be a list")
+    state = _mail_server().state
+    uids = state.newest_uids(folder, count)
+    state.set_flags(folder, uids, [str(flag) for flag in flags])
+    return f"set {flags} on {uids} in {folder}"
+
+
+@_verb("mail_server_assert_list_matches")
+def _do_mail_server_assert_list_matches(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    folder = str(args.get("folder") or "INBOX")
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 30))
+    observed: Any = None
+    while time.time() < deadline:
+        with state.lock:
+            messages = state.folders[folder].messages
+            server = len(messages)
+            server_unread = sum(1 for m in messages.values() if "\\Seen" not in m.flags)
+        observed = ctx.session.execute(
+            "const el = document.querySelector('[data-testid=\"mail-message-count\"]');"
+            "return {shown: el ? Number(el.getAttribute('data-count')) : -1,"
+            " hasMore: el ? el.getAttribute('data-has-more') : null,"
+            " unreadRows: document.querySelectorAll('[data-testid=\"mail-message-row\"][data-unread=\"true\"]').length};"
+        )
+        if (
+            isinstance(observed, dict)
+            and observed.get("shown") == server
+            and observed.get("hasMore") == "false"
+            and (not args.get("unread") or observed.get("unreadRows") == server_unread)
+        ):
+            return f"list matches server: {server} messages, {server_unread} unread"
+        time.sleep(0.5)
+    raise StepError(
+        f"mail_server_assert_list_matches: server={server} unread={server_unread} ui={observed!r}"
+    )
+
+
 def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:
     fn = VERBS.get(verb)
     if fn is None:

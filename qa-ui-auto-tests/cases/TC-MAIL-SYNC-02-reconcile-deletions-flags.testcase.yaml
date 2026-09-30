@@ -1,0 +1,102 @@
+id: TC-MAIL-SYNC-02
+title: Mail sync reconciles deletions and read state changed by another client
+description: |
+  AC-04/AC-05: after the list matches the server, another client delivers 10
+  messages, then expunges the newest 3 and marks the next 2 as read. A manual
+  Sync must remove the expunged rows and show the server's read state, so the
+  unread rows equal the server's unseen count. Browser mode uses the stub
+  server model; native mode uses the fake IMAP server and the real backend.
+covers:
+- F-MAIL-5
+- F-MAIL-3
+tags:
+- mail
+- p0
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- wait_for: '[data-testid="quick-connect"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- mail_server_deliver:
+    count: 10
+    prefix: Other-client
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- mail_server_expunge_newest:
+    count: 3
+- mail_server_set_flags_newest:
+    count: 2
+    flags:
+    - \Seen
+- click: '[data-testid="mail-sync-button"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Synced
+    timeout_sec: 30
+- mail_server_assert_list_matches:
+    unread: true
+    timeout_sec: 60
+- assert_visible: '[data-testid="mail-message-count"]'
+- click: '[data-testid="mail-message-row"]'
+- wait_for: '[data-testid="mail-message-row"][aria-pressed="true"]'
+- screenshot: mail-sync-02-reconcile.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 其他客户端的新增、删除与已读变化在手工同步后全部反映到列表：数量与未读数均与服务器一致（AC-04/AC-05）。
+    actions:
+    - 1
+    - 3
+    - 4
+    - 5
+    - 7
+    - 8
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+    - 20
+    checkpoints:
+    - step: 10
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 13
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Synced", "timeout_sec": 30}}'
+    - step: 18
+      expectation: '{"mail_server_assert_list_matches": {"unread": true, "timeout_sec": 60}}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"mail-message-count\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"mail-message-row\"][aria-pressed=\"true\"]"}'
+    results:
+    - 18
+    - 19
+    - 21
+  visual:
+  - check: 截图中列表与未读样式正确，无残留的已删除邮件。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实后端的删除与标志对账；browser 仅验证渲染层；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

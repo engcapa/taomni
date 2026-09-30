@@ -23,6 +23,11 @@ import {
 import { useSessionImportExport } from "../components/menubar/useSessionImportExport";
 import type { AppCommand } from "../components/menubar/commands";
 import { buildAppMenuSpec, installAppMenu, type MenuActionId } from "../lib/nativeAppMenu";
+import {
+  LEGACY_MAIL_HEADER_LIMIT_PER_FOLDER,
+  LEGACY_MAIL_HEADER_RETENTION_DAYS,
+  mailHeaderLimitOption,
+} from "../lib/mailSync";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
@@ -556,8 +561,8 @@ function sessionToMailTabInfo(
     },
     cache: {
       enabled: opts.mailCacheEnabled !== false,
-      headerRetentionDays: mailNumberOption(opts, "mailHeaderRetentionDays", 30, 1),
-      headerLimitPerFolder: mailNumberOption(opts, "mailHeaderLimitPerFolder", 2000, 1),
+      headerRetentionDays: mailHeaderLimitOption(opts, "mailHeaderRetentionDays", LEGACY_MAIL_HEADER_RETENTION_DAYS),
+      headerLimitPerFolder: mailHeaderLimitOption(opts, "mailHeaderLimitPerFolder", LEGACY_MAIL_HEADER_LIMIT_PER_FOLDER),
       bodyRecentLimit: mailNumberOption(opts, "mailBodyRecentLimit", 200, 0),
       bodyMaxBytes: mailNumberOption(opts, "mailBodyMaxBytes", 262144, 1024),
       attachmentCache: opts.mailAttachmentCache === true,
@@ -3133,7 +3138,7 @@ export function MainLayout() {
       } else if (session.session_type === "Browser") {
         openBrowserSession(session);
       } else if (session.session_type === "Mail") {
-        openMailTab(session);
+        openMailTab(session, parsed.authData ?? undefined);
       } else if (COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) {
         openCommandTerminalTab(session);
       } else if (
