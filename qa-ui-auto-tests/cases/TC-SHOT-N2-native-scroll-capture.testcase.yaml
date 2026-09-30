@@ -16,21 +16,19 @@ steps:
 - wait_for:
     selector: '[data-testid="screenshot-base-image"]'
     timeout_sec: 30
-- drag_to:
-    from: '[data-testid="screenshot-base-image"]'
-    to: '[data-testid="screenshot-base-image"]'
-    from_position:
-      x: 60
-      y: 80
-    to_position:
-      x: 400
-      y: 400
+# The native runner has no canvas-drag verb (drag_to is browser-only), so
+# reach the annotate phase through the fullscreen-select button instead of
+# dragging a region.
+- click: '[data-testid="screenshot-fullscreen"]'
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - click: '[data-testid="screenshot-scroll-capture"]'
 - wait_for: '[data-testid="screenshot-scroll-busy"]'
-# Real backend: hides nothing on this route, injects wheel events via the
-# OS input API, captures and stitches. Must finish without an error toast.
+# Real backend: hides the overlay, injects wheel events through the OS input
+# API, captures frames and stitches them into one image. Must finish without
+# an error toast.
 - wait_for:
     selector: '[data-testid="screenshot-base-image"]'
     timeout_sec: 90
 - assert_not_visible: '[data-testid="screenshot-scroll-busy"]'
+- assert_not_visible: '[data-testid="screenshot-toast"]'
+- assert_not_visible: '[data-testid="screenshot-overlay-error"]'

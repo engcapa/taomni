@@ -16,27 +16,26 @@ steps:
 - wait_for:
     selector: '[data-testid="screenshot-base-image"]'
     timeout_sec: 30
-- drag_to:
-    from: '[data-testid="screenshot-base-image"]'
-    to: '[data-testid="screenshot-base-image"]'
-    from_position:
-      x: 60
-      y: 60
-    to_position:
-      x: 320
-      y: 240
+# The native runner has no canvas-drag verb (drag_to is browser-only), so
+# reach the annotate phase through the fullscreen-select button and use the
+# click-to-place text tool instead of drag-drawn shapes.
+- click: '[data-testid="screenshot-fullscreen"]'
 - wait_for: '[data-testid="screenshot-toolbar"]'
-- click: '[data-testid="screenshot-tool-arrow"]'
-- drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 90
-      y: 90
-    to_position:
-      x: 220
-      y: 170
+- click: '[data-testid="screenshot-tool-text"]'
+- click: '[data-testid="screenshot-annotation-canvas"]'
+- wait_for: '[data-testid="annotation-text-input"]'
+- fill:
+    selector: '[data-testid="annotation-text-input"]'
+    value: "taomni-native"
+- press: Enter
 - wait: 1
+# Undo becomes enabled after the text shape commits, redo after undoing.
+- assert_enabled: '[data-testid="screenshot-undo"]'
+- click: '[data-testid="screenshot-undo"]'
+- assert_enabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-redo"]'
+# Copy routes through the real clipboard pipeline; the toast is the
+# cross-platform success signal (assert_system_clipboard is Linux-only).
 - click: '[data-testid="screenshot-copy"]'
 - wait_for: '[data-testid="screenshot-toast"]'
 - assert_visible: '[data-testid="screenshot-toast"]'

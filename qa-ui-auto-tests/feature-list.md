@@ -9257,6 +9257,9 @@ controls:
   - id: screenshot-overlay
     selector: '[data-testid="screenshot-overlay"]'
     kind: display
+  - id: screenshot-overlay-error
+    selector: '[data-testid="screenshot-overlay-error"]'
+    kind: display
   - id: screenshot-base-image
     selector: '[data-testid="screenshot-base-image"]'
     kind: display

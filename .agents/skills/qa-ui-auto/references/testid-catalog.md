@@ -1464,6 +1464,7 @@
 
 - `[data-testid="system-screenshot"]` — interactive — F27.1.system-screenshot
 - `[data-testid="screenshot-overlay"]` — display — F27.1.screenshot-overlay
+- `[data-testid="screenshot-overlay-error"]` — display — F27.1.screenshot-overlay-error
 - `[data-testid="screenshot-base-image"]` — display — F27.1.screenshot-base-image
 - `[data-testid="screenshot-selection"]` — display — F27.1.screenshot-selection
 - `[data-testid="screenshot-size-hint"]` — display — F27.1.screenshot-size-hint
@@ -1498,8 +1499,8 @@
 - `[data-testid="screenshot-recorder-done"]` — interactive — F27.1.screenshot-recorder-done
 - `[data-testid="screenshot-recorder-save"]` — interactive — F27.1.screenshot-recorder-save
 - `[data-testid="screenshot-recorder-cancel"]` — interactive — F27.1.screenshot-recorder-cancel
-- `[data-testid="screenshot-record-gif"]` — interactive — F27.1.screenshot-record-gif
-- `[data-testid="screenshot-record-mp4"]` — interactive — F27.1.screenshot-record-mp4
+- `[data-testid="screenshot-record-gif"]` — interactive [optional] — F27.1.screenshot-record-gif
+- `[data-testid="screenshot-record-mp4"]` — interactive [optional] — F27.1.screenshot-record-mp4
 - `[data-testid="annotation-text-input"]` — interactive — F27.1.annotation-text-input
 - `[data-testid="screenshot-toast"]` — display — F27.1.screenshot-toast
 
