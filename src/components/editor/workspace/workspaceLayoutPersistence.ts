@@ -179,6 +179,7 @@ const BOTTOM_DOCK_TABS: BottomDockTabId[] = [
   "tests",
   "coverage",
   "debug",
+  "git",
 ];
 const RIGHT_PANE_TABS: RightPaneTabId[] = ["outline", "documentation"];
 

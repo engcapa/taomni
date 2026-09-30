@@ -114,6 +114,7 @@ export const IDEA_XWIN_KEYMAP: readonly IdeaKeymapEntry[] = [
   { taomniActionId: "workspace.hideActiveToolWindow", ideaActionId: "HideActiveWindow", ideaBindings: ["Shift+Esc"] },
   { taomniActionId: "workspace.hideAllToolWindows", ideaActionId: "HideAllWindows", ideaBindings: ["Ctrl+Shift+F12"] },
   { taomniActionId: "workspace.toggleDocumentationPane", ideaActionId: "ActivateStructureToolWindow", ideaBindings: ["Alt+7"] },
-  { taomniActionId: "workspace.openGit", ideaActionId: "ActivateVersionControlToolWindow", ideaBindings: ["Alt+9"] },
+  { taomniActionId: "workspace.gitToolWindow", ideaActionId: "ActivateVersionControlToolWindow", ideaBindings: ["Alt+9"] },
+  { taomniActionId: "workspace.commitToolWindow", ideaActionId: "ActivateCommitToolWindow", ideaBindings: ["Alt+0"] },
   { taomniActionId: "workspace.toggleTodosPane", ideaActionId: "ActivateBookmarksToolWindow", ideaBindings: ["Alt+2"] },
 ];

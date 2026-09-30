@@ -452,6 +452,7 @@ import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
 import { GoToLineDialog } from "./workspace/GoToLineDialog";
 import { languageServiceReadiness } from "./workspace/languageServiceReadiness";
 import { javaSyntaxOutline } from "./workspace/javaSyntaxOutline";
+import { WorkspaceGitManager } from "../git/WorkspaceGitManager";
 import { CodeInsightNotice, caretAnchor, type CodeInsightNoticeState } from "./workspace/CodeInsightNotice";
 import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
 import {
@@ -2542,6 +2543,8 @@ export function CodeWorkspaceTab({
   const codeInsightNoticeSeqRef = useRef(0);
   /** ED-PARITY-014 DEC-014-04: File Structure shows a syntax-only outline. */
   const [structureSyntaxOnly, setStructureSyntaxOnly] = useState(false);
+  /** ED-PARITY-018: the Git tool window mounts on first open, then stays. */
+  const [gitToolWindowMounted, setGitToolWindowMounted] = useState(false);
   const showCodeInsightNotice = useCallback((message: string, action: "configure" | null = null) => {
     codeInsightNoticeSeqRef.current += 1;
     setCodeInsightNotice({
@@ -15713,12 +15716,28 @@ export function CodeWorkspaceTab({
     },
     {
       id: "workspace.openGit",
-      title: "Open Git Manager",
+      title: "Open in Git Tab",
       category: "Git",
-      // IDEA Alt+9 = Git tool window (workspace tool window lands in ED-PARITY-018).
-      keybinding: "Alt+9",
       when: () => !gitRootsLoading && !!onOpenGitManager && gitRoots.length > 0,
       run: openGitManager,
+    },
+    {
+      // ED-PARITY-018 DEC-018-01: IDEA Alt+9 = the Git tool window.
+      id: "workspace.gitToolWindow",
+      title: "Git Tool Window",
+      category: "Git",
+      keybinding: "Alt+9",
+      keywords: ["git", "log", "changes", "vcs"],
+      run: () => handleActivateToolWindow("git"),
+    },
+    {
+      // ED-PARITY-018 DEC-018-02: IDEA Alt+0 = Commit (changes + message).
+      id: "workspace.commitToolWindow",
+      title: "Commit Tool Window",
+      category: "Git",
+      keybinding: "Alt+0",
+      keywords: ["commit", "changes", "vcs"],
+      run: () => handleActivateToolWindow("git"),
     },
     {
       id: "workspace.toggleSyncSplitScroll",
@@ -16243,6 +16262,9 @@ export function CodeWorkspaceTab({
   const [toolbarMoreOpen, setToolbarMoreOpen] = useState(false);
   /** ED-PARITY-012 DEC-012-06: pending Go to Line:Column dialog. */
   const [goToLineRequest, setGoToLineRequest] = useState<GoToLineRequest | null>(null);
+  useEffect(() => {
+    if (bottomDockOpen && bottomDockTab === "git") setGitToolWindowMounted(true);
+  }, [bottomDockOpen, bottomDockTab]);
   // The ⋮ menu closes on any outside press or Esc without swallowing that
   // press, so the next toolbar/editor click still reaches its target.
   useEffect(() => {
@@ -16296,10 +16318,11 @@ export function CodeWorkspaceTab({
       id: "commit",
       label: "Commit",
       icon: <GitCommitHorizontal className="h-3.5 w-3.5" />,
-      active: false,
-      disabled: !onOpenGitManager || gitRoots.length === 0,
+      active: bottomDockOpen && bottomDockTab === "git",
+      shortcut: railShortcut("workspace.commitToolWindow"),
+      disabled: gitRoots.length === 0,
       disabledReason: "No Git repository in this workspace",
-      onSelect: openGitManager,
+      onSelect: () => handleActivateToolWindow("git"),
     },
   ];
   // ED-PARITY-011 DEC-011-05: tab names of files with error diagnostics.
@@ -21927,6 +21950,29 @@ export function CodeWorkspaceTab({
                 }}
                 onRefreshCoverage={() => void scanWorkspaceCoverage()}
               />
+            ),
+          },
+          {
+            // ED-PARITY-018 DEC-018-01: the workspace Git tool window hosts the
+            // same Git manager as the Git tab, scoped to this workspace's repos.
+            id: "git",
+            label: "Git",
+            icon: <GitBranch className="h-3.5 w-3.5" />,
+            // Mounted on first open and kept, so the commit message and
+            // selection survive hiding the tool window.
+            content: gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
+              <div data-testid="code-workspace-git-tool-window" className="relative h-full min-h-0">
+                <WorkspaceGitManager
+                  workspaceName={title}
+                  roots={gitRoots}
+                  activeRepoRoot={activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null}
+                  visible={bottomDockOpen && bottomDockTab === "git"}
+                />
+              </div>
+            ) : (
+              <div data-testid="code-workspace-git-tool-window-empty" role="status" className="px-3 py-3 text-[11px] text-[var(--taomni-code-muted)]">
+                {gitRootsLoading ? "Detecting Git repositories…" : "No Git repository in this workspace"}
+              </div>
             ),
           },
           {

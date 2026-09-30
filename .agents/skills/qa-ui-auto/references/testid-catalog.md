@@ -369,6 +369,8 @@
 - `[data-testid="code-workspace-recent-files-recent-locations"]` — interactive [optional] — F25.5.recent-files-recent-locations
 - `[data-testid="code-workspace-recent-files-edited-only"]` — interactive [optional] — F25.5.recent-files-edited-only
 - `[data-testid="code-workspace-recent-files-path"]` — display [optional] — F25.5.recent-files-path
+- `[data-testid="code-workspace-git-tool-window"]` — display [optional] — F25.5.git-tool-window
+- `[data-testid="code-workspace-git-tool-window-empty"]` — display [optional] — F25.5.git-tool-window-empty
 - `[data-testid="code-workspace-code-insight-notice"]` — display [optional] — F25.5.code-insight-notice
 - `[data-testid="code-workspace-code-insight-configure"]` — interactive [optional] — F25.5.code-insight-configure
 - `[data-testid="problems-severity-error"]` — interactive [optional] — F25.5.problems-severity-filter
@@ -489,6 +491,7 @@
 - `[data-testid="code-workspace-bottom-tab-build"]` — interactive — F25.1.build-tab
 - `[data-testid="code-workspace-bottom-tab-tests"]` — interactive — F25.1.tests-tab
 - `[data-testid="code-workspace-bottom-tab-debug"]` — interactive — F25.1.debug-tab
+- `[data-testid="code-workspace-bottom-tab-git"]` — interactive [optional] — F25.1.bottom-tab-git
 - `[data-testid="code-workspace-bottom-tab-overflow"]` — interactive [optional] — F25.1.bottom-tab-overflow
 - `[data-testid="code-workspace-bottom-tab-overflow-menu"]` — display [optional] — F25.1.bottom-tab-overflow-menu
 - `[data-testid="code-workspace-bottom-tab-overflow-build"]` — interactive [optional] — F25.1.bottom-tab-overflow-build

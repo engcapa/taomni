@@ -192,6 +192,7 @@
   - workspace 内提供 Commit 工具窗（`Alt+0`，左侧）：变更/未版本化复选树、工具条、Amend、多行消息、`Commit` 主按钮 + `Commit and Push…`；Git Log（`Alt+9`，底部）：分支树、文本/哈希过滤、Branch/User/Date 过滤、提交列表、详情。现有独立 Git 标签保留为 “Open in Git tab”。
   - Terminal 工具窗头部：会话 tab、`+`、`˅`、`⋮`、`—`，cwd 为活动根。
   - VCS 变更条弹层与运行 gutter 菜单由 022 提供，本卡提供其执行动作（Rollback、Show Diff、Commit this change、Run/Debug）。
+- P1 设计：[ed-parity-018-git-tool-window-design.md](ed-parity-018-git-tool-window-design.md)。
 - 验收：`ED-PARITY-018-A1`、`ED-PARITY-018-A2`、`ED-PARITY-018-A3`。
 
 <a id="ed-parity-019"></a>
