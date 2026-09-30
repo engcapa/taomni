@@ -321,24 +321,6 @@ function wordAt(text: string, position: LspPosition): { word: string; start: num
   return null;
 }
 
-function workspaceEditFor(path: string, editText: string, editRange: LspRange): LspWorkspaceEdit {
-  return {
-    documentEdits: [{
-      uri: `file://${path}`,
-      path,
-      edits: [{ range: editRange, newText: editText }],
-    }],
-  };
-}
-
-function wholeDocumentRange(text: string): LspRange {
-  const lines = text.split("\n");
-  return {
-    start: { line: 0, character: 0 },
-    end: { line: Math.max(0, lines.length - 1), character: (lines.at(-1) ?? "").length },
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Provider responses
 // ---------------------------------------------------------------------------
@@ -619,10 +601,35 @@ export async function parity007Rename(
     if (text.includes(`${newName}(`)) {
       throw new Error(`B-007 controlled rename failure: '${newName}' already exists in this scope`);
     }
-    const renamedText = text.split(found.word).join(newName);
+    // ED-PARITY-017 DEC-017-06: one minimal edit per whole-word occurrence,
+    // like a real provider, so the preview can show true preimage/postimage.
+    const pattern = new RegExp(`(?<![\\w$])${found.word.replace(/\$/g, "\\$")}(?![\\w$])`, "g");
+    const edits: { range: LspRange; newText: string }[] = [];
+    text.split("\n").forEach((lineText, line) => {
+      for (const match of lineText.matchAll(pattern)) {
+        const start = match.index ?? 0;
+        edits.push({ range: lineRange(text, line, start, start + found.word.length), newText: newName });
+      }
+    });
+    const documentEdits = [{ uri: `file://${path}`, path, edits }];
+    // multi-file mode: a second real document change (required-edit preview).
+    if (parity007Mode() === "multi-file") {
+      const helperPath = `${parity007Root}/src/main/java/demo/ExtractHelper.java`;
+      const helperText = await readDocumentText(helperPath);
+      if (helperText) {
+        documentEdits.push({
+          uri: `file://${helperPath}`,
+          path: helperPath,
+          edits: [{
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+            newText: `// renamed ${found.word} to ${newName}\n`,
+          }],
+        });
+      }
+    }
     return {
       status: parity007Status(path),
-      edit: workspaceEditFor(path, renamedText, wholeDocumentRange(text)),
+      edit: { documentEdits },
     };
   });
 }

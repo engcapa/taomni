@@ -76,6 +76,25 @@ class NativeSessionTransportTest(TestCase):
         self.assertEqual(actions[0]["origin"], {"element-6066-11e4-a52e-4f735466cecf": "row-2"})
         self.assertEqual([a["button"] for a in actions[1:]], [2, 2])
 
+    def test_click_retries_webkit_stale_element_error(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.find = Mock(side_effect=["button-1", "button-2"])
+        session.request = Mock(side_effect=[
+            WebDriverError('HTTP 400: {"message":"JavaScript error: Error: stale element"}'),
+            None,
+            None,
+        ])
+        with patch("tauri_webdriver.time.sleep") as sleep:
+            session.click("#section")
+        self.assertEqual(session.find.call_count, 2)
+        sleep.assert_called_once_with(0.3)
+        click_urls = [
+            call.args[1] for call in session.request.call_args_list
+            if call.args[0] == "POST" and call.args[1].endswith("/click")
+        ]
+        self.assertEqual(click_urls, ["/session/session-1/element/button-1/click", "/session/session-1/element/button-2/click"])
+
     def test_pointer_click_gives_up_after_three_stale_references(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
@@ -384,6 +403,23 @@ class NativeSessionPressComboTest(TestCase):
         self.assertEqual(session.request.call_args_list[1].args[:2], (
             "DELETE", session.endpoint("/actions"),
         ))
+
+    def test_capitalized_shortcut_letter_does_not_add_an_implicit_shift(self) -> None:
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+
+        self.assertEqual(
+            session._combo_actions("Control+Alt+M"),
+            [
+                {"type": "keyDown", "value": session.MODIFIER_MAP["Control"]},
+                {"type": "keyDown", "value": session.MODIFIER_MAP["Alt"]},
+                {"type": "keyDown", "value": "m"},
+                {"type": "pause", "duration": 30},
+                {"type": "keyUp", "value": "m"},
+                {"type": "keyUp", "value": session.MODIFIER_MAP["Alt"]},
+                {"type": "keyUp", "value": session.MODIFIER_MAP["Control"]},
+                {"type": "pause", "duration": 30},
+            ],
+        )
 
 
 class NativeKeysVerbTest(TestCase):

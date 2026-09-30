@@ -889,12 +889,13 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     expect(onReplaceMatches).toHaveBeenCalledTimes(1);
   });
 
-  it("cancels with zero backend effect (A2)", async () => {
+  it("cancels with Escape, restores the Replace All focus, and has zero backend effect (A2)", async () => {
     const onReplaceMatches = vi.fn();
     await openPreview(onReplaceMatches);
 
-    fireEvent.click(screen.getByTestId("code-workspace-replace-cancel"));
+    fireEvent.keyDown(screen.getByTestId("code-workspace-replace-preview"), { key: "Escape" });
     expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByTestId("code-workspace-find-replace-all"));
     expect(onReplaceMatches).not.toHaveBeenCalled();
   });
 

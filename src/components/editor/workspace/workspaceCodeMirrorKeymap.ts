@@ -191,6 +191,8 @@ export interface EditorHostActionHandlers {
    * migration channel for the previously inline keymap business bindings).
    */
   runEditorCommand(command: (view: EditorView) => boolean): boolean;
+  /** Open the IDEA Go to Line:Column dialog (ED-PARITY-012). */
+  openGoToLine?(): boolean;
   /** Live display geometry gate used before consuming PageUp/PageDown. */
   isEditorGeometryReady?(): boolean;
   /** Shared document history owner; undefined keeps standalone CM history. */
@@ -379,7 +381,11 @@ export function buildEditorHostActions(handlers: EditorHostActionHandlers) {
       secondary: ["Meta+g"],
       keywords: ["jump", "line"],
       requiresEditor: true,
-      run: async () => runViaHandlers(handlers, gotoLine),
+      // ED-PARITY-012 DEC-012-06: IDEA "Go to Line:Column" dialog when the
+      // host provides one; the CodeMirror panel is the unhosted fallback.
+      run: async () => (handlers.openGoToLine
+        ? commandResult(handlers.openGoToLine())
+        : runViaHandlers(handlers, gotoLine)),
     }),
     editorAction({
       id: "editor.completeStatement",
@@ -484,6 +490,8 @@ export function buildEditorHostActions(handlers: EditorHostActionHandlers) {
       title: "Find Next Match",
       category: "Edit",
       defaultKeybinding: "F3",
+      // IDEA FindNext secondary (ED-PARITY-013 DEC-013-05).
+      secondary: ["Ctrl+l"],
       keywords: ["search", "next"],
       requiresEditor: true,
       run: async () => runViaHandlers(handlers, findNext),
@@ -493,6 +501,7 @@ export function buildEditorHostActions(handlers: EditorHostActionHandlers) {
       title: "Find Previous Match",
       category: "Edit",
       defaultKeybinding: "Shift+F3",
+      secondary: ["Ctrl+Shift+l"],
       keywords: ["search", "previous"],
       requiresEditor: true,
       run: async () => runViaHandlers(handlers, findPrevious),
@@ -501,8 +510,9 @@ export function buildEditorHostActions(handlers: EditorHostActionHandlers) {
       id: "editor.selectSelectionMatches",
       title: "Select All Occurrences of Selection",
       category: "Edit",
-      defaultKeybinding: "Ctrl+Shift+l",
-      secondary: ["Meta+Shift+l"],
+      // ED-PARITY-013 DEC-013-05: Ctrl+Shift+L is IDEA Find Previous; IDEA's
+      // Select All Occurrences is workspace.editor.selectAllOccurrences.
+      defaultKeybinding: "",
       keywords: ["occurrence", "multi-caret", "selection"],
       requiresEditor: true,
       run: async () => runViaHandlers(handlers, selectSelectionMatches),
@@ -916,6 +926,7 @@ export function disabledReasonLabel(reason: ActionDisabledReason | undefined): s
     case "providerOffline": return "Language server offline";
     case "conflict": return "Binding conflict";
     case "busy": return "Already running";
+    case "loading": return "File is still loading";
     case "unsupported": return "Not supported yet";
     default: return null;
   }

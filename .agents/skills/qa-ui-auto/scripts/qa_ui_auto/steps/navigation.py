@@ -29,7 +29,19 @@ def step_open(ctx: StepContext, args: Any) -> None:
         url = str(args)
     if ctx.dry_run:
         return
-    ctx.page.goto(url, wait_until="domcontentloaded")
+    # Windows Chromium can briefly exhaust the loopback socket buffer while a
+    # worker is closing one context and another worker opens the next case.
+    # The page is still usable after the transient net::ERR_NO_BUFFER_SPACE;
+    # retry the navigation within the case deadline instead of recording a
+    # false product failure.
+    for attempt in range(3):
+        try:
+            ctx.page.goto(url, wait_until="domcontentloaded")
+            return
+        except Exception as exc:  # noqa: BLE001
+            if "ERR_NO_BUFFER_SPACE" not in str(exc) or attempt == 2:
+                raise
+            ctx.page.wait_for_timeout(250 * (attempt + 1))
 
 
 @verb("goto")
@@ -49,11 +61,11 @@ def step_wait(ctx: StepContext, args: Any) -> None:
 def step_wait_for(ctx: StepContext, args: Any) -> None:
     if isinstance(args, dict):
         selector = args["selector"]
-        timeout = float(args.get("timeout_sec", 15)) * 1000.0
+        timeout = float(args.get("timeout_sec", 30)) * 1000.0
         state = args.get("state", "visible")
     else:
         selector = str(args)
-        timeout = 15_000.0
+        timeout = 30_000.0
         state = "visible"
     if ctx.dry_run:
         ctx.page.locator(selector)  # noqa: B018  syntax check only

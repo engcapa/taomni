@@ -31,7 +31,7 @@ function input(
   return element;
 }
 
-function fieldShell(field: HTMLInputElement): HTMLDivElement {
+function fieldShell(field: HTMLElement): HTMLDivElement {
   const shell = document.createElement("div");
   shell.className = "cm-workspace-search-field";
   shell.append(field);
@@ -39,17 +39,18 @@ function fieldShell(field: HTMLInputElement): HTMLDivElement {
 }
 
 function matchStatus(view: EditorView, query: SearchQuery): string {
-  if (!query.search) return "0 matches";
+  // IDEA wording (ED-PARITY-012 A2): "0 results", "N results", "i/N".
+  if (!query.search) return "0 results";
   if (!query.valid) return "Invalid pattern";
   const matches: Array<{ from: number; to: number }> = [];
   const cursor = query.getCursor(view.state);
   for (let item = cursor.next(); !item.done; item = cursor.next()) {
     matches.push(item.value);
   }
-  if (matches.length === 0) return "0 matches";
+  if (matches.length === 0) return "0 results";
   const selection = view.state.selection.main;
   const current = matches.findIndex((match) => match.from === selection.from && match.to === selection.to);
-  return current === -1 ? `${matches.length} matches` : `${current + 1} / ${matches.length}`;
+  return current === -1 ? `${matches.length} results` : `${current + 1} / ${matches.length}`;
 }
 
 export type SearchContextFilter = "anywhere" | "comments" | "strings" | "exclude-comments";
@@ -315,19 +316,20 @@ export function replaceAllPreserveCase(
   view: EditorView,
   query: SearchQuery,
   preserveCase: boolean,
+  /** ED-PARITY-012 DEC-012-04: `from:to` keys of matches the user excluded. */
+  excluded: ReadonlySet<string> = new Set(),
 ): boolean {
   if (view.state.readOnly || !query.valid || !query.search) return false;
-  if (!preserveCase) return replaceAll(view);
+  if (!preserveCase && excluded.size === 0) return replaceAll(view);
 
   const cursor = query.getCursor(view.state);
   const changes: Array<{ from: number; to: number; insert: string }> = [];
 
   for (let item = cursor.next(); !item.done; item = cursor.next()) {
+    if (excluded.has(`${item.value.from}:${item.value.to}`)) continue;
     const matchedText = view.state.sliceDoc(item.value.from, item.value.to);
-    const replacement = applyPreserveCase(
-      matchedText,
-      replacementForMatch(view, query, item.value.from, item.value.to),
-    );
+    const rawReplacement = replacementForMatch(view, query, item.value.from, item.value.to);
+    const replacement = preserveCase ? applyPreserveCase(matchedText, rawReplacement) : rawReplacement;
     changes.push({ from: item.value.from, to: item.value.to, insert: replacement });
   }
 
@@ -341,6 +343,64 @@ export function replaceAllPreserveCase(
   return true;
 }
 
+// ED-PARITY-012 DEC-012-02/04: IDEA keeps the last Find/Replace strings in a
+// per-user history. Session memory is authoritative; localStorage only carries
+// it across reloads and may be unavailable (private window, blocked storage).
+export type SearchHistoryKind = "find" | "replace";
+export const SEARCH_HISTORY_LIMIT = 10;
+const SEARCH_HISTORY_KEY = "taomni.editorSearchHistory.v1";
+let searchHistory: Record<SearchHistoryKind, string[]> | null = null;
+
+function loadSearchHistory(): Record<SearchHistoryKind, string[]> {
+  if (searchHistory) return searchHistory;
+  const empty: Record<SearchHistoryKind, string[]> = { find: [], replace: [] };
+  try {
+    const parsed = JSON.parse(globalThis.localStorage?.getItem(SEARCH_HISTORY_KEY) ?? "null") as unknown;
+    if (parsed && typeof parsed === "object") {
+      for (const kind of ["find", "replace"] as const) {
+        const list = (parsed as Record<string, unknown>)[kind];
+        if (Array.isArray(list)) {
+          empty[kind] = list.filter((item): item is string => typeof item === "string" && item.length > 0)
+            .slice(0, SEARCH_HISTORY_LIMIT);
+        }
+      }
+    }
+  } catch {
+    // Unreadable storage: start from an empty session history.
+  }
+  searchHistory = empty;
+  return searchHistory;
+}
+
+export function readSearchHistory(kind: SearchHistoryKind): readonly string[] {
+  return loadSearchHistory()[kind];
+}
+
+export function recordSearchHistory(kind: SearchHistoryKind, value: string): void {
+  if (!value) return;
+  const history = loadSearchHistory();
+  history[kind] = [value, ...history[kind].filter((item) => item !== value)].slice(0, SEARCH_HISTORY_LIMIT);
+  try {
+    globalThis.localStorage?.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // Session history still works without storage.
+  }
+}
+
+/** Test hook: forget the in-memory history so storage is read again. */
+export function resetSearchHistoryForTests(): void {
+  searchHistory = null;
+}
+
+type SearchField = HTMLInputElement | HTMLTextAreaElement;
+
+const CONTEXT_FILTER_LABELS: Record<SearchContextFilter, string> = {
+  anywhere: "Anywhere",
+  comments: "In Comments",
+  strings: "In Strings",
+  "exclude-comments": "No Comments",
+};
+
 // The panel stays owned by CM. This registry only routes the existing Replace
 // action to that view's panel; query/document state is never duplicated here.
 const panels = new WeakMap<EditorView, WorkspaceSearchPanel>();
@@ -352,8 +412,14 @@ class WorkspaceSearchPanel implements Panel {
   private query: SearchQuery;
   private inSelection = false;
   private contextFilter: SearchContextFilter = "anywhere";
+  private multiline = false;
+  /** DEC-012-04: matches the user excluded from Replace All (mapped through edits). */
+  private excluded: Array<{ from: number; to: number }> = [];
   private readonly searchField: HTMLInputElement;
+  private readonly searchArea: HTMLTextAreaElement;
   private readonly replaceField: HTMLInputElement;
+  private readonly clearButton: HTMLButtonElement;
+  private readonly multilineButton: HTMLButtonElement;
   private readonly caseButton: HTMLButtonElement;
   private readonly wordButton: HTMLButtonElement;
   private readonly regexpButton: HTMLButtonElement;
@@ -366,6 +432,8 @@ class WorkspaceSearchPanel implements Panel {
   private readonly expandButton: HTMLButtonElement;
   private readonly moreOptions: HTMLDivElement;
   private readonly moreButton: HTMLButtonElement;
+  private readonly historyList: HTMLDivElement;
+  private historyKind: SearchHistoryKind | null = null;
   private focusGeneration = 0;
   private destroyed = false;
   private composing = false;
@@ -374,63 +442,107 @@ class WorkspaceSearchPanel implements Panel {
   constructor(private readonly view: EditorView, private readonly focusOwner: () => number | null) {
     panels.set(view, this);
     this.query = getSearchQuery(view.state);
-    // type=search lets the platform show a native clear; do not add a custom ×.
-    this.searchField = input("Find", "search", "Find", "search");
+    // DEC-012-02: a custom clear × replaces the platform type=search control.
+    this.searchField = input("Find", "search", "Find", "text");
     this.searchField.setAttribute("main-field", "true");
+    this.searchField.setAttribute("role", "searchbox");
+    // DEC-012-03: multiline Find swaps in a textarea (Enter = newline).
+    this.searchArea = document.createElement("textarea");
+    this.searchArea.className = "cm-workspace-search-input cm-workspace-search-textarea";
+    this.searchArea.name = "search-multiline";
+    this.searchArea.rows = 3;
+    this.searchArea.placeholder = "Find";
+    this.searchArea.spellcheck = false;
+    this.searchArea.setAttribute("aria-label", "Find");
+    this.searchArea.hidden = true;
     this.replaceField = input("Replace", "replace", "Replace", "text");
+    this.clearButton = button("Clear search", "×", () => this.clearSearch());
+    this.clearButton.classList.add("cm-workspace-search-clear");
+    this.clearButton.hidden = true;
+    this.multilineButton = button("Multiline", "↵", () => this.setMultiline(!this.multiline));
+    this.multilineButton.setAttribute("aria-pressed", "false");
     this.caseButton = button("Match case", "Aa", () => this.toggle("caseSensitive"));
     this.wordButton = button("Match whole word", "W", () => this.toggle("wholeWord"));
     this.regexpButton = button("Use regular expression", ".*", () => this.toggle("regexp"));
     this.inSelectionButton = button("Find in selection", "In Sel", () => this.toggleInSelection());
-    this.contextFilterButton = button("Filter context", "Anywhere", () => this.cycleContextFilter());
+    // DEC-012-02: the context filter is the IDEA funnel on the Find row.
+    this.contextFilterButton = button("Filter context", "", () => this.cycleContextFilter());
+    this.contextFilterButton.classList.add("cm-workspace-search-filter");
+    this.renderContextFilter();
     this.preserveCaseButton = button("Preserve case", "AB/ab", () => this.togglePreserveCase());
     this.selectAllButton = button("Select all occurrences", "Select All", () => this.handleSelectAll());
     this.status = document.createElement("span");
     this.status.className = "cm-workspace-search-status";
     this.status.setAttribute("aria-live", "polite");
 
-    this.expandButton = button("Show replace", "›", () => this.setReplaceOpen(this.replaceRow.hidden === true));
+    this.expandButton = button("Show replace", "›", () => this.setReplaceOpen(this.replaceRow.hidden === true, "replace"));
     this.expandButton.setAttribute("aria-expanded", "false");
     this.moreOptions = document.createElement("div");
     this.moreOptions.className = "cm-workspace-search-options";
     this.moreOptions.hidden = true;
-    this.moreOptions.append(this.inSelectionButton, this.contextFilterButton, this.selectAllButton);
+    this.moreOptions.append(this.inSelectionButton, this.selectAllButton);
     this.moreButton = button("More search options", "…", () => {
       this.moreOptions.hidden = !this.moreOptions.hidden;
       this.moreButton.setAttribute("aria-expanded", String(!this.moreOptions.hidden));
     });
     this.moreButton.setAttribute("aria-expanded", "false");
-    const searchShell = fieldShell(this.searchField);
-    searchShell.append(this.caseButton, this.wordButton, this.regexpButton);
+    this.historyList = document.createElement("div");
+    this.historyList.className = "cm-workspace-search-history";
+    this.historyList.setAttribute("role", "listbox");
+    this.historyList.hidden = true;
+
+    const findHistoryButton = button("Search history", "⌕", () => this.toggleHistory("find"));
+    findHistoryButton.classList.add("cm-workspace-search-history-button");
+    findHistoryButton.setAttribute("aria-haspopup", "listbox");
+    const searchShell = document.createElement("div");
+    searchShell.className = "cm-workspace-search-field";
+    searchShell.append(
+      findHistoryButton,
+      this.searchField,
+      this.searchArea,
+      this.clearButton,
+      this.multilineButton,
+      this.caseButton,
+      this.wordButton,
+      this.regexpButton,
+    );
     const findRow = document.createElement("div");
     findRow.className = "cm-workspace-search-row";
     findRow.append(
       this.expandButton,
       searchShell,
       this.status,
-      button("Previous match", "↑", () => findPrevious(this.view)),
-      button("Next match", "↓", () => findNext(this.view)),
+      button("Previous match", "↑", () => this.find(-1)),
+      button("Next match", "↓", () => this.find(1)),
+      this.contextFilterButton,
       this.moreButton,
       button("Close find and replace", "×", () => closeSearchPanel(this.view)),
     );
 
+    const replaceHistoryButton = button("Replace history", "⌕", () => this.toggleHistory("replace"));
+    replaceHistoryButton.classList.add("cm-workspace-search-history-button");
+    replaceHistoryButton.setAttribute("aria-haspopup", "listbox");
+    const replaceShell = fieldShell(this.replaceField);
+    replaceShell.prepend(replaceHistoryButton);
     const replaceRow = document.createElement("div");
     this.replaceRow = replaceRow;
     replaceRow.hidden = true;
     replaceRow.className = "cm-workspace-search-row cm-workspace-replace-row";
     replaceRow.append(
-      fieldShell(this.replaceField),
+      replaceShell,
       this.preserveCaseButton,
       button("Replace current match", "Replace", () => this.handleReplaceNext()),
       button("Replace all matches", "Replace All", () => this.handleReplaceAll()),
+      button("Exclude current match", "Exclude", () => this.handleExclude()),
     );
 
     this.dom = document.createElement("div");
     this.dom.className = "cm-workspace-search";
     this.dom.setAttribute("data-testid", "code-workspace-editor-search");
-    this.dom.append(findRow, replaceRow, this.moreOptions);
+    this.dom.append(findRow, replaceRow, this.historyList, this.moreOptions);
     this.dom.addEventListener("keydown", (event) => this.onKeyDown(event));
     this.searchField.addEventListener("input", () => this.commit());
+    this.searchArea.addEventListener("input", () => this.commit());
     this.replaceField.addEventListener("input", () => this.commit());
     this.dom.addEventListener("compositionstart", () => { this.composing = true; });
     this.dom.addEventListener("compositionend", () => { this.composing = false; });
@@ -438,26 +550,112 @@ class WorkspaceSearchPanel implements Panel {
   }
 
   mount(): void {
-    this.requestFocus(this.searchField);
+    this.requestFocus(this.activeSearchField());
   }
 
   destroy(): void {
     this.destroyed = true;
     this.focusGeneration += 1;
     this.cancelFocus?.();
+    recordSearchHistory("find", this.query.search);
     if (panels.get(this.view) === this) panels.delete(this.view);
   }
 
-  setReplaceOpen(open: boolean): void {
+  /**
+   * DEC-012-05: IDEA's Ctrl/Cmd+R shows the Replace row but keeps the caret
+   * in the Find field; only the expand button moves focus to Replace.
+   */
+  setReplaceOpen(open: boolean, focus: "search" | "replace" = "search"): void {
     this.replaceRow.hidden = !open;
     this.expandButton.textContent = open ? "⌄" : "›";
     this.expandButton.setAttribute("aria-label", open ? "Hide replace" : "Show replace");
     this.expandButton.title = open ? "Hide replace" : "Show replace";
     this.expandButton.setAttribute("aria-expanded", String(open));
-    this.requestFocus(open ? this.replaceField : this.searchField);
+    this.requestFocus(open && focus === "replace" ? this.replaceField : this.activeSearchField());
   }
 
-  private requestFocus(field: HTMLInputElement): void {
+  private activeSearchField(): SearchField {
+    return this.multiline ? this.searchArea : this.searchField;
+  }
+
+  private setMultiline(multiline: boolean, focus = true): void {
+    if (this.multiline === multiline) return;
+    const value = this.activeSearchField().value;
+    this.multiline = multiline;
+    this.searchField.hidden = multiline;
+    this.searchArea.hidden = !multiline;
+    // openSearchPanel focuses `[main-field]`, so it follows the visible field.
+    this.searchField.toggleAttribute("main-field", !multiline);
+    this.searchArea.toggleAttribute("main-field", multiline);
+    this.multilineButton.setAttribute("aria-pressed", String(multiline));
+    const next = this.activeSearchField();
+    next.value = multiline ? value : value.replace(/\r?\n/g, " ");
+    if (!focus) return;
+    next.focus();
+    this.commit();
+  }
+
+  private clearSearch(): void {
+    const field = this.activeSearchField();
+    field.value = "";
+    this.commit();
+    field.focus();
+  }
+
+  private toggleHistory(kind: SearchHistoryKind): void {
+    if (this.historyKind === kind) {
+      this.closeHistory();
+      return;
+    }
+    const entries = readSearchHistory(kind);
+    this.historyKind = kind;
+    this.historyList.replaceChildren();
+    this.historyList.setAttribute("aria-label", kind === "find" ? "Search history" : "Replace history");
+    if (entries.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "cm-workspace-search-history-empty";
+      empty.textContent = "No recent searches";
+      this.historyList.append(empty);
+    }
+    for (const entry of entries) {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "cm-workspace-search-history-item";
+      option.setAttribute("role", "option");
+      option.textContent = entry;
+      option.title = entry;
+      option.addEventListener("click", () => this.applyHistory(kind, entry));
+      this.historyList.append(option);
+    }
+    this.historyList.hidden = false;
+    (this.historyList.querySelector<HTMLElement>("[role='option']") ?? null)?.focus();
+  }
+
+  private closeHistory(): void {
+    const kind = this.historyKind;
+    this.historyKind = null;
+    this.historyList.hidden = true;
+    this.historyList.replaceChildren();
+    if (kind) (kind === "find" ? this.activeSearchField() : this.replaceField).focus();
+  }
+
+  private applyHistory(kind: SearchHistoryKind, value: string): void {
+    if (kind === "find") {
+      if (value.includes("\n")) this.setMultiline(true, false);
+      this.activeSearchField().value = value;
+    } else {
+      this.replaceField.value = value;
+    }
+    this.commit();
+    this.closeHistory();
+  }
+
+  private find(direction: 1 | -1): void {
+    recordSearchHistory("find", this.query.search);
+    (direction === 1 ? findNext : findPrevious)(this.view);
+  }
+
+  private requestFocus(field: SearchField): void {
     this.cancelFocus?.();
     const generation = ++this.focusGeneration;
     const owner = this.focusOwner();
@@ -498,18 +696,29 @@ class WorkspaceSearchPanel implements Panel {
         }
       }
     }
+    if (update.docChanged && this.excluded.length > 0) {
+      this.excluded = this.excluded
+        .map(({ from, to }) => ({ from: update.changes.mapPos(from, 1), to: update.changes.mapPos(to, -1) }))
+        .filter(({ from, to }) => to > from);
+    }
     if (update.docChanged || update.selectionSet) this.updateStatus();
   }
 
   private commit(): void {
     const query = new SearchQuery({
-      search: this.searchField.value,
+      search: this.activeSearchField().value,
       replace: this.replaceField.value,
       caseSensitive: this.caseButton.getAttribute("aria-pressed") === "true",
       wholeWord: this.wordButton.getAttribute("aria-pressed") === "true",
       regexp: this.regexpButton.getAttribute("aria-pressed") === "true",
     });
+    this.clearButton.hidden = query.search.length === 0;
     if (query.eq(this.query)) return;
+    // DEC-012-04: exclusions belong to one query.
+    if (query.search !== this.query.search || query.caseSensitive !== this.query.caseSensitive
+      || query.wholeWord !== this.query.wholeWord || query.regexp !== this.query.regexp) {
+      this.excluded = [];
+    }
     this.query = query;
     this.view.dispatch({ effects: setSearchQuery.of(query) });
     this.selectInitialMatch();
@@ -524,7 +733,7 @@ class WorkspaceSearchPanel implements Panel {
         : this.regexpButton;
     target.setAttribute("aria-pressed", target.getAttribute("aria-pressed") !== "true" ? "true" : "false");
     this.commit();
-    this.searchField.focus();
+    this.activeSearchField().focus();
   }
 
   private togglePreserveCase(): void {
@@ -537,33 +746,32 @@ class WorkspaceSearchPanel implements Panel {
     this.inSelection = !this.inSelection;
     this.inSelectionButton.setAttribute("aria-pressed", String(this.inSelection));
     this.updateStatus();
-    this.searchField.focus();
+    this.activeSearchField().focus();
+  }
+
+  private renderContextFilter(): void {
+    const label = CONTEXT_FILTER_LABELS[this.contextFilter];
+    this.contextFilterButton.textContent = `▽ ${label}`;
+    this.contextFilterButton.title = `Filter context: ${label}`;
+    this.contextFilterButton.setAttribute("aria-pressed", this.contextFilter !== "anywhere" ? "true" : "false");
   }
 
   private cycleContextFilter(): void {
     if (!isSyntaxFilterAvailable(this.view.state)) {
       this.contextFilter = "anywhere";
-      this.contextFilterButton.textContent = "Anywhere";
+      this.renderContextFilter();
       this.contextFilterButton.setAttribute("aria-disabled", "true");
       return;
     }
     const order: SearchContextFilter[] = ["anywhere", "comments", "strings", "exclude-comments"];
-    const currentIdx = order.indexOf(this.contextFilter);
-    const next = order[(currentIdx + 1) % order.length];
-    this.contextFilter = next;
-    const labels: Record<SearchContextFilter, string> = {
-      anywhere: "Anywhere",
-      comments: "In Comments",
-      strings: "In Strings",
-      "exclude-comments": "No Comments",
-    };
-    this.contextFilterButton.textContent = labels[next];
-    this.contextFilterButton.setAttribute("aria-pressed", next !== "anywhere" ? "true" : "false");
+    this.contextFilter = order[(order.indexOf(this.contextFilter) + 1) % order.length];
+    this.renderContextFilter();
     this.updateStatus();
-    this.searchField.focus();
+    this.activeSearchField().focus();
   }
 
   private handleSelectAll(): void {
+    recordSearchHistory("find", this.query.search);
     const sel = this.view.state.selection.main;
     const selectionRange = this.inSelection && !sel.empty ? { from: sel.from, to: sel.to } : null;
     selectAllOccurrences(this.view, this.query, {
@@ -573,22 +781,47 @@ class WorkspaceSearchPanel implements Panel {
     });
   }
 
+  private isExcluded(range: { from: number; to: number }): boolean {
+    return this.excluded.some((item) => item.from === range.from && item.to === range.to);
+  }
+
+  private handleExclude(): void {
+    const selection = this.view.state.selection.main;
+    const current = getFilteredMatches(this.view.state, this.query)
+      .find((match) => match.from === selection.from && match.to === selection.to);
+    if (current && !this.isExcluded(current)) this.excluded.push({ from: current.from, to: current.to });
+    findNext(this.view);
+    this.updateStatus();
+  }
+
   private handleReplaceNext(): void {
+    recordSearchHistory("find", this.query.search);
+    recordSearchHistory("replace", this.query.replace);
+    const selection = this.view.state.selection.main;
+    if (this.isExcluded({ from: selection.from, to: selection.to })) {
+      findNext(this.view);
+      return;
+    }
     const isPreserveCase = this.preserveCaseButton.getAttribute("aria-pressed") === "true";
     replaceNextPreserveCase(this.view, this.query, isPreserveCase);
     this.updateStatus();
   }
 
   private handleReplaceAll(): void {
+    recordSearchHistory("find", this.query.search);
+    recordSearchHistory("replace", this.query.replace);
     const isPreserveCase = this.preserveCaseButton.getAttribute("aria-pressed") === "true";
-    replaceAllPreserveCase(this.view, this.query, isPreserveCase);
+    const excluded = new Set(this.excluded.map(({ from, to }) => `${from}:${to}`));
+    replaceAllPreserveCase(this.view, this.query, isPreserveCase, excluded);
     this.updateStatus();
   }
 
   private syncQuery(query: SearchQuery): void {
     this.query = query;
-    this.searchField.value = query.search;
+    if (query.search.includes("\n")) this.setMultiline(true, false);
+    this.activeSearchField().value = query.search;
     this.replaceField.value = query.replace;
+    this.clearButton.hidden = query.search.length === 0;
     this.caseButton.setAttribute("aria-pressed", String(query.caseSensitive));
     this.wordButton.setAttribute("aria-pressed", String(query.wholeWord));
     this.regexpButton.setAttribute("aria-pressed", String(query.regexp));
@@ -596,7 +829,8 @@ class WorkspaceSearchPanel implements Panel {
   }
 
   private updateStatus(): void {
-    this.status.textContent = matchStatus(this.view, this.query);
+    const excluded = this.excluded.length;
+    this.status.textContent = matchStatus(this.view, this.query) + (excluded > 0 ? ` · ${excluded} excluded` : "");
     this.replaceRow.querySelectorAll<HTMLButtonElement>("button").forEach((control) => {
       control.disabled = this.view.state.readOnly;
       if (control.disabled) control.title = "Document is read-only";
@@ -614,18 +848,53 @@ class WorkspaceSearchPanel implements Panel {
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
+      if (this.historyKind) {
+        this.closeHistory();
+        return;
+      }
       if (!this.moreOptions.hidden) {
         this.moreOptions.hidden = true;
         this.moreButton.setAttribute("aria-expanded", "false");
-        this.searchField.focus();
+        this.activeSearchField().focus();
         return;
       }
       closeSearchPanel(this.view);
       return;
     }
-    if (event.key === "F3" || (event.key === "Enter" && event.target === this.searchField)) {
+    const searchTarget = event.target === this.searchField || event.target === this.searchArea;
+    // IDEA: Alt+Down opens the history of the focused field.
+    if (event.altKey && event.key === "ArrowDown" && (searchTarget || event.target === this.replaceField)) {
       event.preventDefault();
-      (event.shiftKey ? findPrevious : findNext)(this.view);
+      this.toggleHistory(searchTarget ? "find" : "replace");
+      return;
+    }
+    // DEC-012-05: Tab moves Find -> Replace (and Shift+Tab back) like IDEA.
+    if (event.key === "Tab" && !event.ctrlKey && !event.metaKey && !event.altKey && !this.replaceRow.hidden) {
+      if (searchTarget && !event.shiftKey) {
+        event.preventDefault();
+        this.replaceField.focus();
+        return;
+      }
+      if (event.target === this.replaceField && event.shiftKey) {
+        event.preventDefault();
+        this.activeSearchField().focus();
+        return;
+      }
+    }
+    if (event.key === "F3") {
+      event.preventDefault();
+      this.find(event.shiftKey ? -1 : 1);
+      return;
+    }
+    if (event.key === "Enter" && event.target === this.searchField) {
+      event.preventDefault();
+      this.find(event.shiftKey ? -1 : 1);
+      return;
+    }
+    // DEC-012-03: in multiline Find, Enter is a newline; Ctrl/Cmd+Enter searches.
+    if (event.key === "Enter" && event.target === this.searchArea && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      this.find(event.shiftKey ? -1 : 1);
       return;
     }
     if (event.key === "Enter" && event.target === this.replaceField) {
@@ -745,6 +1014,52 @@ export const WORKSPACE_SEARCH_STYLE = EditorView.theme({
   ".cm-workspace-search-button:disabled": {
     opacity: "0.5",
     cursor: "default",
+  },
+  ".cm-workspace-search-textarea": {
+    height: "auto",
+    minHeight: "4.4em",
+    padding: "4px 7px",
+    resize: "vertical",
+  },
+  ".cm-workspace-search-field .cm-workspace-search-button": {
+    minWidth: "1.6em",
+    padding: "0 4px",
+  },
+  ".cm-workspace-search-history-button": {
+    color: "var(--taomni-code-muted)",
+  },
+  ".cm-workspace-search-filter": {
+    whiteSpace: "nowrap",
+  },
+  ".cm-workspace-search-history": {
+    display: "flex",
+    flexDirection: "column",
+    maxWidth: "520px",
+    maxHeight: "12em",
+    overflowY: "auto",
+    border: "1px solid var(--taomni-code-border)",
+    borderRadius: "4px",
+    background: "var(--taomni-code-bg)",
+  },
+  ".cm-workspace-search-history-item": {
+    border: "none",
+    background: "transparent",
+    color: "inherit",
+    font: "inherit",
+    textAlign: "left",
+    padding: "2px 8px",
+    whiteSpace: "pre",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    cursor: "pointer",
+  },
+  ".cm-workspace-search-history-item:hover, .cm-workspace-search-history-item:focus": {
+    background: "var(--taomni-code-active-line-bg)",
+    outline: "none",
+  },
+  ".cm-workspace-search-history-empty": {
+    padding: "2px 8px",
+    color: "var(--taomni-code-muted)",
   },
   ".cm-searchMatch": {
     backgroundColor: "var(--taomni-code-selection-match-bg)",

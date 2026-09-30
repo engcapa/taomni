@@ -11,7 +11,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import {
   Group as PanelGroup,
   Panel,
@@ -25,7 +25,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Braces,
-  ChevronRight,
   GitBranch,
   GitCommitHorizontal,
   ListTree,
@@ -57,6 +56,9 @@ import {
   Maximize2,
   Square,
   SlidersHorizontal,
+  FolderTree,
+  MoreVertical,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import {
   workspaceListDir,
@@ -151,6 +153,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { selectFilePath } from "../../lib/ipc";
 import { loadCodeViewProfile } from "../../lib/codeViewProfile";
+import { registerShellKeyClaim } from "../../lib/shellKeyClaims";
 import { useAppStore } from "../../stores/appStore";
 import {
   createEditorGroup,
@@ -412,6 +415,16 @@ import {
   type WorkspaceEditPreview,
 } from "./workspace/workspaceEditPreview";
 import { RefactoringPreviewDialog } from "./workspace/RefactoringPreviewDialog";
+import { EditorView } from "@codemirror/view";
+import { InlineRenamePopup, type InlineRenameAnchor } from "./workspace/InlineRenamePopup";
+import {
+  inlineRenameNameError,
+  showInlineRenameMarks,
+  suggestInlineRenameNames,
+  type InlineRenameRange,
+} from "./workspace/inlineRename";
+import { readRefactorOptionsMode, writeRefactorOptionsMode } from "./workspace/refactorOptions";
+import { javaMainRunLines, type RunGutterTarget } from "./workspace/runGutter";
 import { RefactorRecoveryReviewDialog } from "./workspace/RefactorRecoveryReviewDialog";
 import {
   buildRefactorPlan,
@@ -446,7 +459,18 @@ import {
 import { sha256Hex } from "./workspace/projectAnalysisModel";
 import { KeymapCheatSheetDialog } from "./workspace/KeymapCheatSheetDialog";
 import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
+import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
+import { GoToLineDialog } from "./workspace/GoToLineDialog";
+import { languageServiceReadiness } from "./workspace/languageServiceReadiness";
+import { javaSyntaxOutline } from "./workspace/javaSyntaxOutline";
+import { WorkspaceGitManager } from "../git/WorkspaceGitManager";
+import { CodeInsightNotice, caretAnchor, type CodeInsightNoticeState } from "./workspace/CodeInsightNotice";
+import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
 import {
+  BUILTIN_KEYMAP_PRESETS,
+  consumeKeymapDefaultsMigrationNotice,
+  dismissKeymapDefaultsMigrationNotice,
+  isBuiltinKeymapScheme,
   readKeymapSchemes,
   writeKeymapSchemes,
   type KeymapSchemeV3,
@@ -496,6 +520,8 @@ import {
   type ResourceCleanupOutcome,
 } from "./workspace/workspaceResourceRecoveryCoordinator";
 import { BottomDock, BOTTOM_DOCK_MIN_HEIGHT, BOTTOM_DOCK_MAX_HEIGHT } from "./workspace/panels/BottomDock";
+import { ToolWindowRail, type ToolWindowRailItem } from "./workspace/panels/ToolWindowRail";
+import { workspaceNavigationSegments } from "./workspace/workspaceNavigationBar";
 import {
   ReferencesPanel,
   type ReferencesResultState,
@@ -1316,6 +1342,27 @@ type RenameSymbolAtResult = {
   retryable?: boolean;
 };
 
+const EMPTY_RUN_GUTTER: RunGutterTarget[] = [];
+
+/** ED-PARITY-017: outcome of one in-place naming session. */
+type InlineNameResult =
+  | { kind: "commit"; name: string }
+  | { kind: "cancel" }
+  | { kind: "dialog"; value: string };
+
+interface InlineRenameRequest {
+  id: number;
+  kind: "rename" | "extract";
+  fileKey: string;
+  view: EditorView;
+  anchor: InlineRenameAnchor;
+  initialValue: string;
+  suggestions: string[];
+  initialError: string | null;
+  languageId: string | null;
+  resolve: (result: InlineNameResult) => void;
+}
+
 /**
  * ED-PARITY-007 DEC-07: shell-side extension of the pure Extract session. The
  * before-symbols sample belongs to the frozen pre-commit context, the receipt
@@ -1336,6 +1383,18 @@ interface ExtractNamingPromptState {
   initialValue: string;
   resolve: (value: string | null) => void;
 }
+
+/** ED-PARITY-014 DEC-014-03: tool windows listed beside Recent Files (IDEA switcher). */
+const RECENT_FILES_TOOL_WINDOWS = [
+  { id: "project", label: "Project", shortcut: "Alt+1" },
+  { id: "problems", label: "Problems", shortcut: "Alt+6" },
+  { id: "structure", label: "Structure", shortcut: "Alt+7" },
+  { id: "terminal", label: "Terminal", shortcut: "Alt+F12" },
+  { id: "search", label: "Find" },
+  { id: "run", label: "Run" },
+  { id: "debug", label: "Debug" },
+  { id: "todos", label: "TODO" },
+] as const;
 
 export function CodeWorkspaceTab({
   tabId,
@@ -1464,9 +1523,12 @@ export function CodeWorkspaceTab({
   const [baseLayoutRevision, setBaseLayoutRevision] = useState(0);
 
   const openTabPolicySettings = useCallback(() => {
-    tabPolicyTriggerRef.current = document.activeElement instanceof HTMLButtonElement
-      ? document.activeElement
-      : null;
+    const trigger = document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
+    // ED-PARITY-010: an opener inside the transient ⋮ menu disappears with it;
+    // return focus to the ⋮ anchor instead.
+    tabPolicyTriggerRef.current = trigger?.closest('[data-testid="code-workspace-toolbar-more-menu"]')
+      ? document.querySelector<HTMLButtonElement>('[data-testid="code-workspace-toolbar-more"]')
+      : trigger;
     setBaseLayoutRevision(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).layoutRevision);
     setTabPolicySettingsOpen(true);
   }, [workspaceInstanceId]);
@@ -1948,12 +2010,6 @@ export function CodeWorkspaceTab({
   const setRecentFilesOpen = useCallback((open: boolean) => {
     patchWorkspaceUi(workspaceInstanceId, { recentFilesOpen: open });
   }, [patchWorkspaceUi, workspaceInstanceId]);
-  const setRecentAdvanceNonce = useCallback((updater: number | ((prev: number) => number)) => {
-    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).recentAdvanceNonce;
-    patchWorkspaceUi(workspaceInstanceId, {
-      recentAdvanceNonce: typeof updater === "function" ? updater(prev) : updater,
-    });
-  }, [patchWorkspaceUi, workspaceInstanceId]);
   const setRecentEntries = useCallback((entries: RecentFileEntry[]) => {
     patchWorkspaceUi(workspaceInstanceId, { recentEntries: entries });
   }, [patchWorkspaceUi, workspaceInstanceId]);
@@ -2257,6 +2313,7 @@ export function CodeWorkspaceTab({
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
   // Editor keys whose library sources are being fetched (drives the button spinner).
   const [downloadingSourcesKeys, setDownloadingSourcesKeys] = useState<string[]>([]);
+  const [activeSelectionStats, setActiveSelectionStats] = useState({ chars: 0, lineBreaks: 0 });
   const [cursorPositions, setCursorPositions] = useState<Record<EditorGroupId, LspPosition>>({
     primary: { line: 0, character: 0 },
     secondary: { line: 0, character: 0 },
@@ -2513,6 +2570,22 @@ export function CodeWorkspaceTab({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const treePaneRef = useRef<HTMLElement | null>(null);
   const editorPaneRef = useRef<HTMLElement | null>(null);
+  /** ED-PARITY-020 DEC-020-01: caret popup for empty/unavailable code insight. */
+  const [codeInsightNotice, setCodeInsightNotice] = useState<CodeInsightNoticeState | null>(null);
+  const codeInsightNoticeSeqRef = useRef(0);
+  /** ED-PARITY-014 DEC-014-04: File Structure shows a syntax-only outline. */
+  const [structureSyntaxOnly, setStructureSyntaxOnly] = useState(false);
+  /** ED-PARITY-018: the Git tool window mounts on first open, then stays. */
+  const [gitToolWindowMounted, setGitToolWindowMounted] = useState(false);
+  const showCodeInsightNotice = useCallback((message: string, action: "configure" | null = null) => {
+    codeInsightNoticeSeqRef.current += 1;
+    setCodeInsightNotice({
+      id: codeInsightNoticeSeqRef.current,
+      message,
+      action,
+      anchor: caretAnchor(editorPaneRef.current),
+    });
+  }, []);
   const inactiveEditorPaneRef = useRef<HTMLElement | null>(null);
   const terminalDockRef = useRef<TerminalDockHandle | null>(null);
   const runPanelRef = useRef<RunPanelHandle | null>(null);
@@ -2697,6 +2770,7 @@ export function CodeWorkspaceTab({
     closeDocument: closeLspDocument,
     closeDocumentAndWait: closeLspDocumentAndWait,
     updateStatus: updateLspStatusForFile,
+    restartServers: restartLspServers,
   } = useWorkspaceLspSession({
     workspaceInstanceId,
     roots,
@@ -7713,12 +7787,15 @@ export function CodeWorkspaceTab({
     let cancelled = false;
     const position = cursorPositions[groupId] ?? { line: 0, character: 0 };
     const descriptor = lspDescriptorForFile(file);
+    // ED-PARITY-022 DEC-022-04: Java usages are semantic; while the provider
+    // cannot answer, show none rather than a same-text imitation.
+    const semanticOnly = /\.java$/i.test(file.ref.path);
     if (!activeCapabilities?.documentHighlight || !descriptor) {
       const timer = window.setTimeout(() => {
         if (!cancelled && canApply()) {
           setHighlightsByGroup((current) => ({
             ...current,
-            [groupId]: fallbackWordHighlights(file.text, position),
+            [groupId]: semanticOnly ? [] : fallbackWordHighlights(file.text, position),
           }));
         }
       }, LSP_HIGHLIGHT_IDLE_DELAY_MS);
@@ -7746,7 +7823,7 @@ export function CodeWorkspaceTab({
           if (cancelled || !canApply() || !isCurrentLspDocumentRequest(file, epoch)) return;
           setHighlightsByGroup((current) => ({
             ...current,
-            [groupId]: fallbackWordHighlights(file.text, position),
+            [groupId]: semanticOnly ? [] : fallbackWordHighlights(file.text, position),
           }));
         });
     }, LSP_HIGHLIGHT_IDLE_DELAY_MS);
@@ -8199,8 +8276,21 @@ export function CodeWorkspaceTab({
       gitBehind: gitSnapshot?.behind ?? 0,
       fontSize: currentEditorFontSize,
       largeFile: activeFileIsLarge,
+      // ED-PARITY-010 DEC-010-06: IDEA status bar selection count, lock and
+      // navigation bar (root › dirs › file › enclosing symbols).
+      selectionChars: activeSelectionStats.chars,
+      selectionLineBreaks: activeSelectionStats.lineBreaks,
+      readOnly: !!activeFile?.library,
+      navigation: activeFile ? workspaceNavigationSegments(
+        activeFile.ref,
+        roots,
+        symbolChainAtPosition(breadcrumbSymbolsByGroup[activeEditorGroupId] ?? [], cursor),
+      ) : [],
     });
   }, [
+    activeSelectionStats,
+    breadcrumbSymbolsByGroup,
+    roots,
     activeEditorGroupId,
     activeFile?.bom,
     activeFile?.encoding,
@@ -8998,6 +9088,7 @@ export function CodeWorkspaceTab({
     const descriptor = lspDescriptorForFile(file);
     if (!descriptor) {
       setStatusMessage("No documentation available");
+      showCodeInsightNotice("No documentation found.");
       return;
     }
     const requestRevision = file.documentRevision;
@@ -9068,8 +9159,16 @@ export function CodeWorkspaceTab({
       }
     });
     if (outcome.state !== "ready") {
-      if (outcome.state === "unavailable") setStatusMessage("No documentation available");
-      else if (outcome.state === "failed") setStatusMessage(outcome.message);
+      if (outcome.state === "unavailable") {
+        setStatusMessage("No documentation available");
+        // DEC-020-01: a popup at the caret names why (IDEA "No documentation found.").
+        const readiness = languageServiceReadiness(lspFilesRef.current[file.key] ?? null);
+        if (readiness.kind === "ready" || readiness.kind === "idle") showCodeInsightNotice("No documentation found.");
+        else showCodeInsightNotice(`Documentation unavailable: ${readiness.message}`, readiness.action === "configure" ? "configure" : null);
+      } else if (outcome.state === "failed") {
+        setStatusMessage(outcome.message);
+        showCodeInsightNotice(outcome.message);
+      }
       return;
     }
     const payload = outcome.payload;
@@ -9869,8 +9968,21 @@ export function CodeWorkspaceTab({
       confirmWorkspaceEdit: allowPreview && options.preview
         ? (preview: WorkspaceEditPreview, edit: LspWorkspaceEdit) => {
             if (preview.usages.length > 0) {
-              return new Promise<boolean | LspWorkspaceEdit>((resolve) => {
+              return (async () => {
+                // ED-PARITY-017 DEC-017-05: real preimage text per affected file.
+                const sourceTexts: Record<string, string | null> = {};
+                for (const path of new Set(preview.usages.map((usage) => usage.path))) {
+                  try {
+                    const snapshot = await readWorkspaceEditPathSnapshot(path.replace(/^file:\/\//, ""));
+                    sourceTexts[path] = snapshot?.exists && typeof snapshot.text === "string" ? snapshot.text : null;
+                  } catch {
+                    sourceTexts[path] = null;
+                  }
+                }
+                return sourceTexts;
+              })().then((sourceTexts) => new Promise<boolean | LspWorkspaceEdit>((resolve) => {
                 setRefactoringPreviewModal({
+                  sourceTexts,
                   title: options.label?.trim() || preview.label || "Review workspace changes",
                   preview: {
                     ...preview,
@@ -9880,7 +9992,7 @@ export function CodeWorkspaceTab({
                   plan: options.plan && "operations" in options.plan ? options.plan : undefined,
                   resolve,
                 });
-              });
+              }));
             }
             return confirmAppDialog({
               title: options.label?.trim() || "Review workspace changes",
@@ -11279,7 +11391,7 @@ export function CodeWorkspaceTab({
     range: LspRange,
     diagnostics: LspDiagnostic[] = [],
     only: string[] = [],
-    options: { signal?: AbortSignal } = {},
+    options: { signal?: AbortSignal; allowCapabilityFallback?: boolean } = {},
   ): Promise<{
     actions: LspCodeAction[];
     providerActions: readonly ProviderActionV4[];
@@ -11296,7 +11408,7 @@ export function CodeWorkspaceTab({
     } | null;
   }> => {
     const caps = lspFilesRef.current[file.key]?.status?.capabilities;
-    if (caps && !caps.codeAction) {
+    if (caps && !caps.codeAction && !options.allowCapabilityFallback) {
       return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: null };
     }
     const semanticQuery = only.some((kind) => kind === "refactor" || kind.startsWith("refactor."));
@@ -12070,9 +12182,13 @@ export function CodeWorkspaceTab({
       // provider progress (jdtls workDoneProgress) must not stale a produced
       // result. Every requestFailure classification already surfaced its
       // accurate status message there.
-      if (requested.requestFailure) return;
+      if (requested.requestFailure) {
+        showCodeInsightNotice(requested.requestFailure.message);
+        return;
+      }
       if (!requested.context) {
         setStatusMessage(`No ${sectionLabel} provided by the language server`);
+        showCodeInsightNotice(`No ${sectionLabel} provided by the language server`);
         return;
       }
       providerActions = requested.providerActions;
@@ -12086,6 +12202,7 @@ export function CodeWorkspaceTab({
     }
     if (!filtered.length) {
       setStatusMessage(`No ${sectionLabel} provided by the language server`);
+      showCodeInsightNotice(`No ${sectionLabel} provided by the language server`);
       return;
     }
     const sorted = [...filtered].sort((a, b) => {
@@ -12244,6 +12361,12 @@ export function CodeWorkspaceTab({
     const diagnostics = payload?.diagnostics ?? (
       lspFilesRef.current[file.key]?.diagnostics ?? []
     ).filter((item) => item.range.start.line <= line && item.range.end.line >= line);
+    // DEC-020-01: Alt+Enter with an unavailable service answers at the caret.
+    const readiness = languageServiceReadiness(lspFilesRef.current[file.key] ?? null);
+    if (readiness.kind !== "ready" && readiness.kind !== "idle") {
+      showCodeInsightNotice(`Context actions unavailable: ${readiness.message}`, readiness.action === "configure" ? "configure" : null);
+      return;
+    }
     const rect = editorPaneRef.current?.getBoundingClientRect();
     await showCodeActionsMenu(
       payload?.clientX ?? (rect?.left ?? 0) + 80,
@@ -12293,26 +12416,39 @@ export function CodeWorkspaceTab({
     structureFileRef.current = file.key;
     setStructureSymbols([]);
     setStructureUnavailable(null);
+    setStructureSyntaxOnly(false);
     setStructureLoading(true);
     setStructureOpen(true);
+    // ED-PARITY-014 DEC-014-04: with no provider, Java files still get a
+    // syntax-only outline from the bundled grammar, labelled as such.
+    const syntaxFallback = (reason: string) => {
+      const outline = /\.java$/i.test(file.title) ? javaSyntaxOutline(file.text) : [];
+      if (outline.length > 0) {
+        setStructureSymbols(outline);
+        setStructureSyntaxOnly(true);
+        setStructureUnavailable(null);
+      } else {
+        setStructureUnavailable(reason);
+      }
+    };
     const descriptor = lspDescriptorForFile(file);
     if (!descriptor) {
       setStructureLoading(false);
-      setStructureUnavailable("No language service for this file");
+      syntaxFallback("No language service for this file");
       return;
     }
     try {
       const result = await lspDocumentSymbols(descriptor);
       updateLspStatusForFile(file, result.status);
       if (structureFileRef.current !== file.key) return;
-      setStructureSymbols(result.symbols);
-      setStructureUnavailable(
-        result.symbols.length === 0 && !result.status.active
-          ? result.status.error ?? "Language server is not running for this file"
-          : null,
-      );
+      if (result.symbols.length === 0 && !result.status.active) {
+        syntaxFallback(result.status.error ?? "Language server is not running for this file");
+      } else {
+        setStructureSymbols(result.symbols);
+        setStructureUnavailable(null);
+      }
     } catch (err) {
-      if (structureFileRef.current === file.key) setStructureUnavailable(errorMessage(err));
+      if (structureFileRef.current === file.key) syntaxFallback(errorMessage(err));
     } finally {
       if (structureFileRef.current === file.key) setStructureLoading(false);
     }
@@ -12547,6 +12683,97 @@ export function CodeWorkspaceTab({
     });
     setStatusMessage("Restored default tool window layout");
   }, [handleReturnToEditor, restoreDefaultToolWindowLayout, setStatusMessage, workspaceInstanceId]);
+
+  // ED-PARITY-013 DEC-013-05: IDEA F12 / Shift+Esc / Ctrl+Shift+F12. The last
+  // tool window is the most recently opened one; Project is the fallback.
+  const lastToolWindowIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (bottomDockOpen) lastToolWindowIdRef.current = bottomDockTab;
+  }, [bottomDockOpen, bottomDockTab]);
+  useEffect(() => {
+    if (rightPaneOpen && rightPaneTab === "outline") lastToolWindowIdRef.current = "structure";
+  }, [rightPaneOpen, rightPaneTab]);
+  const hiddenToolWindowsRef = useRef<{ project: boolean; bottom: boolean; right: boolean } | null>(null);
+
+  const focusBottomDockSoon = useCallback(() => {
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(
+        '[data-testid="code-workspace-bottom-dock"] [tabindex="0"], [data-testid="code-workspace-bottom-dock"] button, [data-testid="code-workspace-bottom-dock"] input',
+      );
+      el?.focus();
+    });
+  }, []);
+
+  const jumpToLastToolWindow = useCallback(() => {
+    const toolId = lastToolWindowIdRef.current ?? "project";
+    hiddenToolWindowsRef.current = null;
+    if (toolId === "project") {
+      setLanguagePanelOpen(true);
+      requestAnimationFrame(() => treePaneRef.current?.focus());
+      return;
+    }
+    if (toolId === "structure") {
+      setRightPaneTab("outline");
+      setRightPaneOpen(true);
+      return;
+    }
+    setBottomDockTab(toolId as BottomDockTabId);
+    setBottomDockOpen(true);
+    focusBottomDockSoon();
+  }, [focusBottomDockSoon, setBottomDockOpen, setBottomDockTab, setLanguagePanelOpen, setRightPaneOpen, setRightPaneTab]);
+
+  const hideActiveToolWindow = useCallback((): boolean => {
+    const active = document.activeElement;
+    const bottomDock = document.querySelector('[data-testid="code-workspace-bottom-dock"]');
+    const rightPane = document.querySelector('[data-testid="code-workspace-right-pane"]');
+    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    let hid = false;
+    if (active && treePaneRef.current?.contains(active)) {
+      setLanguagePanelOpen(false);
+      hid = true;
+    } else if (active && bottomDock?.contains(active)) {
+      setBottomDockOpen(false);
+      hid = true;
+    } else if (active && rightPane?.contains(active)) {
+      setRightPaneOpen(false);
+      hid = true;
+    } else {
+      // Editor focus: hide the last active tool window when it is open.
+      const last = lastToolWindowIdRef.current;
+      if (last === "structure" && ui.rightPaneOpen) {
+        setRightPaneOpen(false);
+        hid = true;
+      } else if (last && last !== "project" && last !== "structure" && ui.bottomDockOpen) {
+        setBottomDockOpen(false);
+        hid = true;
+      }
+    }
+    if (hid) requestAnimationFrame(() => handleReturnToEditor());
+    return hid;
+  }, [handleReturnToEditor, setBottomDockOpen, setLanguagePanelOpen, setRightPaneOpen, workspaceInstanceId]);
+
+  const toggleAllToolWindows = useCallback(() => {
+    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    const anyOpen = ui.languagePanelOpen || ui.bottomDockOpen || ui.rightPaneOpen;
+    if (anyOpen) {
+      hiddenToolWindowsRef.current = {
+        project: ui.languagePanelOpen,
+        bottom: ui.bottomDockOpen,
+        right: ui.rightPaneOpen,
+      };
+      setLanguagePanelOpen(false);
+      setBottomDockOpen(false);
+      setRightPaneOpen(false);
+      requestAnimationFrame(() => handleReturnToEditor());
+      return;
+    }
+    const restore = hiddenToolWindowsRef.current;
+    hiddenToolWindowsRef.current = null;
+    if (!restore) return;
+    if (restore.project) setLanguagePanelOpen(true);
+    if (restore.bottom) setBottomDockOpen(true);
+    if (restore.right) setRightPaneOpen(true);
+  }, [handleReturnToEditor, setBottomDockOpen, setLanguagePanelOpen, setRightPaneOpen, workspaceInstanceId]);
 
   const toggleOutlinePane = useCallback(() => {
     if (rightPaneOpen && rightPaneTab === "outline") {
@@ -12803,6 +13030,27 @@ export function CodeWorkspaceTab({
     setStatusMessage("Occurrence highlights cleared");
     return true;
   }, [activeEditorGroupId, setStatusMessage]);
+
+  /** ED-PARITY-022 DEC-022-02: VCS popup Show Diff — HEAD (read-only) ↔ buffer. */
+  const showGitHeadDiff = useCallback((key: string) => {
+    const file = openFilesRef.current[key];
+    const head = gitHeadTextByFile[key];
+    if (!file || !head || typeof head.text !== "string") {
+      setStatusMessage("Show Diff is unavailable: the HEAD revision of this file is not loaded");
+      return;
+    }
+    const target = compareTargetForOpenFile(file, undefined);
+    const result = createFileCompareSession(
+      { title: `${file.title} (HEAD)`, text: head.text ?? "", source: "file", readOnly: true },
+      compareDescriptorForOpenFile(file, "buffer", file.path, file.text, file.title),
+      target,
+    );
+    if (!result.session) {
+      setStatusMessage(result.error ?? "Show Diff is unavailable for this file");
+      return;
+    }
+    setActiveCompareSession(result.session);
+  }, [gitHeadTextByFile, setStatusMessage]);
 
   const compareWithClipboard = useCallback(async () => {
     const file = activeFile;
@@ -13951,7 +14199,8 @@ export function CodeWorkspaceTab({
       title: "Surround With…",
       category: "Edit",
       keybinding: "Ctrl+Alt+T",
-      keybindings: ["Meta+Alt+T"],
+      // IDEA XWin lists Ctrl+Alt+Shift+B first (Ctrl+Alt+T opens a terminal on many desktops).
+      keybindings: ["Ctrl+Alt+Shift+B", "Meta+Alt+T"],
       keywords: ["surround", "wrap", "try", "catch", "if", "while", "runnable"],
       when: (context) => context.focus === "editor" && !!context.hasActiveFile && !context.readOnly,
       run: () => {
@@ -14099,6 +14348,7 @@ export function CodeWorkspaceTab({
       title: "Go to File",
       category: "Navigation",
       keybinding: "Ctrl+Shift+N",
+      keybindings: ["Meta+Shift+N"],
       keywords: ["search everywhere", "file", "open"],
       run: () => openSearchEverywhere("files"),
     },
@@ -14131,8 +14381,10 @@ export function CodeWorkspaceTab({
       category: "Navigation",
       keybinding: "Ctrl+E",
       keywords: ["previous", "history"],
+      // ED-PARITY-014 DEC-014-03: IDEA toggles "Show edited only" on a
+      // repeated Ctrl+E instead of stepping the selection.
       run: () => {
-        if (recentFilesOpen && !recentChangedOnly) setRecentAdvanceNonce((nonce) => nonce + 1);
+        if (recentFilesOpen) openRecentFiles({ changedOnly: !recentChangedOnly });
         else openRecentFiles();
       },
     },
@@ -14210,6 +14462,12 @@ export function CodeWorkspaceTab({
       when: () => !!activeFile,
       run: () => {
         if (!activeFile) return;
+        // DEC-020-01: an unavailable service answers with a caret popup.
+        const readiness = languageServiceReadiness(lspFilesRef.current[activeFile.key] ?? null);
+        if (readiness.kind !== "ready" && readiness.kind !== "idle") {
+          showCodeInsightNotice(`Parameter info unavailable: ${readiness.message}`, readiness.action === "configure" ? "configure" : null);
+          return;
+        }
         setParameterInfoRequestNonce((nonce) => nonce + 1);
       },
     },
@@ -14424,6 +14682,7 @@ export function CodeWorkspaceTab({
       title: "Fold All",
       category: "Edit",
       keybinding: "Ctrl+Shift+NumpadSubtract",
+      keybindings: ["Ctrl+Shift+Minus"],
       keywords: ["fold", "collapse", "all"],
       when: (context) => context.focus === "editor"
         && !!editorCommandStateFor(context),
@@ -14434,6 +14693,7 @@ export function CodeWorkspaceTab({
       title: "Unfold All",
       category: "Edit",
       keybinding: "Ctrl+Shift+NumpadAdd",
+      keybindings: ["Ctrl+Shift+Equal"],
       keywords: ["fold", "expand", "all"],
       when: (context) => context.focus === "editor"
         && !!editorCommandStateFor(context),
@@ -14502,6 +14762,8 @@ export function CodeWorkspaceTab({
       title: "Find in Files",
       category: "Search",
       keybinding: "Ctrl+Shift+F",
+      // macOS uses Command for the workspace-wide search chord.
+      keybindings: ["Meta+Shift+F"],
       keywords: ["text", "content", "grep"],
       run: () => openFindInFiles(),
     },
@@ -14510,6 +14772,7 @@ export function CodeWorkspaceTab({
       title: "Replace in Files",
       category: "Search",
       keybinding: "Ctrl+Shift+R",
+      keybindings: ["Meta+Shift+R"],
       keywords: ["bulk replace"],
       run: () => {
         openFindInFiles("replace");
@@ -14584,7 +14847,9 @@ export function CodeWorkspaceTab({
       title: "Quick Documentation",
       category: "Code",
       keybinding: "Ctrl+Q",
-      keybindings: ["F1"],
+      // ED-PARITY-013: F1 is Quick Doc only in IDEA's macOS keymap; on
+      // Windows/Linux IDEA reserves it for Context Help.
+      platformKeybindings: { mac: ["Ctrl+Q", "F1"] },
       keywords: ["docs", "hover", "javadoc"],
       when: (context) => context.focus !== "tree" && context.focus !== "terminal" && !!activeFile && !activeFile.loading,
       run: () => void openQuickDocumentation(),
@@ -14718,7 +14983,7 @@ export function CodeWorkspaceTab({
       title: "Refactor This…",
       category: "Refactor",
       keybinding: "Ctrl+Alt+Shift+T",
-      keybindings: ["Mod-Alt-Shift-T", "Mod-Alt-Shift-t", "Ctrl+T"],
+      keybindings: ["Meta+Alt+Shift+T", "Meta+Alt+Shift+t", "Ctrl+T"],
       keywords: ["refactor", "refactor this", "extract", "inline", "rename", "move"],
       when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
         && !activeFile.library && !!activeCapabilities?.codeAction,
@@ -14729,10 +14994,12 @@ export function CodeWorkspaceTab({
       title: "Extract Method",
       category: "Refactor",
       keybinding: "Ctrl+Alt+M",
-      keybindings: ["Mod-Alt-M", "Mod-Alt-m"],
+      // Keep the native Ctrl chord while giving macOS an explicit, parser-
+      // compatible Command alias. The action host uses '+'-delimited bindings.
+      keybindings: ["Meta+Alt+M", "Meta+Alt+m"],
       keywords: ["refactor", "extract", "method", "function"],
       when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
-        && !activeFile.library && !!activeCapabilities?.codeAction,
+        && !activeFile.library,
       run: () => void runExtractMethodRef.current(),
     },
     {
@@ -14782,7 +15049,8 @@ export function CodeWorkspaceTab({
       id: "workspace.aiExplainSyntax",
       title: t("codeWorkspaceAi.commandExplainSyntax"),
       category: "AI",
-      keybinding: "Ctrl+Alt+S",
+      // ED-PARITY-013 DEC-013-05: Ctrl+Alt+S is IDEA Settings; the Taomni
+      // Classic keymap scheme keeps the old binding.
       keywords: ["ai", "syntax", "grammar", "teach", "learn", "explain", "语法", "讲解"],
       when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading,
       run: () => void runEditorAiActionAtCursor("syntax"),
@@ -14840,6 +15108,8 @@ export function CodeWorkspaceTab({
       title: languagePanelOpen ? "Hide Project Tree" : "Show Project Tree",
       category: "View",
       keybinding: "Alt+1",
+      // IDEA macOS keymap: Cmd+1 activates Project (Option+1 kept as alias).
+      platformKeybindings: { mac: ["Meta+1", "Alt+1"] },
       keywords: ["project", "explorer", "files", "tree", "sidebar", "collapse"],
       run: () => handleActivateToolWindow("project"),
     },
@@ -14872,6 +15142,54 @@ export function CodeWorkspaceTab({
       run: handleRestoreToolWindowLayout,
     },
     {
+      id: "workspace.jumpToLastToolWindow",
+      title: "Jump to Last Tool Window",
+      category: "View",
+      keybinding: "F12",
+      keywords: ["tool window", "last", "focus", "f12"],
+      when: (context) => context.focus !== "modal",
+      run: jumpToLastToolWindow,
+    },
+    {
+      id: "workspace.hideActiveToolWindow",
+      title: "Hide Active Tool Window",
+      category: "View",
+      keybinding: "Shift+Escape",
+      keywords: ["tool window", "hide", "close", "escape"],
+      when: (context) => context.focus !== "modal" && context.focus !== "completion" && context.focus !== "snippet",
+      run: () => hideActiveToolWindow(),
+    },
+    {
+      id: "workspace.hideAllToolWindows",
+      title: "Hide All Tool Windows",
+      category: "View",
+      keybinding: "Ctrl+Shift+F12",
+      keywords: ["tool windows", "hide", "maximize editor", "restore"],
+      when: (context) => context.focus !== "modal",
+      run: toggleAllToolWindows,
+    },
+    {
+      id: "workspace.findAction",
+      title: "Find Action…",
+      category: "Help",
+      keybinding: "Ctrl+Shift+A",
+      platformKeybindings: { mac: ["Meta+Shift+A", "Ctrl+Shift+A"] },
+      keywords: ["actions", "command", "palette", "find action", "assign shortcut"],
+      // The terminal owns its keys; a modal owns its own keyboard state.
+      when: (context) => context.focus !== "terminal" && context.focus !== "modal",
+      run: () => openSearchEverywhere("actions"),
+    },
+    {
+      id: "workspace.showSettings",
+      title: "Settings…",
+      category: "File",
+      keybinding: "Ctrl+Alt+S",
+      platformKeybindings: { mac: ["Meta+,", "Ctrl+Alt+S"] },
+      keywords: ["settings", "preferences", "options"],
+      when: (context) => context.focus !== "terminal" && context.focus !== "modal",
+      run: () => openSettingsSection("general"),
+    },
+    {
       id: "workspace.showProblems",
       title: "Problems",
       category: "View",
@@ -14883,6 +15201,8 @@ export function CodeWorkspaceTab({
       id: "workspace.toggleDocumentationPane",
       title: "Toggle Outline Pane",
       category: "View",
+      // IDEA Alt+7 = Structure tool window.
+      keybinding: "Alt+7",
       keywords: ["right", "outline", "structure", "symbols"],
       run: toggleOutlinePane,
     },
@@ -14913,17 +15233,30 @@ export function CodeWorkspaceTab({
       keybinding: "Ctrl+B",
       keybindings: ["Meta+B"],
       keywords: ["declaration", "jump", "navigate"],
-      when: (context) => {
+      // ED-PARITY-013: Ctrl+B is the navigation key now, so a blocked press
+      // must name the real reason (loading / provider not ready) instead of
+      // the generic "No selection" fallback.
+      getState: (context) => {
         const target = resolveEditorTarget(context);
-        if (context.focus === "tree" || !target.file || target.file.loading) return false;
-        const capabilities = lspFilesRef.current[target.file.key]?.status?.capabilities;
-        const languageId = lspFilesRef.current[target.file.key]?.status?.languageId
-          ?? target.file.languagePath;
+        const state = (availability: "available" | "disabled", disabledReason?: string) => ({
+          availability,
+          ...(disabledReason ? { disabledReason } : {}),
+          source: "provider" as const,
+          scope: "editor" as const,
+          freshness: "current" as const,
+          completeness: "complete" as const,
+        });
+        if (context.focus === "tree" || !target.file) return state("disabled", "noEditor");
+        if (target.file.loading) return state("disabled", "loading");
+        const status = lspFilesRef.current[target.file.key]?.status;
+        const capabilities = status?.capabilities;
+        const languageId = status?.languageId ?? target.file.languagePath;
         const isEquivalent = isDeclarationDefinitionEquivalentLanguage(languageId, target.file.path);
-        if (!capabilities) return true;
-        return isEquivalent
+        const supported = !capabilities || (isEquivalent
           ? capabilities.definition !== false
-          : (capabilities.declaration !== false || capabilities.definition !== false);
+          : (capabilities.declaration !== false || capabilities.definition !== false));
+        if (supported) return state("available");
+        return state("disabled", status?.active ? "unsupported" : "providerOffline");
       },
       run: (context) => {
         const target = resolveEditorTarget(context);
@@ -14935,7 +15268,8 @@ export function CodeWorkspaceTab({
       id: "workspace.gotoDefinition",
       title: "Go to Definition",
       category: "Navigation",
-      keybinding: "F12",
+      // ED-PARITY-013 DEC-013-05: F12 is IDEA Jump to Last Tool Window; Ctrl+B
+      // (Go to Declaration) routes to the definition where they coincide.
       keywords: ["declaration", "jump", "navigate"],
       when: (context) => {
         const target = resolveEditorTarget(context);
@@ -14976,6 +15310,8 @@ export function CodeWorkspaceTab({
       title: "Show Usages",
       category: "Navigation",
       keybinding: "Ctrl+Alt+F7",
+      // XWin: Ctrl+Alt+F7 switches virtual terminals on Linux.
+      platformKeybindings: { linux: ["Ctrl+Alt+7"] },
       keywords: ["usages", "popup", "lightweight"],
       when: (context) => context.focus === "editor" && !!activeFile,
       run: (context) => {
@@ -15042,6 +15378,8 @@ export function CodeWorkspaceTab({
       id: "workspace.toggleTodosPane",
       title: "Toggle TODOs / Bookmarks",
       category: "View",
+      // IDEA Alt+2 = Bookmarks tool window.
+      keybinding: "Alt+2",
       keywords: ["todo", "fixme", "bookmark", "markers"],
       run: toggleTodosPane,
     },
@@ -15447,10 +15785,28 @@ export function CodeWorkspaceTab({
     },
     {
       id: "workspace.openGit",
-      title: "Open Git Manager",
+      title: "Open in Git Tab",
       category: "Git",
       when: () => !gitRootsLoading && !!onOpenGitManager && gitRoots.length > 0,
       run: openGitManager,
+    },
+    {
+      // ED-PARITY-018 DEC-018-01: IDEA Alt+9 = the Git tool window.
+      id: "workspace.gitToolWindow",
+      title: "Git Tool Window",
+      category: "Git",
+      keybinding: "Alt+9",
+      keywords: ["git", "log", "changes", "vcs"],
+      run: () => handleActivateToolWindow("git"),
+    },
+    {
+      // ED-PARITY-018 DEC-018-02: IDEA Alt+0 = Commit (changes + message).
+      id: "workspace.commitToolWindow",
+      title: "Commit Tool Window",
+      category: "Git",
+      keybinding: "Alt+0",
+      keywords: ["commit", "changes", "vcs"],
+      run: () => handleActivateToolWindow("git"),
     },
     {
       id: "workspace.toggleSyncSplitScroll",
@@ -15680,7 +16036,7 @@ export function CodeWorkspaceTab({
       title: "Keyboard Shortcuts (Keymap)",
       category: "Help",
       keybinding: "Ctrl+Alt+/",
-      keybindings: ["Mod-Alt-/", "Mod-k Mod-s"],
+      keybindings: ["Meta+Alt+/", "Meta+K Meta+S"],
       keywords: ["keymap", "shortcuts", "hotkeys", "cheat sheet", "intellij"],
       run: () => setKeymapCheatSheetOpen(true),
     },
@@ -15707,6 +16063,8 @@ export function CodeWorkspaceTab({
       title: "Run to Cursor",
       category: "Debug",
       keybinding: "Alt+F9",
+      // IDEA "Default for XWin" moves Run to Cursor off the window-manager key.
+      platformKeybindings: { linux: ["Shift+Alt+9"] },
       keywords: ["debug", "run", "cursor", "break"],
       when: (context) => {
         if (context.focus === "tree" || context.focus === "terminal") return false;
@@ -15846,6 +16204,9 @@ export function CodeWorkspaceTab({
     toggleSoftWrap,
     toggleTodosPane,
     jumpToMnemonicBookmark,
+    jumpToLastToolWindow,
+    hideActiveToolWindow,
+    toggleAllToolWindows,
     undoWorkspaceEdit,
     redoWorkspaceEdit,
     unsplitAllWindows,
@@ -15880,7 +16241,9 @@ export function CodeWorkspaceTab({
       // because it listens on window capture independently of this guard.
       + ', [data-testid="workspace-keymap-settings-dialog"], [data-testid="keymap-cheatsheet-dialog"], [data-testid="code-workspace-undo-confirm"]'
       // ED-PARITY-009: the Structural Search dialog owns Esc/Ctrl+Enter and text input.
-      + ', [data-testid="structural-search-dialog"]',
+      + ', [data-testid="structural-search-dialog"]'
+      // ED-PARITY-017: the in-place naming session owns Esc/Enter/Shift+F6/Alt+Shift+O.
+      + ', [data-testid="code-workspace-inline-rename"]',
     ));
   }, []);
 
@@ -15967,13 +16330,110 @@ export function CodeWorkspaceTab({
   const [keymapSchemes, setKeymapSchemes] = useState<KeymapSchemeV3[]>(keymapStore.schemes);
   const [activeKeymapSchemeId, setActiveKeymapSchemeId] = useState<string | null>(keymapStore.activeId);
   const [keymapSettingsOpen, setKeymapSettingsOpen] = useState(false);
+  const [toolbarMoreOpen, setToolbarMoreOpen] = useState(false);
+  /** ED-PARITY-012 DEC-012-06: pending Go to Line:Column dialog. */
+  const [goToLineRequest, setGoToLineRequest] = useState<GoToLineRequest | null>(null);
+  useEffect(() => {
+    if (bottomDockOpen && bottomDockTab === "git") setGitToolWindowMounted(true);
+  }, [bottomDockOpen, bottomDockTab]);
+  // The ⋮ menu closes on any outside press or Esc without swallowing that
+  // press, so the next toolbar/editor click still reaches its target.
+  useEffect(() => {
+    if (!toolbarMoreOpen) return;
+    const onPointer = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('[data-testid="code-workspace-toolbar-more-menu"], [data-testid="code-workspace-toolbar-more"]')) return;
+      setToolbarMoreOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setToolbarMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer, true);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointer, true);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [toolbarMoreOpen]);
+  const workspaceWidgetHost = useCodeWorkspaceStatusStore((s) => s.widgetHost);
+  const statusNavigationHost = useCodeWorkspaceStatusStore((s) => s.navigationHost);
+  /** Action to record a shortcut for when the dialog opens (Assign Shortcut). */
+  const [keymapAssignActionId, setKeymapAssignActionId] = useState<string | null>(null);
   const keymapCorruptDiagnostic = keymapStore.recoveredFromCorrupt
     ? "Stored keymap was corrupted; a backup was kept and defaults are active."
     : null;
   const activeKeymapScheme = useMemo(
-    () => keymapSchemes.find((scheme) => scheme.id === activeKeymapSchemeId) ?? null,
+    () => [...keymapSchemes, ...BUILTIN_KEYMAP_PRESETS].find((scheme) => scheme.id === activeKeymapSchemeId) ?? null,
     [keymapSchemes, activeKeymapSchemeId],
   );
+  // ED-PARITY-013 DEC-013-06: one-time notice for profiles that used the
+  // pre-IDEA defaults (F12 / Ctrl+Alt+S). Decided once at mount.
+  const [keymapMigrationNoticeOpen, setKeymapMigrationNoticeOpen] = useState(
+    () => consumeKeymapDefaultsMigrationNotice(),
+  );
+
+  // ED-PARITY-010 DEC-010-01: IDEA tool window stripes. The bottom-dock tools
+  // render their own buttons into `bottomRailHost` (same testids as before).
+  const [bottomRailHost, setBottomRailHost] = useState<HTMLDivElement | null>(null);
+  const railShortcut = (actionId: string) => actionsController.host.effectiveKeybindingDisplay(actionId)[0];
+  const leftToolRailItems: ToolWindowRailItem[] = [
+    {
+      id: "project",
+      label: "Project",
+      icon: <FolderTree className="h-3.5 w-3.5" />,
+      active: languagePanelOpen,
+      shortcut: railShortcut("workspace.toggleProjectTree"),
+      onSelect: toggleProjectTree,
+    },
+    {
+      id: "commit",
+      label: "Commit",
+      icon: <GitCommitHorizontal className="h-3.5 w-3.5" />,
+      active: bottomDockOpen && bottomDockTab === "git",
+      shortcut: railShortcut("workspace.commitToolWindow"),
+      disabled: gitRoots.length === 0,
+      disabledReason: "No Git repository in this workspace",
+      onSelect: () => handleActivateToolWindow("git"),
+    },
+  ];
+  // ED-PARITY-011 DEC-011-05: tab names of files with error diagnostics.
+  const filesWithErrors = useMemo(() => new Set(
+    Object.entries(lspFiles)
+      .filter(([, state]) => state?.diagnostics?.some((diagnostic) => diagnostic.severity === 1))
+      .map(([key]) => key),
+  ), [lspFiles]);
+  // ED-PARITY-010 DEC-010-03: IDEA empty-editor tips with the live bindings.
+  const emptyEditorHints = [
+    { label: "Search Everywhere", shortcut: "Double Shift" },
+    { label: "Go to File", shortcut: railShortcut("workspace.goToFile") },
+    { label: "Recent Files", shortcut: railShortcut("workspace.recentFiles") },
+    { label: "Navigation Bar", shortcut: railShortcut("workspace.activateNavigationBar") },
+    { label: "Drop files here to open them" },
+  ];
+  const rightToolRailItems: ToolWindowRailItem[] = [
+    {
+      id: "structure",
+      label: "Structure",
+      icon: <ListTree className="h-3.5 w-3.5" />,
+      active: rightPaneOpen && rightPaneTab === "outline",
+      shortcut: railShortcut("workspace.toggleDocumentationPane"),
+      onSelect: toggleOutlinePane,
+    },
+    {
+      id: "documentation",
+      label: "Docs",
+      icon: <BookOpen className="h-3.5 w-3.5" />,
+      active: rightPaneOpen && rightPaneTab === "documentation",
+      onSelect: () => {
+        if (rightPaneOpen && rightPaneTab === "documentation") {
+          setRightPaneOpen(false);
+          return;
+        }
+        setRightPaneTab("documentation");
+        setRightPaneOpen(true);
+      },
+    },
+  ];
 
   useEffect(() => {
     writeKeymapSchemes(keymapSchemes, activeKeymapSchemeId);
@@ -15982,6 +16442,15 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     actionsController.host.setKeymapScheme(activeKeymapScheme);
   }, [actionsController.host, activeKeymapScheme]);
+
+  // IDEA's macOS keymap binds Cmd+1..0 to tool windows; the app shell's Cmd+N
+  // tab switch yields those strokes while focus is inside this workspace.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    const host = actionsController.host;
+    return registerShellKeyClaim(root, (event) => host.claimsSingleStroke(event));
+  }, [actionsController.host, visible]);
 
   // §8.19.2: one workspace-root mouse dispatcher; unbound gestures (text
   // selection, editing) pass through untouched. Re-attach only when the
@@ -15999,7 +16468,8 @@ export function CodeWorkspaceTab({
   // reaches this. `null` means the user deleted the active scheme and the app
   // is back on the built-in defaults.
   const applyKeymapScheme = useCallback((scheme: KeymapSchemeV3 | null) => {
-    if (scheme) {
+    // Built-in presets ship with the app: only their id becomes active.
+    if (scheme && !isBuiltinKeymapScheme(scheme.id)) {
       setKeymapSchemes((schemes) => {
         const exists = schemes.some((entry) => entry.id === scheme.id);
         return exists
@@ -16250,9 +16720,15 @@ export function CodeWorkspaceTab({
       // then falls through to indentation when neither applies.
       if (editorEventOwner && !event.ctrlKey && !event.metaKey && !event.altKey) {
         if (logicalKey === "tab") return;
+        const activeCompletionId = targetElement?.getAttribute("aria-activedescendant");
+        const hasActiveCompletionCandidate = !!activeCompletionId
+          && !!document.getElementById(activeCompletionId)?.closest(".cm-tooltip-autocomplete");
         if (
           !event.shiftKey
-          && editorEventOwner.port.state().completionActive
+          && (
+            editorEventOwner.port.state().completionActive
+            || hasActiveCompletionCandidate
+          )
           && ["arrowup", "arrowdown", "pageup", "pagedown", "enter", "escape"].includes(logicalKey)
         ) return;
       }
@@ -16895,15 +17371,20 @@ export function CodeWorkspaceTab({
 
   const goToDeclaration = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
+      // Languages whose declaration is the definition (Java, Kotlin, …) go
+      // straight to the definition query. Preparing here first forced a second
+      // buffer sync inside goToDefinition, which could supersede the query and
+      // drop Ctrl+B silently (ED-PARITY-013: Ctrl+B is now the navigation key).
+      const current = openFilesRef.current[file.key] ?? file;
+      const currentLanguageId = lspFilesRef.current[current.key]?.status?.languageId
+        ?? lspDescriptorForFile(current)?.languageId
+        ?? current.languagePath;
+      if (isDeclarationDefinitionEquivalentLanguage(currentLanguageId, current.path)) {
+        return goToDefinition(current, position);
+      }
       const prepared = await prepareSemanticNavigationRequest(file);
       if (!prepared) return false;
       const { file: live, descriptor } = prepared;
-      const languageId = lspFilesRef.current[live.key]?.status?.languageId
-        ?? descriptor.languageId
-        ?? live.languagePath;
-      if (isDeclarationDefinitionEquivalentLanguage(languageId, live.path)) {
-        return goToDefinition(live, position);
-      }
       const caps = lspFilesRef.current[live.key]?.status?.capabilities;
       if (caps && caps.declaration === false) {
         if (caps.definition !== false) {
@@ -16953,7 +17434,7 @@ export function CodeWorkspaceTab({
         return false;
       }
     },
-    [beginSemanticQuery, goToDefinition, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
+    [beginSemanticQuery, goToDefinition, lspDescriptorForFile, navigateLocations, prepareSemanticNavigationRequest, setStatusMessage, updateLspStatusForFile],
   );
 
   const goToTypeDefinition = useCallback(
@@ -17051,6 +17532,143 @@ export function CodeWorkspaceTab({
   goToTypeDefinitionRef.current = goToTypeDefinition;
   goToImplementationRef.current = goToImplementation;
 
+  // ---------------------------------------------------------------------------
+  // ED-PARITY-017 DEC-017-01..04: in-place naming for Rename / Extract Method
+  // ---------------------------------------------------------------------------
+  const [inlineRename, setInlineRename] = useState<InlineRenameRequest | null>(null);
+  const inlineRenameRef = useRef<InlineRenameRequest | null>(null);
+  const [refactorModalOptions, setRefactorModalOptions] = useState(() => readRefactorOptionsMode() === "dialog");
+
+  const finishInlineRename = useCallback((request: InlineRenameRequest, result: InlineNameResult) => {
+    if (inlineRenameRef.current !== request) return;
+    inlineRenameRef.current = null;
+    setInlineRename(null);
+    try {
+      showInlineRenameMarks(request.view, null);
+    } catch {
+      // The view may already be destroyed (tab closed during the session).
+    }
+    // Focus returns to the editor at the untouched caret (DEC-017-03).
+    if (request.view.dom.isConnected) request.view.focus();
+    request.resolve(result);
+  }, []);
+
+  const activeEditorViewFor = useCallback((fileKey: string): EditorView | null => {
+    const root = rootRef.current;
+    const groupId = activeEditorGroupIdRef.current;
+    const host = root?.querySelector<HTMLElement>(
+      `[data-testid="code-workspace-editor-pane"][data-editor-group-id="${CSS.escape(groupId)}"] [data-testid="code-workspace-editor"] .cm-editor`,
+    );
+    const view = host ? EditorView.findFromDOM(host) : null;
+    const live = openFilesRef.current[fileKey];
+    if (!view || !live || view.state.doc.toString() !== live.text) return null;
+    return view;
+  }, []);
+
+  /**
+   * Open the in-place naming session over `range`. Resolves `dialog` when the
+   * editor view cannot host it (no view, moved document) so the caller falls
+   * back to the modal prompt instead of silently doing nothing.
+   */
+  const promptInlineName = useCallback(async (input: {
+    fileKey: string;
+    kind: "rename" | "extract";
+    range: LspRange;
+    defaultName: string;
+    initialValue?: string;
+    error?: string | null;
+  }): Promise<InlineNameResult> => {
+    const view = activeEditorViewFor(input.fileKey);
+    if (!view) return { kind: "dialog", value: input.initialValue ?? input.defaultName };
+    const doc = view.state.doc;
+    const offset = (position: LspPosition) => {
+      const line = doc.line(Math.min(Math.max(position.line + 1, 1), doc.lines));
+      return Math.min(line.from + position.character, line.to);
+    };
+    const target: InlineRenameRange = { from: offset(input.range.start), to: offset(input.range.end) };
+    if (target.to <= target.from) return { kind: "dialog", value: input.initialValue ?? input.defaultName };
+    if (inlineRenameRef.current) finishInlineRename(inlineRenameRef.current, { kind: "cancel" });
+    view.dispatch({ effects: EditorView.scrollIntoView(target.from, { y: "nearest" }) });
+    await new Promise<void>((resolve) => { window.requestAnimationFrame(() => resolve()); });
+    const coords = view.coordsAtPos(target.from);
+    if (!coords) return { kind: "dialog", value: input.initialValue ?? input.defaultName };
+    const style = window.getComputedStyle(view.contentDOM);
+    const anchor: InlineRenameAnchor = {
+      left: coords.left,
+      top: coords.top,
+      height: Math.max(12, coords.bottom - coords.top),
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+    };
+    showInlineRenameMarks(view, { target, occurrences: [] });
+    const live = openFilesRef.current[input.fileKey];
+    const descriptor = live ? lspDescriptorForFile(live) : null;
+    return new Promise<InlineNameResult>((resolve) => {
+      const request: InlineRenameRequest = {
+        id: Date.now(),
+        kind: input.kind,
+        fileKey: input.fileKey,
+        view,
+        anchor,
+        initialValue: input.initialValue ?? input.defaultName,
+        suggestions: suggestInlineRenameNames(input.defaultName),
+        initialError: input.error ?? null,
+        languageId: descriptor?.languageId
+          ?? (/\.java$/i.test(live?.ref.path ?? "") ? "java" : null),
+        resolve,
+      };
+      inlineRenameRef.current = request;
+      setRefactorModalOptions(readRefactorOptionsMode() === "dialog");
+      setInlineRename(request);
+      // Other occurrences in this file are boxed when the provider can answer
+      // document highlights; the session never waits for them.
+      const caps = lspFilesRef.current[input.fileKey]?.status?.capabilities;
+      if (input.kind === "rename" && descriptor && caps?.documentHighlight) {
+        void lspDocumentHighlights(descriptor, input.range.start)
+          .then((result) => {
+            if (inlineRenameRef.current !== request) return;
+            const occurrences = result.highlights
+              .map((highlight) => ({ from: offset(highlight.range.start), to: offset(highlight.range.end) }))
+              .filter((range) => range.to > range.from);
+            showInlineRenameMarks(view, { target, occurrences });
+          })
+          .catch(() => {});
+      }
+    });
+  }, [activeEditorViewFor, finishInlineRename, lspDescriptorForFile]);
+
+  // The session belongs to one editor document; switching files ends it.
+  useEffect(() => {
+    const request = inlineRenameRef.current;
+    if (request && request.fileKey !== activeKey) finishInlineRename(request, { kind: "cancel" });
+  }, [activeKey, finishInlineRename]);
+
+  /** DEC-017-01: in-place naming by default, the modal prompt as the option / fallback. */
+  const promptSymbolName = useCallback(async (input: {
+    file: OpenFileState;
+    kind: "rename" | "extract";
+    range: LspRange | null;
+    defaultName: string;
+    initialValue?: string;
+    error?: string | null;
+    dialog: (initialValue: string) => Promise<string | null>;
+  }): Promise<string | null> => {
+    if (readRefactorOptionsMode() === "dialog" || !input.range) {
+      return input.dialog(input.initialValue ?? input.defaultName);
+    }
+    const result = await promptInlineName({
+      fileKey: input.file.key,
+      kind: input.kind,
+      range: input.range,
+      defaultName: input.defaultName,
+      initialValue: input.initialValue,
+      error: input.error,
+    });
+    if (result.kind === "commit") return result.name;
+    if (result.kind === "dialog") return input.dialog(result.value);
+    return null;
+  }, [promptInlineName]);
+
   const renameSymbolAt = useCallback(async (
     file: OpenFileState,
     position: LspPosition,
@@ -17059,7 +17677,7 @@ export function CodeWorkspaceTab({
       label?: string;
       confirmLabel?: string;
       /** Caller-owned prompt (Extract Method naming); defaults to the Rename dialog. */
-      promptName?: (defaultName: string) => Promise<string | null>;
+      promptName?: (defaultName: string, range: LspRange | null) => Promise<string | null>;
       /** Re-checked after every await; false aborts without writing. */
       isCurrent?: () => boolean;
     } = {},
@@ -17111,13 +17729,29 @@ export function CodeWorkspaceTab({
           }
           return line.slice(position.character).match(/^[A-Za-z0-9_$]+/)?.[0] ?? "";
         })();
+      const nameRange: LspRange | null = prepared.range ?? (() => {
+        const line = live.text.split("\n")[position.line] ?? "";
+        const before = line.slice(0, position.character).match(/[A-Za-z0-9_$]*$/)?.[0] ?? "";
+        const after = line.slice(position.character).match(/^[A-Za-z0-9_$]*/)?.[0] ?? "";
+        if (!before && !after) return null;
+        return {
+          start: { line: position.line, character: position.character - before.length },
+          end: { line: position.line, character: position.character + after.length },
+        };
+      })();
       const nextName = options.promptName
-        ? await options.promptName(defaultName)
-        : await promptAppDialog({
-            title: options.title ?? "Rename Symbol",
-            label: options.label ?? "New name",
-            initialValue: defaultName,
-            confirmLabel: options.confirmLabel ?? "Rename",
+        ? await options.promptName(defaultName, nameRange)
+        : await promptSymbolName({
+            file: live,
+            kind: "rename",
+            range: nameRange,
+            defaultName,
+            dialog: (initialValue) => promptAppDialog({
+              title: options.title ?? "Rename Symbol",
+              label: options.label ?? "New name",
+              initialValue,
+              confirmLabel: options.confirmLabel ?? "Rename",
+            }),
           });
       if (!isCurrent()) {
         semanticIndex.abandonBuild(buildToken);
@@ -17274,6 +17908,7 @@ export function CodeWorkspaceTab({
     applyLspWorkspaceEdit,
     ensureWorkspaceSemanticDocumentsSynced,
     lspDescriptorForFile,
+    promptSymbolName,
     semanticIndex.beginBuild,
     semanticIndex.abandonBuild,
     semanticIndex.failBuild,
@@ -17286,8 +17921,42 @@ export function CodeWorkspaceTab({
   const renameSymbolAtCursor = useCallback(async () => {
     const file = activeFile;
     if (!file || file.loading) return;
-    await renameSymbolAt(file, editorSelectionRef.current.start);
-  }, [activeFile, renameSymbolAt]);
+    const position = editorSelectionRef.current.start;
+    if (readRefactorOptionsMode() === "dialog") {
+      await renameSymbolAt(file, position);
+      return;
+    }
+    // DEC-017-03: a provider rejection reopens the in-place session with the
+    // rejected name and the real error, so the user can correct and retry
+    // without anything having been written.
+    let retry: { value: string; error: string } | null = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      let submitted: string | null = null;
+      const carried: { value: string; error: string } | null = retry;
+      const live = openFilesRef.current[file.key] ?? file;
+      const outcome = await renameSymbolAt(live, position, {
+        promptName: async (defaultName, range) => {
+          submitted = await promptSymbolName({
+            file: live,
+            kind: "rename",
+            range,
+            defaultName,
+            initialValue: carried?.value,
+            error: carried?.error,
+            dialog: (initialValue) => promptAppDialog({
+              title: "Rename Symbol",
+              label: "New name",
+              initialValue,
+              confirmLabel: "Rename",
+            }),
+          });
+          return submitted;
+        },
+      });
+      if (outcome.status !== "failed" || !outcome.retryable || !submitted) return;
+      retry = { value: submitted, error: outcome.message ?? "Rename failed" };
+    }
+  }, [activeFile, promptSymbolName, renameSymbolAt]);
   renameSymbolRef.current = renameSymbolAtCursor;
 
   // ---------------------------------------------------------------------------
@@ -17520,13 +18189,22 @@ export function CodeWorkspaceTab({
           label: "Method name",
           confirmLabel: "Rename",
           isCurrent: () => ownerMatches() && receiptMatches(),
-          promptName: async (defaultName) => {
+          promptName: async (defaultName, range) => {
             if (replayed) return replayed;
-            const value = await promptExtractName(session.id, {
-              title: "Extract Method",
-              label: "Method name",
-              confirmLabel: "Rename",
+            // ED-PARITY-017: in-place naming on the extracted method; Escape
+            // keeps the provider default name (the extraction stays committed).
+            const value = await promptSymbolName({
+              file: attemptFile,
+              kind: "extract",
+              range,
+              defaultName,
               initialValue: proposed ?? defaultName,
+              dialog: (initialValue) => promptExtractName(session.id, {
+                title: "Extract Method",
+                label: "Method name",
+                confirmLabel: "Rename",
+                initialValue,
+              }),
             });
             if (value && value !== defaultName) proposed = value;
             return value;
@@ -17567,6 +18245,7 @@ export function CodeWorkspaceTab({
     extractOwnerSnapshot,
     finishExtractSession,
     promptExtractName,
+    promptSymbolName,
     renameSymbolAt,
     revealNavLocation,
     semanticIndex.current,
@@ -17577,8 +18256,6 @@ export function CodeWorkspaceTab({
   const runExtractMethod = useCallback(async () => {
     const file = activeFile;
     if (!file || file.loading || file.library) return;
-    const caps = lspFilesRef.current[file.key]?.status?.capabilities;
-    if (caps && !caps.codeAction) return;
     // DEC-07 repeat protection: while one Extract Method owner is alive — from
     // its first request through naming and the rename — a repeated chord is a
     // no-op. Superseding a request that has already applied would commit a
@@ -17621,7 +18298,7 @@ export function CodeWorkspaceTab({
       range,
       [],
       ["refactor.extract"],
-      { signal: requestAbort.signal },
+      { signal: requestAbort.signal, allowCapabilityFallback: true },
     );
     if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) {
       abandon();
@@ -18368,6 +19045,7 @@ export function CodeWorkspaceTab({
         hasSelection: request.hasSelection,
         clientX: request.clientX,
         clientY: request.clientY,
+        shortcutFor: (actionId) => host.effectiveKeybindingDisplay(actionId)[0],
         bindings: {
           "workspace.gotoDefinition": prepareBinding("workspace.gotoDefinition"),
           "workspace.gotoDeclaration": prepareBinding("workspace.gotoDeclaration"),
@@ -18387,6 +19065,8 @@ export function CodeWorkspaceTab({
             )),
           }),
           "workspace.format": prepareBinding("workspace.format"),
+          "workspace.editor.foldAll": prepareBinding("workspace.editor.foldAll"),
+          "workspace.editor.unfoldAll": prepareBinding("workspace.editor.unfoldAll"),
           "workspace.editor.cut": portBinding("workspace.editor.cut", "cut"),
           "workspace.editor.copy": portBinding("workspace.editor.copy", "copy"),
           "workspace.editor.paste": portBinding("workspace.editor.paste", "paste"),
@@ -19474,6 +20154,7 @@ export function CodeWorkspaceTab({
     preview: WorkspaceEditPreview;
     originalEdit: LspWorkspaceEdit;
     plan?: RefactorPlanV3;
+    sourceTexts?: Record<string, string | null>;
     resolve: (filtered: LspWorkspaceEdit | boolean) => void;
   } | null>(null);
 
@@ -19637,6 +20318,7 @@ export function CodeWorkspaceTab({
     workspaceInstanceId,
   ]);
 
+
   const startDebugActiveTarget = useCallback(() => {
     // A Java source without a selected structured debug configuration uses the
     // compatibility jdtls launch path. Once a configuration supplies a debug
@@ -19769,6 +20451,40 @@ export function CodeWorkspaceTab({
     setStatusMessage,
     startDebugActiveFile,
   ]);
+
+  // ED-PARITY-022 DEC-022-03: run gutter ▶ only where a detected run
+  // configuration of this very file exists (no facts → no icon).
+  const runGutterKey = useMemo(() => {
+    if (!activeFile || !activeFileIsJava || !activeRunConfiguration?.sourceFile) return "";
+    const absolute = absolutePathForOpenFile(activeFile);
+    if (!absolute || !fsPathEquals(normalizeFsPath(activeRunConfiguration.sourceFile), normalizeFsPath(absolute))) return "";
+    const { classLine, mainLine } = javaMainRunLines(activeFile.text);
+    if (mainLine === null) return "";
+    return JSON.stringify({
+      label: activeRunConfiguration.label,
+      lines: classLine !== null && classLine !== mainLine ? [classLine, mainLine] : [mainLine],
+    });
+  }, [absolutePathForOpenFile, activeFile, activeFileIsJava, activeRunConfiguration]);
+  const activeRunGutterTargets = useMemo<RunGutterTarget[]>(() => {
+    if (!runGutterKey) return [];
+    const parsed = JSON.parse(runGutterKey) as { label: string; lines: number[] };
+    return parsed.lines.map((line) => ({ line, label: parsed.label }));
+  }, [runGutterKey]);
+  const handleRunGutterClick = useCallback((target: RunGutterTarget, anchor: { x: number; y: number }) => {
+    openEditorContextMenuAt(anchor.x, anchor.y, [
+      {
+        label: `Run '${target.label}'`,
+        testId: "code-workspace-run-gutter-run",
+        shortcut: "Ctrl+Shift+F10",
+        onClick: () => { void runActiveJavaFileRef.current(); },
+      },
+      {
+        label: `Debug '${target.label}'`,
+        testId: "code-workspace-run-gutter-debug",
+        onClick: () => startDebugActiveTarget(),
+      },
+    ]);
+  }, [openEditorContextMenuAt, startDebugActiveTarget]);
 
   /**
    * Attach to a JVM already running with `-agentlib:jdwp=...,server=y,address=…`
@@ -20127,6 +20843,16 @@ export function CodeWorkspaceTab({
 
     return (
       <EditorGroup
+        emptyHints={emptyEditorHints}
+        filesWithErrors={filesWithErrors}
+        onGoToLineRequest={setGoToLineRequest}
+        onCompletionUnavailable={() => {
+          const readiness = languageServiceReadiness(groupFile ? lspFilesRef.current[groupFile.key] ?? null : null);
+          const reason = readiness.kind === "ready" || readiness.kind === "idle"
+            ? "the language server returned no result"
+            : readiness.message;
+          showCodeInsightNotice(`Member completion unavailable: ${reason}`, readiness.action === "configure" ? "configure" : null);
+        }}
         onClipboardUnavailable={setStatusMessage}
         onClipboardObservation={setLatestClipboardObservation}
         groupId={groupId}
@@ -20179,6 +20905,9 @@ export function CodeWorkspaceTab({
         activeInlayHints={inlayHintsByGroup[groupId] ?? []}
         activeSemanticTokens={semanticTokensByGroup[groupId] ?? []}
         activeGitChanges={groupFile ? gitLineChangesByFile[groupFile.key] ?? [] : []}
+        onShowGitDiff={showGitHeadDiff}
+        activeRunGutterTargets={groupFile && groupFile.key === activeKey ? activeRunGutterTargets : EMPTY_RUN_GUTTER}
+        onRunGutterClick={handleRunGutterClick}
         activeGitBlame={gitBlameByGroup[groupId] ?? null}
         activeCoverage={groupFile && coverageReport ? findFileCoverage(coverageReport, absolutePathForOpenFile(groupFile) ?? groupFile.languagePath) : null}
         coverageEnabled={coverageOverlayEnabled}
@@ -20236,6 +20965,7 @@ export function CodeWorkspaceTab({
         ) : null}
         breadcrumbs={showGroupBreadcrumbs && groupFile ? (
           <Breadcrumbs
+            variant={editorAppearanceProfile.breadcrumbs.placement === "status-bar" && statusNavigationHost ? "statusbar" : "bar"}
             pathSegments={groupBreadcrumbSegments}
             symbols={breadcrumbSymbolsByGroup[groupId] ?? []}
             position={cursorPositions[groupId] ?? { line: 0, character: 0 }}
@@ -20341,8 +21071,16 @@ export function CodeWorkspaceTab({
         onSelectionChange={(selection) => {
           if (groupId === activeEditorGroupId) {
             editorSelectionRef.current = selection;
+            const chars = selection.empty ? 0 : selection.text.length;
+            const lineBreaks = selection.empty ? 0 : (selection.text.match(/\n/g)?.length ?? 0);
+            setActiveSelectionStats((current) => (
+              current.chars === chars && current.lineBreaks === lineBreaks ? current : { chars, lineBreaks }
+            ));
             setEditorCommandContextRevision((revision) => revision + 1);
-            setEditorAiSelection(!selection.empty && selection.text.trim().length >= 2 ? selection : null);
+            // ED-PARITY-011 DEC-011-07: only user-made drag/Shift selections
+            // raise the AI toolbar; Find, navigation, double-click and Select
+            // All selections do not.
+            setEditorAiSelection(!selection.empty && selection.userSelected !== false && selection.text.trim().length >= 2 ? selection : null);
           }
           if (groupFile) {
             noteCaretPosition(groupFile.key, selection.end);
@@ -20558,88 +21296,49 @@ export function CodeWorkspaceTab({
             {dirtyCount} unsaved
           </span>
         )}
+        {/* ED-PARITY-010 DEC-010-05: SDK / project-facts widgets live in the
+            status bar (portal) like IDEA's status widgets. */}
+        {visible && workspaceWidgetHost
+          ? createPortal(<>
         <WorkspaceSdkStatus roots={roots} />
-        {projectFactsRoot && (
-          <ProjectFactsStatusBadge
-            status={projectFacts.status}
-            discoveryStatus={projectDescriptorDiscovery.status}
-            discovery={projectDescriptorDiscovery.discovery}
-            discoveryReason={projectDescriptorDiscovery.reason}
-            reason={projectFacts.reason}
-            generation={projectFacts.generation}
-            isStale={projectFacts.isStale}
-            onRefresh={refreshProjectFacts}
-          />
-        )}
+            {projectFactsRoot && (
+              <ProjectFactsStatusBadge
+                status={projectFacts.status}
+                discoveryStatus={projectDescriptorDiscovery.status}
+                discovery={projectDescriptorDiscovery.discovery}
+                discoveryReason={projectDescriptorDiscovery.reason}
+                reason={projectFacts.reason}
+                generation={projectFacts.generation}
+                isStale={projectFacts.isStale}
+                onRefresh={refreshProjectFacts}
+              />
+            )}
+          </>, workspaceWidgetHost)
+          : (
+            <>
+        <WorkspaceSdkStatus roots={roots} />
+            {projectFactsRoot && (
+              <ProjectFactsStatusBadge
+                status={projectFacts.status}
+                discoveryStatus={projectDescriptorDiscovery.status}
+                discovery={projectDescriptorDiscovery.discovery}
+                discoveryReason={projectDescriptorDiscovery.reason}
+                reason={projectFacts.reason}
+                generation={projectFacts.generation}
+                isStale={projectFacts.isStale}
+                onRefresh={refreshProjectFacts}
+              />
+            )}
+            </>
+          )}
+        <IconButton
+          label="Open Git tab"
+          testId="code-workspace-git-panel-toggle"
+          icon={gitRootsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitBranch className="w-3.5 h-3.5" />}
+          disabled={gitRootsLoading || !onOpenGitManager || gitRoots.length === 0}
+          onClick={() => executeWorkspaceCommand("workspace.openGit")}
+        />
         <div className="flex-1" />
-        {/* Project tree collapse lives on the tree toolbar / collapsed rail — avoid a
-            second top-bar toggle that duplicates the panel-local control. */}
-        <IconButton
-          label="Back"
-          testId="code-workspace-nav-back"
-          icon={<ArrowLeft className="w-3.5 h-3.5" />}
-          disabled={!navCan.back}
-          onClick={() => executeWorkspaceCommand("workspace.navigateBack")}
-        />
-        <IconButton
-          label="Forward"
-          testId="code-workspace-nav-forward"
-          icon={<ArrowRight className="w-3.5 h-3.5" />}
-          disabled={!navCan.forward}
-          onClick={() => executeWorkspaceCommand("workspace.navigateForward")}
-        />
-        <div className="flex items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
-          <IconButton
-            label="Editor zoom out"
-            testId="code-workspace-zoom-out"
-            icon={<ZoomOut className="w-3.5 h-3.5" />}
-            disabled={currentEditorFontSize <= CODE_WORKSPACE_MIN_FONT_SIZE}
-            onClick={() => stepCodeViewFontSize(-1)}
-          />
-          <button
-            type="button"
-            data-testid="code-workspace-zoom-reset"
-            title="Reset editor zoom"
-            aria-label="Reset editor zoom"
-            className="h-6 min-w-10 rounded px-1.5 text-[11px] tabular-nums text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
-            onClick={() => setCodeViewFontSize(DEFAULT_EDITOR_APPEARANCE_PROFILE.fontSizePx)}
-          >
-            {currentEditorFontSize}px
-          </button>
-          <IconButton
-            label="Editor zoom in"
-            testId="code-workspace-zoom-in"
-            icon={<ZoomIn className="w-3.5 h-3.5" />}
-            disabled={currentEditorFontSize >= CODE_WORKSPACE_MAX_FONT_SIZE}
-            onClick={() => stepCodeViewFontSize(1)}
-          />
-        </div>
-        <IconButton
-          label={activeFileSoftWrap ? "Disable soft wrap" : "Enable soft wrap"}
-          testId="code-workspace-soft-wrap"
-          active={activeFileSoftWrap}
-          icon={<WrapText className="w-3.5 h-3.5" />}
-          onClick={toggleSoftWrap}
-        />
-        <IconButton
-          label={columnSelectionMode ? "Disable column selection mode" : "Enable column selection mode"}
-          testId="code-workspace-column-selection"
-          active={columnSelectionMode}
-          icon={<Columns3 className="w-3.5 h-3.5" />}
-          onClick={toggleColumnSelectionMode}
-        />
-        <IconButton
-          label="Save"
-          icon={activeFile?.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          disabled={!activeFile || !activeFile.dirty || activeFile.saving || activeFile.loading}
-          onClick={() => executeWorkspaceCommand("workspace.save", { focus: "editor" })}
-        />
-        <IconButton
-          label="Reload"
-          icon={<RotateCcw className="w-3.5 h-3.5" />}
-          disabled={!activeFile || activeFile.loading}
-          onClick={() => executeWorkspaceCommand("workspace.reload", { focus: "editor" })}
-        />
         <IconButton
           label="Build project (Ctrl+F9)"
           testId="code-workspace-build-project"
@@ -20691,104 +21390,204 @@ export function CodeWorkspaceTab({
           disabled={!activeFileDebuggable || debugSessionActive}
           onClick={startDebugActiveTarget}
         />
+        {/* ED-PARITY-010 DEC-010-04: IDEA main toolbar keeps project, VCS, run
+            and search/settings; secondary editor controls moved behind ⋮. */}
         <IconButton
-          label="Refresh tree"
-          icon={<RefreshCw className="w-3.5 h-3.5" />}
-          onClick={() => executeWorkspaceCommand("workspace.refreshTree")}
+          label="Search Everywhere (Double Shift)"
+          testId="code-workspace-toolbar-search"
+          icon={<Search className="w-3.5 h-3.5" />}
+          onClick={() => executeWorkspaceCommand("workspace.searchEverywhere")}
         />
         <IconButton
-          label="Open Git tab"
-          testId="code-workspace-git-panel-toggle"
-          icon={gitRootsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitBranch className="w-3.5 h-3.5" />}
-          disabled={gitRootsLoading || !onOpenGitManager || gitRoots.length === 0}
-          onClick={() => executeWorkspaceCommand("workspace.openGit")}
+          label="Settings"
+          testId="code-workspace-toolbar-settings"
+          icon={<SettingsIcon className="w-3.5 h-3.5" />}
+          onClick={() => openSettingsSection("general")}
         />
+        <div className="relative">
+          <IconButton
+            label="More actions"
+            testId="code-workspace-toolbar-more"
+            icon={<MoreVertical className="w-3.5 h-3.5" />}
+            active={toolbarMoreOpen}
+            onClick={() => setToolbarMoreOpen((open) => !open)}
+          />
+          {toolbarMoreOpen && (
+            <>
+              <div
+                role="toolbar"
+                aria-label="More editor actions"
+                data-testid="code-workspace-toolbar-more-menu"
+                onClick={() => setToolbarMoreOpen(false)}
+                className="absolute right-0 top-8 z-50 flex w-max max-w-[420px] flex-wrap items-center gap-1 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] p-1.5 shadow-lg"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.stopPropagation();
+                    setToolbarMoreOpen(false);
+                  }
+                }}
+              >
         <IconButton
-          label="Split editor right"
-          testId="code-workspace-split-right"
-          icon={<Columns2 className="h-3.5 w-3.5" />}
-          active={splitOrientation === "vertical"}
-          disabled={!activeFile}
-          onClick={() => splitEditor("vertical")}
-        />
-        <IconButton
-          label="Split editor down"
-          testId="code-workspace-split-down"
-          icon={<Rows2 className="h-3.5 w-3.5" />}
-          active={splitOrientation === "horizontal"}
-          disabled={!activeFile}
-          onClick={() => splitEditor("horizontal")}
-        />
-        {splitOrientation && (
-          <>
-            <IconButton
-              label={syncSplitScroll ? "Disable synchronized split scrolling" : "Enable synchronized split scrolling"}
-              testId="code-workspace-split-sync-scroll"
-              icon={<Link2 className="h-3.5 w-3.5" />}
-              active={syncSplitScroll}
-              onClick={() => {
-                setSyncSplitScroll((v) => {
-                  const next = !v;
-                  setStatusMessage(next ? "Synchronized split scrolling enabled" : "Synchronized split scrolling disabled");
-                  return next;
-                });
-              }}
-            />
-            <IconButton
-              label="Equalize split proportions"
-              testId="code-workspace-split-equalize"
-              icon={<AlignHorizontalJustifyCenter className="h-3.5 w-3.5" />}
-              onClick={() => executeWorkspaceCommand("workspace.equalizeSplitProportions")}
-            />
-            <IconButton
-              label="Stretch active split"
-              testId="code-workspace-split-stretch"
-              icon={<Maximize2 className="h-3.5 w-3.5" />}
-              onClick={() => executeWorkspaceCommand("workspace.stretchActiveSplit")}
-            />
-            <IconButton
-              label="Unsplit all (keep tabs)"
-              testId="code-workspace-split-unsplit-all"
-              icon={<Square className="h-3.5 w-3.5" />}
-              onClick={() => executeWorkspaceCommand("workspace.unsplitAll")}
-            />
-            <IconButton
-              label="Close editor split"
-              testId="code-workspace-split-close"
-              icon={<X className="h-3.5 w-3.5" />}
-              onClick={closeSplit}
-            />
-          </>
-        )}
-        <IconButton
-          label={`${activeInlayHintsEnabled ? "Disable" : "Enable"} inlay hints${activeLanguageId ? ` for ${activeLanguageId}` : ""}`}
-          testId="code-workspace-inlay-hints-toggle"
-          icon={<Braces className="h-3.5 w-3.5" />}
-          active={activeInlayHintsEnabled}
-          disabled={!activeCapabilities?.inlayHint}
-          onClick={toggleInlayHintsForActiveLanguage}
-        />
-        <IconButton
-          label={`${intelligencePreferences.inlineBlameEnabled ? "Disable" : "Enable"} inline Git blame`}
-          testId="code-workspace-inline-blame-toggle"
-          icon={<GitCommitHorizontal className="h-3.5 w-3.5" />}
-          active={intelligencePreferences.inlineBlameEnabled}
-          disabled={!activeGitRoot}
-          onClick={toggleInlineBlame}
-        />
-        <IconButton
-          label="Toggle outline pane"
-          testId="code-workspace-right-pane-toggle"
-          icon={<PanelRight className="w-3.5 h-3.5" />}
-          active={rightPaneOpen && rightPaneTab === "outline"}
-          onClick={() => executeWorkspaceCommand("workspace.toggleDocumentationPane")}
-        />
-        <IconButton
-          label="Editor tab policy settings"
-          testId="code-workspace-tab-policy-settings"
-          icon={<SlidersHorizontal className="w-3.5 h-3.5" />}
-          onClick={openTabPolicySettings}
-        />
+                  label="Back"
+                  testId="code-workspace-nav-back"
+                  icon={<ArrowLeft className="w-3.5 h-3.5" />}
+                  disabled={!navCan.back}
+                  onClick={() => executeWorkspaceCommand("workspace.navigateBack")}
+                />
+                <IconButton
+                  label="Forward"
+                  testId="code-workspace-nav-forward"
+                  icon={<ArrowRight className="w-3.5 h-3.5" />}
+                  disabled={!navCan.forward}
+                  onClick={() => executeWorkspaceCommand("workspace.navigateForward")}
+                />
+                <div className="flex items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
+                  <IconButton
+                    label="Editor zoom out"
+                    testId="code-workspace-zoom-out"
+                    icon={<ZoomOut className="w-3.5 h-3.5" />}
+                    disabled={currentEditorFontSize <= CODE_WORKSPACE_MIN_FONT_SIZE}
+                    onClick={() => stepCodeViewFontSize(-1)}
+                  />
+                  <button
+                    type="button"
+                    data-testid="code-workspace-zoom-reset"
+                    title="Reset editor zoom"
+                    aria-label="Reset editor zoom"
+                    className="h-6 min-w-10 rounded px-1.5 text-[11px] tabular-nums text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                    onClick={() => setCodeViewFontSize(DEFAULT_EDITOR_APPEARANCE_PROFILE.fontSizePx)}
+                  >
+                    {currentEditorFontSize}px
+                  </button>
+                  <IconButton
+                    label="Editor zoom in"
+                    testId="code-workspace-zoom-in"
+                    icon={<ZoomIn className="w-3.5 h-3.5" />}
+                    disabled={currentEditorFontSize >= CODE_WORKSPACE_MAX_FONT_SIZE}
+                    onClick={() => stepCodeViewFontSize(1)}
+                  />
+                </div>
+                <IconButton
+                  label={activeFileSoftWrap ? "Disable soft wrap" : "Enable soft wrap"}
+                  testId="code-workspace-soft-wrap"
+                  active={activeFileSoftWrap}
+                  icon={<WrapText className="w-3.5 h-3.5" />}
+                  onClick={toggleSoftWrap}
+                />
+                <IconButton
+                  label={columnSelectionMode ? "Disable column selection mode" : "Enable column selection mode"}
+                  testId="code-workspace-column-selection"
+                  active={columnSelectionMode}
+                  icon={<Columns3 className="w-3.5 h-3.5" />}
+                  onClick={toggleColumnSelectionMode}
+                />
+                <IconButton
+                  label="Save"
+                  icon={activeFile?.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  disabled={!activeFile || !activeFile.dirty || activeFile.saving || activeFile.loading}
+                  onClick={() => executeWorkspaceCommand("workspace.save", { focus: "editor" })}
+                />
+                <IconButton
+                  label="Reload"
+                  icon={<RotateCcw className="w-3.5 h-3.5" />}
+                  disabled={!activeFile || activeFile.loading}
+                  onClick={() => executeWorkspaceCommand("workspace.reload", { focus: "editor" })}
+                />
+                <IconButton
+                  label="Refresh tree"
+                  icon={<RefreshCw className="w-3.5 h-3.5" />}
+                  onClick={() => executeWorkspaceCommand("workspace.refreshTree")}
+                />
+                <IconButton
+                  label="Split editor right"
+                  testId="code-workspace-split-right"
+                  icon={<Columns2 className="h-3.5 w-3.5" />}
+                  active={splitOrientation === "vertical"}
+                  disabled={!activeFile}
+                  onClick={() => splitEditor("vertical")}
+                />
+                <IconButton
+                  label="Split editor down"
+                  testId="code-workspace-split-down"
+                  icon={<Rows2 className="h-3.5 w-3.5" />}
+                  active={splitOrientation === "horizontal"}
+                  disabled={!activeFile}
+                  onClick={() => splitEditor("horizontal")}
+                />
+                {splitOrientation && (
+                  <>
+                    <IconButton
+                      label={syncSplitScroll ? "Disable synchronized split scrolling" : "Enable synchronized split scrolling"}
+                      testId="code-workspace-split-sync-scroll"
+                      icon={<Link2 className="h-3.5 w-3.5" />}
+                      active={syncSplitScroll}
+                      onClick={() => {
+                        setSyncSplitScroll((v) => {
+                          const next = !v;
+                          setStatusMessage(next ? "Synchronized split scrolling enabled" : "Synchronized split scrolling disabled");
+                          return next;
+                        });
+                      }}
+                    />
+                    <IconButton
+                      label="Equalize split proportions"
+                      testId="code-workspace-split-equalize"
+                      icon={<AlignHorizontalJustifyCenter className="h-3.5 w-3.5" />}
+                      onClick={() => executeWorkspaceCommand("workspace.equalizeSplitProportions")}
+                    />
+                    <IconButton
+                      label="Stretch active split"
+                      testId="code-workspace-split-stretch"
+                      icon={<Maximize2 className="h-3.5 w-3.5" />}
+                      onClick={() => executeWorkspaceCommand("workspace.stretchActiveSplit")}
+                    />
+                    <IconButton
+                      label="Unsplit all (keep tabs)"
+                      testId="code-workspace-split-unsplit-all"
+                      icon={<Square className="h-3.5 w-3.5" />}
+                      onClick={() => executeWorkspaceCommand("workspace.unsplitAll")}
+                    />
+                    <IconButton
+                      label="Close editor split"
+                      testId="code-workspace-split-close"
+                      icon={<X className="h-3.5 w-3.5" />}
+                      onClick={closeSplit}
+                    />
+                  </>
+                )}
+                <IconButton
+                  label={`${activeInlayHintsEnabled ? "Disable" : "Enable"} inlay hints${activeLanguageId ? ` for ${activeLanguageId}` : ""}`}
+                  testId="code-workspace-inlay-hints-toggle"
+                  icon={<Braces className="h-3.5 w-3.5" />}
+                  active={activeInlayHintsEnabled}
+                  disabled={!activeCapabilities?.inlayHint}
+                  onClick={toggleInlayHintsForActiveLanguage}
+                />
+                <IconButton
+                  label={`${intelligencePreferences.inlineBlameEnabled ? "Disable" : "Enable"} inline Git blame`}
+                  testId="code-workspace-inline-blame-toggle"
+                  icon={<GitCommitHorizontal className="h-3.5 w-3.5" />}
+                  active={intelligencePreferences.inlineBlameEnabled}
+                  disabled={!activeGitRoot}
+                  onClick={toggleInlineBlame}
+                />
+                <IconButton
+                  label="Toggle outline pane"
+                  testId="code-workspace-right-pane-toggle"
+                  icon={<PanelRight className="w-3.5 h-3.5" />}
+                  active={rightPaneOpen && rightPaneTab === "outline"}
+                  onClick={() => executeWorkspaceCommand("workspace.toggleDocumentationPane")}
+                />
+                <IconButton
+                  label="Editor tab policy settings"
+                  testId="code-workspace-tab-policy-settings"
+                  icon={<SlidersHorizontal className="w-3.5 h-3.5" />}
+                  onClick={openTabPolicySettings}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
       {resourceCleanupRecoveries.length > 0 && (
@@ -20827,29 +21626,9 @@ export function CodeWorkspaceTab({
       )}
 
       <div className="flex-1 min-h-0 flex">
-        {!languagePanelOpen && (
-          <div
-            data-testid="code-workspace-project-collapsed-rail"
-            className="h-full w-7 shrink-0 flex flex-col items-center border-r border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
-          >
-            <button
-              type="button"
-              data-testid="code-workspace-project-expand"
-              title="Show project tree"
-              aria-label="Show project tree"
-              className="mt-1 h-7 w-7 inline-flex items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
-              onClick={toggleProjectTree}
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-            <span
-              className="mt-2 text-[10px] font-medium tracking-wide text-[var(--taomni-code-muted)]"
-              style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-            >
-              Explorer
-            </span>
-          </div>
-        )}
+        <ToolWindowRail side="left" top={leftToolRailItems} bottomSlotRef={setBottomRailHost} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex-1 min-h-0 flex">
         <PanelGroup
           orientation="horizontal"
           id={`code-workspace-${workspaceInstanceId}`}
@@ -21029,8 +21808,10 @@ export function CodeWorkspaceTab({
             </aside>
           </Panel>
       </PanelGroup>
-      </div>
+        </div>
       <BottomDock
+        railHost={bottomRailHost}
+        onRestoreLayout={handleRestoreToolWindowLayout}
         open={bottomDockOpen}
         height={currentBottomDockHeight}
         maxHeight={maxBottomDockHeight}
@@ -21067,6 +21848,9 @@ export function CodeWorkspaceTab({
                 fullProjectNote={activeCapabilities?.workspaceDiagnostics === true
                   ? null
                   : "On-the-fly diagnostics only — this server does not expose workspace-wide diagnostics."}
+                readiness={activeKey ? languageServiceReadiness(activeLspState) : null}
+                onConfigureLanguageService={() => openLanguageServersSettings(activeLspState?.status?.presetId)}
+                onRetryLanguageService={restartLspServers}
               />
             ),
           },
@@ -21486,6 +22270,29 @@ export function CodeWorkspaceTab({
             ),
           },
           {
+            // ED-PARITY-018 DEC-018-01: the workspace Git tool window hosts the
+            // same Git manager as the Git tab, scoped to this workspace's repos.
+            id: "git",
+            label: "Git",
+            icon: <GitBranch className="h-3.5 w-3.5" />,
+            // Mounted on first open and kept, so the commit message and
+            // selection survive hiding the tool window.
+            content: gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
+              <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 outline-none">
+                <WorkspaceGitManager
+                  workspaceName={title}
+                  roots={gitRoots}
+                  activeRepoRoot={activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null}
+                  visible={bottomDockOpen && bottomDockTab === "git"}
+                />
+              </div>
+            ) : (
+              <div data-testid="code-workspace-git-tool-window-empty" role="status" className="px-3 py-3 text-[11px] text-[var(--taomni-code-muted)]">
+                {gitRootsLoading ? "Detecting Git repositories…" : "No Git repository in this workspace"}
+              </div>
+            ),
+          },
+          {
             id: "debug",
             label: "Debug",
             icon: <Bug className="h-3.5 w-3.5" />,
@@ -21557,6 +22364,9 @@ export function CodeWorkspaceTab({
         onOpenChange={setBottomDockOpen}
         onActiveTabChange={(tab) => setBottomDockTab(tab as BottomDockTabId)}
       />
+        </div>
+        <ToolWindowRail side="right" top={rightToolRailItems} />
+      </div>
       <TabSwitcher
         open={tabSwitcherOpen}
         entries={switcherSnapshot?.editors ?? []}
@@ -21583,6 +22393,12 @@ export function CodeWorkspaceTab({
         onOpenFileItem={openGoToFileItem}
         onOpenSymbol={(symbol, options) => void openWorkspaceSymbol(symbol, options)}
         onRunCommand={runSearchEverywhereCommand}
+        onAssignShortcut={(commandId) => {
+          // ED-PARITY-013 DEC-013-03: Find Action Alt+Enter = Assign Shortcut.
+          setSearchEverywhereOpen(false);
+          setKeymapAssignActionId(commandId);
+          setKeymapSettingsOpen(true);
+        }}
         onSearchText={(query) => {
           setSearchEverywhereOpen(false);
           setBottomDockOpen(true);
@@ -21596,6 +22412,17 @@ export function CodeWorkspaceTab({
         recentChangedOnly={recentChangedOnly}
         onCloseRecent={() => setRecentFilesOpen(false)}
         onPickRecent={pickRecentFile}
+        onToggleRecentChangedOnly={() => openRecentFiles({ changedOnly: !recentChangedOnly })}
+        recentToolWindows={RECENT_FILES_TOOL_WINDOWS}
+        onActivateRecentToolWindow={(id) => {
+          setRecentFilesOpen(false);
+          handleActivateToolWindow(id);
+        }}
+        onOpenRecentLocationsFromRecent={() => {
+          setRecentFilesOpen(false);
+          setRecentLocationsChangedOnly(false);
+          setRecentLocationsOpen(true);
+        }}
         recentLocationsOpen={recentLocationsOpen}
         recentLocationsChangedOnly={recentLocationsChangedOnly}
         workspaceId={workspaceInstanceId}
@@ -21638,6 +22465,7 @@ export function CodeWorkspaceTab({
         structureSymbols={structureSymbols}
         structureLoading={structureLoading}
         structureUnavailable={structureUnavailable}
+        structureSyntaxOnly={structureSyntaxOnly}
         onCloseStructure={() => setStructureOpen(false)}
         onPickStructure={pickStructureSymbol}
         quickDocOpen={quickDocOpen}
@@ -21994,6 +22822,25 @@ export function CodeWorkspaceTab({
           );
         }}
       />
+      {inlineRename && (
+        <InlineRenamePopup
+          key={inlineRename.id}
+          kind={inlineRename.kind}
+          anchor={inlineRename.anchor}
+          initialValue={inlineRename.initialValue}
+          suggestions={inlineRename.suggestions}
+          initialError={inlineRename.initialError}
+          validate={(name) => inlineRenameNameError(name, inlineRename.languageId)}
+          modalOptions={refactorModalOptions}
+          onCommit={(name) => finishInlineRename(inlineRename, { kind: "commit", name })}
+          onCancel={() => finishInlineRename(inlineRename, { kind: "cancel" })}
+          onOpenDialog={(value) => finishInlineRename(inlineRename, { kind: "dialog", value })}
+          onToggleModalOptions={(modal) => {
+            writeRefactorOptionsMode(modal ? "dialog" : "editor");
+            setRefactorModalOptions(modal);
+          }}
+        />
+      )}
       {refactoringPreviewModal && (
         <RefactoringPreviewDialog
           open={true}
@@ -22001,6 +22848,7 @@ export function CodeWorkspaceTab({
           preview={refactoringPreviewModal.preview}
           originalEdit={refactoringPreviewModal.originalEdit}
           plan={refactoringPreviewModal.plan}
+          sourceTexts={refactoringPreviewModal.sourceTexts}
           onConfirm={(filteredEdit) => {
             refactoringPreviewModal.resolve(filteredEdit);
             setRefactoringPreviewModal(null);
@@ -22102,6 +22950,43 @@ export function CodeWorkspaceTab({
           }}
         />
       )}
+      {codeInsightNotice && (
+        <CodeInsightNotice
+          notice={codeInsightNotice}
+          onClose={() => setCodeInsightNotice(null)}
+          onConfigure={() => openLanguageServersSettings(activeLspState?.status?.presetId)}
+        />
+      )}
+      {goToLineRequest && (
+        <GoToLineDialog
+          current={goToLineRequest.current}
+          lineCount={goToLineRequest.lineCount}
+          onGo={(target) => {
+            const request = goToLineRequest;
+            setGoToLineRequest(null);
+            request.apply(target);
+          }}
+          onCancel={() => {
+            const request = goToLineRequest;
+            setGoToLineRequest(null);
+            request.cancel();
+          }}
+          restoreFocusFallback={handleReturnToEditor}
+        />
+      )}
+      {keymapMigrationNoticeOpen && !keymapSettingsOpen && (
+        <KeymapMigrationNotice
+          onOpenKeymap={() => {
+            dismissKeymapDefaultsMigrationNotice();
+            setKeymapMigrationNoticeOpen(false);
+            setKeymapSettingsOpen(true);
+          }}
+          onDismiss={() => {
+            dismissKeymapDefaultsMigrationNotice();
+            setKeymapMigrationNoticeOpen(false);
+          }}
+        />
+      )}
       {keymapSettingsOpen && (
         <KeymapSettingsDialog
           open={true}
@@ -22113,7 +22998,13 @@ export function CodeWorkspaceTab({
           onActiveSchemeChange={setActiveKeymapSchemeId}
           onSchemesChange={(schemes) => setKeymapSchemes([...schemes])}
           onApplyScheme={applyKeymapScheme}
-          onClose={() => setKeymapSettingsOpen(false)}
+          presets={BUILTIN_KEYMAP_PRESETS}
+          assignActionId={keymapAssignActionId}
+          restoreFocusFallback={handleReturnToEditor}
+          onClose={() => {
+            setKeymapSettingsOpen(false);
+            setKeymapAssignActionId(null);
+          }}
         />
       )}
       <CodeStyleSettingsDialog

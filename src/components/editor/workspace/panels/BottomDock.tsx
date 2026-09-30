@@ -8,7 +8,9 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronDown, ChevronUp, Minus, MoreHorizontal, MoreVertical } from "lucide-react";
+import { toolWindowRailButtonClass } from "./ToolWindowRail";
 
 export interface BottomDockTab {
   id: string;
@@ -29,9 +31,18 @@ interface BottomDockProps {
   onHeightChange?: (height: number) => void;
   onEscape?: () => void;
   maxHeight?: number;
+  /**
+   * ED-PARITY-010 DEC-010-01/02: when given, the tool buttons render into this
+   * tool window rail slot and the dock shows an IDEA tool window header
+   * (title + ⋮ + —) instead of a horizontal tab strip.
+   */
+  railHost?: HTMLElement | null;
+  onRestoreLayout?: () => void;
 }
 
 export const BOTTOM_DOCK_HEADER_HEIGHT = 50;
+/** IDEA-style tool window header height when the tab strip lives on the rail. */
+const RAIL_MODE_HEADER_HEIGHT = 32;
 export const BOTTOM_DOCK_MIN_HEIGHT = 49;
 export const BOTTOM_DOCK_MAX_HEIGHT = 849;
 export const BOTTOM_DOCK_DEFAULT_HEIGHT = 323;
@@ -70,7 +81,10 @@ export function BottomDock({
   onHeightChange,
   onEscape,
   maxHeight = BOTTOM_DOCK_MAX_HEIGHT,
+  railHost,
+  onRestoreLayout,
 }: BottomDockProps) {
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const active = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const [uncontrolledHeight, setUncontrolledHeight] = useState(readStoredHeight);
   const preferredHeight = controlledHeight ?? uncontrolledHeight;
@@ -239,7 +253,7 @@ export function BottomDock({
       data-testid="code-workspace-bottom-dock"
       data-open={open || undefined}
       onKeyDown={handleDockKeyDown}
-      className="shrink-0 border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] relative flex flex-col"
+      className={`shrink-0 bg-[var(--taomni-code-gutter-bg)] relative flex flex-col ${railHost && !open ? "" : "border-t border-[var(--taomni-code-border)]"}`}
     >
       {open && (
         <div
@@ -256,6 +270,138 @@ export function BottomDock({
           onKeyDown={onResizeKeyDown}
         />
       )}
+      {railHost ? (
+        <>
+          {createPortal(
+            <>
+              {tabs.map((tab) => {
+                const selected = tab.id === active?.id && open;
+                const showBadge = typeof tab.badge === "number" ? tab.badge > 0 : !!tab.badge;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    data-testid={`code-workspace-bottom-tab-${tab.id}`}
+                    aria-selected={selected}
+                    aria-pressed={selected}
+                    aria-label={tab.label}
+                    data-active={selected || undefined}
+                    title={tab.label}
+                    className={`relative ${toolWindowRailButtonClass}`}
+                    onClick={() => selectTab(tab.id)}
+                  >
+                    {tab.icon}
+                    <span className="w-full truncate px-0.5 text-center text-[9px] leading-3">{tab.label}</span>
+                    {showBadge && (
+                      <span className="absolute right-0 top-0 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-[8px] leading-3 tabular-nums text-[var(--taomni-code-text)]">
+                        {tab.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              <div className="relative">
+                <button
+                  ref={overflowButtonRef}
+                  type="button"
+                  data-testid="code-workspace-bottom-tab-overflow"
+                  aria-label="More tool windows"
+                  aria-haspopup="menu"
+                  aria-expanded={overflowOpen}
+                  title="More tool windows"
+                  className={toolWindowRailButtonClass}
+                  onClick={() => setOverflowOpen((prev) => !prev)}
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+                {overflowOpen && (
+                  <div
+                    ref={overflowMenuRef}
+                    role="menu"
+                    data-testid="code-workspace-bottom-tab-overflow-menu"
+                    className="absolute bottom-0 left-9 z-50 min-w-44 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 shadow-lg"
+                  >
+                    {tabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        role="menuitem"
+                        data-testid={`code-workspace-bottom-tab-overflow-${tab.id}`}
+                        aria-selected={tab.id === active?.id}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                        onClick={() => {
+                          selectTab(tab.id);
+                          setOverflowOpen(false);
+                        }}
+                      >
+                        <span className="shrink-0">{tab.icon}</span>
+                        <span className="flex-1 truncate text-left">{tab.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>,
+            railHost,
+          )}
+          {open && active && (
+            <div
+              ref={headerRef}
+              data-testid="code-workspace-tool-window-header"
+              className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)]/50 px-2"
+            >
+              <span data-testid="code-workspace-tool-window-title" className="text-[12px] font-medium text-[var(--taomni-code-text)]">
+                {active.label}
+              </span>
+              <span className="flex-1" />
+              <div className="relative">
+                <button
+                  type="button"
+                  data-testid="code-workspace-tool-window-options"
+                  aria-label={`${active.label} options`}
+                  aria-haspopup="menu"
+                  aria-expanded={optionsOpen}
+                  title="Options"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                  onClick={() => setOptionsOpen((prev) => !prev)}
+                >
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </button>
+                {optionsOpen && (
+                  <div role="menu" data-testid="code-workspace-tool-window-options-menu"
+                    className="absolute right-0 top-7 z-50 min-w-48 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] py-1 text-xs shadow-lg">
+                    <button type="button" role="menuitem" className="flex w-full px-3 py-1.5 hover:bg-[var(--taomni-code-active-line-bg)]"
+                      onClick={() => { setOptionsOpen(false); onOpenChange(false); onEscape?.(); }}>
+                      Hide<span className="ml-auto pl-4 opacity-60">Shift+Esc</span>
+                    </button>
+                    {onRestoreLayout && (
+                      <button type="button" role="menuitem" className="flex w-full px-3 py-1.5 hover:bg-[var(--taomni-code-active-line-bg)]"
+                        onClick={() => { setOptionsOpen(false); onRestoreLayout(); }}>
+                        Restore Default Layout<span className="ml-auto pl-4 opacity-60">Shift+F12</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                data-testid="code-workspace-tool-window-hide"
+                aria-label={`Hide ${active.label}`}
+                title="Hide (Shift+Esc)"
+                className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                onClick={() => {
+                  onOpenChange(false);
+                  onEscape?.();
+                }}
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
       <div
         ref={headerRef}
         className="h-[50px] flex items-center gap-1 overflow-hidden px-2 border-b border-[var(--taomni-code-border)]/50"
@@ -349,13 +495,16 @@ export function BottomDock({
         )}
       </div>
 
+        </>
+      )}
+
       {/* Keep every panel mounted so stateful tools (search, terminals)
           survive tab switches and dock collapse; hide inactive ones. */}
       <div
         hidden={!open || !active}
         data-testid="code-workspace-bottom-dock-body"
         className="min-h-0 overflow-hidden"
-        style={{ height: open ? Math.max(0, effectiveHeight - BOTTOM_DOCK_HEADER_HEIGHT) : 0 }}
+        style={{ height: open ? Math.max(0, effectiveHeight - (railHost ? RAIL_MODE_HEADER_HEIGHT : BOTTOM_DOCK_HEADER_HEIGHT)) : 0 }}
       >
         {tabs.map((tab) => (
           <div

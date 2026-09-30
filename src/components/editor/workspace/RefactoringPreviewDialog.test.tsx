@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LspWorkspaceEdit } from "../../../lib/editor/lsp";
 import { RefactoringPreviewDialog } from "./RefactoringPreviewDialog";
-import { buildWorkspaceEditPreview } from "./workspaceEditPreview";
+import { buildWorkspaceEditPreview, usageLineImages } from "./workspaceEditPreview";
 
 afterEach(cleanup);
 
@@ -203,5 +203,47 @@ describe("RefactoringPreviewDialog", () => {
 
     expect(screen.getByTestId("refactoring-preview-error-conflicts")).toHaveTextContent("Target symbol already declared");
     expect(screen.getByTestId("refactoring-preview-apply")).toBeDisabled();
+  });
+
+  it("ED-PARITY-017: shows real preimage/postimage lines and a typed unavailable source", () => {
+    const edit: LspWorkspaceEdit = {
+      documentEdits: [
+        {
+          uri: "file:///repo/A.java",
+          path: "/repo/A.java",
+          edits: [{ range: { start: { line: 1, character: 8 }, end: { line: 1, character: 11 } }, newText: "total" }],
+        },
+        {
+          uri: "file:///repo/B.java",
+          path: "/repo/B.java",
+          edits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, newText: "// x\n" }],
+        },
+      ],
+    };
+    const preview = buildWorkspaceEditPreview(edit);
+    render(
+      <RefactoringPreviewDialog
+        open={true}
+        preview={preview}
+        originalEdit={edit}
+        sourceTexts={{ "/repo/A.java": "class A {\n    int sum = 0;\n}\n", "/repo/B.java": null }}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("refactoring-preview-before").textContent).toBe("-     int sum = 0;");
+    expect(screen.getByTestId("refactoring-preview-after").textContent).toBe("+     int total = 0;");
+    expect(screen.getByTestId("refactoring-preview-source-unavailable")).toBeInTheDocument();
+  });
+
+  it("ED-PARITY-017: usageLineImages covers insertions and refuses ranges outside the text", () => {
+    expect(usageLineImages("package demo;\n", {
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      newText: "// note\n",
+    })).toEqual({ before: ["package demo;"], after: ["// note", "package demo;"] });
+    expect(usageLineImages("a\n", {
+      range: { start: { line: 5, character: 0 }, end: { line: 5, character: 1 } },
+      newText: "b",
+    })).toBeNull();
   });
 });

@@ -25,6 +25,9 @@ steps:
 - vault_first_run: qa-parity007-password
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
+    key: taomni.codeWorkspace.refactorOptions.v1
+    value: '{"mode":"dialog"}'
+- seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id": "qa-parity007-native", "name": "parity007", "roots": [{"id": "parity007", "name": "parity007", "path": "${fixture.parity007_root}", "kind": "folder"}], "looseFiles": [], "lastActiveFile":
       {"kind": "root", "rootId": "parity007", "path": "src/main/java/demo/ExtractTarget.java"}, "lastOpenedAt": 1756100000000, "isGitRepo": false}]'
@@ -50,7 +53,7 @@ steps:
     label: b0
 - screenshot: tc-ide-parity-007-03-b0.png
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -59,7 +62,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for:
     selector: '[data-testid="text-input-dialog-input"]'
     timeout_sec: 90
@@ -105,7 +108,7 @@ steps:
     label: b2
 - screenshot: tc-ide-parity-007-03-b2.png
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_file_contains:
     path: ${fixture.parity007_extract_target}
     contains: int sum = getSum(values);
@@ -115,7 +118,7 @@ steps:
     source: ${fixture.parity007_extract_target}
     label: undo1-b1
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_file_sha256:
     path: ${fixture.parity007_extract_target}
     equals: ${fixture.parity007_initial_sha}
@@ -125,7 +128,7 @@ steps:
     source: ${fixture.parity007_extract_target}
     label: undo2-b0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Shift+z
+- press: Mod+Shift+z
 - assert_file_contains:
     path: ${fixture.parity007_extract_target}
     contains: int sum = getSum(values);
@@ -135,7 +138,7 @@ steps:
     source: ${fixture.parity007_extract_target}
     label: redo1-b1
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Shift+z
+- press: Mod+Shift+z
 - assert_file_contains:
     path: ${fixture.parity007_extract_target}
     contains: int sum = sumOf(values);
@@ -145,20 +148,20 @@ steps:
     source: ${fixture.parity007_extract_target}
     label: redo2-b2
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_file_sha256:
     path: ${fixture.parity007_extract_target}
     equals: ${fixture.parity007_initial_sha}
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+End
+- press: Mod+End
 - type: // pending
 - assert_file_contains:
     path: ${fixture.parity007_extract_target}
     contains: return min + ".." + max;
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -167,7 +170,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for:
     selector: '[data-testid="status-bar-message"]'
     timeout_sec: 60
@@ -179,7 +182,7 @@ steps:
     path: ${fixture.parity007_extract_target}
     equals: ${fixture.parity007_initial_sha}
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_text:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     contains: // pending
@@ -189,61 +192,61 @@ verification:
   - id: ED-PARITY-007-V4-1-provider
     requirement: The real JDT LS offers the method extraction for E1; the direct chord applies it, the host file becomes B1, and the E1 program oracle keeps stdout 12,0,-2,12.
     actions:
-    - 11
+    - 12
     checkpoints:
-    - step: 11
-      expectation: The host ExtractTarget.java still has the reference B0 bytes before the extraction.
     - step: 12
+      expectation: The host ExtractTarget.java still has the reference B0 bytes before the extraction.
+    - step: 13
       expectation: javac/java of the initial source prints exactly 12,0,-2,12 with exit 0.
-    - step: 26
+    - step: 27
       expectation: The real provider edit produced the call site and the new method on disk.
-    - step: 28
+    - step: 29
       expectation: The extracted B1 still prints exactly 12,0,-2,12.
     results:
-    - 11
     - 12
-    - 26
-    - 28
+    - 13
+    - 27
+    - 29
   - id: ED-PARITY-007-V4-2-naming-undo
     requirement: Naming through the real Rename chain updates the declaration and the call site, and two undos then redos walk the host bytes B2 -> B1 -> B0 -> B1 -> B2 with the oracle holding at every
       state.
     actions:
-    - 36
+    - 37
     checkpoints:
-    - step: 36
+    - step: 37
       expectation: The host file has sumOf in the declaration and the call site.
-    - step: 38
+    - step: 39
       expectation: The renamed B2 still prints 12,0,-2,12.
-    - step: 43
+    - step: 44
       expectation: The first undo restores B1 on disk and the oracle still passes.
-    - step: 46
+    - step: 47
       expectation: The second undo restores the exact initial B0 hash.
-    - step: 55
+    - step: 56
       expectation: Redo restores B1 then B2 on disk and the oracle still passes.
     results:
-    - 36
-    - 38
-    - 43
-    - 46
-    - 55
+    - 37
+    - 39
+    - 44
+    - 47
+    - 56
   - id: ED-PARITY-007-V4-3-dirty
     requirement: With unsaved input the extraction stays in the buffer, never writes the pending input to disk, does not prompt for a name, and undo keeps the pending input.
     actions:
-    - 57
+    - 58
     checkpoints:
-    - step: 77
-      expectation: The status line asks to save before renaming.
     - step: 78
-      expectation: No naming dialog appears for the dirty buffer.
+      expectation: The status line asks to save before renaming.
     - step: 79
+      expectation: No naming dialog appears for the dirty buffer.
+    - step: 80
       expectation: The host file is unchanged by the dirty extraction.
-    - step: 82
+    - step: 83
       expectation: Undo keeps the pending input in the buffer.
     results:
-    - 77
     - 78
     - 79
-    - 82
+    - 80
+    - 83
   visual:
   - check: Real WebView dialog rendering and the extracted method layout.
     method: manual

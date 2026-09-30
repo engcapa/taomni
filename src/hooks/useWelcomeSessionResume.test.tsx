@@ -127,6 +127,32 @@ describe("useWelcomeSessionResume (V-07)", () => {
     await waitFor(() => expect(result.current.view.state).toBe("empty"));
   });
 
+  it("re-reads and retries when clear races a newer snapshot commit", async () => {
+    const initial = record([savedEntry("before-clear")]);
+    const newer = { ...initial, revision: initial.revision + 1 };
+    resumeIpcMocks.getWelcomeRunSnapshot
+      .mockResolvedValueOnce({ record: initial, legacyCandidate: null, issue: null })
+      .mockResolvedValueOnce({ record: newer, legacyCandidate: null, issue: null });
+    resumeIpcMocks.clearWelcomeRunSnapshot
+      .mockRejectedValueOnce(new Error("snapshot revision mismatch: expected 3, current 4"))
+      .mockResolvedValueOnce(undefined);
+
+    const { result } = renderHook(() => useWelcomeSessionResume(true, makeCallbacks()));
+    await waitFor(() => expect(result.current.view.state).toBe("available"));
+
+    await act(async () => {
+      await result.current.clearRecord();
+    });
+
+    await waitFor(() => expect(result.current.view.state).toBe("empty"));
+    expect(resumeIpcMocks.clearWelcomeRunSnapshot).toHaveBeenNthCalledWith(1, {
+      expectedRevision: initial.revision,
+    });
+    expect(resumeIpcMocks.clearWelcomeRunSnapshot).toHaveBeenNthCalledWith(2, {
+      expectedRevision: newer.revision,
+    });
+  });
+
   it("restores entries in record order and aggregates success (AC-19)", async () => {
     resumeIpcMocks.getWelcomeRunSnapshot.mockResolvedValue({
       record: record([savedEntry("ssh-a", "SSH"), savedEntry("db-b", "SSH")]),

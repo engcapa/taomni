@@ -70,7 +70,9 @@ import {
 } from "../floating-toolbar/floatingToolbarStyles";
 import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2, X } from "lucide-react";
 import {
+  createOscMarkerBlankingSuppressor,
   createOsc7BlankingSuppressor,
+  createTaskExitOscParser,
   createTaskStartOutputSuppressor,
   type InputEchoSuppressor,
 } from "../../lib/terminalOutputFilter";
@@ -111,7 +113,11 @@ import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import { extractTerminalCommand } from "../../lib/terminalCommand";
 import { normalizeLocalStartCwd } from "../../lib/terminalCwd";
 import { inferTerminalProgram } from "../../lib/terminalActivity";
-import { buildSshCwdIntegration, buildLocalZshCwdIntegration } from "../../lib/terminalShellIntegration";
+import {
+  buildSshCwdIntegration,
+  buildLocalZshCwdIntegration,
+  CWD_INTEGRATION_DONE_MARKER,
+} from "../../lib/terminalShellIntegration";
 import {
   buildInteractiveCommandInput,
   renderTerminalTask,
@@ -278,6 +284,7 @@ interface TerminalPanelProps {
 const DEFAULT_FONT_SIZE = 14;
 /** Upper bound on how long keystrokes wait for a hidden setup line to land. */
 const INJECTED_INPUT_HOLD_MAX_MS = 1_500;
+const CWD_SETUP_INPUT_HOLD_MAX_MS = 4_000;
 const CWD_QUERY_COMMAND =
   " printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"${PWD}\"; : __taomni_cwd_sync_done";
 function buildSshInitialCwdProbe(cwd: string): string {
@@ -1053,11 +1060,15 @@ export function TerminalPanel({
     }
   }, []);
 
-  const holdInjectedInput = useCallback((data: string) => {
+  const holdInjectedInput = useCallback((data: string, inputHoldTimeoutMs: number) => {
     const hold = injectedInputHoldRef.current;
     hold.queue.push(data);
-    if (hold.pump !== null) return;
-    hold.expiresAt = Date.now() + INJECTED_INPUT_HOLD_MAX_MS;
+    const expiresAt = Date.now() + Math.max(INJECTED_INPUT_HOLD_MAX_MS, inputHoldTimeoutMs);
+    if (hold.pump !== null) {
+      hold.expiresAt = Math.max(hold.expiresAt, expiresAt);
+      return;
+    }
+    hold.expiresAt = expiresAt;
     hold.pump = window.setInterval(() => {
       const suppressor = injectedInputEchoSuppressorRef.current;
       // Flush as soon as the injected line's own output proves it landed, or
@@ -1119,7 +1130,7 @@ export function TerminalPanel({
     // so hold the keystrokes and flush them once the injected line has landed.
     const activeSuppressor = injectedInputEchoSuppressorRef.current;
     if (!injectedInputHoldRef.current.flushing && activeSuppressor && !activeSuppressor.done) {
-      holdInjectedInput(filtered);
+      holdInjectedInput(filtered, activeSuppressor.inputHoldTimeoutMs ?? INJECTED_INPUT_HOLD_MAX_MS);
       return;
     }
 
@@ -2463,6 +2474,7 @@ export function TerminalPanel({
       macOptionIsMeta: false,
     });
     termRef.current = term;
+    const taskExitOscParser = createTaskExitOscParser();
 
     const fitAddon = new FitAddon();
     fitAddonRef.current = fitAddon;
@@ -2719,6 +2731,16 @@ export function TerminalPanel({
     const syncAutomationState = () => {
       const panel = panelRef.current;
       if (!panel) return;
+      // Output callbacks can run before xterm has committed the final prompt
+      // row. Re-check the deferred installer from the same readiness poll so
+      // startup commands and cwd setup cannot be stranded by that ordering.
+      if (
+        connectionStateRef.current === "connected"
+        && terminalAtIdlePrompt(term)
+        && installSshCwdIntegrationRef.current
+      ) {
+        installSshCwdIntegrationRef.current();
+      }
       panel.setAttribute("data-terminal-text", getBufferText(term));
       if (
         connectionStateRef.current === "connected" &&
@@ -2796,6 +2818,14 @@ export function TerminalPanel({
           const suppressor = injectedInputEchoSuppressorRef.current;
           let filtered = suppressor ? suppressor.filter(data) : data;
           if (suppressor?.done) injectedInputEchoSuppressorRef.current = null;
+          if (filtered.length === 0) return;
+          // xterm normally consumes OSC 633, but PTY/WebView combinations can
+          // deliver a split marker before the parser handler is ready. Parse
+          // the raw stream as a fallback so task plans never wait forever for
+          // an exit event that is already visible in the terminal output.
+          const taskExit = taskExitOscParser.feed(filtered);
+          for (const exitCode of taskExit.exitCodes) onTaskExitRef.current?.(exitCode);
+          filtered = taskExit.data;
           if (filtered.length === 0) return;
           if (loggingActiveRef.current) {
             outputLogRef.current += new TextDecoder().decode(filtered);
@@ -3098,7 +3128,16 @@ export function TerminalPanel({
             return true;
           }
           integrationInstalling = true;
-          const integrationTimeoutMs = /\bMINGW(?:32|64)\b/.test(getLastBufferLines(liveTerm, 3)) ? 30_000 : 4_000;
+          const isMingwShell = /\bMINGW(?:32|64)\b/.test(getLastBufferLines(liveTerm, 3));
+          // Git Bash can take long enough to echo a prompt hook that the user
+          // types into the hidden setup line. A one-shot OSC 7 probe still
+          // captures the requested cwd without modifying its prompt.
+          const useMingwCwdProbe = ssh && isMingwShell && integrationCommand.includes("TaomniCwdIntegrationDone");
+          const commandForShell = useMingwCwdProbe
+            ? (initialCwd ? buildSshInitialCwdProbe(initialCwd) : CWD_QUERY_COMMAND)
+            : integrationCommand;
+          const integrationTimeoutMs = isMingwShell && !useMingwCwdProbe ? 30_000 : 4_000;
+          const inputHoldTimeoutMs = Math.min(integrationTimeoutMs, CWD_SETUP_INPUT_HOLD_MAX_MS);
           if (installSshCwdIntegrationRef.current === installCwdIntegration) {
             installSshCwdIntegrationRef.current = null;
           }
@@ -3108,7 +3147,22 @@ export function TerminalPanel({
           // non-POSIX shell — which never emits the OSC 7 — isn't blacked out
           // for too long before output resumes.
           automationInputSettlingRef.current = true;
-          const suppressor = createOsc7BlankingSuppressor(integrationTimeoutMs);
+          // SSH/local shell integration emits a private completion marker after
+          // the one-shot setup. Matching that marker avoids mistaking a prompt's
+          // ordinary OSC 7 report for completion while the setup line is still
+          // being echoed on a laggy Windows PTY.
+          const suppressor = commandForShell.includes("TaomniCwdIntegrationDone")
+            ? createOscMarkerBlankingSuppressor(
+                CWD_INTEGRATION_DONE_MARKER,
+                integrationTimeoutMs,
+                Date.now(),
+                inputHoldTimeoutMs,
+              )
+            : createOsc7BlankingSuppressor(
+                integrationTimeoutMs,
+                Date.now(),
+                inputHoldTimeoutMs,
+              );
           injectedInputEchoSuppressorRef.current = suppressor;
           window.setTimeout(() => {
             if (
@@ -3120,7 +3174,7 @@ export function TerminalPanel({
             automationInputSettlingRef.current = false;
             syncAutomationState();
           }, integrationTimeoutMs);
-          writeTerminal(targetSid, encodeBase64(`${integrationCommand}\r`)).catch(() => {
+          writeTerminal(targetSid, encodeBase64(`${commandForShell}\r`)).catch(() => {
             if (sessionIdRef.current === targetSid && injectedInputEchoSuppressorRef.current === suppressor) {
               integrationInstalling = false;
               installSshCwdIntegrationRef.current = installCwdIntegration;
@@ -3739,6 +3793,13 @@ export function TerminalPanel({
       tabId,
       sessionId: registeredSessionId,
       title: tabTitle,
+      isReady: () => {
+        const liveTerm = termRef.current;
+        return !!liveTerm
+          && connectionStateRef.current === "connected"
+          && !automationInputSettlingRef.current
+          && terminalAtIdlePrompt(liveTerm);
+      },
       localEnvironment: isLocal
         ? {
             platform: getAppPlatform(),
@@ -4644,7 +4705,7 @@ function terminalAtIdlePrompt(term: Terminal): boolean {
 
   if (text.replace(/\s+$/, "").length === 0) return false; // blank: not ready
   // Ends in a prompt terminator, optionally followed by a single space.
-  return /[$#>%][ ]?$/.test(text);
+  return /[$#>%][ \t]{0,4}$/.test(text);
 }
 
 function computeInlineGhost(

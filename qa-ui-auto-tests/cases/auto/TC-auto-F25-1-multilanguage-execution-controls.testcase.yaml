@@ -130,7 +130,10 @@ steps:
 - click: '[data-testid="workspace-build-run-tools-close"]'
 - click: '[data-testid="run-panel-configure-tools"]'
 - click: '[data-testid="workspace-build-run-tools-cancel"]'
-- click: '[data-testid="code-workspace-bottom-tab-build"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+- wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow-build"]'
+- hover: '[data-testid="code-workspace-bottom-tab-build"]'
 - assert_visible: '[data-testid="code-workspace-build-panel"]'
 - click: '[data-testid="build-panel-refresh"]'
 - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
@@ -240,27 +243,27 @@ verification:
     - 50
     - 51
     - 52
-    - 54
-    - 55
     - 57
     - 58
+    - 60
     - 61
-    - 67
-    - 68
+    - 64
+    - 70
     - 71
-    - 73
     - 74
     - 76
+    - 77
     - 79
-    - 80
     - 82
     - 83
-    - 84
     - 85
     - 86
     - 87
     - 88
+    - 89
+    - 90
     - 91
+    - 94
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -283,48 +286,48 @@ verification:
         JSON.stringify(localStorage).includes(''netcoredbg-custom'')", "expect_truthy": true}}'
     - step: 48
       expectation: '{"assert_visible": "[data-testid=\"workspace-build-run-tools-dialog\"]"}'
-    - step: 53
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-build-panel\"]"}'
     - step: 56
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-build-panel\"]"}'
     - step: 59
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tests-panel\"]"}'
-    - step: 60
-      expectation: '{"assert_disabled": "[data-testid=\"tests-load-results\"]"}'
-    - step: 62
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-analysis-panel\"]"}'
-    - step: 63
-      expectation: '{"assert_visible": "[data-testid=\"analysis-semantic-index\"]"}'
-    - step: 64
-      expectation: '{"assert_visible": "[data-testid=\"analysis-lsp-status\"]"}'
-    - step: 65
-      expectation: '{"assert_visible": "[data-testid=\"analysis-inspection-profile\"]"}'
-    - step: 66
-      expectation: '{"assert_visible": "[data-testid=\"analysis-inspection-baseline\"]"}'
-    - step: 69
-      expectation: '{"assert_visible": "[data-testid=\"analysis-inspection-suppressions\"]"}'
-    - step: 70
-      expectation: '{"assert_visible": "[data-testid=\"analysis-data-flow\"]"}'
-    - step: 72
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
+    - step: 62
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tests-panel\"]"}'
+    - step: 63
+      expectation: '{"assert_disabled": "[data-testid=\"tests-load-results\"]"}'
+    - step: 65
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-analysis-panel\"]"}'
+    - step: 66
+      expectation: '{"assert_visible": "[data-testid=\"analysis-semantic-index\"]"}'
+    - step: 67
+      expectation: '{"assert_visible": "[data-testid=\"analysis-lsp-status\"]"}'
+    - step: 68
+      expectation: '{"assert_visible": "[data-testid=\"analysis-inspection-profile\"]"}'
+    - step: 69
+      expectation: '{"assert_visible": "[data-testid=\"analysis-inspection-baseline\"]"}'
+    - step: 72
+      expectation: '{"assert_visible": "[data-testid=\"analysis-inspection-suppressions\"]"}'
+    - step: 73
+      expectation: '{"assert_visible": "[data-testid=\"analysis-data-flow\"]"}'
     - step: 75
-      expectation: '{"assert_visible": "[data-testid=\"debug-panel\"]"}'
-    - step: 77
-      expectation: '{"assert_visible": "[data-testid=\"debug-function-breakpoints\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
     - step: 78
-      expectation: '{"assert_visible": "[data-testid=\"debug-data-breakpoints\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"debug-panel\"]"}'
+    - step: 80
+      expectation: '{"assert_visible": "[data-testid=\"debug-function-breakpoints\"]"}'
     - step: 81
+      expectation: '{"assert_visible": "[data-testid=\"debug-data-breakpoints\"]"}'
+    - step: 84
       expectation: '{"assert_visible": "[data-testid=\"debug-function-breakpoint-row\"][data-function-name=\"Service.run\"]"}'
-    - step: 89
+    - step: 92
       expectation: '{"assert_text": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]", "contains":
         "if ready"}}'
-    - step: 90
+    - step: 93
       expectation: '{"assert_text": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]", "contains":
         "hit 3"}}'
-    - step: 92
+    - step: 95
       expectation: '{"assert_count": {"selector": "[data-testid=\"debug-function-breakpoint-row\"]", "equal": 0}}'
     results:
-    - 92
+    - 95
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

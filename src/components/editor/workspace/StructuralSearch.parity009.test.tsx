@@ -267,3 +267,50 @@ describe("Structural Search session ED-PARITY-009", () => {
     await act(async () => { late.resolve(ok(requestId, THREE)); });
   });
 });
+
+describe("ED-PARITY-016: Structural Search templates and filters", () => {
+  beforeEach(async () => {
+    for (const mock of Object.values(ipc)) mock.mockReset();
+    ipc.structuralSearchCapabilities.mockResolvedValue(CAPS);
+    ipc.structuralSearchCancel.mockResolvedValue(true);
+    ipc.structuralSearchRun.mockImplementation(async (request: StructuralSearchRequest) => ok(request.requestId, THREE));
+    localStorage.clear();
+    const templates = await import("./structuralSearchTemplates");
+    templates.resetRecentStructuralTemplatesForTests();
+  });
+
+  afterEach(() => cleanup());
+
+  it("loads an existing template and records run templates as Recent", async () => {
+    render(<Harness />);
+    await openDialog();
+    const existing = screen.getAllByTestId("structural-search-template-item")
+      .find((item) => item.getAttribute("data-template-id") === "equals")!;
+    fireEvent.click(existing);
+    expect(screen.getByTestId("structural-search-template")).toHaveValue("$a$.equals($b$)");
+    expect(screen.getAllByTestId("structural-search-variable-row").map((row) => row.getAttribute("data-variable")))
+      .toEqual(["a", "b"]);
+    fireEvent.click(screen.getByTestId("structural-search-find"));
+    await waitFor(() => expect(ipc.structuralSearchRun).toHaveBeenCalledTimes(1));
+    expect(lastRequest().query.pattern).toBe("$a$.equals($b$)");
+
+    fireEvent.click(screen.getByRole("button", { name: "Search Structurally…" }));
+    await waitFor(() => expect(screen.getByTestId("structural-search-dialog")).toBeInTheDocument());
+    const recent = screen.getAllByTestId("structural-search-template-item")
+      .filter((item) => item.getAttribute("data-template-kind") === "recent");
+    expect(recent.map((item) => item.textContent)).toEqual(["$a$.equals($b$)"]);
+  });
+
+  it("lists IDEA filter kinds with only Text available on the syntax backend", async () => {
+    render(<Harness />);
+    await openDialog();
+    fireEvent.click(screen.getByTestId("structural-search-add-filter"));
+    expect(screen.getByTestId("structural-search-filter-option-text")).toBeEnabled();
+    for (const kind of ["count", "type", "reference", "script"]) {
+      expect(screen.getByTestId(`structural-search-filter-option-${kind}`)).toBeDisabled();
+    }
+    expect(screen.getByTestId("structural-search-filter-reason")).toHaveTextContent("syntax-only backend");
+    fireEvent.click(screen.getByTestId("structural-search-filter-option-text"));
+    expect(screen.getByTestId("structural-search-variable-text")).toHaveFocus();
+  });
+});

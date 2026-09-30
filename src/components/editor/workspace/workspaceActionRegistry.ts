@@ -7,6 +7,7 @@
  */
 
 import type { EditorView } from "@codemirror/view";
+import type { PlatformKeybindingOverrides } from "./workspaceKeymapPlatform";
 
 export type ActionCategory =
   | "Edit"
@@ -244,6 +245,8 @@ export interface WorkspaceActionMetadata {
   category: ActionCategory;
   keybinding?: string | ActionPlatformKeybindings;
   secondaryKeybindings?: string[];
+  /** Per-platform replacement sets (ED-PARITY-013 DEC-013-01). */
+  platformKeybindings?: PlatformKeybindingOverrides;
   when?: string | WhenExpr | ((context: WorkspaceActionContext) => boolean);
   provenance: ActionProvenance;
   capabilityRequirement?: string;
@@ -766,6 +769,7 @@ export const DEFAULT_WORKSPACE_ACTIONS: WorkspaceActionMetadata[] = [
     description: "Find and open any file in the workspace",
     category: "Navigate",
     keybinding: "Ctrl+Shift+N",
+    secondaryKeybindings: ["Meta+Shift+N"],
     provenance: "local",
     keywords: ["file", "open", "find", "search"],
   },
@@ -1047,6 +1051,7 @@ export const DEFAULT_WORKSPACE_ACTIONS: WorkspaceActionMetadata[] = [
     description: "Search text across the whole workspace with regex and filters",
     category: "Search",
     keybinding: "Ctrl+Shift+F",
+    secondaryKeybindings: ["Meta+Shift+F"],
     provenance: "local",
     keywords: ["find", "search", "grep", "files"],
   },
@@ -1056,6 +1061,7 @@ export const DEFAULT_WORKSPACE_ACTIONS: WorkspaceActionMetadata[] = [
     description: "Replace text across multiple files with preview",
     category: "Search",
     keybinding: "Ctrl+Shift+R",
+    secondaryKeybindings: ["Meta+Shift+R"],
     provenance: "local",
     keywords: ["replace", "substitute", "files"],
   },
@@ -1120,6 +1126,7 @@ export const DEFAULT_WORKSPACE_ACTIONS: WorkspaceActionMetadata[] = [
     description: "Extract selection into a new method or function",
     category: "Refactor",
     keybinding: "Ctrl+Alt+M",
+    secondaryKeybindings: ["Meta+Alt+M", "Meta+Alt+m"],
     provenance: "provider",
     keywords: ["extract", "method", "function"],
   },
@@ -1294,6 +1301,7 @@ export const DEFAULT_WORKSPACE_ACTIONS: WorkspaceActionMetadata[] = [
     description: "Show or hide the project explorer file tree",
     category: "View",
     keybinding: "Alt+1",
+    platformKeybindings: { mac: ["Meta+1", "Alt+1"] },
     provenance: "local",
     keywords: ["tree", "explorer", "sidebar", "project"],
   },
@@ -1549,7 +1557,7 @@ export const DEFAULT_WORKSPACE_ACTIONS: WorkspaceActionMetadata[] = [
     description: "Open shortcut reference and command executor dialog",
     category: "Help",
     keybinding: "Ctrl+Alt+/",
-    secondaryKeybindings: ["Ctrl+K Ctrl+S"],
+    secondaryKeybindings: ["Meta+Alt+/", "Ctrl+K Ctrl+S", "Meta+K Meta+S"],
     provenance: "local",
     keywords: ["keymap", "shortcuts", "cheat sheet", "keyboard", "intellij"],
   },

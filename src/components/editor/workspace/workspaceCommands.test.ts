@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   eventLogicalKey,
+  parseKeybinding,
   workspaceCommandMatchesKeybinding,
   workspaceCommandToActionDefinition,
   type WorkspaceCommand,
@@ -62,6 +63,38 @@ describe("workspaceCommands", () => {
       altKey: false,
       metaKey: false,
     })).toBe(true);
+  });
+
+  it("matches explicit Meta secondary bindings on macOS", () => {
+    const goToFile = command({
+      id: "workspace.goToFile",
+      keybinding: "Ctrl+Shift+N",
+      keybindings: ["Meta+Shift+N"],
+    });
+
+    expect(workspaceCommandMatchesKeybinding(goToFile, {
+      key: "N",
+      code: "KeyN",
+      ctrlKey: false,
+      shiftKey: true,
+      altKey: false,
+      metaKey: true,
+    })).toBe(true);
+  });
+
+  it("does not treat the second stroke of a chord as a standalone keybinding", () => {
+    expect(parseKeybinding("Meta+K Meta+S")).toBeNull();
+    expect(workspaceCommandMatchesKeybinding(command({
+      keybinding: "Ctrl+S",
+      keybindings: ["Meta+K Meta+S"],
+    }), {
+      key: "s",
+      code: "KeyS",
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      metaKey: true,
+    })).toBe(false);
   });
 
   it("registers commands into a host and executes by id with context gating", async () => {

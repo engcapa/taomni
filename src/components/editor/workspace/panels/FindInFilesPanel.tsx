@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Language } from "@codemirror/language";
 import { Ban, CaseSensitive, ChevronDown, ChevronRight, File, Loader2, Regex, Search, WholeWord } from "lucide-react";
 import {
@@ -338,6 +338,7 @@ export function FindInFilesPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const replacementInputRef = useRef<HTMLInputElement>(null);
   const replaceAllButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreReplaceButtonFocusRef = useRef(false);
   const matchRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const pendingMatchFocusRef = useRef<string | null>(null);
   const searchIdRef = useRef<string | null>(null);
@@ -353,6 +354,12 @@ export function FindInFilesPanel({
     target?.focus();
     target?.select();
   }, [focusNonce, focusTarget]);
+
+  useLayoutEffect(() => {
+    if (replacePreview || !restoreReplaceButtonFocusRef.current) return;
+    restoreReplaceButtonFocusRef.current = false;
+    replaceAllButtonRef.current?.focus();
+  }, [replacePreview]);
 
   const appliedPresetNonceRef = useRef(0);
   useEffect(() => {
@@ -1306,9 +1313,9 @@ export function FindInFilesPanel({
             commitError={replaceCommitError}
             onCommit={(excluded) => void commitReplacePreview(excluded)}
             onCancel={() => {
+              restoreReplaceButtonFocusRef.current = true;
               setReplacePreview(null);
               setReplaceCommitError(null);
-              requestAnimationFrame(() => replaceAllButtonRef.current?.focus());
             }}
           />
         </div>

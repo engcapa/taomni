@@ -46,7 +46,8 @@ export type BottomDockTabId =
   | "build"
   | "tests"
   | "coverage"
-  | "debug";
+  | "debug"
+  | "git";
 export type DebugSubTabId = "debugger" | "console" | "breakpoints" | "memory";
 export type EditorGroupId = "primary" | "secondary" | string;
 export type EditorSplitOrientation = "horizontal" | "vertical";

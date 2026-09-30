@@ -10,6 +10,14 @@ export interface CodeWorkspaceLspProgress {
   cancellable: boolean;
 }
 
+/** One IDEA navigation-bar segment (ED-PARITY-010 DEC-010-06). */
+export interface CodeWorkspaceNavigationSegment {
+  label: string;
+  kind: "root" | "dir" | "file" | "symbol";
+  /** LSP SymbolKind for symbol segments (class, method, …). */
+  symbolKind?: number;
+}
+
 export interface CodeWorkspaceStatusSegments {
   tabId: string;
   /** 1-based line for display. */
@@ -31,6 +39,14 @@ export interface CodeWorkspaceStatusSegments {
   largeFile: boolean;
   /** Most recently updated server work-done task, when one is active. */
   lspProgress?: CodeWorkspaceLspProgress | null;
+  /** Selected character count (0 when the selection is empty). */
+  selectionChars?: number;
+  /** Line breaks inside the selection. */
+  selectionLineBreaks?: number;
+  /** Active editor is read-only (library/decompiled/locked). */
+  readOnly?: boolean;
+  /** Navigation bar path: root › directories › file › symbols. */
+  navigation?: readonly CodeWorkspaceNavigationSegment[];
 }
 
 export interface CodeWorkspaceStatusActions {
@@ -48,11 +64,30 @@ export interface CodeWorkspaceStatusActions {
 }
 
 interface CodeWorkspaceStatusStoreState {
+  /** Status-bar slot where the active workspace portals its SDK/Facts widgets. */
+  widgetHost: HTMLElement | null;
+  setWidgetHost: (host: HTMLElement | null) => void;
+  /** Status-bar slot hosting the active editor's navigation bar (breadcrumbs). */
+  navigationHost: HTMLElement | null;
+  setNavigationHost: (host: HTMLElement | null) => void;
+  /** Editor group currently portalling its breadcrumbs into `navigationHost`. */
+  navigationPortalOwner: string | null;
+  setNavigationPortalOwner: (owner: string | null, previous?: string | null) => void;
   status: CodeWorkspaceStatusSegments | null;
   actions: CodeWorkspaceStatusActions | null;
   setStatus: (status: CodeWorkspaceStatusSegments | null) => void;
   setActions: (tabId: string, actions: CodeWorkspaceStatusActions | null) => void;
   clearForTab: (tabId: string) => void;
+}
+
+function navigationEqual(
+  left: readonly CodeWorkspaceNavigationSegment[] | undefined,
+  right: readonly CodeWorkspaceNavigationSegment[] | undefined,
+): boolean {
+  const a = left ?? [];
+  const b = right ?? [];
+  return a.length === b.length
+    && a.every((segment, index) => segment.label === b[index]?.label && segment.kind === b[index]?.kind);
 }
 
 function segmentsEqual(
@@ -76,6 +111,10 @@ function segmentsEqual(
     && left.gitBehind === right.gitBehind
     && left.fontSize === right.fontSize
     && left.largeFile === right.largeFile
+    && (left.selectionChars ?? 0) === (right.selectionChars ?? 0)
+    && (left.selectionLineBreaks ?? 0) === (right.selectionLineBreaks ?? 0)
+    && !!left.readOnly === !!right.readOnly
+    && navigationEqual(left.navigation, right.navigation)
     && left.lspProgress?.key === right.lspProgress?.key
     && left.lspProgress?.label === right.lspProgress?.label
     && left.lspProgress?.message === right.lspProgress?.message
@@ -120,6 +159,21 @@ export function detectIndentation(text: string): { type: "spaces" | "tabs"; size
 export const useCodeWorkspaceStatusStore = create<CodeWorkspaceStatusStoreState>((set, get) => ({
   status: null,
   actions: null,
+  widgetHost: null,
+  setWidgetHost: (widgetHost) => {
+    if (get().widgetHost !== widgetHost) set({ widgetHost });
+  },
+  navigationHost: null,
+  setNavigationHost: (navigationHost) => {
+    if (get().navigationHost !== navigationHost) set({ navigationHost });
+  },
+  navigationPortalOwner: null,
+  setNavigationPortalOwner: (owner, previous) => {
+    const current = get().navigationPortalOwner;
+    // Clearing only releases the slot for the owner that still holds it.
+    if (owner === null && previous !== undefined && current !== previous) return;
+    if (current !== owner) set({ navigationPortalOwner: owner });
+  },
 
   setStatus: (status) => {
     if (segmentsEqual(get().status, status)) return;

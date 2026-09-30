@@ -21,6 +21,7 @@ pub mod redis_ops;
 pub mod saved_queries;
 pub mod sql;
 pub mod sql_rewrite;
+pub mod tx;
 
 pub use bookmarks::*;
 pub use history::*;
@@ -302,6 +303,8 @@ pub struct DbSession {
     /// Last successful default schema/database from `USE` / `SET search_path`
     /// etc. Shared with pool `after_connect` hooks so reconnects restore it.
     pub active_schema: sql::ActiveSchemaSlot,
+    /// Manual-commit state shared with the pool `after_connect` hook.
+    pub tx: tx::TxSlot,
     shutdown: CancellationToken,
     keepalive: Option<JoinHandle<()>>,
     /// Loopback forwarder task when the connection is routed through a proxy /
@@ -314,6 +317,7 @@ impl DbSession {
         handle: DbHandle,
         forward: Option<JoinHandle<()>>,
         active_schema: sql::ActiveSchemaSlot,
+        tx: tx::TxSlot,
     ) -> Self {
         let shutdown = CancellationToken::new();
         let keepalive = start_keepalive(&handle, shutdown.clone());
@@ -321,6 +325,7 @@ impl DbSession {
             handle,
             cancel: AsyncMutex::new(CancellationToken::new()),
             active_schema,
+            tx,
             shutdown,
             keepalive,
             forward,
@@ -334,6 +339,37 @@ impl DbSession {
         let token = CancellationToken::new();
         *guard = token.clone();
         token
+    }
+
+    /// Manual commit is available on engines with real session transactions.
+    fn tx_supported(&self) -> bool {
+        matches!(self.handle, DbHandle::MySql(_) | DbHandle::Postgres(_))
+    }
+
+    fn tx_status(&self) -> tx::DbTxStatus {
+        self.tx.status(self.tx_supported())
+    }
+
+    /// PostgreSQL has no session autocommit switch: open a transaction before
+    /// the first write of a manual-commit session.
+    async fn tx_before_statement(&self, sql: &str) -> Result<(), String> {
+        if !self.tx.manual() || self.tx.open() {
+            return Ok(());
+        }
+        if let DbHandle::Postgres(pool) = &self.handle
+            && tx::classify(sql, false) == tx::TxEffect::Write
+        {
+            sql::exec_control_postgres(pool, "BEGIN").await?;
+            self.tx.mark_open();
+        }
+        Ok(())
+    }
+
+    fn tx_after_statement(&self, sql: &str) {
+        if self.tx_supported() {
+            let mysql = matches!(self.handle, DbHandle::MySql(_));
+            self.tx.note_executed(tx::classify(sql, mysql));
+        }
     }
 
     /// Record a successful session default-schema switch so reconnects and
@@ -560,10 +596,25 @@ pub async fn db_connect(
     };
 
     let active_schema = sql::new_active_schema_slot(&config);
+    let tx_state = tx::TxState::shared();
     let handle = match config.engine.as_str() {
-        "MySQL" => sql::connect_mysql(&config, password.as_deref(), active_schema.clone()).await?,
+        "MySQL" => {
+            sql::connect_mysql(
+                &config,
+                password.as_deref(),
+                active_schema.clone(),
+                tx_state.clone(),
+            )
+            .await?
+        }
         "PostgreSQL" => {
-            sql::connect_postgres(&config, password.as_deref(), active_schema.clone()).await?
+            sql::connect_postgres(
+                &config,
+                password.as_deref(),
+                active_schema.clone(),
+                tx_state.clone(),
+            )
+            .await?
         }
         "PanWeiDB" => panwei::connect(&config, password.as_deref()).await?,
         "Oracle" => oracle::connect(&config, password.as_deref()).await?,
@@ -581,7 +632,12 @@ pub async fn db_connect(
             return Err(format!("Unsupported database engine: {other}"));
         }
     };
-    let session = Arc::new(DbSession::with_forward(handle, forward_task, active_schema));
+    let session = Arc::new(DbSession::with_forward(
+        handle,
+        forward_task,
+        active_schema,
+        tx_state,
+    ));
     let previous = {
         let mut map = state.db_connections.write().await;
         // If a stale session exists under this id, close it after releasing the map lock.
@@ -996,6 +1052,7 @@ pub async fn db_execute(
     sql: String,
 ) -> Result<QueryResult, String> {
     let session = get_session(&state, &session_id).await?;
+    session.tx_before_statement(&sql).await?;
     let token = session.fresh_cancel_token().await;
     let result = match &session.handle {
         DbHandle::MySql(pool) => sql::execute_mysql(pool, &sql, &token).await,
@@ -1010,6 +1067,7 @@ pub async fn db_execute(
     };
     if result.is_ok() {
         session.note_schema_switch(&sql).await;
+        session.tx_after_statement(&sql);
     }
     result
 }
@@ -1023,6 +1081,7 @@ pub async fn db_execute_stream(
     on_event: QueryStreamChannel,
 ) -> Result<(), String> {
     let session = get_session(&state, &session_id).await?;
+    session.tx_before_statement(&sql).await?;
     let token = session.fresh_cancel_token().await;
     let result = match &session.handle {
         DbHandle::MySql(pool) => {
@@ -1053,6 +1112,7 @@ pub async fn db_execute_stream(
     };
     if result.is_ok() {
         session.note_schema_switch(&sql).await;
+        session.tx_after_statement(&sql);
     }
     result
 }
@@ -1062,6 +1122,78 @@ pub async fn db_cancel(state: State<'_, AppState>, session_id: String) -> Result
     let session = get_session(&state, &session_id).await?;
     session.cancel.lock().await.cancel();
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Tauri commands — manual commit
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn db_tx_status(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<tx::DbTxStatus, String> {
+    Ok(get_session(&state, &session_id).await?.tx_status())
+}
+
+#[tauri::command]
+pub async fn db_tx_set_manual(
+    state: State<'_, AppState>,
+    session_id: String,
+    manual: bool,
+) -> Result<tx::DbTxStatus, String> {
+    let session = get_session(&state, &session_id).await?;
+    match &session.handle {
+        // Switching autocommit back on commits the open transaction.
+        DbHandle::MySql(pool) => {
+            let sql = if manual {
+                "SET autocommit=0"
+            } else {
+                "SET autocommit=1"
+            };
+            sql::exec_control_mysql(pool, sql).await?;
+        }
+        DbHandle::Postgres(pool) => {
+            if !manual && session.tx.open() {
+                sql::exec_control_postgres(pool, "COMMIT").await?;
+            }
+        }
+        _ => return Err("Manual commit is not supported for this engine".into()),
+    }
+    session.tx.set_manual(manual);
+    Ok(session.tx_status())
+}
+
+async fn end_transaction(
+    state: &State<'_, AppState>,
+    session_id: &str,
+    commit: bool,
+) -> Result<tx::DbTxStatus, String> {
+    let session = get_session(state, session_id).await?;
+    let sql = if commit { "COMMIT" } else { "ROLLBACK" };
+    match &session.handle {
+        DbHandle::MySql(pool) => sql::exec_control_mysql(pool, sql).await?,
+        DbHandle::Postgres(pool) => sql::exec_control_postgres(pool, sql).await?,
+        _ => return Err("Manual commit is not supported for this engine".into()),
+    }
+    session.tx.reset();
+    Ok(session.tx_status())
+}
+
+#[tauri::command]
+pub async fn db_tx_commit(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<tx::DbTxStatus, String> {
+    end_transaction(&state, &session_id, true).await
+}
+
+#[tauri::command]
+pub async fn db_tx_rollback(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<tx::DbTxStatus, String> {
+    end_transaction(&state, &session_id, false).await
 }
 
 // ---------------------------------------------------------------------------
@@ -1246,9 +1378,14 @@ mod live_tests {
         };
 
         let active_schema = sql::new_active_schema_slot(&config);
-        let handle = sql::connect_postgres(&config, config.password.as_deref(), active_schema)
-            .await
-            .expect("Hologres PostgreSQL connect should succeed");
+        let handle = sql::connect_postgres(
+            &config,
+            config.password.as_deref(),
+            active_schema,
+            tx::TxState::shared(),
+        )
+        .await
+        .expect("Hologres PostgreSQL connect should succeed");
         let pool = match handle {
             DbHandle::Postgres(pool) => pool,
             _ => unreachable!("PostgreSQL config must create a Postgres pool"),

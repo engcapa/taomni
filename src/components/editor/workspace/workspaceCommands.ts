@@ -9,6 +9,7 @@ import type {
 } from "./workspaceActionRegistry";
 import type { ActionSnapshotItem } from "./workspaceActionHost";
 import type { ShellShortcutClaim } from "./shellShortcutRouter";
+import type { PlatformKeybindingOverrides } from "./workspaceKeymapPlatform";
 
 export type WorkspaceCommandFocus = WorkspaceFocus;
 
@@ -24,6 +25,8 @@ export interface WorkspaceCommand {
   category: string;
   keybinding?: string;
   keybindings?: string[];
+  /** Per-platform replacement binding sets (ED-PARITY-013 DEC-013-01). */
+  platformKeybindings?: PlatformKeybindingOverrides;
   keywords?: string[];
   provenance?: ActionProvenance;
   when?: (context: WorkspaceCommandContext) => boolean;
@@ -122,6 +125,7 @@ export function eventLogicalKey(
 }
 
 export function parseKeybinding(value: string): ParsedKeybinding | null {
+  if (/\s/.test(value.trim())) return null;
   const parts = value.split("+").map((part) => part.trim()).filter(Boolean);
   if (parts.length === 0) return null;
   const modifiers = new Set(parts.slice(0, -1).map((part) => part.toLowerCase()));
@@ -173,6 +177,7 @@ export function workspaceCommandToActionDefinition(
     keywords: cmd.keywords,
     keybinding: cmd.keybinding,
     secondaryKeybindings: cmd.keybindings,
+    platformKeybindings: cmd.platformKeybindings,
     provenance: cmd.provenance ?? "local",
     when: cmd.when,
     run: async (ctx) => {

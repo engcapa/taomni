@@ -1,19 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { history, undo, undoDepth } from "@codemirror/commands";
-import { SearchQuery, search } from "@codemirror/search";
+import { SearchQuery, closeSearchPanel, getSearchQuery, openSearchPanel, search } from "@codemirror/search";
 import { javascript } from "@codemirror/lang-javascript";
 import { java } from "@codemirror/lang-java";
 import {
   applyPreserveCase,
+  createWorkspaceSearchPanel,
   detectCasing,
   getFilteredMatches,
   isSyntaxFilterAvailable,
   matchContextFilter,
+  openWorkspaceReplacePanel,
+  readSearchHistory,
+  recordSearchHistory,
   replaceAllPreserveCase,
   replaceNextPreserveCase,
+  resetSearchHistoryForTests,
   selectAllOccurrences,
+  SEARCH_HISTORY_LIMIT,
 } from "./editorSearchPanel";
 
 describe("§8.26 / ED-FIND-001: editorSearchPanel Preserve Case", () => {
@@ -262,5 +268,123 @@ describe("ED-FIND-002: selection / comments / strings search filtering", () => {
     expect(updatedCommentMatches.length).toBe(1);
     expect(updatedCommentMatches[0].from).toBe(25 + 22);
     expect(updatedState.sliceDoc(updatedCommentMatches[0].from, updatedCommentMatches[0].to)).toBe("alice");
+  });
+});
+
+describe("ED-PARITY-012: IDEA Find/Replace row", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    resetSearchHistoryForTests();
+  });
+
+  function mountPanel(doc: string) {
+    const parent = document.createElement("div");
+    document.body.append(parent);
+    const view = new EditorView({
+      parent,
+      state: EditorState.create({
+        doc,
+        extensions: [history(), search({ createPanel: (v) => createWorkspaceSearchPanel(v) })],
+      }),
+    });
+    openSearchPanel(view);
+    const panel = view.dom.querySelector<HTMLElement>("[data-testid='code-workspace-editor-search']")!;
+    const find = panel.querySelector<HTMLInputElement>("input[name='search']")!;
+    const type = (field: HTMLInputElement | HTMLTextAreaElement, value: string) => {
+      field.value = value;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    const buttonNamed = (name: string) => panel.querySelector<HTMLButtonElement>(`button[aria-label='${name}']`)!;
+    return { view, panel, find, type, buttonNamed, cleanup: () => { view.destroy(); parent.remove(); } };
+  }
+
+  it("keeps a bounded, deduplicated, persisted history", () => {
+    for (let i = 0; i < SEARCH_HISTORY_LIMIT + 3; i += 1) recordSearchHistory("find", `q${i}`);
+    recordSearchHistory("find", "q5");
+    const history = readSearchHistory("find");
+    expect(history).toHaveLength(SEARCH_HISTORY_LIMIT);
+    expect(history[0]).toBe("q5");
+    expect(history.filter((item) => item === "q5")).toHaveLength(1);
+    resetSearchHistoryForTests();
+    expect(readSearchHistory("find")[0]).toBe("q5");
+  });
+
+  it("shows the clear button only for a non-empty query and clears it", () => {
+    const { find, type, buttonNamed, view, cleanup } = mountPanel("alpha beta alpha");
+    const clear = buttonNamed("Clear search");
+    expect(clear.hidden).toBe(true);
+    type(find, "alpha");
+    expect(clear.hidden).toBe(false);
+    expect(getSearchQuery(view.state).search).toBe("alpha");
+    clear.click();
+    expect(find.value).toBe("");
+    expect(clear.hidden).toBe(true);
+    expect(getSearchQuery(view.state).search).toBe("");
+    cleanup();
+  });
+
+  it("records the query on close and offers it from the history dropdown", () => {
+    const first = mountPanel("alpha beta");
+    first.type(first.find, "alpha");
+    closeSearchPanel(first.view);
+    first.cleanup();
+
+    const second = mountPanel("alpha beta");
+    second.buttonNamed("Search history").click();
+    const option = second.panel.querySelector<HTMLButtonElement>("[role='listbox'] [role='option']");
+    expect(option?.textContent).toBe("alpha");
+    option!.click();
+    expect(second.find.value).toBe("alpha");
+    expect(getSearchQuery(second.view.state).search).toBe("alpha");
+    expect(second.panel.querySelector("[role='listbox']")?.hasAttribute("hidden")).toBe(true);
+    second.cleanup();
+  });
+
+  it("switches to a multiline textarea and back", () => {
+    const { panel, find, type, buttonNamed, view, cleanup } = mountPanel("one\ntwo\none");
+    type(find, "one");
+    const toggle = buttonNamed("Multiline");
+    toggle.click();
+    const area = panel.querySelector<HTMLTextAreaElement>("textarea[name='search-multiline']")!;
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    expect(area.hidden).toBe(false);
+    expect(find.hidden).toBe(true);
+    expect(area.value).toBe("one");
+    type(area, "one\ntwo");
+    expect(getSearchQuery(view.state).search).toBe("one\ntwo");
+    toggle.click();
+    expect(find.hidden).toBe(false);
+    expect(find.value).toBe("one two");
+    cleanup();
+  });
+
+  it("Exclude skips a match in Replace All, and one undo restores the rest", () => {
+    const { panel, find, type, buttonNamed, view, cleanup } = mountPanel("foo foo foo");
+    openWorkspaceReplacePanel(view);
+    type(find, "foo");
+    type(panel.querySelector<HTMLInputElement>("input[name='replace']")!, "bar");
+    // The first match is selected when the query is committed.
+    expect(view.state.selection.main.from).toBe(0);
+    buttonNamed("Exclude current match").click();
+    expect(panel.querySelector(".cm-workspace-search-status")?.textContent).toContain("1 excluded");
+    buttonNamed("Replace all matches").click();
+    expect(view.state.doc.toString()).toBe("foo bar bar");
+    undo(view);
+    expect(view.state.doc.toString()).toBe("foo foo foo");
+    // A new query forgets the exclusions.
+    type(find, "fo");
+    expect(panel.querySelector(".cm-workspace-search-status")?.textContent).not.toContain("excluded");
+    cleanup();
+  });
+
+  it("Ctrl+R opens Replace while focus stays in Find", async () => {
+    const { panel, find, view, cleanup } = mountPanel("alpha");
+    find.focus();
+    find.dispatchEvent(new KeyboardEvent("keydown", { key: "r", ctrlKey: true, bubbles: true }));
+    await Promise.resolve();
+    expect(panel.querySelector<HTMLElement>(".cm-workspace-replace-row")?.hidden).toBe(false);
+    expect(document.activeElement).toBe(find);
+    expect(view.state.doc.toString()).toBe("alpha");
+    cleanup();
   });
 });

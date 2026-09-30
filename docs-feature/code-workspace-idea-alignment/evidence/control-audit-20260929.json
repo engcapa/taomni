@@ -1,0 +1,51 @@
+{
+  "referenceId": "REF-IDEA-ALIGN-20260929",
+  "capturedAt": "2026-09-29",
+  "idea": {
+    "product": "IntelliJ IDEA Ultimate",
+    "version": "2026.2.2",
+    "build": "IU-262.10315.125",
+    "keymap": "XWin",
+    "platform": "Linux X11",
+    "window": {"width": 1400, "height": 1000},
+    "profile": "dark UI, light editor scheme, Source Code Pro 16px, JDK zulu-21"
+  },
+  "taomni": {
+    "head": "06ef13d0",
+    "runtime": "browser preview (pnpm dev, 127.0.0.1:5000, Chrome DevTools)",
+    "viewport": {"width": 1400, "height": 900},
+    "profile": "light theme, JetBrains Mono 13px, Inter 12px",
+    "languageService": "unavailable (browser preview)",
+    "vfsRoot": "/preview/taomni-idea-align-20260929"
+  },
+  "fixture": {
+    "root": "/tmp/taomni-idea-align-20260929",
+    "git": "1 commit + working-tree change in OrderService.java",
+    "sha256": {
+      "align.iml": "7ae91f003d171b667098c53659f49ba9f7ae17611a48998e8838a461a525e6cc",
+      "README.txt": "ed2913ac069c14edd684a80722487ab0b3315cca1e01f5a1b170b0e4b72777f1",
+      "src/com/acme/app/Main.java": "2a9653c5c924e618da501381d554dfe815a766053888f0d276a6a03c7feadbc6",
+      "src/com/acme/app/OrderService.java": "82dbba4aa601934be2fdf9443c9932cdbda576bf2e15a55e980ea5f570922446",
+      "src/com/acme/util/PriceCalculator.java": "1d928522e087228283e29c2324b5f386c55609241fdd1fbd126a7a6e8e6c0e2e"
+    },
+    "restoredAfterAudit": true
+  },
+  "artifacts": "qa-ui-auto-report/idea-reference/align-detail-20260929/",
+  "confirmedDefects": [
+    {"card": "ED-PARITY-012", "summary": "Esc from Go to File / Recent Files / File Structure / Search Everywhere / Keymap dialog leaves focus on BODY", "source": "src/components/editor/CodeWorkspaceTab.tsx:21592,21607,21651"},
+    {"card": "ED-PARITY-013", "summary": "Ctrl+Shift+A is unregistered; following keystrokes replaced the editor selection", "source": "src/components/editor/workspace/workspaceActionRegistry.ts"},
+    {"card": "ED-PARITY-013", "summary": "F12 bound to Go to Definition, IDEA XWin default is Jump to Last Tool Window", "source": "src/components/editor/workspace/workspaceActionRegistry.ts:941"},
+    {"card": "ED-PARITY-014", "summary": "Search Everywhere All tab lists actions unrelated to the query and shows provider/generation diagnostics in the footer", "source": "src/components/editor/workspace/SearchEverywhere.tsx:380-395"},
+    {"card": "ED-PARITY-015", "summary": "Problems shows 'No problems in open files' while the language server is unavailable", "source": "src/components/editor/workspace/panels/ProblemsPanel.tsx:176"},
+    {"card": "ED-PARITY-020", "summary": "Without a provider, member completion falls back to buffer words (0, 1, acme, ...)", "source": "src/components/editor/workspace/CodeMirrorHost.tsx:2483"}
+  ],
+  "unverified": [
+    "Taomni native runtime at HEAD",
+    "JDT LS ready state in Taomni (completion, quick doc, parameter info, intentions, rename, extract, Ctrl+B)",
+    "Taomni VCS gutter, run gutter, Commit/Git tool windows",
+    "Project tree context menu on both sides",
+    "IDEA cross-file refactor preview",
+    "Windows/macOS keymaps and rendering"
+  ],
+  "status": "reference-only"
+}

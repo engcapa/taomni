@@ -48,7 +48,7 @@ steps:
 - open: ${cfg.app.base_url}?servers=main
 - wait_for:
     selector: '[data-testid="servers-dialog"]'
-    timeout_sec: 15
+    timeout_sec: 30
 - assert_visible: '[data-testid="server-list"]'
 - assert_visible: '[data-testid="server-settings"]'
 - assert_visible: '[data-testid="server-row-ssh"]'
@@ -83,7 +83,7 @@ verification:
     - 18
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
     - step: 3
       expectation: '{"assert_visible": "[data-testid=\"server-list\"]"}'
     - step: 4

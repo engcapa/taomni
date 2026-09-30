@@ -1,0 +1,462 @@
+id: TC-IDE-PARITY-017-01
+title: 'In-place Rename: boxed name, suggestions, Esc zero-change, options, dialog hand-off and preview images'
+description: 'ED-PARITY-017 A1/A2/A3 browser case on the controlled parity007 Java provider: Shift+F6 opens the in-place naming session (boxed name, suggestions, IDEA hint) with zero document change; provider rejection and invalid names keep the session; Esc twice leaves the buffer untouched; Alt+Shift+O shows options; Shift+F6 hands the typed name to the Rename dialog; a multi-file rename previews true before/after lines and undoes in one step.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- refactor
+- parity007
+- ed-parity-017
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity007_extract
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: Shift+F6
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    timeout_sec: 30
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') + '|' + document.activeElement?.value + '|' + String(document.activeElement?.selectionEnd)
+    contains: code-workspace-inline-rename-input|sum|3
+- assert_text:
+    selector: .cm-inline-rename-target
+    contains: sum
+- assert_attribute:
+    selector: '[data-testid="code-workspace-inline-rename"]'
+    name: data-list-open
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="code-workspace-inline-rename-suggestion"]'
+    contains: sum
+- assert_text:
+    selector: '[data-testid="code-workspace-inline-rename-hint"]'
+    contains: Press Shift+F6 again to open the dialog
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: &id001
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int sum = 0;'
+    - '        for (int v : values) {'
+    - '            sum += v;'
+    - '        }'
+    - '        return sum * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- parity007_trace:
+    prepares: 1
+    renames: 0
+    pending: 0
+- screenshot: tc-ide-parity-017-01-inline.png
+- fill:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    value: total
+- press: Enter
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename-error"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="code-workspace-inline-rename-error"]'
+    contains: already exists
+- eval_readonly:
+    expression: document.activeElement?.value
+    contains: total
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- fill:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    value: 9x
+- press: Enter
+- assert_text:
+    selector: '[data-testid="code-workspace-inline-rename-error"]'
+    contains: not a valid identifier
+- parity007_trace:
+    prepares: 2
+    renames: 1
+    pending: 0
+- press: Escape
+- assert_attribute:
+    selector: '[data-testid="code-workspace-inline-rename"]'
+    name: data-list-open
+    equals: 'false'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename"]'
+    state: detached
+    timeout_sec: 5
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- assert_count:
+    selector: .cm-inline-rename-target
+    equal: 0
+- assert_count:
+    selector: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+    equal: 0
+- eval_readonly:
+    expression: document.activeElement?.classList.contains('cm-content') === true
+    expect_truthy: true
+- press: Shift+F6
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    timeout_sec: 30
+- press: Alt+Shift+O
+- wait_for: '[data-testid="code-workspace-inline-rename-options"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-inline-rename-option-comments"]'
+    name: disabled
+    equals: ''
+- assert_text:
+    selector: '[data-testid="code-workspace-inline-rename-option-comments-reason"]'
+    contains: Not supported by the language server rename
+- assert_attribute:
+    selector: '[data-testid="code-workspace-inline-rename-option-modal"]'
+    name: data-checked
+    equals: 'false'
+- click: '[data-testid="code-workspace-inline-rename-option-modal"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-inline-rename-option-modal"]'
+    name: data-checked
+    equals: 'true'
+- click: '[data-testid="code-workspace-inline-rename-option-modal"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-inline-rename-option-modal"]'
+    name: data-checked
+    equals: 'false'
+- fill:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    value: count
+- press: Shift+F6
+- wait_for:
+    selector: '[data-testid="text-input-dialog-input"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="code-workspace-inline-rename"]'
+    equal: 0
+- eval_readonly:
+    expression: document.activeElement?.value
+    contains: count
+- press: Enter
+- wait_for:
+    selector: '[data-testid="text-input-dialog"]'
+    state: hidden
+    timeout_sec: 30
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int count = 0;'
+    - '        for (int v : values) {'
+    - '            count += v;'
+    - '        }'
+    - '        return count * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+- parity007_set_mode: multi-file
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+Home
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowDown
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: Shift+F6
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    value: acc
+- press: Enter
+- wait_for:
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    contains: ExtractHelper.java
+- assert_text:
+    selector: '[data-testid="refactoring-preview-row"][data-path$="ExtractTarget.java"] [data-testid="refactoring-preview-before"]'
+    contains: '-         int sum = 0;'
+- assert_text:
+    selector: '[data-testid="refactoring-preview-row"][data-path$="ExtractTarget.java"] [data-testid="refactoring-preview-after"]'
+    contains: +         int acc = 0;
+- assert_text:
+    selector: '[data-testid="refactoring-preview-row"][data-path$="ExtractHelper.java"] [data-testid="refactoring-preview-after"]'
+    contains: + // renamed sum to acc
+- assert_count:
+    selector: '[data-testid="refactoring-preview-source-unavailable"]'
+    equal: 0
+- screenshot: tc-ide-parity-017-01-preview.png
+- click: '[data-testid="refactoring-preview-apply"]'
+- wait_for:
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    state: hidden
+    timeout_sec: 30
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - package demo;
+    - ''
+    - public class ExtractTarget {
+    - '    int total(int[] values) {'
+    - '        int acc = 0;'
+    - '        for (int v : values) {'
+    - '            acc += v;'
+    - '        }'
+    - '        return acc * 2;'
+    - '    }'
+    - ''
+    - '    String range(int[] values) {'
+    - '        int min = Integer.MAX_VALUE;'
+    - '        int max = Integer.MIN_VALUE;'
+    - '        for (int v : values) {'
+    - '            min = Math.min(min, v);'
+    - '            max = Math.max(max, v);'
+    - '        }'
+    - '        return min + ".." + max;'
+    - '    }'
+    - '}'
+    - ''
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+z
+- wait: 0.5
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals: *id001
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1/DEC-017-02：Shift+F6 打开行内命名——名称加框、输入框聚焦并全选、候选列表与 IDEA 提示；打开期间文档零修改，只发出一次 prepareRename。
+    actions:
+    - 28
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 29
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'') + ''|'' + document.activeElement?.value + ''|'' + String(document.activeElement?.selectionEnd)", "contains": "code-workspace-inline-rename-input|sum|3"}}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": ".cm-inline-rename-target", "contains": "sum"}}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "name": "data-list-open", "equals": "true"}}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-inline-rename-suggestion\"]", "contains": "sum"}}'
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-inline-rename-hint\"]", "contains": "Press Shift+F6 again to open the dialog"}}'
+    - step: 34
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
+    - step: 35
+      expectation: '{"parity007_trace": {"prepares": 1, "renames": 0, "pending": 0}}'
+    results:
+    - 29
+    - 30
+    - 33
+    - 34
+  - id: R2
+    requirement: A3/DEC-017-03：provider 拒绝（名称冲突）在框内显示真实错误并保留输入；非法标识符本地拦截不再请求 provider；首次 Esc 只关列表，第二次 Esc 结束会话，文档与 dirty 不变，焦点回编辑器。
+    actions:
+    - 37
+    - 38
+    - 43
+    - 44
+    - 47
+    - 49
+    checkpoints:
+    - step: 39
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename-error\"]", "timeout_sec": 30}}'
+    - step: 40
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-inline-rename-error\"]", "contains": "already exists"}}'
+    - step: 41
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.value", "contains": "total"}}'
+    - step: 42
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-inline-rename-error\"]", "contains": "not a valid identifier"}}'
+    - step: 46
+      expectation: '{"parity007_trace": {"prepares": 2, "renames": 1, "pending": 0}}'
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "name": "data-list-open", "equals": "false"}}'
+    - step: 50
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 51
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
+    - step: 52
+      expectation: '{"assert_count": {"selector": ".cm-inline-rename-target", "equal": 0}}'
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-editor-tab-key][data-active=\"true\"][data-dirty=\"true\"]", "equal": 0}}'
+    - step: 54
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    results:
+    - 40
+    - 42
+    - 46
+    - 48
+    - 51
+    - 53
+    - 54
+  - id: R3
+    requirement: DEC-017-04：Alt+Shift+O 选项弹层——comments/strings 不可用并给出原因、模态选项未勾选；模态选项可切换并写回偏好；再次 Shift+F6 以当前输入打开 Rename 对话框，确认后应用，一次 Undo 恢复。
+    actions:
+    - 57
+    - 62
+    - 64
+    - 66
+    - 67
+    - 71
+    - 75
+    checkpoints:
+    - step: 58
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-inline-rename-options\"]"}'
+    - step: 59
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename-option-comments\"]", "name": "disabled", "equals": ""}}'
+    - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-inline-rename-option-comments-reason\"]", "contains": "Not supported by the language server rename"}}'
+    - step: 61
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename-option-modal\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 63
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename-option-modal\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 65
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename-option-modal\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 68
+      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog-input\"]", "timeout_sec": 10}}'
+    - step: 69
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-inline-rename\"]", "equal": 0}}'
+    - step: 70
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.value", "contains": "count"}}'
+    - step: 72
+      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "state": "hidden", "timeout_sec": 30}}'
+    - step: 73
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int count = 0;", "        for (int v : values) {", "            count += v;", "        }", "        return count * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
+    - step: 76
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
+    results:
+    - 59
+    - 60
+    - 70
+    - 73
+    - 76
+  - id: R4
+    requirement: A2/DEC-017-05：跨文件 rename 的 Preview 列出两个文件并显示真实改前/改后行；Do Refactor 应用后一次 Undo 恢复原文。
+    actions:
+    - 77
+    - 100
+    - 108
+    - 112
+    checkpoints:
+    - step: 101
+      expectation: '{"wait_for": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "timeout_sec": 30}}'
+    - step: 102
+      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "contains": "ExtractHelper.java"}}'
+    - step: 103
+      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"ExtractTarget.java\"] [data-testid=\"refactoring-preview-before\"]", "contains": "-         int sum = 0;"}}'
+    - step: 104
+      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"ExtractTarget.java\"] [data-testid=\"refactoring-preview-after\"]", "contains": "+         int acc = 0;"}}'
+    - step: 105
+      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"ExtractHelper.java\"] [data-testid=\"refactoring-preview-after\"]", "contains": "+ // renamed sum to acc"}}'
+    - step: 106
+      expectation: '{"assert_count": {"selector": "[data-testid=\"refactoring-preview-source-unavailable\"]", "equal": 0}}'
+    - step: 109
+      expectation: '{"wait_for": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "state": "hidden", "timeout_sec": 30}}'
+    - step: 110
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int acc = 0;", "        for (int v : values) {", "            acc += v;", "        }", "        return acc * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
+    - step: 114
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
+    results:
+    - 103
+    - 104
+    - 105
+    - 110
+    - 114
+  visual:
+  - check: 对照 IDEA 行内 Rename 加框、候选与提示。
+    method: manual
+    reason: IDEA 实时同步其他出现处、comments/strings 选项不对齐（different/unavailable）。
+  native:
+  - check: browser 使用受控 provider；真实 JDT LS 由 TC-IDE-PARITY-017-03 证明。
+    method: not-applicable
+    reason: browser 证据不外推 native。

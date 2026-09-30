@@ -1,0 +1,36 @@
+{
+  "referenceId": "REF-IDEA-ALIGN-20260928",
+  "capturedAt": "2026-09-28",
+  "product": "IntelliJ IDEA Ultimate",
+  "version": "2026.2.2",
+  "build": "IU-262.10315.125",
+  "platform": "Linux X11",
+  "client": {"width": 1400, "height": 1000, "dpi": 96, "theme": "dark"},
+  "fixture": {
+    "root": "/tmp/taomni-design-audit-20260928",
+    "file": "src/StructuralTarget.java",
+    "sha256": "8fea975fe2c16a584a0538981201f8c567b9c511b9a7ef4950b65500c0b6ec23"
+  },
+  "artifacts": "qa-ui-auto-report/idea-reference/current-design-audit-20260928/",
+  "observed": [
+    "welcome-project-list",
+    "project-shell",
+    "go-to-file",
+    "editor-surface",
+    "editor-find",
+    "find-escape",
+    "structural-search-reference",
+    "undo-byte-restoration"
+  ],
+  "unverified": [
+    "Windows WebView2",
+    "macOS WKWebView",
+    "JDT LS ready state",
+    "screen-reader announcements",
+    "full keymap conflict workflow",
+    "Structural Search Replace and all modifiers",
+    "Git staged/commit/conflict flows",
+    "Run/Debug session recovery"
+  ],
+  "status": "reference-only"
+}

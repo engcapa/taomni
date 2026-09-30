@@ -41,6 +41,8 @@ export interface TerminalRegistryEntry {
   getLastLines: (n: number) => string;
   /** Write text to the terminal's stdin (newlines flow as-is). */
   writeInput: (data: string) => void;
+  /** True only when the connected shell is at an idle prompt and accepts input. */
+  isReady?: () => boolean;
   /**
    * Run a command as an integrated task using the registered local shell's
    * syntax. The implementation reports completion through OSC 633 while

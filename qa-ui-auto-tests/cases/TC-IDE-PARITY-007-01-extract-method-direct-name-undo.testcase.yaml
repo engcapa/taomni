@@ -20,6 +20,9 @@ steps:
 - wait_for:
     selector: '[data-testid="welcome-panel"]'
     timeout_sec: 60
+- seed_storage:
+    key: taomni.codeWorkspace.refactorOptions.v1
+    value: '{"mode":"dialog"}'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -28,7 +31,7 @@ steps:
     selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
     timeout_sec: 60
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -37,7 +40,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - parity007_trace:
     requests: 1
     resolves: 1
@@ -132,7 +135,7 @@ steps:
     pending: 0
 - screenshot: tc-ide-parity-007-01-renamed.png
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_not_visible: '[data-testid="code-workspace-undo-confirm"]'
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -165,7 +168,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -192,7 +195,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Shift+z
+- press: Mod+Shift+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -224,7 +227,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Shift+z
+- press: Mod+Shift+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -256,9 +259,9 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -285,7 +288,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -294,7 +297,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for: '[data-testid="text-input-dialog-input"]'
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -367,7 +370,7 @@ steps:
     renames: 1
     pending: 0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -394,7 +397,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -403,7 +406,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for: '[data-testid="text-input-dialog-input"]'
 - click: '[data-testid="text-input-dialog-cancel"]'
 - wait_for:
@@ -446,7 +449,7 @@ steps:
     renames: 1
     pending: 0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+z
+- press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
     equals:
@@ -473,7 +476,7 @@ steps:
     - '}'
     - ''
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: ArrowDown
@@ -482,7 +485,7 @@ steps:
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
 - press: Shift+ArrowDown
-- press: Control+Alt+M
+- press: Mod+Alt+M
 - wait_for: '[data-testid="text-input-dialog-input"]'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'
@@ -576,82 +579,82 @@ verification:
     requirement: Ctrl+Alt+M on the E1 selection runs the single method candidate directly (no candidate menu), prompts in the Extract Method dialog with the provider default name fully selected, and produces
       B1 on the buffer and on disk.
     actions:
-    - 18
+    - 19
     checkpoints:
-    - step: 32
+    - step: 33
       expectation: Exactly one code-action request and one resolve; no second candidate and no rename were involved.
-    - step: 31
+    - step: 32
       expectation: No frozen candidate menu is present.
     - step: 2
       expectation: The naming dialog opened directly (Extract Method TextInputDialog).
-    - step: 25
-      expectation: The provider default name is present and fully selected in the input.
     - step: 26
+      expectation: The provider default name is present and fully selected in the input.
+    - step: 27
       expectation: The buffer is the extracted B1 with the call site and the new method.
     results:
-    - 32
+    - 33
     - 2
-    - 25
     - 26
+    - 27
   - id: ED-PARITY-007-V3-01-naming
     requirement: Enter renames both the call site and the declaration, and two editor undos then redos walk B2 -> B1 -> B0 -> B1 -> B2 without an undo confirmation.
     actions:
-    - 29
+    - 30
     checkpoints:
-    - step: 31
-      expectation: The committed buffer is B2 with sumOf in the declaration and the call site.
     - step: 32
+      expectation: The committed buffer is B2 with sumOf in the declaration and the call site.
+    - step: 33
       expectation: The naming step issued exactly one provider prepare and rename.
-    - step: 37
+    - step: 38
       expectation: The first editor undo returns B1 with no undo confirmation.
-    - step: 40
+    - step: 41
       expectation: The second undo returns the initial B0.
-    - step: 46
+    - step: 47
       expectation: Redo restores B1 and then B2.
-    - step: 36
+    - step: 37
       expectation: No undo confirmation dialog appears for the editor undo.
     results:
-    - 31
+    - 32
+    - 38
+    - 41
+    - 47
     - 37
-    - 40
-    - 46
-    - 36
   - id: ED-PARITY-007-V3-01-cancel
     requirement: Escape and the mouse Cancel keep the provider default name, leaving exactly one extraction history entry that one undo reverts.
     actions:
-    - 72
+    - 73
     checkpoints:
-    - step: 64
+    - step: 65
       expectation: Escape leaves B1 with the default name and no extra rename.
-    - step: 71
+    - step: 72
       expectation: One undo after the Escape path returns B0.
-    - step: 86
+    - step: 87
       expectation: Cancel keeps the default name and adds no rename.
-    - step: 90
+    - step: 91
       expectation: One undo after the Cancel path returns B0.
     results:
-    - 64
-    - 71
-    - 86
-    - 90
+    - 65
+    - 72
+    - 87
+    - 91
   - id: ED-PARITY-007-V3-01-validation
     requirement: A provider-rejected name keeps the committed B1 and the user input, and a corrected retry renames without repeating the extraction.
     actions:
-    - 102
+    - 103
     checkpoints:
-    - step: 106
-      expectation: The dialog reopens with the rejected 1bad input preserved.
     - step: 107
+      expectation: The dialog reopens with the rejected 1bad input preserved.
+    - step: 108
       expectation: The committed buffer is still B1; the extraction was not repeated.
-    - step: 112
-      expectation: The corrected name commits B2.
     - step: 113
+      expectation: The corrected name commits B2.
+    - step: 114
       expectation: Only rename requests grew; the code-action request count did not.
     results:
-    - 106
     - 107
-    - 112
+    - 108
     - 113
+    - 114
   visual:
   - check: Dialog geometry, disabled-confirm styling and the extracted call site against the IDEA reference.
     method: manual

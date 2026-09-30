@@ -424,7 +424,25 @@ controls:
   - id: workspace-cursor
     selector: '[data-testid="status-bar-workspace-cursor"]'
     kind: display
-    optional: true       # active Code Workspace file only (debounced caret)
+    optional: true       # active Code Workspace file only (debounced caret); IDEA `line:col (N chars)`
+  - id: workspace-navbar             # ED-PARITY-010 IDEA navigation bar
+    selector: '[data-testid="status-bar-workspace-navbar"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="status-bar-workspace-navbar-segment"]'
+  - id: workspace-navbar-host        # ED-PARITY-011 slot the active editor portals its breadcrumbs into
+    selector: '[data-testid="status-bar-workspace-navbar-host"]'
+    kind: display
+    optional: true
+  - id: workspace-readonly
+    selector: '[data-testid="status-bar-workspace-readonly"]'
+    kind: display
+    optional: true
+  - id: workspace-status-widgets     # SDK / project-facts widgets portalled by the workspace
+    selector: '[data-testid="status-bar-workspace-widgets"]'
+    kind: display
+    optional: true
   - id: workspace-large-file
     selector: '[data-testid="status-bar-workspace-large-file"]'
     kind: display
@@ -3770,6 +3788,26 @@ controls:
     selector: '[data-testid="confirm-dialog-confirm"]'
     kind: interactive
     optional: true
+  - id: choice-dialog              # same ConfirmDialog module, three-way choice variant
+    selector: '[data-testid="choice-dialog"]'
+    kind: display
+    optional: true
+  - id: choice-dialog-message
+    selector: '[data-testid="choice-dialog-message"]'
+    kind: display
+    optional: true
+  - id: choice-dialog-primary
+    selector: '[data-testid="choice-dialog-primary"]'
+    kind: interactive
+    optional: true
+  - id: choice-dialog-secondary
+    selector: '[data-testid="choice-dialog-secondary"]'
+    kind: interactive
+    optional: true
+  - id: choice-dialog-cancel
+    selector: '[data-testid="choice-dialog-cancel"]'
+    kind: interactive
+    optional: true
   - id: alert-dialog
     selector: '[data-testid="alert-dialog"]'
     kind: display
@@ -4332,6 +4370,38 @@ controls:
     selector: '[data-testid="query-result-grid"]'
     kind: display
     optional: true
+  - id: query-result-row-1
+    selector: '[data-testid="query-result-grid"] button[title="Row 1"]'
+    kind: interactive
+    optional: true       # row-number button selects the first clean row
+  - id: query-result-delete-row
+    selector: '[data-testid="query-result-grid"] button[aria-label="Delete row"]'
+    kind: interactive
+    optional: true
+  - id: query-result-submit-edits
+    selector: '[data-testid="query-result-grid"] button[aria-label="Submit grid edits"]'
+    kind: interactive
+    optional: true       # DB-EDIT-001: confirmation lists the SQL and a no-primary-key warning
+  - id: query-result-row
+    selector: '[data-testid="query-result-row"]'
+    kind: display
+    optional: true       # one per rendered table-view row, in display order
+  - id: query-result-sort-header
+    selector: '[data-testid="query-result-sort-header"]'
+    kind: interactive
+    optional: true       # DB-GRID-001: column header sort (asc → desc → none); data-column, data-sort
+  - id: query-result-row-count
+    selector: '[data-testid="query-result-row-count"]'
+    kind: display
+    optional: true       # DB-GRID-001: rows/columns, or shown [total]/columns with data-filtered="true"
+  - id: query-result-filter-toggle
+    selector: '[data-testid="query-result-grid"] button[aria-label="Filter rows"]'
+    kind: interactive
+    optional: true
+  - id: query-result-filter-input
+    selector: '[data-testid="query-result-grid"] input[placeholder="Filter rows"]'
+    kind: interactive
+    optional: true       # client-side cross-column substring filter
   - id: query-result-generated-sql
     selector: '[data-testid="query-result-generated-sql"]'
     kind: display
@@ -4484,6 +4554,55 @@ controls:
     selector: '[data-testid="db-connection-error-banner"]'
     kind: display
     optional: true       # connection failed; editor and Query Library remain mounted
+  # DB parity batch 1 (docs-feature/db-client-parity/batch1-plan.md).
+  - id: run-all
+    selector: '[data-testid="db-run-all"]'
+    kind: interactive
+    optional: true       # toolbar Run (all statements / selection) inside a SQL tab
+  - id: explain-current
+    selector: '[data-testid="db-explain-current"]'
+    kind: interactive
+    optional: true       # DB-EXEC-004: EXPLAIN the statement at the cursor
+  - id: result-log-tab
+    selector: '[data-testid="result-log-tab"]'
+    kind: interactive
+    optional: true       # DB-EXEC-001: appears after the first run in a query panel
+  - id: execution-log
+    selector: '[data-testid="db-execution-log"]'
+    kind: display
+    optional: true       # DB-EXEC-001: per-statement status table with run summary
+  - id: execution-log-run
+    selector: '[data-testid="db-execution-log-run"]'
+    kind: display
+    optional: true       # one group per Run click, newest first
+  - id: execution-log-entry
+    selector: '[data-testid="db-execution-log-entry"]'
+    kind: display
+    optional: true       # one row per statement; data-status = success/failed/cancelled/skipped/not-run
+  - id: execution-log-summary
+    selector: '[data-testid="db-execution-log-summary"]'
+    kind: display
+    optional: true
+  - id: result-sheet-tab
+    selector: '[data-testid="result-sheet-tab"]'
+    kind: interactive
+    optional: true       # one tab per executed statement with a result sheet
+  - id: tx-mode
+    selector: '[data-testid="db-tx-mode"]'
+    kind: interactive
+    optional: true       # DB-TX-001: Auto / Manual commit toggle (MySQL / PostgreSQL only); data-mode = auto|manual
+  - id: tx-commit
+    selector: '[data-testid="db-tx-commit"]'
+    kind: interactive
+    optional: true       # Manual mode only
+  - id: tx-rollback
+    selector: '[data-testid="db-tx-rollback"]'
+    kind: interactive
+    optional: true       # Manual mode only
+  - id: tx-pending
+    selector: '[data-testid="db-tx-pending"]'
+    kind: display
+    optional: true       # "Pending: N" statements since the last commit / rollback
   # Shared tab actions — chat / detach.
   - id: chat-toggle
     selector: '[data-testid="db-chat-toggle"]'
@@ -6463,6 +6582,10 @@ controls:
   - id: debug-tab
     selector: '[data-testid="code-workspace-bottom-tab-debug"]'
     kind: interactive
+  - id: bottom-tab-git               # ED-PARITY-018 Git tool window tab
+    selector: '[data-testid="code-workspace-bottom-tab-git"]'
+    kind: interactive
+    optional: true
   - id: bottom-tab-overflow
     selector: '[data-testid="code-workspace-bottom-tab-overflow"]'
     kind: interactive
@@ -7167,6 +7290,19 @@ files:
   - src/components/editor/workspace/useWorkspaceTreeData.ts
   - src/components/editor/workspace/TabSwitcher.tsx
   - src/components/editor/workspace/KeymapSettingsDialog.tsx
+  - src/components/editor/workspace/ShortcutKeyCaps.tsx
+  - src/components/editor/workspace/panels/ToolWindowRail.tsx
+  - src/components/editor/workspace/workspaceNavigationBar.ts
+  - src/components/editor/workspace/fileTypeIcon.tsx
+  - src/components/editor/workspace/importFold.ts
+  - src/components/editor/workspace/GoToLineDialog.tsx
+  - src/components/editor/workspace/languageServiceReadiness.ts
+  - src/components/editor/workspace/CodeInsightNotice.tsx
+  - src/components/editor/workspace/javaSyntaxOutline.ts
+  - src/components/editor/workspace/structuralSearchTemplates.ts
+  - src/components/editor/workspace/KeymapMigrationNotice.tsx
+  - src/components/editor/workspace/useFocusReturn.ts
+  - src/components/editor/workspace/workspaceKeymapPlatform.ts
   - src/components/editor/workspace/ClipboardHistoryPopup.tsx
   - src/components/editor/workspace/panels/TodosBookmarksPanel.tsx
   - src/components/editor/workspace/todoBookmarks.ts
@@ -7255,6 +7391,134 @@ controls:
     selector: '[data-testid="refactoring-preview-cancel"]'
     kind: interactive
     optional: true       # cancel leaves every affected file unchanged (ED-PARITY-007-05)
+  - id: refactoring-preview-row
+    selector: '[data-testid="refactoring-preview-row"]'
+    kind: display
+    optional: true       # one usage row with its path (ED-PARITY-017-01/03)
+  - id: refactoring-preview-before
+    selector: '[data-testid="refactoring-preview-before"]'
+    kind: display
+    optional: true       # real preimage line(s) of a usage (ED-PARITY-017 DEC-017-05)
+  - id: refactoring-preview-after
+    selector: '[data-testid="refactoring-preview-after"]'
+    kind: display
+    optional: true       # real postimage line(s) of a usage (ED-PARITY-017 DEC-017-05)
+  - id: refactoring-preview-source-unavailable
+    selector: '[data-testid="refactoring-preview-source-unavailable"]'
+    kind: display
+    optional: true       # typed notice when a usage's source text cannot be read
+  - id: error-stripe
+    selector: '[data-testid="code-workspace-error-stripe"]'
+    kind: display
+    optional: true       # ED-PARITY-022 right-edge error stripe
+  - id: error-stripe-mark
+    selector: '[data-testid="code-workspace-error-stripe-mark"]'
+    kind: interactive
+    optional: true       # stripe mark (data-kind/data-line); click moves the caret
+  - id: run-gutter
+    selector: '[data-testid="code-workspace-run-gutter"]'
+    kind: interactive
+    optional: true       # run ▶ backed by real run facts (data-line)
+  - id: run-gutter-run
+    selector: '[data-testid="code-workspace-run-gutter-run"]'
+    kind: display
+    optional: true       # Run item of the run gutter menu
+  - id: run-gutter-debug
+    selector: '[data-testid="code-workspace-run-gutter-debug"]'
+    kind: display
+    optional: true       # Debug item of the run gutter menu
+  - id: git-change-marker-modified
+    selector: '.cm-git-change-marker.cm-git-change-modified'
+    kind: interactive
+    optional: true       # VCS gutter modified bar; click opens the change popup
+  - id: lsp-usage-mark
+    selector: '.cm-lsp-usage'
+    kind: display
+    optional: true       # provider caret usage highlight
+  - id: git-diff-peek
+    selector: '[data-testid="code-workspace-git-diff-peek"]'
+    kind: display
+    optional: true       # VCS change popup (data-change-kind/data-change-index)
+  - id: git-diff-peek-previous
+    selector: '[data-testid="git-diff-peek-previous"]'
+    kind: interactive
+    optional: true       # previous change
+  - id: git-diff-peek-next
+    selector: '[data-testid="git-diff-peek-next"]'
+    kind: interactive
+    optional: true       # next change
+  - id: git-diff-peek-rollback
+    selector: '[data-testid="git-diff-peek-rollback-btn"]'
+    kind: interactive
+    optional: true       # Rollback lines as one undoable edit
+  - id: git-diff-peek-show-diff
+    selector: '[data-testid="git-diff-peek-show-diff"]'
+    kind: interactive
+    optional: true       # HEAD ↔ buffer compare
+  - id: git-diff-peek-copy
+    selector: '[data-testid="git-diff-peek-copy"]'
+    kind: display
+    optional: true       # copy HEAD lines
+  - id: git-diff-peek-position
+    selector: '[data-testid="git-diff-peek-position"]'
+    kind: display
+    optional: true       # N of M changes
+  - id: git-diff-peek-old-line
+    selector: '[data-testid="git-diff-peek-old-line"]'
+    kind: display
+    optional: true       # HEAD line
+  - id: git-diff-peek-new-line
+    selector: '[data-testid="git-diff-peek-new-line"]'
+    kind: display
+    optional: true       # buffer line
+  - id: inline-rename-session
+    selector: '[data-testid="code-workspace-inline-rename"]'
+    kind: display
+    optional: true       # ED-PARITY-017 in-place naming session (data-kind, data-list-open)
+  - id: inline-rename-target-mark
+    selector: '.cm-inline-rename-target'
+    kind: display
+    optional: true       # CodeMirror box around the symbol being named
+  - id: inline-rename-input
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    kind: interactive
+    optional: true       # name input over the boxed symbol; Enter/Esc/Shift+F6/Alt+Shift+O
+  - id: inline-rename-suggestions
+    selector: '[data-testid="code-workspace-inline-rename-suggestions"]'
+    kind: display
+    optional: true       # name suggestion listbox
+  - id: inline-rename-suggestion
+    selector: '[data-testid="code-workspace-inline-rename-suggestion"]'
+    kind: display
+    optional: true       # one suggestion (arrow keys pick it into the input)
+  - id: inline-rename-hint
+    selector: '[data-testid="code-workspace-inline-rename-hint"]'
+    kind: display
+    optional: true       # IDEA hint line (Shift+F6 dialog / Alt+Shift+O options)
+  - id: inline-rename-error
+    selector: '[data-testid="code-workspace-inline-rename-error"]'
+    kind: display
+    optional: true       # provider or local name error; the session stays open
+  - id: inline-rename-options
+    selector: '[data-testid="code-workspace-inline-rename-options"]'
+    kind: display
+    optional: true       # Alt+Shift+O options popup
+  - id: inline-rename-option-comments
+    selector: '[data-testid="code-workspace-inline-rename-option-comments"]'
+    kind: display
+    optional: true       # disabled: LSP rename has no comments/strings option
+  - id: inline-rename-option-comments-reason
+    selector: '[data-testid="code-workspace-inline-rename-option-comments-reason"]'
+    kind: display
+    optional: true       # typed unavailable reason
+  - id: inline-rename-option-modal
+    selector: '[data-testid="code-workspace-inline-rename-option-modal"]'
+    kind: interactive
+    optional: true       # "Specify refactoring options in modal dialogs" preference (data-checked)
+  - id: inline-rename-open-dialog
+    selector: '[data-testid="code-workspace-inline-rename-open-dialog"]'
+    kind: interactive
+    optional: true       # hands the typed name to the Rename / Extract Method dialog
   - id: intention-candidate-item        # frozen provider candidate rows
     selector: '[data-testid^="code-workspace-intention-"]'
     kind: interactive
@@ -7646,6 +7910,10 @@ controls:
     selector: '[data-testid="code-workspace-bottom-tab-terminal"]'
     kind: interactive
     optional: true
+  - id: bottom-dock-overflow-terminal-tab
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-terminal"]'
+    kind: interactive
+    optional: true
   - id: bottom-dock-search-tab
     selector: '[data-testid="code-workspace-bottom-tab-search"]'
     kind: interactive
@@ -7812,6 +8080,274 @@ controls:
   - id: keymap-settings-apply         # the only commit edge; disabled when clean
     selector: '[data-testid="keymap-settings-apply"]'
     kind: interactive
+    optional: true
+  # ED-PARITY-010 IDEA shell: tool window rails, tool window header, toolbar ⋮, empty editor.
+  - id: toolbar-more                  # ⋮ More actions (zoom/wrap/split/back/forward/…)
+    selector: '[data-testid="code-workspace-toolbar-more"]'
+    kind: interactive
+  - id: toolbar-more-menu
+    selector: '[data-testid="code-workspace-toolbar-more-menu"]'
+    kind: display
+    optional: true
+  - id: toolbar-search
+    selector: '[data-testid="code-workspace-toolbar-search"]'
+    kind: interactive
+    optional: true
+  - id: toolbar-settings
+    selector: '[data-testid="code-workspace-toolbar-settings"]'
+    kind: interactive
+    optional: true
+  - id: tool-rail-left
+    selector: '[data-testid="code-workspace-tool-rail-left"]'
+    kind: display
+    optional: true
+  - id: tool-rail-right
+    selector: '[data-testid="code-workspace-tool-rail-right"]'
+    kind: display
+    optional: true
+  - id: tool-rail-button              # `code-workspace-tool-rail-<id>` stripe buttons
+    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-rail-structure"]'
+      - '[data-testid="code-workspace-tool-rail-commit"]'
+      - '[data-testid="code-workspace-tool-rail-documentation"]'
+  - id: tool-window-header
+    selector: '[data-testid="code-workspace-tool-window-header"]'
+    kind: display
+    optional: true
+  - id: tool-window-title
+    selector: '[data-testid="code-workspace-tool-window-title"]'
+    kind: display
+    optional: true
+  - id: tool-window-hide
+    selector: '[data-testid="code-workspace-tool-window-hide"]'
+    kind: interactive
+    optional: true
+  - id: tool-window-options
+    selector: '[data-testid="code-workspace-tool-window-options"]'
+    kind: interactive
+    optional: true
+  - id: bottom-tool-overflow-item     # "More tool windows" entry, `…-overflow-<id>`
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-problems"]'
+    kind: interactive
+    optional: true
+  - id: terminal-dock-panel
+    selector: '[data-testid="code-workspace-terminal-dock"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+      - '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+  - id: toolbar-split-right-in-header # negative probe: split is not a main-toolbar button
+    selector: 'header [data-testid="code-workspace-split-right"]'
+    kind: display
+    optional: true
+  - id: ai-selection-toolbar         # ED-PARITY-011 DEC-011-07 user-selection-only AI toolbar
+    selector: '[data-testid="code-workspace-ai-selection-toolbar"]'
+    kind: display
+    optional: true
+  - id: goto-line-dialog             # ED-PARITY-012 DEC-012-06 Go to Line:Column dialog
+    selector: '[data-testid="code-workspace-goto-line-dialog"]'
+    kind: display
+    optional: true
+  - id: goto-line-input
+    selector: '[data-testid="code-workspace-goto-line-input"]'
+    kind: interactive
+    optional: true
+  - id: goto-line-ok
+    selector: '[data-testid="code-workspace-goto-line-ok"]'
+    kind: interactive
+    optional: true
+  - id: goto-line-cancel
+    selector: '[data-testid="code-workspace-goto-line-cancel"]'
+    kind: interactive
+    optional: true
+  - id: goto-line-error
+    selector: '[data-testid="code-workspace-goto-line-error"]'
+    kind: display
+    optional: true
+  - id: structure-popup              # File Structure (Ctrl+F12) quick-pick popup
+    selector: '[data-testid="code-workspace-structure-popup"]'
+    kind: display
+    optional: true
+  - id: recent-locations-dialog      # Recent Locations (Ctrl+Shift+E)
+    selector: '[data-testid="recent-locations-dialog"]'
+    kind: display
+    optional: true
+  - id: problems-provider-state      # ED-PARITY-015 typed language-service state in Problems
+    selector: '[data-testid="code-workspace-problems-provider-state"]'
+    kind: display
+    optional: true
+  - id: problems-stale
+    selector: '[data-testid="code-workspace-problems-stale"]'
+    kind: display
+    optional: true
+  - id: problems-configure
+    selector: '[data-testid="code-workspace-problems-configure"]'
+    kind: interactive
+    optional: true
+  - id: problems-retry
+    selector: '[data-testid="code-workspace-problems-retry"]'
+    kind: interactive
+    optional: true
+  - id: problems-diagnostic-line
+    selector: '[data-testid="problems-diagnostic-line"]'
+    kind: display
+    optional: true
+  - id: structure-title              # ED-PARITY-014 File Structure titled with the file name
+    selector: '[data-testid="code-workspace-structure-title"]'
+    kind: display
+    optional: true
+  - id: structure-syntax-only
+    selector: '[data-testid="code-workspace-structure-syntax-only"]'
+    kind: display
+    optional: true
+  - id: search-everywhere-selected-path
+    selector: '[data-testid="search-everywhere-selected-path"]'
+    kind: display
+    optional: true
+  - id: recent-files-tool-window
+    selector: '[data-testid="code-workspace-recent-files-tool-window-problems"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-recent-files-tool-window-project"]'
+  - id: recent-files-tool-windows
+    selector: '[data-testid="code-workspace-recent-files-tool-windows"]'
+    kind: display
+    optional: true
+  - id: recent-files-recent-locations
+    selector: '[data-testid="code-workspace-recent-files-recent-locations"]'
+    kind: interactive
+    optional: true
+  - id: recent-files-edited-only
+    selector: '[data-testid="code-workspace-recent-files-edited-only"]'
+    kind: interactive
+    optional: true
+  - id: recent-files-path
+    selector: '[data-testid="code-workspace-recent-files-path"]'
+    kind: display
+    optional: true
+  - id: git-tool-window              # ED-PARITY-018 workspace Git tool window (Alt+9 / Commit rail)
+    selector: '[data-testid="code-workspace-git-tool-window"]'
+    kind: display
+    optional: true
+  - id: git-tool-window-empty
+    selector: '[data-testid="code-workspace-git-tool-window-empty"]'
+    kind: display
+    optional: true
+  - id: code-insight-notice          # ED-PARITY-020 caret popup for empty/unavailable code insight
+    selector: '[data-testid="code-workspace-code-insight-notice"]'
+    kind: display
+    optional: true
+  - id: code-insight-configure
+    selector: '[data-testid="code-workspace-code-insight-configure"]'
+    kind: interactive
+    optional: true
+  - id: problems-severity-filter
+    selector: '[data-testid="problems-severity-error"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="problems-severity-warning"]'
+      - '[data-testid="problems-severity-info"]'
+  - id: empty-editor-hints
+    selector: '[data-testid="code-workspace-empty-editor"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-empty-editor-hint"]'
+  # ED-PARITY-013 Keymap tree, find-by-shortcut, row menu and recorders.
+  - id: keymap-group                  # collapsible category node, `keymap-group-<category>`
+    selector: '[data-testid="keymap-group-Navigation"]'
+    kind: interactive
+    optional: true
+  - id: keymap-find-by-shortcut
+    selector: '[data-testid="keymap-find-by-shortcut"]'
+    kind: interactive
+    optional: true
+  - id: keymap-shortcut-filter        # records the chord to filter by
+    selector: '[data-testid="keymap-shortcut-filter"]'
+    kind: interactive
+    optional: true
+  - id: keymap-row-menu               # row context menu (Add Keyboard/Mouse, Remove, Reset)
+    selector: '[data-testid="keymap-row-menu"]'
+    kind: display
+    optional: true
+  - id: keymap-row-menu-add-keyboard
+    selector: '[data-testid="keymap-row-menu-add-keyboard"]'
+    kind: interactive
+    optional: true
+  - id: keymap-row-menu-add-mouse
+    selector: '[data-testid="keymap-row-menu-add-mouse"]'
+    kind: interactive
+    optional: true
+  - id: keymap-recorder-second-stroke
+    selector: '[data-testid="keymap-recorder-second-stroke"]'
+    kind: interactive
+    optional: true
+  - id: keymap-mouse-recorder-pad     # left click with a modifier records a mouse shortcut
+    selector: '[data-testid="keymap-mouse-recorder-pad"]'
+    kind: interactive
+    optional: true
+  - id: keymap-mouse-recorder-hint
+    selector: '[data-testid="keymap-mouse-recorder-hint"]'
+    kind: display
+    optional: true
+  - id: keymap-mouse-recorder-value
+    selector: '[data-testid="keymap-mouse-recorder-value"]'
+    kind: display
+    optional: true
+  - id: keymap-mouse-recorder-ok
+    selector: '[data-testid="keymap-mouse-recorder-ok"]'
+    kind: interactive
+    optional: true
+  - id: keymap-row-action             # further `keymap-row-<action-id>` rows used by ED-PARITY-013
+    selector: '[data-testid="keymap-row-workspace.recentFiles"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="keymap-row-workspace.goToFile"]'
+      - '[data-testid="keymap-row-workspace.gotoDefinition"]'
+  - id: keymap-add-action
+    selector: '[data-testid="keymap-add-workspace.recentFiles"]'
+    kind: interactive
+    optional: true
+  - id: keymap-replace-appended-slot  # an appended chord after the inherited default (DEC-013-12)
+    selector: '[data-testid="keymap-replace-editor.replace-1"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="keymap-replace-workspace.recentFiles-1"]'
+  - id: keymap-no-shortcut-action
+    selector: '[data-testid="keymap-no-shortcut-workspace.jumpToLastToolWindow"]'
+    kind: display
+    optional: true
+  - id: recent-files-popup
+    selector: '[data-testid="code-workspace-recent-files"]'
+    kind: display
+    optional: true
+  - id: workspace-right-pane          # Structure/Outline tool window (Alt+7)
+    selector: '[data-testid="code-workspace-right-pane"]'
+    kind: display
+    optional: true
+  - id: workspace-terminal-dock       # terminal surface that owns its keys
+    selector: '[data-workspace-focus="terminal"]'
+    kind: interactive
+    optional: true
+  - id: keymap-migration-notice       # one-time IDEA default-binding balloon
+    selector: '[data-testid="keymap-migration-notice"]'
+    kind: display
+    optional: true
+  - id: search-everywhere-action-shortcut
+    selector: '[data-testid="search-everywhere-shortcut-workspace.format"]'
+    kind: display
+    optional: true
+  - id: search-everywhere-assign-shortcut-hint
+    selector: '[data-testid="search-everywhere-assign-shortcut-hint"]'
+    kind: display
     optional: true
   # §8.20.2 W1 reference-information surfaces rendered by the workspace.
   - id: parameter-info-tooltip
@@ -8408,6 +8944,18 @@ controls:
     selector: '[data-testid="editor-context-format"]'
     kind: interactive
     optional: true
+  - id: editor-context-goto          # ED-PARITY-021 Go To › submenu parent
+    selector: '[data-testid="editor-context-goto"]'
+    kind: interactive
+    optional: true
+  - id: tab-menu-close-other-tabs    # ED-PARITY-021 tab menu availability
+    selector: '[data-testid="context-menu-item-close-other-tabs"]'
+    kind: interactive
+    optional: true
+  - id: tab-menu-close-tabs-right
+    selector: '[data-testid="context-menu-item-close-tabs-to-the-right"]'
+    kind: interactive
+    optional: true
 -->
 
 - 编辑器外观配置支持字体族、字号、行高、连字、高对比度主题、活动/全部编辑器缩放范围、软换行路径 glob、虚拟光标空间与面包屑多语言过滤。
@@ -8430,6 +8978,35 @@ files:
   - src/stubs/parity009StructuralSearch.ts
   - src-tauri/src/structural_search.rs
 controls:
+  - id: structural-search-templates   # ED-PARITY-016 Recent / Existing Templates pane
+    selector: '[data-testid="structural-search-templates"]'
+    kind: display
+    optional: true
+  - id: structural-search-template-item
+    selector: '[data-testid="structural-search-template-item"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-add-filter
+    selector: '[data-testid="structural-search-add-filter"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-filter-menu
+    selector: '[data-testid="structural-search-filter-menu"]'
+    kind: display
+    optional: true
+  - id: structural-search-filter-option
+    selector: '[data-testid="structural-search-filter-option-text"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="structural-search-filter-option-count"]'
+      - '[data-testid="structural-search-filter-option-type"]'
+      - '[data-testid="structural-search-filter-option-reference"]'
+      - '[data-testid="structural-search-filter-option-script"]'
+  - id: structural-search-filter-reason
+    selector: '[data-testid="structural-search-filter-reason"]'
+    kind: display
+    optional: true
   - id: structural-search-dialog
     selector: '[data-testid="structural-search-dialog"]'
     kind: display

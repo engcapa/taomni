@@ -1,6 +1,102 @@
 export interface InputEchoSuppressor {
   readonly done: boolean;
+  /** Maximum time terminal input should wait for this injected line to settle. */
+  readonly inputHoldTimeoutMs?: number;
   filter(data: Uint8Array, now?: number): Uint8Array;
+}
+
+export interface TaskExitOscParserResult {
+  data: Uint8Array;
+  exitCodes: number[];
+}
+
+export interface TaskExitOscParser {
+  feed(data: Uint8Array): TaskExitOscParserResult;
+  reset(): void;
+}
+
+const TASK_EXIT_OSC_PREFIX = new TextEncoder().encode("\x1b]633;TaomniTaskExit=");
+const OSC_BEL = 0x07;
+const OSC_ESC = 0x1b;
+const OSC_ST_BACKSLASH = 0x5c;
+
+/**
+ * Decode task exit markers from the raw PTY stream as a fallback for xterm's
+ * OSC parser. PTY chunks can split both the marker and its BEL/ST terminator;
+ * incomplete candidates stay buffered until the next chunk. Completed markers
+ * are removed from the bytes returned to xterm because this parser also owns
+ * the notification when the xterm handler is unavailable.
+ */
+class TaskExitOscParserImpl implements TaskExitOscParser {
+  private pending: number[] = [];
+
+  feed(data: Uint8Array): TaskExitOscParserResult {
+    const input = [...this.pending, ...data];
+    this.pending = [];
+    const output: number[] = [];
+    const exitCodes: number[] = [];
+    let cursor = 0;
+
+    while (cursor < input.length) {
+      const markerAt = indexOfBytes(input.slice(cursor), TASK_EXIT_OSC_PREFIX);
+      if (markerAt < 0) {
+        const absolute = findTrailingPrefixStart(input, cursor, TASK_EXIT_OSC_PREFIX);
+        if (absolute >= 0) {
+          output.push(...input.slice(cursor, absolute));
+          this.pending = input.slice(absolute);
+        } else {
+          output.push(...input.slice(cursor));
+        }
+        break;
+      }
+
+      const start = cursor + markerAt;
+      output.push(...input.slice(cursor, start));
+      const payloadStart = start + TASK_EXIT_OSC_PREFIX.length;
+      let payloadEnd = payloadStart;
+      while (payloadEnd < input.length && (input[payloadEnd] === 0x2d || isAsciiDigit(input[payloadEnd]))) {
+        payloadEnd += 1;
+      }
+
+      if (payloadEnd === input.length) {
+        this.pending = input.slice(start);
+        break;
+      }
+
+      let terminatorLength = 0;
+      if (input[payloadEnd] === OSC_BEL) {
+        terminatorLength = 1;
+      } else if (input[payloadEnd] === OSC_ESC) {
+        if (payloadEnd + 1 >= input.length) {
+          this.pending = input.slice(start);
+          break;
+        }
+        if (input[payloadEnd + 1] === OSC_ST_BACKSLASH) terminatorLength = 2;
+      }
+
+      const payload = new TextDecoder().decode(new Uint8Array(input.slice(payloadStart, payloadEnd)));
+      if (terminatorLength > 0 && /^-?\d+$/.test(payload)) {
+        exitCodes.push(Number.parseInt(payload, 10));
+        cursor = payloadEnd + terminatorLength;
+        continue;
+      }
+
+      // Preserve malformed or unrelated OSC data byte-for-byte. A generated
+      // task marker always has a numeric payload and one of the two terminators.
+      output.push(...input.slice(start, payloadEnd + (terminatorLength || 1)));
+      cursor = payloadEnd + (terminatorLength || 1);
+    }
+
+    return { data: new Uint8Array(output), exitCodes };
+  }
+
+  reset(): void {
+    this.pending = [];
+  }
+}
+
+export function createTaskExitOscParser(): TaskExitOscParser {
+  return new TaskExitOscParserImpl();
 }
 
 class ByteInputEchoSuppressor implements InputEchoSuppressor {
@@ -208,14 +304,18 @@ const OSC7_INTRODUCER = [0x1b, 0x5d, 0x37, 0x3b];
  * The result is the echoed command vanishing and the shell redrawing a clean
  * prompt in its place.
  */
-class Osc7BlankingSuppressor implements InputEchoSuppressor {
+class OscSequenceBlankingSuppressor implements InputEchoSuppressor {
+  private readonly sequence: readonly number[];
   private readonly expiresAt: number;
+  readonly inputHoldTimeoutMs: number;
   private clearedLine = false;
   private matched = 0;
   private finished = false;
 
-  constructor(ttlMs: number, now: number) {
+  constructor(sequence: readonly number[], ttlMs: number, now: number, inputHoldTimeoutMs: number) {
+    this.sequence = sequence;
     this.expiresAt = now + ttlMs;
+    this.inputHoldTimeoutMs = Math.max(0, inputHoldTimeoutMs);
   }
 
   get done(): boolean {
@@ -241,11 +341,11 @@ class Osc7BlankingSuppressor implements InputEchoSuppressor {
 
     for (let i = 0; i < data.length; i += 1) {
       const byte = data[i];
-      if (byte === OSC7_INTRODUCER[this.matched]) {
+      if (byte === this.sequence[this.matched]) {
         this.matched += 1;
-        if (this.matched === OSC7_INTRODUCER.length) {
-          // Found the real OSC 7: emit it and everything after, untouched.
-          out.push(...OSC7_INTRODUCER);
+        if (this.matched === this.sequence.length) {
+          // Found the completion sequence: emit it and everything after.
+          out.push(...this.sequence);
           for (let j = i + 1; j < data.length; j += 1) out.push(data[j]);
           this.finished = true;
           return new Uint8Array(out);
@@ -253,7 +353,7 @@ class Osc7BlankingSuppressor implements InputEchoSuppressor {
       } else {
         // Mismatch mid-introducer: those bytes were echo noise, so drop them
         // and restart the match (the byte may itself be a fresh ESC).
-        this.matched = byte === OSC7_INTRODUCER[0] ? 1 : 0;
+        this.matched = byte === this.sequence[0] ? 1 : 0;
       }
       // Every other byte is dropped (the echoed command + its newline).
     }
@@ -269,8 +369,24 @@ class Osc7BlankingSuppressor implements InputEchoSuppressor {
 export function createOsc7BlankingSuppressor(
   ttlMs = 1500,
   now = Date.now(),
+  inputHoldTimeoutMs = Math.min(ttlMs, 1500),
 ): InputEchoSuppressor {
-  return new Osc7BlankingSuppressor(ttlMs, now);
+  return new OscSequenceBlankingSuppressor(OSC7_INTRODUCER, ttlMs, now, inputHoldTimeoutMs);
+}
+
+/** Hide an injected setup line until its private OSC completion marker arrives. */
+export function createOscMarkerBlankingSuppressor(
+  marker: string,
+  ttlMs = 1500,
+  now = Date.now(),
+  inputHoldTimeoutMs = Math.min(ttlMs, 1500),
+): InputEchoSuppressor {
+  return new OscSequenceBlankingSuppressor(
+    Array.from(new TextEncoder().encode(marker)),
+    ttlMs,
+    now,
+    inputHoldTimeoutMs,
+  );
 }
 
 /**
@@ -348,6 +464,30 @@ function indexOfBytes(haystack: number[], needle: Uint8Array): number {
     if (matches) return start;
   }
   return -1;
+}
+
+function findTrailingPrefixStart(
+  haystack: number[],
+  from: number,
+  prefix: Uint8Array,
+): number {
+  for (let start = haystack.length - 1; start >= from; start -= 1) {
+    const available = haystack.length - start;
+    if (available >= prefix.length || haystack[start] !== prefix[0]) continue;
+    let matches = true;
+    for (let offset = 0; offset < available; offset += 1) {
+      if (haystack[start + offset] !== prefix[offset]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) return start;
+  }
+  return -1;
+}
+
+function isAsciiDigit(value: number): boolean {
+  return value >= 0x30 && value <= 0x39;
 }
 
 function concatManyBytes(...parts: Uint8Array[]): Uint8Array {

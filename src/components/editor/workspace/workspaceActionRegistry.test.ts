@@ -10,6 +10,20 @@ describe("workspaceActionRegistry", () => {
     workspaceActionRegistry.clear();
   });
 
+  it("declares the macOS Go to File binding in the shared catalog", () => {
+    const action = DEFAULT_WORKSPACE_ACTIONS.find((candidate) => candidate.id === "workspace.goToFile");
+    expect(action?.secondaryKeybindings).toContain("Meta+Shift+N");
+  });
+
+  it("declares the macOS search, replace, and keymap bindings in the shared catalog", () => {
+    expect(DEFAULT_WORKSPACE_ACTIONS.find((candidate) => candidate.id === "workspace.findInFiles")?.secondaryKeybindings)
+      .toContain("Meta+Shift+F");
+    expect(DEFAULT_WORKSPACE_ACTIONS.find((candidate) => candidate.id === "workspace.replaceInFiles")?.secondaryKeybindings)
+      .toContain("Meta+Shift+R");
+    expect(DEFAULT_WORKSPACE_ACTIONS.find((candidate) => candidate.id === "workspace.openKeymapCheatsheet")?.secondaryKeybindings)
+      .toContain("Meta+Alt+/");
+  });
+
   it("registers and retrieves workspace actions with aliases", () => {
     const unregister = workspaceActionRegistry.register({
       id: "workspace.format",
@@ -209,4 +223,3 @@ describe("workspaceActionRegistry", () => {
     unsub();
   });
 });
-

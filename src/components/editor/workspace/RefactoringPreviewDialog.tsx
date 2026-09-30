@@ -13,6 +13,7 @@ import type { LspWorkspaceEdit } from "../../../lib/editor/lsp";
 import type { RefactorPlanV3 } from "./refactorPlan";
 import {
   filterWorkspaceEditByUsages,
+  usageLineImages,
   type WorkspaceEditPreview,
   type WorkspaceEditPreviewUsage,
 } from "./workspaceEditPreview";
@@ -23,6 +24,11 @@ export interface RefactoringPreviewDialogProps {
   preview: WorkspaceEditPreview;
   originalEdit: LspWorkspaceEdit;
   plan?: RefactorPlanV3;
+  /**
+   * ED-PARITY-017 DEC-017-05: real source text per usage path (null = could
+   * not be read). When present every usage shows its preimage/postimage.
+   */
+  sourceTexts?: Readonly<Record<string, string | null>>;
   onConfirm: (filteredEdit: LspWorkspaceEdit) => void;
   onCancel: () => void;
 }
@@ -33,6 +39,7 @@ export function RefactoringPreviewDialog({
   preview,
   originalEdit,
   plan,
+  sourceTexts,
   onConfirm,
   onCancel,
 }: RefactoringPreviewDialogProps) {
@@ -332,9 +339,11 @@ export function RefactoringPreviewDialog({
                     {filteredUsages.map((usage) => {
                       const isIncluded = !excludedIds.has(usage.id);
                       const isRequired = requiredUsageIds.has(usage.id);
+                      const source = sourceTexts ? sourceTexts[usage.path] : undefined;
+                      const images = typeof source === "string" ? usageLineImages(source, usage) : null;
                       return (
+                        <div key={usage.id} data-testid="refactoring-preview-row" data-path={usage.path}>
                         <label
-                          key={usage.id}
                           className={`flex items-center gap-2 rounded px-2 py-1 hover:bg-[var(--taomni-code-active-line-bg)] font-mono text-[11px] ${
                             isRequired ? "cursor-not-allowed opacity-80" : "cursor-pointer"
                           }`}
@@ -365,6 +374,28 @@ export function RefactoringPreviewDialog({
                             </span>
                           )}
                         </label>
+                        {sourceTexts && (images ? (
+                          <div className="ml-6 mb-1 rounded border border-[var(--taomni-code-border)] font-mono text-[11px]">
+                            <pre
+                              data-testid="refactoring-preview-before"
+                              aria-label="Before"
+                              className="m-0 whitespace-pre-wrap break-all bg-red-500/10 px-2 py-0.5 text-[var(--taomni-code-fg)]"
+                            >{images.before.map((line) => `- ${line}`).join("\n")}</pre>
+                            <pre
+                              data-testid="refactoring-preview-after"
+                              aria-label="After"
+                              className="m-0 whitespace-pre-wrap break-all bg-emerald-500/10 px-2 py-0.5 text-[var(--taomni-code-fg)]"
+                            >{images.after.map((line) => `+ ${line}`).join("\n")}</pre>
+                          </div>
+                        ) : (
+                          <div
+                            data-testid="refactoring-preview-source-unavailable"
+                            className="ml-6 mb-1 text-[11px] text-[var(--taomni-code-muted)]"
+                          >
+                            Source unavailable: the current file text could not be read for this change
+                          </div>
+                        ))}
+                        </div>
                       );
                     })}
                   </div>
