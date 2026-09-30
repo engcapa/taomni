@@ -888,6 +888,8 @@ pub fn run() {
             mail::lists::mail_unsubscribe_one_click,
             mail::mbox::mail_export_mbox,
             mail::mbox::mail_import_messages,
+            mail::certs::mail_probe_certificate,
+            mail::autoconfig::mail_autoconfig,
             mail::mail_list_cached_folders,
             mail::mail_list_cached_messages,
             mail::mail_get_message_body,

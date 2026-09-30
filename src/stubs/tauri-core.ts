@@ -4039,6 +4039,24 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const config = invokeArgs?.config as { sync?: { subscribedOnly?: boolean } } | undefined;
       return stubMailSyncAll(accountId, mailStubSeed, limit, config?.sync?.subscribedOnly === true) as T;
     }
+    case "mail_autoconfig": {
+      // Browser preview: the backend's built-in table for a few domains only.
+      const email = String((args as InvokeArgs | undefined)?.email ?? "");
+      const domain = email.split("@")[1]?.toLowerCase() ?? "";
+      const table: Record<string, [string, string, string]> = {
+        "qq.com": ["custom", "imap.qq.com", "smtp.qq.com"],
+        "163.com": ["custom", "imap.163.com", "smtp.163.com"],
+        "gmail.com": ["gmail", "imap.gmail.com", "smtp.gmail.com"],
+      };
+      const hit = table[domain];
+      if (!hit) return null as T;
+      return {
+        source: "builtin",
+        provider: hit[0],
+        imap: { host: hit[1], port: 993, security: "TLS" },
+        smtp: { host: hit[2], port: 465, security: "TLS" },
+      } as T;
+    }
     case "mail_list_folders": {
       const invokeArgs = args as InvokeArgs | undefined;
       return stubMailListFolders(stubMailAccountId(invokeArgs), mailStubSeed) as T;

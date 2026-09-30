@@ -165,6 +165,47 @@ export function mailSearchServer(config: MailTabInfo, folder: string, query: Mai
   );
 }
 
+export interface MailServerGuess {
+  host: string;
+  port: number;
+  security: "TLS" | "STARTTLS" | "None";
+}
+
+export interface MailAutoconfig {
+  source: "builtin" | "ispdb" | "provider" | "well-known" | "guess";
+  provider: "gmail" | "outlook" | "custom";
+  imap: MailServerGuess;
+  smtp: MailServerGuess;
+}
+
+/** Discover IMAP/SMTP settings; `allowOnline` sends the domain to ISPDB. */
+export function mailAutoconfig(email: string, allowOnline: boolean): Promise<MailAutoconfig | null> {
+  return invoke<MailAutoconfig | null>("mail_autoconfig", { email, allowOnline });
+}
+
+export interface MailCertificateInfo {
+  host: string;
+  port: number;
+  sha256: string;
+  subject: string;
+  issuer: string;
+  notBefore: string;
+  notAfter: string;
+  derBase64: string;
+  trustedBySystem: boolean;
+  verifyError?: string | null;
+}
+
+/** Fetch the IMAP or SMTP server certificate for review (AC-44). */
+export function mailProbeCertificate(config: MailTabInfo, protocol: "imap" | "smtp"): Promise<MailCertificateInfo> {
+  return withVaultLockedNotice(() => invoke<MailCertificateInfo>("mail_probe_certificate", { config, protocol }));
+}
+
+/** Handshake errors the backend tagged as certificate problems. */
+export function isMailCertificateError(message: string | null | undefined): boolean {
+  return /untrusted server certificate|no longer matches the one you trusted/i.test(message ?? "");
+}
+
 /** LIST the remote folder tree (no message sync); resolves to cached folders. */
 export function mailListFolders(config: MailTabInfo): Promise<MailFolder[]> {
   return withVaultLockedNotice(() => invoke<MailFolder[]>("mail_list_folders", { config }));

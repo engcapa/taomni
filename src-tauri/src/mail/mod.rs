@@ -39,6 +39,8 @@ use tokio::task::JoinHandle;
 use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 
+pub mod autoconfig;
+pub mod certs;
 #[cfg(test)]
 mod fake_imap;
 pub mod folders;
@@ -123,6 +125,9 @@ pub struct MailServerConfig {
     pub password: Option<String>,
     #[serde(default)]
     pub security: MailConnectionSecurity,
+    /// Base64 DER of a certificate the user trusted for this server (AC-44).
+    #[serde(default)]
+    pub trusted_cert: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,6 +143,9 @@ pub struct MailSmtpConfig {
     pub security: MailConnectionSecurity,
     #[serde(default = "default_true")]
     pub use_imap_auth: bool,
+    /// Base64 DER of a certificate the user trusted for this server (AC-44).
+    #[serde(default)]
+    pub trusted_cert: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -3627,14 +3635,14 @@ fn connect_imap_with_socket(
         mail_effective_endpoint(account, host, port, runtime)?;
     let stream = tcp_connect(&connect_host, connect_port)?;
     let socket = stream.try_clone().ok();
+    let trusted = account.config.imap.trusted_cert.as_deref();
+    let pinned = trusted.is_some_and(|value| !value.trim().is_empty());
     let session = match account.config.imap.security {
         MailConnectionSecurity::Tls => {
-            let connector = TlsConnector::builder()
-                .build()
-                .map_err(|e| format!("failed to build IMAP TLS connector: {e}"))?;
-            let tls_stream = connector
-                .connect(host, stream)
-                .map_err(|e| format!("IMAP TLS handshake failed: {e}"))?;
+            let connector = certs::tls_connector(trusted)?;
+            let tls_stream = connector.connect(host, stream).map_err(|e| {
+                certs::certificate_error_hint(&format!("IMAP TLS handshake failed: {e}"), pinned)
+            })?;
             let mut client = imap::Client::new(tls_stream);
             client
                 .read_greeting()
@@ -3649,12 +3657,10 @@ fn connect_imap_with_socket(
             client
                 .read_greeting()
                 .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            let connector = TlsConnector::builder()
-                .build()
-                .map_err(|e| format!("failed to build IMAP STARTTLS connector: {e}"))?;
-            let client = client
-                .secure(host, &connector)
-                .map_err(|e| format!("IMAP STARTTLS failed: {e}"))?;
+            let connector = certs::tls_connector(trusted)?;
+            let client = client.secure(host, &connector).map_err(|e| {
+                certs::certificate_error_hint(&format!("IMAP STARTTLS failed: {e}"), pinned)
+            })?;
             ActiveImapSession::Tls {
                 session: authenticate_imap_client(client, account)?,
                 forward_task,
@@ -4391,7 +4397,7 @@ fn smtp_send_error(error: &str) -> String {
             "SMTP send failed: the message is larger than this server accepts (SIZE limit). Remove or shrink attachments, or share them as links. Server said: {error}"
         )
     } else {
-        format!("SMTP send failed: {error}")
+        certs::certificate_error_hint(&format!("SMTP send failed: {error}"), false)
     }
 }
 
@@ -4732,16 +4738,13 @@ fn build_smtp_transport(
     if account.auth_mode == MailAuthMode::OAuth2 {
         builder = builder.authentication(vec![Mechanism::Xoauth2]);
     }
+    let trusted = account.config.smtp.trusted_cert.as_deref();
     builder = match account.config.smtp.security {
         MailConnectionSecurity::Tls => {
-            let params = TlsParameters::new(host.to_string())
-                .map_err(|e| format!("SMTP TLS parameters failed: {e}"))?;
-            builder.tls(Tls::Wrapper(params))
+            builder.tls(Tls::Wrapper(certs::smtp_tls_parameters(host, trusted)?))
         }
         MailConnectionSecurity::Starttls => {
-            let params = TlsParameters::new(host.to_string())
-                .map_err(|e| format!("SMTP STARTTLS parameters failed: {e}"))?;
-            builder.tls(Tls::Required(params))
+            builder.tls(Tls::Required(certs::smtp_tls_parameters(host, trusted)?))
         }
         MailConnectionSecurity::None => builder.tls(Tls::None),
     };
@@ -6553,6 +6556,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     username: Some("sender@example.com".into()),
                     password: Some("secret".into()),
                     security: MailConnectionSecurity::Tls,
+                    trusted_cert: None,
                 },
                 smtp: MailSmtpConfig {
                     host: "smtp.example.com".into(),
@@ -6561,6 +6565,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     password: Some("secret".into()),
                     security: MailConnectionSecurity::Tls,
                     use_imap_auth: true,
+                    trusted_cert: None,
                 },
                 oauth: MailOAuthSettings::default(),
                 network_settings: None,
@@ -6763,6 +6768,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     username: Some(email.into()),
                     password: None,
                     security: MailConnectionSecurity::Tls,
+                    trusted_cert: None,
                 },
                 smtp: MailSmtpConfig {
                     host: smtp_host.into(),
@@ -6771,6 +6777,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     password: None,
                     security: MailConnectionSecurity::Starttls,
                     use_imap_auth: true,
+                    trusted_cert: None,
                 },
                 oauth: MailOAuthSettings {
                     client_id: Some(client_id.into()),

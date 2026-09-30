@@ -114,6 +114,7 @@ import { LocalShellOptionsForm } from "./forms/LocalShellOptionsForm";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { MailAppearanceSettings } from "../mail/MailAppearanceSettings";
 import {
+  mailAutoconfig,
   mailOAuthAuthorize,
   mailOAuthDeviceComplete,
   mailOAuthDeviceStart,
@@ -1454,6 +1455,40 @@ function MailSettings({
   vaultState: "empty" | "locked" | "unlocked";
 }) {
   const isOAuth = authMode === "oauth2";
+  // TASK-14: fill servers from the address (built-in table, then ISPDB).
+  const [autoconfigOnline, setAutoconfigOnline] = useState(true);
+  const [autoconfigBusy, setAutoconfigBusy] = useState(false);
+  const [autoconfigResult, setAutoconfigResult] = useState<string | null>(null);
+  const detectMailSettings = async () => {
+    setAutoconfigBusy(true);
+    setAutoconfigResult(null);
+    try {
+      const found = await mailAutoconfig(username, autoconfigOnline);
+      if (!found) {
+        setAutoconfigResult("No settings found; enter the servers manually.");
+        return;
+      }
+      if (found.provider !== "custom" && found.provider !== provider) {
+        setProvider(found.provider);
+      } else {
+        setImapHost(found.imap.host);
+        setImapPort(String(found.imap.port));
+        setImapSecurity(found.imap.security);
+        setSmtpHost(found.smtp.host);
+        setSmtpPort(String(found.smtp.port));
+        setSmtpSecurity(found.smtp.security);
+        setSmtpUseImapAuth(true);
+      }
+      const label = found.source === "builtin" ? "built-in" : found.source === "guess" ? "guessed" : found.source;
+      setAutoconfigResult(
+        `Found (${label}): ${found.imap.host}:${found.imap.port} / ${found.smtp.host}:${found.smtp.port}`,
+      );
+    } catch (e) {
+      setAutoconfigResult(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAutoconfigBusy(false);
+    }
+  };
   const oauthSupported = supportsMailOAuthProvider(provider);
   const effectiveOauthFlow = effectiveMailOAuthFlow(provider, oauthFlow);
   const usesDeviceCode = oauthSupported && effectiveOauthFlow === "device";
@@ -1523,6 +1558,27 @@ function MailSettings({
           placeholder="name@example.com"
           onChange={(e) => setUsername(e.target.value)}
         />
+        <button
+          type="button"
+          className="taomni-btn h-7 px-2 ml-2"
+          data-testid="mail-autoconfig"
+          disabled={autoconfigBusy || !username.includes("@")}
+          onClick={() => void detectMailSettings()}
+        >
+          {autoconfigBusy ? "Detecting…" : "Detect settings"}
+        </button>
+        <label
+          className="ml-2 inline-flex items-center gap-1 text-[var(--taomni-text-muted)]"
+          title="Also asks autoconfig.thunderbird.net and the provider's autoconfig host, which reveals the address's domain"
+        >
+          <Checkbox checked={autoconfigOnline} onChange={setAutoconfigOnline} dataTestId="mail-autoconfig-online" />
+          Online lookup
+        </label>
+        {autoconfigResult && (
+          <span className="ml-2 text-[11px] text-[var(--taomni-text-muted)]" data-testid="mail-autoconfig-result">
+            {autoconfigResult}
+          </span>
+        )}
       </Field>
 
       {isOAuth && (

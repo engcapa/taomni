@@ -5646,6 +5646,52 @@ controls:
 - 会话设置 “Attachment cache” 开启后，下载过的附件写入 `<app_data>/mail-cache/attachments/`，再次打开直接使用本地副本。
 - 发送被服务器以大小拒绝（552 / SIZE）时给出明确提示。
 - 附件提醒：正文（不含引用部分）或主题提到 “attached/附件” 而没有附件时，发送前提醒，可 “Attach…” 或 “Send anyway”。
+
+---
+
+### 13.16 账户自动配置与证书例外 🟡
+
+<!-- feature
+id: F-MAIL-16
+status: partial
+area: mail/account
+components: [SessionEditor, MailClientTab]
+files:
+  - src/components/session/SessionEditor.tsx
+  - src/components/mail/MailClientTab.tsx
+  - src-tauri/src/mail/autoconfig.rs
+  - src-tauri/src/mail/certs.rs
+controls:
+  - id: autoconfig
+    selector: '[data-testid="mail-autoconfig"]'
+    kind: interactive
+  - id: autoconfig-online
+    selector: '[data-testid="mail-autoconfig-online"]'
+    kind: interactive
+  - id: autoconfig-result
+    selector: '[data-testid="mail-autoconfig-result"]'
+    kind: display
+  - id: cert-review
+    selector: '[data-testid="mail-cert-review"]'
+    kind: interactive
+    optional: true       # only after an untrusted-certificate handshake error
+  - id: cert-dialog
+    selector: '[data-testid="mail-cert-dialog"]'
+    kind: display
+    optional: true
+  - id: cert-fingerprint
+    selector: '[data-testid="mail-cert-fingerprint"]'
+    kind: display
+    optional: true
+  - id: cert-trust
+    selector: '[data-testid="mail-cert-trust"]'
+    kind: interactive
+    optional: true
+-->
+
+- 会话编辑器 “Detect settings”：先查内置表（Gmail、Outlook、QQ、163、126、iCloud、Yahoo、Fastmail 等，离线），勾选 “Online lookup” 时再依次查询 ISPDB、`autoconfig.<domain>`、`/.well-known/autoconfig`，最后猜测 `imap./smtp.<domain>` 并探测端口；在线查询会把域名发给第三方，提示中有说明，可关闭。
+- 证书例外：握手因证书不受信任失败时，状态栏出现 “Review certificate”，对话框显示主题、签发者、有效期与 SHA-256 指纹；“Trust for this account” 把该证书设为此服务器唯一的信任锚（禁用系统根证书，放宽主机名校验），证书变化时握手失败并再次提示。保存的会话写入会话选项，Quick Connect 标签只在内存中生效。
+- 未完成：Yahoo/AOL/Fastmail 等 OAuth 需要在各厂商注册客户端 ID，尚未接入；RFC 6186 SRV 与 Exchange Autodiscover 未实现（未引入 DNS 解析依赖）。证书固定的 TLS 行为已在 Windows 上用本地 TLS 服务器验证，macOS/Linux 待原生验证。
 ---
 
 ## 14. SocksCap 网络流量路由

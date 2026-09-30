@@ -50,6 +50,9 @@ steps:
 - fill:
     selector: '[data-testid="mail-compose-subject"]'
     value: Quarterly report attached
+- type:
+    selector: '[data-testid="mail-compose-editor"]'
+    text: Numbers for the quarter
 - click: '[data-testid="mail-compose-send"]'
 - wait_for:
     selector: '[data-testid="mail-attach-reminder"]'
@@ -85,31 +88,32 @@ verification:
     - 12
     - 13
     - 14
+    - 15
     checkpoints:
     - step: 8
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 15
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-attach-reminder\"]", "timeout_sec": 10}}'
     - step: 16
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-attach-reminder\"]", "timeout_sec": 10}}'
+    - step: 17
       expectation: '{"assert_visible": "[data-testid=\"mail-compose-dialog\"]"}'
     results:
-    - 15
     - 16
+    - 17
   - id: R2
     requirement: 点 “Send anyway” 后邮件发出，状态提示发送成功，服务器 Sent 有副本。
     actions:
-    - 17
+    - 18
     checkpoints:
-    - step: 18
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached", "timeout_sec": 30}}'
     - step: 19
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Message sent", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached", "timeout_sec": 30}}'
     - step: 20
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Message sent", "timeout_sec": 30}}'
+    - step: 21
       expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1, "timeout_sec": 20}}'
     results:
-    - 18
     - 19
     - 20
+    - 21
   visual:
   - check: 截图中提醒已关闭、状态栏提示已发送。
     method: manual

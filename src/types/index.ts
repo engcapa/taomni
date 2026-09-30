@@ -296,6 +296,8 @@ export interface MailTabInfo {
     username?: string | null;
     password?: string;
     security: MailConnectionSecurity;
+    /** Base64 DER of a certificate trusted for this server (AC-44). */
+    trustedCert?: string | null;
   };
   smtp: {
     host: string;
@@ -304,6 +306,8 @@ export interface MailTabInfo {
     password?: string;
     security: MailConnectionSecurity;
     useImapAuth: boolean;
+    /** Base64 DER of a certificate trusted for this server (AC-44). */
+    trustedCert?: string | null;
   };
   oauth: {
     clientId?: string | null;

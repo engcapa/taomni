@@ -5,6 +5,7 @@ import type { MailDraft, MailFolder, MailFolderSyncResult, MailMessageBody, Mail
 import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { MailClientTab } from "./MailClientTab";
 import { useTaoAlertStore } from "../../stores/taoAlertStore";
+import { useAppStore } from "../../stores/appStore";
 
 const mailMocks = vi.hoisted(() => ({
   mailClearCache: vi.fn(),
@@ -43,6 +44,7 @@ const mailMocks = vi.hoisted(() => ({
   mailUnsubscribeOneClick: vi.fn(),
   mailExportMbox: vi.fn(),
   mailImportMessages: vi.fn(),
+  mailProbeCertificate: vi.fn(),
 }));
 
 const eventMocks = vi.hoisted(() => ({
@@ -62,7 +64,12 @@ const chatState = vi.hoisted(() => ({
   sendMessage: vi.fn(),
 }));
 
-vi.mock("../../lib/mail", () => ({ ...mailMocks, MAIL_IDLE_EVENT: "mail://idle" }));
+vi.mock("../../lib/mail", () => ({
+  ...mailMocks,
+  MAIL_IDLE_EVENT: "mail://idle",
+  isMailCertificateError: (message: string | null | undefined) =>
+    /untrusted server certificate|no longer matches the one you trusted/i.test(message ?? ""),
+}));
 
 vi.mock("../../lib/ipc", () => ({
   openLocalPath: vi.fn(),
@@ -1038,6 +1045,30 @@ describe("MailClientTab", () => {
     fireEvent.doubleClick(chip);
     await waitFor(() => expect(mailMocks.mailDownloadAttachment).toHaveBeenCalled());
     expect(mailMocks.mailDownloadAttachment.mock.calls[0][5]).toBe("2");
+  });
+
+  it("reviews and trusts a self-signed server certificate (AC-44)", async () => {
+    mailMocks.mailSyncAllFolders.mockRejectedValueOnce(
+      new Error("IMAP TLS handshake failed: self signed certificate (untrusted server certificate; review it to add an exception)"),
+    );
+    mailMocks.mailProbeCertificate.mockResolvedValue({
+      host: "imap.example.com", port: 993, sha256: "AA:BB", subject: "CN=imap.example.com",
+      issuer: "CN=imap.example.com", notBefore: "2026", notAfter: "2036", derBase64: "MIIB",
+      trustedBySystem: false, verifyError: "self signed certificate",
+    });
+    useAppStore.setState({ tabs: [{ id: "mail-tab", type: "mail", title: "Mail", mail: info } as never] });
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+    fireEvent.click(await screen.findByTestId("mail-cert-review"));
+    expect(await screen.findByTestId("mail-cert-fingerprint")).toHaveTextContent("AA:BB");
+    expect(mailMocks.mailProbeCertificate).toHaveBeenCalledWith(info, "imap");
+    fireEvent.click(screen.getByTestId("mail-cert-trust"));
+    await waitFor(() => {
+      const tab = useAppStore.getState().tabs.find((entry) => entry.id === "mail-tab") as { mail?: MailTabInfo } | undefined;
+      expect(tab?.mail?.imap.trustedCert).toBe("MIIB");
+    });
+    expect(screen.queryByTestId("mail-cert-dialog")).toBeNull();
   });
 
   it("saves a template and starts a new message from it (AC-30)", async () => {

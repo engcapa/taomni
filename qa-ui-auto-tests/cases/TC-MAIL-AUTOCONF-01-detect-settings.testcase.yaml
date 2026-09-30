@@ -1,0 +1,81 @@
+id: TC-MAIL-AUTOCONF-01
+title: Mail session editor detects IMAP/SMTP settings from the address
+description: 'TASK-14 (docs-feature/mail-thunderbird-parity-design.md AC-43).
+
+  In a new Mail session, typing a qq.com address and pressing "Detect
+
+  settings" with the online lookup turned off fills imap.qq.com:993 and
+
+  smtp.qq.com:465 from the built-in table (no network, nothing sent to third
+
+  parties).
+
+  Browser mode uses the stub''s copy of the table (renderer orchestration
+
+  only); native mode runs the real backend command.
+
+  '
+covers:
+- F-MAIL-16
+tags:
+- mail
+- p2
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mail"]'
+- wait_for: '[data-testid="session-editor"] input[aria-label="Mail email or username"]'
+- fill:
+    selector: '[data-testid="session-editor"] input[aria-label="Mail email or username"]'
+    value: someone@qq.com
+- set_check:
+    selector: '[data-testid="mail-autoconfig-online"]'
+    checked: false
+- click: '[data-testid="mail-autoconfig"]'
+- assert_text:
+    selector: '[data-testid="mail-autoconfig-result"]'
+    contains: 'imap.qq.com:993 / smtp.qq.com:465'
+    timeout_sec: 15
+- assert_text:
+    selector: '[data-testid="mail-autoconfig-result"]'
+    contains: built-in
+- screenshot: mail-autoconf-01-detected.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 输入 qq.com 邮箱并关闭在线查询后点 Detect settings，自动填入 imap.qq.com:993 与 smtp.qq.com:465，来源为内置表（AC-43，不向第三方发送域名）。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"] input[aria-label=\"Mail email or username\"]"}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-autoconfig-result\"]", "contains": "imap.qq.com:993 / smtp.qq.com:465", "timeout_sec": 15}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-autoconfig-result\"]", "contains": "built-in"}}'
+    results:
+    - 9
+    - 10
+  visual:
+  - check: 截图中 IMAP/SMTP 字段已填好，结果提示来源为内置表。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实后端内置表；在线查询（ISPDB/厂商 autoconfig）不在 CI 中访问外网，由 Rust 解析测试覆盖。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

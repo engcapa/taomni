@@ -538,6 +538,7 @@ function sessionToMailTabInfo(
       username: session.username || emailAddress || null,
       password,
       security: mailSecurityFromOptions(opts.mailImapSecurity, "tls"),
+      trustedCert: str("mailImapTrustedCert") || null,
     },
     smtp: {
       host: str("mailSmtpHost"),
@@ -546,6 +547,7 @@ function sessionToMailTabInfo(
       password: smtpUseImapAuth ? password : smtpPassword,
       security: mailSecurityFromOptions(opts.mailSmtpSecurity, "tls"),
       useImapAuth: smtpUseImapAuth,
+      trustedCert: str("mailSmtpTrustedCert") || null,
     },
     oauth: {
       clientId: str("mailOauthClientId") || null,

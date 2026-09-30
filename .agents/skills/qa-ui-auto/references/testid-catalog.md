@@ -800,6 +800,16 @@
 - `[data-testid="git-diff-stage"]` — interactive [optional] — F26.2.git-diff-stage
 - `[data-testid="git-diff-unstage"]` — interactive [optional] — F26.2.git-diff-unstage
 
+## mail/account (F-MAIL-16)
+
+- `[data-testid="mail-autoconfig"]` — interactive — F-MAIL-16.autoconfig
+- `[data-testid="mail-autoconfig-online"]` — interactive — F-MAIL-16.autoconfig-online
+- `[data-testid="mail-autoconfig-result"]` — display — F-MAIL-16.autoconfig-result
+- `[data-testid="mail-cert-review"]` — interactive [optional] — F-MAIL-16.cert-review
+- `[data-testid="mail-cert-dialog"]` — display [optional] — F-MAIL-16.cert-dialog
+- `[data-testid="mail-cert-fingerprint"]` — display [optional] — F-MAIL-16.cert-fingerprint
+- `[data-testid="mail-cert-trust"]` — interactive [optional] — F-MAIL-16.cert-trust
+
 ## mail/attachments (F-MAIL-15)
 
 - `[data-testid="mail-attach-reminder"]` — display — F-MAIL-15.attach-reminder

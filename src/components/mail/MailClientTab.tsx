@@ -58,6 +58,8 @@ import {
   mailDeleteMessages,
   mailDownloadAttachment,
   mailExportMbox,
+  isMailCertificateError,
+  mailProbeCertificate,
   mailImportMessages,
   mailFetchRaw,
   mailGetMessageBody,
@@ -95,6 +97,7 @@ import {
   type MailDraftAttachment,
   type MailDraftContext,
   type MailFolder,
+  type MailCertificateInfo,
   type MailFolderSyncResult,
   type MailIdleEvent,
   type MailMessageBody,
@@ -123,6 +126,8 @@ import {
   type MailOutboxState,
 } from "../../lib/mailOutbox";
 import { parseMailto } from "../../lib/mailto";
+import { useAppStore } from "../../stores/appStore";
+import { useSessionStore } from "../../stores/sessionStore";
 import { mentionsAttachment } from "../../lib/mailAttachReminder";
 import { isEditableTarget, mailShortcutAction, type MailShortcutAction } from "../../lib/mailShortcuts";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
@@ -1184,6 +1189,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const draggedMessagesRef = useRef<MailMessageHeader[]>([]);
   const [dropFolder, setDropFolder] = useState<string | null>(null);
   const [unsubscribeArmed, setUnsubscribeArmed] = useState<string | null>(null);
+  const [certReview, setCertReview] = useState<{
+    protocol: "imap" | "smtp";
+    loading: boolean;
+    info?: MailCertificateInfo;
+    error?: string;
+  } | null>(null);
+  const retryAfterTrustRef = useRef(false);
   const [subscriptionBusy, setSubscriptionBusy] = useState<string | null>(null);
   const oauthReauthRequired = isOAuthReauthRequired(error);
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
@@ -3061,6 +3073,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const composeDraftIdRef = useRef<string | null>(null);
   composeDraftIdRef.current = composeOpen ? draft.id ?? null : null;
 
+  useEffect(() => {
+    if (!retryAfterTrustRef.current) return;
+    retryAfterTrustRef.current = false;
+    void syncFolderNow(selectedFolderRef.current, "sync", true);
+  }, [info.imap.trustedCert, info.smtp.trustedCert]);
+
   // Outbox: send due messages only while the tab is open (DEC-01).
   useEffect(() => {
     const first = window.setTimeout(() => void processOutboxRef.current(), 3000);
@@ -4084,6 +4102,57 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     await reloadVisibleFromCache(folder.name);
   });
 
+  /** AC-44: show the server certificate so the user can add an exception. */
+  const openCertReview = async (protocol: "imap" | "smtp") => {
+    setCertReview({ protocol, loading: true });
+    try {
+      const cert = await mailProbeCertificate(info, protocol);
+      setCertReview({ protocol, loading: false, info: cert });
+    } catch (e) {
+      setCertReview({ protocol, loading: false, error: mailClientErrorMessage(e) });
+    }
+  };
+
+  const trustReviewedCertificate = async () => {
+    const review = certReview;
+    if (!review?.info) return;
+    const der = review.info.derBase64;
+    const key = review.protocol === "smtp" ? "mailSmtpTrustedCert" : "mailImapTrustedCert";
+    // Persist on the saved session (quick-connect tabs keep it in memory).
+    const store = useSessionStore.getState();
+    const session = store.sessions.find((entry) => entry.id === info.sessionId);
+    if (session) {
+      let options: Record<string, unknown> = {};
+      try {
+        options = JSON.parse(session.options_json || "{}") as Record<string, unknown>;
+      } catch {
+        options = {};
+      }
+      options[key] = der;
+      try {
+        await store.updateSession({ ...session, options_json: JSON.stringify(options) });
+      } catch (e) {
+        setError(mailClientErrorMessage(e));
+        return;
+      }
+    }
+    useAppStore.setState((state) => ({
+      tabs: state.tabs.map((tab) => {
+        if (tab.id !== tabId || !tab.mail) return tab;
+        const mail = review.protocol === "smtp"
+          ? { ...tab.mail, smtp: { ...tab.mail.smtp, trustedCert: der } }
+          : { ...tab.mail, imap: { ...tab.mail.imap, trustedCert: der } };
+        return { ...tab, mail };
+      }),
+    }));
+    setCertReview(null);
+    setError(null);
+    setStatus(session
+      ? "Certificate trusted for this account; reconnecting…"
+      : "Certificate trusted until this tab closes (save the account to keep it); reconnecting…");
+    retryAfterTrustRef.current = true;
+  };
+
   const openExternalUrl = async (url: string) => {
     try {
       const { open } = await import("@tauri-apps/plugin-shell");
@@ -4820,6 +4889,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           >
             {error ?? status}
           </span>
+          {error && isMailCertificateError(error) && (
+            <button
+              type="button"
+              className="ml-auto h-5 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
+              data-testid="mail-cert-review"
+              onClick={() => void openCertReview(/smtp/i.test(error) ? "smtp" : "imap")}
+            >
+              <ShieldCheck className="w-3 h-3" />
+              Review certificate
+            </button>
+          )}
           {error && oauthReauthRequired && onEditSession && (
             <button
               type="button"
@@ -5413,6 +5493,71 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           >
             <div className="flex-1 min-h-0">
               {renderReaderSurface(popupMessage, true)}
+            </div>
+          </MailDraggableDialog>
+        </div>
+      )}
+
+      {certReview && (
+        <div className="absolute inset-0 z-[150] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title={`${certReview.protocol.toUpperCase()} server certificate`}
+            icon={<ShieldCheck className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Server certificate"
+            minWidth={420}
+            minHeight={260}
+            className="w-[min(620px,92vw)] min-h-[280px]"
+            onClose={() => setCertReview(null)}
+          >
+            <div className="flex-1 min-h-0 overflow-auto p-3 text-[12px] flex flex-col gap-2" data-testid="mail-cert-dialog">
+              {certReview.loading && (
+                <div className="flex items-center gap-2 text-[var(--taomni-text-muted)]">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Fetching the certificate…
+                </div>
+              )}
+              {certReview.error && <div className="text-red-500">{certReview.error}</div>}
+              {certReview.info && (
+                <>
+                  <div className="text-[var(--taomni-warning,#d97706)]">
+                    {certReview.info.trustedBySystem
+                      ? "This certificate is trusted by the system."
+                      : `Not trusted by the system: ${certReview.info.verifyError ?? "unknown issuer"}`}
+                  </div>
+                  <div className="grid grid-cols-[92px_1fr] gap-x-2 gap-y-1">
+                    <span className="text-[var(--taomni-text-muted)]">Server</span>
+                    <span>{certReview.info.host}:{certReview.info.port}</span>
+                    <span className="text-[var(--taomni-text-muted)]">Subject</span>
+                    <span className="break-all">{certReview.info.subject || "(none)"}</span>
+                    <span className="text-[var(--taomni-text-muted)]">Issuer</span>
+                    <span className="break-all">{certReview.info.issuer || "(none)"}</span>
+                    <span className="text-[var(--taomni-text-muted)]">Valid</span>
+                    <span>{certReview.info.notBefore} – {certReview.info.notAfter}</span>
+                    <span className="text-[var(--taomni-text-muted)]">SHA-256</span>
+                    <code className="break-all font-mono text-[11px]" data-testid="mail-cert-fingerprint">
+                      {certReview.info.sha256}
+                    </code>
+                  </div>
+                  <div className="text-[11px] text-[var(--taomni-text-muted)]">
+                    Compare the fingerprint with the one your mail administrator gave you. Only this exact
+                    certificate will be accepted for this server; if it changes you will be asked again.
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="h-10 px-3 flex items-center justify-end gap-2 border-t border-[var(--taomni-divider)]">
+              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" onClick={() => setCertReview(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="taomni-btn h-7 px-3 text-[12px]"
+                data-primary="true"
+                data-testid="mail-cert-trust"
+                disabled={!certReview.info}
+                onClick={() => void trustReviewedCertificate()}
+              >
+                Trust for this account
+              </button>
             </div>
           </MailDraggableDialog>
         </div>
