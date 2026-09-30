@@ -714,7 +714,16 @@ export default function DbClientTab({
       });
     return () => {
       cancelled = true;
-      void dbDisconnect(runtimeSessionId).catch(() => undefined);
+      // DB-TX-002: roll back uncommitted manual-commit work before closing.
+      const tx = txStatusRef.current;
+      const pending = tx?.manual ? tx.pending : 0;
+      const disconnect = () => dbDisconnect(runtimeSessionId).catch(() => undefined);
+      if (pending > 0) {
+        void dbTxRollback(runtimeSessionId).catch(() => undefined).then(disconnect);
+        setStatusMessage(`Rolled back ${pending} uncommitted statement(s) when the database tab closed.`);
+      } else {
+        void disconnect();
+      }
       setTabDbConn(tabId, null);
       setTabDbSelectedObjects(tabId, null);
       Object.values(timersRef.current).forEach(clearInterval);
@@ -725,9 +734,16 @@ export default function DbClientTab({
   const [txStatus, setTxStatus] = useState<DbTxStatus | null>(null);
   const txStatusRef = useRef<DbTxStatus | null>(null);
   const applyTxStatus = useCallback((next: DbTxStatus | null) => {
+    const previous = txStatusRef.current;
     txStatusRef.current = next;
     setTxStatus(next);
-  }, []);
+    // DB-TX-002: a new physical connection drops the open transaction.
+    if (previous?.manual && previous.pending > 0 && next && next.generation > previous.generation) {
+      const message = `The database connection was re-established. ${previous.pending} uncommitted statement(s) were lost.`;
+      setStatusMessage(message);
+      void alertAppDialog({ title: "Connection re-established", message });
+    }
+  }, [setStatusMessage]);
   const txAvailable = supportsManualCommit(info.engine);
 
   const refreshTxStatus = useCallback(async () => {

@@ -5,6 +5,7 @@ import DbClientTab from "./DbClientTab";
 import type { DbConnectInfo } from "../../types";
 import type { DbQueryWorkspace, DbSavedQuery, DbSqlHistoryEntry } from "../../lib/ipc";
 import { getQueryTab } from "../../lib/queryRegistry";
+import { useAppStore } from "../../stores/appStore";
 
 // Full DbClientTab mounts are heavy; the 1s default flakes when workers are busy.
 configure({ asyncUtilTimeout: 5000 });
@@ -1265,20 +1266,27 @@ describe("DbClientTab manual commit", () => {
 
   /** Stateful fake of the backend TxState: inserts count while manual. */
   function fakeTx() {
-    const state = { supported: true, manual: false, pending: 0, generation: 1 };
-    ipcMock.dbTxStatus.mockImplementation(async () => ({ ...state }));
+    // `dropNext` simulates the pool opening a new connection before the next statement.
+    const state = { supported: true, manual: false, pending: 0, generation: 1, dropNext: false };
+    const snapshot = () => ({ supported: state.supported, manual: state.manual, pending: state.pending, generation: state.generation });
+    ipcMock.dbTxStatus.mockImplementation(async () => snapshot());
     ipcMock.dbTxSetManual.mockImplementation(async (_sessionId: string, manual: boolean) => {
       state.manual = manual;
       state.pending = 0;
-      return { ...state };
+      return snapshot();
     });
     const end = async () => {
       state.pending = 0;
-      return { ...state };
+      return snapshot();
     };
     ipcMock.dbTxCommit.mockImplementation(end);
     ipcMock.dbTxRollback.mockImplementation(end);
     ipcMock.dbExecuteStream.mockImplementation(async (_session: string, sql: string, _max: number | null, onEvent: (event: StreamEvent) => void) => {
+      if (state.dropNext) {
+        state.dropNext = false;
+        state.generation += 1;
+        state.pending = 0;
+      }
       if (state.manual && /^insert/i.test(sql)) state.pending += 1;
       onEvent({ kind: "done", rowsAffected: 1, durationMs: 1, warnings: [] });
     });
@@ -1340,6 +1348,63 @@ describe("DbClientTab manual commit", () => {
     await waitFor(() => expect(screen.getByTestId("db-tx-mode")).toHaveAttribute("data-mode", "auto"));
     expect(ipcMock.dbTxSetManual).toHaveBeenLastCalledWith(expect.any(String), false);
     expect(screen.queryByTestId("db-tx-commit")).not.toBeInTheDocument();
+  });
+
+  it("warns once when a reconnect drops uncommitted statements", async () => {
+    const state = fakeTx();
+    await renderConnected("insert into t values (1)");
+    fireEvent.click(screen.getByTestId("db-tx-mode"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-mode")).toHaveAttribute("data-mode", "manual"));
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 1"));
+
+    state.dropNext = true;
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(dialogMock.alert).toHaveBeenCalledTimes(1));
+    expect(dialogMock.alert.mock.calls[0][0]).toEqual({
+      title: "Connection re-established",
+      message: "The database connection was re-established. 1 uncommitted statement(s) were lost.",
+    });
+    // The insert that just ran on the new connection is the only pending one.
+    expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 1");
+
+    fireEvent.click(screen.getByTestId("db-tx-rollback"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 0"));
+    state.dropNext = true;
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 1"));
+    expect(dialogMock.alert).toHaveBeenCalledTimes(1);
+  });
+
+  it("rolls back pending statements before disconnecting when the tab closes", async () => {
+    fakeTx();
+    await renderConnected("insert into t values (1)");
+    fireEvent.click(screen.getByTestId("db-tx-mode"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-mode")).toHaveAttribute("data-mode", "manual"));
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 1"));
+
+    // An earlier test's deferred rollback -> disconnect may land late; count from here.
+    ipcMock.dbDisconnect.mockClear();
+    ipcMock.dbTxRollback.mockClear();
+    cleanup();
+    await waitFor(() => expect(ipcMock.dbDisconnect).toHaveBeenCalledTimes(1));
+    expect(ipcMock.dbTxRollback).toHaveBeenCalledTimes(1);
+    expect(ipcMock.dbTxRollback.mock.invocationCallOrder[0]).toBeLessThan(ipcMock.dbDisconnect.mock.invocationCallOrder[0]);
+    expect(useAppStore.getState().statusMessage).toBe("Rolled back 1 uncommitted statement(s) when the database tab closed.");
+  });
+
+  it("only disconnects on close in auto-commit mode", async () => {
+    fakeTx();
+    await renderConnected("insert into t values (1)");
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(ipcMock.dbExecuteStream).toHaveBeenCalledTimes(1));
+    // An earlier test's deferred rollback -> disconnect may land late; count from here.
+    ipcMock.dbDisconnect.mockClear();
+    ipcMock.dbTxRollback.mockClear();
+    cleanup();
+    await waitFor(() => expect(ipcMock.dbDisconnect).toHaveBeenCalledTimes(1));
+    expect(ipcMock.dbTxRollback).not.toHaveBeenCalled();
   });
 
   it("keeps the toggle disabled until connected and hides it for other engines", async () => {

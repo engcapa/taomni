@@ -279,6 +279,7 @@ cases:
 - TC-DB-EXEC-004-explain-native
 - TC-DB-TX-001-manual-commit-browser
 - TC-DB-TX-001-manual-commit-native
+- TC-DB-TX-002-reconnect-close-native
 - TC-DB-EDIT-001-grid-sql-preview-native
 - TC-DB-GRID-001-sort-filter-count-native
 - TC-auto-F-DB-2-redis-session-scaffold

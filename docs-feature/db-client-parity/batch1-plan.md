@@ -190,3 +190,29 @@
 | V2 | A2 | 同上 | 打开 Filter rows 输入 `Ann`，再清空 | 计数 `3/3` → `2 [3]/3` → `3/3` | unit | `QueryResultGrid.test.tsx` “shows filtered row count …”（P2 新增） |
 | V3 | A1 A2 | native，`mysql_required` | `SELECT` 三行，点列头排序，Filter rows 输入过滤 | 计数 `3/2` → `1 [3]/2`；排序后首行变化 | native | `qa-ui-auto-tests/cases/TC-DB-GRID-001-sort-filter-count-native.testcase.yaml`（P2 新增） |
 | — | — | browser | — | 浏览器预览得不到结果网格；不设 browser 用例 | — | — |
+
+<a id="db-tx-002"></a>
+## DB-TX-002 重连与关闭时的未提交处理
+
+- 来源 / 范围 / 参照：DBV-TX-02；MySQL/MariaDB 与 PostgreSQL 的 Manual 模式。`主参照: merge`：重连后的可见提示取 DbVisualizer（DBeaver 只在日志里记录）；关闭标签时回滚取 DBeaver 的 “rollback on close” 默认值，但不弹三选框，改为回滚后在状态栏说明，避免关闭流程被阻塞。依赖 DB-TX-001。
+- 当前事实：DB-TX-001 的 `TxState.generation` 在每个新物理连接时加 1 并清零计数，但前端不比较 generation；关闭标签只调用 `db_disconnect`，服务器端隐式回滚且无提示。
+- 规则：
+  - 前端每次拿到新的 `DbTxStatus`（运行结束、网格保存、Commit / Rollback、切换模式）时与上一次比较：`generation` 变大且上一次是 Manual 且 `pending > 0`，弹出提示框（标题 `Connection re-established`，内容 `The database connection was re-established. N uncommitted statement(s) were lost.`），并写入状态栏；计数随新状态归零。
+  - 卸载（关闭标签）时，Manual 且 `pending > 0`：先 `db_tx_rollback` 再 `db_disconnect`，状态栏显示 `Rolled back N uncommitted statement(s) when the database tab closed.`。回滚失败也继续断开。
+- 保留契约：Auto 模式与无未提交语句时的关闭行为不变；Commit / Rollback 计数规则不变。
+- 非目标：关闭前询问 Commit / Rollback；自动重试丢失的语句。
+- 验收：
+  - `A1` generation 变化且之前有未提交语句时弹出提示并清零计数；没有未提交语句时不提示。
+  - `A2` 关闭标签时有未提交语句则先回滚再断开，并在状态栏说明；否则只断开。
+  - `A3` 真实 MySQL 上连接被杀后下一条语句触发提示，之前的插入不存在。
+
+<a id="db-tx-002-test-cases"></a>
+### 测试用例
+
+| V | AC | 前置 / fixture | 操作 | 预期 | 层级 | 路径 / ID |
+|---|---|---|---|---|---|---|
+| V1 | A1 | mock IPC | Manual 下插入（Pending 1）后下一次状态的 generation + 1、pending 0 | alert 标题 `Connection re-established`，内容含 `1 uncommitted`；计数 0；无未提交时 generation 变化不提示 | unit | `DbClientTab.test.tsx` “reconnect …”（P2 新增） |
+| V2 | A2 | mock IPC | Manual 且 Pending 1 时卸载组件；Auto 时卸载 | 先 `dbTxRollback` 后 `dbDisconnect`，状态栏消息；Auto 只调用 `dbDisconnect` | unit | 同上 |
+| V3 | A1 A3 | native，`mysql_required` | Manual，插入一行（Pending 1）；执行 `KILL CONNECTION_ID()`；再执行计数查询 | 出现 `alert-dialog` 含 `uncommitted`；Pending 0；计数 `count-0` | native | `qa-ui-auto-tests/cases/TC-DB-TX-002-reconnect-close-native.testcase.yaml`（P2 新增） |
+| V4 | A2 | 同上 | 再插入一行（Pending 1）后关闭数据库标签；重新打开会话计数 | 状态栏含 `Rolled back 1`；重新打开后 `count-0` 且模式为 Auto | native | 同上 |
+| — | — | browser | — | 浏览器预览不能建立连接，Manual 模式不可用；不设 browser 用例 | — | — |
