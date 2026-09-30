@@ -184,6 +184,19 @@ class FakeMailState:
         with self.lock:
             return len(self.folders.get(folder, FakeFolder(0)).messages)
 
+    def subjects(self, folder: str) -> list[str]:
+        """Subject header of every message in ``folder``."""
+        with self.lock:
+            messages = list(self.folders.get(folder, FakeFolder(0)).messages.values())
+        subjects = []
+        for message in messages:
+            head = message.raw.decode("utf-8", "replace").split("\r\n\r\n", 1)[0]
+            for line in head.split("\r\n"):
+                if line.lower().startswith("subject:"):
+                    subjects.append(line.split(":", 1)[1].strip())
+                    break
+        return subjects
+
 
 def _unquote(value: str) -> str:
     value = value.strip()
@@ -250,13 +263,19 @@ def _search_tokens(text: str) -> list[str]:
 
 
 def _search_keys(folder: FakeFolder, text: str) -> list[int]:
-    """AND of TEXT/BODY/SUBJECT/FROM/TO/UNSEEN/SEEN/FLAGGED/KEYWORD/ALL keys."""
+    """AND of UID <set>/TEXT/BODY/SUBJECT/FROM/TO/UNSEEN/SEEN/FLAGGED/KEYWORD/ALL keys."""
     tokens = _search_tokens(text)
     checks = []
+    uid_ranges: list[tuple[int, int]] | None = None
+    maximum = max(folder.messages, default=0)
     index = 0
     while index < len(tokens):
         key = tokens[index].upper()
         if key == "CHARSET":
+            index += 2
+            continue
+        if key == "UID" and index + 1 < len(tokens):
+            uid_ranges = _uid_ranges(tokens[index + 1], maximum)
             index += 2
             continue
         if key in {"TEXT", "BODY", "SUBJECT", "FROM", "TO", "KEYWORD"} and index + 1 < len(tokens):
@@ -290,7 +309,10 @@ def _search_keys(folder: FakeFolder, text: str) -> list[int]:
                 return False
         return True
 
-    return [uid for uid, message in sorted(folder.messages.items()) if matches(message)]
+    return [
+        uid for uid, message in sorted(folder.messages.items())
+        if (uid_ranges is None or _in(uid, uid_ranges)) and matches(message)
+    ]
 
 
 def _quote(name: str) -> str:
@@ -384,7 +406,7 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                                 for line in m.raw.decode("utf-8", "replace").splitlines()
                             )
                         ]
-                    elif criteria.startswith("UID "):
+                    elif criteria.startswith("UID ") and " " not in criteria[4:].strip():
                         ranges = _uid_ranges(criteria[4:].strip(), maximum)
                         hits = [uid for uid in sorted(folder.messages) if _in(uid, ranges)]
                     else:

@@ -19,6 +19,7 @@ import {
   Download,
   ExternalLink,
   FileText,
+  Filter as FilterIcon,
   Folder,
   FolderInput,
   FolderPlus,
@@ -115,6 +116,8 @@ import {
 import { listen } from "@tauri-apps/api/event";
 import { notifyDesktop } from "../../lib/lanNotify";
 import { formatInviteRange, hasCalendarPart, myPartstat } from "../../lib/mailInvite";
+import { filterFromMessage, mailApplyFilters, type MailFilter } from "../../lib/mailFilters";
+import { MailFiltersPanel } from "./MailFiltersPanel";
 import {
   isSelectable,
   isSubscribed,
@@ -276,6 +279,7 @@ interface MailDraggableDialogProps {
   className: string;
   children: ReactNode;
   headerActions?: ReactNode;
+  closeTestId?: string;
   onClose: () => void;
 }
 
@@ -482,6 +486,7 @@ function MailDraggableDialog({
   className,
   children,
   headerActions,
+  closeTestId,
   onClose,
 }: MailDraggableDialogProps) {
   const { containerRef, handleRef } = useModalDraggableAndResizable({ minWidth, minHeight });
@@ -514,6 +519,7 @@ function MailDraggableDialog({
           onClick={onClose}
           aria-label="Close dialog"
           title="Close"
+          data-testid={closeTestId}
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -1195,6 +1201,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const draggedMessagesRef = useRef<MailMessageHeader[]>([]);
   const [dropFolder, setDropFolder] = useState<string | null>(null);
   const [unsubscribeArmed, setUnsubscribeArmed] = useState<string | null>(null);
+  /** Message filters dialog (TASK-13); the draft pre-fills "Create filter from message". */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterDraft, setFilterDraft] = useState<MailFilter | null>(null);
+  /** Failed actions of the last incoming filter run (AC-42), kept until the dialog is opened. */
+  const [filterErrors, setFilterErrors] = useState<string[]>([]);
+  const incomingFiltersRef = useRef<(() => Promise<void>) | null>(null);
   /** Calendar invitation of the open message (TASK-20), keyed by message. */
   const [inviteView, setInviteView] = useState<{
     key: string;
@@ -2007,6 +2019,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         },
       });
       if (changed && info.cache.enabled) await reloadVisibleFromCache(folder);
+      if (loop.fetched > 0 && folder.trim().toUpperCase() === "INBOX") {
+        await incomingFiltersRef.current?.();
+      }
       return loop;
     } finally {
       if (indicator !== "none" && visibleRef.current) setSyncProgress(null);
@@ -2199,6 +2214,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         }
       }
       if (indicator === "none") notifyNewMail(newMessages);
+      // New INBOX mail from the full scan goes through the incoming filters
+      // (a cheap cache query when nothing is new or no filter is enabled).
+      if (result.fetchedMessages > 0) await incomingFiltersRef.current?.();
       if (!visibleRef.current) {
         pendingCacheRefreshRef.current = true;
         return result;
@@ -3716,6 +3734,43 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     ?? displayFolders.find((folder) => `${folder.name} ${folderLabel(folder)}`.toLowerCase().includes("inbox"))?.name
     ?? "INBOX";
 
+  /** AC-40: run the incoming filters on new INBOX mail (tab open only, DEC-01). */
+  incomingFiltersRef.current = async () => {
+    try {
+      const result = await mailApplyFilters(info, resolveInboxFolder(), "incoming", {
+        trashFolder: resolveSpecialFolder("trash"),
+      });
+      if (result.errors.length > 0) {
+        setFilterErrors(result.errors);
+        setError(`Mail filter actions failed: ${result.errors.join("; ")}`);
+      }
+      if (result.matched > 0) {
+        setStatus(`Filters handled ${result.matched} new message${result.matched === 1 ? "" : "s"}`);
+        await reloadVisibleFromCache(selectedFolderRef.current);
+        void loadCachedFolders();
+      }
+    } catch (e) {
+      console.debug("incoming mail filters failed", e);
+    }
+  };
+
+  /** AC-41: run filters by hand on the selected folder. */
+  const runFiltersOnFolder = async (filterIds: string[] | undefined) => {
+    const folder = selectedFolderRef.current;
+    const result = await mailApplyFilters(info, folder, "manual", {
+      filterIds,
+      trashFolder: resolveSpecialFolder("trash"),
+    });
+    await reloadVisibleFromCache(folder);
+    void loadCachedFolders();
+    return result;
+  };
+
+  const openFilterFromMessage = (message: MailMessageHeader) => {
+    setFilterDraft(filterFromMessage(message));
+    setFiltersOpen(true);
+  };
+
   const handleToggleFlagged = (targets: MailMessageHeader[]) => runMailAction(async () => {
     const unique = dedupeMessages(targets);
     if (unique.length === 0) return;
@@ -4411,6 +4466,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       { label: `Not junk${suffix}`, icon: <Inbox className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleNotJunkMessages(targets) },
       { label: `Delete${suffix}`, icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, disabled: busyAction, onClick: () => void handleDeleteMessages(targets) },
       { label: "", separator: true },
+      { label: "Create filter from message…", icon: <FilterIcon className="w-3.5 h-3.5" />, testId: "mail-menu-create-filter", onClick: () => openFilterFromMessage(message) },
       { label: "Save as .eml", icon: <Save className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleSaveEml(message) },
       { label: "View source", icon: <Code className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleViewSource(message) },
       { label: "Print", icon: <Printer className="w-3.5 h-3.5" />, onClick: () => handlePrintMessage(message) },
@@ -5140,6 +5196,23 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   >
                     <ListChecks className="w-3.5 h-3.5" />
                   </button>
+                  <button
+                    type="button"
+                    className="ml-1 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
+                    title="Message filters"
+                    aria-label="Message filters"
+                    data-testid="mail-filters-open"
+                    data-errors={filterErrors.length || undefined}
+                    onClick={() => {
+                      setFilterDraft(null);
+                      setFiltersOpen(true);
+                    }}
+                  >
+                    <FilterIcon className="w-3.5 h-3.5" />
+                    {filterErrors.length > 0 && (
+                      <AlertTriangle className="w-2.5 h-2.5 -ml-1 -mt-2 text-amber-500" data-testid="mail-filters-error-badge" />
+                    )}
+                  </button>
                 </div>
                 <div className="flex-1 min-h-0 py-1 overflow-auto">
                   {treeFolders.map((folder) => {
@@ -5745,6 +5818,37 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           <button type="button" className="taomni-btn h-7 px-2" data-testid="mail-undo-send-button" onClick={() => void handleUndoSend()}>
             Undo
           </button>
+        </div>
+      )}
+
+      {filtersOpen && (
+        <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title="Message filters"
+            icon={<FilterIcon className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Message filters"
+            closeTestId="mail-filters-close"
+            minWidth={460}
+            minHeight={320}
+            className="w-[min(720px,92vw)] h-[min(560px,80vh)] min-h-[340px]"
+            onClose={() => {
+              setFiltersOpen(false);
+              setFilterErrors([]);
+            }}
+          >
+            <MailFiltersPanel
+              recentErrors={filterErrors}
+              accountId={info.sessionId}
+              folders={displayFolders.filter(isSelectable).map((folder) => ({ name: folder.name, label: folderLabel(folder) }))}
+              currentFolder={{
+                name: selectedFolder,
+                label: folderLabel(displayFolders.find((folder) => folder.name === selectedFolder) ?? { name: selectedFolder, displayName: selectedFolder } as MailFolder),
+              }}
+              initialDraft={filterDraft}
+              onRun={runFiltersOnFolder}
+              onStatus={setStatus}
+            />
+          </MailDraggableDialog>
         </div>
       )}
 

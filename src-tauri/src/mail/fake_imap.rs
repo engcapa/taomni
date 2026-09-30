@@ -476,12 +476,25 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                     .map(|(uid, _)| *uid)
                     .collect()
             } else if let Some(set) = criteria.strip_prefix("UID ") {
-                let ranges = parse_uid_set(set.trim(), max);
+                // `UID <set>` optionally followed by `BODY "<needle>"` (filters).
+                let (set, rest) = set.trim().split_once(' ').unwrap_or((set.trim(), ""));
+                let ranges = parse_uid_set(set, max);
+                let needle = rest
+                    .trim()
+                    .strip_prefix("BODY ")
+                    .map(|value| unquote(value.trim()).to_uppercase());
                 folder
                     .messages
-                    .keys()
-                    .copied()
-                    .filter(|uid| in_set(*uid, &ranges))
+                    .iter()
+                    .filter(|(uid, _)| in_set(**uid, &ranges))
+                    .filter(|(_, message)| {
+                        needle.as_ref().is_none_or(|needle| {
+                            let raw = String::from_utf8_lossy(&message.raw).to_uppercase();
+                            let body = raw.split_once("\r\n\r\n").map_or("", |(_, b)| b);
+                            body.contains(needle.as_str())
+                        })
+                    })
+                    .map(|(uid, _)| *uid)
                     .collect()
             } else {
                 Vec::new()

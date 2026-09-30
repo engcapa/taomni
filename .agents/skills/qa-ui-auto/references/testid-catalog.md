@@ -909,6 +909,34 @@
 - `[data-testid="mail-identities-editor"]` — display [optional] — F-MAIL-9.identities-editor
 - `[data-testid="mail-identity-add"]` — interactive [optional] — F-MAIL-9.identity-add
 
+## mail/filters (F-MAIL-19)
+
+- `[data-testid="mail-filters-open"]` — interactive — F-MAIL-19.filters-open
+- `[data-testid="mail-filters-close"]` — interactive — F-MAIL-19.filters-close
+- `[data-testid="mail-filters-panel"]` — display [optional] — F-MAIL-19.filters-panel
+- `[data-testid="mail-filter-new"]` — interactive — F-MAIL-19.filter-new
+- `[data-testid="mail-filter-row"]` — display — F-MAIL-19.filter-row
+- `[data-testid="mail-filter-name"]` — interactive — F-MAIL-19.filter-name
+- `[data-testid="mail-filter-condition-field"]` — interactive — F-MAIL-19.filter-condition-field
+- `[data-testid="mail-filter-condition-op"]` — interactive [optional] — F-MAIL-19.filter-condition-op
+- `[data-testid="mail-filter-condition-value"]` — interactive — F-MAIL-19.filter-condition-value
+- `[data-testid="mail-filter-action-folder"]` — interactive — F-MAIL-19.filter-action-folder
+- `[data-testid="mail-filter-save"]` — interactive — F-MAIL-19.filter-save
+- `[data-testid="mail-filter-match"]` — interactive [optional] — F-MAIL-19.filter-match
+- `[data-testid="mail-filter-on-incoming"]` — interactive [optional] — F-MAIL-19.filter-on-incoming
+- `[data-testid="mail-filter-add-condition"]` — interactive [optional] — F-MAIL-19.filter-add-condition
+- `[data-testid="mail-filter-add-action"]` — interactive [optional] — F-MAIL-19.filter-add-action
+- `[data-testid="mail-filter-action-kind"]` — interactive [optional] — F-MAIL-19.filter-action-kind
+- `[data-testid="mail-filter-action-tag"]` — interactive [optional] — F-MAIL-19.filter-action-tag
+- `[data-testid="mail-filter-action-address"]` — interactive [optional] — F-MAIL-19.filter-action-address
+- `[data-testid="mail-filter-run-all"]` — interactive [optional] — F-MAIL-19.filter-run-all
+- `[data-testid="mail-filter-run"]` — interactive [optional] — F-MAIL-19.filter-run
+- `[data-testid="mail-filter-edit"]` — interactive [optional] — F-MAIL-19.filter-edit
+- `[data-testid="mail-filter-delete"]` — interactive [optional] — F-MAIL-19.filter-delete
+- `[data-testid="mail-filter-enabled"]` — interactive [optional] — F-MAIL-19.filter-enabled
+- `[data-testid="mail-menu-create-filter"]` — interactive [optional] — F-MAIL-19.menu-create-filter
+- `[data-testid="mail-filters-recent-errors"]` — display [optional] — F-MAIL-19.filters-recent-errors
+
 ## mail/folders (F-MAIL-11)
 
 - `[data-testid="mail-subscriptions-open"]` — interactive — F-MAIL-11.subscriptions-open

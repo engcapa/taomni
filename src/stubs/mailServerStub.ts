@@ -364,6 +364,11 @@ export function stubMailTransfer(
   return count;
 }
 
+/** Cached headers of a folder (what the filter engine sees). */
+export function stubMailCachedHeaders(accountId: string, seed: Seed, folderName: string): StubMailHeader[] {
+  return [...folderState(account(accountId, seed), folderName).cache.values()];
+}
+
 export function stubMailUpdateCachedFlags(accountId: string, folder: string, uids: number[], add: string[], remove: string[]) {
   const state = accounts.get(accountId);
   const entry = state?.folders.get(folder);
@@ -437,6 +442,7 @@ export interface StubMailQaControl {
   accounts: () => string[];
   idleClients: () => number;
   smtpContains: (text: string) => boolean;
+  subjects: (accountId: string, folder: string) => string[];
 }
 
 function stubInvite(summary: string, uid: string): StubMailInvite {
@@ -512,6 +518,9 @@ export function installStubMailQaControl(seed: Seed): void {
     },
     smtpContains(text) {
       return sentTexts.some((sent) => sent.includes(text));
+    },
+    subjects(accountId, folderName) {
+      return [...folderState(account(accountId, seed), folderName).server.values()].map((message) => message.subject);
     },
     unseen(accountId, folderName) {
       return [...folderState(account(accountId, seed), folderName).server.values()].filter(isUnseen).length;

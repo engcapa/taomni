@@ -2685,7 +2685,13 @@ def _do_mail_server_assert_folder_count(ctx: NativeStepContext, args: Any) -> st
     count = -1
     while time.time() < deadline:
         count = state.count(folder)
-        if count >= minimum and ("equals" not in args or count == int(args["equals"])):
+        subjects = state.subjects(folder)
+        if (
+            count >= minimum
+            and ("equals" not in args or count == int(args["equals"]))
+            and ("has_subject" not in args or args["has_subject"] in subjects)
+            and ("lacks_subject" not in args or args["lacks_subject"] not in subjects)
+        ):
             return f"{folder} has {count} messages on the server"
         time.sleep(0.25)
     raise StepError(f"mail_server_assert_folder_count: {folder} has {count}, expected {args!r}")

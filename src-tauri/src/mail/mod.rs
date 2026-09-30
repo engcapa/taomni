@@ -41,6 +41,7 @@ use crate::terminal::network::NetworkSettings;
 
 pub mod autoconfig;
 pub mod calendar;
+pub mod filters;
 pub mod certs;
 #[cfg(test)]
 mod fake_imap;
@@ -1493,7 +1494,8 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
             ON mail_drafts(account_id, updated_at DESC);",
     )?;
     sync::migrate_mail_tables(conn)?;
-    pop3::migrate_local_tables(conn)
+    pop3::migrate_local_tables(conn)?;
+    filters::migrate_filter_tables(conn)
 }
 
 fn with_mail_db<T>(

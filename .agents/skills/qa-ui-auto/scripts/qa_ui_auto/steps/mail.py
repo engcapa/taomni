@@ -93,14 +93,25 @@ def mail_server_assert_folder_count(ctx: StepContext, args: Any) -> None:
     deadline = time.time() + float(args.get("timeout_sec", 20))
     count = -1
     while time.time() < deadline:
-        count = ctx.page.evaluate(  # type: ignore[attr-defined]
+        observed = ctx.page.evaluate(  # type: ignore[attr-defined]
             f"""(folder) => {{
               const ids = {_CONTROL}.accounts();
-              return ids.length ? {_CONTROL}.observe(ids[0], folder).server.length : -1;
+              if (!ids.length) return {{ count: -1, subjects: [] }};
+              return {{
+                count: {_CONTROL}.observe(ids[0], folder).server.length,
+                subjects: {_CONTROL}.subjects(ids[0], folder),
+              }};
             }}""",
             folder,
         )
-        if count >= minimum and ("equals" not in args or count == int(args["equals"])):
+        count = observed["count"]
+        subjects = observed["subjects"]
+        if (
+            count >= minimum
+            and ("equals" not in args or count == int(args["equals"]))
+            and ("has_subject" not in args or args["has_subject"] in subjects)
+            and ("lacks_subject" not in args or args["lacks_subject"] not in subjects)
+        ):
             return
         time.sleep(0.25)
     raise StepError(f"mail_server_assert_folder_count: {folder} has {count}, expected {args!r}")

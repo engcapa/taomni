@@ -1198,6 +1198,14 @@
               "type": "integer",
               "minimum": 0
             },
+            "has_subject": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lacks_subject": {
+              "type": "string",
+              "minLength": 1
+            },
             "timeout_sec": {
               "type": "number",
               "minimum": 1

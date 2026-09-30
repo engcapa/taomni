@@ -18,6 +18,8 @@ import {
   type Seed as MailStubSeed,
   type StubMailSearchQuery,
 } from "./mailServerStub";
+import { stubApplyFilters, stubListFilters, stubSaveFilters } from "./mailFiltersStub";
+import type { MailFilter } from "../lib/mailFilters";
 import type { SessionConfig, SessionGroup, LocalShellOption, LocalDirectoryShortcut, IpcRunSnapshotRecord, IpcSnapshotEntry } from "../lib/ipc";
 import {
   isSshSession,
@@ -4122,6 +4124,31 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       }
       return { accepted: true, response: "browser-preview accepted", sentCopyFolder: "Sent" } as T;
     }
+    case "mail_list_filters":
+      return stubListFilters(stubMailAccountId(args as InvokeArgs | undefined)) as T;
+    case "mail_save_filters": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const filters = (invokeArgs?.filters as MailFilter[] | undefined) ?? [];
+      return stubSaveFilters(stubMailAccountId(invokeArgs), mailStubSeed, filters) as T;
+    }
+    case "mail_apply_filters": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubApplyFilters(
+        stubMailAccountId(invokeArgs),
+        mailStubSeed,
+        (invokeArgs?.folder as string | undefined) ?? "INBOX",
+        String(invokeArgs?.trigger ?? "manual"),
+        {
+          uids: (invokeArgs?.uids as number[] | null | undefined) ?? null,
+          filterIds: (invokeArgs?.filterIds as string[] | null | undefined) ?? null,
+          trashFolder: (invokeArgs?.trashFolder as string | null | undefined) ?? null,
+        },
+      ) as T;
+    }
+    case "mail_export_filters":
+      return stubListFilters(stubMailAccountId(args as InvokeArgs | undefined)).length as T;
+    case "mail_import_filters":
+      return stubListFilters(stubMailAccountId(args as InvokeArgs | undefined)) as T;
     case "mail_get_invite": {
       const invokeArgs = args as InvokeArgs | undefined;
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";

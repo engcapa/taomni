@@ -5774,6 +5774,120 @@ controls:
 
 ---
 
+### 13.19 消息过滤器 ✅
+
+<!-- feature
+id: F-MAIL-19
+status: done
+area: mail/filters
+components: [MailFiltersPanel, MailClientTab]
+files:
+  - src/components/mail/MailFiltersPanel.tsx
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailFilters.ts
+  - src-tauri/src/mail/filters.rs
+controls:
+  - id: filters-open
+    selector: '[data-testid="mail-filters-open"]'
+    kind: interactive
+  - id: filters-close
+    selector: '[data-testid="mail-filters-close"]'
+    kind: interactive
+  - id: filters-panel
+    selector: '[data-testid="mail-filters-panel"]'
+    kind: display
+    optional: true
+  - id: filter-new
+    selector: '[data-testid="mail-filter-new"]'
+    kind: interactive
+  - id: filter-row
+    selector: '[data-testid="mail-filter-row"]'
+    kind: display
+  - id: filter-name
+    selector: '[data-testid="mail-filter-name"]'
+    kind: interactive
+  - id: filter-condition-field
+    selector: '[data-testid="mail-filter-condition-field"]'
+    kind: interactive
+  - id: filter-condition-op
+    selector: '[data-testid="mail-filter-condition-op"]'
+    kind: interactive
+    optional: true
+  - id: filter-condition-value
+    selector: '[data-testid="mail-filter-condition-value"]'
+    kind: interactive
+  - id: filter-action-folder
+    selector: '[data-testid="mail-filter-action-folder"]'
+    kind: interactive
+  - id: filter-save
+    selector: '[data-testid="mail-filter-save"]'
+    kind: interactive
+  - id: filter-match
+    selector: '[data-testid="mail-filter-match"]'
+    kind: interactive
+    optional: true
+  - id: filter-on-incoming
+    selector: '[data-testid="mail-filter-on-incoming"]'
+    kind: interactive
+    optional: true
+  - id: filter-add-condition
+    selector: '[data-testid="mail-filter-add-condition"]'
+    kind: interactive
+    optional: true
+  - id: filter-add-action
+    selector: '[data-testid="mail-filter-add-action"]'
+    kind: interactive
+    optional: true
+  - id: filter-action-kind
+    selector: '[data-testid="mail-filter-action-kind"]'
+    kind: interactive
+    optional: true
+  - id: filter-action-tag
+    selector: '[data-testid="mail-filter-action-tag"]'
+    kind: interactive
+    optional: true
+  - id: filter-action-address
+    selector: '[data-testid="mail-filter-action-address"]'
+    kind: interactive
+    optional: true
+  - id: filter-run-all
+    selector: '[data-testid="mail-filter-run-all"]'
+    kind: interactive
+    optional: true
+  - id: filter-run
+    selector: '[data-testid="mail-filter-run"]'
+    kind: interactive
+    optional: true
+  - id: filter-edit
+    selector: '[data-testid="mail-filter-edit"]'
+    kind: interactive
+    optional: true
+  - id: filter-delete
+    selector: '[data-testid="mail-filter-delete"]'
+    kind: interactive
+    optional: true
+  - id: filter-enabled
+    selector: '[data-testid="mail-filter-enabled"]'
+    kind: interactive
+    optional: true
+  - id: menu-create-filter
+    selector: '[data-testid="mail-menu-create-filter"]'
+    kind: interactive
+    optional: true       # message context menu
+  - id: filters-recent-errors
+    selector: '[data-testid="mail-filters-recent-errors"]'
+    kind: display
+    optional: true
+-->
+
+- 邮箱栏的漏斗按钮打开 “Message filters” 对话框（DEC-11，Thunderbird 式）：规则列表可启用/停用、上移下移（即执行顺序）、编辑、删除、对当前文件夹单独运行或全部运行，并可导出/导入 JSON。
+- 编辑器支持多条件（From/To/Cc/To 或 Cc/主题/正文/大小 KB/天数/标签/有附件；包含、不包含、是、不是、开头、结尾、正则、大于、小于；全部或任一匹配）与多动作（移动、复制、标记已读/未读、加星、加标签、删除到废纸篓、转发、停止执行后续过滤器）。邮件右键 “Create filter from message…” 预填发件人。
+- 收信过滤：标签打开期间，INBOX 同步取到新邮件后执行（DEC-01，不在后台运行）；每个文件夹记录已过滤的最高 UID，只处理之后到达的邮件，保存规则时不回溯旧邮件；UIDVALIDITY 变化后重新建立基线。POP3 账户同样适用。
+- 正文条件：正文已缓存时本地匹配，未缓存时用服务器 `UID SEARCH BODY` 判断（因此正文只支持包含/不包含）。
+- 动作失败（例如目标文件夹不存在）时邮件留在原处，错误显示在状态栏，漏斗按钮出现警示，打开对话框可看到失败明细（AC-42）。
+
+---
+
 ## 14. SocksCap 网络流量路由
 
 ### 14.1 SocksCap 控制面板 🟡

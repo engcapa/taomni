@@ -73,6 +73,17 @@ vi.mock("../../lib/mail", () => ({
     /untrusted server certificate|no longer matches the one you trusted/i.test(message ?? ""),
 }));
 
+const filterMocks = vi.hoisted(() => ({
+  mailApplyFilters: vi.fn(),
+  mailListFilters: vi.fn(),
+  mailSaveFilters: vi.fn(),
+}));
+
+vi.mock("../../lib/mailFilters", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/mailFilters")>()),
+  ...filterMocks,
+}));
+
 vi.mock("../../lib/ipc", () => ({
   openLocalPath: vi.fn(),
   selectUploadFile: vi.fn(async () => []),
@@ -246,6 +257,9 @@ describe("MailClientTab", () => {
     mailMocks.mailIdleStart.mockResolvedValue(true);
     mailMocks.mailIdleStop.mockResolvedValue(true);
     mailMocks.mailListFolders.mockResolvedValue([]);
+    for (const mock of Object.values(filterMocks)) mock.mockReset();
+    filterMocks.mailApplyFilters.mockResolvedValue({ folder: "INBOX", examined: 0, matched: 0, moved: 0, errors: [] });
+    filterMocks.mailListFilters.mockResolvedValue([]);
     eventMocks.handlers.clear();
     useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
   });
@@ -509,6 +523,40 @@ describe("MailClientTab", () => {
     await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(3));
     await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "121"));
     expect(useTaoAlertStore.getState().mailNew).toMatchObject([{ count: 120, mailTabId: "mail-tab" }]);
+  });
+
+  it("runs the incoming filters after new INBOX mail arrives (AC-40/AC-42)", async () => {
+    const syncOnOpenInfo: MailTabInfo = { ...info, sync: { ...info.sync, onOpen: true } };
+    const arrival: MailMessageHeader = { ...uncachedMessage, uid: 2000, messageId: "new@example.com", flags: [] };
+    mailMocks.mailSyncFolder.mockResolvedValueOnce(stepResult({ messages: [arrival], fetched: 1, newUnseen: 1 }));
+    filterMocks.mailApplyFilters.mockResolvedValue({
+      folder: "INBOX",
+      examined: 1,
+      matched: 1,
+      moved: 1,
+      errors: ["copy to Backup: folder missing"],
+    });
+    render(<MailClientTab tabId="mail-tab" info={syncOnOpenInfo} visible />);
+    await waitFor(() => expect(filterMocks.mailApplyFilters).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: info.sessionId }),
+      "INBOX",
+      "incoming",
+      expect.objectContaining({ trashFolder: null }),
+    ));
+    expect(await screen.findByTestId("mail-filters-error-badge")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("mail-filters-open"));
+    expect(await screen.findByTestId("mail-filters-recent-errors")).toHaveTextContent("copy to Backup: folder missing");
+  });
+
+  it("creates a filter from a message context menu (DEC-11)", async () => {
+    renderMailbox();
+    await screen.findByText(message.subject);
+    fireEvent.contextMenu(getMessageRow());
+    fireEvent.click(await screen.findByTestId("mail-menu-create-filter"));
+    expect(await screen.findByTestId("mail-filter-editor")).toBeInTheDocument();
+    expect(screen.getByTestId("mail-filter-condition-value")).toHaveValue(message.from?.address);
+    expect(screen.getByTestId("mail-filter-name")).toHaveValue(`From ${message.from?.name || message.from?.address}`);
+    expect(filterMocks.mailApplyFilters).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), "manual", expect.anything());
   });
 
   it("keeps periodic sync running while hidden and refreshes from cache when visible", async () => {

@@ -137,6 +137,24 @@ class FakeMailServerTest(unittest.TestCase):
         self.assertTrue(self.server.state.smtp_contains("body"))
         self.assertFalse(self.server.state.smtp_contains("METHOD:REPLY"))
 
+    def test_uid_set_with_body_search(self) -> None:
+        uids = self.server.state.deliver("INBOX", 3, prefix="Body")
+        client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
+        client.login("qa", "x")
+        client.select("INBOX")
+        wanted = f"{uids[0]},{uids[1]}"
+        typ, data = client.uid("SEARCH", "UID", wanted, "BODY", '"Body of Body 0002"')
+        self.assertEqual(typ, "OK")
+        self.assertEqual(data[0].split(), [str(uids[1]).encode()])
+        typ, data = client.uid("SEARCH", "UID", wanted)
+        self.assertEqual(data[0].split(), [str(uids[0]).encode(), str(uids[1]).encode()])
+        client.logout()
+
+    def test_subjects(self) -> None:
+        self.server.state.deliver("Archive", 2, prefix="Moved")
+        self.assertEqual(self.server.state.subjects("Archive"), ["Moved 0001", "Moved 0002"])
+        self.assertEqual(self.server.state.subjects("Missing"), [])
+
     def test_invite_delivery(self) -> None:
         (uid,) = self.server.state.deliver("INBOX", 1, prefix="Invite", invite="QA standup")
         raw = self.server.state.folders["INBOX"].messages[uid].raw

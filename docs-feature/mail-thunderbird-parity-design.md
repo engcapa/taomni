@@ -147,11 +147,11 @@ R1、R2、R4 共同的根本原因是：“同步到哪里”由缓存内容推�
 | DEC-08 旧设置迁移 | A. 已保存设置中等于旧默认值的 `headerRetentionDays = 30` 和 `headerLimitPerFolder = 2000` 视为“未改动”，迁移为 0（不限）；非默认值保留。<br>B. 全部保留旧值。 | A。这样符合 DEC-02 的默认意图，又不覆盖用户显式修改过的值。代价：少数有意设为 30/2000 的用户会被放开，可以在设置里改回。 | agent 自决（可逆） | `MainLayout.tsx:559-560` 默认 30/2000，最小值 1 | AC-12；TASK-01、TASK-04 |
 | DEC-09 同步测试手段 | A. 纯函数规划器配合脚本化的假 IMAP 流做单元测试，另加由环境变量开启的真实 Dovecot/GreenMail 活体测试。<br>B. 只做活体测试。 | A。缺口场景需要可重复的 UID 布局，单元测试最稳定；活体测试证明与真实服务器互通。 | agent 自决 | 当前没有任何同步算法测试（`mod.rs` tests 从 `:5700` 起） | V-01–V-05 |
 | DEC-10 线程视图 UI | Thunderbird 树形线程 vs Gmail 式会话卡片 | 接手 TASK-07 时出原型并提问 | 待用户决策 | 未提出，不影响 P0 | TASK-07（UI 部分） |
-| DEC-11 过滤器规则编辑器 UI | 条件/动作表单 vs 类 Sieve 文本 | 接手 TASK-13 时出原型并提问 | 待用户决策 | 未提出 | TASK-13 |
-| DEC-12 统一收件箱入口 | 独立的“统一邮件”标签 vs 在账户标签内切换 | 接手 TASK-16 时提问 | 待用户决策 | 未提出 | TASK-16 |
-| DEC-13 CardDAV / vCard 依赖 | agent 先核实候选 crate 的三端兼容性、许可证与维护状态 | 接手 TASK-19 时给出比较，再提问 | 待用户决策 | 未提出 | TASK-19 |
-| DEC-14 CalDAV 日历 UI（第二期） | 日历视图的形态与入口 | 第一期（邀请卡片）不受影响；第二期先出原型 | 待用户决策 | 未提出 | TASK-20 第二期 |
-| DEC-15 POP3 实现方式 | 引入 crate vs 自行实现（协议简单） | agent 核实后可以自决，并记录理由 | agent 可自决 | — | TASK-21 |
+| DEC-11 过滤器规则编辑器 UI | 条件/动作表单 vs 类 Sieve 文本 | Thunderbird 式对话框：规则列表 + 编辑对话框，多条件行（字段/运算符/值，全部或任一匹配）、多动作行；邮件右键“从此邮件创建过滤器”预填发件人；收信时执行，也可对文件夹手动执行 | 用户已定 | 2026-09-30 提问答复 | TASK-13 |
+| DEC-12 统一收件箱入口 | 独立的“统一邮件”标签 vs 在账户标签内切换 | 独立标签：从邮件菜单或侧边栏打开，按时间合并所有已保存账户的 INBOX/Sent/Drafts/星标，操作经所属账户执行；不影响单账户标签 | 用户已定 | 2026-09-30 提问答复 | TASK-16 |
+| DEC-13 CardDAV / vCard 依赖 | 引入 vCard crate vs 自行实现 | 自行实现，不新增依赖：vCard 3/4 与 ICS 行格式相同，复用 calendar.rs 的折行与转义；WebDAV（PROPFIND/REPORT）用现有 reqwest + quick-xml | 用户已定 | 2026-09-30 提问答复 | TASK-19 |
+| DEC-14 CalDAV 日历 UI（第二期） | 最小（同步 + 议程）/ 完整日历标签 / 不做 | 最小：CalDAV 账户与同步，接受邀请写入所选日历；邮件标签内提供“议程”列表显示近期事件；不做日/周/月网格；提醒只在标签打开时用桌面通知（DEC-01） | 用户已定 | 2026-09-30 提问答复 | TASK-20 第二期 |
+| DEC-15 POP3 实现方式 | 引入 crate vs 自行实现（协议简单） | 自行实现（`mail/pop3.rs`）：协议只需约 10 个命令，TLS 复用 native-tls 与证书固定，APOP 用 md-5 | agent 自决 | TASK-21 实现 | TASK-21 |
 ### 4.2 P0 同步引擎
 
 #### 不变量
@@ -763,7 +763,7 @@ macOS 和 Linux 未执行时标为未验证，不单独阻塞交付。性能基�
 | TASK-10 特殊文件夹、订阅、STATUS | 已实现 | Rust `mail::folders::`；TC-MAIL-FOLDER-01 | AC-33 往返次数未做基线对比（已实现 CONDSTORE 下 STATUS 未变跳过） |
 | TASK-11 标签与垃圾邮件 | 已实现 | Vitest `mailTags.test.ts`；TC-MAIL-TAG-01 | 本地垃圾邮件识别不在范围内 |
 | TASK-12 IDLE 与桌面通知 | 已实现 | Rust `mail::idle`（假 IMAP 服务器）；TC-MAIL-IDLE-01（含关闭后 IDLE 连接数为 0） | QRESYNC/VANISHED 未实现（可选项；删除对账沿用 P0 路径） |
-| TASK-13 过滤器 | 未开始 | — | 等待 DEC-11（规则编辑器 UI） |
+| TASK-13 过滤器 | 已实现 | Rust `mail::filters`（条件/动作语义、存储与 UID 水位、服务器 BODY 搜索走假 IMAP）；Vitest `MailFiltersPanel.test.tsx`、`MailClientTab.test.tsx`（AC-40/AC-42）；TC-MAIL-FILTER-01 | 转发以附件形式发出；正文条件只支持包含/不包含（未缓存正文用服务器 SEARCH）；收信过滤只在标签打开期间运行（DEC-01） |
 | TASK-14 自动配置与证书例外 | 部分 | Rust `mail::autoconfig`、`mail::certs`（本地 TLS 服务器）；TC-MAIL-AUTOCONF-01 | Exchange Autodiscover、RFC 6186 SRV 未实现；Yahoo/AOL/Fastmail OAuth 需厂商客户端 ID；证书固定仅在 Windows 验证 |
 | TASK-15 附件与大邮件 | 已实现 | Rust `mail::parts`（假服务器端到端）；Vitest；TC-MAIL-ATTACH-01 | AC-45 内存峰值未测量 |
 | TASK-16 统一收件箱 | 未开始 | — | 等待 DEC-12（入口形式） |
