@@ -46,6 +46,7 @@ pub mod idle;
 pub mod lists;
 pub mod mbox;
 pub mod outgoing;
+mod parts;
 pub mod search;
 mod sync;
 
@@ -409,6 +410,10 @@ pub struct MailAttachmentInfo {
     pub name: Option<String>,
     pub content_type: Option<String>,
     pub size: Option<usize>,
+    /// IMAP section ("2", "1.3") for large messages listed via BODYSTRUCTURE;
+    /// downloads then fetch only that part.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -899,6 +904,7 @@ impl ActiveImapSession {
         uid: u32,
         attachment_index: usize,
         target_path: &str,
+        section: Option<&str>,
     ) -> Result<MailDownloadAttachmentResult, String> {
         match self {
             Self::Tls { session, .. } => imap_download_attachment(
@@ -908,6 +914,7 @@ impl ActiveImapSession {
                 uid,
                 attachment_index,
                 target_path,
+                section,
             ),
             Self::Plain { session, .. } => imap_download_attachment(
                 session,
@@ -916,6 +923,7 @@ impl ActiveImapSession {
                 uid,
                 attachment_index,
                 target_path,
+                section,
             ),
         }
     }
@@ -2154,6 +2162,7 @@ pub async fn mail_download_attachment(
     uid: u32,
     attachment_index: usize,
     target_path: String,
+    section: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<MailDownloadAttachmentResult, String> {
     let target_path = target_path.trim().to_string();
@@ -2161,19 +2170,61 @@ pub async fn mail_download_attachment(
         return Err("attachment download path is required".into());
     }
     let account = resolve_config(&state, config)?;
+    let section = section
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    // AC-46: with the attachment cache on, a second open is a local copy.
+    let cache_path = account.config.cache.attachment_cache.then(|| {
+        let key = section
+            .clone()
+            .unwrap_or_else(|| format!("i{attachment_index}"));
+        parts::attachment_cache_path(
+            state.mail_cache_root(),
+            &crate::state::mail_db_file_stem(&account.config.session_id),
+            &folder,
+            uid,
+            &key,
+        )
+    });
+    if let Some(cached) = cache_path.as_ref().filter(|path| path.is_file()) {
+        if let Ok(bytes) = std::fs::read(cached) {
+            let path = write_attachment_file(&target_path, &bytes)?;
+            return Ok(MailDownloadAttachmentResult {
+                path,
+                name: None,
+                content_type: None,
+                size: bytes.len(),
+            });
+        }
+    }
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || {
+    let result = tokio::task::spawn_blocking(move || {
         with_imap_session(
             &pool,
             &account,
             &handle,
             ImapSessionOpts::default(),
-            |imap| imap.download_attachment(&account, &folder, uid, attachment_index, &target_path),
+            |imap| {
+                imap.download_attachment(
+                    &account,
+                    &folder,
+                    uid,
+                    attachment_index,
+                    &target_path,
+                    section.as_deref(),
+                )
+            },
         )
     })
     .await
-    .map_err(|e| format!("mail attachment download task failed: {e}"))?
+    .map_err(|e| format!("mail attachment download task failed: {e}"))??;
+    if let Some(cache) = cache_path {
+        if let Ok(bytes) = std::fs::read(&result.path) {
+            parts::write_cache_file(&cache, &bytes);
+        }
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -4038,8 +4089,11 @@ fn imap_fetch_body<T: Read + Write>(
         .ok_or_else(|| format!("message UID {uid} not found in {folder}"))?;
     let mut message = parse_fetch_header(&account.config.session_id, folder, fetch)
         .unwrap_or_else(|| empty_cached_message(&account.config.session_id, folder, uid));
+    let truncated = fetch.size.is_some_and(|size| size as usize > raw_limit);
     if let Some(body) = fetch.body() {
-        save_raw_message(account, folder, uid, body)?;
+        if !truncated {
+            save_raw_message(account, folder, uid, body)?;
+        }
         let parsed = parse_body_message(
             &account.config.session_id,
             folder,
@@ -4049,6 +4103,24 @@ fn imap_fetch_body<T: Read + Write>(
             raw_limit,
         );
         merge_body(&mut message, parsed);
+    }
+    if truncated {
+        // TASK-15: the partial fetch cut the message; read the text parts
+        // whole and list every attachment from BODYSTRUCTURE instead.
+        match parts::imap_fetch_large_body(session, uid) {
+            Ok(large) => {
+                if large.text.is_some() || large.html.is_some() {
+                    message.body_text = large.text;
+                    message.body_html = large.html;
+                }
+                if !large.attachments.is_empty() {
+                    message.header.has_attachments = true;
+                    message.header.attachment_count = large.attachments.len();
+                    message.header.attachments = large.attachments;
+                }
+            }
+            Err(e) => log::debug!("mail: BODYSTRUCTURE fallback failed for UID {uid}: {e}"),
+        }
     }
     Ok(message)
 }
@@ -4272,10 +4344,21 @@ fn imap_download_attachment<T: Read + Write>(
     uid: u32,
     attachment_index: usize,
     target_path: &str,
+    section: Option<&str>,
 ) -> Result<MailDownloadAttachmentResult, String> {
     session
         .examine(folder)
         .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
+    if let Some(section) = section {
+        let bytes = parts::imap_fetch_section(session, uid, section)?;
+        let path = write_attachment_file(target_path, &bytes)?;
+        return Ok(MailDownloadAttachmentResult {
+            path,
+            name: None,
+            content_type: None,
+            size: bytes.len(),
+        });
+    }
     let fetches = session
         .uid_fetch(uid.to_string(), "(UID BODY.PEEK[])")
         .map_err(|e| format!("IMAP UID FETCH attachment failed: {e}"))?;
@@ -4287,19 +4370,39 @@ fn imap_download_attachment<T: Read + Write>(
         .body()
         .ok_or_else(|| format!("message UID {uid} did not include a body"))?;
     let attachment = extract_attachment(body, attachment_index)?;
+    let path = write_attachment_file(target_path, &attachment.bytes)?;
+    Ok(MailDownloadAttachmentResult {
+        path,
+        name: attachment.name,
+        content_type: attachment.content_type,
+        size: attachment.bytes.len(),
+    })
+}
+
+/// SMTP failure text, with a hint when the server rejected the size (AC-47).
+fn smtp_send_error(error: &str) -> String {
+    let lower = error.to_ascii_lowercase();
+    let too_big = lower.contains("552")
+        || lower.contains("message size")
+        || lower.contains("too large")
+        || lower.contains("exceeds") && lower.contains("size");
+    if too_big {
+        format!(
+            "SMTP send failed: the message is larger than this server accepts (SIZE limit). Remove or shrink attachments, or share them as links. Server said: {error}"
+        )
+    } else {
+        format!("SMTP send failed: {error}")
+    }
+}
+
+fn write_attachment_file(target_path: &str, bytes: &[u8]) -> Result<String, String> {
     let path = std::path::PathBuf::from(target_path);
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("failed to create attachment folder: {e}"))?;
     }
-    std::fs::write(&path, &attachment.bytes)
-        .map_err(|e| format!("failed to write attachment: {e}"))?;
-    Ok(MailDownloadAttachmentResult {
-        path: path.to_string_lossy().to_string(),
-        name: attachment.name,
-        content_type: attachment.content_type,
-        size: attachment.bytes.len(),
-    })
+    std::fs::write(&path, bytes).map_err(|e| format!("failed to write attachment: {e}"))?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 fn parse_fetch_header(
@@ -4587,7 +4690,7 @@ fn send_smtp_with(
     let response = transport
         .mailer
         .send(&message)
-        .map_err(|e| format!("SMTP send failed: {e}"))?;
+        .map_err(|e| smtp_send_error(&e.to_string()))?;
     Ok(MailSendResult {
         accepted: true,
         response: format!("{response:?}"),
@@ -5895,6 +5998,7 @@ fn attachment_info(part: &mail_parser::MessagePart<'_>) -> MailAttachmentInfo {
         name: part.attachment_name().map(ToOwned::to_owned),
         content_type,
         size,
+        section: None,
     }
 }
 
@@ -7005,6 +7109,18 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
         assert_eq!(contacts.len(), 1);
         assert_eq!(contacts[0].email, "sender@example.com");
         assert_eq!(contacts[0].source, "history");
+    }
+
+    #[test]
+    fn smtp_size_rejections_get_a_hint() {
+        assert!(
+            smtp_send_error("permanent error (552): 5.3.4 Message size exceeds fixed limit")
+                .contains("SIZE limit")
+        );
+        assert_eq!(
+            smtp_send_error("permanent error (550): no such user"),
+            "SMTP send failed: permanent error (550): no such user"
+        );
     }
 
     #[test]

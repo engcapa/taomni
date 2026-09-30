@@ -13,6 +13,8 @@ export interface MailAttachmentInfo {
   name?: string | null;
   contentType?: string | null;
   size?: number | null;
+  /** IMAP section when listed from BODYSTRUCTURE (large messages). */
+  section?: string | null;
 }
 
 export interface MailFolder {
@@ -525,6 +527,8 @@ export function mailDownloadAttachment(
   uid: number,
   attachmentIndex: number,
   targetPath: string,
+  /** IMAP section of a large message's attachment (fetches only that part). */
+  section?: string | null,
 ): Promise<MailDownloadAttachmentResult> {
   return withVaultLockedNotice(() =>
     invoke<MailDownloadAttachmentResult>("mail_download_attachment", {
@@ -533,6 +537,7 @@ export function mailDownloadAttachment(
       uid,
       attachmentIndex,
       targetPath,
+      section: section ?? null,
     }),
   );
 }

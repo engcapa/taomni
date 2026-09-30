@@ -255,6 +255,11 @@ impl AppState {
         }
     }
 
+    /// Root of the per-account mail caches (`<app_data>/mail-cache`).
+    pub fn mail_cache_root(&self) -> &std::path::Path {
+        &self.mail_db_dir
+    }
+
     pub fn mail_db(&self, account_id: &str) -> Result<MailDbHandle, String> {
         let stem = mail_db_file_stem(account_id);
         let mut dbs = self.mail_dbs.lock().map_err(|e| e.to_string())?;
@@ -273,7 +278,7 @@ impl AppState {
     }
 }
 
-fn mail_db_file_stem(account_id: &str) -> String {
+pub(crate) fn mail_db_file_stem(account_id: &str) -> String {
     use sha2::{Digest, Sha256};
 
     let mut cleaned = account_id

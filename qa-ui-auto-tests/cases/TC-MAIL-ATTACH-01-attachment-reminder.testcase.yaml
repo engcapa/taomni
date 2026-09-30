@@ -1,0 +1,120 @@
+id: TC-MAIL-ATTACH-01
+title: Mail warns about a mentioned but missing attachment before sending
+description: 'TASK-15 (docs-feature/mail-thunderbird-parity-design.md).
+
+  Composes a message whose subject says "attached" without adding a file.
+
+  Send must stop and show the attachment reminder; "Send anyway" then sends
+
+  and stores the Sent copy on the server.
+
+  Browser mode drives the stub server model (renderer orchestration only);
+
+  native mode runs the real Tauri backend SMTP send against the in-process
+
+  fake servers started by the mail_server fixture.
+
+  '
+covers:
+- F-MAIL-15
+tags:
+- mail
+- p2
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- click: '[data-testid="mail-compose-open"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- fill:
+    selector: '[data-testid="mail-recipient-to"] input'
+    value: receiver@example.com
+- press: Enter
+- fill:
+    selector: '[data-testid="mail-compose-subject"]'
+    value: Quarterly report attached
+- click: '[data-testid="mail-compose-send"]'
+- wait_for:
+    selector: '[data-testid="mail-attach-reminder"]'
+    timeout_sec: 10
+- assert_visible: '[data-testid="mail-compose-dialog"]'
+- click: '[data-testid="mail-attach-reminder-send"]'
+- wait_for:
+    selector: '[data-testid="mail-compose-dialog"]'
+    state: detached
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Message sent
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Sent
+    min: 1
+    timeout_sec: 20
+- screenshot: mail-attach-01-sent-anyway.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 主题提到附件但未添加附件时，点 Send 不发送，显示附件提醒，写信窗口保持打开。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-attach-reminder\"]", "timeout_sec": 10}}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"mail-compose-dialog\"]"}'
+    results:
+    - 15
+    - 16
+  - id: R2
+    requirement: 点 “Send anyway” 后邮件发出，状态提示发送成功，服务器 Sent 有副本。
+    actions:
+    - 17
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Message sent", "timeout_sec": 30}}'
+    - step: 20
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1, "timeout_sec": 20}}'
+    results:
+    - 18
+    - 19
+    - 20
+  visual:
+  - check: 截图中提醒已关闭、状态栏提示已发送。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实后端 SMTP 发送与 Sent 副本；browser 仅验证渲染层；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

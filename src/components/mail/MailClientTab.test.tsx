@@ -1011,6 +1011,35 @@ describe("MailClientTab", () => {
     expect(await screen.findByTestId("mail-compose-dialog")).toHaveTextContent("team@example.com");
   });
 
+  it("reminds about a missing attachment before sending (TASK-15)", async () => {
+    mailMocks.mailSendMessage.mockResolvedValue({ accepted: true, response: "ok" });
+    fireEvent.click(await replyAndReach("mail-compose-subject"));
+    fireEvent.change(screen.getByTestId("mail-compose-subject"), { target: { value: "Report attached" } });
+    fireEvent.click(screen.getByTestId("mail-compose-send"));
+    expect(await screen.findByTestId("mail-attach-reminder")).toBeInTheDocument();
+    expect(mailMocks.mailSendMessage).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("mail-attach-reminder-send"));
+    await waitFor(() => expect(mailMocks.mailSendMessage).toHaveBeenCalledTimes(1));
+  });
+
+  it("downloads a large message's attachment by its IMAP section (TASK-15)", async () => {
+    const large: MailMessageHeader = {
+      ...message,
+      hasAttachments: true,
+      attachmentCount: 1,
+      attachments: [{ name: "big.pdf", contentType: "application/pdf", size: 31_457_280, section: "2" }],
+    };
+    mailMocks.mailListCachedMessages.mockResolvedValue([large]);
+    mailMocks.mailGetMessageBody.mockResolvedValue({ ...messageBody, attachments: large.attachments });
+    mailMocks.mailDownloadAttachment.mockResolvedValue({ path: "/tmp/big.pdf", name: "big.pdf", contentType: "application/pdf", size: 3 });
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    const chip = await screen.findByTitle(/big\.pdf/);
+    fireEvent.doubleClick(chip);
+    await waitFor(() => expect(mailMocks.mailDownloadAttachment).toHaveBeenCalled());
+    expect(mailMocks.mailDownloadAttachment.mock.calls[0][5]).toBe("2");
+  });
+
   it("saves a template and starts a new message from it (AC-30)", async () => {
     const template = {
       id: "tpl-1",

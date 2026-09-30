@@ -123,6 +123,7 @@ import {
   type MailOutboxState,
 } from "../../lib/mailOutbox";
 import { parseMailto } from "../../lib/mailto";
+import { mentionsAttachment } from "../../lib/mailAttachReminder";
 import { isEditableTarget, mailShortcutAction, type MailShortcutAction } from "../../lib/mailShortcuts";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
 import {
@@ -1111,6 +1112,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   );
   const outboxCount = useMemo(() => drafts.filter(isOutbox).length, [drafts]);
   const [sendLaterOpen, setSendLaterOpen] = useState(false);
+  const [attachReminder, setAttachReminder] = useState(false);
   const [sendLaterAt, setSendLaterAt] = useState("");
   const [undoSend, setUndoSend] = useState<{ draftId: string; until: number } | null>(null);
   const [undoNow, setUndoNow] = useState(() => Date.now());
@@ -2977,6 +2979,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const closeComposer = () => {
     setComposeOpen(false);
     setSendLaterOpen(false);
+    setAttachReminder(false);
     setDraft(emptyComposeDraft());
   };
 
@@ -3079,12 +3082,19 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     if (undoTimerRef.current != null) window.clearTimeout(undoTimerRef.current);
   }, []);
 
-  const handleSendDraft = async () => {
+  const handleSendDraft = async (skipAttachReminder = false) => {
     const built = buildSendRequest(draft);
     if (typeof built === "string") {
       setError(built);
       return;
     }
+    // Thunderbird's attachment reminder: text mentions one, none attached.
+    if (!skipAttachReminder && draft.attachments.length === 0
+      && mentionsAttachment(draft.subject, draft.textBody, draft.htmlBody)) {
+      setAttachReminder(true);
+      return;
+    }
+    setAttachReminder(false);
     setError(null);
     const undoSeconds = Math.max(0, Math.floor(info.undoSendSeconds ?? 0));
     if (undoSeconds > 0) {
@@ -3480,7 +3490,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         setStatus("Attachment save cancelled");
         return;
       }
-      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath);
+      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath, attachment.section);
       setStatus(`Saved attachment to ${result.path}`);
     } catch (e) {
       setError(mailClientErrorMessage(e));
@@ -3495,7 +3505,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     try {
       const defaultPath = suggestedAttachmentName(attachment, index, message.subject);
       const targetPath = await temporaryFilePath(defaultPath);
-      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath);
+      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath, attachment.section);
       await openLocalPath(result.path);
       setStatus(`Opened attachment ${result.name || defaultPath}`);
     } catch (e) {
@@ -3527,7 +3537,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           suggestedAttachmentName(attachment, index, message.subject),
           usedNames,
         );
-        await mailDownloadAttachment(info, message.folder, message.uid, index, joinLocalPath(targetDir, fileName));
+        await mailDownloadAttachment(info, message.folder, message.uid, index, joinLocalPath(targetDir, fileName), attachment.section);
         saved += 1;
       }
       setStatus(`Saved ${saved} attachment${saved === 1 ? "" : "s"} to ${targetDir}`);
@@ -5798,6 +5808,34 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 </div>
               )}
             </div>
+            {attachReminder && (
+              <div
+                className="px-3 py-1.5 flex items-center gap-2 text-[12px] border-t border-[var(--taomni-divider)] bg-[var(--taomni-warning-bg,rgba(217,119,6,0.12))]"
+                role="alert"
+                data-testid="mail-attach-reminder"
+              >
+                <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                <span className="flex-1">The message mentions an attachment, but nothing is attached.</span>
+                <button
+                  type="button"
+                  className="taomni-btn h-6 px-2 text-[11px]"
+                  onClick={() => {
+                    setAttachReminder(false);
+                    void handleAddDraftAttachments();
+                  }}
+                >
+                  Attach…
+                </button>
+                <button
+                  type="button"
+                  className="taomni-btn h-6 px-2 text-[11px]"
+                  data-testid="mail-attach-reminder-send"
+                  onClick={() => void handleSendDraft(true)}
+                >
+                  Send anyway
+                </button>
+              </div>
+            )}
             <div className="h-10 px-3 flex items-center justify-end gap-2 border-t border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
               <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 mr-auto" onClick={() => void handleAddDraftAttachments()} disabled={sending}>
                 <Paperclip className="w-3.5 h-3.5" />
@@ -5869,7 +5907,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   </div>
                 )}
               </div>
-              <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" data-primary="true" data-testid="mail-compose-send" onClick={handleSendDraft} disabled={sending}>
+              <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" data-primary="true" data-testid="mail-compose-send" onClick={() => void handleSendDraft()} disabled={sending}>
                 {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 Send
               </button>

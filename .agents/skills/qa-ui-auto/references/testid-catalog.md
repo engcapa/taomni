@@ -800,6 +800,11 @@
 - `[data-testid="git-diff-stage"]` — interactive [optional] — F26.2.git-diff-stage
 - `[data-testid="git-diff-unstage"]` — interactive [optional] — F26.2.git-diff-unstage
 
+## mail/attachments (F-MAIL-15)
+
+- `[data-testid="mail-attach-reminder"]` — display — F-MAIL-15.attach-reminder
+- `[data-testid="mail-attach-reminder-send"]` — interactive — F-MAIL-15.attach-reminder-send
+
 ## mail/compose (F-MAIL-1)
 
 - `[data-testid="mail-client-tab"]` — display — F-MAIL-1.mail-client-tab

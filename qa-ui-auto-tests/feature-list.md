@@ -5618,6 +5618,34 @@ controls:
 - 带 `List-Unsubscribe` 的邮件在阅读区显示 “Unsubscribe”：支持 RFC 8058 一键退订时先确认再 POST；否则优先 mailto（打开写信窗口），再退回浏览器打开 https 链接。表头在拉取时解析并缓存。
 - 阅读区（HTML 与纯文本）中的 `mailto:` 链接在应用内打开写信窗口并填好收件人、抄送、主题与正文。
 - 未完成：注册为系统 `mailto:` 默认处理程序需要引入 Tauri deep-link 插件并修改三端安装注册，尚未实施。
+
+---
+
+### 13.15 附件与大邮件 ✅
+
+<!-- feature
+id: F-MAIL-15
+status: done
+area: mail/attachments
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailAttachReminder.ts
+  - src-tauri/src/mail/parts.rs
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: attach-reminder
+    selector: '[data-testid="mail-attach-reminder"]'
+    kind: display
+  - id: attach-reminder-send
+    selector: '[data-testid="mail-attach-reminder-send"]'
+    kind: interactive
+-->
+
+- 超过正文部分拉取上限的邮件，打开时先取 `BODYSTRUCTURE`，只拉 text/plain 与 text/html 分段（完整、不截断），并列出全部附件及其 IMAP 分段号；下载时只取该分段（`BODY.PEEK[<section>]`），不再拉整封邮件。
+- 会话设置 “Attachment cache” 开启后，下载过的附件写入 `<app_data>/mail-cache/attachments/`，再次打开直接使用本地副本。
+- 发送被服务器以大小拒绝（552 / SIZE）时给出明确提示。
+- 附件提醒：正文（不含引用部分）或主题提到 “attached/附件” 而没有附件时，发送前提醒，可 “Attach…” 或 “Send anyway”。
 ---
 
 ## 14. SocksCap 网络流量路由

@@ -27,6 +27,8 @@ pub struct FakeFolder {
     pub uid_validity: u32,
     pub uid_next: u32,
     pub messages: BTreeMap<u32, FakeMessage>,
+    /// Test-provided BODYSTRUCTURE and `BODY[<section>]` payloads per UID.
+    pub structures: BTreeMap<u32, (String, BTreeMap<String, Vec<u8>>)>,
 }
 
 impl FakeFolder {
@@ -35,6 +37,7 @@ impl FakeFolder {
             uid_validity,
             uid_next: 1,
             messages: BTreeMap::new(),
+            structures: BTreeMap::new(),
         }
     }
 }
@@ -148,6 +151,25 @@ impl FakeImap {
     }
 
     /// Skip UIDs (simulates messages delivered and removed elsewhere).
+    /// Serve `structure` for BODYSTRUCTURE and `sections` for BODY[<section>].
+    pub fn set_structure(
+        &self,
+        folder: &str,
+        uid: u32,
+        structure: &str,
+        sections: &[(&str, &[u8])],
+    ) {
+        let mut state = self.state.lock().unwrap();
+        let folder = state.folders.get_mut(folder).expect("folder");
+        let sections = sections
+            .iter()
+            .map(|(name, data)| (name.to_ascii_uppercase(), data.to_vec()))
+            .collect();
+        folder
+            .structures
+            .insert(uid, (structure.to_string(), sections));
+    }
+
     /// Deliver one message with caller-built raw bytes (custom headers).
     pub fn deliver_raw(&self, folder: &str, raw: Vec<u8>) -> u32 {
         let mut state = self.state.lock().unwrap();
@@ -502,6 +524,12 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                         format_internal_date(message.internal_ts)
                     ));
                 }
+                let extra = folder.structures.get(uid);
+                if items_upper.contains("BODYSTRUCTURE") {
+                    if let Some((structure, _)) = extra {
+                        parts.push(format!("BODYSTRUCTURE {structure}"));
+                    }
+                }
                 let head = format!("* {} FETCH ({}", index + 1, parts.join(" "));
                 bytes.extend_from_slice(head.as_bytes());
                 if items_upper.contains("BODY.PEEK[HEADER]") {
@@ -518,6 +546,19 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                         format!(" BODY[] {{{}}}\r\n", message.raw.len()).as_bytes(),
                     );
                     bytes.extend_from_slice(&message.raw);
+                }
+                if let Some((_, sections)) = extra {
+                    for (start, _) in items_upper.match_indices("BODY.PEEK[") {
+                        let tail = &items_upper[start + 10..];
+                        let Some(end) = tail.find(']') else { continue };
+                        let name = &tail[..end];
+                        if let Some(data) = sections.get(name) {
+                            bytes.extend_from_slice(
+                                format!(" BODY[{name}] {{{}}}\r\n", data.len()).as_bytes(),
+                            );
+                            bytes.extend_from_slice(data);
+                        }
+                    }
                 }
                 bytes.extend_from_slice(b")\r\n");
             }
