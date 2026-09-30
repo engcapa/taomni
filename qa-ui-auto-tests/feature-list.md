@@ -5592,6 +5592,32 @@ controls:
 - 会话设置 “Undo send”（秒，默认 0）开启后，点 Send 先进入 Outbox 并显示倒计时与 Undo，撤销后回到编辑状态。
 - 限制（DEC-01）：Outbox、稍后发送与重试只在该账户标签打开期间执行，UI 中有说明。
 - “Receipt” 勾选后请求已读回执（`Disposition-Notification-To`，RFC 8098）；对收到的回执请求自动应答尚未实现。
+
+---
+
+### 13.14 mbox 导入导出、mailto 与邮件列表退订 🟡
+
+<!-- feature
+id: F-MAIL-14
+status: partial
+area: mail/lists
+components: [MailClientTab, MailMessageBodyView, MailHtmlReader]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/components/mail/MailHtmlReader.tsx
+  - src/lib/mailto.ts
+  - src-tauri/src/mail/lists.rs
+  - src-tauri/src/mail/mbox.rs
+controls:
+  - id: unsubscribe
+    selector: '[data-testid="mail-unsubscribe"]'
+    kind: interactive
+-->
+
+- 文件夹右键 “Export as mbox…” 导出 mboxrd（Thunderbird 可导入，`From - ` 分隔、`>From ` 转义，每批 50 封流式写入）；“Import messages (mbox/.eml)…” 拆分 mbox 或读取单封 .eml，经 IMAP APPEND 写入该文件夹并同步到列表。文件对话框无法由 WebDriver 驱动，导入导出由 Rust 往返测试覆盖。
+- 带 `List-Unsubscribe` 的邮件在阅读区显示 “Unsubscribe”：支持 RFC 8058 一键退订时先确认再 POST；否则优先 mailto（打开写信窗口），再退回浏览器打开 https 链接。表头在拉取时解析并缓存。
+- 阅读区（HTML 与纯文本）中的 `mailto:` 链接在应用内打开写信窗口并填好收件人、抄送、主题与正文。
+- 未完成：注册为系统 `mailto:` 默认处理程序需要引入 Tauri deep-link 插件并修改三端安装注册，尚未实施。
 ---
 
 ## 14. SocksCap 网络流量路由

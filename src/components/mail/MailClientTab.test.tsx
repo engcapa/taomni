@@ -40,6 +40,9 @@ const mailMocks = vi.hoisted(() => ({
   mailIdleStop: vi.fn(),
   mailSetFolderSubscription: vi.fn(),
   mailListFolders: vi.fn(),
+  mailUnsubscribeOneClick: vi.fn(),
+  mailExportMbox: vi.fn(),
+  mailImportMessages: vi.fn(),
 }));
 
 const eventMocks = vi.hoisted(() => ({
@@ -965,6 +968,47 @@ describe("MailClientTab", () => {
     expect(await screen.findByTestId("mail-compose-dialog")).toBeInTheDocument();
     await waitFor(() => expect(store[0].replyContext?.outbox).toBeUndefined());
     expect(mailMocks.mailSendMessage).not.toHaveBeenCalled();
+  });
+
+  it("unsubscribes by mailto in the composer and one-click after confirm (TASK-18)", async () => {
+    const listMail: MailMessageHeader = {
+      ...message,
+      listUnsubscribe: { uris: ["mailto:leave@lists.example.com?subject=unsubscribe"], oneClick: false },
+    };
+    mailMocks.mailListCachedMessages.mockResolvedValue([listMail]);
+    const view = renderMailbox();
+    fireEvent.click(await screen.findByTestId("mail-unsubscribe"));
+    expect(await screen.findByTestId("mail-compose-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("mail-compose-subject")).toHaveValue("unsubscribe");
+    expect(screen.getByTestId("mail-compose-dialog")).toHaveTextContent("leave@lists.example.com");
+    view.unmount();
+
+    const oneClick: MailMessageHeader = {
+      ...message,
+      listUnsubscribe: { uris: ["https://lists.example.com/u/1"], oneClick: true },
+    };
+    mailMocks.mailListCachedMessages.mockResolvedValue([oneClick]);
+    mailMocks.mailUnsubscribeOneClick.mockResolvedValue(200);
+    renderMailbox();
+    const button = await screen.findByTestId("mail-unsubscribe");
+    fireEvent.click(button);
+    expect(mailMocks.mailUnsubscribeOneClick).not.toHaveBeenCalled();
+    expect(await screen.findByText("Confirm unsubscribe")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("mail-unsubscribe"));
+    await waitFor(() => expect(mailMocks.mailUnsubscribeOneClick).toHaveBeenCalledWith("https://lists.example.com/u/1"));
+    expect(await screen.findByText(/Unsubscribe request sent/)).toBeInTheDocument();
+  });
+
+  it("opens mailto links from a plain-text body in the composer (TASK-18)", async () => {
+    mailMocks.mailGetMessageBody.mockResolvedValue({ ...messageBody, html: null, text: "Write to team@example.com today" });
+    renderMailbox();
+    const link = await waitFor(() => {
+      const el = document.querySelector('a[href^="mailto:team@example.com"]');
+      if (!el) throw new Error("no mailto link yet");
+      return el as HTMLElement;
+    });
+    fireEvent.click(link);
+    expect(await screen.findByTestId("mail-compose-dialog")).toHaveTextContent("team@example.com");
   });
 
   it("saves a template and starts a new message from it (AC-30)", async () => {

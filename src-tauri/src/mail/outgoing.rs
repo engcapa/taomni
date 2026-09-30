@@ -108,7 +108,7 @@ pub(super) fn new_message_id(email_address: &str) -> String {
     format!("<{}@{}>", uuid::Uuid::new_v4().simple(), domain)
 }
 
-fn imap_append<T: Read + Write>(
+pub(super) fn imap_append<T: Read + Write>(
     session: &mut imap::Session<T>,
     folder: &str,
     bytes: &[u8],
@@ -151,7 +151,12 @@ fn imap_create<T: Read + Write>(
 }
 
 impl ActiveImapSession {
-    fn append(&mut self, folder: &str, bytes: &[u8], flags: &[&str]) -> Result<(), String> {
+    pub(super) fn append(
+        &mut self,
+        folder: &str,
+        bytes: &[u8],
+        flags: &[&str],
+    ) -> Result<(), String> {
         match self {
             Self::Tls { session, .. } => imap_append(session, folder, bytes, flags),
             Self::Plain { session, .. } => imap_append(session, folder, bytes, flags),

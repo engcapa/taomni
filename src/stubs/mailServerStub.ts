@@ -28,6 +28,7 @@ type StubMailHeader = {
   bodyCached: boolean;
   inReplyTo?: string | null;
   references?: string[];
+  listUnsubscribe?: { uris: string[]; oneClick: boolean } | null;
 };
 
 type StubFolderMeta = { name: string; displayName: string };
@@ -405,7 +406,7 @@ function idleChanged(accountId: string, folder: string) {
 }
 
 export interface StubMailQaControl {
-  deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean) => number[];
+  deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
   setFlags: (accountId: string, folder: string, uid: number, flags: string[]) => void;
   observe: (accountId: string, folder: string) => { server: number[]; cache: number[] };
@@ -416,7 +417,7 @@ export interface StubMailQaControl {
 
 export function installStubMailQaControl(seed: Seed): void {
   const control: StubMailQaControl = {
-    deliver(accountId, folderName, count, prefix = "QA", thread = false) {
+    deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null) {
       const state = account(accountId, seed);
       const folder = folderState(state, folderName);
       const uids: number[] = [];
@@ -429,6 +430,7 @@ export function installStubMailQaControl(seed: Seed): void {
           message.inReplyTo = ancestry[ancestry.length - 1];
           message.references = [...ancestry];
         }
+        if (listUnsubscribe) message.listUnsubscribe = { uris: [listUnsubscribe], oneClick: false };
         ancestry.push(message.messageId.replace(/^<|>$/g, ""));
         folder.server.set(uid, message);
         uids.push(uid);

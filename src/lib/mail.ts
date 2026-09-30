@@ -57,6 +57,8 @@ export interface MailMessageHeader {
   inReplyTo?: string | null;
   /** Thread ancestry, oldest first (no angle brackets). */
   references?: string[];
+  /** Mailing-list unsubscribe options (TASK-18). */
+  listUnsubscribe?: MailListUnsubscribe | null;
 }
 
 export interface MailMessageBody {
@@ -304,6 +306,39 @@ export interface MailSendRequest {
   replyTo?: string | null;
   /** Ask for a read receipt (Disposition-Notification-To). */
   requestReadReceipt?: boolean;
+}
+
+export interface MailListUnsubscribe {
+  /** https/http/mailto URIs from `List-Unsubscribe`, in header order. */
+  uris: string[];
+  /** RFC 8058 one-click POST is offered. */
+  oneClick: boolean;
+}
+
+export interface MailExportResult {
+  path: string;
+  count: number;
+}
+
+export interface MailImportResult {
+  imported: number;
+  failed: number;
+  firstError?: string | null;
+}
+
+/** Export a folder to an mbox file (mboxrd, Thunderbird-compatible). */
+export function mailExportMbox(config: MailTabInfo, folder: string, path: string): Promise<MailExportResult> {
+  return withVaultLockedNotice(() => invoke<MailExportResult>("mail_export_mbox", { config, folder, path }));
+}
+
+/** Import an mbox or .eml file into a folder (IMAP APPEND). */
+export function mailImportMessages(config: MailTabInfo, folder: string, path: string): Promise<MailImportResult> {
+  return withVaultLockedNotice(() => invoke<MailImportResult>("mail_import_messages", { config, folder, path }));
+}
+
+/** RFC 8058 one-click unsubscribe POST (https only). */
+export function mailUnsubscribeOneClick(url: string): Promise<number> {
+  return invoke<number>("mail_unsubscribe_one_click", { url });
 }
 
 export interface MailSendAttachment {

@@ -1086,6 +1086,10 @@
             },
             "thread": {
               "type": "boolean"
+            },
+            "list_unsubscribe": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },

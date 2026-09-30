@@ -18,6 +18,8 @@ interface MailHtmlReaderProps {
   /** Appearance font size (px). */
   fontSize?: number;
   fontFamily?: string;
+  /** In-app handling of `mailto:` links (opens the composer). */
+  onMailtoLink?: (href: string) => void;
 }
 
 /**
@@ -33,10 +35,13 @@ export const MailHtmlReader = forwardRef<MailHtmlReaderHandle, MailHtmlReaderPro
     preferDark = false,
     fontSize = 14,
     fontFamily,
+    onMailtoLink,
   },
   ref,
 ) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const onMailtoRef = useRef(onMailtoLink);
+  onMailtoRef.current = onMailtoLink;
   const [frameHeight, setFrameHeight] = useState(160);
   const srcDoc = useMemo(
     () => buildMailReaderSrcDoc(html, {
@@ -119,9 +124,23 @@ export const MailHtmlReader = forwardRef<MailHtmlReaderHandle, MailHtmlReaderPro
     let t1: number | undefined;
     let t2: number | undefined;
 
+    const onFrameClick = (event: MouseEvent) => {
+      const anchor = (event.target as Element | null)?.closest?.("a[href]");
+      const href = anchor?.getAttribute("href") ?? "";
+      if (!/^mailto:/i.test(href) || !onMailtoRef.current) return;
+      event.preventDefault();
+      onMailtoRef.current(href);
+    };
+    let clickDoc: Document | null = null;
+
     const attachObservers = () => {
       const doc = iframe.contentDocument;
       if (!doc?.body) return;
+      if (clickDoc !== doc) {
+        clickDoc?.removeEventListener("click", onFrameClick);
+        doc.addEventListener("click", onFrameClick);
+        clickDoc = doc;
+      }
       measure();
       if (typeof ResizeObserver !== "undefined") {
         ro = new ResizeObserver(() => measure());
@@ -159,6 +178,7 @@ export const MailHtmlReader = forwardRef<MailHtmlReaderHandle, MailHtmlReaderPro
       if (t1 !== undefined) clearTimeout(t1);
       if (t2 !== undefined) clearTimeout(t2);
       iframe.removeEventListener("load", onLoad);
+      clickDoc?.removeEventListener("click", onFrameClick);
       ro?.disconnect();
       mo?.disconnect();
     };

@@ -2648,7 +2648,8 @@ def _mail_args(args: Any, name: str, *, need_count: bool = True) -> tuple[str, i
 def _do_mail_server_deliver(ctx: NativeStepContext, args: Any) -> str:
     folder, count = _mail_args(args, "mail_server_deliver")
     uids = _mail_server().state.deliver(folder, count, prefix=str(args.get("prefix") or "QA"),
-                                        thread=bool(args.get("thread")))
+                                        thread=bool(args.get("thread")),
+                                        list_unsubscribe=args.get("list_unsubscribe") or None)
     return f"delivered {len(uids)} to {folder} (uids {uids[0]}..{uids[-1]})"
 
 

@@ -43,6 +43,8 @@ use crate::terminal::network::NetworkSettings;
 mod fake_imap;
 pub mod folders;
 pub mod idle;
+pub mod lists;
+pub mod mbox;
 pub mod outgoing;
 pub mod search;
 mod sync;
@@ -464,6 +466,9 @@ pub struct MailMessageHeader {
     /// `References` message ids, oldest first (without angle brackets).
     #[serde(default)]
     pub references: Vec<String>,
+    /// `List-Unsubscribe` of mailing-list mail (TASK-18).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub list_unsubscribe: Option<lists::MailListUnsubscribe>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -4307,6 +4312,12 @@ fn parse_fetch_header(
     let parsed = MessageParser::default().parse(header);
     let flags = fetch_flag_strings(fetch);
     let fallback_date = fetch.internal_date().map(|d| d.timestamp());
+    let list_unsubscribe = parsed.as_ref().and_then(|message| {
+        lists::parse_list_unsubscribe(
+            message.header_raw("List-Unsubscribe"),
+            message.header_raw("List-Unsubscribe-Post"),
+        )
+    });
     let (message_id, subject, from, to, cc, date_ts, in_reply_to, references) = match parsed {
         Some(message) => (
             message.message_id().map(clean_message_id),
@@ -4349,6 +4360,7 @@ fn parse_fetch_header(
             body_cached: false,
             in_reply_to,
             references,
+            list_unsubscribe,
         },
         body_text: None,
         body_html: None,
@@ -4435,6 +4447,7 @@ fn parse_body_message(
                     body_cached: true,
                     in_reply_to: header_message_ids(message.in_reply_to()).into_iter().next(),
                     references: header_message_ids(message.references()),
+                    list_unsubscribe: None,
                 },
                 body_text: text,
                 body_html: html,
@@ -4465,6 +4478,7 @@ fn parse_body_message(
                     body_cached: true,
                     in_reply_to: None,
                     references: Vec::new(),
+                    list_unsubscribe: None,
                 },
                 body_text: Some(text),
                 body_html: None,
@@ -4501,6 +4515,9 @@ fn merge_body(target: &mut MailMessageCached, body: MailMessageCached) {
     if target.header.references.is_empty() {
         target.header.references = body.header.references;
     }
+    if target.header.list_unsubscribe.is_none() {
+        target.header.list_unsubscribe = body.header.list_unsubscribe;
+    }
     target.header.has_attachments = body.header.has_attachments;
     target.header.attachment_count = body.header.attachment_count;
     target.header.attachments = body.header.attachments;
@@ -4533,6 +4550,7 @@ fn empty_cached_message(account_id: &str, folder: &str, uid: u32) -> MailMessage
             body_cached: false,
             in_reply_to: None,
             references: Vec::new(),
+            list_unsubscribe: None,
         },
         body_text: None,
         body_html: None,
@@ -5030,9 +5048,9 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
          (account_id, folder, uid, message_id, subject, from_name, from_addr,
           to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
           attachments_json, snippet, body_text, body_html, body_cached_at, raw_size, updated_at,
-          internal_ts, in_reply_to, references_json)
+          internal_ts, in_reply_to, references_json, list_unsubscribe_json)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-                 ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?23, ?24)
+                 ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?23, ?24, ?25)
          ON CONFLICT(account_id, folder, uid) DO UPDATE SET
             message_id = COALESCE(excluded.message_id, mail_messages.message_id),
             subject = CASE WHEN excluded.subject != '' THEN excluded.subject ELSE mail_messages.subject END,
@@ -5046,6 +5064,7 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
             in_reply_to = COALESCE(excluded.in_reply_to, mail_messages.in_reply_to),
             references_json = CASE WHEN excluded.references_json != '[]'
                                    THEN excluded.references_json ELSE mail_messages.references_json END,
+            list_unsubscribe_json = COALESCE(excluded.list_unsubscribe_json, mail_messages.list_unsubscribe_json),
             has_attachments = CASE
                 WHEN excluded.attachments_json != '[]' OR excluded.has_attachments = 1
                 THEN excluded.has_attachments
@@ -5088,6 +5107,10 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
             message.flags_authoritative as i64,
             header.in_reply_to,
             serde_json::to_string(&header.references).unwrap_or_else(|_| "[]".into()),
+            header
+                .list_unsubscribe
+                .as_ref()
+                .and_then(|list| serde_json::to_string(list).ok()),
         ],
     )?;
     Ok(())
@@ -5565,7 +5588,8 @@ fn list_cached_messages(
     let mut stmt = conn.prepare(
         "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
                 to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
-                attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json
+                attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
+                list_unsubscribe_json
          FROM mail_messages
          WHERE account_id = ?1 AND folder = ?2
          ORDER BY COALESCE(date_ts, 0) DESC, uid DESC
@@ -5745,7 +5769,7 @@ fn get_cached_body(
         "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
                 to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
                 attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
-                body_text, body_html
+                list_unsubscribe_json, body_text, body_html
          FROM mail_messages
          WHERE account_id = ?1 AND folder = ?2 AND uid = ?3
            AND body_cached_at IS NOT NULL
@@ -5753,8 +5777,8 @@ fn get_cached_body(
         params![account_id, folder, uid],
         |row| {
             let mut header = row_to_header(row)?;
-            let body_text: Option<String> = row.get(19)?;
-            let body_html: Option<String> = row.get(20)?;
+            let body_text: Option<String> = row.get(20)?;
+            let body_html: Option<String> = row.get(21)?;
             header.body_cached = true;
             Ok(MailMessageBody {
                 account_id: header.account_id,
@@ -5813,6 +5837,9 @@ fn row_to_header(row: &rusqlite::Row<'_>) -> SqlResult<MailMessageHeader> {
             .get::<_, Option<String>>(18)?
             .and_then(|json| serde_json::from_str(&json).ok())
             .unwrap_or_default(),
+        list_unsubscribe: row
+            .get::<_, Option<String>>(19)?
+            .and_then(|json| serde_json::from_str(&json).ok()),
     })
 }
 

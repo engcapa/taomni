@@ -898,6 +898,10 @@
 - `[data-testid="mail-message-row"][aria-pressed="true"]` — interactive — F-MAIL-12.message-row-shortcuts
 - `[data-testid="mail-folder-row"][data-folder-name="Archive"]` — interactive — F-MAIL-12.folder-drop-target
 
+## mail/lists (F-MAIL-14)
+
+- `[data-testid="mail-unsubscribe"]` — interactive — F-MAIL-14.unsubscribe
+
 ## mail/organize (F-MAIL-8)
 
 - `[data-testid="mail-menu-tag"]` — interactive — F-MAIL-8.menu-tag

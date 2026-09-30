@@ -60,7 +60,8 @@ def _unique_token() -> str:
 def build_message(subject: str, sender: str = "QA Sender <qa-sender@example.com>",
                   to: str = "qa@example.com", body: str | None = None,
                   date: datetime | None = None, message_id: str | None = None,
-                  ancestry: list[str] | None = None) -> bytes:
+                  ancestry: list[str] | None = None,
+                  extra_headers: str = "") -> bytes:
     date = date or datetime.now(timezone.utc)
     slug = re.sub(r"[^A-Za-z0-9]+", "-", subject).strip("-") or "message"
     text = body if body is not None else f"Body of {subject}\r\n"
@@ -71,7 +72,7 @@ def build_message(subject: str, sender: str = "QA Sender <qa-sender@example.com>
         thread = f"In-Reply-To: <{ancestry[-1]}>\r\nReferences: {refs}\r\n"
     return (
         f"From: {sender}\r\nTo: {to}\r\nSubject: {subject}\r\n"
-        f"Date: {format_datetime(date)}\r\nMessage-ID: <{message_id}>\r\n{thread}"
+        f"Date: {format_datetime(date)}\r\nMessage-ID: <{message_id}>\r\n{thread}{extra_headers}"
         f"MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n{text}"
     ).encode("utf-8")
 
@@ -104,7 +105,9 @@ class FakeMailState:
             waiter.set()
         return self.highest_modseq
 
-    def deliver(self, folder: str, count: int, prefix: str = "QA", thread: bool = False) -> list[int]:
+    def deliver(self, folder: str, count: int, prefix: str = "QA", thread: bool = False,
+                list_unsubscribe: str | None = None) -> list[int]:
+        extra = f"List-Unsubscribe: <{list_unsubscribe}>\r\n" if list_unsubscribe else ""
         with self.lock:
             entry = self.folders.setdefault(folder, FakeFolder(uid_validity=2000 + len(self.folders)))
             modseq = self.bump()
@@ -115,7 +118,8 @@ class FakeMailState:
                 entry.uid_next += 1
                 subject = f"{prefix} {index + 1:04d}"
                 message_id = f"{prefix}-{index + 1}.{_unique_token()}@qa.taomni".replace(" ", "-")
-                raw = build_message(subject, message_id=message_id, ancestry=list(ancestry) if thread else None)
+                raw = build_message(subject, message_id=message_id, ancestry=list(ancestry) if thread else None,
+                                    extra_headers=extra)
                 ancestry.append(message_id)
                 entry.messages[uid] = FakeMessage(raw=raw, internal_ts=int(time.time()) + index, modseq=modseq)
                 uids.append(uid)

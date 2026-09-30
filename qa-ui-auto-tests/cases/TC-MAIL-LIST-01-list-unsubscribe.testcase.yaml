@@ -1,0 +1,103 @@
+id: TC-MAIL-LIST-01
+title: Mail offers Unsubscribe for list mail and opens a mailto unsubscribe in the composer
+description: 'TASK-18 (docs-feature/mail-thunderbird-parity-design.md AC-53).
+
+  Delivers a newsletter carrying List-Unsubscribe (mailto), syncs, opens it and
+
+  requires the reader''s Unsubscribe action; clicking it opens the composer
+
+  addressed to the list''s unsubscribe address. RFC 8058 one-click POST is
+
+  covered by the Rust test against a local HTTP server and by Vitest.
+
+  Browser mode drives the stub server model (renderer orchestration only);
+
+  native mode parses the real header fetched from the in-process fake IMAP
+
+  server started by the mail_server fixture.
+
+  '
+covers:
+- F-MAIL-14
+tags:
+- mail
+- p2
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- mail_server_deliver:
+    count: 1
+    prefix: Newsletter
+    list_unsubscribe: mailto:leave@lists.example.com?subject=unsubscribe
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-search-input"]'
+    value: Newsletter 0001
+- click: '[data-testid="mail-message-row"]'
+- wait_for:
+    selector: '[data-testid="mail-unsubscribe"]'
+    timeout_sec: 20
+- click: '[data-testid="mail-unsubscribe"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- assert_text:
+    selector: '[data-testid="mail-compose-dialog"]'
+    contains: leave@lists.example.com
+- screenshot: mail-list-01-unsubscribe.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 带 List-Unsubscribe 的邮件在阅读区显示 Unsubscribe；点击后打开写信窗口，收件人为列表的退订地址（AC-53 的 mailto 分支）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 10
+    - 12
+    - 13
+    - 15
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-unsubscribe\"]", "timeout_sec": 20}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"mail-compose-dialog\"]"}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-compose-dialog\"]", "contains": "leave@lists.example.com"}}'
+    results:
+    - 14
+    - 17
+  visual:
+  - check: 截图中写信窗口收件人为退订地址、主题为 unsubscribe。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实后端解析并缓存 List-Unsubscribe 头；browser 仅验证渲染层；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

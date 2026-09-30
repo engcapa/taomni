@@ -148,6 +148,26 @@ impl FakeImap {
     }
 
     /// Skip UIDs (simulates messages delivered and removed elsewhere).
+    /// Deliver one message with caller-built raw bytes (custom headers).
+    pub fn deliver_raw(&self, folder: &str, raw: Vec<u8>) -> u32 {
+        let mut state = self.state.lock().unwrap();
+        state.highest_modseq += 1;
+        let modseq = state.highest_modseq;
+        let folder = state.folders.get_mut(folder).expect("folder");
+        let uid = folder.uid_next;
+        folder.uid_next += 1;
+        folder.messages.insert(
+            uid,
+            FakeMessage {
+                flags: Vec::new(),
+                raw,
+                internal_ts: 1_700_000_000,
+                modseq,
+            },
+        );
+        uid
+    }
+
     pub fn burn_uids(&self, folder: &str, count: u32) {
         let mut state = self.state.lock().unwrap();
         state.folders.get_mut(folder).unwrap().uid_next += count;

@@ -57,6 +57,8 @@ import {
   mailDeleteFolder,
   mailDeleteMessages,
   mailDownloadAttachment,
+  mailExportMbox,
+  mailImportMessages,
   mailFetchRaw,
   mailGetMessageBody,
   mailIdleStart,
@@ -84,6 +86,7 @@ import {
   mailSyncFolder,
   mailSyncHeaders,
   mailTestConnection,
+  mailUnsubscribeOneClick,
   MAIL_IDLE_EVENT,
   type MailAddress,
   type MailAttachmentInfo,
@@ -119,6 +122,7 @@ import {
   toDateTimeLocal,
   type MailOutboxState,
 } from "../../lib/mailOutbox";
+import { parseMailto } from "../../lib/mailto";
 import { isEditableTarget, mailShortcutAction, type MailShortcutAction } from "../../lib/mailShortcuts";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
 import {
@@ -1177,6 +1181,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [subscriptionsOpen, setSubscriptionsOpen] = useState(false);
   const draggedMessagesRef = useRef<MailMessageHeader[]>([]);
   const [dropFolder, setDropFolder] = useState<string | null>(null);
+  const [unsubscribeArmed, setUnsubscribeArmed] = useState<string | null>(null);
   const [subscriptionBusy, setSubscriptionBusy] = useState<string | null>(null);
   const oauthReauthRequired = isOAuthReauthRequired(error);
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
@@ -3974,6 +3979,101 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setStatus(`Emptied ${result.deleted} message${result.deleted === 1 ? "" : "s"} from ${folderLabel(folder)}`);
   });
 
+  /** In-app composer for `mailto:` links (reader links, List-Unsubscribe). */
+  const openComposeFromMailto = (href: string) => {
+    const fields = parseMailto(href);
+    if (!fields) return;
+    const body = fields.body.trim();
+    openCompose({
+      to: parseRecipientsText(fields.to.join(", ")),
+      cc: parseRecipientsText(fields.cc.join(", ")),
+      bcc: parseRecipientsText(fields.bcc.join(", ")),
+      subject: fields.subject,
+      ...(body ? { textBody: fields.body, htmlBody: plainTextToMailHtml(fields.body) } : {}),
+    }, !body);
+  };
+
+  const handleUnsubscribe = async (message: MailMessageHeader) => {
+    const list = message.listUnsubscribe;
+    if (!list) return;
+    const key = messageKey(message);
+    const https = list.uris.find((uri) => /^https:/i.test(uri));
+    const mailto = list.uris.find((uri) => /^mailto:/i.test(uri));
+    if (list.oneClick && https) {
+      // RFC 8058: confirm first, then POST without opening a browser.
+      if (unsubscribeArmed !== key) {
+        setUnsubscribeArmed(key);
+        return;
+      }
+      setUnsubscribeArmed(null);
+      try {
+        await mailUnsubscribeOneClick(https);
+        setStatus("Unsubscribe request sent");
+      } catch (e) {
+        setError(mailClientErrorMessage(e));
+      }
+      return;
+    }
+    if (mailto) {
+      openComposeFromMailto(mailto);
+      return;
+    }
+    const web = list.uris.find((uri) => /^https?:/i.test(uri));
+    if (web) void openExternalUrl(web);
+  };
+
+  const renderUnsubscribe = (message: MailMessageHeader) => {
+    if (!message.listUnsubscribe || message.listUnsubscribe.uris.length === 0) return null;
+    const armed = unsubscribeArmed === messageKey(message);
+    return (
+      <button
+        type="button"
+        className="taomni-btn h-5 px-2 text-[10px]"
+        data-testid="mail-unsubscribe"
+        data-armed={armed ? "true" : undefined}
+        title={message.listUnsubscribe.uris.join("\n")}
+        onClick={() => void handleUnsubscribe(message)}
+      >
+        {armed ? "Confirm unsubscribe" : "Unsubscribe"}
+      </button>
+    );
+  };
+
+  const handleExportMbox = (folder: MailFolder) => runMailAction(async () => {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const safe = folderLabel(folder).replace(/[\\/:*?"<>|]+/g, "_") || "folder";
+    const targetPath = await save({ title: `Export ${folderLabel(folder)} as mbox`, defaultPath: `${safe}.mbox` });
+    if (typeof targetPath !== "string" || !targetPath.trim()) {
+      setStatus("Export cancelled");
+      return;
+    }
+    setStatus(`Exporting ${folderLabel(folder)}…`);
+    const result = await mailExportMbox(info, folder.name, targetPath);
+    setStatus(`Exported ${result.count} message${result.count === 1 ? "" : "s"} to ${result.path}`);
+  });
+
+  const handleImportMessages = (folder: MailFolder) => runMailAction(async () => {
+    const paths = await selectUploadFile();
+    if (!paths.length) {
+      setStatus("Import cancelled");
+      return;
+    }
+    let imported = 0;
+    let failed = 0;
+    let firstError: string | null = null;
+    for (const path of paths) {
+      const result = await mailImportMessages(info, folder.name, path);
+      imported += result.imported;
+      failed += result.failed;
+      firstError = firstError ?? result.firstError ?? null;
+    }
+    setStatus(`Imported ${imported} message${imported === 1 ? "" : "s"} into ${folderLabel(folder)}${failed ? `; ${failed} failed` : ""}`);
+    if (firstError) setError(`Import failed for some messages: ${firstError}`);
+    // Pull the appended mail into the cache and list.
+    await runFolderSync(folder.name, { maxSteps: 20 }).catch(() => undefined);
+    await reloadVisibleFromCache(folder.name);
+  });
+
   const openExternalUrl = async (url: string) => {
     try {
       const { open } = await import("@tauri-apps/plugin-shell");
@@ -4165,6 +4265,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       { label: "", separator: true },
       { label: "New subfolder…", icon: <FolderPlus className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleCreateFolder(folder) },
       { label: "Rename folder…", icon: <PenLine className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleRenameFolder(folder) },
+      { label: "Export as mbox…", icon: <Download className="w-3.5 h-3.5" />, disabled: busyAction || !isSelectable(folder), onClick: () => void handleExportMbox(folder) },
+      { label: "Import messages (mbox/.eml)…", icon: <FolderInput className="w-3.5 h-3.5" />, disabled: busyAction || !isSelectable(folder), onClick: () => void handleImportMessages(folder) },
       {
         label: isTrashLike ? "Empty folder" : "Delete folder",
         icon: isTrashLike ? <Trash2 className="w-3.5 h-3.5" /> : <FolderX className="w-3.5 h-3.5" />,
@@ -4335,6 +4437,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                     {currentAllowsRemote ? "Block remote images" : "Load remote images"}
                   </button>
                 )}
+                {renderUnsubscribe(message)}
               </div>
               {currentAttachments.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -4397,6 +4500,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 fontSize={mailFontSize}
                 title={message.subject || "Message body"}
                 loading={loadingThisBody && !currentBody}
+                onMailtoLink={openComposeFromMailto}
               />
             </div>
           </div>
@@ -5169,6 +5273,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                           {selectedAllowsRemote ? "Block remote images" : "Load remote images"}
                         </button>
                       )}
+                      {renderUnsubscribe(selectedMessage)}
                     </div>
                     {visibleAttachments.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -5231,6 +5336,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                       fontSize={mailFontSize}
                       title={selectedMessage.subject || "Message body"}
                       loading={!!selectedMessage && bodyLoadingKey === messageKey(selectedMessage) && !selectedBody}
+                      onMailtoLink={openComposeFromMailto}
                     />
                   </div>
                 </div>

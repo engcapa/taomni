@@ -30,7 +30,7 @@ use super::{
 pub(super) const FLAG_RECONCILE_WINDOW: usize = 500;
 /// UIDs per `UID FETCH (FLAGS)` command.
 const FLAG_FETCH_CHUNK: usize = 1000;
-const MAIL_SCHEMA_VERSION: i64 = 4;
+const MAIL_SCHEMA_VERSION: i64 = 5;
 
 /// Which work a `mail_sync_folder` call should do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -157,6 +157,8 @@ pub fn migrate_mail_tables(conn: &Connection) -> SqlResult<()> {
         "references_json",
         "TEXT NOT NULL DEFAULT '[]'",
     )?;
+    // v5: mailing-list unsubscribe (TASK-18).
+    add_column_if_missing(conn, "mail_messages", "list_unsubscribe_json", "TEXT")?;
     // v4: local full-text index.
     if version < 4 {
         super::search::migrate_search_index(conn)?;
@@ -1200,6 +1202,37 @@ mod tests {
             let idle = step(&fake, &conn, &account, MailSyncRequestMode::Auto, 50);
             assert_eq!((idle.fetched, idle.new_unseen, idle.more), (0, 0, false));
         }
+    }
+
+    /// TASK-18: List-Unsubscribe is parsed from the header fetch and cached.
+    #[test]
+    fn list_unsubscribe_is_cached_with_the_header() {
+        let fake = FakeImap::start(false);
+        let conn = db();
+        let account = account(serde_json::json!({}));
+        let raw = concat!(
+            "From: News <news@example.com>\r\n",
+            "To: user@example.com\r\n",
+            "Subject: Weekly\r\n",
+            "Date: Tue, 14 Nov 2023 22:13:20 +0000\r\n",
+            "Message-ID: <weekly@example.com>\r\n",
+            "List-Unsubscribe: <mailto:leave@example.com>, <https://example.com/u>\r\n",
+            "List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n",
+            "\r\nBody\r\n"
+        );
+        fake.deliver_raw("INBOX", raw.as_bytes().to_vec());
+        fake.deliver("INBOX", 1, "plain");
+        step(&fake, &conn, &account, MailSyncRequestMode::Auto, 50);
+        let rows = super::super::list_cached_messages(&conn, "acct", "INBOX", 10, 0).unwrap();
+        let weekly = rows.iter().find(|row| row.subject == "Weekly").unwrap();
+        let list = weekly.list_unsubscribe.clone().expect("list header cached");
+        assert!(list.one_click);
+        assert_eq!(
+            list.uris,
+            vec!["mailto:leave@example.com", "https://example.com/u"]
+        );
+        let plain = rows.iter().find(|row| row.subject != "Weekly").unwrap();
+        assert!(plain.list_unsubscribe.is_none());
     }
 
     /// AC-07/AC-12: backfill walks older history down to UID 1.

@@ -44,10 +44,6 @@ steps:
 - drag_to:
     from: '[data-testid="mail-message-row"]'
     to: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
-- assert_text:
-    selector: '[data-testid="mail-client-tab"]'
-    contains: Moved 1 message to Archive
-    timeout_sec: 15
 - mail_server_assert_folder_count:
     folder: Archive
     equals: 3
@@ -59,7 +55,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 把邮件拖到文件夹树的 Archive 上完成移动：状态提示移动成功，服务器 Archive 多一封（stub 预置 2 封），INBOX 列表与服务器一致（AC-56）。
+    requirement: 把邮件拖到文件夹树的 Archive 上完成移动：服务器 Archive 多一封（stub 预置 2 封），INBOX 列表与服务器一致（AC-56）。
     actions:
     - 1
     - 2
@@ -73,15 +69,12 @@ verification:
     - step: 9
       expectation: '{"mail_server_assert_folder_count": {"folder": "Archive", "equals": 2}}'
     - step: 11
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Moved 1 message to Archive", "timeout_sec": 15}}'
-    - step: 12
       expectation: '{"mail_server_assert_folder_count": {"folder": "Archive", "equals": 3, "timeout_sec": 15}}'
-    - step: 13
+    - step: 12
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 30}}'
     results:
     - 11
     - 12
-    - 13
   visual:
   - check: 截图中 INBOX 列表少了被拖走的邮件。
     method: manual

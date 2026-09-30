@@ -41,9 +41,9 @@ def mail_server_deliver(ctx: StepContext, args: Any) -> None:
     _require_control(ctx)
     prefix = str(args.get("prefix") or "QA")
     delivered = ctx.page.evaluate(  # type: ignore[attr-defined]
-        f"""([folder, count, prefix, thread]) => {_CONTROL}.accounts()
-              .map((id) => {_CONTROL}.deliver(id, folder, count, prefix, thread).length)""",
-        [_folder(args), count, prefix, bool(args.get("thread"))],
+        f"""([folder, count, prefix, thread, list]) => {_CONTROL}.accounts()
+              .map((id) => {_CONTROL}.deliver(id, folder, count, prefix, thread, list).length)""",
+        [_folder(args), count, prefix, bool(args.get("thread")), args.get("list_unsubscribe") or None],
     )
     if not delivered:
         raise StepError("mail_server_deliver: no browser mail account exists yet; open the mail tab first")
