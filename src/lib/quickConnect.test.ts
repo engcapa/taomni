@@ -163,6 +163,19 @@ describe("mail quick connect", () => {
     expect(options.mailHeaderLimitPerFolder).toBe("0");
   });
 
+  it("opens POP3 accounts with pop3:// and POP3 default ports (TASK-21)", () => {
+    const tls = parseQuickConnectInput("pop3://me%40example.com@pop.example.com");
+    expect(tls.config.session_type).toBe("Mail");
+    expect(tls.config.port).toBe(995);
+    expect(tls.config.id).toBe("quick-pop3-me@example.com@pop.example.com_995");
+    const options = JSON.parse(tls.config.options_json);
+    expect(options.mailIncoming).toBe("pop3");
+    expect(options.mailSmtpHost).toBe("smtp.example.com");
+    const plain = parseQuickConnectInput("pop3://qa:pw@127.0.0.1?security=none&smtp=127.0.0.1:1025");
+    expect(plain.config.port).toBe(110);
+    expect(plain.authData).toBe("pw");
+  });
+
   it("accepts a password, plain security and an explicit SMTP endpoint", () => {
     const parsed = parseQuickConnectInput("mail://qa:secret@127.0.0.1:1143?security=none&smtp=127.0.0.1:1025");
     expect(parsed.authData).toBe("secret");

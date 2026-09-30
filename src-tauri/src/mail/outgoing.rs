@@ -360,6 +360,15 @@ pub async fn mail_store_remote_draft(
     draft_id: String,
     state: State<'_, AppState>,
 ) -> Result<MailDraft, String> {
+    if super::pop3::is_pop3(&config) {
+        // POP3 has no server Drafts folder; the local draft is the only copy.
+        return with_mail_db(&state, &config.session_id, |db| {
+            Ok(list_mail_drafts(db, &config.session_id)?
+                .into_iter()
+                .find(|draft| draft.id == draft_id))
+        })?
+        .ok_or_else(|| format!("draft {draft_id} not found"));
+    }
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let draft = with_mail_db(&state, &account_id, |db| {
@@ -429,6 +438,10 @@ pub async fn mail_discard_remote_draft(
     draft_id: String,
     state: State<'_, AppState>,
 ) -> Result<bool, String> {
+    if super::pop3::is_pop3(&config) {
+        let _ = (&draft_id, &state);
+        return Ok(false);
+    }
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let Some(location) = with_mail_db(&state, &account_id, |db| {

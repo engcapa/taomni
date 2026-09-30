@@ -27,6 +27,8 @@ def setup(ctx: Any) -> None:
     values["mail_mode"] = mode
     if mode != "native":
         values["mail_quick_connect"] = "mail://qa%40example.com@imap.example.com:993"
+        # The stub server model is protocol-agnostic; POP3 renders the same.
+        values["mail_pop3_quick_connect"] = "pop3://qa%40example.com@pop.example.com:995"
         return
     if mail_fake_server.ACTIVE is not None:
         mail_fake_server.ACTIVE.stop()
@@ -37,6 +39,10 @@ def setup(ctx: Any) -> None:
     values["mail_smtp_port"] = str(server.smtp_port)
     values["mail_quick_connect"] = (
         f"mail://qa%40example.com:qa-pass@127.0.0.1:{server.imap_port}"
+        f"?security=none&smtp=127.0.0.1:{server.smtp_port}"
+    )
+    values["mail_pop3_quick_connect"] = (
+        f"pop3://qa%40example.com:qa-pass@127.0.0.1:{server.pop3_port}"
         f"?security=none&smtp=127.0.0.1:{server.smtp_port}"
     )
 

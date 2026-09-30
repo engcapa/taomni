@@ -192,6 +192,25 @@ pub async fn mail_export_mbox(
     path: String,
     state: State<'_, AppState>,
 ) -> Result<MailExportResult, String> {
+    if super::pop3::is_pop3(&config) {
+        let target = PathBuf::from(path.trim());
+        let raws = super::local_cmds::folder_raw(&state, &config.session_id, folder.trim())?;
+        let file = File::create(&target)
+            .map_err(|e| format!("cannot create {}: {e}", target.display()))?;
+        let mut out = BufWriter::new(file);
+        for (_, raw) in &raws {
+            out.write_all(mbox_separator(None).as_bytes())
+                .and_then(|_| out.write_all(&mboxrd_escape(raw)))
+                .and_then(|_| out.write_all(if raw.ends_with(b"\n") { b"\n" } else { b"\n\n" }))
+                .map_err(|e| format!("writing mbox failed: {e}"))?;
+        }
+        out.flush()
+            .map_err(|e| format!("writing mbox failed: {e}"))?;
+        return Ok(MailExportResult {
+            path: target.display().to_string(),
+            count: raws.len(),
+        });
+    }
     let account = resolve_config(&state, config)?;
     let target = PathBuf::from(path.trim());
     if target.as_os_str().is_empty() {
@@ -251,6 +270,15 @@ pub async fn mail_import_messages(
     if messages.is_empty() {
         return Ok(MailImportResult {
             imported: 0,
+            failed: 0,
+            first_error: None,
+        });
+    }
+    if super::pop3::is_pop3(&config) {
+        let imported =
+            super::local_cmds::import(&state, &config.session_id, folder.trim(), &messages)?;
+        return Ok(MailImportResult {
+            imported,
             failed: 0,
             first_error: None,
         });

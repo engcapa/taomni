@@ -568,8 +568,13 @@ function sessionToMailTabInfo(
     },
     specialFolders: parseSpecialFolders(opts.mailSpecialFolders),
     undoSendSeconds: mailNumberOption(opts, "mailUndoSendSeconds", 0, 0),
+    incoming: opts.mailIncoming === "pop3" ? "pop3" : "imap",
+    pop3LeaveDays: opts.mailPop3LeaveDays === undefined || opts.mailPop3LeaveDays === null || String(opts.mailPop3LeaveDays).trim() === ""
+      ? null
+      : mailNumberOption(opts, "mailPop3LeaveDays", 0, 0),
     cache: {
-      enabled: opts.mailCacheEnabled !== false,
+      // POP3 mail lives only in the local store, so its cache is always on.
+      enabled: opts.mailCacheEnabled !== false || opts.mailIncoming === "pop3",
       headerRetentionDays: mailHeaderLimitOption(opts, "mailHeaderRetentionDays", LEGACY_MAIL_HEADER_RETENTION_DAYS),
       headerLimitPerFolder: mailHeaderLimitOption(opts, "mailHeaderLimitPerFolder", LEGACY_MAIL_HEADER_LIMIT_PER_FOLDER),
       bodyRecentLimit: mailNumberOption(opts, "mailBodyRecentLimit", 200, 0),

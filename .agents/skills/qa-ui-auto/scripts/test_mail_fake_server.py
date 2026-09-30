@@ -108,6 +108,21 @@ class FakeMailServerTest(unittest.TestCase):
         self.assertIn(b'"Archive"', b" ".join(client.lsub()[1]))
         client.logout()
 
+    def test_pop3_shares_the_inbox(self) -> None:
+        import poplib
+
+        client = poplib.POP3("127.0.0.1", self.server.pop3_port, timeout=5)
+        client.user("qa")
+        client.pass_("x")
+        self.assertEqual(client.stat()[0], 5)
+        uidl = client.uidl()[1]
+        self.assertEqual(uidl[0], b"1 uid1")
+        lines = client.retr(2)[1]
+        self.assertIn(b"Subject: Seed 0002", lines)
+        client.dele(1)
+        client.quit()
+        self.assertEqual(self.server.state.count("INBOX"), 4)
+
     def test_append_and_smtp(self) -> None:
         client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
         client.login("qa", "x")

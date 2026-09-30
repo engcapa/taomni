@@ -46,9 +46,11 @@ mod fake_imap;
 pub mod folders;
 pub mod idle;
 pub mod lists;
+mod local_cmds;
 pub mod mbox;
 pub mod outgoing;
 mod parts;
+mod pop3;
 pub mod search;
 mod sync;
 
@@ -92,6 +94,15 @@ pub enum MailProvider {
     Gmail,
     #[serde(rename = "outlook", alias = "Outlook", alias = "outlook.com")]
     Outlook,
+}
+
+/// Incoming protocol of an account (TASK-21).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MailIncomingProtocol {
+    #[default]
+    Imap,
+    Pop3,
 }
 
 impl Default for MailProvider {
@@ -388,6 +399,13 @@ pub struct MailAccountConfig {
     /// automatic: off for Gmail/Outlook (the server files it), on otherwise.
     #[serde(default)]
     pub save_sent_copy: Option<bool>,
+    /// IMAP (default) or POP3 with local folders.
+    #[serde(default)]
+    pub incoming: MailIncomingProtocol,
+    /// POP3: delete downloaded mail from the server after N days
+    /// (`None` = keep on the server, `0` = delete right after download).
+    #[serde(default)]
+    pub pop3_leave_days: Option<u32>,
     /// Manual special folders (`sent`, `drafts`, `trash`, `junk`, `archive`
     /// -> server folder name); beats SPECIAL-USE and name matching.
     #[serde(default)]
@@ -1473,7 +1491,8 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
         CREATE INDEX IF NOT EXISTS idx_mail_drafts_updated
             ON mail_drafts(account_id, updated_at DESC);",
     )?;
-    sync::migrate_mail_tables(conn)
+    sync::migrate_mail_tables(conn)?;
+    pop3::migrate_local_tables(conn)
 }
 
 fn with_mail_db<T>(
@@ -1492,6 +1511,9 @@ pub async fn mail_test_connection(
     config: MailAccountConfig,
     state: State<'_, AppState>,
 ) -> Result<MailTestConnectionResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::test_connection(&state, config).await;
+    }
     let account = resolve_config(&state, config)?;
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
@@ -1798,6 +1820,10 @@ pub async fn mail_sync_folder(
     include_bodies: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<MailFolderSyncResult, String> {
+    if pop3::is_pop3(&config) {
+        let name = folder.clone().unwrap_or_else(|| "INBOX".into());
+        return local_cmds::sync_folder(&state, config, name.trim()).await;
+    }
     let account = resolve_config(&state, config)?;
     let folder = folder
         .filter(|f| !f.trim().is_empty())
@@ -1877,6 +1903,9 @@ pub async fn mail_sync_all_folders(
     full_reconcile: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<MailSyncAllResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::sync_all(&state, config).await;
+    }
     let account = resolve_config(&state, config)?;
     let cache_enabled = account.config.cache.enabled;
     let cache_settings = account.config.cache.clone();
@@ -2130,6 +2159,9 @@ pub async fn mail_get_message_body(
     uid: u32,
     state: State<'_, AppState>,
 ) -> Result<MailMessageBody, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::get_body(&state, &config.session_id, folder.trim(), uid);
+    }
     let account_id = config.session_id.clone();
     if config.cache.enabled {
         let cached = with_mail_db(&state, &account_id, |db| {
@@ -2173,6 +2205,16 @@ pub async fn mail_download_attachment(
     section: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<MailDownloadAttachmentResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::download_attachment(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            uid,
+            attachment_index,
+            target_path.trim(),
+        );
+    }
     let target_path = target_path.trim().to_string();
     if target_path.is_empty() {
         return Err("attachment download path is required".into());
@@ -2241,6 +2283,10 @@ pub async fn mail_send_message(
     request: MailSendRequest,
     state: State<'_, AppState>,
 ) -> Result<MailSendResult, String> {
+    if pop3::is_pop3(&config) {
+        validate_send_request(&request)?;
+        return local_cmds::send(&state, config, request).await;
+    }
     let account = resolve_config(&state, config)?;
     validate_send_request(&request)?;
     let account_id = account.config.session_id.clone();
@@ -2338,6 +2384,15 @@ pub async fn mail_mark_read(
     all: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<MailMarkReadResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::mark_read(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            uids,
+            all.unwrap_or(false),
+        );
+    }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
         return Err("mail folder is required".into());
@@ -2386,6 +2441,11 @@ pub async fn mail_clear_cache(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    if with_mail_db(&state, &account_id, |db| {
+        pop3::has_local_store(db, &account_id)
+    })? {
+        return Err("This POP3 account keeps its mail only on this computer; clearing the cache would delete it.".into());
+    }
     state.mail_imap_pool.invalidate(&account_id);
     with_mail_db(&state, &account_id, |db| {
         db.execute(
@@ -2409,6 +2469,16 @@ pub async fn mail_set_flags(
     remove: Option<Vec<String>>,
     state: State<'_, AppState>,
 ) -> Result<MailFlagResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::set_flags(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            &uids,
+            &add.unwrap_or_default(),
+            &remove.unwrap_or_default(),
+        );
+    }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
         return Err("mail folder is required".into());
@@ -2464,6 +2534,16 @@ pub async fn mail_move_messages(
     target_folder: String,
     state: State<'_, AppState>,
 ) -> Result<MailMoveResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::move_or_copy(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            &uids,
+            target_folder.trim(),
+            false,
+        );
+    }
     let folder = folder.trim().to_string();
     let target_folder = target_folder.trim().to_string();
     if folder.is_empty() || target_folder.is_empty() {
@@ -2518,6 +2598,16 @@ pub async fn mail_copy_messages(
     target_folder: String,
     state: State<'_, AppState>,
 ) -> Result<MailMoveResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::move_or_copy(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            &uids,
+            target_folder.trim(),
+            true,
+        );
+    }
     let folder = folder.trim().to_string();
     let target_folder = target_folder.trim().to_string();
     if folder.is_empty() || target_folder.is_empty() {
@@ -2565,6 +2655,15 @@ pub async fn mail_delete_messages(
     all: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<MailDeleteResult, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::delete(
+            &state,
+            &config.session_id,
+            folder.trim(),
+            uids,
+            all.unwrap_or(false),
+        );
+    }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
         return Err("mail folder is required".into());
@@ -2618,6 +2717,10 @@ pub async fn mail_fetch_raw(
     uid: u32,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::raw(&state, &config.session_id, folder.trim(), uid)
+            .map(|raw| String::from_utf8_lossy(&raw).to_string());
+    }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
         return Err("mail folder is required".into());
@@ -2647,6 +2750,16 @@ pub async fn mail_save_raw(
     target_path: String,
     state: State<'_, AppState>,
 ) -> Result<MailDownloadAttachmentResult, String> {
+    if pop3::is_pop3(&config) {
+        let raw = local_cmds::raw(&state, &config.session_id, folder.trim(), uid)?;
+        let path = write_attachment_file(target_path.trim(), &raw)?;
+        return Ok(MailDownloadAttachmentResult {
+            path,
+            name: None,
+            content_type: Some("message/rfc822".into()),
+            size: raw.len(),
+        });
+    }
     let folder = folder.trim().to_string();
     if folder.is_empty() {
         return Err("mail folder is required".into());
@@ -2691,6 +2804,9 @@ pub async fn mail_create_folder(
     name: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::create_folder(&state, &config.session_id, name.trim());
+    }
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err("folder name is required".into());
@@ -2731,6 +2847,9 @@ pub async fn mail_rename_folder(
     to: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::rename_folder(&state, &config.session_id, from.trim(), to.trim());
+    }
     let from = from.trim().to_string();
     let to = to.trim().to_string();
     if from.is_empty() || to.is_empty() {
@@ -2773,6 +2892,9 @@ pub async fn mail_delete_folder(
     name: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
+    if pop3::is_pop3(&config) {
+        return local_cmds::delete_folder(&state, &config.session_id, name.trim());
+    }
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err("folder name is required".into());
@@ -5581,6 +5703,10 @@ fn prune_mail_cache(
     folder: &str,
     cache: &MailCacheSettings,
 ) -> SqlResult<()> {
+    // POP3 mail exists only locally: never prune it (TASK-21).
+    if pop3::has_local_store(conn, account_id)? {
+        return Ok(());
+    }
     // Header pruning only ever cuts the low (oldest-UID) end so the cached span
     // stays contiguous; `sync::apply_prune_cut` moves the watermark with it.
     // Retention uses the server arrival time (INTERNALDATE), not the sender's
@@ -6574,6 +6700,8 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 ai: MailAiSettings::default(),
                 save_sent_copy: None,
                 special_folders: HashMap::new(),
+                incoming: MailIncomingProtocol::Imap,
+                pop3_leave_days: None,
             },
             auth_mode: MailAuthMode::Password,
             network_settings: None,
@@ -6793,6 +6921,8 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 ai: MailAiSettings::default(),
                 save_sent_copy: None,
                 special_folders: HashMap::new(),
+                incoming: MailIncomingProtocol::Imap,
+                pop3_leave_days: None,
             },
             auth_mode: MailAuthMode::OAuth2,
             network_settings: None,

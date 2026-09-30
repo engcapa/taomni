@@ -343,6 +343,16 @@ pub async fn mail_search_server(
     query: MailSearchQuery,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailMessageHeader>, String> {
+    if super::pop3::is_pop3(&config) {
+        // Local mailbox: the "server" is the local store.
+        let local = MailSearchQuery {
+            folder: Some(folder.clone()),
+            ..query.clone()
+        };
+        return with_mail_db(&state, &config.session_id, |db| {
+            search_cached_messages(db, &config.session_id, &local)
+        });
+    }
     let account = resolve_config(&state, config)?;
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();

@@ -191,6 +191,13 @@ fn starttls_preamble(stream: &mut TcpStream, protocol: &str) -> Result<(), Strin
         if !reply.starts_with("220") {
             return Err(format!("STARTTLS refused: {}", reply.trim()));
         }
+    } else if protocol == "pop3" {
+        read_line(&mut reader)?; // +OK greeting
+        stream.write_all(b"STLS\r\n").map_err(|e| e.to_string())?;
+        let reply = read_line(&mut reader)?;
+        if !reply.starts_with("+OK") {
+            return Err(format!("STLS refused: {}", reply.trim()));
+        }
     } else {
         read_line(&mut reader)?; // * OK greeting
         stream
@@ -257,6 +264,7 @@ pub async fn mail_probe_certificate(
     state: State<'_, AppState>,
 ) -> Result<MailCertificateInfo, String> {
     let smtp = protocol.eq_ignore_ascii_case("smtp");
+    let pop3 = super::pop3::is_pop3(&config);
     let account = resolve_config(&state, config)?;
     let (host, port, security) = if smtp {
         (
@@ -280,7 +288,13 @@ pub async fn mail_probe_certificate(
             &connect_host,
             connect_port,
             security,
-            if smtp { "smtp" } else { "imap" },
+            if smtp {
+                "smtp"
+            } else if pop3 {
+                "pop3"
+            } else {
+                "imap"
+            },
         )?;
         let mut info = describe_certificate(&host, port, &der);
         info.trusted_by_system = verified.is_ok();

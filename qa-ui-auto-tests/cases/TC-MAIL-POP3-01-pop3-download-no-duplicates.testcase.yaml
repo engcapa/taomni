@@ -1,0 +1,107 @@
+id: TC-MAIL-POP3-01
+title: Mail POP3 account downloads into local folders without duplicates
+description: 'TASK-21 (docs-feature/mail-thunderbird-parity-design.md AC-65).
+
+  Opens a POP3 account through Quick Connect (pop3://), requires the local
+
+  INBOX to match the server mailbox, delivers three more messages, syncs twice
+
+  and requires the list to still match the server exactly (UIDL de-duplication,
+
+  no repeated downloads).
+
+  Browser mode drives the stub server model (renderer orchestration only);
+
+  native mode runs the real Tauri POP3 client (USER/PASS, UIDL, RETR) against
+
+  the in-process fake POP3 listener of the mail_server fixture, which serves
+
+  the same INBOX as its IMAP side.
+
+  '
+covers:
+- F-MAIL-17
+tags:
+- mail
+- p2
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_pop3_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: POP3
+- mail_server_deliver:
+    count: 3
+    prefix: Pop3-new
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- click: '[data-testid="mail-sync-button"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: new headers across
+    timeout_sec: 30
+- mail_server_assert_list_matches:
+    timeout_sec: 30
+- screenshot: mail-pop3-01-local-inbox.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: POP3 账户打开后本地 INBOX 与服务器邮箱一致，状态栏显示 POP3。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "POP3"}}'
+    results:
+    - 8
+    - 9
+  - id: R2
+    requirement: 服务器新增 3 封后同步两次，列表仍与服务器完全一致，没有重复下载（AC-65）。
+    actions:
+    - 10
+    - 11
+    - 13
+    checkpoints:
+    - step: 12
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 14
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "new headers across", "timeout_sec": 30}}'
+    - step: 15
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 30}}'
+    results:
+    - 12
+    - 15
+  visual:
+  - check: 截图中本地文件夹（INBOX/Sent/Drafts/Trash/Junk）与 POP3 状态显示正确。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实 POP3 客户端与本地存储；“保留 N 天后删除”由 Rust 测试覆盖；browser 仅验证渲染层。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

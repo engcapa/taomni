@@ -329,6 +329,10 @@ export interface MailTabInfo {
     /** Hide and skip unsubscribed folders (LSUB; TASK-10). */
     subscribedOnly?: boolean;
   };
+  /** Incoming protocol: IMAP (default) or POP3 with local folders (TASK-21). */
+  incoming?: "imap" | "pop3";
+  /** POP3: delete downloaded mail from the server after N days (null = keep). */
+  pop3LeaveDays?: number | null;
   /** Seconds a sent message can still be undone (0 = send immediately). */
   undoSendSeconds?: number;
   /** Manual special folders: sent/drafts/trash/junk/archive -> folder name. */

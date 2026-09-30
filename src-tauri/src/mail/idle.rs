@@ -212,6 +212,11 @@ pub async fn mail_idle_start(
     folder: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<bool, String> {
+    if super::pop3::is_pop3(&config) {
+        // POP3 has no push; the tab keeps polling.
+        let _ = (&app, &folder);
+        return Ok(false);
+    }
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let folder = folder

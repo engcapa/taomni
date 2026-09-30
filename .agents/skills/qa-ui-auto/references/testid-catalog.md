@@ -925,6 +925,11 @@
 - `[data-testid="mail-quick-filter-tag"]` — interactive — F-MAIL-8.quick-filter-tag
 - `[data-testid="mail-message-junk"]` — display [optional] — F-MAIL-8.message-junk
 
+## mail/pop3 (F-MAIL-17)
+
+- `[data-testid="mail-incoming-protocol"]` — interactive [optional] — F-MAIL-17.incoming-protocol
+- `[data-testid="mail-pop3-leave-days"]` — interactive [optional] — F-MAIL-17.pop3-leave-days
+
 ## mail/search (F-MAIL-7)
 
 - `[data-testid="mail-search-input"]` — interactive — F-MAIL-7.search-input

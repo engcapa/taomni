@@ -1388,6 +1388,8 @@ function MailSettings({
   syncOnOpen, setSyncOnOpen,
   idlePush, setIdlePush,
   subscribedOnly, setSubscribedOnly,
+  incoming, setIncoming,
+  pop3LeaveDays, setPop3LeaveDays,
   undoSendSeconds, setUndoSendSeconds,
   specialFolders, setSpecialFolders,
   desktopNotify, setDesktopNotify,
@@ -1442,6 +1444,8 @@ function MailSettings({
   syncOnOpen: boolean; setSyncOnOpen: (v: boolean) => void;
   idlePush: boolean; setIdlePush: (v: boolean) => void;
   subscribedOnly: boolean; setSubscribedOnly: (v: boolean) => void;
+  incoming: "imap" | "pop3"; setIncoming: (v: "imap" | "pop3") => void;
+  pop3LeaveDays: string; setPop3LeaveDays: (v: string) => void;
   undoSendSeconds: string; setUndoSendSeconds: (v: string) => void;
   specialFolders: Partial<Record<MailSpecialFolderKey, string>>;
   setSpecialFolders: (v: Partial<Record<MailSpecialFolderKey, string>>) => void;
@@ -1534,7 +1538,40 @@ function MailSettings({
         )}
       </Field>
 
-      <Field label="IMAP server">
+      <Field label="Incoming">
+        <select
+          className="taomni-input w-40"
+          value={incoming}
+          aria-label="Mail incoming protocol"
+          data-testid="mail-incoming-protocol"
+          onChange={(e) => {
+            const next = e.target.value === "pop3" ? "pop3" : "imap";
+            setIncoming(next);
+            // Keep the port on the new protocol's default for the chosen security.
+            const tls = imapSecurity === "TLS";
+            setImapPort(String(next === "pop3" ? (tls ? 995 : 110) : tls ? 993 : 143));
+          }}
+        >
+          <option value="imap">IMAP (server folders)</option>
+          <option value="pop3">POP3 (local folders)</option>
+        </select>
+        {incoming === "pop3" && (
+          <>
+            <span className="ml-3 text-[var(--taomni-text-muted)]">Delete from server after</span>
+            <input
+              className="taomni-input w-14 ml-1"
+              value={pop3LeaveDays}
+              placeholder="never"
+              aria-label="POP3 leave on server days"
+              data-testid="mail-pop3-leave-days"
+              onChange={(e) => setPop3LeaveDays(e.target.value.replace(/[^0-9]/g, ""))}
+            />
+            <span className="ml-1 text-[var(--taomni-text-muted)]">days (blank = keep, 0 = at once)</span>
+          </>
+        )}
+      </Field>
+
+      <Field label={incoming === "pop3" ? "POP3 server" : "IMAP server"}>
         <input
           className="taomni-input w-72"
           value={imapHost}
@@ -2756,6 +2793,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailSyncOnOpen, setMailSyncOnOpen] = useState(() => optionBoolean(initialOptions, "mailSyncOnOpen", true));
   const [mailIdlePush, setMailIdlePush] = useState(() => optionBoolean(initialOptions, "mailIdlePush", true));
   const [mailSubscribedOnly, setMailSubscribedOnly] = useState(() => optionBoolean(initialOptions, "mailSubscribedOnly", false));
+  const [mailIncoming, setMailIncoming] = useState<"imap" | "pop3">(() => (optionString(initialOptions, "mailIncoming", "imap") === "pop3" ? "pop3" : "imap"));
+  const [mailPop3LeaveDays, setMailPop3LeaveDays] = useState(() => optionString(initialOptions, "mailPop3LeaveDays", ""));
   const [mailUndoSendSeconds, setMailUndoSendSeconds] = useState(() => optionString(initialOptions, "mailUndoSendSeconds", "0"));
   const [mailSpecialFolders, setMailSpecialFolders] = useState(() => parseSpecialFolders(initialOptions.mailSpecialFolders));
   const [mailDesktopNotify, setMailDesktopNotify] = useState(() => optionBoolean(initialOptions, "mailDesktopNotify", false));
@@ -3117,6 +3156,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailSyncOnOpen,
           mailIdlePush,
           mailSubscribedOnly,
+          mailIncoming,
+          mailPop3LeaveDays,
           mailUndoSendSeconds,
           mailSpecialFolders: JSON.stringify(parseSpecialFolders(mailSpecialFolders)),
           mailDesktopNotify,
@@ -3694,6 +3735,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailSyncOnOpen(optionBoolean(nextOptions, "mailSyncOnOpen", true));
     setMailIdlePush(optionBoolean(nextOptions, "mailIdlePush", true));
     setMailSubscribedOnly(optionBoolean(nextOptions, "mailSubscribedOnly", false));
+    setMailIncoming(optionString(nextOptions, "mailIncoming", "imap") === "pop3" ? "pop3" : "imap");
+    setMailPop3LeaveDays(optionString(nextOptions, "mailPop3LeaveDays", ""));
     setMailUndoSendSeconds(optionString(nextOptions, "mailUndoSendSeconds", "0"));
     setMailSpecialFolders(parseSpecialFolders(nextOptions.mailSpecialFolders));
     setMailDesktopNotify(optionBoolean(nextOptions, "mailDesktopNotify", false));
@@ -4813,6 +4856,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 syncOnOpen={mailSyncOnOpen} setSyncOnOpen={setMailSyncOnOpen}
                 idlePush={mailIdlePush} setIdlePush={setMailIdlePush}
                 subscribedOnly={mailSubscribedOnly} setSubscribedOnly={setMailSubscribedOnly}
+                incoming={mailIncoming} setIncoming={setMailIncoming}
+                pop3LeaveDays={mailPop3LeaveDays} setPop3LeaveDays={setMailPop3LeaveDays}
                 undoSendSeconds={mailUndoSendSeconds} setUndoSendSeconds={setMailUndoSendSeconds}
                 specialFolders={mailSpecialFolders} setSpecialFolders={setMailSpecialFolders}
                 desktopNotify={mailDesktopNotify} setDesktopNotify={setMailDesktopNotify}

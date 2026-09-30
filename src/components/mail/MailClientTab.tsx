@@ -2594,7 +2594,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setError(null);
     try {
       const result = await mailTestConnection(info);
-      setStatus(`IMAP ${result.imapOk ? "ok" : "failed"}, SMTP ${result.smtpOk ? "ok" : "failed"}, ${result.folderCount} folders`);
+      setStatus(`${info.incoming === "pop3" ? "POP3" : "IMAP"} ${result.imapOk ? "ok" : "failed"}, SMTP ${result.smtpOk ? "ok" : "failed"}, ${result.folderCount} folders`);
     } catch (e) {
       setError(mailClientErrorMessage(e));
     } finally {
@@ -5036,7 +5036,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 </div>
                 <div className="shrink-0 border-t border-[var(--taomni-divider)] px-3 py-2 text-[11px] text-[var(--taomni-text-muted)] leading-5">
                   <div className="truncate" title={`${info.imap.host}:${info.imap.port}`}>
-                    IMAP {info.imap.host}:{info.imap.port}
+                    {info.incoming === "pop3" ? "POP3" : "IMAP"} {info.imap.host}:{info.imap.port}
                   </div>
                   <div className="truncate" title={`${info.smtp.host}:${info.smtp.port}`}>
                     SMTP {info.smtp.host}:{info.smtp.port}

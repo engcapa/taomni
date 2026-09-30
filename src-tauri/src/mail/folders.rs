@@ -197,6 +197,9 @@ pub async fn mail_list_folders(
     config: MailAccountConfig,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
+    if super::pop3::is_pop3(&config) {
+        return super::local_cmds::list_folders(&state, &config.session_id);
+    }
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let cache_enabled = account.config.cache.enabled;
@@ -230,6 +233,10 @@ pub async fn mail_set_folder_subscription(
     subscribed: bool,
     state: State<'_, AppState>,
 ) -> Result<Vec<MailFolder>, String> {
+    if super::pop3::is_pop3(&config) {
+        let _ = (&folder, subscribed);
+        return super::local_cmds::list_folders(&state, &config.session_id);
+    }
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let cache_enabled = account.config.cache.enabled;

@@ -542,6 +542,66 @@ class _SmtpHandler(socketserver.StreamRequestHandler):
                 send("502 unsupported")
 
 
+class _Pop3Handler(socketserver.StreamRequestHandler):
+    """POP3 view of the shared INBOX (TASK-21): USER/PASS, STAT, UIDL, RETR,
+    DELE (applied on QUIT), NOOP, QUIT. UIDL = "uid<N>" of the IMAP UID, so
+    both protocols see the same mailbox."""
+
+    def handle(self) -> None:
+        state: FakeMailState = self.server.state
+
+        def send(data: bytes) -> None:
+            self.wfile.write(data)
+            self.wfile.flush()
+
+        send(b"+OK qa POP3 ready\r\n")
+        marked: set[int] = set()
+        with state.lock:
+            snapshot = sorted(state.folders["INBOX"].messages.items())
+        while True:
+            line = self.rfile.readline()
+            if not line:
+                return
+            text = line.decode("utf-8", "replace").strip()
+            upper = text.upper()
+            with state.lock:
+                state.log.append(f"POP3 {text.split(' ')[0].upper()}")
+            if upper.startswith(("USER", "PASS", "NOOP", "RSET", "CAPA", "APOP")):
+                send(b"+OK\r\n")
+            elif upper.startswith("STAT"):
+                send(f"+OK {len(snapshot)} 0\r\n".encode())
+            elif upper.startswith("UIDL"):
+                out = b"+OK\r\n" + b"".join(
+                    f"{index + 1} uid{uid}\r\n".encode() for index, (uid, _) in enumerate(snapshot)
+                ) + b".\r\n"
+                send(out)
+            elif upper.startswith("RETR "):
+                index = int(text.split()[1]) - 1
+                raw = snapshot[index][1].raw.replace(b"\r\n", b"\n").split(b"\n")
+                body = b"".join((b"." + part if part.startswith(b".") else part) + b"\r\n" for part in raw)
+                send(b"+OK\r\n" + body + b".\r\n")
+            elif upper.startswith("DELE "):
+                marked.add(int(text.split()[1]) - 1)
+                send(b"+OK\r\n")
+            elif upper.startswith("QUIT"):
+                with state.lock:
+                    for index in marked:
+                        state.folders["INBOX"].messages.pop(snapshot[index][0], None)
+                send(b"+OK bye\r\n")
+                return
+            else:
+                send(b"-ERR unsupported\r\n")
+
+
+class _Pop3Server(socketserver.ThreadingTCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def __init__(self, state: FakeMailState):
+        super().__init__(("127.0.0.1", 0), _Pop3Handler)
+        self.state = state
+
+
 class _ImapServer(socketserver.ThreadingTCPServer):
     daemon_threads = True
     allow_reuse_address = True
@@ -565,17 +625,20 @@ class FakeMailServer:
         self.state = FakeMailState()
         self._imap = _ImapServer(self.state)
         self._smtp = _SmtpServer(self.state)
+        self._pop3 = _Pop3Server(self.state)
         self.imap_port = self._imap.server_address[1]
         self.smtp_port = self._smtp.server_address[1]
+        self.pop3_port = self._pop3.server_address[1]
         self._threads = [
             threading.Thread(target=self._imap.serve_forever, daemon=True),
             threading.Thread(target=self._smtp.serve_forever, daemon=True),
+            threading.Thread(target=self._pop3.serve_forever, daemon=True),
         ]
         for thread in self._threads:
             thread.start()
 
     def stop(self) -> None:
-        for server in (self._imap, self._smtp):
+        for server in (self._imap, self._smtp, self._pop3):
             server.shutdown()
             server.server_close()
 

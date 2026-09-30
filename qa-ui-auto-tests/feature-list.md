@@ -5692,6 +5692,35 @@ controls:
 - 会话编辑器 “Detect settings”：先查内置表（Gmail、Outlook、QQ、163、126、iCloud、Yahoo、Fastmail 等，离线），勾选 “Online lookup” 时再依次查询 ISPDB、`autoconfig.<domain>`、`/.well-known/autoconfig`，最后猜测 `imap./smtp.<domain>` 并探测端口；在线查询会把域名发给第三方，提示中有说明，可关闭。
 - 证书例外：握手因证书不受信任失败时，状态栏出现 “Review certificate”，对话框显示主题、签发者、有效期与 SHA-256 指纹；“Trust for this account” 把该证书设为此服务器唯一的信任锚（禁用系统根证书，放宽主机名校验），证书变化时握手失败并再次提示。保存的会话写入会话选项，Quick Connect 标签只在内存中生效。
 - 未完成：Yahoo/AOL/Fastmail 等 OAuth 需要在各厂商注册客户端 ID，尚未接入；RFC 6186 SRV 与 Exchange Autodiscover 未实现（未引入 DNS 解析依赖）。证书固定的 TLS 行为已在 Windows 上用本地 TLS 服务器验证，macOS/Linux 待原生验证。
+
+---
+
+### 13.17 POP3 账户与本地文件夹 ✅
+
+<!-- feature
+id: F-MAIL-17
+status: done
+area: mail/pop3
+components: [SessionEditor, MailClientTab]
+files:
+  - src/components/session/SessionEditor.tsx
+  - src/lib/quickConnect.ts
+  - src-tauri/src/mail/pop3.rs
+  - src-tauri/src/mail/local_cmds.rs
+controls:
+  - id: incoming-protocol
+    selector: '[data-testid="mail-incoming-protocol"]'
+    kind: interactive
+    optional: true       # session editor; quick connect uses pop3://
+  - id: pop3-leave-days
+    selector: '[data-testid="mail-pop3-leave-days"]'
+    kind: interactive
+    optional: true
+-->
+
+- 会话编辑器 “Incoming” 可选 POP3（本地文件夹），Quick Connect 支持 `pop3://` / `pop3s://`（默认端口 995/110）。支持 TLS、STLS 与明文；明文且服务器提供时间戳时使用 APOP，OAuth 使用 XOAUTH2。
+- 以 `UIDL` 去重下载到本地 INBOX（每批 50 封，重复同步不产生重复邮件）；“Delete from server after N days”（空 = 保留，0 = 下载后立即删除）按下载时间在服务器执行 `DELE`。
+- 本地文件夹（INBOX/Sent/Drafts/Trash/Junk 与自建文件夹）支持移动、复制、删除、标记、搜索、重命名与 mbox 导入导出；发出的邮件副本存入本地 Sent。本地邮件不受邮件头保留策略裁剪，清空缓存会被拒绝（邮件只有本地一份）。
 ---
 
 ## 14. SocksCap 网络流量路由
