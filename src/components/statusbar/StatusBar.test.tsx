@@ -103,8 +103,8 @@ describe("StatusBar code-workspace segments", () => {
 
     render(<StatusBar />);
 
-    expect(screen.getByTestId("status-bar-workspace-cursor")).toHaveTextContent("Ln 12, Col 4");
-    expect(screen.getByTestId("status-bar-workspace-indentation")).toHaveTextContent("Spaces: 2");
+    expect(screen.getByTestId("status-bar-workspace-cursor")).toHaveTextContent("12:4");
+    expect(screen.getByTestId("status-bar-workspace-indentation")).toHaveTextContent("2 spaces");
     expect(screen.getByTestId("status-bar-workspace-encoding")).toHaveTextContent("UTF-8");
     expect(screen.getByTestId("status-bar-workspace-eol")).toHaveTextContent("LF");
     expect(screen.getByTestId("status-bar-workspace-language")).toHaveTextContent("typescript");
@@ -123,6 +123,48 @@ describe("StatusBar code-workspace segments", () => {
     expect(openGitManager).toHaveBeenCalledTimes(1);
     // Normal-size file: no large-file indicator.
     expect(screen.queryByTestId("status-bar-workspace-large-file")).toBeNull();
+  });
+
+  it("ED-PARITY-010: renders the IDEA workspace layout (navigation bar, selection count, lock)", () => {
+    useCodeWorkspaceStatusStore.setState({
+      status: {
+        tabId: "ws-tab",
+        line: 20,
+        column: 10,
+        encoding: "UTF-8",
+        eol: "LF",
+        indentation: "Spaces: 4 (EditorConfig)",
+        languageId: "java",
+        lspActive: false,
+        lspLabel: null,
+        lspError: false,
+        gitBranch: null,
+        gitAhead: 0,
+        gitBehind: 0,
+        fontSize: 13,
+        largeFile: false,
+        selectionChars: 5,
+        selectionLineBreaks: 0,
+        readOnly: true,
+        navigation: [
+          { label: "app", kind: "root" },
+          { label: "src", kind: "dir" },
+          { label: "OrderService.java", kind: "file" },
+          { label: "OrderService", kind: "symbol", symbolKind: 5 },
+          { label: "total", kind: "symbol", symbolKind: 6 },
+        ],
+      },
+      actions: {},
+    });
+    render(<StatusBar />);
+    expect(screen.getByTestId("status-bar-workspace-cursor")).toHaveTextContent("20:10 (5 chars)");
+    expect(screen.getByTestId("status-bar-workspace-indentation")).toHaveTextContent("4 spaces");
+    expect(screen.getByTestId("status-bar-workspace-readonly")).toBeInTheDocument();
+    const segments = screen.getAllByTestId("status-bar-workspace-navbar-segment").map((node) => node.textContent);
+    expect(segments).toEqual(["app", "src", "OrderService.java", "COrderService", "mtotal"]);
+    // App-level segments give way to the workspace like IDEA.
+    expect(screen.queryByTestId("status-bar-selected-session")).toBeNull();
+    expect(screen.getByTestId("status-bar")).not.toHaveTextContent("X11:");
   });
 
   it("shows the large-file indicator only in large-file mode", () => {

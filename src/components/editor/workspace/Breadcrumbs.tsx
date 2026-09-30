@@ -43,6 +43,8 @@ type BreadcrumbItem =
   | { type: "collapsed"; hiddenPaths: BreadcrumbPathSegment[] };
 
 interface BreadcrumbsProps {
+  /** `statusbar` renders compactly inside the status bar navigation slot. */
+  variant?: "bar" | "statusbar";
   pathSegments: BreadcrumbPathSegment[];
   symbols: LspDocumentSymbol[];
   position: LspPosition;
@@ -484,6 +486,7 @@ export function Breadcrumbs({
   onSymbolClick,
   activeNavigationBar = false,
   onCloseNavigationBar,
+  variant = "bar",
 }: BreadcrumbsProps) {
   const symbolChain = symbolChainAtPosition(symbols, position);
   const navRef = useRef<HTMLElement | null>(null);
@@ -682,7 +685,10 @@ export function Breadcrumbs({
     const path = item.type === "path" ? item.value : null;
     const symbol = item.type === "symbol" ? item.value : null;
     const label = path?.label ?? symbol?.name ?? "";
-    const flexible = compact && (path?.kind === "file" || !!symbol);
+    // IDEA's navigation bar keeps the file name whole and truncates the
+    // surrounding directories/members first; a narrow status bar otherwise
+    // squeezed the file segment to zero width (ED-PARITY-011 DEC-011-02).
+    const flexible = compact && path?.kind !== "file";
     const isFocused = navBarFocusedIndex === index;
     const icon = path?.kind === "root" || path?.kind === "directory" ? (
       <Folder className="h-3 w-3 shrink-0 text-[#d59d32]" />
@@ -781,7 +787,10 @@ export function Breadcrumbs({
       onKeyDown={handleNavKeyDown}
       aria-label="Editor breadcrumbs"
       data-testid="code-workspace-breadcrumbs"
-      className="relative flex h-7 shrink-0 items-center overflow-hidden border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-[11px] text-[var(--taomni-code-muted)] outline-none"
+      data-variant={variant}
+      className={variant === "statusbar"
+        ? "relative flex h-full min-w-0 flex-1 items-center overflow-hidden text-[11px] text-[var(--taomni-status-text)] outline-none"
+        : "relative flex h-7 shrink-0 items-center overflow-hidden border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-[11px] text-[var(--taomni-code-muted)] outline-none"}
     >
       <div
         ref={fullPathMeasureRef}

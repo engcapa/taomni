@@ -88,6 +88,7 @@
   - workspace 头部工具栏降到 IDEA 主工具栏的信息分组：项目/根、VCS 分支、运行配置 + Run/Debug、搜索、设置；缩放/换行/列选择/inlay/blame/tab policy 移入 `⋮` 或 View 菜单，SDK/Facts 状态移入状态栏 widget。
   - 编辑器状态栏段与应用状态栏分离：左侧导航栏（路径 + 类/方法），右侧 `行:列 (N chars)`、换行符、编码、缩进、只读锁；禁止截断成 `Spaces: 2 (Aut`。
 - 完成条件：A1–A4、browser/native/accessibility/IDEA comparison 证据齐全，当前端真机完成，其他端明确未验证。
+- P1 设计：[ed-parity-010-shell-design.md](ed-parity-010-shell-design.md)。
 - 验收：`ED-PARITY-010-A1`、`ED-PARITY-010-A2`、`ED-PARITY-010-A3`、`ED-PARITY-010-A4`。
 
 <a id="ed-parity-011"></a>
@@ -103,6 +104,7 @@
   - breadcrumb 移到状态栏导航栏并包含类/方法层级；编辑器顶部不再单独占 20px。
   - 默认折叠 import 与单行方法体（对应 IDEA Code Folding 默认值），折叠标记只在 hover/当前块显示。
   - 选区 AI 工具条按 DEC-ALIGN-08 调整。
+- P1 设计：[ed-parity-011-editor-surface-design.md](ed-parity-011-editor-surface-design.md)。
 - 验收：`ED-PARITY-011-A1`、`ED-PARITY-011-A2`、`ED-PARITY-011-A3`、`ED-PARITY-011-A4`。
 
 <a id="ed-parity-012"></a>
@@ -116,6 +118,7 @@
   - 首个切片（已确认缺陷）：`WorkspacePopupsHost` 的 Go to File、Recent Files、File Structure、Search Everywhere、Recent Locations、Quick Doc、Location Peek，以及 Keymap 对话框，关闭时把焦点交回打开前的编辑器 view（DEC-ALIGN-11）；当前 `CodeWorkspaceTab.tsx:21592/21607/21651` 只改 state。
   - Find 框补历史下拉、清除 `×`、多行切换、过滤漏斗；Replace 行补 Exclude、历史、多行；`Ctrl+R` 保持焦点在 Find 框；所有匹配统一高亮并在滚动条画刻度。
   - Go to Line 改为预填并全选 `行:列` 的小对话框（Enter/Esc/OK/Cancel），替换 CodeMirror 默认底部面板。
+- P1 设计：[ed-parity-012-find-focus-design.md](ed-parity-012-find-focus-design.md)。
 - 验收：`ED-PARITY-012-A1`、`ED-PARITY-012-A2`、`ED-PARITY-012-A3`、`ED-PARITY-012-A4`。
 
 <a id="ed-parity-013"></a>
@@ -129,6 +132,7 @@
   - 按 DEC-ALIGN-07 迁移默认绑定：`F12` → Jump to Last Tool Window，`Alt+0/2/7/9`、`Shift+Esc`、`Ctrl+Shift+F12`、`Ctrl+Alt+S` 按 IDEA；旧绑定作为 “VS Code compatible” 可选 scheme，已有用户 scheme 读取不变。
   - 快捷键显示统一格式化：当前平台只显示当前平台绑定（Linux/Windows 不显示 `Meta+`），键帽拆分，方向键/Enter/Space 用本地化名称，Search Everywhere、Keymap、菜单、tooltip 共享同一格式化函数。
   - Keymap UI：分组树、按快捷键查找（含第二击）、默认方案首次修改自动派生、右键 Add Keyboard/Mouse Shortcut/Remove、录制对话框含 Second stroke；关闭后焦点归还（DEC-ALIGN-11）。
+- P1 设计（DEC-013-*、细化断言、任务与用例）：[ed-parity-013-keymap-design.md](ed-parity-013-keymap-design.md)。
 - 验收：`ED-PARITY-013-A1`、`ED-PARITY-013-A2`、`ED-PARITY-013-A3`、`ED-PARITY-013-A4`。
 
 <a id="ed-parity-014"></a>
@@ -144,6 +148,7 @@
   - File Structure 标题为文件名，提供 Inherited/Anonymous/Lambdas 开关、可见性图标、预选 caret 成员；无 provider 时用已有 tree-sitter Java 解析（Structural Search 后端）给出降级大纲并标注 “syntax only”。
   - Find in Files 改为浮动弹层（结果 + 下方可编辑预览 + scope 按钮 + File mask + `Open in Find Window`），底部 Search 工具窗作为 “Open in Find Window” 的目标。
   - 项目树：根节点显示模块名/路径，External Libraries 节点（有 SDK 时），顶层文件元数据，头部改为 Locate/Expand/Collapse/`⋮`/Hide，新建类动作移入 `+` 菜单。
+- P1 设计：[ed-parity-014-navigation-design.md](ed-parity-014-navigation-design.md)。
 - 验收：`ED-PARITY-014-A1`、`ED-PARITY-014-A2`、`ED-PARITY-014-A3`、`ED-PARITY-014-A4`。
 
 <a id="ed-parity-015"></a>
@@ -156,6 +161,7 @@
   - 首个切片（已确认缺陷）：`panels/ProblemsPanel.tsx:176` 在 provider 不可用/加载/失败时显示对应 typed 状态和“配置/重试”，不再显示 “No problems in open files”；右上检查 widget（011）与 Problems 计数同源。
   - Problems 工具窗对齐 IDEA：File（带计数）/Project Errors 标签，按文件分组，行尾 `:行号`，左侧查看/快速修复/预览按钮。
   - 弹层外观与键盘交给 020；本卡保留 provider 就绪状态机、诊断/Problems 数据和恢复。
+- P1 设计：[ed-parity-015-java-readiness-design.md](ed-parity-015-java-readiness-design.md)。
 - 验收：`ED-PARITY-015-A1`、`ED-PARITY-015-A2`、`ED-PARITY-015-A3`、`ED-PARITY-015-A4`。
 
 <a id="ed-parity-016"></a>
@@ -164,6 +170,7 @@
 - 交付：Structural Search 的 IDEA 风格 dialog、scope/modifier、结果树、空态、取消和导航。
 - 主要文件：`StructuralSearchDialog.tsx`、`StructuralSearchPanel.tsx`、session、tree-sitter backend。
 - 必须保留：Java AST 精确结果、注释/字符串排除、取消释放、编辑器字节不变。
+- P1 设计：[ed-parity-016-structural-search-design.md](ed-parity-016-structural-search-design.md)。
 - 验收：`ED-PARITY-016-A1`、`ED-PARITY-016-A2`、`ED-PARITY-016-A3`。
 
 <a id="ed-parity-017"></a>
@@ -173,6 +180,7 @@
 - 主要文件：code action adapter、workspace edit transaction、preview surface、recovery ledger、shared consumers。
 - 必须保留：dirty、外部修改、partial effect、owner/generation 和实际磁盘结果。
 - 2026-09-29 复核细化（[参照](references/idea-control-audit-20260929.md#code-insight)）：IDEA 的 `Shift+F6` 为行内重命名（名称加框、候选名列表、注释/文本出现开关、`Alt+Shift+O` 选项提示），Extract Method 直接插入并进入行内命名，Esc 两次零修改撤回；本卡以此为交互目标，跨文件 preview 仍需补采 IDEA 参照。
+- P1 设计：[ed-parity-017-refactor-inline-design.md](ed-parity-017-refactor-inline-design.md)。
 - 验收：`ED-PARITY-017-A1`、`ED-PARITY-017-A2`、`ED-PARITY-017-A3`。
 
 <a id="ed-parity-018"></a>
@@ -185,6 +193,7 @@
   - workspace 内提供 Commit 工具窗（`Alt+0`，左侧）：变更/未版本化复选树、工具条、Amend、多行消息、`Commit` 主按钮 + `Commit and Push…`；Git Log（`Alt+9`，底部）：分支树、文本/哈希过滤、Branch/User/Date 过滤、提交列表、详情。现有独立 Git 标签保留为 “Open in Git tab”。
   - Terminal 工具窗头部：会话 tab、`+`、`˅`、`⋮`、`—`，cwd 为活动根。
   - VCS 变更条弹层与运行 gutter 菜单由 022 提供，本卡提供其执行动作（Rollback、Show Diff、Commit this change、Run/Debug）。
+- P1 设计：[ed-parity-018-git-tool-window-design.md](ed-parity-018-git-tool-window-design.md)。
 - 验收：`ED-PARITY-018-A1`、`ED-PARITY-018-A2`、`ED-PARITY-018-A3`。
 
 <a id="ed-parity-019"></a>
@@ -193,6 +202,7 @@
 - 交付：组合收口、三端可访问性/快捷键/缩放/主题验证和正式 IDEA comparison。
 - 主要文件：各任务最终组合后的实际路径、QA cases、comparison records、feature catalog。
 - 必须保留：三端构建兼容、当前端真机证据、其他端明确未验证；不把 browser 代替 native。
+- P1 设计：[ed-parity-019-closure-design.md](ed-parity-019-closure-design.md)。
 - 验收：`ED-PARITY-019-A1`、`ED-PARITY-019-A2`、`ED-PARITY-019-A3`。
 
 <a id="ed-parity-020"></a>
@@ -209,6 +219,7 @@
   - 错误 tooltip：`Required type / Provided` 结构、首选修复链接 + 快捷键 + More actions。
 - 必须保留：provider snippet、一次接受/undo、resolve gate、IME、迟到响应隔离（旧 005 契约）。
 - 依赖：011（surface token）、013（快捷键显示格式）；provider 就绪由 015 负责，native provider 态需 JDT LS fixture。
+- P1 设计：[ed-parity-020-code-insight-design.md](ed-parity-020-code-insight-design.md)。
 - 验收：`ED-PARITY-020-A1`、`ED-PARITY-020-A2`、`ED-PARITY-020-A3`。
 
 <a id="ed-parity-021"></a>
@@ -222,6 +233,7 @@
   - tab 菜单顺序按 IDEA：Close 组 → Copy Path/Reference… → Split Right/Split and Move Right/Split Down/Split and Move Down → Pin Tab、Configure Editor Tabs… → Bookmarks › → Open In › → Local History ›、Git › → Rename File…；单 tab 时 Close Other Tabs 禁用。
   - 所有菜单项有助记符、快捷键来自 013 的格式化函数、可用态来自同一 Action Registry 判定；菜单在视口内翻转，不压到状态栏。
   - 项目树菜单本轮未采样，P1 先补采 IDEA 参照。
+- P1 设计：[ed-parity-021-context-menus-design.md](ed-parity-021-context-menus-design.md)。
 - 必须保留：现有菜单动作的执行路径、prepared evaluation 冻结、调试/AI 入口可发现性。
 - 依赖：013。
 - 验收：`ED-PARITY-021-A1`、`ED-PARITY-021-A2`、`ED-PARITY-021-A3`。
@@ -240,6 +252,7 @@
   - 参数名 inlay 与 Code Vision 分开：本卡只做参数名 inlay；Code Vision 不在本批次。
 - 必须保留：现有折叠、断点 gutter、调试行标记、blame 开关、性能（大文件 gutter 更新预算）。
 - 依赖：011、018（Git 数据与执行动作）、015（语义数据）。
+- P1 设计：[ed-parity-022-gutter-stripe-design.md](ed-parity-022-gutter-stripe-design.md)。
 - 验收：`ED-PARITY-022-A1`、`ED-PARITY-022-A2`、`ED-PARITY-022-A3`。
 
 ## 7. 验收条件

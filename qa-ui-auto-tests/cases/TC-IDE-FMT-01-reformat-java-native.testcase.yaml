@@ -74,12 +74,12 @@ steps:
       column: 8
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 10, Col 9
+    contains: '10:9'
     timeout_sec: 10
 - type: '    '
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 10, Col 13
+    contains: '10:13'
     timeout_sec: 10
 - eval_readonly:
     expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state?.doc?.line(10)?.text?.startsWith('            System.out.println')
@@ -153,11 +153,9 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
         "Java", "timeout_sec": 60}}'
     - step: 14
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        10, Col 9", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"10:9\", \"timeout_sec\": 10}}"
     - step: 16
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        10, Col 13", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"10:13\", \"timeout_sec\": 10}}"
     - step: 17
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-content'')?.cmTile?.root?.view?.state?.doc?.line(10)?.text?.startsWith(''            System.out.println'')
         === true", "expect_truthy": true}}'

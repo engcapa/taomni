@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SearchEverywhere, type GoToFileItem } from "./SearchEverywhere";
+import { SearchEverywhere, actionMatchesQuery, rankAllModeItems, type GoToFileItem } from "./SearchEverywhere";
 import type { ActionSnapshotItem, PreparedActionEvaluation } from "./workspaceActionHost";
 import { createWorkspaceSemanticIndexSnapshot } from "./workspaceSemanticIndex";
 
@@ -190,8 +190,11 @@ describe("SearchEverywhere", () => {
     expect(screen.getByRole("tab", { name: "Symbols" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Go to class"), { target: { value: "CWT" } });
     expect(await screen.findByText("CodeWorkspaceTab")).toBeInTheDocument();
-    expect(screen.getByTestId("search-everywhere-semantic-index")).toHaveTextContent("Stale · result generation 3");
-    expect(screen.getByTestId("search-everywhere-symbol-provider-status")).toHaveTextContent("1/1 provider");
+    // ED-PARITY-014 DEC-014-02: diagnostics moved from the footer text into the tooltip.
+    const status = screen.getByTestId("search-everywhere-symbol-provider-status");
+    expect(status.getAttribute("title")).toContain("Stale · result generation 3");
+    expect(status.getAttribute("title")).toContain("1/1 provider");
+    expect(status).toHaveTextContent("");
     fireEvent.keyDown(screen.getByLabelText("Go to class"), { key: "Enter" });
     expect(onOpenSymbol).toHaveBeenCalled();
 
@@ -277,5 +280,43 @@ describe("SearchEverywhere", () => {
     fireEvent.change(screen.getByLabelText("Go to symbol"), { target: { value: "Test" } });
     expect(await screen.findByText("TestSymbol")).toBeInTheDocument();
     expect(screen.getByTestId("search-everywhere-symbol-provider-status")).toBeInTheDocument();
+  });
+});
+
+describe("ED-PARITY-014: Search Everywhere All ranking", () => {
+  afterEach(() => cleanup());
+  const action = (id: string, title: string, keywords: string[] = []) => ({
+    kind: "action" as const,
+    value: { ...actionSnapshots[0], id, title, keywords },
+  });
+  const symbol = (name: string) => ({
+    kind: "symbol" as const,
+    value: {
+      name, kind: 6, containerName: "OrderService", path: "src/OrderService.java", uri: "file:///src/OrderService.java",
+      line: 9, character: 4, resolved: true, resolveToken: null,
+    },
+  });
+
+  it("drops actions whose words do not contain the query", () => {
+    expect(actionMatchesQuery("total", { title: "Move to Line Start", keywords: ["caret"] })).toBe(false);
+    expect(actionMatchesQuery("line start", { title: "Move to Line Start", keywords: [] })).toBe(true);
+    expect(actionMatchesQuery("grep", { title: "Find in Files", keywords: ["content", "grep"] })).toBe(true);
+  });
+
+  it("lists symbols, then files, then matching actions", () => {
+    const ranked = rankAllModeItems("total", [
+      action("move", "Move to Line Start"),
+      action("totals", "Show Totals"),
+      { kind: "file" as const, value: { rootId: "r", rootName: "app", path: "src/Totals.java" } },
+      symbol("total"),
+    ]);
+    expect(ranked.map((item) => item.kind)).toEqual(["symbol", "file", "action"]);
+    expect(ranked.some((item) => item.kind === "action" && item.value.id === "move")).toBe(false);
+  });
+
+  it("shows the selected item's path in the footer", () => {
+    renderPopup();
+    fireEvent.change(screen.getByLabelText("Go to file"), { target: { value: "cwt" } });
+    expect(screen.getByTestId("search-everywhere-selected-path")).toHaveTextContent("app/src/components/editor/CodeWorkspaceTab.tsx");
   });
 });

@@ -20,6 +20,9 @@ steps:
 - wait_for:
     selector: '[data-testid="welcome-panel"]'
     timeout_sec: 60
+- seed_storage:
+    key: taomni.codeWorkspace.refactorOptions.v1
+    value: '{"mode":"dialog"}'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -108,21 +111,21 @@ verification:
   - id: ED-PARITY-007-V3-08-repeat
     requirement: 'A repeated invocation commits exactly one extraction: the buffer becomes B1 once, one undo restores B0, and no provider response stays pending.'
     actions:
-    - 17
+    - 18
     checkpoints:
-    - step: 19
+    - step: 20
       expectation: The repeated chords left no pending provider response.
-    - step: 21
+    - step: 22
       expectation: 'Exactly one extraction was committed: the buffer is B1 with a single new method.'
-    - step: 26
-      expectation: A single undo restores the initial B0.
     - step: 27
+      expectation: A single undo restores the initial B0.
+    - step: 28
       expectation: The closing observation still sees no pending response.
     results:
-    - 19
-    - 21
-    - 26
+    - 20
+    - 22
     - 27
+    - 28
   visual:
   - check: Real WebView rendering of the repeated-invocation flow.
     method: manual

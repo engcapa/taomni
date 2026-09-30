@@ -8,6 +8,7 @@ import {
   useState,
   type MutableRefObject,
 } from "react";
+import { importFoldRange } from "./importFold";
 import { TriangleAlert, X } from "lucide-react";
 import {
   ChangeSet,
@@ -91,7 +92,7 @@ import {
   unfoldAll,
   unfoldEffect,
 } from "@codemirror/language";
-import { search, searchPanelOpen } from "@codemirror/search";
+import { gotoLine, search, searchPanelOpen } from "@codemirror/search";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import { readNativeTextResult, readTextResult, writeText } from "../../../lib/clipboard";
 import { codeViewExtensions } from "../../../lib/codeViewTheme";
@@ -145,6 +146,8 @@ import {
 } from "./lspCompletion";
 import type { CompletionScopeFactsState } from "./completionScopeAdapter";
 import { createDiagnosticChrome } from "./lspDiagnosticChrome";
+import { createErrorStripe, setErrorStripeSources } from "./errorStripe";
+import { createRunGutter, setRunGutter, type RunGutterTarget } from "./runGutter";
 import {
   createLspOverlayChrome,
   createLspSemanticTokenChrome,
@@ -268,6 +271,20 @@ export function documentTextIdentity(doc: Text): string {
  * adds the content identity and the horizontal scroll offset.
  * ED-REPAIR-009: binds the capture identity to the exact doc version.
  */
+/** Views whose file has a default import fold, keyed to that file's path. */
+const importFoldPathByView = new WeakMap<EditorView, string>();
+
+function importsExpandedIn(view: EditorView): boolean {
+  const path = importFoldPathByView.get(view);
+  const range = path ? importFoldRange(path, view.state.doc.toString()) : null;
+  if (!range) return false;
+  let folded = false;
+  foldedRanges(view.state).between(range.from, range.from + 1, (from) => {
+    if (from === range.from) folded = true;
+  });
+  return !folded;
+}
+
 export function captureEditorViewState(view: EditorView): PersistedEditorViewState {
   const selection = view.state.selection;
   const main = selection.main;
@@ -290,6 +307,7 @@ export function captureEditorViewState(view: EditorView): PersistedEditorViewSta
     folds,
     textIdentity: documentTextIdentity(view.state.doc),
     scrollLeft: view.scrollDOM?.scrollLeft ?? 0,
+    ...(importsExpandedIn(view) ? { importsExpanded: true } : {}),
   };
 }
 
@@ -376,6 +394,14 @@ export interface EditorRevealTarget {
   end?: { line: number; character: number };
 }
 
+/** ED-PARITY-012 DEC-012-06: one Go to Line:Column dialog request. */
+export interface GoToLineRequest {
+  current: { line: number; column: number };
+  lineCount: number;
+  apply: (target: { line: number; column: number }) => void;
+  cancel: () => void;
+}
+
 export interface EditorSelectionRange {
   start: LspPosition;
   end: LspPosition;
@@ -383,6 +409,12 @@ export interface EditorSelectionRange {
   text: string;
   /** Viewport-relative rect of the selection head; null when empty/unavailable. */
   rect: { top: number; left: number; right: number; bottom: number } | null;
+  /**
+   * ED-PARITY-011 DEC-011-07: true when the user made this selection by a
+   * pointer drag or a Shift+navigation extend — not by Find, navigation,
+   * double/triple click, Select All or a programmatic jump.
+   */
+  userSelected?: boolean;
 }
 
 interface CodeMirrorHostProps {
@@ -498,6 +530,10 @@ interface CodeMirrorHostProps {
   parameterPopup?: ParameterPopupView | null;
   onSelectionChange?: (selection: EditorSelectionRange) => void;
   onFoldProvenanceChange?: (provenance: RegionFoldingProvenance | null) => void;
+  /** ED-PARITY-012 DEC-012-06: host-rendered Go to Line:Column dialog. */
+  onGoToLineRequest?: (request: GoToLineRequest) => void;
+  /** ED-PARITY-020: completion hit an unavailable provider at a member access. */
+  onCompletionUnavailable?: (info: { explicit: boolean }) => void;
   onViewportChange?: (range: LspRange) => void;
   /**
    * ED-IMPROVE-007: one-shot caret/selection/scroll/fold snapshot for this
@@ -510,6 +546,9 @@ interface CodeMirrorHostProps {
   onExpandSelection?: (selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   onLightbulb?: (line: number) => void;
   onGitChangeClick?: (change: GitLineChange) => void;
+  /** ED-PARITY-022 DEC-022-03: run gutter targets backed by real run facts. */
+  runGutterTargets?: RunGutterTarget[];
+  onRunGutterClick?: (target: RunGutterTarget, anchor: { x: number; y: number }) => void;
   /** Toggle a breakpoint at a 1-based line (breakpoint gutter click). */
   onToggleBreakpoint?: (line: number) => void;
   /** Edit a breakpoint's condition/logpoint at a 1-based line (gutter right-click). */
@@ -1553,6 +1592,12 @@ const WORKSPACE_EDITOR_STYLE = EditorView.theme({
   ".cm-foldGutter .cm-gutterElement": {
     minWidth: "1.6ch",
     padding: "0 4px",
+    // ED-PARITY-011 DEC-011-06: IDEA shows fold markers on gutter hover only.
+    opacity: "0",
+    transition: "opacity 120ms",
+  },
+  ".cm-gutters:hover .cm-foldGutter .cm-gutterElement, .cm-foldGutter .cm-gutterElement:focus-within": {
+    opacity: "1",
   },
 });
 
@@ -1637,6 +1682,7 @@ function positionCompletionInfo(view: EditorView, list: Rect, option: Rect, info
 const EMPTY_DIAGNOSTICS: LspDiagnostic[] = [];
 const EMPTY_HIGHLIGHTS: LspDocumentHighlight[] = [];
 const EMPTY_INLAY_HINTS: LspInlayHint[] = [];
+const EMPTY_RUN_GUTTER_TARGETS: RunGutterTarget[] = [];
 const EMPTY_SEMANTIC_TOKENS: LspSemanticToken[] = [];
 const EMPTY_GIT_CHANGES: GitLineChange[] = [];
 const EMPTY_DEBUG_BREAKPOINTS: DebugBreakpointMarker[] = [];
@@ -1933,13 +1979,19 @@ function signatureTooltipDom(
 function lspNavigationExtensions(
   definitionRef: MutableRefObject<(position: LspPosition) => Promise<boolean>>,
   referencesRef: MutableRefObject<(position: LspPosition) => Promise<void>>,
+  hasActionHost: () => boolean = () => false,
 ): Extension[] {
   const definitionAtSelection = (view: EditorView) => {
+    // ED-PARITY-013 DEC-013-11: with a workspace action host these keys are
+    // host-owned (F12 = Jump to Last Tool Window, Ctrl+Alt+B = Implementation),
+    // so this legacy CodeMirror binding must not act as a second dispatcher.
+    if (hasActionHost()) return false;
     const position = lspPositionFromOffset(view.state.doc, view.state.selection.main.head);
     void definitionRef.current(position);
     return true;
   };
   const referencesAtSelection = (view: EditorView) => {
+    if (hasActionHost()) return false;
     const position = lspPositionFromOffset(view.state.doc, view.state.selection.main.head);
     void referencesRef.current(position);
     return true;
@@ -2140,6 +2192,7 @@ function areCodeMirrorHostPropsEqual(prev: CodeMirrorHostProps, next: CodeMirror
   if (!sameOptionalArray(prev.inlayHints, next.inlayHints)) return false;
   if (!sameOptionalArray(prev.semanticTokens, next.semanticTokens)) return false;
   if (!sameOptionalArray(prev.gitChanges, next.gitChanges)) return false;
+  if (!sameOptionalArray(prev.runGutterTargets, next.runGutterTargets)) return false;
   if (!sameOptionalArray(prev.debugBreakpoints, next.debugBreakpoints)) return false;
   if (!sameOptionalArray(prev.completionTriggers, next.completionTriggers)) return false;
   if (!sameOptionalArray(prev.signatureTriggers, next.signatureTriggers)) return false;
@@ -2281,12 +2334,16 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   parameterPopup = null,
   onSelectionChange,
   onFoldProvenanceChange,
+  onGoToLineRequest,
+  onCompletionUnavailable,
   onViewportChange,
   initialViewState = null,
   onViewStateChange,
   onExpandSelection,
   onLightbulb,
   onGitChangeClick,
+  runGutterTargets = EMPTY_RUN_GUTTER_TARGETS,
+  onRunGutterClick,
   onToggleBreakpoint,
   onEditBreakpoint,
   onContextMenu,
@@ -2613,6 +2670,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       getDocumentRevision: () => getCompletionIdentityRef.current()?.documentRevision ?? -1,
       reportDiagnostic: (kind, detail) => onCompletionDiagnosticRef.current(kind, detail),
       onScopeFallback: (state) => onScopeFallbackRef.current?.(state),
+      onProviderUnavailable: (info) => onCompletionUnavailableRef.current?.(info),
       onResolveGate: (request) => presentResolveGateRef.current?.(request),
       onAcceptancePending: (cancel) => {
         pendingCompletionAcceptanceRef.current?.();
@@ -2721,6 +2779,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     }
   };
   const lastSelectionRef = useRef<{ from: number; to: number; searchOpen: boolean } | null>(null);
+  /** Origin of the latest selection change (DEC-011-07). */
+  const selectionOriginRef = useRef<"pointer" | "keyboard" | "other">("other");
+  const pointerClickCountRef = useRef(1);
+  const shiftExtendKeyRef = useRef(false);
+  const selectionKeyTrackerCleanupRef = useRef<(() => void) | null>(null);
   const selectionEmitTimerRef = useRef<number | null>(null);
   const viewportEmitTimerRef = useRef<number | null>(null);
   const renderedDiagnosticsRef = useRef(diagnostics);
@@ -2782,6 +2845,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const onParameterEscapeRef = useRef(onParameterEscape);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onFoldProvenanceChangeRef = useRef(onFoldProvenanceChange);
+  const onGoToLineRequestRef = useRef(onGoToLineRequest);
+  const onCompletionUnavailableRef = useRef(onCompletionUnavailable);
   const onViewportChangeRef = useRef(onViewportChange);
   // ED-IMPROVE-007: the initial snapshot is read once at view creation; later
   // prop changes never re-apply it over the user's live caret/scroll.
@@ -2807,6 +2872,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const onGitChangeClickRef = useRef(onGitChangeClick);
+  const onRunGutterClickRef = useRef(onRunGutterClick);
   const onContextMenuRef = useRef(onContextMenu);
   const onToggleRenderedDocRawRef = useRef(onToggleRenderedDocRaw);
   const completionTriggersRef = useRef(completionTriggers ?? []);
@@ -2846,10 +2912,13 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onParameterEscapeRef.current = onParameterEscape;
   onSelectionChangeRef.current = onSelectionChange;
   onFoldProvenanceChangeRef.current = onFoldProvenanceChange;
+  onGoToLineRequestRef.current = onGoToLineRequest;
+  onCompletionUnavailableRef.current = onCompletionUnavailable;
   onViewportChangeRef.current = onViewportChange;
   onExpandSelectionRef.current = onExpandSelection;
   onLightbulbRef.current = onLightbulb;
   onGitChangeClickRef.current = onGitChangeClick;
+  onRunGutterClickRef.current = onRunGutterClick;
   onToggleBreakpointRef.current = onToggleBreakpoint;
   onEditBreakpointRef.current = onEditBreakpoint;
   debugStepRef.current = debugStep;
@@ -2937,6 +3006,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         empty: main.empty,
         text: main.empty ? "" : view.state.doc.sliceString(from, to),
         rect,
+        userSelected: selectionOriginRef.current !== "other",
       });
     }
     if (foldHandler) {
@@ -3141,6 +3211,18 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         // IDEA: typing `.` / `:` (or server trigger chars) opens the popup
         // immediately instead of waiting for activateOnTypingDelay.
         EditorView.updateListener.of((update) => {
+          for (const tr of update.transactions) {
+            if (!tr.selection) continue;
+            selectionOriginRef.current = tr.isUserEvent("select.pointer")
+              ? (pointerClickCountRef.current > 1 ? "other" : "pointer")
+              // Workspace keyboard actions (virtual-space moves) dispatch without
+              // a userEvent; a Shift+navigation keydown marks them as user-made.
+              : shiftExtendKeyRef.current && (tr.isUserEvent("select") || !tr.annotation(Transaction.userEvent))
+                ? "keyboard"
+                : "other";
+          }
+        }),
+        EditorView.updateListener.of((update) => {
           if (!update.docChanged || update.transactions.every((tr) => !tr.isUserEvent("input.type"))) {
             return;
           }
@@ -3216,6 +3298,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           semanticTokens,
         )),
         LSP_INTELLIGENCE_THEME,
+        // ED-PARITY-022 DEC-022-01: right-edge error stripe (read-only marks).
+        createErrorStripe({ diagnostics, gitChanges, usages: highlights }),
+        createRunGutter({
+          targets: runGutterTargets,
+          onClick: (target, anchor) => onRunGutterClickRef.current?.(target, anchor),
+        }),
         gitCompartment.current.of(createGitEditorChrome(
           gitChanges,
           gitBlame,
@@ -3253,7 +3341,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             viewRef.current?.focus();
           },
         })),
-        ...lspNavigationExtensions(onDefinitionRef, onReferencesRef),
+        ...lspNavigationExtensions(
+          onDefinitionRef,
+          onReferencesRef,
+          () => !!workspaceActionHostRef.current && !workspaceActionHostRef.current.isDisposed(),
+        ),
         ...codeViewExtensions(),
         WORKSPACE_EDITOR_STYLE,
         LSP_EDITOR_STYLE,
@@ -3356,6 +3448,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           // production pointer entry equivalent to a user click before
           // CodeMirror resolves its selection position.
           mousedown(_event, view) {
+            pointerClickCountRef.current = _event.detail || 1;
+            shiftExtendKeyRef.current = false;
             if (!view.hasFocus) view.focus();
             return false;
           },
@@ -3620,6 +3714,26 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     const view = new EditorView({ state, parent: hostRef.current });
     editorLanguageByView.set(view, liveTemplateLanguageForPath(pathRef.current));
     viewRef.current = view;
+    // ED-PARITY-011 DEC-011-07: remember whether the latest key in this view
+    // was a Shift+navigation extend. Window capture sees it even when the
+    // workspace dispatcher consumes the key before CodeMirror.
+    const trackSelectionKey = (event: KeyboardEvent) => {
+      if (!(event.target instanceof Node) || !view.dom.contains(event.target)) return;
+      if (["Shift", "Control", "Alt", "Meta"].includes(event.key)) return;
+      shiftExtendKeyRef.current = event.shiftKey && !event.ctrlKey && !event.metaKey
+        && /^(Arrow(Left|Right|Up|Down)|Home|End|PageUp|PageDown)$/.test(event.key);
+    };
+    window.addEventListener("keydown", trackSelectionKey, true);
+    selectionKeyTrackerCleanupRef.current = () => window.removeEventListener("keydown", trackSelectionKey, true);
+    // ED-PARITY-011 DEC-011-06: IDEA folds the import block by default.
+    // Imports the user expanded in this leaf stay expanded when it remounts.
+    const importFold = importFoldRange(pathRef.current, view.state.doc.toString());
+    if (importFold && importFold.to <= view.state.doc.length) {
+      importFoldPathByView.set(view, pathRef.current);
+      if (initialViewStateRef.current?.importsExpanded !== true) {
+        view.dispatch({ effects: foldEffect.of(importFold) });
+      }
+    }
     const providerRowForEvent = (event: MouseEvent): { row: HTMLLIElement; index: number } | null => {
       if (!pathRef.current.toLowerCase().endsWith(".java") || viewRef.current !== view) return null;
       const row = (event.target as HTMLElement).closest<HTMLLIElement>(
@@ -3776,6 +3890,25 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       // removed in cleanup so a remount re-binds against the fresh view.
       unregisterEditorActions = actionHost.registerActions(buildEditorHostActions({
         openReplacePanel: () => openReplacePanel(view),
+        // ED-PARITY-012 DEC-012-06: IDEA "Go to Line:Column" dialog.
+        openGoToLine: () => {
+          const request = onGoToLineRequestRef.current;
+          if (!request) return gotoLine(view);
+          const head = view.state.selection.main.head;
+          const line = view.state.doc.lineAt(head);
+          request({
+            current: { line: line.number, column: head - line.from + 1 },
+            lineCount: view.state.doc.lines,
+            apply: (target) => {
+              const targetLine = view.state.doc.line(Math.min(target.line, view.state.doc.lines));
+              const pos = Math.min(targetLine.from + target.column - 1, targetLine.to);
+              view.dispatch({ selection: { anchor: pos }, scrollIntoView: true, userEvent: "select" });
+              view.focus();
+            },
+            cancel: () => view.focus(),
+          });
+          return true;
+        },
         expandSemanticSelection: () => expandSemanticSelection(view),
         // §8.19.4 explicit Basic Completion. With a popup already open at
         // this caret, close + restart so the second explicit call re-runs the
@@ -3902,6 +4035,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       view.contentDOM.removeEventListener("focusout", clipboardFocusOutGuard, true);
       pendingCompletionAcceptanceRef.current?.();
       pendingCompletionAcceptanceRef.current = null;
+      selectionKeyTrackerCleanupRef.current?.();
+      selectionKeyTrackerCleanupRef.current = null;
       view.destroy();
       viewRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
@@ -4160,6 +4295,31 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       effects: updateLspOverlayChrome(highlights, inlayHints),
     });
   }, [highlights, inlayHints]);
+
+  // The stripe is secondary chrome: update it after the frame so document and
+  // decoration transactions keep their single synchronous dispatch.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const view = viewRef.current;
+      if (!view || !view.dom.isConnected) return;
+      view.dispatch({
+        effects: setErrorStripeSources.of({ diagnostics, gitChanges, usages: highlights }),
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [diagnostics, gitChanges, highlights]);
+
+  const runGutterClick = useCallback(
+    (target: RunGutterTarget, anchor: { x: number; y: number }) => onRunGutterClickRef.current?.(target, anchor),
+    [],
+  );
+  const renderedRunGutterRef = useRef(runGutterTargets);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || renderedRunGutterRef.current === runGutterTargets) return;
+    renderedRunGutterRef.current = runGutterTargets;
+    view.dispatch({ effects: setRunGutter.of({ targets: runGutterTargets, onClick: runGutterClick }) });
+  }, [runGutterClick, runGutterTargets]);
 
   useEffect(() => {
     const view = viewRef.current;

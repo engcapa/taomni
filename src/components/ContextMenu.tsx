@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useLayoutEffect, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { ChevronRight } from "lucide-react";
+import { useFocusReturn } from "./editor/workspace/useFocusReturn";
 
 export interface MenuItem {
   label: string;
@@ -33,6 +34,9 @@ interface ContextMenuProps extends ContextMenuAppearance {
 const MENU_MARGIN = 6;
 
 export function ContextMenu({ items, x, y, onClose, appearance }: ContextMenuProps) {
+  // ED-PARITY-021 A3 / DEC-ALIGN-11: closing (Esc, outside click, an action
+  // that moves no focus) gives focus back to the element that opened the menu.
+  useFocusReturn(true);
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });
 

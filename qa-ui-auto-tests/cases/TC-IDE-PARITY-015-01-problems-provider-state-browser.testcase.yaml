@@ -1,0 +1,107 @@
+id: TC-IDE-PARITY-015-01
+title: Problems names an unavailable language service instead of showing No problems
+description: 'ED-PARITY-015 A1/A3/A4 browser case: a Java file in browser preview has no JDT LS. The status pill and the Problems tool window give the same reason, Problems does not claim ''No problems'' and its Configure button opens Language Servers settings.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-015
+- problems
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog"] input'
+    value: Demo015.java
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-active="true"][data-editor-tab-key$="Demo015.java"]'
+    timeout_sec: 15
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- type: class Demo015 { int x = "s"; }
+- assert_text:
+    selector: '[data-testid="code-workspace-lsp-status-pill"]'
+    contains: not available
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-bottom-tab-problems"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-problems-panel"]'
+    timeout_sec: 10
+- wait_for:
+    selector: '[data-testid="code-workspace-problems-provider-state"][data-state="failed"]'
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="code-workspace-problems-provider-state"]'
+    contains: not available
+- assert_pattern:
+    selector: '[data-testid="code-workspace-problems-panel"]'
+    regex: (?s)\A(?!.*No problems)
+- screenshot: tc-ide-parity-015-01-problems-unavailable.png
+- click: '[data-testid="code-workspace-problems-configure"]'
+- wait_for:
+    selector: '[data-testid="language-servers-settings"]'
+    timeout_sec: 15
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1/DEC-015-01：状态胶囊与 Problems 对同一不可用状态给出同一原因。
+    actions:
+    - 17
+    - 21
+    checkpoints:
+    - step: 20
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains": "not available", "timeout_sec": 30}}'
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"][data-state=\"failed\"]", "timeout_sec": 10}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"]", "contains": "not available"}}'
+    results:
+    - 20
+    - 24
+  - id: R2
+    requirement: A3/A4/DEC-015-02：语言服务不可用时 Problems 不显示 “No problems”，而显示 typed 状态与 Configure；Configure 打开 Language Servers 设置。
+    actions:
+    - 21
+    - 27
+    checkpoints:
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"][data-state=\"failed\"]", "timeout_sec": 10}}'
+    - step: 25
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-problems-panel\"]", "regex": "(?s)\\A(?!.*No problems)"}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"language-servers-settings\"]", "timeout_sec": 15}}'
+    results:
+    - 25
+    - 28
+  visual:
+  - check: 对照 IDEA Problems 空态与 Taomni typed 状态行的文案与按钮位置。
+    method: manual
+    reason: 像素与字体另行比较。
+  native:
+  - check: browser 无 JDT LS；native 就绪路径由 TC-IDE-PARITY-015-02 覆盖。
+    method: not-applicable
+    reason: browser 证据不外推 native。

@@ -1,0 +1,246 @@
+id: TC-IDE-PARITY-013-03
+title: Keymap tree, Find by Shortcut, Keyboard/Mouse Shortcut recorders and derived default scheme
+description: 'ED-PARITY-013 A2.1-A2.4/A2.6/A1.3 browser case. The Keymap dialog is a collapsed category tree; Find Actions by Shortcut narrows it to the holders of Ctrl+Shift+N; the row context menu offers Add Keyboard/Mouse Shortcut; the Keyboard Shortcut sub-dialog replaces the first stroke unless Second stroke is checked; the default scheme derives an editable (copy) that appends to the inherited Ctrl+E (DEC-013-12); the Mouse Shortcut recorder rejects a plain click and records Shift+Click; Cancel writes nothing; a later Apply persists and the new chord really opens Recent Files.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- keymap
+- ed-parity-013
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+A
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- type:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    text: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="keymap-group-Navigation"]'
+    name: aria-expanded
+    equals: 'false'
+- click: '[data-testid="keymap-group-Navigation"]'
+- assert_visible: '[data-testid="keymap-row-workspace.goToFile"]'
+- click: '[data-testid="keymap-find-by-shortcut"]'
+- click: '[data-testid="keymap-shortcut-filter"]'
+- press: Control+Shift+N
+- assert_visible: '[data-testid="keymap-row-workspace.goToFile"]'
+- assert_count:
+    selector: '[data-testid="keymap-row-workspace.recentFiles"]'
+    equal: 0
+- click: '[data-testid="keymap-find-by-shortcut"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Recent Files
+- wait_for: '[data-testid="keymap-row-workspace.recentFiles"]'
+- right_click: '[data-testid="keymap-row-workspace.recentFiles"]'
+- assert_text:
+    selector: '[data-testid="keymap-row-menu"]'
+    contains: Add Mouse Shortcut
+- click: '[data-testid="keymap-row-menu-add-keyboard"]'
+- assert_visible: '[data-testid="keymap-recorder"]'
+- press: Control+Alt+k
+- press: Control+Alt+j
+- assert_text_equals:
+    selector: '[data-testid="keymap-recorder-strokes"]'
+    equals: '[KeyJ]'
+- set_check:
+    selector: '[data-testid="keymap-recorder-second-stroke"]'
+    checked: true
+- press: Control+Alt+k
+- assert_text_equals:
+    selector: '[data-testid="keymap-recorder-strokes"]'
+    equals: '[KeyJ, KeyK]'
+- click: '[data-testid="keymap-recorder-ok"]'
+- wait_for:
+    selector: '[data-testid="keymap-recorder"]'
+    state: detached
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"keymap-scheme-select\"] option:checked")?.textContent?.includes("(copy)")
+    expect_truthy: true
+- assert_pattern:
+    selector: '[data-testid="keymap-replace-workspace.recentFiles-1"]'
+    regex: Ctrl[+](Alt|Option)[+]J Ctrl[+](Alt|Option)[+]K
+- right_click: '[data-testid="keymap-row-workspace.recentFiles"]'
+- click: '[data-testid="keymap-row-menu-add-mouse"]'
+- click: '[data-testid="keymap-mouse-recorder-pad"]'
+- assert_visible: '[data-testid="keymap-mouse-recorder-hint"]'
+- click:
+    selector: '[data-testid="keymap-mouse-recorder-pad"]'
+    modifiers:
+    - Shift
+- assert_text:
+    selector: '[data-testid="keymap-mouse-recorder-value"]'
+    contains: Shift+Click
+- click: '[data-testid="keymap-mouse-recorder-ok"]'
+- click: '[data-testid="keymap-settings-cancel"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- eval_readonly:
+    expression: '!(localStorage.getItem("taomni.codeWorkspace.keymap.v3:index") || "").includes("KeyJ")'
+    expect_truthy: true
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+A
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- type:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    text: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Recent Files
+- assert_count:
+    selector: '[data-testid="keymap-replace-workspace.recentFiles-1"]'
+    equal: 0
+- click: '[data-testid="keymap-add-workspace.recentFiles"]'
+- press: Control+Alt+j
+- press: Enter
+- click: '[data-testid="keymap-settings-apply"]'
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Alt+j
+- assert_visible: '[data-testid="code-workspace-recent-files"]'
+- assert_localstorage:
+    key: taomni.codeWorkspace.keymap.v3:index
+    contains: KeyJ
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A2.4：动作按分类分组，默认折叠，点击展开。
+    actions:
+    - 20
+    checkpoints:
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"keymap-group-Navigation\"]", "name": "aria-expanded", "equals": "false"}}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"keymap-row-workspace.goToFile\"]"}'
+    results:
+    - 19
+    - 21
+  - id: R2
+    requirement: A2.3：Find Actions by Shortcut 录入 Ctrl+Shift+N 后只剩其持有者。
+    actions:
+    - 22
+    - 24
+    checkpoints:
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"keymap-row-workspace.goToFile\"]"}'
+    - step: 26
+      expectation: '{"assert_count": {"selector": "[data-testid=\"keymap-row-workspace.recentFiles\"]", "equal": 0}}'
+    results:
+    - 25
+    - 26
+  - id: R3
+    requirement: A2.2：行右键菜单含 Add Keyboard/Mouse Shortcut；录制框未勾 Second stroke 时新键替换第一击，勾选后录两击。
+    actions:
+    - 30
+    - 32
+    - 34
+    - 35
+    - 37
+    - 38
+    checkpoints:
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-row-menu\"]", "contains": "Add Mouse Shortcut"}}'
+    - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"keymap-recorder\"]"}'
+    - step: 36
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"keymap-recorder-strokes\"]", "equals": "[KeyJ]"}}'
+    - step: 39
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"keymap-recorder-strokes\"]", "equals": "[KeyJ, KeyK]"}}'
+    results:
+    - 31
+    - 36
+    - 39
+  - id: R4
+    requirement: A2.1/DEC-013-12：默认方案首次修改派生 (copy)，新 chord 追加在继承的 Ctrl+E 之后。
+    actions:
+    - 40
+    checkpoints:
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"keymap-scheme-select\\\"] option:checked\")?.textContent?.includes(\"(copy)\")", "expect_truthy": true}}'
+    - step: 43
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"keymap-replace-workspace.recentFiles-1\"]", "regex": "Ctrl[+](Alt|Option)[+]J Ctrl[+](Alt|Option)[+]K"}}'
+    results:
+    - 42
+    - 43
+  - id: R5
+    requirement: A2.6：Mouse Shortcut 录制拒绝无修饰点击，记录 Shift+Click。
+    actions:
+    - 45
+    - 46
+    - 48
+    checkpoints:
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"keymap-mouse-recorder-hint\"]"}'
+    - step: 49
+      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-mouse-recorder-value\"]", "contains": "Shift+Click"}}'
+    results:
+    - 47
+    - 49
+  - id: R6
+    requirement: A2.1：Cancel 零写入，重开不见草稿；Apply 后持久化且新 chord 真实打开 Recent Files。
+    actions:
+    - 51
+    - 64
+    - 65
+    - 69
+    checkpoints:
+    - step: 53
+      expectation: '{"eval_readonly": {"expression": "!(localStorage.getItem(\"taomni.codeWorkspace.keymap.v3:index\") || \"\").includes(\"KeyJ\")", "expect_truthy": true}}'
+    - step: 61
+      expectation: '{"assert_count": {"selector": "[data-testid=\"keymap-replace-workspace.recentFiles-1\"]", "equal": 0}}'
+    - step: 70
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-recent-files\"]"}'
+    - step: 71
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.keymap.v3:index", "contains": "KeyJ"}}'
+    results:
+    - 53
+    - 61
+    - 70
+    - 71
+  visual:
+  - check: 分组树、键帽与录制子对话框在 720px 对话框内不截断。
+    method: manual
+    reason: 像素/字体需人工评审。
+  native:
+  - check: 重启后持久化由 TC-IDE-PARITY-004-04 在 native 证明。
+    method: external
+    reason: browser 不证明 WebView 存储跨进程存活。

@@ -64,6 +64,8 @@ interface SearchEverywhereProps {
   onOpenFile: (item: GoToFileItem, options?: { split: boolean }) => void;
   onOpenSymbol?: (item: GoToSymbolItem, options?: { split: boolean }) => void;
   onRunCommand?: (commandId: string) => void | Promise<ActionResult>;
+  /** ED-PARITY-013 DEC-013-03: Alt+Enter on an action = Assign Shortcut. */
+  onAssignShortcut?: (commandId: string) => void;
   /** Text tab: hand query to Find in Files. */
   onSearchText?: (query: string) => void;
 }
@@ -74,6 +76,51 @@ type SearchItem =
   | { kind: "file"; value: GoToFileItem }
   | { kind: "action"; value: ActionSnapshotItem }
   | { kind: "symbol"; value: GoToSymbolItem };
+
+function searchItemText(item: SearchItem): string {
+  if (item.kind === "file") return `${item.value.rootName}/${item.value.path}`;
+  if (item.kind === "action") {
+    return `${item.value.category} ${item.value.title} ${item.value.keywords?.join(" ") ?? ""}`;
+  }
+  return `${item.value.name} ${item.value.containerName ?? ""} ${item.value.path}`;
+}
+
+/**
+ * IDEA-style action match for the All tab: every query word must occur in the
+ * action title or keywords. Scattered-letter fuzzy matching let "total" pull
+ * in "Move to Line Start".
+ */
+export function actionMatchesQuery(query: string, action: Pick<ActionSnapshotItem, "title" | "keywords">): boolean {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const haystack = `${action.title} ${action.keywords?.join(" ") ?? ""}`.toLowerCase();
+  return words.every((word) => haystack.includes(word));
+}
+
+/**
+ * ED-PARITY-014 DEC-014-01: All ranks each contributor on its own and lists
+ * symbols, then files, then actions (IDEA order); actions only when their
+ * words match the query.
+ */
+export function rankAllModeItems(query: string, all: SearchItem[]): SearchItem[] {
+  if (!query.trim()) return all.slice(0, MAX_RESULTS);
+  const symbols = rankFuzzy(query, all.filter((item) => item.kind === "symbol"), searchItemText, MAX_RESULTS);
+  const files = rankFuzzy(query, all.filter((item) => item.kind === "file"), searchItemText, MAX_RESULTS);
+  const actions = rankFuzzy(
+    query,
+    all.filter((item) => item.kind === "action" && actionMatchesQuery(query, item.value)),
+    searchItemText,
+    MAX_RESULTS,
+  );
+  return [...symbols, ...files, ...actions].slice(0, MAX_RESULTS);
+}
+
+function selectedItemPath(item: SearchItem | null): string {
+  if (!item) return "";
+  if (item.kind === "file") return `${item.value.rootName}/${item.value.path}`;
+  if (item.kind === "symbol") return `${item.value.path}${item.value.resolved ? `:${item.value.line + 1}` : ""}`;
+  return `${item.value.category} › ${item.value.title}`;
+}
 
 function itemKey(item: SearchItem): string {
   if (item.kind === "file") return `file:${item.value.rootId}:${item.value.path}`;
@@ -104,6 +151,7 @@ export function SearchEverywhere({
   onOpenFile,
   onOpenSymbol,
   onRunCommand,
+  onAssignShortcut,
   onSearchText,
 }: SearchEverywhereProps) {
   const [mode, setMode] = useState<SearchEverywhereMode>(initialMode);
@@ -214,18 +262,8 @@ export function SearchEverywhere({
   const filterItems = useCallback(
     (q: string, all: SearchItem[]) => {
       if (mode === "text") return [];
-      return rankFuzzy(
-        q,
-        all,
-        (item) => {
-          if (item.kind === "file") return `${item.value.rootName}/${item.value.path}`;
-          if (item.kind === "action") {
-            return `${item.value.category} ${item.value.title} ${item.value.keywords?.join(" ") ?? ""}`;
-          }
-          return `${item.value.name} ${item.value.containerName ?? ""} ${item.value.path}`;
-        },
-        MAX_RESULTS,
-      );
+      if (mode === "all") return rankAllModeItems(q, all);
+      return rankFuzzy(q, all, searchItemText, MAX_RESULTS);
     },
     [mode],
   );
@@ -280,7 +318,10 @@ export function SearchEverywhere({
               <span className="min-w-0 flex-1 truncate text-[var(--taomni-code-text)]">{item.value.title}</span>
               <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">{item.value.category}</span>
               {item.value.keybinding && (
-                <kbd className="shrink-0 rounded border border-[var(--taomni-code-border)] px-1 text-[10px] text-[var(--taomni-code-muted)]">
+                <kbd
+                  data-testid={`search-everywhere-shortcut-${item.value.id}`}
+                  className="shrink-0 rounded border border-[var(--taomni-code-border)] px-1 text-[10px] text-[var(--taomni-code-muted)]"
+                >
                   {item.value.keybinding}
                 </kbd>
               )}
@@ -355,52 +396,47 @@ export function SearchEverywhere({
           ))}
         </div>
       }
-      footer={
-        <>
-          <span>↑↓ select</span>
-          <span>
-            Enter {
-              mode === "actions" ? "run"
-                : mode === "text" ? "search"
-                  : "open"
-            }
-          </span>
-          {(mode === "all" || mode === "files" || mode === "classes" || mode === "symbols") && (
-            <span>Ctrl+Enter split</span>
-          )}
-          <span>Esc close</span>
-          <span className="ml-auto">
+      footer={(selected) => {
+        // ED-PARITY-014 DEC-014-02: IDEA footer = selected item's path plus
+        // the split action; provider/index diagnostics live in the tooltip.
+        const providerStatus = [
+          symbolSnapshotLabel,
+          `${symbolQueryStatus.providerCount}/${symbolQueryStatus.sessionCount} provider${symbolQueryStatus.sessionCount === 1 ? "" : "s"}${symbolQueryStatus.complete ? " · complete" : " · incomplete"}`
+            + (symbolQueryStatus.failedProviderCount > 0 ? ` (${symbolQueryStatus.failedProviderCount} failed)` : "")
+            + (symbolQueryStatus.skippedProviderCount > 0 ? ` (${symbolQueryStatus.skippedProviderCount} skipped)` : "")
+            + (symbolQueryStatus.truncated ? " · truncated" : ""),
+          `${symbols.length} symbol${symbols.length === 1 ? "" : "s"}`,
+          ...(symbolQueryStatus.diagnostics ?? []),
+        ].filter(Boolean).join("\n");
+        return (
+          <>
+            <span data-testid="search-everywhere-selected-path" className="min-w-0 flex-1 truncate" title={selectedItemPath(selected)}>
+              {selectedItemPath(selected)}
+            </span>
+            {(mode === "actions" || mode === "all") && onAssignShortcut && (
+              <span data-testid="search-everywhere-assign-shortcut-hint" className="shrink-0">Alt+Enter assign shortcut</span>
+            )}
+            {(mode === "all" || mode === "files" || mode === "classes" || mode === "symbols") && (
+              <span className="shrink-0">Open In Right Split Ctrl+Enter</span>
+            )}
             {mode === "files" && (
-              <>{truncated ? "file index truncated · " : ""}{items.length} file{items.length === 1 ? "" : "s"}</>
+              <span className="shrink-0">{truncated ? "file index truncated · " : ""}{items.length} file{items.length === 1 ? "" : "s"}</span>
             )}
-            {mode === "actions" && <>{actionCommands.length} action{actionCommands.length === 1 ? "" : "s"}</>}
+            {mode === "actions" && <span className="shrink-0">{actionCommands.length} action{actionCommands.length === 1 ? "" : "s"}</span>}
             {(mode === "all" || mode === "classes" || mode === "symbols") && (
-              <>
-                {symbolSnapshotLabel && (
-                  <span data-testid="search-everywhere-semantic-index">
-                    {symbolSnapshotLabel} · {" "}
-                  </span>
-                )}
-                <span
-                  data-testid="search-everywhere-symbol-provider-status"
-                  title={symbolQueryStatus.diagnostics?.join("\n") || undefined}
-                  className={!symbolQueryStatus.complete ? "text-amber-500" : undefined}
-                >
-                  {symbolQueryStatus.providerCount}/{symbolQueryStatus.sessionCount} provider{symbolQueryStatus.sessionCount === 1 ? "" : "s"}
-                  {symbolQueryStatus.complete ? " · complete" : " · incomplete"}
-                  {symbolQueryStatus.failedProviderCount > 0 ? ` (${symbolQueryStatus.failedProviderCount} failed)` : ""}
-                  {symbolQueryStatus.skippedProviderCount > 0 ? ` (${symbolQueryStatus.skippedProviderCount} skipped)` : ""}
-                  {symbolQueryStatus.truncated ? " · truncated" : ""}
-                  {symbolQueryStatus.truncated || symbolQueryStatus.skippedProviderCount > 0 || symbolQueryStatus.failedProviderCount > 0 || (symbolQueryStatus.diagnostics?.length ?? 0) > 0 ? " · bounded" : ""}
-                  {" · "}
-                </span>
-                {symbols.length} symbol{symbols.length === 1 ? "" : "s"}
-              </>
+              <span
+                data-testid="search-everywhere-symbol-provider-status"
+                role="img"
+                aria-label={providerStatus}
+                title={providerStatus}
+                data-complete={symbolQueryStatus.complete}
+                className={`inline-block h-2 w-2 shrink-0 rounded-full ${symbolQueryStatus.complete ? "bg-emerald-500/70" : "bg-amber-500"}`}
+              />
             )}
-            {mode === "text" && <Type className="inline h-3 w-3" />}
-          </span>
-        </>
-      }
+            {mode === "text" && <Type className="inline h-3 w-3 shrink-0" />}
+          </>
+        );
+      }}
       onClose={onClose}
       onPick={(item, options) => {
         if (item.kind === "file") {
@@ -411,6 +447,11 @@ export function SearchEverywhere({
         else if (options) onOpenSymbol?.(item.value, options);
         else onOpenSymbol?.(item.value);
       }}
+      onAltEnter={onAssignShortcut
+        ? (item) => {
+          if (item.kind === "action") onAssignShortcut(item.value.id);
+        }
+        : undefined}
       onEnterEmpty={(q) => {
         if (mode === "text" && q.trim()) onSearchText?.(q.trim());
       }}

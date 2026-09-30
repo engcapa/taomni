@@ -1,0 +1,165 @@
+id: TC-IDE-PARITY-012-03
+title: Go to Line:Column dialog prefilled with the caret position
+description: 'ED-PARITY-012 DEC-012-06: Ctrl+G opens IDEA''s small Go to Line:Column dialog prefilled with the caret line:column and fully selected; Enter jumps, Esc/Cancel move nothing, invalid input is flagged and OK is disabled; focus returns to the editor.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-012
+- find
+- focus
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+Home
+- press: ArrowDown
+- press: End
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: '2:'
+- press: Control+g
+- wait_for:
+    selector: '[data-testid="code-workspace-goto-line-dialog"]'
+    timeout_sec: 10
+- eval_readonly:
+    expression: /^2:\d+$/.test(document.activeElement?.value ?? '') && document.activeElement.selectionStart === 0 && document.activeElement.selectionEnd === document.activeElement.value.length
+    expect_truthy: true
+- type: '3:5'
+- press: Enter
+- wait_for:
+    selector: '[data-testid="code-workspace-goto-line-dialog"]'
+    state: detached
+    timeout_sec: 5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: '3:5'
+- &id001
+  eval_readonly:
+    expression: document.activeElement?.classList.contains('cm-content') === true
+    expect_truthy: true
+- press: Control+g
+- wait_for:
+    selector: '[data-testid="code-workspace-goto-line-dialog"]'
+    timeout_sec: 10
+- type: '1:1'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-goto-line-dialog"]'
+    state: detached
+    timeout_sec: 5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: '3:5'
+- *id001
+- press: Control+g
+- wait_for:
+    selector: '[data-testid="code-workspace-goto-line-dialog"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="code-workspace-goto-line-input"]'
+    value: '99'
+- assert_visible: '[data-testid="code-workspace-goto-line-error"]'
+- eval_readonly:
+    expression: document.getElementById('code-workspace-goto-line-input')?.getAttribute('aria-invalid') === 'true' && document.getElementById('code-workspace-goto-line-input')?.closest('div[aria-modal]')?.querySelector('button')?.disabled === true
+    expect_truthy: true
+- click: '[data-testid="code-workspace-goto-line-cancel"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-goto-line-dialog"]'
+    state: detached
+    timeout_sec: 5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: '3:5'
+- eval_readonly:
+    expression: document.querySelectorAll('.cm-gotoLine').length === 0
+    expect_truthy: true
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: DEC-012-06：Ctrl+G 打开 Go to Line:Column 对话框，预填当前 行:列 并全选；输入 3:5 Enter 跳到 3:5，焦点回编辑器。
+    actions:
+    - 17
+    - 20
+    - 21
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-goto-line-dialog\"]", "timeout_sec": 10}}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "/^2:\\d+$/.test(document.activeElement?.value ?? '''') && document.activeElement.selectionStart === 0 && document.activeElement.selectionEnd === document.activeElement.value.length", "expect_truthy": true}}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-goto-line-dialog\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "3:5"}}'
+    - step: 24
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    results:
+    - 19
+    - 23
+    - 24
+  - id: R2
+    requirement: DEC-012-06：Esc 取消零移动，焦点回编辑器。
+    actions:
+    - 25
+    - 28
+    checkpoints:
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-goto-line-dialog\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "3:5"}}'
+    - step: 31
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    results:
+    - 30
+    - 31
+  - id: R3
+    requirement: DEC-012-06：非法输入显示提示且 OK 禁用；Cancel 零移动；不再出现 CodeMirror 默认底部面板。
+    actions:
+    - 32
+    - 34
+    - 37
+    checkpoints:
+    - step: 35
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-goto-line-error\"]"}'
+    - step: 36
+      expectation: '{"eval_readonly": {"expression": "document.getElementById(''code-workspace-goto-line-input'')?.getAttribute(''aria-invalid'') === ''true'' && document.getElementById(''code-workspace-goto-line-input'')?.closest(''div[aria-modal]'')?.querySelector(''button'')?.disabled === true", "expect_truthy": true}}'
+    - step: 38
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-goto-line-dialog\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "3:5"}}'
+    - step: 40
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-gotoLine'').length === 0", "expect_truthy": true}}'
+    results:
+    - 35
+    - 36
+    - 39
+    - 40
+  visual:
+  - check: 对照 IDEA idea-06/07/08 检查 Find/Replace 行控件顺序与间距。
+    method: manual
+    reason: 像素与字体按 DEC-ALIGN-06 另行比较。
+  native:
+  - check: 本用例断言 renderer 焦点与键盘派发；native WebView 由保留 native 用例覆盖。
+    method: not-applicable
+    reason: browser 证据不外推 native。

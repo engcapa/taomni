@@ -118,7 +118,7 @@ describe("ED-FINDFOCUS-001 real focus with StrictMode", () => {
     expect(view.state.selection.main).toMatchObject({ from: 8, to: 12 });
     fireEvent.compositionEnd(field);
     fireEvent.input(field, { target: { value: "not-present" } });
-    expect(view.dom.querySelector(".cm-workspace-search-status")).toHaveTextContent("0 matches");
+    expect(view.dom.querySelector(".cm-workspace-search-status")).toHaveTextContent("0 results");
     fireEvent.input(field, { target: { value: "tree" } });
     expect(view.state.selection.main).toMatchObject({ from: 8, to: 12 });
     fireEvent.keyDown(field, { key: "Escape" });

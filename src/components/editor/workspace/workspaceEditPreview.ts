@@ -261,3 +261,29 @@ export function formatWorkspaceEditPreview(
   }
   return lines.join("\n");
 }
+
+/**
+ * ED-PARITY-017 DEC-017-05: the real preimage/postimage lines of one usage,
+ * computed from the source text the edit will be applied to. Returns null
+ * when the range does not fit the text (the preview then says so instead of
+ * inventing lines).
+ */
+export function usageLineImages(
+  text: string,
+  usage: Pick<WorkspaceEditPreviewUsage, "range" | "newText">,
+  maxLines = 3,
+): { before: string[]; after: string[] } | null {
+  const lines = text.split(/\r\n|\r|\n/);
+  const { start, end } = usage.range;
+  if (start.line < 0 || end.line >= lines.length || end.line < start.line) return null;
+  const first = lines[start.line]!;
+  const last = lines[end.line]!;
+  if (start.character > first.length || end.character > last.length) return null;
+  const before = lines.slice(start.line, end.line + 1);
+  const after = `${first.slice(0, start.character)}${usage.newText}${last.slice(end.character)}`
+    .split(/\r\n|\r|\n/);
+  const clip = (values: string[]) => (
+    values.length > maxLines ? [...values.slice(0, maxLines), `… ${values.length - maxLines} more line(s)`] : values
+  );
+  return { before: clip(before), after: clip(after) };
+}

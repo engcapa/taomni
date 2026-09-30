@@ -55,7 +55,7 @@ describe("editorAppearanceProfile", () => {
         showMarkers: true,
       },
       virtualSpace: { afterLineEnd: true, atFileBottom: false },
-      breadcrumbs: { visible: false, placement: "top", languages: ["*"] },
+      breadcrumbs: { visible: false, placement: "status-bar", languages: ["*"] },
       clipboard: { historyEnabled: true, historyMaxItems: 50, historyMaxTotalBytes: 1024 },
     });
     expect(defaultEditorAppearanceProfile()).toEqual(DEFAULT_EDITOR_APPEARANCE_PROFILE);

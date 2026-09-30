@@ -1,0 +1,102 @@
+id: TC-IDE-PARITY-010-03
+title: Tool window switching, hide-all and default layout keep the dirty editor
+description: 'ED-PARITY-010 A3 browser case: after an unsaved edit, switching bottom tool windows through the rail, hiding and restoring every tool window (Ctrl+Shift+F12) and Restore Default Layout (Shift+F12) keep the same editor view, its text and its dirty marker.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-010
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: zz010
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-dirty="true"]'
+    name: data-dirty
+    equals: 'true'
+- click: '[data-testid="code-workspace-bottom-tab-problems"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-bottom-tab-search"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-tool-window-title"]'
+    contains: Search
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+F12
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    state: detached
+    timeout_sec: 5
+- press: Control+Shift+F12
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    timeout_sec: 10
+- press: Shift+F12
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: zz010
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-dirty="true"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    equal: 1
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A3：编辑产生 dirty 后切换 Problems/Search、隐藏/恢复全部工具窗、恢复默认布局，编辑器文本与 dirty 标记保留，只有一个 editor view。
+    actions:
+    - 14
+    - 16
+    - 18
+    - 21
+    - 23
+    - 25
+    checkpoints:
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-dirty=\"true\"]", "name": "data-dirty", "equals": "true"}}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "zz010"}}'
+    - step: 27
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-dirty=\"true\"]", "equal": 1}}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "equal": 1}}'
+    results:
+    - 24
+    - 26
+    - 27
+    - 28
+  visual:
+  - check: rail 图标/标签截断与选中蓝底需人工对照 IDEA idea-01-shell。
+    method: manual
+    reason: 像素与字体按 DEC-ALIGN-06 profile 另行比较。
+  native:
+  - check: 打包 WebView 中的 rail/工具窗由 TC-IDE-PARITY-010-04 覆盖。
+    method: external
+    reason: browser 不经过打包 WebView。

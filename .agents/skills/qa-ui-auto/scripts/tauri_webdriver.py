@@ -548,10 +548,15 @@ class NativeSession:
                     time.sleep(0.3)
                     continue
                 if ("element not interactable" in str(exc) or "element click intercepted" in str(exc)) and attempt < 2:
+                    # A synthetic click() does not move focus the way a real
+                    # pointer press does, so focus editable/focusable targets
+                    # (e.g. a CodeMirror `.cm-content` whose center sits under
+                    # a sticky gutter) explicitly.
                     with suppress(Exception):
                         self.execute(
                             f"const el = document.querySelector({json.dumps(selector)});"
-                            "if (el) { el.scrollIntoView({block:'center', inline:'center'}); el.click(); }"
+                            "if (el) { el.scrollIntoView({block:'center', inline:'center'}); el.click();"
+                            " if (el.isContentEditable || el.tabIndex >= 0) el.focus(); }"
                         )
                         return f"clicked {selector}"
                 raise

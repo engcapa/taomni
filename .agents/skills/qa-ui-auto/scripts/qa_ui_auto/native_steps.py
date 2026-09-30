@@ -157,9 +157,12 @@ def _press(ctx: NativeStepContext, args: Any) -> str:
         key, selector = args, None
     elif isinstance(args, dict) and "key" in args:
         key = str(args["key"])
+        # IDEA's macOS keymap binds some actions to a different stroke.
+        if platform.system() == "Darwin" and isinstance(args.get("macos_key"), str):
+            key = str(args["macos_key"])
         selector = args.get("selector")
     else:
-        raise StepError(f"press: expected string or {{key, selector?}}, got {args!r}")
+        raise StepError(f"press: expected string or {{key, macos_key?, selector?}}, got {args!r}")
     if selector:
         ctx.session.focus(selector)
     return ctx.session.press_combo(key)
@@ -1936,7 +1939,23 @@ def _do_native_pointer_drag(ctx: NativeStepContext, args: Any) -> str:
         "if (!(root instanceof HTMLElement)) return null;"
         "const lines = Array.from(root.querySelectorAll('.cm-line'));"
         f"const points = {json.dumps([start, end])};"
+        # Lines are document lines: with folded ranges (e.g. the default
+        # import fold) the n-th rendered `.cm-line` is not document line n,
+        # so resolve through the CodeMirror view when it is reachable.
+        "const content = root.matches('.cm-content') ? root : root.querySelector('.cm-content');"
+        "const view = content?.cmTile?.root?.view ?? null;"
+        "const locateInView = ({line,column}) => {"
+        " const doc = view.state.doc;"
+        " if (line > doc.lines) return null;"
+        " const docLine = doc.line(line);"
+        " if (column > docLine.length) return null;"
+        " const caret = view.coordsAtPos(docLine.from + column);"
+        " if (!caret) return null;"
+        " return {x:Math.round(caret.left), y:Math.round((caret.top + caret.bottom) / 2),"
+        "  lineLength:docLine.length};"
+        "};"
         "const locate = ({line,column}) => {"
+        " if (view?.state?.doc && typeof view.coordsAtPos === 'function') return locateInView({line,column});"
         " const el = lines[line - 1];"
         " if (!(el instanceof HTMLElement) || column > (el.textContent?.length ?? 0)) return null;"
         " const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);"

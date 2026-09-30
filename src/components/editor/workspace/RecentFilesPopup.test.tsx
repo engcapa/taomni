@@ -71,3 +71,35 @@ describe("RecentFilesPopup", () => {
     expect(screen.getByText("No recently changed files")).toBeInTheDocument();
   });
 });
+
+describe("ED-PARITY-014: Recent Files switcher", () => {
+  afterEach(() => cleanup());
+
+  it("shows tool windows beside the files, Show edited only and the selected path", () => {
+    const onToggle = vi.fn();
+    const onActivate = vi.fn();
+    const onRecentLocations = vi.fn();
+    render(
+      <RecentFilesPopup
+        open
+        entries={entries}
+        onClose={vi.fn()}
+        onPick={vi.fn()}
+        onToggleChangedOnly={onToggle}
+        toolWindows={[{ id: "project", label: "Project", shortcut: "Alt+1" }]}
+        onActivateToolWindow={onActivate}
+        onOpenRecentLocations={onRecentLocations}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("code-workspace-recent-files-tool-window-project"));
+    expect(onActivate).toHaveBeenCalledWith("project");
+    fireEvent.click(screen.getByTestId("code-workspace-recent-files-recent-locations"));
+    expect(onRecentLocations).toHaveBeenCalledTimes(1);
+    const editedOnly = screen.getByTestId("code-workspace-recent-files-edited-only");
+    expect(editedOnly).not.toBeChecked();
+    fireEvent.click(editedOnly);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    // The previous file is preselected; its full path is in the footer.
+    expect(screen.getByTestId("code-workspace-recent-files-path")).toHaveTextContent("app / src/previous.ts");
+  });
+});

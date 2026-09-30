@@ -41,6 +41,10 @@ export function attachWorkspaceMouseDispatcher(
     // Left button clicks only for now (schema supports other buttons once an
     // action actually registers one); dblclick supplies clickCount 2.
     if (event.button !== 0) return;
+    // The Keymap "Mouse Shortcut" recorder must see the gesture it records
+    // instead of executing the action currently bound to it (ED-PARITY-013).
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("[data-mouse-shortcut-capture]")) return;
     const clickCount = event.type === "dblclick" ? 2 : 1;
     const modifiers = modifiersOf(event);
     const snapshot = host.getSnapshot({ kind: "snapshot", eventTarget: event.target });

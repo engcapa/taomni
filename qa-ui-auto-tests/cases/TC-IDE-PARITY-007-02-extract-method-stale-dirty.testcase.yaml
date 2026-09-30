@@ -19,6 +19,9 @@ steps:
 - wait_for:
     selector: '[data-testid="welcome-panel"]'
     timeout_sec: 60
+- seed_storage:
+    key: taomni.codeWorkspace.refactorOptions.v1
+    value: '{"mode":"dialog"}'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -242,54 +245,54 @@ verification:
   - id: ED-PARITY-007-V3-02-request
     requirement: An edit during the code-action request window produces no extraction, keeps the user input, reports the accurate stale reason and can be retried successfully.
     actions:
-    - 19
+    - 20
     checkpoints:
-    - step: 23
-      expectation: The status line reports that the refactor actions became stale.
     - step: 24
-      expectation: The typed character is still in the buffer.
+      expectation: The status line reports that the refactor actions became stale.
     - step: 25
+      expectation: The typed character is still in the buffer.
+    - step: 26
       expectation: No candidate menu was opened.
-    - step: 50
+    - step: 51
       expectation: A second, unblocked invocation left no pending provider response.
     results:
-    - 23
     - 24
     - 25
-    - 50
+    - 26
+    - 51
   - id: ED-PARITY-007-V3-02-resolve
     requirement: An edit while the provider resolves a selected candidate is rejected as stale with zero extraction and zero naming.
     actions:
-    - 60
+    - 61
     checkpoints:
-    - step: 66
-      expectation: The status line reports the interrupted resolve as stale.
     - step: 67
+      expectation: The status line reports the interrupted resolve as stale.
+    - step: 68
       expectation: No naming dialog was opened.
-    - step: 72
+    - step: 73
       expectation: The buffer returns to the initial B0 after undoing the typed character.
     results:
-    - 66
     - 67
-    - 72
+    - 68
+    - 73
   - id: ED-PARITY-007-V3-02-dirty
     requirement: 'A dirty buffer extracts into the buffer only: no naming prompt, no disk write, the pending input survives and undo keeps it.'
     actions:
-    - 69
+    - 70
     checkpoints:
-    - step: 89
-      expectation: The status line asks to save before renaming.
     - step: 90
-      expectation: No naming dialog is shown for a dirty buffer.
+      expectation: The status line asks to save before renaming.
     - step: 91
-      expectation: The extracted call site is in the buffer.
+      expectation: No naming dialog is shown for a dirty buffer.
     - step: 92
+      expectation: The extracted call site is in the buffer.
+    - step: 93
       expectation: Undo restores the pre-extraction buffer and still shows the pending input.
     results:
-    - 89
     - 90
     - 91
     - 92
+    - 93
   visual:
   - check: Status line wording and dialog absence across the stale states.
     method: manual

@@ -65,6 +65,7 @@ steps:
 - wait_for:
     selector: '[data-testid="workspace-editor-appearance-settings-dialog"]'
     state: detached
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - assert_text:
     selector: '[data-testid="code-workspace-zoom-reset"]'
     contains: 26px
@@ -208,14 +209,14 @@ verification:
     - 20
     - 22
     - 23
-    - 26
-    - 36
-    - 46
-    - 49
-    - 53
+    - 27
+    - 37
+    - 47
+    - 50
     - 54
     - 55
-    - 58
+    - 56
+    - 59
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -239,93 +240,93 @@ verification:
     - step: 24
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]", "state":
         "detached"}}'
-    - step: 25
+    - step: 26
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-zoom-reset\"]", "contains": "26px"}}'
-    - step: 28
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "dirty"}}'
     - step: 29
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "role", "equals": "status"}}'
+        "data-state", "equals": "dirty"}}'
     - step: 30
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "aria-live", "equals": "polite"}}'
+        "role", "equals": "status"}}'
     - step: 31
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "aria-atomic", "equals": "true"}}'
+        "aria-live", "equals": "polite"}}'
     - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "aria-atomic", "equals": "true"}}'
+    - step: 33
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "contains":
         "Unsaved changes"}}'
-    - step: 33
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
-        "role", "equals": "textbox"}}'
     - step: 34
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
-        "aria-multiline", "equals": "true"}}'
+        "role", "equals": "textbox"}}'
     - step: 35
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name":
+        "aria-multiline", "equals": "true"}}'
+    - step: 36
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'
-    - step: 38
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "saved"}}'
     - step: 39
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-result-kind", "equals": "saved-current"}}'
+        "data-state", "equals": "saved"}}'
     - step: 40
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-write-count", "equals": "1"}}'
+        "data-result-kind", "equals": "saved-current"}}'
     - step: 41
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-dirty", "equals": "false"}}'
+        "data-write-count", "equals": "1"}}'
     - step: 42
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "false"}}'
+    - step: 43
       expectation: '{"eval_readonly": {"expression": "/^[a-f0-9]{64}$/.test(document.getElementById(\"code-workspace-save-observation\")?.getAttribute(\"data-encoded-bytes-sha256\")
         ?? \"\")", "expect_truthy": true}}'
-    - step: 43
+    - step: 44
       expectation: '{"eval_readonly": {"expression": "document.getElementById(\"code-workspace-save-observation\")?.hasAttribute(\"data-final-text-sha256\")",
         "expect_truthy": true}}'
-    - step: 44
+    - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "contains":
         "Saved README.txt"}}'
-    - step: 45
+    - step: 46
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'
-    - step: 48
+    - step: 49
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "dirty"}}'
-    - step: 51
+    - step: 52
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "clean"}}'
-    - step: 52
+    - step: 53
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'
-    - step: 57
+    - step: 58
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "dirty"}}'
-    - step: 60
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "saved"}}'
     - step: 61
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-result-kind", "equals": "saved-current"}}'
+        "data-state", "equals": "saved"}}'
     - step: 62
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-write-count", "equals": "1"}}'
+        "data-result-kind", "equals": "saved-current"}}'
     - step: 63
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-dirty", "equals": "false"}}'
+        "data-write-count", "equals": "1"}}'
     - step: 64
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-encoded-bytes-sha256", "equals": "5eebea28ed7980381dff6dedc26f77ca7340bfccb34f6869f83435a0fe4983c1"}}'
+        "data-dirty", "equals": "false"}}'
     - step: 65
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-encoded-bytes-sha256", "equals": "5eebea28ed7980381dff6dedc26f77ca7340bfccb34f6869f83435a0fe4983c1"}}'
+    - step: 66
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'
     results:
-    - 60
     - 61
     - 62
     - 63
     - 64
     - 65
+    - 66
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

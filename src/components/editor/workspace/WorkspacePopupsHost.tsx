@@ -8,14 +8,21 @@ import type {
 import { SearchEverywhere } from "./SearchEverywhere";
 import type { ActionSnapshotItem } from "./workspaceActionHost";
 import type { ActionResult } from "./workspaceActionRegistry";
-import { RecentFilesPopup, type RecentFileEntry } from "./RecentFilesPopup";
+import { RecentFilesPopup, type RecentFileEntry, type RecentToolWindowEntry } from "./RecentFilesPopup";
 import { StructurePopup } from "./StructurePopup";
 import { QuickDocPopup } from "./QuickDocPopup";
 import type { QuickDocContent } from "./referenceDocumentation";
 import { LocationPeek, type LocationPeekState } from "./LocationPeek";
 import { RecentLocationsDialog } from "./RecentLocationsDialog";
+import { useFocusReturn } from "./useFocusReturn";
 import type { NavigationHistoryFacade, NavigationLocation, WorkspaceLocationController } from "./navigationHistoryModel";
 import type { WorkspaceSemanticIndexSnapshot } from "./workspaceSemanticIndex";
+
+/** DEC-ALIGN-11: return focus when a non-QuickPick popup closes (ED-PARITY-012). */
+function FocusReturn({ active }: { active: boolean }) {
+  useFocusReturn(active);
+  return null;
+}
 
 interface WorkspacePopupsHostProps {
   searchEverywhereOpen: boolean;
@@ -31,12 +38,18 @@ interface WorkspacePopupsHostProps {
   onOpenFileItem: (item: GoToFileItem) => void;
   onOpenSymbol: (symbol: GoToSymbolItem, options?: { split: boolean }) => void;
   onRunCommand: (commandId: string) => void | Promise<ActionResult>;
+  /** ED-PARITY-013 DEC-013-03: Alt+Enter on an action row = Assign Shortcut. */
+  onAssignShortcut?: (commandId: string) => void;
   onSearchText: (query: string) => void;
 
   recentFilesOpen: boolean;
   recentEntries: RecentFileEntry[];
   recentAdvanceNonce: number;
   recentChangedOnly?: boolean;
+  onToggleRecentChangedOnly?: () => void;
+  recentToolWindows?: readonly RecentToolWindowEntry[];
+  onActivateRecentToolWindow?: (id: string) => void;
+  onOpenRecentLocationsFromRecent?: () => void;
   onCloseRecent: () => void;
   onPickRecent: (entry: RecentFileEntry) => void;
 
@@ -53,6 +66,7 @@ interface WorkspacePopupsHostProps {
   structureSymbols: LspDocumentSymbol[];
   structureLoading: boolean;
   structureUnavailable: string | null;
+  structureSyntaxOnly?: boolean;
   onCloseStructure: () => void;
   onPickStructure: (symbol: LspDocumentSymbol) => void;
 
@@ -86,11 +100,16 @@ export function WorkspacePopupsHost({
   onOpenFileItem,
   onOpenSymbol,
   onRunCommand,
+  onAssignShortcut,
   onSearchText,
   recentFilesOpen,
   recentEntries,
   recentAdvanceNonce,
   recentChangedOnly = false,
+  onToggleRecentChangedOnly,
+  recentToolWindows,
+  onActivateRecentToolWindow,
+  onOpenRecentLocationsFromRecent,
   onCloseRecent,
   onPickRecent,
   recentLocationsOpen = false,
@@ -105,6 +124,7 @@ export function WorkspacePopupsHost({
   structureSymbols,
   structureLoading,
   structureUnavailable,
+  structureSyntaxOnly = false,
   onCloseStructure,
   onPickStructure,
   quickDocOpen,
@@ -122,6 +142,11 @@ export function WorkspacePopupsHost({
 }: WorkspacePopupsHostProps) {
   return (
     <>
+      {/* First in tree order: their layout effects must record the opener
+          before a popup's autoFocus moves focus into it. */}
+      <FocusReturn active={!!recentLocationsOpen} />
+      <FocusReturn active={!!quickDocOpen} />
+      <FocusReturn active={!!locationPeek} />
       <SearchEverywhere
         open={searchEverywhereOpen}
         initialMode={searchEverywhereMode}
@@ -133,6 +158,7 @@ export function WorkspacePopupsHost({
         semanticIndex={semanticIndex}
         fetchSymbols={fetchWorkspaceSymbols}
         onClose={onCloseSearchEverywhere}
+        onAssignShortcut={onAssignShortcut}
         onOpenFile={onOpenFileItem}
         onOpenSymbol={(symbol, options) => void onOpenSymbol(symbol, options)}
         onRunCommand={onRunCommand}
@@ -143,6 +169,10 @@ export function WorkspacePopupsHost({
         entries={recentEntries}
         advanceNonce={recentAdvanceNonce}
         changedOnly={recentChangedOnly}
+        onToggleChangedOnly={onToggleRecentChangedOnly}
+        toolWindows={recentToolWindows}
+        onActivateToolWindow={onActivateRecentToolWindow}
+        onOpenRecentLocations={onOpenRecentLocationsFromRecent}
         onClose={onCloseRecent}
         onPick={onPickRecent}
       />
@@ -163,6 +193,7 @@ export function WorkspacePopupsHost({
         symbols={structureSymbols}
         loading={structureLoading}
         unavailableReason={structureUnavailable}
+        syntaxOnly={structureSyntaxOnly}
         onClose={onCloseStructure}
         onPick={onPickStructure}
       />

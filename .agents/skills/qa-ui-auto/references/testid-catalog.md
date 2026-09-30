@@ -161,6 +161,9 @@
 - `[data-testid="editor-context-goto-definition"]` — interactive [optional] — F25.3.context-goto-definition
 - `[data-testid="editor-context-goto-declaration"]` — interactive [optional] — F25.3.context-goto-declaration
 - `[data-testid="editor-context-format"]` — interactive [optional] — F25.3.context-format
+- `[data-testid="editor-context-goto"]` — interactive [optional] — F25.3.editor-context-goto
+- `[data-testid="context-menu-item-close-other-tabs"]` — interactive [optional] — F25.3.tab-menu-close-other-tabs
+- `[data-testid="context-menu-item-close-tabs-to-the-right"]` — interactive [optional] — F25.3.tab-menu-close-tabs-right
 
 ## code-workspace/editor-shell (F25.5)
 
@@ -185,6 +188,38 @@
 - `[data-testid="refactoring-preview-apply"]` — interactive [optional] — F25.5.refactoring-preview-apply
 - `[data-testid="refactoring-preview-select-none"]` — interactive [optional] — F25.5.refactoring-preview-select-none
 - `[data-testid="refactoring-preview-cancel"]` — interactive [optional] — F25.5.refactoring-preview-cancel
+- `[data-testid="refactoring-preview-row"]` — display [optional] — F25.5.refactoring-preview-row
+- `[data-testid="refactoring-preview-before"]` — display [optional] — F25.5.refactoring-preview-before
+- `[data-testid="refactoring-preview-after"]` — display [optional] — F25.5.refactoring-preview-after
+- `[data-testid="refactoring-preview-source-unavailable"]` — display [optional] — F25.5.refactoring-preview-source-unavailable
+- `[data-testid="code-workspace-error-stripe"]` — display [optional] — F25.5.error-stripe
+- `[data-testid="code-workspace-error-stripe-mark"]` — interactive [optional] — F25.5.error-stripe-mark
+- `[data-testid="code-workspace-run-gutter"]` — interactive [optional] — F25.5.run-gutter
+- `[data-testid="code-workspace-run-gutter-run"]` — display [optional] — F25.5.run-gutter-run
+- `[data-testid="code-workspace-run-gutter-debug"]` — display [optional] — F25.5.run-gutter-debug
+- `.cm-git-change-marker.cm-git-change-modified` — interactive [optional] — F25.5.git-change-marker-modified
+- `.cm-lsp-usage` — display [optional] — F25.5.lsp-usage-mark
+- `[data-testid="code-workspace-git-diff-peek"]` — display [optional] — F25.5.git-diff-peek
+- `[data-testid="git-diff-peek-previous"]` — interactive [optional] — F25.5.git-diff-peek-previous
+- `[data-testid="git-diff-peek-next"]` — interactive [optional] — F25.5.git-diff-peek-next
+- `[data-testid="git-diff-peek-rollback-btn"]` — interactive [optional] — F25.5.git-diff-peek-rollback
+- `[data-testid="git-diff-peek-show-diff"]` — interactive [optional] — F25.5.git-diff-peek-show-diff
+- `[data-testid="git-diff-peek-copy"]` — display [optional] — F25.5.git-diff-peek-copy
+- `[data-testid="git-diff-peek-position"]` — display [optional] — F25.5.git-diff-peek-position
+- `[data-testid="git-diff-peek-old-line"]` — display [optional] — F25.5.git-diff-peek-old-line
+- `[data-testid="git-diff-peek-new-line"]` — display [optional] — F25.5.git-diff-peek-new-line
+- `[data-testid="code-workspace-inline-rename"]` — display [optional] — F25.5.inline-rename-session
+- `.cm-inline-rename-target` — display [optional] — F25.5.inline-rename-target-mark
+- `[data-testid="code-workspace-inline-rename-input"]` — interactive [optional] — F25.5.inline-rename-input
+- `[data-testid="code-workspace-inline-rename-suggestions"]` — display [optional] — F25.5.inline-rename-suggestions
+- `[data-testid="code-workspace-inline-rename-suggestion"]` — display [optional] — F25.5.inline-rename-suggestion
+- `[data-testid="code-workspace-inline-rename-hint"]` — display [optional] — F25.5.inline-rename-hint
+- `[data-testid="code-workspace-inline-rename-error"]` — display [optional] — F25.5.inline-rename-error
+- `[data-testid="code-workspace-inline-rename-options"]` — display [optional] — F25.5.inline-rename-options
+- `[data-testid="code-workspace-inline-rename-option-comments"]` — display [optional] — F25.5.inline-rename-option-comments
+- `[data-testid="code-workspace-inline-rename-option-comments-reason"]` — display [optional] — F25.5.inline-rename-option-comments-reason
+- `[data-testid="code-workspace-inline-rename-option-modal"]` — interactive [optional] — F25.5.inline-rename-option-modal
+- `[data-testid="code-workspace-inline-rename-open-dialog"]` — interactive [optional] — F25.5.inline-rename-open-dialog
 - `[data-testid^="code-workspace-intention-"]` — interactive [optional] — F25.5.intention-candidate-item
 - `[data-testid="extract-method-name-prompt"]` — display [optional] — F25.5.extract-method-name-prompt
 - `[data-testid="refactor-recovery-review"]` — display [optional] — F25.5.refactor-recovery-review
@@ -325,6 +360,80 @@
 - `[data-testid="keymap-settings-ok"]` — interactive [optional] — F25.5.keymap-settings-ok
 - `[data-testid="keymap-settings-cancel"]` — interactive [optional] — F25.5.keymap-settings-cancel
 - `[data-testid="keymap-settings-apply"]` — interactive [optional] — F25.5.keymap-settings-apply
+- `[data-testid="code-workspace-toolbar-more"]` — interactive — F25.5.toolbar-more
+- `[data-testid="code-workspace-toolbar-more-menu"]` — display [optional] — F25.5.toolbar-more-menu
+- `[data-testid="code-workspace-toolbar-search"]` — interactive [optional] — F25.5.toolbar-search
+- `[data-testid="code-workspace-toolbar-settings"]` — interactive [optional] — F25.5.toolbar-settings
+- `[data-testid="code-workspace-tool-rail-left"]` — display [optional] — F25.5.tool-rail-left
+- `[data-testid="code-workspace-tool-rail-right"]` — display [optional] — F25.5.tool-rail-right
+- `[data-testid="code-workspace-tool-rail-project"]` — interactive [optional] — F25.5.tool-rail-button
+  ↳ `[data-testid="code-workspace-tool-rail-structure"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-commit"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-documentation"]` — alias
+- `[data-testid="code-workspace-tool-window-header"]` — display [optional] — F25.5.tool-window-header
+- `[data-testid="code-workspace-tool-window-title"]` — display [optional] — F25.5.tool-window-title
+- `[data-testid="code-workspace-tool-window-hide"]` — interactive [optional] — F25.5.tool-window-hide
+- `[data-testid="code-workspace-tool-window-options"]` — interactive [optional] — F25.5.tool-window-options
+- `[data-testid="code-workspace-bottom-tab-overflow-problems"]` — interactive [optional] — F25.5.bottom-tool-overflow-item
+- `[data-testid="code-workspace-terminal-dock"]` — display [optional] — F25.5.terminal-dock-panel
+  ↳ `[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]` — alias
+  ↳ `[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]` — alias
+- `header [data-testid="code-workspace-split-right"]` — display [optional] — F25.5.toolbar-split-right-in-header
+- `[data-testid="code-workspace-ai-selection-toolbar"]` — display [optional] — F25.5.ai-selection-toolbar
+- `[data-testid="code-workspace-goto-line-dialog"]` — display [optional] — F25.5.goto-line-dialog
+- `[data-testid="code-workspace-goto-line-input"]` — interactive [optional] — F25.5.goto-line-input
+- `[data-testid="code-workspace-goto-line-ok"]` — interactive [optional] — F25.5.goto-line-ok
+- `[data-testid="code-workspace-goto-line-cancel"]` — interactive [optional] — F25.5.goto-line-cancel
+- `[data-testid="code-workspace-goto-line-error"]` — display [optional] — F25.5.goto-line-error
+- `[data-testid="code-workspace-structure-popup"]` — display [optional] — F25.5.structure-popup
+- `[data-testid="recent-locations-dialog"]` — display [optional] — F25.5.recent-locations-dialog
+- `[data-testid="code-workspace-problems-provider-state"]` — display [optional] — F25.5.problems-provider-state
+- `[data-testid="code-workspace-problems-stale"]` — display [optional] — F25.5.problems-stale
+- `[data-testid="code-workspace-problems-configure"]` — interactive [optional] — F25.5.problems-configure
+- `[data-testid="code-workspace-problems-retry"]` — interactive [optional] — F25.5.problems-retry
+- `[data-testid="problems-diagnostic-line"]` — display [optional] — F25.5.problems-diagnostic-line
+- `[data-testid="code-workspace-structure-title"]` — display [optional] — F25.5.structure-title
+- `[data-testid="code-workspace-structure-syntax-only"]` — display [optional] — F25.5.structure-syntax-only
+- `[data-testid="search-everywhere-selected-path"]` — display [optional] — F25.5.search-everywhere-selected-path
+- `[data-testid="code-workspace-recent-files-tool-window-problems"]` — interactive [optional] — F25.5.recent-files-tool-window
+  ↳ `[data-testid="code-workspace-recent-files-tool-window-project"]` — alias
+- `[data-testid="code-workspace-recent-files-tool-windows"]` — display [optional] — F25.5.recent-files-tool-windows
+- `[data-testid="code-workspace-recent-files-recent-locations"]` — interactive [optional] — F25.5.recent-files-recent-locations
+- `[data-testid="code-workspace-recent-files-edited-only"]` — interactive [optional] — F25.5.recent-files-edited-only
+- `[data-testid="code-workspace-recent-files-path"]` — display [optional] — F25.5.recent-files-path
+- `[data-testid="code-workspace-git-tool-window"]` — display [optional] — F25.5.git-tool-window
+- `[data-testid="code-workspace-git-tool-window-empty"]` — display [optional] — F25.5.git-tool-window-empty
+- `[data-testid="code-workspace-code-insight-notice"]` — display [optional] — F25.5.code-insight-notice
+- `[data-testid="code-workspace-code-insight-configure"]` — interactive [optional] — F25.5.code-insight-configure
+- `[data-testid="problems-severity-error"]` — interactive [optional] — F25.5.problems-severity-filter
+  ↳ `[data-testid="problems-severity-warning"]` — alias
+  ↳ `[data-testid="problems-severity-info"]` — alias
+- `[data-testid="code-workspace-empty-editor"]` — display [optional] — F25.5.empty-editor-hints
+  ↳ `[data-testid="code-workspace-empty-editor-hint"]` — alias
+- `[data-testid="keymap-group-Navigation"]` — interactive [optional] — F25.5.keymap-group
+- `[data-testid="keymap-find-by-shortcut"]` — interactive [optional] — F25.5.keymap-find-by-shortcut
+- `[data-testid="keymap-shortcut-filter"]` — interactive [optional] — F25.5.keymap-shortcut-filter
+- `[data-testid="keymap-row-menu"]` — display [optional] — F25.5.keymap-row-menu
+- `[data-testid="keymap-row-menu-add-keyboard"]` — interactive [optional] — F25.5.keymap-row-menu-add-keyboard
+- `[data-testid="keymap-row-menu-add-mouse"]` — interactive [optional] — F25.5.keymap-row-menu-add-mouse
+- `[data-testid="keymap-recorder-second-stroke"]` — interactive [optional] — F25.5.keymap-recorder-second-stroke
+- `[data-testid="keymap-mouse-recorder-pad"]` — interactive [optional] — F25.5.keymap-mouse-recorder-pad
+- `[data-testid="keymap-mouse-recorder-hint"]` — display [optional] — F25.5.keymap-mouse-recorder-hint
+- `[data-testid="keymap-mouse-recorder-value"]` — display [optional] — F25.5.keymap-mouse-recorder-value
+- `[data-testid="keymap-mouse-recorder-ok"]` — interactive [optional] — F25.5.keymap-mouse-recorder-ok
+- `[data-testid="keymap-row-workspace.recentFiles"]` — interactive [optional] — F25.5.keymap-row-action
+  ↳ `[data-testid="keymap-row-workspace.goToFile"]` — alias
+  ↳ `[data-testid="keymap-row-workspace.gotoDefinition"]` — alias
+- `[data-testid="keymap-add-workspace.recentFiles"]` — interactive [optional] — F25.5.keymap-add-action
+- `[data-testid="keymap-replace-editor.replace-1"]` — display [optional] — F25.5.keymap-replace-appended-slot
+  ↳ `[data-testid="keymap-replace-workspace.recentFiles-1"]` — alias
+- `[data-testid="keymap-no-shortcut-workspace.jumpToLastToolWindow"]` — display [optional] — F25.5.keymap-no-shortcut-action
+- `[data-testid="code-workspace-recent-files"]` — display [optional] — F25.5.recent-files-popup
+- `[data-testid="code-workspace-right-pane"]` — display [optional] — F25.5.workspace-right-pane
+- `[data-workspace-focus="terminal"]` — interactive [optional] — F25.5.workspace-terminal-dock
+- `[data-testid="keymap-migration-notice"]` — display [optional] — F25.5.keymap-migration-notice
+- `[data-testid="search-everywhere-shortcut-workspace.format"]` — display [optional] — F25.5.search-everywhere-action-shortcut
+- `[data-testid="search-everywhere-assign-shortcut-hint"]` — display [optional] — F25.5.search-everywhere-assign-shortcut-hint
 - `[data-testid="code-workspace-parameter-info"]` — display [optional] — F25.5.parameter-info-tooltip
 - `[data-testid="code-workspace-quick-doc"]` — display [optional] — F25.5.quick-doc-popup
 - `[data-testid="code-workspace-editor-banners"]` — display [optional] — F25.5.editor-banners
@@ -414,6 +523,7 @@
 - `[data-testid="code-workspace-bottom-tab-build"]` — interactive — F25.1.build-tab
 - `[data-testid="code-workspace-bottom-tab-tests"]` — interactive — F25.1.tests-tab
 - `[data-testid="code-workspace-bottom-tab-debug"]` — interactive — F25.1.debug-tab
+- `[data-testid="code-workspace-bottom-tab-git"]` — interactive [optional] — F25.1.bottom-tab-git
 - `[data-testid="code-workspace-bottom-tab-overflow"]` — interactive [optional] — F25.1.bottom-tab-overflow
 - `[data-testid="code-workspace-bottom-tab-overflow-menu"]` — display [optional] — F25.1.bottom-tab-overflow-menu
 - `[data-testid="code-workspace-bottom-tab-overflow-build"]` — interactive [optional] — F25.1.bottom-tab-overflow-build
@@ -749,6 +859,16 @@
 
 ## editor/structural-search (F25.6)
 
+- `[data-testid="structural-search-templates"]` — display [optional] — F25.6.structural-search-templates
+- `[data-testid="structural-search-template-item"]` — interactive [optional] — F25.6.structural-search-template-item
+- `[data-testid="structural-search-add-filter"]` — interactive [optional] — F25.6.structural-search-add-filter
+- `[data-testid="structural-search-filter-menu"]` — display [optional] — F25.6.structural-search-filter-menu
+- `[data-testid="structural-search-filter-option-text"]` — interactive [optional] — F25.6.structural-search-filter-option
+  ↳ `[data-testid="structural-search-filter-option-count"]` — alias
+  ↳ `[data-testid="structural-search-filter-option-type"]` — alias
+  ↳ `[data-testid="structural-search-filter-option-reference"]` — alias
+  ↳ `[data-testid="structural-search-filter-option-script"]` — alias
+- `[data-testid="structural-search-filter-reason"]` — display [optional] — F25.6.structural-search-filter-reason
 - `[data-testid="structural-search-dialog"]` — display — F25.6.structural-search-dialog
 - `[data-testid="structural-search-template"]` — interactive — F25.6.structural-search-template
 - `[data-testid="structural-search-language"]` — display — F25.6.structural-search-language
@@ -931,6 +1051,11 @@
 - `[data-testid="status-bar-workspace-encoding"]` — interactive [optional] — F1.7.workspace-encoding
 - `[data-testid="status-bar-workspace-eol"]` — interactive [optional] — F1.7.workspace-eol
 - `[data-testid="status-bar-workspace-cursor"]` — display [optional] — F1.7.workspace-cursor
+- `[data-testid="status-bar-workspace-navbar"]` — display [optional] — F1.7.workspace-navbar
+  ↳ `[data-testid="status-bar-workspace-navbar-segment"]` — alias
+- `[data-testid="status-bar-workspace-navbar-host"]` — display [optional] — F1.7.workspace-navbar-host
+- `[data-testid="status-bar-workspace-readonly"]` — display [optional] — F1.7.workspace-readonly
+- `[data-testid="status-bar-workspace-widgets"]` — display [optional] — F1.7.workspace-status-widgets
 - `[data-testid="status-bar-workspace-large-file"]` — display [optional] — F1.7.workspace-large-file
 
 ## main/tabs (F1.5)

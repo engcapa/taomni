@@ -1,0 +1,136 @@
+id: TC-IDE-PARITY-016-01
+title: Structural Search dialog offers Recent/Existing templates and IDEA filter kinds
+description: 'ED-PARITY-016 A1/A2 browser case on the parity009 fixture backend: the Search Structurally dialog lists Recent and Existing Java templates that load into the template editor; Add filter lists Text/Count/Type/Reference/Script with only Text available on the syntax backend (others typed unavailable with a reason); the println template still yields the three AST matches and becomes a Recent template.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.6
+tags:
+- code-workspace
+- structural-search
+- ed-parity-016
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
+- parity009_ssr
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity009_root}"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+A
+- wait_for: '[data-testid="code-workspace-search-everywhere"]'
+- fill:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    value: Search Structurally
+- press: Enter
+- wait_for: '[data-testid="structural-search-dialog"]'
+- assert_visible: '[data-testid="structural-search-templates"]'
+- click: '[data-testid="structural-search-template-item"][data-template-id="stderr"]'
+- assert_attribute:
+    selector: '[data-testid="structural-search-template"]'
+    name: value
+    equals: System.err.println($arg$);
+- click: '[data-testid="structural-search-template-item"][data-template-id="println"]'
+- assert_attribute:
+    selector: '[data-testid="structural-search-template"]'
+    name: value
+    equals: System.out.println($arg$);
+- click: '[data-testid="structural-search-add-filter"]'
+- assert_visible: '[data-testid="structural-search-filter-menu"]'
+- assert_disabled: '[data-testid="structural-search-filter-option-type"]'
+- assert_disabled: '[data-testid="structural-search-filter-option-count"]'
+- assert_text:
+    selector: '[data-testid="structural-search-filter-reason"]'
+    contains: syntax-only backend
+- click: '[data-testid="structural-search-filter-option-text"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'structural-search-variable-text'
+    expect_truthy: true
+- click: '[data-testid="structural-search-find"]'
+- wait_for: '[data-testid="structural-search-panel"][data-phase="results"]'
+- assert_text:
+    selector: '[data-testid="structural-search-summary"]'
+    contains: 3 results
+- click: '[data-testid="structural-search-edit-query"]'
+- wait_for: '[data-testid="structural-search-dialog"]'
+- assert_text:
+    selector: '[data-testid="structural-search-template-item"][data-template-kind="recent"]'
+    contains: System.out.println($arg$);
+- press: Escape
+- assert_not_visible: '[data-testid="structural-search-dialog"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1/DEC-016-01：对话框左侧有 Recent 与 Existing Templates（Java），点击模板载入模板编辑器。
+    actions:
+    - 13
+    - 15
+    checkpoints:
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"structural-search-dialog\"]"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"structural-search-templates\"]"}'
+    - step: 14
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"structural-search-template\"]", "name": "value", "equals": "System.err.println($arg$);"}}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"structural-search-template\"]", "name": "value", "equals": "System.out.println($arg$);"}}'
+    results:
+    - 14
+    - 16
+  - id: R2
+    requirement: A1/DEC-016-02：Add filter 列出 Text/Count/Type/Reference/Script；语法后端只支持 Text，其余 typed unavailable 并给出原因；选择 Text 聚焦 Text 过滤输入。
+    actions:
+    - 17
+    - 22
+    checkpoints:
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"structural-search-filter-menu\"]"}'
+    - step: 19
+      expectation: '{"assert_disabled": "[data-testid=\"structural-search-filter-option-type\"]"}'
+    - step: 20
+      expectation: '{"assert_disabled": "[data-testid=\"structural-search-filter-option-count\"]"}'
+    - step: 21
+      expectation: '{"assert_text": {"selector": "[data-testid=\"structural-search-filter-reason\"]", "contains": "syntax-only backend"}}'
+    - step: 23
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'') === ''structural-search-variable-text''", "expect_truthy": true}}'
+    results:
+    - 19
+    - 20
+    - 21
+    - 23
+  - id: R3
+    requirement: A2：运行后结果仍为 3 个 AST 匹配；再次打开对话框时刚运行的模板出现在 Recent；Esc 关闭。
+    actions:
+    - 24
+    - 27
+    checkpoints:
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"structural-search-panel\"][data-phase=\"results\"]"}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"structural-search-summary\"]", "contains": "3 results"}}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"structural-search-template-item\"][data-template-kind=\"recent\"]", "contains": "System.out.println($arg$);"}}'
+    - step: 31
+      expectation: '{"assert_not_visible": "[data-testid=\"structural-search-dialog\"]"}'
+    results:
+    - 26
+    - 29
+    - 31
+  visual:
+  - check: 对照 IDEA Search Structurally 对话框的三栏布局。
+    method: manual
+    reason: 像素另行比较。
+  native:
+  - check: native tree-sitter 后端由 TC-IDE-PARITY-009-03 覆盖。
+    method: not-applicable
+    reason: browser 证据不外推 native。

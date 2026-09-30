@@ -48,16 +48,19 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - assert_visible: '[data-testid="code-workspace-editor-tab-strip"]'
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - click: '[data-testid="code-workspace-split-right"]'
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"]'
     min: 2
 - wait: 0.5
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - click: '[data-testid="code-workspace-split-down"]'
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"]'
     min: 3
 - wait: 0.5
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - assert_visible: '[data-testid="code-workspace-split-equalize"]'
 - assert_visible: '[data-testid="code-workspace-split-unsplit-all"]'
 - click: '[data-testid="code-workspace-split-equalize"]'
@@ -65,6 +68,7 @@ steps:
     selector: '[data-testid="code-workspace-editor-pane"]'
     min: 3
 - screenshot: tc-ide-c4-three-leaves.png
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - click: '[data-testid="code-workspace-split-unsplit-all"]'
 - wait: 0.5
 - assert_count:
@@ -99,15 +103,15 @@ verification:
     - 7
     - 9
     - 11
-    - 14
-    - 17
-    - 22
+    - 15
+    - 19
     - 25
-    - 28
-    - 30
+    - 29
+    - 32
     - 34
     - 38
-    - 40
+    - 42
+    - 44
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -123,30 +127,30 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
     - step: 13
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
-    - step: 15
+    - step: 16
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 2}}'
-    - step: 18
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 3}}'
     - step: 20
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-split-equalize\"]"}'
-    - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-split-unsplit-all\"]"}'
-    - step: 23
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 3}}'
-    - step: 27
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-split-equalize\"]"}'
+    - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-split-unsplit-all\"]"}'
+    - step: 26
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 3}}'
     - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 32
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]", "max": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
     - step: 35
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree\"]"}'
     - step: 36
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]", "max": 0}}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 40
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
-    - step: 41
+    - step: 45
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"][data-active=\"true\"]"}'
     results:
-    - 41
+    - 45
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
