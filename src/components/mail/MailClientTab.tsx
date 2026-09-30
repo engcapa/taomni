@@ -11,6 +11,7 @@ import {
   Archive,
   Ban,
   Bot,
+  CalendarDays,
   CheckCircle2,
   ChevronDown,
   Code,
@@ -62,6 +63,8 @@ import {
   mailProbeCertificate,
   mailImportMessages,
   mailFetchRaw,
+  mailGetInvite,
+  mailRespondInvite,
   mailGetMessageBody,
   mailIdleStart,
   mailIdleStop,
@@ -100,6 +103,8 @@ import {
   type MailCertificateInfo,
   type MailFolderSyncResult,
   type MailIdleEvent,
+  type MailInvite,
+  type MailInviteReply,
   type MailMessageBody,
   type MailMessageHeader,
   type MailSearchField,
@@ -109,6 +114,7 @@ import {
 } from "../../lib/mail";
 import { listen } from "@tauri-apps/api/event";
 import { notifyDesktop } from "../../lib/lanNotify";
+import { formatInviteRange, hasCalendarPart, myPartstat } from "../../lib/mailInvite";
 import {
   isSelectable,
   isSubscribed,
@@ -1189,6 +1195,15 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const draggedMessagesRef = useRef<MailMessageHeader[]>([]);
   const [dropFolder, setDropFolder] = useState<string | null>(null);
   const [unsubscribeArmed, setUnsubscribeArmed] = useState<string | null>(null);
+  /** Calendar invitation of the open message (TASK-20), keyed by message. */
+  const [inviteView, setInviteView] = useState<{
+    key: string;
+    invite: MailInvite | null;
+    loading: boolean;
+    responding?: MailInviteReply;
+    responded?: string;
+    error?: string;
+  } | null>(null);
   const [certReview, setCertReview] = useState<{
     protocol: "imap" | "smtp";
     loading: boolean;
@@ -1451,6 +1466,34 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     () => (selectedBody?.attachments.length ? selectedBody.attachments : selectedMessage?.attachments ?? []),
     [selectedBody?.attachments, selectedMessage?.attachments],
   );
+  // AC-62: parse the invitation once the body shows a calendar part.
+  const inviteInfoRef = useRef(info);
+  inviteInfoRef.current = info;
+  const selectedInviteKey = selectedMessage && hasCalendarPart(visibleAttachments)
+    ? messageKey(selectedMessage)
+    : null;
+  useEffect(() => {
+    if (!selectedInviteKey || !selectedMessage) {
+      setInviteView(null);
+      return;
+    }
+    let cancelled = false;
+    const { folder, uid } = selectedMessage;
+    setInviteView({ key: selectedInviteKey, invite: null, loading: true });
+    mailGetInvite(inviteInfoRef.current, folder, uid)
+      .then((invite) => {
+        if (!cancelled) setInviteView({ key: selectedInviteKey, invite, loading: false });
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setInviteView({ key: selectedInviteKey, invite: null, loading: false, error: mailClientErrorMessage(e) });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // selectedMessage is identified by selectedInviteKey.
+  }, [selectedInviteKey]);
   const activeRecipientSuggestions = useMemo<RecipientSuggestion[]>(() => {
     const { field, query: recipientQuery, suggestions } = recipientSearch;
     if (!field || !recipientQuery.trim()) return [];
@@ -4067,6 +4110,132 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     );
   };
 
+  /** AC-62: Accept / Tentative / Decline sends an iTIP REPLY to the organizer. */
+  const handleRespondInvite = async (message: MailMessageHeader, response: MailInviteReply) => {
+    const key = messageKey(message);
+    setInviteView((current) => (current?.key === key ? { ...current, responding: response, error: undefined } : current));
+    try {
+      const result = await mailRespondInvite(info, message.folder, message.uid, response);
+      setInviteView((current) => (current?.key === key ? { ...current, responding: undefined, responded: result.partstat } : current));
+      setStatus(`Invitation reply (${result.partstat.toLowerCase()}) sent to ${result.sentTo}`);
+    } catch (e) {
+      const error = mailClientErrorMessage(e);
+      setInviteView((current) => (current?.key === key ? { ...current, responding: undefined, error } : current));
+    }
+  };
+
+  const renderInviteCard = (message: MailMessageHeader) => {
+    const view = inviteView;
+    if (!view || view.key !== messageKey(message)) return null;
+    if (view.loading) {
+      return (
+        <div className="mx-4 mt-3 flex items-center gap-2 text-[12px] text-[var(--taomni-text-muted)]" data-testid="mail-invite-loading">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading calendar invitation…
+        </div>
+      );
+    }
+    const invite = view.invite;
+    if (!invite) {
+      return view.error ? (
+        <div className="mx-4 mt-3 text-[12px] text-red-500" data-testid="mail-invite-error">{view.error}</div>
+      ) : null;
+    }
+    const cancelled = invite.method === "CANCEL" || invite.status === "CANCELLED";
+    const canRespond = invite.method === "REQUEST" && !cancelled && !!invite.organizer;
+    const current = view.responded ?? myPartstat(invite, info.emailAddress);
+    const calendarIndex = visibleAttachments.findIndex((attachment) => hasCalendarPart([attachment]));
+    const replies: Array<{ response: MailInviteReply; label: string; partstat: string }> = [
+      { response: "accept", label: "Accept", partstat: "ACCEPTED" },
+      { response: "tentative", label: "Tentative", partstat: "TENTATIVE" },
+      { response: "decline", label: "Decline", partstat: "DECLINED" },
+    ];
+    return (
+      <div
+        className="mx-4 mt-3 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] p-3 text-[12px]"
+        data-testid="mail-invite-card"
+        data-method={invite.method}
+        data-partstat={current ?? undefined}
+      >
+        <div className="flex items-start gap-2">
+          <CalendarDays className="w-4 h-4 mt-0.5 text-[var(--taomni-accent)]" />
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold break-words" data-testid="mail-invite-summary">
+              {cancelled ? "Cancelled: " : invite.method === "REPLY" ? "Reply: " : ""}{invite.summary || "(untitled event)"}
+            </div>
+            <div className="mt-1 grid grid-cols-[72px_1fr] gap-x-2 gap-y-0.5">
+              <span className="text-[var(--taomni-text-muted)]">When</span>
+              <span data-testid="mail-invite-when">{formatInviteRange(invite) || "(not specified)"}</span>
+              {invite.location && (
+                <>
+                  <span className="text-[var(--taomni-text-muted)]">Where</span>
+                  <span className="break-words">{invite.location}</span>
+                </>
+              )}
+              {invite.organizer && (
+                <>
+                  <span className="text-[var(--taomni-text-muted)]">Organizer</span>
+                  <span className="truncate">{invite.organizer.name ? `${invite.organizer.name} <${invite.organizer.email}>` : invite.organizer.email}</span>
+                </>
+              )}
+              {invite.attendees.length > 0 && (
+                <>
+                  <span className="text-[var(--taomni-text-muted)]">Attendees</span>
+                  <span className="break-words">
+                    {invite.attendees.map((attendee) => `${attendee.name || attendee.email} (${attendee.partstat.toLowerCase()})`).join(", ")}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {canRespond && replies.map((reply) => (
+            <button
+              key={reply.response}
+              type="button"
+              className={`taomni-btn h-6 px-2 text-[11px] ${current === reply.partstat ? "text-[var(--taomni-accent)] border-[var(--taomni-accent)]" : ""}`}
+              data-testid={`mail-invite-${reply.response}`}
+              aria-pressed={current === reply.partstat}
+              disabled={!!view.responding}
+              onClick={() => void handleRespondInvite(message, reply.response)}
+            >
+              {view.responding === reply.response ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              {reply.label}
+            </button>
+          ))}
+          {calendarIndex >= 0 && (
+            <button
+              type="button"
+              className="taomni-btn h-6 px-2 text-[11px]"
+              data-testid="mail-invite-export"
+              title="Save the event as an .ics file"
+              onClick={() => void handleDownloadAttachment(message, visibleAttachments[calendarIndex], calendarIndex)}
+            >
+              <Download className="w-3 h-3" /> Export .ics
+            </button>
+          )}
+          {calendarIndex >= 0 && (
+            <button
+              type="button"
+              className="taomni-btn h-6 px-2 text-[11px]"
+              data-testid="mail-invite-open"
+              title="Open in the system calendar app"
+              onClick={() => void handleOpenAttachment(message, visibleAttachments[calendarIndex], calendarIndex)}
+            >
+              <ExternalLink className="w-3 h-3" /> Open in calendar
+            </button>
+          )}
+          {view.responded && (
+            <span className="text-[var(--taomni-text-muted)]" data-testid="mail-invite-responded">
+              Reply sent ({view.responded.toLowerCase()})
+            </span>
+          )}
+        </div>
+        {view.error && <div className="mt-1 text-red-500" data-testid="mail-invite-error">{view.error}</div>}
+      </div>
+    );
+  };
+
   const handleExportMbox = (folder: MailFolder) => runMailAction(async () => {
     const { save } = await import("@tauri-apps/plugin-dialog");
     const safe = folderLabel(folder).replace(/[\\/:*?"<>|]+/g, "_") || "folder";
@@ -5407,6 +5576,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                       </div>
                     ) : null}
                   </div>
+
+                  {renderInviteCard(selectedMessage)}
 
                   <RemoteImagesBanner
                     visible={selectedHasRemoteImages}

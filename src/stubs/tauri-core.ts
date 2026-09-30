@@ -12,6 +12,7 @@ import {
   stubMailIdleStart,
   stubMailSetSubscription,
   stubMailIdleStop,
+  stubMailRecordSent,
   stubMailTransfer,
   stubMailUpdateCachedFlags,
   type Seed as MailStubSeed,
@@ -4102,6 +4103,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         draftId?: string | null;
       } | undefined) ?? {};
       const messageId = `<sent-${Date.now()}@taomni.local>`;
+      stubMailRecordSent(`Subject: ${request.subject ?? ""}\n\n${request.textBody ?? ""}`);
       stubMailAppend(accountId, mailStubSeed, "Sent", {
         subject: request.subject ?? "",
         messageId,
@@ -4119,6 +4121,26 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         stubMailExpunge(accountId, mailStubSeed, drafted.remoteDraftFolder, drafted.remoteDraftUid);
       }
       return { accepted: true, response: "browser-preview accepted", sentCopyFolder: "Sent" } as T;
+    }
+    case "mail_get_invite": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uid = Number(invokeArgs?.uid ?? 0);
+      return (stubMailFindHeader(stubMailAccountId(invokeArgs), mailStubSeed, folder, uid)?.invite ?? null) as T;
+    }
+    case "mail_respond_invite": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uid = Number(invokeArgs?.uid ?? 0);
+      const invite = stubMailFindHeader(stubMailAccountId(invokeArgs), mailStubSeed, folder, uid)?.invite;
+      if (!invite) throw new Error("this message has no calendar invitation");
+      const partstat = ({ accept: "ACCEPTED", tentative: "TENTATIVE", decline: "DECLINED" } as Record<string, string>)[
+        String(invokeArgs?.response ?? "")
+      ];
+      if (!partstat) throw new Error(`unknown invitation response ${String(invokeArgs?.response)}`);
+      // Like the backend: an iTIP REPLY to the organizer (not stored in Sent).
+      stubMailRecordSent(`METHOD:REPLY\nUID:${invite.uid}\nATTENDEE;PARTSTAT=${partstat}:mailto:user@example.com`);
+      return { partstat, sentTo: invite.organizer.email } as T;
     }
     case "mail_set_flags": {
       const invokeArgs = args as InvokeArgs | undefined;

@@ -134,6 +134,17 @@ class FakeMailServerTest(unittest.TestCase):
         with smtplib.SMTP("127.0.0.1", self.server.smtp_port) as smtp:
             smtp.sendmail("qa@example.com", ["to@example.com"], b"Subject: hi\r\n\r\nbody\r\n")
         self.assertEqual(self.server.state.smtp_messages[0]["to"], ["to@example.com"])
+        self.assertTrue(self.server.state.smtp_contains("body"))
+        self.assertFalse(self.server.state.smtp_contains("METHOD:REPLY"))
+
+    def test_invite_delivery(self) -> None:
+        (uid,) = self.server.state.deliver("INBOX", 1, prefix="Invite", invite="QA standup")
+        raw = self.server.state.folders["INBOX"].messages[uid].raw
+        self.assertIn(b"Content-Type: text/calendar; method=REQUEST", raw)
+        self.assertIn(b"SUMMARY:QA standup\r\n", raw)
+        self.assertIn(b"ORGANIZER;CN=QA Sender:mailto:qa-sender@example.com\r\n", raw)
+        self.assertIn(b"ATTENDEE;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:qa@example.com\r\n", raw)
+        self.assertTrue(raw.rstrip().endswith(b"--"))
 
 
 if __name__ == "__main__":

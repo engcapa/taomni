@@ -41,9 +41,10 @@ def mail_server_deliver(ctx: StepContext, args: Any) -> None:
     _require_control(ctx)
     prefix = str(args.get("prefix") or "QA")
     delivered = ctx.page.evaluate(  # type: ignore[attr-defined]
-        f"""([folder, count, prefix, thread, list]) => {_CONTROL}.accounts()
-              .map((id) => {_CONTROL}.deliver(id, folder, count, prefix, thread, list).length)""",
-        [_folder(args), count, prefix, bool(args.get("thread")), args.get("list_unsubscribe") or None],
+        f"""([folder, count, prefix, thread, list, invite]) => {_CONTROL}.accounts()
+              .map((id) => {_CONTROL}.deliver(id, folder, count, prefix, thread, list, invite).length)""",
+        [_folder(args), count, prefix, bool(args.get("thread")), args.get("list_unsubscribe") or None,
+         args.get("invite") or None],
     )
     if not delivered:
         raise StepError("mail_server_deliver: no browser mail account exists yet; open the mail tab first")
@@ -123,6 +124,24 @@ def mail_server_assert_idle_clients(ctx: StepContext, args: Any) -> None:
             return
         time.sleep(0.25)
     raise StepError(f"mail_server_assert_idle_clients: {count} IDLE clients, expected {expected}")
+
+
+@verb("mail_server_assert_smtp_contains")
+def mail_server_assert_smtp_contains(ctx: StepContext, args: Any) -> None:
+    """Some message the stub "sent" contains ``text`` (e.g. an iTIP REPLY)."""
+    args = args if isinstance(args, dict) else {}
+    text = args.get("text")
+    if not isinstance(text, str) or not text:
+        raise StepError("mail_server_assert_smtp_contains: expected {text: str, timeout_sec?}")
+    if ctx.dry_run:
+        return
+    _require_control(ctx)
+    deadline = time.time() + float(args.get("timeout_sec", 10))
+    while time.time() < deadline:
+        if ctx.page.evaluate(f"(text) => {_CONTROL}.smtpContains(text)", text):  # type: ignore[attr-defined]
+            return
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_smtp_contains: no sent message contains {text!r}")
 
 
 @verb("mail_server_assert_list_matches")

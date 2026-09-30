@@ -724,18 +724,18 @@ P1 及以后的卡片彼此基本独立。依赖关系写在各卡片的“依�
 
 | AC | 方案位置 | 开发任务 | 验证项与平台 | 所需证据 / 实际证据链接 | 当前缺口 |
 |---|---|---|---|---|---|
-| AC-01 | §4.2 模式与前端编排 | TASK-02、TASK-04 | V-02、V-03、V-04、V-05、V-08（Win） | 待生成 | 未实现 |
-| AC-02 | §4.2 前端编排 | TASK-04 | V-03 | 待生成 | 未实现 |
-| AC-03 | §4.2 核心操作、§4.4 | TASK-02、TASK-04 | V-02、V-08 | 待生成 | 未实现 |
-| AC-04 | §4.2 对账 | TASK-02、TASK-03 | V-02、V-05、V-08 | 待生成 | 未实现 |
-| AC-05 | §4.2 对账 | TASK-01、TASK-03 | V-01、V-05、V-08 | 待生成 | 未实现 |
-| AC-06 | §4.2 保留策略 | TASK-01 | V-01、V-08 | 待生成 | 未实现 |
-| AC-07 | §4.2 前端编排、DEC-06 | TASK-02、TASK-04 | V-02、V-03、V-04、V-09 | 待生成 | 未实现 |
-| AC-08 | §4.2 模式 | TASK-01、TASK-02 | V-01、V-02、V-05 | 待生成 | 未实现 |
-| AC-09 | §4.2 前端编排 | TASK-02、TASK-04 | V-02、V-03、V-08 | 待生成 | 未实现 |
-| AC-10 | §4.2 前端编排 | TASK-02、TASK-04 | V-03、V-09 | 待生成 | 未实现 |
-| AC-11 | §4.4 | TASK-01、TASK-02 | V-01、V-02、V-05、V-08 | 待生成 | 未实现 |
-| AC-12 | §4.2 保留策略与前端编排 | TASK-01、TASK-02、TASK-04 | V-02、V-06、V-09 | 待生成 | 未实现 |
+| AC-01 | §4.2 模式与前端编排 | TASK-02、TASK-04 | V-02、V-03、V-04、V-05、V-08（Win） | Rust `mail::sync::`；Vitest `MailClientTab.test.tsx`（AC-01 用例）；TC-MAIL-SYNC-01/02 | 已实现；V-05、V-08/V-09 未执行 |
+| AC-02 | §4.2 前端编排 | TASK-04 | V-03 | Vitest 编排用例；TC-116 | 已实现；V-05、V-08/V-09 未执行 |
+| AC-03 | §4.2 核心操作、§4.4 | TASK-02、TASK-04 | V-02、V-08 | Rust `mail::sync::`（中断后收敛） | 已实现；V-05、V-08/V-09 未执行 |
+| AC-04 | §4.2 对账 | TASK-02、TASK-03 | V-02、V-05、V-08 | Rust `mail::sync::`；TC-MAIL-SYNC-02 | 已实现；V-05、V-08/V-09 未执行 |
+| AC-05 | §4.2 对账 | TASK-01、TASK-03 | V-01、V-05、V-08 | Rust `mail::`（flags 覆盖写）；TC-MAIL-SYNC-02 | 已实现；V-05、V-08/V-09 未执行 |
+| AC-06 | §4.2 保留策略 | TASK-01 | V-01、V-08 | Rust `mail::`（按 INTERNALDATE 裁剪） | 已实现；V-05、V-08/V-09 未执行 |
+| AC-07 | §4.2 前端编排、DEC-06 | TASK-02、TASK-04 | V-02、V-03、V-04、V-09 | Rust `mail::sync::`（backfill）；Vitest（AC-07 用例） | 已实现；V-05、V-08/V-09 未执行 |
+| AC-08 | §4.2 模式 | TASK-01、TASK-02 | V-01、V-02、V-05 | Rust `mail::sync::`（UIDVALIDITY 重置） | 已实现；V-05、V-08/V-09 未执行 |
+| AC-09 | §4.2 前端编排 | TASK-02、TASK-04 | V-02、V-03、V-08 | Vitest（新邮件提醒计数） | 已实现；V-05、V-08/V-09 未执行 |
+| AC-10 | §4.2 前端编排 | TASK-02、TASK-04 | V-03、V-09 | Vitest（AC-10 用例） | 已实现；V-05、V-08/V-09 未执行 |
+| AC-11 | §4.4 | TASK-01、TASK-02 | V-01、V-02、V-05、V-08 | Rust `mail::`（v1→v5 迁移） | 已实现；V-05、V-08/V-09 未执行 |
+| AC-12 | §4.2 保留策略与前端编排 | TASK-01、TASK-02、TASK-04 | V-02、V-06、V-09 | Rust `mail::sync::`；V-06 未测 | 已实现；V-06 性能基线、V-09 未执行 |
 
 本轮 P0 交付条件：
 - V-01 至 V-05、V-07 通过；
@@ -744,6 +744,35 @@ P1 及以后的卡片彼此基本独立。依赖关系写在各卡片的“依�
 - 三端代码兼容检查记录在案。
 
 macOS 和 Linux 未执行时标为未验证，不单独阻塞交付。性能基线（V-06）只作记录，不作为门禁。
+
+### 9.1 实现与验证状态（分支 `feat/mail-thunderbird-parity`）
+
+验证层级说明：
+- 本机（Windows）只跑单元测试：`src-tauri/` 下 `cargo test --lib mail::`，仓库根 `npx vitest run src/components/mail src/components/session src/lib`。
+- 三端 UI 验证在 GitHub Actions `qa-ui-auto-platforms.yml` 上执行，Linux、Windows、macOS × browser、native 共 6 个组合。native 模式连接 `mail_server` fixture 启动的进程内假 IMAP/SMTP/POP3 服务器（`mail_fake_server.py`），证明真实后端与 WebView 链路，但不证明与真实邮件服务商的互通。browser 模式只证明渲染层编排。
+- 托管 CI 不运行 `cargo test`，因此 Rust 单元测试（包括证书固定、POP3 协议）只在 Windows 本机执行过；macOS/Linux 上的 native-tls 行为未验证。
+- V-05（真实 IMAP 集成测试）、V-06（性能基线）、V-08/V-09（真机手册）均未执行。
+
+| 任务 | 状态 | 自动化证据 | 未完成 / 限制 |
+|---|---|---|---|
+| TASK-01 至 TASK-05（P0） | 已实现 | Rust `mail::sync::` 与 `mail::`；Vitest；TC-MAIL-SYNC-01/02、TC-114/115/116（CI 三端全绿） | V-05、V-06、V-08、V-09 未执行 |
+| TASK-06 Sent 副本与服务器草稿 | 已实现 | Rust（APPEND、草稿替换）；TC-MAIL-SEND-01 | — |
+| TASK-07 线程头与会话视图 | 已实现 | Vitest（AC-23/AC-24 用例）；TC-MAIL-THREAD-01 | Thunderbird/Gmail 归并（AC-23）未用真实客户端核对 |
+| TASK-08 搜索 | 已实现 | Rust `mail::search::`；Vitest（AC-25/AC-26）；TC-MAIL-SEARCH-01 | AC-25 的 1 秒目标未测量 |
+| TASK-09 身份、签名、模板 | 已实现 | Vitest（AC-28/AC-29）；TC-MAIL-TEMPLATE-01 | — |
+| TASK-10 特殊文件夹、订阅、STATUS | 已实现 | Rust `mail::folders::`；TC-MAIL-FOLDER-01 | AC-33 往返次数未做基线对比（已实现 CONDSTORE 下 STATUS 未变跳过） |
+| TASK-11 标签与垃圾邮件 | 已实现 | Vitest `mailTags.test.ts`；TC-MAIL-TAG-01 | 本地垃圾邮件识别不在范围内 |
+| TASK-12 IDLE 与桌面通知 | 已实现 | Rust `mail::idle`（假 IMAP 服务器）；TC-MAIL-IDLE-01（含关闭后 IDLE 连接数为 0） | QRESYNC/VANISHED 未实现（可选项；删除对账沿用 P0 路径） |
+| TASK-13 过滤器 | 未开始 | — | 等待 DEC-11（规则编辑器 UI） |
+| TASK-14 自动配置与证书例外 | 部分 | Rust `mail::autoconfig`、`mail::certs`（本地 TLS 服务器）；TC-MAIL-AUTOCONF-01 | Exchange Autodiscover、RFC 6186 SRV 未实现；Yahoo/AOL/Fastmail OAuth 需厂商客户端 ID；证书固定仅在 Windows 验证 |
+| TASK-15 附件与大邮件 | 已实现 | Rust `mail::parts`（假服务器端到端）；Vitest；TC-MAIL-ATTACH-01 | AC-45 内存峰值未测量 |
+| TASK-16 统一收件箱 | 未开始 | — | 等待 DEC-12（入口形式） |
+| TASK-17 发件箱、稍后发送、撤销、回执 | 部分 | Vitest（AC-49/AC-50）；TC-MAIL-OUTBOX-01 | 对收到的回执请求自动应答未实现；稍后发送只在标签打开时生效（DEC-01） |
+| TASK-18 mbox、mailto、退订 | 部分 | Rust `mail::mbox`（往返）、`mail::lists`（RFC 8058 POST）；TC-MAIL-LIST-01 | AC-52 系统 `mailto:` 注册未实施（需要 deep-link 插件与三端安装注册）；Thunderbird 配置目录导入未实现 |
+| TASK-19 通讯录与 CardDAV | 未开始 | — | 等待 DEC-13（vCard/WebDAV 依赖选型） |
+| TASK-20 日历邀请 | 第一期已实现 | Rust `mail::calendar`（ICS 解析、iTIP REPLY）；Vitest（AC-62/AC-63）；TC-MAIL-INVITE-01（native 断言假 SMTP 收到 `PARTSTAT=ACCEPTED`） | 带 TZID 的时间按发件人时区显示（未引入时区库）；回复不存 Sent；第二期 CalDAV 等待 DEC-14 |
+| TASK-21 POP3 | 已实现 | Rust `mail::pop3`（假 POP3 服务器，APOP、UIDL 去重、删除策略）；TC-MAIL-POP3-01 | 非 Windows 的 TLS 行为未验证 |
+| TASK-22 快捷键、拖拽、列表性能 | 已实现 | Vitest；TC-MAIL-KEYS-01、TC-MAIL-DRAG-01（browser） | 列表使用 `content-visibility` 而非虚拟列表；AC-54 帧率未测量；DRAG-01 只有 browser（native 驱动不支持拖拽） |
 
 ## 10. 风险、未决项与回退
 

@@ -2649,7 +2649,8 @@ def _do_mail_server_deliver(ctx: NativeStepContext, args: Any) -> str:
     folder, count = _mail_args(args, "mail_server_deliver")
     uids = _mail_server().state.deliver(folder, count, prefix=str(args.get("prefix") or "QA"),
                                         thread=bool(args.get("thread")),
-                                        list_unsubscribe=args.get("list_unsubscribe") or None)
+                                        list_unsubscribe=args.get("list_unsubscribe") or None,
+                                        invite=args.get("invite") or None)
     return f"delivered {len(uids)} to {folder} (uids {uids[0]}..{uids[-1]})"
 
 
@@ -2705,6 +2706,22 @@ def _do_mail_server_assert_idle_clients(ctx: NativeStepContext, args: Any) -> st
             return f"{count} IDLE connection(s) on the fake server"
         time.sleep(0.25)
     raise StepError(f"mail_server_assert_idle_clients: {count} IDLE clients, expected {expected}")
+
+
+@_verb("mail_server_assert_smtp_contains")
+def _do_mail_server_assert_smtp_contains(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    text = args.get("text")
+    if not isinstance(text, str) or not text:
+        raise StepError("mail_server_assert_smtp_contains: expected {text: str, timeout_sec?}")
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 20))
+    while time.time() < deadline:
+        if state.smtp_contains(text):
+            return f"fake SMTP received a message containing {text!r}"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_smtp_contains: no SMTP message contains {text!r} "
+                    f"({len(state.smtp_messages)} received)")
 
 
 @_verb("mail_server_assert_list_matches")

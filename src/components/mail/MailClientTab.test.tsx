@@ -45,6 +45,8 @@ const mailMocks = vi.hoisted(() => ({
   mailExportMbox: vi.fn(),
   mailImportMessages: vi.fn(),
   mailProbeCertificate: vi.fn(),
+  mailGetInvite: vi.fn(),
+  mailRespondInvite: vi.fn(),
 }));
 
 const eventMocks = vi.hoisted(() => ({
@@ -1027,6 +1029,63 @@ describe("MailClientTab", () => {
     expect(mailMocks.mailSendMessage).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("mail-attach-reminder-send"));
     await waitFor(() => expect(mailMocks.mailSendMessage).toHaveBeenCalledTimes(1));
+  });
+
+  it("shows a calendar invitation and sends the chosen reply (TASK-20)", async () => {
+    const invited: MailMessageHeader = {
+      ...message,
+      hasAttachments: true,
+      attachmentCount: 1,
+      attachments: [{ name: "invite.ics", contentType: "text/calendar", size: 420 }],
+    };
+    mailMocks.mailListCachedMessages.mockResolvedValue([invited]);
+    mailMocks.mailGetMessageBody.mockResolvedValue({ ...messageBody, attachments: invited.attachments });
+    mailMocks.mailGetInvite.mockResolvedValue({
+      method: "REQUEST",
+      uid: "evt-1",
+      sequence: 0,
+      summary: "Design review",
+      location: "Room 1",
+      start: { local: "2026-10-05T10:00", tzid: "China Standard Time", allDay: false },
+      end: { local: "2026-10-05T11:00", tzid: "China Standard Time", allDay: false },
+      organizer: { email: "boss@example.com", name: "Boss", partstat: "ACCEPTED" },
+      attendees: [],
+      ics: "",
+    });
+    mailMocks.mailRespondInvite.mockResolvedValue({ partstat: "TENTATIVE", sentTo: "boss@example.com" });
+    renderMailbox();
+    const card = await screen.findByTestId("mail-invite-card");
+    expect(card).toHaveTextContent("Design review");
+    expect(screen.getByTestId("mail-invite-when")).toHaveTextContent("2026-10-05 10:00 – 11:00 (China Standard Time)");
+    fireEvent.click(screen.getByTestId("mail-invite-tentative"));
+    await waitFor(() => expect(mailMocks.mailRespondInvite).toHaveBeenCalledWith(
+      expect.anything(), invited.folder, invited.uid, "tentative",
+    ));
+    expect(await screen.findByTestId("mail-invite-responded")).toHaveTextContent("tentative");
+    expect(screen.getByTestId("mail-invite-card")).toHaveAttribute("data-partstat", "TENTATIVE");
+  });
+
+  it("shows a cancelled meeting without reply buttons (AC-63)", async () => {
+    const cancelled: MailMessageHeader = {
+      ...message,
+      attachments: [{ name: "cancel.ics", contentType: "text/calendar", size: 300 }],
+    };
+    mailMocks.mailListCachedMessages.mockResolvedValue([cancelled]);
+    mailMocks.mailGetMessageBody.mockResolvedValue({ ...messageBody, attachments: cancelled.attachments });
+    mailMocks.mailGetInvite.mockResolvedValue({
+      method: "CANCEL",
+      uid: "evt-1",
+      sequence: 1,
+      summary: "Design review",
+      status: "CANCELLED",
+      organizer: { email: "boss@example.com", partstat: "ACCEPTED" },
+      attendees: [],
+      ics: "",
+    });
+    renderMailbox();
+    expect(await screen.findByTestId("mail-invite-summary")).toHaveTextContent("Cancelled: Design review");
+    expect(screen.queryByTestId("mail-invite-accept")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mail-invite-export")).toBeInTheDocument();
   });
 
   it("downloads a large message's attachment by its IMAP section (TASK-15)", async () => {

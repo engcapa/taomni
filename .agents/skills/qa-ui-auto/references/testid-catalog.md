@@ -815,6 +815,17 @@
 - `[data-testid="mail-attach-reminder"]` — display — F-MAIL-15.attach-reminder
 - `[data-testid="mail-attach-reminder-send"]` — interactive — F-MAIL-15.attach-reminder-send
 
+## mail/calendar (F-MAIL-18)
+
+- `[data-testid="mail-invite-card"]` — display — F-MAIL-18.invite-card
+- `[data-testid="mail-invite-summary"]` — display — F-MAIL-18.invite-summary
+- `[data-testid="mail-invite-accept"]` — interactive — F-MAIL-18.invite-accept
+- `[data-testid="mail-invite-responded"]` — display — F-MAIL-18.invite-responded
+- `[data-testid="mail-invite-tentative"]` — interactive [optional] — F-MAIL-18.invite-tentative
+- `[data-testid="mail-invite-decline"]` — interactive [optional] — F-MAIL-18.invite-decline
+- `[data-testid="mail-invite-export"]` — interactive [optional] — F-MAIL-18.invite-export
+- `[data-testid="mail-invite-open"]` — interactive [optional] — F-MAIL-18.invite-open
+
 ## mail/compose (F-MAIL-1)
 
 - `[data-testid="mail-client-tab"]` — display — F-MAIL-1.mail-client-tab

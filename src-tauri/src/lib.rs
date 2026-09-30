@@ -890,6 +890,8 @@ pub fn run() {
             mail::mbox::mail_import_messages,
             mail::certs::mail_probe_certificate,
             mail::autoconfig::mail_autoconfig,
+            mail::calendar::mail_get_invite,
+            mail::calendar::mail_respond_invite,
             mail::mail_list_cached_folders,
             mail::mail_list_cached_messages,
             mail::mail_get_message_body,

@@ -19,7 +19,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from email.utils import format_datetime
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 
 @dataclass
@@ -61,7 +61,7 @@ def build_message(subject: str, sender: str = "QA Sender <qa-sender@example.com>
                   to: str = "qa@example.com", body: str | None = None,
                   date: datetime | None = None, message_id: str | None = None,
                   ancestry: list[str] | None = None,
-                  extra_headers: str = "") -> bytes:
+                  extra_headers: str = "", invite: str | None = None) -> bytes:
     date = date or datetime.now(timezone.utc)
     slug = re.sub(r"[^A-Za-z0-9]+", "-", subject).strip("-") or "message"
     text = body if body is not None else f"Body of {subject}\r\n"
@@ -70,10 +70,32 @@ def build_message(subject: str, sender: str = "QA Sender <qa-sender@example.com>
     if ancestry:
         refs = " ".join(f"<{item}>" for item in ancestry)
         thread = f"In-Reply-To: <{ancestry[-1]}>\r\nReferences: {refs}\r\n"
-    return (
+    head = (
         f"From: {sender}\r\nTo: {to}\r\nSubject: {subject}\r\n"
         f"Date: {format_datetime(date)}\r\nMessage-ID: <{message_id}>\r\n{thread}{extra_headers}"
-        f"MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n{text}"
+        "MIME-Version: 1.0\r\n"
+    )
+    if invite is None:
+        return (head + f"Content-Type: text/plain; charset=utf-8\r\n\r\n{text}").encode("utf-8")
+    # iMIP REQUEST (RFC 6047): the organizer is the sender, `to` is invited.
+    organizer = re.search(r"<([^>]+)>", sender)
+    organizer_addr = organizer.group(1) if organizer else sender
+    start = date.astimezone(timezone.utc) + timedelta(days=1)
+    stamp = "%Y%m%dT%H%M%SZ"
+    ics = (
+        "BEGIN:VCALENDAR\r\nPRODID:-//Taomni QA//EN\r\nVERSION:2.0\r\nMETHOD:REQUEST\r\n"
+        f"BEGIN:VEVENT\r\nUID:{message_id}\r\nSEQUENCE:0\r\n"
+        f"DTSTAMP:{date.astimezone(timezone.utc).strftime(stamp)}\r\n"
+        f"DTSTART:{start.strftime(stamp)}\r\nDTEND:{(start + timedelta(hours=1)).strftime(stamp)}\r\n"
+        f"SUMMARY:{invite}\r\nLOCATION:QA room\r\nORGANIZER;CN=QA Sender:mailto:{organizer_addr}\r\n"
+        f"ATTENDEE;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{to}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    )
+    boundary = f"inv-{_unique_token()}"
+    return (
+        head + f'Content-Type: multipart/alternative; boundary="{boundary}"\r\n\r\n'
+        f"--{boundary}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n{text}"
+        f"--{boundary}\r\nContent-Type: text/calendar; method=REQUEST; charset=utf-8\r\n\r\n{ics}"
+        f"--{boundary}--\r\n"
     ).encode("utf-8")
 
 
@@ -106,7 +128,7 @@ class FakeMailState:
         return self.highest_modseq
 
     def deliver(self, folder: str, count: int, prefix: str = "QA", thread: bool = False,
-                list_unsubscribe: str | None = None) -> list[int]:
+                list_unsubscribe: str | None = None, invite: str | None = None) -> list[int]:
         extra = f"List-Unsubscribe: <{list_unsubscribe}>\r\n" if list_unsubscribe else ""
         with self.lock:
             entry = self.folders.setdefault(folder, FakeFolder(uid_validity=2000 + len(self.folders)))
@@ -119,11 +141,17 @@ class FakeMailState:
                 subject = f"{prefix} {index + 1:04d}"
                 message_id = f"{prefix}-{index + 1}.{_unique_token()}@qa.taomni".replace(" ", "-")
                 raw = build_message(subject, message_id=message_id, ancestry=list(ancestry) if thread else None,
-                                    extra_headers=extra)
+                                    extra_headers=extra, invite=invite)
                 ancestry.append(message_id)
                 entry.messages[uid] = FakeMessage(raw=raw, internal_ts=int(time.time()) + index, modseq=modseq)
                 uids.append(uid)
             return uids
+
+    def smtp_contains(self, text: str) -> bool:
+        """Some message accepted over SMTP contains ``text`` (e.g. an iTIP REPLY)."""
+        needle = text.encode("utf-8")
+        with self.lock:
+            return any(needle in message["raw"] for message in self.smtp_messages)
 
     def append_raw(self, folder: str, raw: bytes, flags: list[str]) -> int:
         with self.lock:

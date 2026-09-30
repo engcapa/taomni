@@ -25,7 +25,7 @@ use base64::{
 };
 use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart, header::ContentType};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
-use lettre::transport::smtp::client::{Tls, TlsParameters};
+use lettre::transport::smtp::client::Tls;
 use lettre::{Message, SmtpTransport, Transport};
 use mail_parser::{Address as ParsedAddress, MessageParser, MimeHeaders, PartType};
 use native_tls::TlsConnector;
@@ -40,6 +40,7 @@ use crate::state::AppState;
 use crate::terminal::network::NetworkSettings;
 
 pub mod autoconfig;
+pub mod calendar;
 pub mod certs;
 #[cfg(test)]
 mod fake_imap;

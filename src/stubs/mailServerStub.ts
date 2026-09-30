@@ -29,7 +29,30 @@ type StubMailHeader = {
   inReplyTo?: string | null;
   references?: string[];
   listUnsubscribe?: { uris: string[]; oneClick: boolean } | null;
+  /** Parsed iTIP REQUEST served by mail_get_invite (TASK-20). */
+  invite?: StubMailInvite | null;
 };
+
+export type StubMailInvite = {
+  method: string;
+  uid: string;
+  sequence: number;
+  summary: string;
+  location: string | null;
+  start: { local: string; epoch: number; tzid: string; allDay: boolean };
+  end: { local: string; epoch: number; tzid: string; allDay: boolean };
+  organizer: { email: string; name: string; partstat: string };
+  attendees: { email: string; name: string | null; partstat: string }[];
+  status: string | null;
+  ics: string;
+};
+
+/** Text of messages the stub "sent" over SMTP, for QA assertions. */
+const sentTexts: string[] = [];
+
+export function stubMailRecordSent(text: string) {
+  sentTexts.push(text);
+}
 
 type StubFolderMeta = { name: string; displayName: string };
 
@@ -406,18 +429,42 @@ function idleChanged(accountId: string, folder: string) {
 }
 
 export interface StubMailQaControl {
-  deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null) => number[];
+  deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null, invite?: string | null) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
   setFlags: (accountId: string, folder: string, uid: number, flags: string[]) => void;
   observe: (accountId: string, folder: string) => { server: number[]; cache: number[] };
   unseen: (accountId: string, folder: string) => number;
   accounts: () => string[];
   idleClients: () => number;
+  smtpContains: (text: string) => boolean;
+}
+
+function stubInvite(summary: string, uid: string): StubMailInvite {
+  const start = nowTs() + 86_400;
+  const time = (epoch: number) => ({
+    local: new Date(epoch * 1000).toISOString().slice(0, 16),
+    epoch,
+    tzid: "UTC",
+    allDay: false,
+  });
+  return {
+    method: "REQUEST",
+    uid,
+    sequence: 0,
+    summary,
+    location: "QA room",
+    start: time(start),
+    end: time(start + 3600),
+    organizer: { email: "qa-sender@example.com", name: "QA Sender", partstat: "ACCEPTED" },
+    attendees: [{ email: "user@example.com", name: "Preview User", partstat: "NEEDS-ACTION" }],
+    status: null,
+    ics: ["BEGIN:VCALENDAR", "METHOD:REQUEST", "BEGIN:VEVENT", `UID:${uid}`, `SUMMARY:${summary}`, "END:VEVENT", "END:VCALENDAR", ""].join("\r\n"),
+  };
 }
 
 export function installStubMailQaControl(seed: Seed): void {
   const control: StubMailQaControl = {
-    deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null) {
+    deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null, invite = null) {
       const state = account(accountId, seed);
       const folder = folderState(state, folderName);
       const uids: number[] = [];
@@ -431,6 +478,11 @@ export function installStubMailQaControl(seed: Seed): void {
           message.references = [...ancestry];
         }
         if (listUnsubscribe) message.listUnsubscribe = { uris: [listUnsubscribe], oneClick: false };
+        if (invite) {
+          message.invite = stubInvite(invite, message.messageId.replace(/^<|>$/g, ""));
+          message.attachments = [{ name: "invite.ics", contentType: "text/calendar", size: 420 }];
+          message.attachmentCount = 1;
+        }
         ancestry.push(message.messageId.replace(/^<|>$/g, ""));
         folder.server.set(uid, message);
         uids.push(uid);
@@ -457,6 +509,9 @@ export function installStubMailQaControl(seed: Seed): void {
     },
     idleClients() {
       return idleWatchers.size;
+    },
+    smtpContains(text) {
+      return sentTexts.some((sent) => sent.includes(text));
     },
     unseen(accountId, folderName) {
       return [...folderState(account(accountId, seed), folderName).server.values()].filter(isUnseen).length;

@@ -722,6 +722,65 @@ export function mailFetchRaw(
   );
 }
 
+export interface MailInviteTime {
+  /** Epoch seconds for UTC and all-day values; null for zoned wall-clock times. */
+  epoch?: number | null;
+  /** `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM` in the sender's zone. */
+  local: string;
+  tzid?: string | null;
+  allDay: boolean;
+}
+
+export interface MailInviteAttendee {
+  email: string;
+  name?: string | null;
+  partstat: string;
+}
+
+/** iTIP/iMIP calendar invitation carried by a message (TASK-20). */
+export interface MailInvite {
+  method: string;
+  uid: string;
+  sequence: number;
+  summary: string;
+  location?: string | null;
+  description?: string | null;
+  start?: MailInviteTime | null;
+  end?: MailInviteTime | null;
+  organizer?: MailInviteAttendee | null;
+  attendees: MailInviteAttendee[];
+  status?: string | null;
+  ics: string;
+}
+
+export type MailInviteReply = "accept" | "tentative" | "decline";
+
+export interface MailInviteResponse {
+  partstat: string;
+  sentTo: string;
+}
+
+export function mailGetInvite(
+  config: MailTabInfo,
+  folder: string,
+  uid: number,
+): Promise<MailInvite | null> {
+  return withVaultLockedNotice(() =>
+    invoke<MailInvite | null>("mail_get_invite", { config, folder, uid }),
+  );
+}
+
+export function mailRespondInvite(
+  config: MailTabInfo,
+  folder: string,
+  uid: number,
+  response: MailInviteReply,
+): Promise<MailInviteResponse> {
+  return withVaultLockedNotice(() =>
+    invoke<MailInviteResponse>("mail_respond_invite", { config, folder, uid, response }),
+  );
+}
+
 export function mailSaveRaw(
   config: MailTabInfo,
   folder: string,

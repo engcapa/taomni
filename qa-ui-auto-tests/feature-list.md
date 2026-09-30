@@ -5721,6 +5721,57 @@ controls:
 - 会话编辑器 “Incoming” 可选 POP3（本地文件夹），Quick Connect 支持 `pop3://` / `pop3s://`（默认端口 995/110）。支持 TLS、STLS 与明文；明文且服务器提供时间戳时使用 APOP，OAuth 使用 XOAUTH2。
 - 以 `UIDL` 去重下载到本地 INBOX（每批 50 封，重复同步不产生重复邮件）；“Delete from server after N days”（空 = 保留，0 = 下载后立即删除）按下载时间在服务器执行 `DELE`。
 - 本地文件夹（INBOX/Sent/Drafts/Trash/Junk 与自建文件夹）支持移动、复制、删除、标记、搜索、重命名与 mbox 导入导出；发出的邮件副本存入本地 Sent。本地邮件不受邮件头保留策略裁剪，清空缓存会被拒绝（邮件只有本地一份）。
+
+---
+
+### 13.18 日历邀请（iTIP/iMIP） 🟡
+
+<!-- feature
+id: F-MAIL-18
+status: partial
+area: mail/calendar
+components: [MailClientTab]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailInvite.ts
+  - src-tauri/src/mail/calendar.rs
+controls:
+  - id: invite-card
+    selector: '[data-testid="mail-invite-card"]'
+    kind: display
+  - id: invite-summary
+    selector: '[data-testid="mail-invite-summary"]'
+    kind: display
+  - id: invite-accept
+    selector: '[data-testid="mail-invite-accept"]'
+    kind: interactive
+  - id: invite-responded
+    selector: '[data-testid="mail-invite-responded"]'
+    kind: display
+  - id: invite-tentative
+    selector: '[data-testid="mail-invite-tentative"]'
+    kind: interactive
+    optional: true
+  - id: invite-decline
+    selector: '[data-testid="mail-invite-decline"]'
+    kind: interactive
+    optional: true
+  - id: invite-export
+    selector: '[data-testid="mail-invite-export"]'
+    kind: interactive
+    optional: true       # save dialog cannot be driven by WebDriver
+  - id: invite-open
+    selector: '[data-testid="mail-invite-open"]'
+    kind: interactive
+    optional: true       # opens the OS calendar app
+-->
+
+- 含 `text/calendar`（或 .ics）部分的邮件在阅读区显示邀请卡片：标题、时间、地点、组织者与参与者状态；支持 METHOD REQUEST / CANCEL / REPLY（取消的邀请显示 “Cancelled”，不提供回复）。
+- “Accept / Tentative / Decline” 向组织者发送 RFC 5546/6047 iTIP `METHOD:REPLY`（`text/calendar; method=REPLY`，保留 UID 与 SEQUENCE），卡片标记当前回复状态。
+- “Export .ics” 保存日历部分；“Open in calendar” 用系统日历应用打开。
+- 时间：UTC 与全天事件按本地时区显示；带 TZID 的时间按发件人时区的时刻加时区名显示（未内置时区数据库）。
+- 未完成：CalDAV 同步与应用内日历视图（TASK-20 第二阶段，待 DEC-14 决策）；回复不写入已发送文件夹。
+
 ---
 
 ## 14. SocksCap 网络流量路由

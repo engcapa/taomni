@@ -1090,6 +1090,27 @@
             "list_unsubscribe": {
               "type": "string",
               "minLength": 1
+            },
+            "invite": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "mail_server_assert_smtp_contains": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
             }
           }
         },

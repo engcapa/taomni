@@ -287,7 +287,6 @@ pub(super) fn send_and_store_copy(
     } else {
         None
     };
-    let account_id = account.config.session_id.clone();
     let stored = with_imap_session(pool, account, runtime, ImapSessionOpts::default(), |imap| {
         let mut sent_folder = None;
         if let Some(bytes) = &copy {
