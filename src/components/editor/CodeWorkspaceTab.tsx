@@ -16912,6 +16912,18 @@ export function CodeWorkspaceTab({
         && targetElement?.closest('[data-testid="code-workspace-find-file-group"]')
         && ["delete", "arrowup", "arrowdown", "enter"].includes(logicalKey)
       ) return;
+      // IDEA debugger trees own their navigation and value keys (F2 Set
+      // Value, Delete removes a watch, Ctrl+C copies the value); stepping keys
+      // such as F7/F8/F9 still reach the workspace dispatcher.
+      if (
+        targetElement?.closest('[data-testid="debug-variables-tree"], [data-testid="debug-frames-list"]')
+        && !event.altKey
+        && (
+          (!event.ctrlKey && !event.metaKey
+            && ["f2", "f4", "delete", "insert", "enter", "arrowup", "arrowdown", "arrowleft", "arrowright", "home", "end"].includes(logicalKey))
+          || ((event.ctrlKey || event.metaKey) && !event.shiftKey && logicalKey === "c")
+        )
+      ) return;
       // Native text controls own their character history. A workspace journal
       // must never consume Ctrl/Cmd+Z, redo, or Ctrl/Cmd+Y while an input is
       // focused, otherwise replacing files would be undone from the query box.
