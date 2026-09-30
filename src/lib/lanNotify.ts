@@ -3,10 +3,10 @@ import { isTauriRuntime } from "./runtime";
 let permissionChecked = false;
 let permissionGranted = false;
 
-/** Show a desktop notification for a new LanChat message. Desktop-only: the
- *  Tauri notification plugin is loaded lazily and only in the Tauri runtime, so
- *  the browser preview never bundles or invokes it. Best-effort. */
-export async function notifyLanMessage(title: string, body: string): Promise<void> {
+/** Show a desktop notification. Desktop-only: the Tauri notification plugin is
+ *  loaded lazily and only in the Tauri runtime, so the browser preview never
+ *  bundles or invokes it. Best-effort. */
+export async function notifyDesktop(title: string, body: string): Promise<void> {
   if (!isTauriRuntime()) return;
   try {
     const mod = await import("@tauri-apps/plugin-notification");
@@ -21,4 +21,9 @@ export async function notifyLanMessage(title: string, body: string): Promise<voi
   } catch {
     /* notifications are best-effort */
   }
+}
+
+/** Show a desktop notification for a new LanChat message. */
+export function notifyLanMessage(title: string, body: string): Promise<void> {
+  return notifyDesktop(title, body);
 }

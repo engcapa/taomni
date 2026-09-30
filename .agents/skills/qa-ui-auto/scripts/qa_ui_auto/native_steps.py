@@ -2689,6 +2689,23 @@ def _do_mail_server_assert_folder_count(ctx: NativeStepContext, args: Any) -> st
     raise StepError(f"mail_server_assert_folder_count: {folder} has {count}, expected {args!r}")
 
 
+@_verb("mail_server_assert_idle_clients")
+def _do_mail_server_assert_idle_clients(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    if not isinstance(args.get("equals"), int):
+        raise StepError("mail_server_assert_idle_clients: expected {equals: int, timeout_sec?}")
+    expected = int(args["equals"])
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 10))
+    count = -1
+    while time.time() < deadline:
+        count = state.idle_clients()
+        if count == expected:
+            return f"{count} IDLE connection(s) on the fake server"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_idle_clients: {count} IDLE clients, expected {expected}")
+
+
 @_verb("mail_server_assert_list_matches")
 def _do_mail_server_assert_list_matches(ctx: NativeStepContext, args: Any) -> str:
     args = args if isinstance(args, dict) else {}

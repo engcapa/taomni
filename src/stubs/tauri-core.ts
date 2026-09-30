@@ -9,6 +9,8 @@ import {
   stubMailSearch,
   stubMailSyncAll,
   stubMailSyncFolder,
+  stubMailIdleStart,
+  stubMailIdleStop,
   stubMailTransfer,
   stubMailUpdateCachedFlags,
   type Seed as MailStubSeed,
@@ -4011,6 +4013,15 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         limit,
         hasMore: offset + page.length < messages.length,
       } as T;
+    }
+    case "mail_idle_start": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = ((invokeArgs?.folder as string | null | undefined) ?? "INBOX") || "INBOX";
+      return stubMailIdleStart(stubMailAccountId(invokeArgs), folder) as T;
+    }
+    case "mail_idle_stop": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubMailIdleStop(String(invokeArgs?.accountId ?? "")) as T;
     }
     case "mail_sync_folder": {
       const invokeArgs = args as InvokeArgs | undefined;

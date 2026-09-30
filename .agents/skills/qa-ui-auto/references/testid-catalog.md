@@ -894,6 +894,12 @@
 - `input[aria-label="Mail background hex"]` — interactive — F-MAIL-4.mail-background
 - `input[aria-label="Mail foreground hex"]` — interactive — F-MAIL-4.mail-foreground
 
+## mail/sync (F-MAIL-10)
+
+- `[data-testid="mail-idle-status"]` — display — F-MAIL-10.idle-status
+- `[data-testid="mail-idle-push"]` — interactive [optional] — F-MAIL-10.idle-push-setting
+- `[data-testid="mail-desktop-notify"]` — interactive [optional] — F-MAIL-10.desktop-notify-setting
+
 ## mail/sync (F-MAIL-3)
 
 - `[data-testid="mail-sync-button"]` — interactive — F-MAIL-3.sync-button

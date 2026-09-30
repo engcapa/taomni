@@ -318,6 +318,10 @@ export interface MailTabInfo {
     onOpen: boolean;
     intervalMinutes: number;
     maxFetchPerSync: number;
+    /** IMAP IDLE push while the tab is open (TASK-12); polling stays as fallback. */
+    idle?: boolean;
+    /** Desktop notification for new mail while the tab is open. */
+    desktopNotify?: boolean;
   };
   cache: MailCacheSettings;
   ai: MailAiSettings;

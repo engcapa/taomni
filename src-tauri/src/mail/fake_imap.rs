@@ -311,8 +311,46 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
             writer.write_all(out.as_bytes())?;
             writer.write_all(ok.as_bytes())?;
             return Ok(());
+        } else if upper.starts_with("IDLE") {
+            let name = selected.clone().unwrap_or_else(|| "INBOX".into());
+            let baseline = state.highest_modseq;
+            drop(state);
+            writer.write_all(b"+ idling\r\n")?;
+            reader
+                .get_ref()
+                .set_read_timeout(Some(std::time::Duration::from_millis(100)))?;
+            let mut notified = baseline;
+            loop {
+                {
+                    let state = shared.lock().unwrap();
+                    if state.highest_modseq != notified {
+                        notified = state.highest_modseq;
+                        let exists = state
+                            .folders
+                            .get(&name)
+                            .map(|f| f.messages.len())
+                            .unwrap_or(0);
+                        writer.write_all(format!("* {exists} EXISTS\r\n").as_bytes())?;
+                    }
+                }
+                let mut done = String::new();
+                match reader.read_line(&mut done) {
+                    Ok(0) => return Ok(()),
+                    Ok(_) if done.trim().eq_ignore_ascii_case("DONE") => break,
+                    Ok(_) => {}
+                    Err(e)
+                        if matches!(
+                            e.kind(),
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                        ) => {}
+                    Err(e) => return Err(e),
+                }
+            }
+            reader.get_ref().set_read_timeout(None)?;
+            writer.write_all(format!("{tag} OK idle done\r\n").as_bytes())?;
+            continue;
         } else if upper.starts_with("CAPABILITY") {
-            out.push_str("* CAPABILITY IMAP4rev1 UIDPLUS MOVE");
+            out.push_str("* CAPABILITY IMAP4rev1 UIDPLUS MOVE IDLE");
             if state.condstore {
                 out.push_str(" CONDSTORE");
             }

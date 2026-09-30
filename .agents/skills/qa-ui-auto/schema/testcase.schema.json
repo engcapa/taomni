@@ -1048,6 +1048,23 @@
             }
           }
         },
+        "mail_server_assert_idle_clients": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "equals"
+          ],
+          "properties": {
+            "equals": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
         "mail_server_deliver": {
           "type": "object",
           "additionalProperties": false,

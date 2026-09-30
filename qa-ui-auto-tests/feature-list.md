@@ -5416,6 +5416,39 @@ controls:
 - 会话编辑器“Identities”可添加别名身份（显示名、地址、Reply-To、签名）；写信窗口“From”选择身份，发送时使用该身份的 From/Reply-To 与信封发件人；切换身份时替换未改动的签名块。
 - 回复/全部回复/转发自动选择原邮件 To/Cc 中匹配的身份（与 Thunderbird 一致），全部回复排除所有自有地址。
 - “Save as template”把当前内容另存为模板（本地草稿库，kind=template）；Drafts 对话框的 Templates 页签列出模板，点击以副本新建邮件，不修改模板本身。
+
+---
+
+### 13.10 IMAP IDLE 即时收信与系统通知 ✅
+
+<!-- feature
+id: F-MAIL-10
+status: done
+area: mail/sync
+components: [MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/components/session/SessionEditor.tsx
+  - src/lib/mail.ts
+  - src/lib/lanNotify.ts
+  - src-tauri/src/mail/idle.rs
+controls:
+  - id: idle-status
+    selector: '[data-testid="mail-idle-status"]'
+    kind: display
+  - id: idle-push-setting
+    selector: '[data-testid="mail-idle-push"]'
+    kind: interactive
+    optional: true       # session editor; quick connect uses the default (on)
+  - id: desktop-notify-setting
+    selector: '[data-testid="mail-desktop-notify"]'
+    kind: interactive
+    optional: true
+-->
+
+- 邮件标签打开期间，为 INBOX 建立独立的 IMAP IDLE 连接（每 25 分钟重发），收到 EXISTS/EXPUNGE/FETCH 后执行一次无缺口的静默补齐；服务器不支持 IDLE 或断线时按退避重连，期间仍按间隔轮询，不漏邮件。
+- 工具栏在 Sync 旁显示 “Push/Poll” 状态；关闭标签立即断开 IDLE 连接（DEC-01：不做后台收信）。
+- 会话编辑器 “New mail” 可关闭即时推送，或开启新邮件系统通知（仅在标签打开期间发送）。
 ---
 
 ## 14. SocksCap 网络流量路由

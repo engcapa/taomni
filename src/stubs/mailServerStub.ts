@@ -7,6 +7,8 @@
 // "from another client" while the UI runs. This proves renderer orchestration
 // only; real IMAP behavior is covered by the Rust tests and native cases.
 
+import { emit } from "./tauri-event";
+
 type StubMailHeader = {
   accountId: string;
   folder: string;
@@ -368,6 +370,30 @@ function templateMessage(accountId: string, folder: string, uid: number, subject
   };
 }
 
+/** Accounts whose tab holds an IDLE watcher (TASK-12), keyed by account id. */
+const idleWatchers = new Map<string, string>();
+
+function idleNotify(accountId: string, folder: string, kind: string) {
+  void emit("mail://idle", { accountId, folder, kind });
+}
+
+export function stubMailIdleStart(accountId: string, folder: string): boolean {
+  idleWatchers.set(accountId, folder);
+  idleNotify(accountId, folder, "ready");
+  return true;
+}
+
+export function stubMailIdleStop(accountId: string): boolean {
+  return idleWatchers.delete(accountId);
+}
+
+function idleChanged(accountId: string, folder: string) {
+  if (idleWatchers.get(accountId) === folder) {
+    // Like a server push: asynchronous, after the change is visible.
+    window.setTimeout(() => idleNotify(accountId, folder, "changed"), 50);
+  }
+}
+
 export interface StubMailQaControl {
   deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
@@ -375,6 +401,7 @@ export interface StubMailQaControl {
   observe: (accountId: string, folder: string) => { server: number[]; cache: number[] };
   unseen: (accountId: string, folder: string) => number;
   accounts: () => string[];
+  idleClients: () => number;
 }
 
 export function installStubMailQaControl(seed: Seed): void {
@@ -396,15 +423,18 @@ export function installStubMailQaControl(seed: Seed): void {
         folder.server.set(uid, message);
         uids.push(uid);
       }
+      idleChanged(accountId, folderName);
       return uids;
     },
     expunge(accountId, folderName, uids) {
       const folder = folderState(account(accountId, seed), folderName);
       for (const uid of uids) folder.server.delete(uid);
+      idleChanged(accountId, folderName);
     },
     setFlags(accountId, folderName, uid, flags) {
       const message = folderState(account(accountId, seed), folderName).server.get(uid);
       if (message) message.flags = [...flags];
+      idleChanged(accountId, folderName);
     },
     observe(accountId, folderName) {
       const folder = folderState(account(accountId, seed), folderName);
@@ -412,6 +442,9 @@ export function installStubMailQaControl(seed: Seed): void {
         server: [...folder.server.keys()].sort((a, b) => a - b),
         cache: [...folder.cache.keys()].sort((a, b) => a - b),
       };
+    },
+    idleClients() {
+      return idleWatchers.size;
     },
     unseen(accountId, folderName) {
       return [...folderState(account(accountId, seed), folderName).server.values()].filter(isUnseen).length;

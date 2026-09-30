@@ -105,6 +105,26 @@ def mail_server_assert_folder_count(ctx: StepContext, args: Any) -> None:
     raise StepError(f"mail_server_assert_folder_count: {folder} has {count}, expected {args!r}")
 
 
+@verb("mail_server_assert_idle_clients")
+def mail_server_assert_idle_clients(ctx: StepContext, args: Any) -> None:
+    """IDLE watchers the stub server holds (TASK-12 AC-37: none after close)."""
+    args = args if isinstance(args, dict) else {}
+    if not isinstance(args.get("equals"), int):
+        raise StepError("mail_server_assert_idle_clients: expected {equals: int, timeout_sec?}")
+    if ctx.dry_run:
+        return
+    _require_control(ctx)
+    expected = int(args["equals"])
+    deadline = time.time() + float(args.get("timeout_sec", 10))
+    count = -1
+    while time.time() < deadline:
+        count = ctx.page.evaluate(f"{_CONTROL}.idleClients()")  # type: ignore[attr-defined]
+        if count == expected:
+            return
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_idle_clients: {count} IDLE clients, expected {expected}")
+
+
 @verb("mail_server_assert_list_matches")
 def mail_server_assert_list_matches(ctx: StepContext, args: Any) -> None:
     """The visible, fully loaded list has exactly the server's message count

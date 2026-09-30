@@ -881,6 +881,8 @@ pub fn run() {
             mail::outgoing::mail_discard_remote_draft,
             mail::search::mail_search_messages,
             mail::search::mail_search_server,
+            mail::idle::mail_idle_start,
+            mail::idle::mail_idle_stop,
             mail::mail_list_cached_folders,
             mail::mail_list_cached_messages,
             mail::mail_get_message_body,

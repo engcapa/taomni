@@ -1384,6 +1384,8 @@ function MailSettings({
   bodyMaxBytes, setBodyMaxBytes,
   attachmentCache, setAttachmentCache,
   syncOnOpen, setSyncOnOpen,
+  idlePush, setIdlePush,
+  desktopNotify, setDesktopNotify,
   syncIntervalMinutes, setSyncIntervalMinutes,
   maxFetchPerSync, setMaxFetchPerSync,
   saveSentCopy, setSaveSentCopy,
@@ -1433,6 +1435,8 @@ function MailSettings({
   bodyMaxBytes: string; setBodyMaxBytes: (v: string) => void;
   attachmentCache: boolean; setAttachmentCache: (v: boolean) => void;
   syncOnOpen: boolean; setSyncOnOpen: (v: boolean) => void;
+  idlePush: boolean; setIdlePush: (v: boolean) => void;
+  desktopNotify: boolean; setDesktopNotify: (v: boolean) => void;
   syncIntervalMinutes: string; setSyncIntervalMinutes: (v: string) => void;
   maxFetchPerSync: string; setMaxFetchPerSync: (v: string) => void;
   saveSentCopy: string; setSaveSentCopy: (v: string) => void;
@@ -1783,6 +1787,17 @@ function MailSettings({
           aria-label="Mail max fetch per sync"
           onChange={(e) => setMaxFetchPerSync(e.target.value)}
         />
+      </Field>
+
+      <Field label="New mail">
+        <label className="flex items-center gap-1.5">
+          <Checkbox checked={idlePush} onChange={setIdlePush} dataTestId="mail-idle-push" />
+          Instant push (IMAP IDLE) while the tab is open
+        </label>
+        <label className="ml-3 flex items-center gap-1.5">
+          <Checkbox checked={desktopNotify} onChange={setDesktopNotify} dataTestId="mail-desktop-notify" />
+          Desktop notification
+        </label>
       </Field>
 
       <Field label="Sent copy">
@@ -2639,6 +2654,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailBodyMaxBytes, setMailBodyMaxBytes] = useState(() => optionString(initialOptions, "mailBodyMaxBytes", "262144"));
   const [mailAttachmentCache, setMailAttachmentCache] = useState(() => optionBoolean(initialOptions, "mailAttachmentCache", false));
   const [mailSyncOnOpen, setMailSyncOnOpen] = useState(() => optionBoolean(initialOptions, "mailSyncOnOpen", true));
+  const [mailIdlePush, setMailIdlePush] = useState(() => optionBoolean(initialOptions, "mailIdlePush", true));
+  const [mailDesktopNotify, setMailDesktopNotify] = useState(() => optionBoolean(initialOptions, "mailDesktopNotify", false));
   const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
   const [mailMaxFetchPerSync, setMailMaxFetchPerSync] = useState(() => optionString(initialOptions, "mailMaxFetchPerSync", "200"));
   const [mailSaveSentCopy, setMailSaveSentCopy] = useState(() => optionString(initialOptions, "mailSaveSentCopy", "auto"));
@@ -2995,6 +3012,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailBodyMaxBytes,
           mailAttachmentCache,
           mailSyncOnOpen,
+          mailIdlePush,
+          mailDesktopNotify,
           mailSyncIntervalMinutes,
           mailMaxFetchPerSync,
           mailSaveSentCopy,
@@ -3567,6 +3586,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailBodyMaxBytes(optionString(nextOptions, "mailBodyMaxBytes", "262144"));
     setMailAttachmentCache(optionBoolean(nextOptions, "mailAttachmentCache", false));
     setMailSyncOnOpen(optionBoolean(nextOptions, "mailSyncOnOpen", true));
+    setMailIdlePush(optionBoolean(nextOptions, "mailIdlePush", true));
+    setMailDesktopNotify(optionBoolean(nextOptions, "mailDesktopNotify", false));
     setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
     setMailMaxFetchPerSync(optionString(nextOptions, "mailMaxFetchPerSync", "200"));
     setMailSaveSentCopy(optionString(nextOptions, "mailSaveSentCopy", "auto"));
@@ -4681,6 +4702,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 bodyMaxBytes={mailBodyMaxBytes} setBodyMaxBytes={setMailBodyMaxBytes}
                 attachmentCache={mailAttachmentCache} setAttachmentCache={setMailAttachmentCache}
                 syncOnOpen={mailSyncOnOpen} setSyncOnOpen={setMailSyncOnOpen}
+                idlePush={mailIdlePush} setIdlePush={setMailIdlePush}
+                desktopNotify={mailDesktopNotify} setDesktopNotify={setMailDesktopNotify}
                 syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}
                 maxFetchPerSync={mailMaxFetchPerSync} setMaxFetchPerSync={setMailMaxFetchPerSync}
                 saveSentCopy={mailSaveSentCopy} setSaveSentCopy={setMailSaveSentCopy}

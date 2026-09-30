@@ -36,6 +36,19 @@ const mailMocks = vi.hoisted(() => ({
   mailSyncFolder: vi.fn(),
   mailSyncHeaders: vi.fn(),
   mailTestConnection: vi.fn(),
+  mailIdleStart: vi.fn(),
+  mailIdleStop: vi.fn(),
+}));
+
+const eventMocks = vi.hoisted(() => ({
+  handlers: new Map<string, (event: { payload: unknown }) => void>(),
+}));
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async (name: string, handler: (event: { payload: unknown }) => void) => {
+    eventMocks.handlers.set(name, handler);
+    return () => eventMocks.handlers.delete(name);
+  }),
 }));
 
 const chatState = vi.hoisted(() => ({
@@ -44,7 +57,7 @@ const chatState = vi.hoisted(() => ({
   sendMessage: vi.fn(),
 }));
 
-vi.mock("../../lib/mail", () => mailMocks);
+vi.mock("../../lib/mail", () => ({ ...mailMocks, MAIL_IDLE_EVENT: "mail://idle" }));
 
 vi.mock("../../lib/ipc", () => ({
   openLocalPath: vi.fn(),
@@ -216,6 +229,9 @@ describe("MailClientTab", () => {
       hasMore: false,
     });
     mailMocks.mailSyncFolder.mockResolvedValue(stepResult({}));
+    mailMocks.mailIdleStart.mockResolvedValue(true);
+    mailMocks.mailIdleStop.mockResolvedValue(true);
+    eventMocks.handlers.clear();
     useTaoAlertStore.setState({ aiDone: [], mailNew: [] });
   });
 
@@ -938,6 +954,49 @@ describe("MailClientTab", () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
     expect(mailMocks.mailSyncFolder.mock.calls.length).toBeGreaterThan(afterFirst);
+  });
+
+  it("holds an IDLE watcher while open and catches up on push (TASK-12)", async () => {
+    const view = renderMailbox();
+    await waitFor(() => expect(mailMocks.mailIdleStart).toHaveBeenCalledWith(info, "INBOX"));
+    await waitFor(() => expect(eventMocks.handlers.has("mail://idle")).toBe(true));
+    const before = mailMocks.mailSyncFolder.mock.calls.length;
+
+    const push = eventMocks.handlers.get("mail://idle")!;
+    act(() => push({ payload: { accountId: "someone-else", folder: "INBOX", kind: "changed" } }));
+    act(() => push({ payload: { accountId: info.sessionId, folder: "INBOX", kind: "ready" } }));
+    expect(await screen.findByTestId("mail-idle-status")).toHaveAttribute("data-state", "ready");
+    act(() => push({ payload: { accountId: info.sessionId, folder: "INBOX", kind: "changed" } }));
+    await waitFor(() => expect(mailMocks.mailSyncFolder.mock.calls.length).toBeGreaterThan(before), { timeout: 3000 });
+
+    view.unmount();
+    expect(mailMocks.mailIdleStop).toHaveBeenCalledWith(info.sessionId);
+    expect(eventMocks.handlers.has("mail://idle")).toBe(false);
+  });
+
+  it("waits for background sync instead of dropping a manual sync click", async () => {
+    let resolveSync: (value: MailFolderSyncResult) => void = () => {};
+    mailMocks.mailSyncFolder.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveSync = resolve;
+    }));
+    renderMailbox();
+    await waitFor(() => expect(eventMocks.handlers.has("mail://idle")).toBe(true));
+    // A push starts a background catch-up that is still running at click time.
+    act(() => eventMocks.handlers.get("mail://idle")!({
+      payload: { accountId: info.sessionId, folder: "INBOX", kind: "changed" },
+    }));
+    await waitFor(() => expect(mailMocks.mailSyncFolder).toHaveBeenCalledTimes(1), { timeout: 3000 });
+
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    expect(mailMocks.mailSyncAllFolders).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSync(stepResult({}));
+    });
+    await waitFor(() => expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(1), { timeout: 3000 });
   });
 });
 

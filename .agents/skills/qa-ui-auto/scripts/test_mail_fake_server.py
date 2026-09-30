@@ -71,6 +71,31 @@ class FakeMailServerTest(unittest.TestCase):
         self.assertEqual(data, [str(uids[2]).encode()])
         client.logout()
 
+    def test_idle_pushes_exists_and_ends_on_done(self) -> None:
+        import socket
+        import time
+
+        sock = socket.create_connection(("127.0.0.1", self.server.imap_port), timeout=5)
+        reader = sock.makefile("rb")
+        reader.readline()  # greeting
+        sock.sendall(b"a1 LOGIN qa x\r\n")
+        reader.readline()
+        sock.sendall(b"a2 EXAMINE INBOX\r\n")
+        while not reader.readline().startswith(b"a2 "):
+            pass
+        sock.sendall(b"a3 IDLE\r\n")
+        self.assertTrue(reader.readline().startswith(b"+"))
+        deadline = time.time() + 2
+        while self.server.state.idle_clients() != 1 and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertEqual(self.server.state.idle_clients(), 1)
+        self.server.state.deliver("INBOX", 2, prefix="Pushed")
+        self.assertEqual(reader.readline(), b"* 7 EXISTS\r\n")
+        sock.sendall(b"DONE\r\n")
+        self.assertTrue(reader.readline().startswith(b"a3 OK"))
+        self.assertEqual(self.server.state.idle_clients(), 0)
+        sock.close()
+
     def test_append_and_smtp(self) -> None:
         client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
         client.login("qa", "x")

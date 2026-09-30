@@ -13,6 +13,7 @@ the real Tauri app syncs against it.
 from __future__ import annotations
 
 import re
+import select
 import socketserver
 import threading
 import time
@@ -69,6 +70,11 @@ class FakeMailState:
         self.log: list[str] = []
         self.smtp_messages: list[dict] = []
         self.idle_waiters: list[threading.Event] = []
+
+    def idle_clients(self) -> int:
+        """Connections currently in IDLE (AC-37: zero after the tab closes)."""
+        with self.lock:
+            return len(self.idle_waiters)
 
     def bump(self) -> int:
         self.highest_modseq += 1
@@ -426,8 +432,10 @@ class _ImapHandler(socketserver.StreamRequestHandler):
             self.send(b"".join(out) + ok.encode())
 
     def _idle(self, waiter: threading.Event, tag: str) -> None:
+        # select() instead of socket timeouts: a timed-out buffered makefile()
+        # refuses every later read, so DONE would never be seen.
         state = self.server.state
-        self.connection.settimeout(0.2)
+        line = b""
         try:
             while True:
                 if waiter.is_set():
@@ -435,18 +443,19 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                     with state.lock:
                         count = len(state.folders["INBOX"].messages)
                     self.send(f"* {count} EXISTS\r\n")
-                try:
-                    line = self.rfile.readline()
-                except (TimeoutError, OSError):
+                readable, _, _ = select.select([self.connection], [], [], 0.2)
+                if not readable:
                     continue
+                line = self.rfile.readline()
                 if not line or line.strip().upper() == b"DONE":
                     break
         finally:
-            self.connection.settimeout(None)
             with state.lock:
                 if waiter in state.idle_waiters:
                     state.idle_waiters.remove(waiter)
-        self.send(f"{tag} OK idle done\r\n")
+        if line:
+            self.send(f"{tag} OK idle done\r\n")
+
 
 
 class _SmtpHandler(socketserver.StreamRequestHandler):

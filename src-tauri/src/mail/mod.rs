@@ -41,6 +41,7 @@ use crate::terminal::network::NetworkSettings;
 
 #[cfg(test)]
 mod fake_imap;
+pub mod idle;
 pub mod outgoing;
 pub mod search;
 mod sync;
@@ -3465,13 +3466,23 @@ fn connect_imap(
     account: &ResolvedMailAccount,
     runtime: &tokio::runtime::Handle,
 ) -> Result<ActiveImapSession, String> {
+    connect_imap_with_socket(account, runtime).map(|(session, _)| session)
+}
+
+/// Connect and also return a clone of the TCP socket, so a watcher can shut
+/// the connection down from another thread (e.g. to end a blocked IDLE).
+fn connect_imap_with_socket(
+    account: &ResolvedMailAccount,
+    runtime: &tokio::runtime::Handle,
+) -> Result<(ActiveImapSession, Option<TcpStream>), String> {
     let host = account.config.imap.host.trim();
     let port = account.config.imap.port;
     let (connect_host, connect_port, forward_task) =
         mail_effective_endpoint(account, host, port, runtime)?;
-    match account.config.imap.security {
+    let stream = tcp_connect(&connect_host, connect_port)?;
+    let socket = stream.try_clone().ok();
+    let session = match account.config.imap.security {
         MailConnectionSecurity::Tls => {
-            let stream = tcp_connect(&connect_host, connect_port)?;
             let connector = TlsConnector::builder()
                 .build()
                 .map_err(|e| format!("failed to build IMAP TLS connector: {e}"))?;
@@ -3482,13 +3493,12 @@ fn connect_imap(
             client
                 .read_greeting()
                 .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            Ok(ActiveImapSession::Tls {
+            ActiveImapSession::Tls {
                 session: authenticate_imap_client(client, account)?,
                 forward_task,
-            })
+            }
         }
         MailConnectionSecurity::Starttls => {
-            let stream = tcp_connect(&connect_host, connect_port)?;
             let mut client = imap::Client::new(stream);
             client
                 .read_greeting()
@@ -3499,23 +3509,23 @@ fn connect_imap(
             let client = client
                 .secure(host, &connector)
                 .map_err(|e| format!("IMAP STARTTLS failed: {e}"))?;
-            Ok(ActiveImapSession::Tls {
+            ActiveImapSession::Tls {
                 session: authenticate_imap_client(client, account)?,
                 forward_task,
-            })
+            }
         }
         MailConnectionSecurity::None => {
-            let stream = tcp_connect(&connect_host, connect_port)?;
             let mut client = imap::Client::new(stream);
             client
                 .read_greeting()
                 .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            Ok(ActiveImapSession::Plain {
+            ActiveImapSession::Plain {
                 session: authenticate_imap_client(client, account)?,
                 forward_task,
-            })
+            }
         }
-    }
+    };
+    Ok((session, socket))
 }
 
 fn mail_effective_endpoint(

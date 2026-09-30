@@ -58,6 +58,8 @@ import {
   mailDownloadAttachment,
   mailFetchRaw,
   mailGetMessageBody,
+  mailIdleStart,
+  mailIdleStop,
   mailIndexCachedContacts,
   mailDeleteDraft,
   mailDiscardRemoteDraft,
@@ -79,6 +81,7 @@ import {
   mailSyncFolder,
   mailSyncHeaders,
   mailTestConnection,
+  MAIL_IDLE_EVENT,
   type MailAddress,
   type MailAttachmentInfo,
   type MailContactSuggestion,
@@ -87,11 +90,14 @@ import {
   type MailDraftContext,
   type MailFolder,
   type MailFolderSyncResult,
+  type MailIdleEvent,
   type MailMessageBody,
   type MailMessageHeader,
   type MailSearchField,
   type MailSyncRequestMode,
 } from "../../lib/mail";
+import { listen } from "@tauri-apps/api/event";
+import { notifyDesktop } from "../../lib/lanNotify";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
 import {
   DEFAULT_IDENTITY_ID,
@@ -1740,13 +1746,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const notifyNewMail = useCallback((count: number) => {
     if (count <= 0) return;
-    pushMailNew(
-      tabId,
-      info.sessionId,
-      info.displayName?.trim() || info.emailAddress || info.sessionId,
-      count,
-    );
-  }, [info.displayName, info.emailAddress, info.sessionId, pushMailNew, tabId]);
+    const title = info.displayName?.trim() || info.emailAddress || info.sessionId;
+    pushMailNew(tabId, info.sessionId, title, count);
+    // Only while the tab is open (DEC-01); opt-in per account.
+    if (info.sync.desktopNotify) {
+      void notifyDesktop(title, count === 1 ? "1 new message" : `${count} new messages`);
+    }
+  }, [info.displayName, info.emailAddress, info.sessionId, info.sync.desktopNotify, pushMailNew, tabId]);
 
   const applySyncedFolder = useCallback((folder: MailFolder) => {
     const next = mergeFolderMeta(foldersRef.current, folder);
@@ -1959,10 +1965,21 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const activeBeforeSync = selectedFolderRef.current;
 
     if (syncInFlightRef.current) {
-      if (indicator !== "none" && visibleRef.current) {
-        setStatus("Mail sync already running");
+      // Background work (open catch-up, backfill, quiet poll) holds the lock.
+      // Periodic scans just skip; a manual sync waits its turn instead of
+      // being dropped, so a click always ends with fresh server state.
+      if (quiet || indicator === "none") return null;
+      if (indicator === "sync") setSyncing(true);
+      if (visibleRef.current) setStatus("Waiting for current mail sync…");
+      const deadline = Date.now() + 120_000;
+      while (syncInFlightRef.current && Date.now() < deadline) {
+        await delay(150);
       }
-      return null;
+      if (syncInFlightRef.current) {
+        if (indicator === "sync" && visibleRef.current) setSyncing(false);
+        if (visibleRef.current) setStatus("Mail sync already running");
+        return null;
+      }
     }
     syncInFlightRef.current = true;
 
@@ -2287,6 +2304,58 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }, intervalMs);
     return () => window.clearInterval(id);
   }, [batchSize, info.sync.intervalMinutes, quietPollSelectedAndInbox, syncAllFolders]);
+
+  // IMAP IDLE push (TASK-12): while the tab is open a dedicated connection
+  // waits on INBOX; each change runs the normal gap-free quiet catch-up, so a
+  // lost push only delays mail until the next poll. Stopped on close (DEC-01).
+  const quietPollRef = useRef(quietPollSelectedAndInbox);
+  quietPollRef.current = quietPollSelectedAndInbox;
+  const idleConfigRef = useRef(info);
+  idleConfigRef.current = info;
+  const [idleState, setIdleState] = useState<string | null>(null);
+  const idleEnabled = info.sync.idle !== false;
+  useEffect(() => {
+    if (!idleEnabled) return;
+    const accountId = info.sessionId;
+    let disposed = false;
+    let debounce: number | null = null;
+    let unlisten: (() => void) | null = null;
+    const schedulePoll = (waitMs = 400) => {
+      if (debounce != null) window.clearTimeout(debounce);
+      debounce = window.setTimeout(() => {
+        debounce = null;
+        if (disposed) return;
+        // The quiet poll skips while another sync (open catch-up, backfill)
+        // holds the lock; keep the push pending instead of dropping it.
+        if (syncInFlightRef.current) {
+          schedulePoll(500);
+          return;
+        }
+        void quietPollRef.current();
+      }, waitMs);
+    };
+    void listen<MailIdleEvent>(MAIL_IDLE_EVENT, (event) => {
+      const payload = event.payload;
+      if (disposed || payload?.accountId !== accountId) return;
+      // "stopped" may come from a previous watcher replaced by this tab's.
+      if (payload.kind === "stopped") return;
+      setIdleState(payload.kind);
+      if (payload.kind === "changed") schedulePoll();
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    }).catch(() => {});
+    void mailIdleStart(idleConfigRef.current, "INBOX").catch((e) => {
+      console.debug("mail IDLE unavailable; polling only", e);
+      if (!disposed) setIdleState("unsupported");
+    });
+    return () => {
+      disposed = true;
+      if (debounce != null) window.clearTimeout(debounce);
+      unlisten?.();
+      void mailIdleStop(accountId).catch(() => {});
+    };
+  }, [idleEnabled, info.sessionId]);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -3939,6 +4008,24 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           Sync
         </button>
+        {idleEnabled && idleState && (
+          <span
+            className="h-7 px-1.5 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]"
+            data-testid="mail-idle-status"
+            data-state={idleState}
+            title={idleState === "ready" || idleState === "changed"
+              ? "Instant push (IMAP IDLE) active"
+              : "Instant push unavailable; polling"}
+          >
+            <span
+              aria-hidden="true"
+              className={`w-1.5 h-1.5 rounded-full ${idleState === "ready" || idleState === "changed"
+                ? "bg-[var(--taomni-success,#22c55e)]"
+                : "bg-[var(--taomni-text-muted)]"}`}
+            />
+            {idleState === "ready" || idleState === "changed" ? "Push" : "Poll"}
+          </span>
+        )}
         {syncProgress && (
           <span
             className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"

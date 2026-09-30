@@ -158,6 +158,27 @@ export function mailSearchServer(config: MailTabInfo, folder: string, query: Mai
   );
 }
 
+/** Tauri event emitted by an open tab's IMAP IDLE watcher (TASK-12). */
+export const MAIL_IDLE_EVENT = "mail://idle";
+
+export interface MailIdleEvent {
+  accountId: string;
+  folder: string;
+  /** "ready" | "changed" | "unsupported" | "error" | "stopped" */
+  kind: string;
+  error?: string;
+}
+
+/** Start the account's IDLE watcher while its mail tab is open. */
+export function mailIdleStart(config: MailTabInfo, folder = "INBOX"): Promise<boolean> {
+  return withVaultLockedNotice(() => invoke<boolean>("mail_idle_start", { config, folder }));
+}
+
+/** Stop the account's IDLE watcher (tab closed; DEC-01). */
+export function mailIdleStop(accountId: string): Promise<boolean> {
+  return invoke<boolean>("mail_idle_stop", { accountId });
+}
+
 export interface MailSyncFolderOptions {
   mode?: MailSyncRequestMode;
   limit?: number;

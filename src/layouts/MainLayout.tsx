@@ -559,6 +559,8 @@ function sessionToMailTabInfo(
       onOpen: opts.mailSyncOnOpen !== false,
       intervalMinutes: mailNumberOption(opts, "mailSyncIntervalMinutes", 5, 1),
       maxFetchPerSync: mailNumberOption(opts, "mailMaxFetchPerSync", 200, 1),
+      idle: opts.mailIdlePush !== false,
+      desktopNotify: opts.mailDesktopNotify === true,
     },
     cache: {
       enabled: opts.mailCacheEnabled !== false,
