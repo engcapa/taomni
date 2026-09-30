@@ -337,6 +337,8 @@ export interface MailTabInfo {
   carddav?: { url: string; username?: string | null } | null;
   /** CalDAV calendar for the agenda (TASK-20 phase 2); null = off. */
   caldav?: { url: string; username?: string | null } | null;
+  /** Answer read receipt requests: ask (default), always or never (TASK-17). */
+  receiptPolicy?: "ask" | "always" | "never";
   /** Seconds a sent message can still be undone (0 = send immediately). */
   undoSendSeconds?: number;
   /** Manual special folders: sent/drafts/trash/junk/archive -> folder name. */

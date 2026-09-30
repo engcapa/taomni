@@ -59,6 +59,8 @@ export interface MailMessageHeader {
   inReplyTo?: string | null;
   /** Thread ancestry, oldest first (no angle brackets). */
   references?: string[];
+  /** The sender asked for a read receipt at this address (TASK-17). */
+  receiptTo?: string | null;
   /** Mailing-list unsubscribe options (TASK-18). */
   listUnsubscribe?: MailListUnsubscribe | null;
 }
@@ -778,6 +780,20 @@ export function mailRespondInvite(
 ): Promise<MailInviteResponse> {
   return withVaultLockedNotice(() =>
     invoke<MailInviteResponse>("mail_respond_invite", { config, folder, uid, response }),
+  );
+}
+
+/** RFC 3503 keyword: the read receipt request was answered or declined. */
+export const MAIL_MDN_SENT = "$MDNSent";
+
+export function mailSendReceipt(
+  config: MailTabInfo,
+  folder: string,
+  uid: number,
+  automatic = false,
+): Promise<{ sentTo: string }> {
+  return withVaultLockedNotice(() =>
+    invoke<{ sentTo: string }>("mail_send_receipt", { config, folder, uid, automatic }),
   );
 }
 

@@ -5553,6 +5553,20 @@ controls:
     selector: '[data-testid="mail-compose-read-receipt"]'
     kind: interactive
     optional: true       # request flag only; covered by Vitest + Rust header test
+  - id: receipt-banner
+    selector: '[data-testid="mail-receipt-banner"]'
+    kind: display
+  - id: receipt-send
+    selector: '[data-testid="mail-receipt-send"]'
+    kind: interactive
+  - id: receipt-ignore
+    selector: '[data-testid="mail-receipt-ignore"]'
+    kind: interactive
+    optional: true
+  - id: receipt-policy
+    selector: '[data-testid="mail-receipt-policy"]'
+    kind: interactive
+    optional: true       # session editor
   - id: outbox-count
     selector: '[data-testid="mail-outbox-count"]'
     kind: display
@@ -5591,7 +5605,8 @@ controls:
 - 发送时服务器不可达（连接失败、DNS、超时、421/45x）会自动进入 Outbox，并按 1/2/5/10/30 分钟退避重试；认证失败或地址错误仍留在写信窗口提示。
 - 会话设置 “Undo send”（秒，默认 0）开启后，点 Send 先进入 Outbox 并显示倒计时与 Undo，撤销后回到编辑状态。
 - 限制（DEC-01）：Outbox、稍后发送与重试只在该账户标签打开期间执行，UI 中有说明。
-- “Receipt” 勾选后请求已读回执（`Disposition-Notification-To`，RFC 8098）；对收到的回执请求自动应答尚未实现。
+- “Receipt” 勾选后请求已读回执（`Disposition-Notification-To`，RFC 8098）。
+- 收到回执请求时按账户设置 “Read receipts” 处理：询问（默认，阅读区提示 Send receipt / Ignore）、总是发送或从不发送。回执为 RFC 8098 `multipart/report; report-type=disposition-notification`；发送或忽略后给邮件打上 `$MDNSent`（RFC 3503），其他客户端也不再询问。自己发出的邮件和已发送文件夹中的邮件不提示。
 
 ---
 

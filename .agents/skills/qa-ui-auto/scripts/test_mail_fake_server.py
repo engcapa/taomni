@@ -175,6 +175,11 @@ class FakeMailServerTest(unittest.TestCase):
         self.assertIn("SUMMARY:A &amp; B", body)
         self.assertTrue(self.server.state.caldav_contains("SUMMARY:A & B"))
 
+    def test_read_receipt_delivery(self) -> None:
+        (uid,) = self.server.state.deliver("INBOX", 1, prefix="Receipt", read_receipt=True)
+        raw = self.server.state.folders["INBOX"].messages[uid].raw
+        self.assertIn(b"Disposition-Notification-To: QA Sender <qa-sender@example.com>\r\n", raw)
+
     def test_subjects(self) -> None:
         self.server.state.deliver("Archive", 2, prefix="Moved")
         self.assertEqual(self.server.state.subjects("Archive"), ["Moved 0001", "Moved 0002"])

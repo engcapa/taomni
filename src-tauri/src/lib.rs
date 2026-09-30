@@ -906,6 +906,7 @@ pub fn run() {
             mail::caldav::mail_caldav_sync,
             mail::caldav::mail_list_agenda,
             mail::caldav::mail_add_invite_to_calendar,
+            mail::receipts::mail_send_receipt,
             mail::mail_list_cached_folders,
             mail::mail_list_cached_messages,
             mail::mail_get_message_body,

@@ -1094,6 +1094,9 @@
             "invite": {
               "type": "string",
               "minLength": 1
+            },
+            "read_receipt": {
+              "type": "boolean"
             }
           }
         },

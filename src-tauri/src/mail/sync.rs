@@ -30,7 +30,7 @@ use super::{
 pub(super) const FLAG_RECONCILE_WINDOW: usize = 500;
 /// UIDs per `UID FETCH (FLAGS)` command.
 const FLAG_FETCH_CHUNK: usize = 1000;
-const MAIL_SCHEMA_VERSION: i64 = 6;
+const MAIL_SCHEMA_VERSION: i64 = 7;
 
 /// Which work a `mail_sync_folder` call should do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -162,6 +162,8 @@ pub fn migrate_mail_tables(conn: &Connection) -> SqlResult<()> {
     // v6: when this client last changed the flags (ms), so a reconcile that
     // read the server before our STORE does not undo it.
     add_column_if_missing(conn, "mail_messages", "flags_local_at", "INTEGER")?;
+    // v7: read receipt requests (Disposition-Notification-To, TASK-17).
+    add_column_if_missing(conn, "mail_messages", "receipt_to", "TEXT")?;
     // v4: local full-text index.
     if version < 4 {
         super::search::migrate_search_index(conn)?;
@@ -1240,6 +1242,7 @@ mod tests {
             "Message-ID: <weekly@example.com>\r\n",
             "List-Unsubscribe: <mailto:leave@example.com>, <https://example.com/u>\r\n",
             "List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n",
+            "Disposition-Notification-To: \"News\" <receipts@example.com>\r\n",
             "\r\nBody\r\n"
         );
         fake.deliver_raw("INBOX", raw.as_bytes().to_vec());
@@ -1253,8 +1256,10 @@ mod tests {
             list.uris,
             vec!["mailto:leave@example.com", "https://example.com/u"]
         );
+        assert_eq!(weekly.receipt_to.as_deref(), Some("receipts@example.com"));
         let plain = rows.iter().find(|row| row.subject != "Weekly").unwrap();
         assert!(plain.list_unsubscribe.is_none());
+        assert!(plain.receipt_to.is_none());
     }
 
     /// AC-07/AC-12: backfill walks older history down to UID 1.

@@ -861,6 +861,10 @@
 - `[data-testid="mail-send-later-at"]` — interactive [optional] — F-MAIL-13.send-later-at
 - `[data-testid="mail-send-later-confirm"]` — interactive — F-MAIL-13.send-later-confirm
 - `[data-testid="mail-compose-read-receipt"]` — interactive [optional] — F-MAIL-13.compose-read-receipt
+- `[data-testid="mail-receipt-banner"]` — display — F-MAIL-13.receipt-banner
+- `[data-testid="mail-receipt-send"]` — interactive — F-MAIL-13.receipt-send
+- `[data-testid="mail-receipt-ignore"]` — interactive [optional] — F-MAIL-13.receipt-ignore
+- `[data-testid="mail-receipt-policy"]` — interactive [optional] — F-MAIL-13.receipt-policy
 - `[data-testid="mail-outbox-count"]` — display — F-MAIL-13.outbox-count
 - `[data-testid="mail-drafts-tab-outbox"]` — interactive — F-MAIL-13.drafts-tab-outbox
 - `[data-testid="mail-outbox-row"]` — display — F-MAIL-13.outbox-row

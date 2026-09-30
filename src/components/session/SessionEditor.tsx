@@ -1395,6 +1395,7 @@ function MailSettings({
   cardDavUsername, setCardDavUsername,
   calDavUrl, setCalDavUrl,
   calDavUsername, setCalDavUsername,
+  receiptPolicy, setReceiptPolicy,
   specialFolders, setSpecialFolders,
   desktopNotify, setDesktopNotify,
   syncIntervalMinutes, setSyncIntervalMinutes,
@@ -1455,6 +1456,7 @@ function MailSettings({
   cardDavUsername: string; setCardDavUsername: (v: string) => void;
   calDavUrl: string; setCalDavUrl: (v: string) => void;
   calDavUsername: string; setCalDavUsername: (v: string) => void;
+  receiptPolicy: string; setReceiptPolicy: (v: string) => void;
   specialFolders: Partial<Record<MailSpecialFolderKey, string>>;
   setSpecialFolders: (v: Partial<Record<MailSpecialFolderKey, string>>) => void;
   desktopNotify: boolean; setDesktopNotify: (v: boolean) => void;
@@ -1957,6 +1959,20 @@ function MailSettings({
           onChange={(e) => setUndoSendSeconds(e.target.value)}
         />
         <span className="ml-1 text-[var(--taomni-text-muted)]">seconds to cancel after Send (0 = off)</span>
+      </Field>
+
+      <Field label="Read receipts">
+        <select
+          className="taomni-input w-56"
+          value={receiptPolicy}
+          aria-label="Answer read receipt requests"
+          data-testid="mail-receipt-policy"
+          onChange={(e) => setReceiptPolicy(e.target.value)}
+        >
+          <option value="ask">Ask me when a sender requests one</option>
+          <option value="always">Always send</option>
+          <option value="never">Never send</option>
+        </select>
       </Field>
 
       <Field label="CardDAV">
@@ -2848,6 +2864,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailCardDavUsername, setMailCardDavUsername] = useState(() => optionString(initialOptions, "mailCardDavUsername", ""));
   const [mailCalDavUrl, setMailCalDavUrl] = useState(() => optionString(initialOptions, "mailCalDavUrl", ""));
   const [mailCalDavUsername, setMailCalDavUsername] = useState(() => optionString(initialOptions, "mailCalDavUsername", ""));
+  const [mailReceiptPolicy, setMailReceiptPolicy] = useState(() => optionString(initialOptions, "mailReceiptPolicy", "ask"));
   const [mailSpecialFolders, setMailSpecialFolders] = useState(() => parseSpecialFolders(initialOptions.mailSpecialFolders));
   const [mailDesktopNotify, setMailDesktopNotify] = useState(() => optionBoolean(initialOptions, "mailDesktopNotify", false));
   const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
@@ -3215,6 +3232,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailCardDavUsername: mailCardDavUsername.trim(),
           mailCalDavUrl: mailCalDavUrl.trim(),
           mailCalDavUsername: mailCalDavUsername.trim(),
+          mailReceiptPolicy,
           mailSpecialFolders: JSON.stringify(parseSpecialFolders(mailSpecialFolders)),
           mailDesktopNotify,
           mailSyncIntervalMinutes,
@@ -3798,6 +3816,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailCardDavUsername(optionString(nextOptions, "mailCardDavUsername", ""));
     setMailCalDavUrl(optionString(nextOptions, "mailCalDavUrl", ""));
     setMailCalDavUsername(optionString(nextOptions, "mailCalDavUsername", ""));
+    setMailReceiptPolicy(optionString(nextOptions, "mailReceiptPolicy", "ask"));
     setMailSpecialFolders(parseSpecialFolders(nextOptions.mailSpecialFolders));
     setMailDesktopNotify(optionBoolean(nextOptions, "mailDesktopNotify", false));
     setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
@@ -4923,6 +4942,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 cardDavUsername={mailCardDavUsername} setCardDavUsername={setMailCardDavUsername}
                 calDavUrl={mailCalDavUrl} setCalDavUrl={setMailCalDavUrl}
                 calDavUsername={mailCalDavUsername} setCalDavUsername={setMailCalDavUsername}
+                receiptPolicy={mailReceiptPolicy} setReceiptPolicy={setMailReceiptPolicy}
                 specialFolders={mailSpecialFolders} setSpecialFolders={setMailSpecialFolders}
                 desktopNotify={mailDesktopNotify} setDesktopNotify={setMailDesktopNotify}
                 syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}

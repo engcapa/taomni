@@ -542,12 +542,12 @@ fn load_candidates(
         "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
                 to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
                 attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
-                list_unsubscribe_json, body_text
+                list_unsubscribe_json, receipt_to, body_text
          FROM mail_messages WHERE account_id = ?1 AND folder = ?2 {clause} ORDER BY uid"
     );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(params![account_id, folder, bound], |row| {
-        Ok((row_to_header(row)?, row.get::<_, Option<String>>(20)?))
+        Ok((row_to_header(row)?, row.get::<_, Option<String>>(21)?))
     })?;
     let wanted: Option<HashSet<u32>> = match selection {
         CandidateSelection::Uids(uids) => Some(uids.iter().copied().collect()),
@@ -1133,6 +1133,7 @@ mod tests {
             in_reply_to: None,
             references: Vec::new(),
             list_unsubscribe: None,
+            receipt_to: None,
         }
     }
 

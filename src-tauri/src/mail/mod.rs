@@ -55,6 +55,7 @@ pub mod mbox;
 pub mod outgoing;
 mod parts;
 mod pop3;
+pub mod receipts;
 pub mod search;
 mod sync;
 mod vcard;
@@ -512,6 +513,10 @@ pub struct MailMessageHeader {
     /// `List-Unsubscribe` of mailing-list mail (TASK-18).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub list_unsubscribe: Option<lists::MailListUnsubscribe>,
+    /// `Disposition-Notification-To` address: the sender asked for a read
+    /// receipt (RFC 8098, TASK-17).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_to: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -4570,6 +4575,7 @@ fn parse_fetch_header(
             message.header_raw("List-Unsubscribe-Post"),
         )
     });
+    let receipt_to = parsed.as_ref().and_then(receipt_request);
     let (message_id, subject, from, to, cc, date_ts, in_reply_to, references) = match parsed {
         Some(message) => (
             message.message_id().map(clean_message_id),
@@ -4613,6 +4619,7 @@ fn parse_fetch_header(
             in_reply_to,
             references,
             list_unsubscribe,
+            receipt_to,
         },
         body_text: None,
         body_html: None,
@@ -4700,6 +4707,7 @@ fn parse_body_message(
                     in_reply_to: header_message_ids(message.in_reply_to()).into_iter().next(),
                     references: header_message_ids(message.references()),
                     list_unsubscribe: None,
+                    receipt_to: receipt_request(&message),
                 },
                 body_text: text,
                 body_html: html,
@@ -4731,6 +4739,7 @@ fn parse_body_message(
                     in_reply_to: None,
                     references: Vec::new(),
                     list_unsubscribe: None,
+                    receipt_to: None,
                 },
                 body_text: Some(text),
                 body_html: None,
@@ -4740,6 +4749,17 @@ fn parse_body_message(
             }
         }
     }
+}
+
+/// Receipt address of a read-receipt request (RFC 8098 §2.1).
+fn receipt_request(message: &mail_parser::Message<'_>) -> Option<String> {
+    let raw = message.header_raw("Disposition-Notification-To")?;
+    let address = match (raw.find('<'), raw.rfind('>')) {
+        (Some(start), Some(end)) if end > start => &raw[start + 1..end],
+        _ => raw,
+    };
+    let address = address.trim();
+    address.contains('@').then(|| address.to_string())
 }
 
 fn merge_body(target: &mut MailMessageCached, body: MailMessageCached) {
@@ -4766,6 +4786,9 @@ fn merge_body(target: &mut MailMessageCached, body: MailMessageCached) {
     }
     if target.header.references.is_empty() {
         target.header.references = body.header.references;
+    }
+    if target.header.receipt_to.is_none() {
+        target.header.receipt_to = body.header.receipt_to.clone();
     }
     if target.header.list_unsubscribe.is_none() {
         target.header.list_unsubscribe = body.header.list_unsubscribe;
@@ -4803,6 +4826,7 @@ fn empty_cached_message(account_id: &str, folder: &str, uid: u32) -> MailMessage
             in_reply_to: None,
             references: Vec::new(),
             list_unsubscribe: None,
+            receipt_to: None,
         },
         body_text: None,
         body_html: None,
@@ -5297,9 +5321,9 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
          (account_id, folder, uid, message_id, subject, from_name, from_addr,
           to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
           attachments_json, snippet, body_text, body_html, body_cached_at, raw_size, updated_at,
-          internal_ts, in_reply_to, references_json, list_unsubscribe_json)
+          internal_ts, in_reply_to, references_json, list_unsubscribe_json, receipt_to)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-                 ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?23, ?24, ?25)
+                 ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?23, ?24, ?25, ?26)
          ON CONFLICT(account_id, folder, uid) DO UPDATE SET
             message_id = COALESCE(excluded.message_id, mail_messages.message_id),
             subject = CASE WHEN excluded.subject != '' THEN excluded.subject ELSE mail_messages.subject END,
@@ -5314,6 +5338,7 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
             references_json = CASE WHEN excluded.references_json != '[]'
                                    THEN excluded.references_json ELSE mail_messages.references_json END,
             list_unsubscribe_json = COALESCE(excluded.list_unsubscribe_json, mail_messages.list_unsubscribe_json),
+            receipt_to = COALESCE(excluded.receipt_to, mail_messages.receipt_to),
             has_attachments = CASE
                 WHEN excluded.attachments_json != '[]' OR excluded.has_attachments = 1
                 THEN excluded.has_attachments
@@ -5360,6 +5385,7 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
                 .list_unsubscribe
                 .as_ref()
                 .and_then(|list| serde_json::to_string(list).ok()),
+            header.receipt_to,
         ],
     )?;
     Ok(())
@@ -5842,7 +5868,7 @@ fn list_cached_messages(
         "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
                 to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
                 attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
-                list_unsubscribe_json
+                list_unsubscribe_json, receipt_to
          FROM mail_messages
          WHERE account_id = ?1 AND folder = ?2
          ORDER BY COALESCE(date_ts, 0) DESC, uid DESC
@@ -5850,6 +5876,26 @@ fn list_cached_messages(
     )?;
     let rows = stmt.query_map(params![account_id, folder, limit, offset], row_to_header)?;
     rows.collect()
+}
+
+/// One cached header.
+fn cached_header(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uid: u32,
+) -> SqlResult<Option<MailMessageHeader>> {
+    conn.query_row(
+        "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
+                to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
+                attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
+                list_unsubscribe_json, receipt_to
+         FROM mail_messages
+         WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
+        params![account_id, folder, uid],
+        row_to_header,
+    )
+    .optional()
 }
 
 fn unread_cached_uids(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<Vec<u32>> {
@@ -6036,7 +6082,7 @@ fn get_cached_body(
         "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
                 to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
                 attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
-                list_unsubscribe_json, body_text, body_html
+                list_unsubscribe_json, receipt_to, body_text, body_html
          FROM mail_messages
          WHERE account_id = ?1 AND folder = ?2 AND uid = ?3
            AND body_cached_at IS NOT NULL
@@ -6044,8 +6090,8 @@ fn get_cached_body(
         params![account_id, folder, uid],
         |row| {
             let mut header = row_to_header(row)?;
-            let body_text: Option<String> = row.get(20)?;
-            let body_html: Option<String> = row.get(21)?;
+            let body_text: Option<String> = row.get(21)?;
+            let body_html: Option<String> = row.get(22)?;
             header.body_cached = true;
             Ok(MailMessageBody {
                 account_id: header.account_id,
@@ -6107,6 +6153,7 @@ fn row_to_header(row: &rusqlite::Row<'_>) -> SqlResult<MailMessageHeader> {
         list_unsubscribe: row
             .get::<_, Option<String>>(19)?
             .and_then(|json| serde_json::from_str(&json).ok()),
+        receipt_to: row.get(20)?,
     })
 }
 

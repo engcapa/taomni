@@ -46,6 +46,7 @@ const mailMocks = vi.hoisted(() => ({
   mailImportMessages: vi.fn(),
   mailProbeCertificate: vi.fn(),
   mailGetInvite: vi.fn(),
+  mailSendReceipt: vi.fn(),
   mailRespondInvite: vi.fn(),
 }));
 
@@ -69,6 +70,7 @@ const chatState = vi.hoisted(() => ({
 vi.mock("../../lib/mail", () => ({
   ...mailMocks,
   MAIL_IDLE_EVENT: "mail://idle",
+  MAIL_MDN_SENT: "$MDNSent",
   isMailCertificateError: (message: string | null | undefined) =>
     /untrusted server certificate|no longer matches the one you trusted/i.test(message ?? ""),
 }));
@@ -1180,6 +1182,39 @@ describe("MailClientTab", () => {
     expect(await screen.findByTestId("mail-invite-in-calendar")).toBeInTheDocument();
     expect(screen.queryByTestId("mail-invite-add-calendar")).not.toBeInTheDocument();
     expect(screen.getByTestId("mail-agenda-open")).toBeInTheDocument();
+  });
+
+  it("asks before sending a read receipt and only once (TASK-17)", async () => {
+    const asking: MailMessageHeader = { ...message, receiptTo: "boss@example.com" };
+    mailMocks.mailListCachedMessages.mockResolvedValue([asking]);
+    mailMocks.mailSendReceipt.mockResolvedValue({ sentTo: "boss@example.com" });
+    renderMailbox();
+    expect(await screen.findByTestId("mail-receipt-banner")).toHaveTextContent("boss@example.com");
+    expect(mailMocks.mailSendReceipt).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("mail-receipt-send"));
+    await waitFor(() => expect(mailMocks.mailSendReceipt).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: info.sessionId }), asking.folder, asking.uid, false,
+    ));
+    await waitFor(() => expect(screen.queryByTestId("mail-receipt-banner")).not.toBeInTheDocument());
+    expect(await screen.findByText(/Read receipt sent to boss@example.com/)).toBeInTheDocument();
+  });
+
+  it("follows the always and never receipt policies (TASK-17)", async () => {
+    const asking: MailMessageHeader = { ...message, receiptTo: "boss@example.com" };
+    mailMocks.mailListCachedMessages.mockResolvedValue([asking]);
+    mailMocks.mailSendReceipt.mockResolvedValue({ sentTo: "boss@example.com" });
+    const view = render(<MailClientTab tabId="mail-tab" info={{ ...info, receiptPolicy: "always" }} visible />);
+    await waitFor(() => expect(mailMocks.mailSendReceipt).toHaveBeenCalledWith(
+      expect.anything(), asking.folder, asking.uid, true,
+    ));
+    expect(screen.queryByTestId("mail-receipt-banner")).not.toBeInTheDocument();
+    view.unmount();
+
+    mailMocks.mailSendReceipt.mockClear();
+    render(<MailClientTab tabId="mail-tab" info={{ ...info, receiptPolicy: "never" }} visible />);
+    await screen.findByText(message.subject);
+    expect(screen.queryByTestId("mail-receipt-banner")).not.toBeInTheDocument();
+    expect(mailMocks.mailSendReceipt).not.toHaveBeenCalled();
   });
 
   it("shows a cancelled meeting without reply buttons (AC-63)", async () => {

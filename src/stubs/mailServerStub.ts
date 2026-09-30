@@ -30,6 +30,8 @@ type StubMailHeader = {
   inReplyTo?: string | null;
   references?: string[];
   listUnsubscribe?: { uris: string[]; oneClick: boolean } | null;
+  /** Disposition-Notification-To (TASK-17). */
+  receiptTo?: string | null;
   /** Parsed iTIP REQUEST served by mail_get_invite (TASK-20). */
   invite?: StubMailInvite | null;
 };
@@ -435,7 +437,7 @@ function idleChanged(accountId: string, folder: string) {
 }
 
 export interface StubMailQaControl {
-  deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null, invite?: string | null) => number[];
+  deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean, listUnsubscribe?: string | null, invite?: string | null, readReceipt?: boolean) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
   setFlags: (accountId: string, folder: string, uid: number, flags: string[]) => void;
   observe: (accountId: string, folder: string) => { server: number[]; cache: number[] };
@@ -472,7 +474,7 @@ function stubInvite(summary: string, uid: string): StubMailInvite {
 
 export function installStubMailQaControl(seed: Seed): void {
   const control: StubMailQaControl = {
-    deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null, invite = null) {
+    deliver(accountId, folderName, count, prefix = "QA", thread = false, listUnsubscribe = null, invite = null, readReceipt = false) {
       const state = account(accountId, seed);
       const folder = folderState(state, folderName);
       const uids: number[] = [];
@@ -486,6 +488,7 @@ export function installStubMailQaControl(seed: Seed): void {
           message.references = [...ancestry];
         }
         if (listUnsubscribe) message.listUnsubscribe = { uris: [listUnsubscribe], oneClick: false };
+        if (readReceipt) message.receiptTo = "qa-sender@example.com";
         if (invite) {
           message.invite = stubInvite(invite, message.messageId.replace(/^<|>$/g, ""));
           message.attachments = [{ name: "invite.ics", contentType: "text/calendar", size: 420 }];

@@ -134,8 +134,11 @@ class FakeMailState:
         return self.highest_modseq
 
     def deliver(self, folder: str, count: int, prefix: str = "QA", thread: bool = False,
-                list_unsubscribe: str | None = None, invite: str | None = None) -> list[int]:
+                list_unsubscribe: str | None = None, invite: str | None = None,
+                read_receipt: bool = False) -> list[int]:
         extra = f"List-Unsubscribe: <{list_unsubscribe}>\r\n" if list_unsubscribe else ""
+        if read_receipt:
+            extra += "Disposition-Notification-To: QA Sender <qa-sender@example.com>\r\n"
         with self.lock:
             entry = self.folders.setdefault(folder, FakeFolder(uid_validity=2000 + len(self.folders)))
             modseq = self.bump()

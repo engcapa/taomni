@@ -4305,6 +4305,20 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       throw new Error("vCard files need the desktop app");
     case "mail_carddav_sync":
       throw new Error("CardDAV sync needs the desktop app");
+    case "mail_send_receipt": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uid = Number(invokeArgs?.uid ?? 0);
+      const accountId = stubMailAccountId(invokeArgs);
+      const header = stubMailFindHeader(accountId, mailStubSeed, folder, uid);
+      if (!header?.receiptTo) throw new Error("the sender did not ask for a read receipt");
+      stubMailRecordSent(
+        `To: <${header.receiptTo}>\nContent-Type: multipart/report; report-type=disposition-notification\n`
+        + `Original-Message-ID: ${header.messageId}\nDisposition: ${invokeArgs?.automatic ? "automatic-action" : "manual-action"}`,
+      );
+      stubMailUpdateCachedFlags(accountId, folder, [uid], ["$MDNSent"], []);
+      return { sentTo: header.receiptTo } as T;
+    }
     case "mail_list_agenda": {
       const invokeArgs = args as InvokeArgs | undefined;
       return stubListAgenda(stubMailAccountId(invokeArgs), Number(invokeArgs?.days ?? 14)) as T;

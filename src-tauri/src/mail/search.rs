@@ -174,7 +174,7 @@ pub(super) fn search_cached_messages(
         "SELECT m.account_id, m.folder, m.uid, m.message_id, m.subject, m.from_name, m.from_addr,
                 m.to_json, m.cc_json, m.date_ts, m.flags_json, m.has_attachments, m.attachment_count,
                 m.attachments_json, m.snippet, m.raw_size, m.body_cached_at, m.in_reply_to,
-                m.references_json, m.list_unsubscribe_json
+                m.references_json, m.list_unsubscribe_json, m.receipt_to
          FROM mail_messages m
          WHERE m.account_id = ?",
     );
@@ -405,6 +405,7 @@ mod tests {
                 in_reply_to: None,
                 references: vec![],
                 list_unsubscribe: None,
+                receipt_to: None,
             },
             body_text: None,
             body_html: None,
