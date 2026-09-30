@@ -572,6 +572,12 @@ pub struct MailSendRequest {
     /// a successful send.
     #[serde(default)]
     pub draft_id: Option<String>,
+    /// `From:` of a non-default identity ("Name <addr>"); `None` = account.
+    #[serde(default)]
+    pub from: Option<String>,
+    /// Reply-To of that identity (overrides the account Reply-To).
+    #[serde(default)]
+    pub reply_to: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -635,6 +641,9 @@ pub struct MailDraftContext {
     /// Thread ancestry of the replied-to message, oldest first.
     #[serde(default)]
     pub references: Vec<String>,
+    /// Sending identity chosen in the composer.
+    #[serde(default)]
+    pub identity_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -4542,15 +4551,23 @@ fn build_send_message_with(
     request: &MailSendRequest,
     options: &MessageBuildOptions,
 ) -> Result<Message, String> {
-    let from_address: lettre::Address = account
-        .config
-        .email_address
-        .parse()
-        .map_err(|e| format!("invalid from address: {e}"))?;
-    let from = Mailbox::new(
-        account.config.display_name.clone().and_then(non_empty),
-        from_address.clone(),
-    );
+    let from = match request
+        .from
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
+        Some(identity) => parse_mailbox(identity)?,
+        None => Mailbox::new(
+            account.config.display_name.clone().and_then(non_empty),
+            account
+                .config
+                .email_address
+                .parse()
+                .map_err(|e| format!("invalid from address: {e}"))?,
+        ),
+    };
+    let from_address = from.email.clone();
     let mut builder = Message::builder()
         .from(from)
         .subject(request.subject.trim());
@@ -4566,10 +4583,10 @@ fn build_send_message_with(
                 .map_err(|e| format!("invalid draft envelope: {e}"))?;
         builder = builder.envelope(envelope);
     }
-    if let Some(reply_to) = account
-        .config
+    if let Some(reply_to) = request
         .reply_to
         .as_deref()
+        .or(account.config.reply_to.as_deref())
         .map(str::trim)
         .filter(|v| !v.is_empty())
     {
@@ -6861,6 +6878,8 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             in_reply_to: None,
             references: Vec::new(),
             draft_id: None,
+            from: None,
+            reply_to: None,
             to: vec!["Receiver <receiver@example.com>".into()],
             cc: vec![],
             bcc: vec![],
@@ -6891,6 +6910,8 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             in_reply_to: Some("parent@example.com".into()),
             references: vec!["<root@example.com>".into(), "parent@example.com".into()],
             draft_id: None,
+            from: None,
+            reply_to: None,
         };
         let account = sample_resolved_account();
         let raw =
@@ -6921,6 +6942,32 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
     }
 
     #[test]
+    fn identity_overrides_from_and_reply_to() {
+        let request = MailSendRequest {
+            to: vec!["receiver@example.com".into()],
+            cc: vec![],
+            bcc: vec![],
+            subject: "Hi".into(),
+            text_body: Some("Body".into()),
+            html_body: None,
+            attachments: vec![],
+            in_reply_to: None,
+            references: vec![],
+            draft_id: None,
+            from: Some("Support <support@example.com>".into()),
+            reply_to: Some("help@example.com".into()),
+        };
+        let message = build_send_message(&sample_resolved_account(), &request).unwrap();
+        let raw = String::from_utf8(message.formatted()).unwrap();
+        assert!(raw.contains("From: Support <support@example.com>"), "{raw}");
+        assert!(raw.contains("Reply-To: help@example.com"), "{raw}");
+        assert_eq!(
+            message.envelope().from().unwrap().to_string(),
+            "support@example.com"
+        );
+    }
+
+    #[test]
     fn draft_envelope_allows_messages_without_recipients() {
         let request = MailSendRequest {
             to: vec![],
@@ -6933,6 +6980,8 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             in_reply_to: None,
             references: vec![],
             draft_id: None,
+            from: None,
+            reply_to: None,
         };
         let options = MessageBuildOptions {
             self_envelope: true,
@@ -6979,6 +7028,8 @@ References: <a@x>
             in_reply_to: None,
             references: Vec::new(),
             draft_id: None,
+            from: None,
+            reply_to: None,
             attachments: vec![MailSendAttachment {
                 path: path.to_string_lossy().into_owned(),
                 name: Some("report.txt".into()),
@@ -7005,6 +7056,8 @@ References: <a@x>
             in_reply_to: None,
             references: Vec::new(),
             draft_id: None,
+            from: None,
+            reply_to: None,
             to: vec!["Receiver <receiver@example.com>".into()],
             cc: vec![],
             bcc: vec![],
@@ -7040,6 +7093,8 @@ References: <a@x>
             in_reply_to: None,
             references: Vec::new(),
             draft_id: None,
+            from: None,
+            reply_to: None,
             to: vec!["Receiver <receiver@example.com>".into()],
             cc: vec![],
             bcc: vec![],
@@ -7104,6 +7159,7 @@ References: <a@x>
                     message_id: Some("msg@example.com".into()),
                     subject: Some("Original".into()),
                     references: Vec::new(),
+                    identity_id: None,
                 }),
                 remote_draft_folder: None,
                 remote_draft_uid: None,

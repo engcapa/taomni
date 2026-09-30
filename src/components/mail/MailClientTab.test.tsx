@@ -848,6 +848,62 @@ describe("MailClientTab", () => {
     expect(screen.getByTestId("mail-message-row")).toHaveAttribute("data-unread", "true");
   });
 
+  it("replies from the alias the message was addressed to (AC-28/AC-29)", async () => {
+    const aliasInfo: MailTabInfo = {
+      ...info,
+      identities: [{ id: "alias", name: "Support", email: "support@example.com", replyTo: "help@example.com", signature: "Support team" }],
+    };
+    mailMocks.mailListCachedMessages.mockResolvedValue([{ ...message, to: [{ address: "support@example.com" }] }]);
+    mailMocks.mailSendMessage.mockResolvedValue({ accepted: true, response: "ok" });
+
+    render(<MailClientTab tabId="mail-tab" info={aliasInfo} visible />);
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    const from = await screen.findByTestId("mail-compose-from");
+    expect(from).toHaveValue("alias");
+    fireEvent.click(screen.getByTestId("mail-compose-send"));
+    await waitFor(() => expect(mailMocks.mailSendMessage).toHaveBeenCalled());
+    expect(mailMocks.mailSendMessage.mock.calls[0][1]).toMatchObject({
+      from: "Support <support@example.com>",
+      replyTo: "help@example.com",
+    });
+  });
+
+  it("saves a template and starts a new message from it (AC-30)", async () => {
+    const template = {
+      id: "tpl-1",
+      accountId: info.sessionId,
+      to: ["team@example.com"],
+      cc: [],
+      bcc: [],
+      subject: "Weekly status",
+      textBody: "Status body",
+      htmlBody: "<p>Status body</p>",
+      attachments: [],
+      replyContext: { kind: "template" },
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    mailMocks.mailSaveDraft.mockResolvedValue(template);
+    mailMocks.mailListDrafts.mockResolvedValue([template]);
+
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByTestId("mail-compose-open"));
+    fireEvent.change(await screen.findByTestId("mail-compose-subject"), { target: { value: "Weekly status" } });
+    fireEvent.click(screen.getByTestId("mail-compose-save-template"));
+    await waitFor(() => expect(mailMocks.mailSaveDraft).toHaveBeenCalledWith(
+      info.sessionId,
+      expect.objectContaining({ id: null, replyContext: expect.objectContaining({ kind: "template" }) }),
+    ));
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    fireEvent.click(screen.getByTestId("mail-drafts-open"));
+    fireEvent.click(await screen.findByTestId("mail-drafts-tab-templates"));
+    fireEvent.click(within(await screen.findByTestId("mail-template-row")).getByText("Weekly status"));
+    expect(await screen.findByTestId("mail-compose-subject")).toHaveValue("Weekly status");
+  });
+
   it("skips overlapping periodic sync ticks while a sync is still running", async () => {
     vi.useFakeTimers();
     const intervalInfo: MailTabInfo = {

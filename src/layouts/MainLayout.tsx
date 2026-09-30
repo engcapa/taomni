@@ -28,6 +28,7 @@ import {
   LEGACY_MAIL_HEADER_RETENTION_DAYS,
   mailHeaderLimitOption,
 } from "../lib/mailSync";
+import { parseMailIdentities } from "../lib/mailIdentities";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
@@ -573,6 +574,7 @@ function sessionToMailTabInfo(
       skipBodyConfirm: opts.mailAiSkipBodyConfirm === true,
     },
     saveSentCopy: opts.mailSaveSentCopy === "on" ? true : opts.mailSaveSentCopy === "off" ? false : null,
+    identities: parseMailIdentities(opts.mailIdentities),
   };
 }
 

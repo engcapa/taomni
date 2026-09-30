@@ -259,6 +259,9 @@ export interface MailSendRequest {
   references?: string[];
   /** Local draft whose server copy is removed after sending. */
   draftId?: string | null;
+  /** `From:` of a non-default identity ("Name <addr>"); null = account address. */
+  from?: string | null;
+  replyTo?: string | null;
 }
 
 export interface MailSendAttachment {
@@ -310,6 +313,8 @@ export interface MailDraftContext {
   subject?: string | null;
   /** Thread ancestry of the replied-to message, oldest first. */
   references?: string[];
+  /** Sending identity chosen in the composer. */
+  identityId?: string | null;
 }
 
 export interface MailDraft {

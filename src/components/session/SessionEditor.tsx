@@ -30,6 +30,8 @@ import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
 import { ensureVaultReady } from "../../lib/vaultGate";
 import { MAIL_HEADER_LIMITS_EXPLICIT_KEY, mailHeaderLimitOption } from "../../lib/mailSync";
+import { parseMailIdentities } from "../../lib/mailIdentities";
+import { MailIdentitiesEditor } from "./MailIdentitiesEditor";
 import {
   selectFilePath,
   selectFolderPath,
@@ -48,7 +50,7 @@ import {
   type WslDistro,
   type LocalShellOption,
 } from "../../lib/ipc";
-import type { DbConnectInfo, HBaseConnectInfo } from "../../types";
+import type { DbConnectInfo, HBaseConnectInfo, MailIdentity } from "../../types";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import {
   DEFAULT_NETWORK_SETTINGS,
@@ -1385,6 +1387,7 @@ function MailSettings({
   syncIntervalMinutes, setSyncIntervalMinutes,
   maxFetchPerSync, setMaxFetchPerSync,
   saveSentCopy, setSaveSentCopy,
+  identities, setIdentities,
   aiEnabled, setAiEnabled,
   aiSkipBodyConfirm, setAiSkipBodyConfirm,
   vaultState,
@@ -1433,6 +1436,7 @@ function MailSettings({
   syncIntervalMinutes: string; setSyncIntervalMinutes: (v: string) => void;
   maxFetchPerSync: string; setMaxFetchPerSync: (v: string) => void;
   saveSentCopy: string; setSaveSentCopy: (v: string) => void;
+  identities: MailIdentity[]; setIdentities: (v: MailIdentity[]) => void;
   aiEnabled: boolean; setAiEnabled: (v: boolean) => void;
   aiSkipBodyConfirm: boolean; setAiSkipBodyConfirm: (v: boolean) => void;
   vaultState: "empty" | "locked" | "unlocked";
@@ -1639,6 +1643,9 @@ function MailSettings({
           placeholder="Default text appended to new messages and replies"
           onChange={(e) => setSignature(e.target.value)}
         />
+      </Field>
+      <Field label="Identities">
+        <MailIdentitiesEditor identities={identities} onChange={setIdentities} />
       </Field>
 
       <Field label="IMAP security">
@@ -2635,6 +2642,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
   const [mailMaxFetchPerSync, setMailMaxFetchPerSync] = useState(() => optionString(initialOptions, "mailMaxFetchPerSync", "200"));
   const [mailSaveSentCopy, setMailSaveSentCopy] = useState(() => optionString(initialOptions, "mailSaveSentCopy", "auto"));
+  const [mailIdentityList, setMailIdentityList] = useState<MailIdentity[]>(() => parseMailIdentities(initialOptions.mailIdentities));
   const [mailAiEnabled, setMailAiEnabled] = useState(() => optionBoolean(initialOptions, "mailAiEnabled", true));
   const [mailAiSkipBodyConfirm, setMailAiSkipBodyConfirm] = useState(() => optionBoolean(initialOptions, "mailAiSkipBodyConfirm", false));
 
@@ -2990,6 +2998,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailSyncIntervalMinutes,
           mailMaxFetchPerSync,
           mailSaveSentCopy,
+          mailIdentities: JSON.stringify(parseMailIdentities(mailIdentityList)),
           mailAiEnabled,
           mailAiSkipBodyConfirm,
         }
@@ -3561,6 +3570,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
     setMailMaxFetchPerSync(optionString(nextOptions, "mailMaxFetchPerSync", "200"));
     setMailSaveSentCopy(optionString(nextOptions, "mailSaveSentCopy", "auto"));
+    setMailIdentityList(parseMailIdentities(nextOptions.mailIdentities));
     setMailAiEnabled(optionBoolean(nextOptions, "mailAiEnabled", true));
     setMailAiSkipBodyConfirm(optionBoolean(nextOptions, "mailAiSkipBodyConfirm", false));
     setOss(ossFormFromOptions(session?.options_json));
@@ -4674,6 +4684,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}
                 maxFetchPerSync={mailMaxFetchPerSync} setMaxFetchPerSync={setMailMaxFetchPerSync}
                 saveSentCopy={mailSaveSentCopy} setSaveSentCopy={setMailSaveSentCopy}
+                identities={mailIdentityList} setIdentities={setMailIdentityList}
                 aiEnabled={mailAiEnabled} setAiEnabled={setMailAiEnabled}
                 aiSkipBodyConfirm={mailAiSkipBodyConfirm} setAiSkipBodyConfirm={setMailAiSkipBodyConfirm}
                 vaultState={vaultState}

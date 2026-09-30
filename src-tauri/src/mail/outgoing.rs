@@ -331,6 +331,8 @@ fn draft_send_request(draft: &MailDraft) -> MailSendRequest {
             .map(|context| context.references.clone())
             .unwrap_or_default(),
         draft_id: Some(draft.id.clone()),
+        from: None,
+        reply_to: None,
     }
 }
 

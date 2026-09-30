@@ -5366,6 +5366,56 @@ controls:
 
 - 右键菜单“Tag”提供 Thunderbird 默认标签（Important/Work/Personal/To Do/Later = `$label1`～`$label5`），写入服务器 IMAP 关键字，列表行显示色点，快捷过滤与本地搜索可按标签筛选；标志对账会同步其他客户端改动的关键字。
 - “Mark as junk / Not junk”在移动之前设置 `$Junk`/`$NotJunk`（服务器不支持关键字时忽略），列表对 `$Junk` 邮件显示标记。
+
+---
+
+### 13.9 发件身份与模板 ✅
+
+<!-- feature
+id: F-MAIL-9
+status: done
+area: mail/compose
+components: [MailClientTab, SessionEditor, MailIdentitiesEditor]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailIdentities.ts
+  - src/components/session/MailIdentitiesEditor.tsx
+  - src/components/session/SessionEditor.tsx
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: compose-from
+    selector: '[data-testid="mail-compose-from"]'
+    kind: interactive
+    optional: true       # disabled until a session defines identities (quick connect has none)
+  - id: compose-save-template
+    selector: '[data-testid="mail-compose-save-template"]'
+    kind: interactive
+  - id: compose-discard
+    selector: '[data-testid="mail-compose-discard"]'
+    kind: interactive
+  - id: drafts-tab-templates
+    selector: '[data-testid="mail-drafts-tab-templates"]'
+    kind: interactive
+  - id: drafts-tab-drafts
+    selector: '[data-testid="mail-drafts-tab-drafts"]'
+    kind: interactive
+    optional: true
+  - id: template-row
+    selector: '[data-testid="mail-template-row"]'
+    kind: interactive
+  - id: identities-editor
+    selector: '[data-testid="mail-identities-editor"]'
+    kind: display
+    optional: true       # session editor; identities need a saved session
+  - id: identity-add
+    selector: '[data-testid="mail-identity-add"]'
+    kind: interactive
+    optional: true
+-->
+
+- 会话编辑器“Identities”可添加别名身份（显示名、地址、Reply-To、签名）；写信窗口“From”选择身份，发送时使用该身份的 From/Reply-To 与信封发件人；切换身份时替换未改动的签名块。
+- 回复/全部回复/转发自动选择原邮件 To/Cc 中匹配的身份（与 Thunderbird 一致），全部回复排除所有自有地址。
+- “Save as template”把当前内容另存为模板（本地草稿库，kind=template）；Drafts 对话框的 Templates 页签列出模板，点击以副本新建邮件，不修改模板本身。
 ---
 
 ## 14. SocksCap 网络流量路由

@@ -855,6 +855,17 @@
 - `[data-testid="mail-thread-expand"]` — interactive [optional] — F-MAIL-6.thread-expand
 - `[data-testid="mail-save-sent-copy"]` — interactive [optional] — F-MAIL-6.save-sent-copy
 
+## mail/compose (F-MAIL-9)
+
+- `[data-testid="mail-compose-from"]` — interactive [optional] — F-MAIL-9.compose-from
+- `[data-testid="mail-compose-save-template"]` — interactive — F-MAIL-9.compose-save-template
+- `[data-testid="mail-compose-discard"]` — interactive — F-MAIL-9.compose-discard
+- `[data-testid="mail-drafts-tab-templates"]` — interactive — F-MAIL-9.drafts-tab-templates
+- `[data-testid="mail-drafts-tab-drafts"]` — interactive [optional] — F-MAIL-9.drafts-tab-drafts
+- `[data-testid="mail-template-row"]` — interactive — F-MAIL-9.template-row
+- `[data-testid="mail-identities-editor"]` — display [optional] — F-MAIL-9.identities-editor
+- `[data-testid="mail-identity-add"]` — interactive [optional] — F-MAIL-9.identity-add
+
 ## mail/organize (F-MAIL-8)
 
 - `[data-testid="mail-menu-tag"]` — interactive — F-MAIL-8.menu-tag

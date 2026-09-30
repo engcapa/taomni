@@ -48,7 +48,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import type { MailTabInfo } from "../../types";
+import type { MailIdentity, MailTabInfo } from "../../types";
 import {
   mailClearCache,
   mailCopyMessages,
@@ -93,6 +93,15 @@ import {
   type MailSyncRequestMode,
 } from "../../lib/mail";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
+import {
+  DEFAULT_IDENTITY_ID,
+  identityFromHeader,
+  identityLabel,
+  mailIdentities,
+  ownIdentityAddresses,
+  pickReplyIdentity,
+  swapSignature,
+} from "../../lib/mailIdentities";
 import {
   JUNK_KEYWORD,
   MAIL_TAGS,
@@ -187,6 +196,8 @@ interface ComposeDraft {
   attachments: MailDraftAttachment[];
   replyContext?: MailDraftContext | null;
   richFormatUsed: boolean;
+  /** Sending identity (DEFAULT_IDENTITY_ID = account address). */
+  identityId?: string | null;
 }
 
 type RecipientFieldKey = "to" | "cc" | "bcc";
@@ -678,6 +689,23 @@ function decodeFolderLabel(name: string, folders: readonly MailFolder[]): string
   return folder ? folderLabel(folder) : name;
 }
 
+const TEMPLATE_KIND = "template";
+
+function isTemplate(saved: MailDraft): boolean {
+  return saved.replyContext?.kind === TEMPLATE_KIND;
+}
+
+function draftContextWithIdentity(draft: ComposeDraft): MailDraftContext | null {
+  const identityId = draft.identityId && draft.identityId !== DEFAULT_IDENTITY_ID ? draft.identityId : null;
+  if (!draft.replyContext && !identityId) return null;
+  return { ...(draft.replyContext ?? {}), identityId };
+}
+
+function identitySendFields(identity: MailIdentity): { from: string | null; replyTo: string | null } {
+  if (identity.id === DEFAULT_IDENTITY_ID) return { from: null, replyTo: null };
+  return { from: identityFromHeader(identity), replyTo: identity.replyTo ?? null };
+}
+
 function draftWithSignature(draft: Partial<ComposeDraft>, signature: string | null | undefined): ComposeDraft {
   const base = { ...emptyComposeDraft(), ...draft };
   if (!signature?.trim()) return base;
@@ -727,6 +755,7 @@ function draftFromSaved(saved: MailDraft): ComposeDraft {
     attachments: saved.attachments ?? [],
     replyContext: saved.replyContext ?? null,
     richFormatUsed: hasRichMailFormatting(saved.htmlBody),
+    identityId: saved.replyContext?.identityId ?? null,
   };
 }
 
@@ -1019,6 +1048,11 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [draft, setDraft] = useState<ComposeDraft>(EMPTY_DRAFT);
   const [drafts, setDrafts] = useState<MailDraft[]>([]);
   const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftsTab, setDraftsTab] = useState<"drafts" | "templates">("drafts");
+  const visibleDrafts = useMemo(
+    () => drafts.filter((saved) => isTemplate(saved) === (draftsTab === "templates")),
+    [drafts, draftsTab],
+  );
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState<RecipientSearchState>({
@@ -1078,6 +1112,11 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
   const batchSize = useMemo(() => refreshBatchSize(info), [info.sync.maxFetchPerSync]);
   const catchupBatchSize = useMemo(() => catchupStepSize(info), [info.sync.maxFetchPerSync]);
+  const identities = useMemo(() => mailIdentities(info), [info]);
+  const identityById = useCallback(
+    (id: string | null | undefined) => identities.find((identity) => identity.id === id) ?? identities[0],
+    [identities],
+  );
   const defaultMailDomain = useMemo(
     () => extractDefaultMailDomain([info.emailAddress, info.imap.username, info.smtp.username]),
     [info.emailAddress, info.imap.username, info.smtp.username],
@@ -2448,7 +2487,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   };
 
   const openCompose = (nextDraft: Partial<ComposeDraft> = {}, includeSignature = true) => {
-    const next = includeSignature ? draftWithSignature(nextDraft, info.signature) : { ...emptyComposeDraft(), ...nextDraft };
+    const identity = identityById(nextDraft.identityId);
+    const withIdentity = { ...nextDraft, identityId: identity.id };
+    const next = includeSignature ? draftWithSignature(withIdentity, identity.signature) : { ...emptyComposeDraft(), ...withIdentity };
     setDraft(next);
     lastSavedDraftJsonRef.current = serializeDraftContent(next);
     setRecipientSearch({ field: null, query: "", suggestions: [], loading: false });
@@ -2470,7 +2511,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         textBody: draft.textBody || mailHtmlToPlainText(draft.htmlBody),
         htmlBody: sanitizeMailComposeHtml(draft.htmlBody),
         attachments: draft.attachments,
-        replyContext: draft.replyContext ?? null,
+        replyContext: draftContextWithIdentity(draft),
       });
       lastSavedDraftJsonRef.current = serialized;
       setDraft((current) => ({ ...current, id: saved.id }));
@@ -2492,6 +2533,42 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     } finally {
       setSavingDraft(false);
     }
+  };
+
+  /** Templates are local drafts tagged kind "template"; each save adds one. */
+  const saveCurrentAsTemplate = async () => {
+    if (!draftHasContent(draft)) return;
+    setSavingDraft(true);
+    try {
+      const saved = await mailSaveDraft(info.sessionId, {
+        id: null,
+        to: draft.to.map(formatRecipientForSend),
+        cc: draft.cc.map(formatRecipientForSend),
+        bcc: draft.bcc.map(formatRecipientForSend),
+        subject: draft.subject,
+        textBody: draft.textBody || mailHtmlToPlainText(draft.htmlBody),
+        htmlBody: sanitizeMailComposeHtml(draft.htmlBody),
+        attachments: draft.attachments,
+        replyContext: { kind: TEMPLATE_KIND, identityId: draftContextWithIdentity(draft)?.identityId ?? null },
+      });
+      setDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      setStatus("Template saved");
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const openFromTemplate = (template: MailDraft) => {
+    const next = draftFromSaved(template);
+    openCompose({
+      ...next,
+      id: null,
+      replyContext: null,
+      identityId: template.replyContext?.identityId ?? null,
+    }, false);
+    setDraftsOpen(false);
   };
 
   const openSavedDraft = (saved: MailDraft) => {
@@ -2534,12 +2611,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     source: "header",
   });
 
-  const replyDraftBody = (target: MailMessageHeader, currentBody: MailMessageBody) => {
+  const replyDraftBody = (target: MailMessageHeader, currentBody: MailMessageBody, signature: string | null | undefined) => {
     const intro = `On ${formatFullDate(target.dateTs) || "an unknown date"}, ${addressLabel(target.from) || "(unknown sender)"} wrote:`;
     const originalText = currentBody.text?.trim() || currentBody.snippet || "";
     return {
-      htmlBody: buildReplyHtml(intro, { html: currentBody.html, text: originalText }, info.signature),
-      textBody: `\n\n${info.signature?.trim() ? `-- \n${info.signature.trimEnd()}\n\n` : ""}${intro}\n${quotePlainText(originalText)}`,
+      htmlBody: buildReplyHtml(intro, { html: currentBody.html, text: originalText }, signature),
+      textBody: `\n\n${signature?.trim() ? `-- \n${signature.trimEnd()}\n\n` : ""}${intro}\n${quotePlainText(originalText)}`,
     };
   };
 
@@ -2549,8 +2626,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const replyBody = bodyMatchesMessage(body, target)
       ? body
       : fallbackBodyFor(target);
-    const replyBodyDraft = replyDraftBody(target, replyBody);
+    const identity = pickReplyIdentity(identities, target);
+    const replyBodyDraft = replyDraftBody(target, replyBody, identity.signature);
     openCompose({
+      identityId: identity.id,
       to: parseRecipientsText(from),
       subject: target.subject.toLowerCase().startsWith("re:")
         ? target.subject
@@ -2568,6 +2647,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       normalizedMailAddress(info.emailAddress),
       normalizedMailAddress(info.imap.username),
       normalizedMailAddress(info.smtp.username),
+      ...ownIdentityAddresses(identities),
     ].filter(Boolean));
     const to: string[] = [];
     const cc: string[] = [];
@@ -2583,8 +2663,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const replyBody = bodyMatchesMessage(body, target)
       ? body
       : fallbackBodyFor(target);
-    const replyBodyDraft = replyDraftBody(target, replyBody);
+    const identity = pickReplyIdentity(identities, target);
+    const replyBodyDraft = replyDraftBody(target, replyBody, identity.signature);
     openCompose({
+      identityId: identity.id,
       to: parseRecipientsText(to.join(", ")),
       cc: parseRecipientsText(cc.join(", ")),
       subject: target.subject.toLowerCase().startsWith("re:")
@@ -2618,6 +2700,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       })),
       ...threadHeadersFor(draft.replyContext),
       draftId: draft.id ?? null,
+      ...identitySendFields(identityById(draft.identityId)),
     };
     const recipients = [...draft.to, ...draft.cc, ...draft.bcc];
     if (recipients.length === 0) {
@@ -3269,7 +3352,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setStatus(`Moved ${moved} message${moved === 1 ? "" : "s"} to Trash`);
   });
 
-  const buildForwardBody = (target: MailMessageHeader): { htmlBody: string; textBody: string } => {
+  const buildForwardBody = (
+    target: MailMessageHeader,
+    signature: string | null | undefined = info.signature,
+  ): { htmlBody: string; textBody: string } => {
     const currentBody = bodyMatchesMessage(body, target)
       ? body
       : fallbackBodyFor(target);
@@ -3281,15 +3367,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     ].filter(Boolean);
     const originalText = currentBody.text?.trim() || currentBody.snippet || "";
     return {
-      htmlBody: buildForwardHtml(headerLines, { html: currentBody.html, text: originalText }, info.signature),
-      textBody: `\n\n${info.signature?.trim() ? `-- \n${info.signature.trimEnd()}\n\n` : ""}---------- Forwarded message ----------\n${headerLines.join("\n")}\n\n${originalText}`,
+      htmlBody: buildForwardHtml(headerLines, { html: currentBody.html, text: originalText }, signature),
+      textBody: `\n\n${signature?.trim() ? `-- \n${signature.trimEnd()}\n\n` : ""}---------- Forwarded message ----------\n${headerLines.join("\n")}\n\n${originalText}`,
     };
   };
 
   const openForward = (target = selectedMessage) => {
     if (!target) return;
-    const forwardBody = buildForwardBody(target);
+    const identity = pickReplyIdentity(identities, target);
+    const forwardBody = buildForwardBody(target, identity.signature);
     openCompose({
+      identityId: identity.id,
       subject: forwardSubject(target.subject),
       htmlBody: forwardBody.htmlBody,
       textBody: forwardBody.textBody,
@@ -4635,9 +4723,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       {draftsOpen && (
         <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
           <MailDraggableDialog
-            title="Local drafts"
+            title={draftsTab === "drafts" ? "Drafts" : "Templates"}
             icon={<FileText className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
-            ariaLabel="Local drafts"
+            ariaLabel="Drafts and templates"
             minWidth={420}
             minHeight={300}
             className="w-[min(680px,90vw)] h-[min(520px,78vh)] min-h-[340px]"
@@ -4647,23 +4735,40 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               <button type="button" className="taomni-btn h-7 px-2 text-[12px]" onClick={() => void refreshDrafts()} disabled={draftsLoading}>
                 {draftsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
               </button>
-              <span className="text-[12px] text-[var(--taomni-text-muted)]">{drafts.length} draft{drafts.length === 1 ? "" : "s"}</span>
+              <div className="flex items-center gap-1" role="tablist" aria-label="Drafts and templates">
+                {(["drafts", "templates"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={draftsTab === tab}
+                    data-testid={`mail-drafts-tab-${tab}`}
+                    className={`taomni-btn h-7 px-2 text-[12px] ${draftsTab === tab ? "text-[var(--taomni-accent)]" : ""}`}
+                    onClick={() => setDraftsTab(tab)}
+                  >
+                    {tab === "drafts" ? "Drafts" : "Templates"}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[12px] text-[var(--taomni-text-muted)]">
+                {visibleDrafts.length} {draftsTab === "drafts" ? "draft" : "template"}{visibleDrafts.length === 1 ? "" : "s"}
+              </span>
             </div>
             <div className="flex-1 min-h-0 overflow-auto p-2" data-testid="mail-drafts-dialog">
-              {drafts.length === 0 ? (
+              {visibleDrafts.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-                  No saved drafts
+                  {draftsTab === "drafts" ? "No saved drafts" : "No templates. Use \"Save as template\" in the composer."}
                 </div>
-              ) : drafts.map((saved) => (
+              ) : visibleDrafts.map((saved) => (
                 <div
                   key={saved.id}
                   className="min-h-14 px-2 py-1.5 rounded border border-transparent hover:border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] flex items-center gap-2"
-                  data-testid="mail-draft-row"
+                  data-testid={isTemplate(saved) ? "mail-template-row" : "mail-draft-row"}
                 >
                   <button
                     type="button"
                     className="min-w-0 flex-1 text-left"
-                    onClick={() => openSavedDraft(saved)}
+                    onClick={() => (isTemplate(saved) ? openFromTemplate(saved) : openSavedDraft(saved))}
                   >
                     <div className="text-[12px] font-semibold truncate">{saved.subject || "(no subject)"}</div>
                     <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
@@ -4774,6 +4879,33 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               </div>
             )}
             <div className="p-3 grid grid-cols-[56px_1fr] gap-2 text-[12px]">
+              <label className="self-center text-[var(--taomni-text-muted)]" htmlFor={`mail-from-${tabId}`}>From</label>
+              <select
+                id={`mail-from-${tabId}`}
+                className="taomni-input h-7"
+                data-testid="mail-compose-from"
+                value={identityById(draft.identityId).id}
+                disabled={sending || identities.length < 2}
+                onChange={(event) => {
+                  const next = identityById(event.target.value);
+                  setDraft((current) => {
+                    const previous = identityById(current.identityId);
+                    return {
+                      ...current,
+                      identityId: next.id,
+                      htmlBody: swapSignature(
+                        current.htmlBody,
+                        signatureToMailHtml(previous.signature),
+                        signatureToMailHtml(next.signature),
+                      ),
+                    };
+                  });
+                }}
+              >
+                {identities.map((identity) => (
+                  <option key={identity.id} value={identity.id}>{identityLabel(identity)}</option>
+                ))}
+              </select>
               <RecipientField
                 id={`mail-to-${tabId}`}
                 label="To"
@@ -4880,7 +5012,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 {savingDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 Save draft
               </button>
-              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" onClick={() => void discardCurrentDraft()} disabled={sending}>
+              <button
+                type="button"
+                className="taomni-btn h-7 px-3 text-[12px]"
+                data-testid="mail-compose-save-template"
+                onClick={() => void saveCurrentAsTemplate()}
+                disabled={savingDraft || sending || !draftHasContent(draft)}
+                title="Save this message as a reusable template"
+              >
+                Save as template
+              </button>
+              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" data-testid="mail-compose-discard" onClick={() => void discardCurrentDraft()} disabled={sending}>
                 Discard
               </button>
               <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" data-primary="true" data-testid="mail-compose-send" onClick={handleSendDraft} disabled={sending}>

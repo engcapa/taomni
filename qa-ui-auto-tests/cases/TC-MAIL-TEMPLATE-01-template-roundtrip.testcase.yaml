@@ -1,0 +1,114 @@
+id: TC-MAIL-TEMPLATE-01
+title: Mail saves a template and starts a new message from it
+description: |
+  TASK-09 (AC-30): a composed message saved as a template appears under
+  Drafts > Templates, and opening it starts a new message with the same
+  subject and recipients (not an edit of the template). Uses the local draft
+  store in both modes; native mode exercises the Tauri SQLite path.
+covers:
+- F-MAIL-9
+tags:
+- mail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- click: '[data-testid="mail-compose-open"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- assert_visible: '[data-testid="mail-compose-subject"]'
+- fill:
+    selector: '[data-testid="mail-recipient-to"] input'
+    value: team@example.com
+- press: Enter
+- fill:
+    selector: '[data-testid="mail-compose-subject"]'
+    value: Weekly status template
+- click: '[data-testid="mail-compose-save-template"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Template saved
+    timeout_sec: 20
+- click: '[data-testid="mail-compose-discard"]'
+- wait_for:
+    selector: '[data-testid="mail-compose-dialog"]'
+    state: detached
+- click: '[data-testid="mail-drafts-open"]'
+- click: '[data-testid="mail-drafts-tab-templates"]'
+- assert_count:
+    selector: '[data-testid="mail-template-row"]'
+    equal: 1
+- click: '[data-testid="mail-template-row"] button'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="mail-compose-subject"]'
+    name: value
+    equals: Weekly status template
+- assert_text:
+    selector: '[data-testid="mail-recipient-to"]'
+    contains: team@example.com
+- screenshot: mail-template-01.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 另存为模板后模板列表出现该模板，从模板新建带出主题与收件人（AC-30）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 18
+    - 19
+    - 21
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"mail-compose-subject\"]"}'
+    - step: 15
+      expectation: '{"assert_text": {"contains": "Template saved"}}'
+    - step: 17
+      expectation: '{"wait_for": {"state": "detached"}}'
+    - step: 20
+      expectation: '{"assert_count": {"equal": 1}}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"mail-compose-dialog\"]"}'
+    - step: 23
+      expectation: '{"assert_attribute": {"name": "value", "equals": "Weekly status template"}}'
+    - step: 24
+      expectation: '{"assert_text": {"contains": "team@example.com"}}'
+    results:
+    - 20
+    - 23
+    - 24
+  visual:
+  - check: 截图中从模板打开的写信窗口字段完整。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实 SQLite 草稿/模板存储；browser 使用 localStorage 桩；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

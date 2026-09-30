@@ -272,6 +272,15 @@ export interface MailAiSettings {
   skipBodyConfirm: boolean;
 }
 
+/** A sending identity (alias) of a mail account. */
+export interface MailIdentity {
+  id: string;
+  name?: string | null;
+  email: string;
+  replyTo?: string | null;
+  signature?: string | null;
+}
+
 export interface MailTabInfo {
   sessionId: string;
   emailAddress: string;
@@ -314,6 +323,8 @@ export interface MailTabInfo {
   ai: MailAiSettings;
   /** Store sent mail in the Sent folder via IMAP; null = automatic by provider. */
   saveSentCopy?: boolean | null;
+  /** Additional sending identities (the account address is always the first). */
+  identities?: MailIdentity[];
 }
 
 export interface GitTabInfo {
