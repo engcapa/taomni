@@ -1,0 +1,156 @@
+id: TC-DB-TX-001-manual-commit-native
+title: Native manual commit keeps writes pending until Commit or Rollback
+description: |
+  DB-TX-001 V4. On a real MySQL/MariaDB session, switching the toolbar to Manual
+  keeps an INSERT pending (Pending: 1); Rollback discards it (count 0), and a
+  second INSERT followed by Commit persists it (count 1). Switching back to
+  Auto with nothing pending needs no confirmation.
+covers:
+- F-DB-1
+tags:
+- database
+- sql
+- transaction
+- db-parity
+- native-boundary
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- mysql_required
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-db-tx-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.database.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.database.port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.database.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.database.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.database.database}
+- click: '[data-testid="db-save-in-vault"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-tx
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-pw1"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-db-tx-master
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-db-tx-master
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-tx"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-db-tx"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- wait_for:
+    selector: '[data-testid="schema-tree"]'
+    timeout_sec: 30
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: "CREATE TABLE IF NOT EXISTS qa_db_tx001_t (id INT); DELETE FROM qa_db_tx001_t WHERE id >= 0;"
+- click: '[data-testid="db-run-all"]'
+- wait_for:
+    selector: '[data-testid="result-log-tab"]'
+    timeout_sec: 60
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-run"]:first-of-type [data-testid="db-execution-log-summary"]'
+    contains: 'Success: 2'
+    timeout_sec: 60
+- assert_attribute:
+    selector: '[data-testid="db-tx-mode"]'
+    name: data-mode
+    equals: auto
+- click: '[data-testid="db-tx-mode"]'
+- wait_for:
+    selector: '[data-testid="db-tx-mode"][data-mode="manual"]'
+    timeout_sec: 30
+- wait_for: '[data-testid="db-tx-commit"]'
+- assert_text:
+    selector: '[data-testid="db-tx-pending"]'
+    contains: 'Pending: 0'
+    timeout_sec: 60
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: "INSERT INTO qa_db_tx001_t VALUES (1);"
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="db-tx-pending"]'
+    contains: 'Pending: 1'
+    timeout_sec: 60
+- click: '[data-testid="db-tx-rollback"]'
+- assert_text:
+    selector: '[data-testid="db-tx-pending"]'
+    contains: 'Pending: 0'
+    timeout_sec: 60
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: "SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_tx001_t;"
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: count-0
+    timeout_sec: 60
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: "INSERT INTO qa_db_tx001_t VALUES (2);"
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="db-tx-pending"]'
+    contains: 'Pending: 1'
+    timeout_sec: 60
+- click: '[data-testid="db-tx-commit"]'
+- assert_text:
+    selector: '[data-testid="db-tx-pending"]'
+    contains: 'Pending: 0'
+    timeout_sec: 60
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: "SELECT CONCAT('count-', COUNT(*)) AS n FROM qa_db_tx001_t;"
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: count-1
+    timeout_sec: 60
+- click: '[data-testid="db-tx-mode"]'
+- wait_for:
+    selector: '[data-testid="db-tx-mode"][data-mode="auto"]'
+    timeout_sec: 30
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_count:
+    selector: '[data-testid="db-tx-commit"]'
+    equal: 0
+- screenshot: db-tx-001-manual-commit-native.png

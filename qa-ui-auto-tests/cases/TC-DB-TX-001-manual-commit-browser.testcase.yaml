@@ -1,0 +1,67 @@
+id: TC-DB-TX-001-manual-commit-browser
+title: Transaction mode toggle is shown for MySQL and disabled while offline
+description: |
+  DB-TX-001 V5. In the offline MySQL scaffold the editor toolbar shows the
+  transaction mode toggle in Auto mode, disabled because there is no live
+  connection; the Commit / Rollback controls stay hidden.
+covers:
+- F-DB-1
+tags:
+- database
+- sql
+- transaction
+- db-parity
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: db-host.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '3306'
+- fill:
+    selector: input[aria-label="Database username"]
+    value: qa_user
+- fill:
+    selector: input[aria-label="Database name"]
+    value: qa_db
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-tx
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-tx"]'
+- open_session:
+    name: qa-db-tx
+    double_click: true
+- wait_for: '[data-testid="db-connection-error-banner"]'
+- assert_visible: '[data-testid="db-tx-mode"]'
+- assert_disabled: '[data-testid="db-tx-mode"]'
+- assert_text:
+    selector: '[data-testid="db-tx-mode"]'
+    contains: Auto
+- assert_attribute:
+    selector: '[data-testid="db-tx-mode"]'
+    name: data-mode
+    equals: auto
+- assert_count:
+    selector: '[data-testid="db-tx-commit"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="db-tx-pending"]'
+    equal: 0
+- screenshot: db-tx-001-manual-commit-browser.png

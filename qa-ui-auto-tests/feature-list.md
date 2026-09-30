@@ -4537,6 +4537,22 @@ controls:
     selector: '[data-testid="result-sheet-tab"]'
     kind: interactive
     optional: true       # one tab per executed statement with a result sheet
+  - id: tx-mode
+    selector: '[data-testid="db-tx-mode"]'
+    kind: interactive
+    optional: true       # DB-TX-001: Auto / Manual commit toggle (MySQL / PostgreSQL only); data-mode = auto|manual
+  - id: tx-commit
+    selector: '[data-testid="db-tx-commit"]'
+    kind: interactive
+    optional: true       # Manual mode only
+  - id: tx-rollback
+    selector: '[data-testid="db-tx-rollback"]'
+    kind: interactive
+    optional: true       # Manual mode only
+  - id: tx-pending
+    selector: '[data-testid="db-tx-pending"]'
+    kind: display
+    optional: true       # "Pending: N" statements since the last commit / rollback
   # Shared tab actions — chat / detach.
   - id: chat-toggle
     selector: '[data-testid="db-chat-toggle"]'

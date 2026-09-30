@@ -27,6 +27,10 @@ const ipcMock = vi.hoisted(() => ({
     onEvent({ kind: "done", rowsAffected: 0, durationMs: 1, warnings: [] });
   }),
   dbCancel: vi.fn(async () => undefined),
+  dbTxStatus: vi.fn(async (_sessionId: string) => ({ supported: true, manual: false, pending: 0, generation: 1 })),
+  dbTxSetManual: vi.fn(async (_sessionId: string, manual: boolean) => ({ supported: true, manual, pending: 0, generation: 1 })),
+  dbTxCommit: vi.fn(async (_sessionId: string) => ({ supported: true, manual: true, pending: 0, generation: 1 })),
+  dbTxRollback: vi.fn(async (_sessionId: string) => ({ supported: true, manual: true, pending: 0, generation: 1 })),
   dbAppendHistory: vi.fn(async () => undefined),
   dbListHistory: vi.fn(async (): Promise<DbSqlHistoryEntry[]> => []),
   dbDeleteHistory: vi.fn(async () => undefined),
@@ -75,6 +79,10 @@ vi.mock("../../lib/ipc", () => ({
   dbRewriteResultSql: ipcMock.dbRewriteResultSql,
   dbExecuteStream: ipcMock.dbExecuteStream,
   dbCancel: ipcMock.dbCancel,
+  dbTxStatus: ipcMock.dbTxStatus,
+  dbTxSetManual: ipcMock.dbTxSetManual,
+  dbTxCommit: ipcMock.dbTxCommit,
+  dbTxRollback: ipcMock.dbTxRollback,
   dbAppendHistory: ipcMock.dbAppendHistory,
   dbListHistory: ipcMock.dbListHistory,
   dbDeleteHistory: ipcMock.dbDeleteHistory,
@@ -1210,5 +1218,109 @@ describe("DbClientTab error choice", () => {
 
     await waitFor(() => expect(statuses()).toEqual(["success", "failed"]));
     expect(dialogMock.choice).not.toHaveBeenCalled();
+  });
+});
+
+describe("DbClientTab manual commit", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    localStorage.clear();
+    dbChildProps.editorInitialDocFallback = "select 1";
+  });
+
+  /** Stateful fake of the backend TxState: inserts count while manual. */
+  function fakeTx() {
+    const state = { supported: true, manual: false, pending: 0, generation: 1 };
+    ipcMock.dbTxStatus.mockImplementation(async () => ({ ...state }));
+    ipcMock.dbTxSetManual.mockImplementation(async (_sessionId: string, manual: boolean) => {
+      state.manual = manual;
+      state.pending = 0;
+      return { ...state };
+    });
+    const end = async () => {
+      state.pending = 0;
+      return { ...state };
+    };
+    ipcMock.dbTxCommit.mockImplementation(end);
+    ipcMock.dbTxRollback.mockImplementation(end);
+    ipcMock.dbExecuteStream.mockImplementation(async (_session: string, sql: string, _max: number | null, onEvent: (event: StreamEvent) => void) => {
+      if (state.manual && /^insert/i.test(sql)) state.pending += 1;
+      onEvent({ kind: "done", rowsAffected: 1, durationMs: 1, warnings: [] });
+    });
+    return state;
+  }
+
+  async function renderConnected(doc: string) {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = doc;
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitFor(() => expect(screen.getByTestId("db-tx-mode")).not.toBeDisabled());
+  }
+
+  it("switches to manual, counts pending writes and commits or rolls back", async () => {
+    fakeTx();
+    await renderConnected("insert into t values (1)");
+    expect(screen.getByTestId("db-tx-mode")).toHaveTextContent("Auto");
+    expect(screen.queryByTestId("db-tx-commit")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("db-tx-mode"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-mode")).toHaveAttribute("data-mode", "manual"));
+    expect(ipcMock.dbTxSetManual).toHaveBeenCalledWith(expect.any(String), true);
+    expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 0");
+
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 1"));
+    fireEvent.click(screen.getByTestId("db-tx-commit"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 0"));
+    expect(ipcMock.dbTxCommit).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 1"));
+    fireEvent.click(screen.getByTestId("db-tx-rollback"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 0"));
+    expect(ipcMock.dbTxRollback).toHaveBeenCalledTimes(1);
+  });
+
+  it("confirms before switching back to auto-commit with pending statements", async () => {
+    fakeTx();
+    await renderConnected("insert into t values (1)");
+    fireEvent.click(screen.getByTestId("db-tx-mode"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-mode")).toHaveAttribute("data-mode", "manual"));
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-pending")).toHaveTextContent("Pending: 1"));
+
+    dialogMock.confirm.mockResolvedValueOnce(false);
+    fireEvent.click(screen.getByTestId("db-tx-mode"));
+    await waitFor(() => expect(dialogMock.confirm).toHaveBeenCalledTimes(1));
+    expect(dialogMock.confirm.mock.calls[0][0]).toMatchObject({
+      title: "Switch to auto-commit",
+      message: "1 pending statement(s) will be committed.",
+    });
+    await act(async () => undefined);
+    expect(ipcMock.dbTxSetManual).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("db-tx-mode")).toHaveAttribute("data-mode", "manual");
+
+    dialogMock.confirm.mockResolvedValueOnce(true);
+    fireEvent.click(screen.getByTestId("db-tx-mode"));
+    await waitFor(() => expect(screen.getByTestId("db-tx-mode")).toHaveAttribute("data-mode", "auto"));
+    expect(ipcMock.dbTxSetManual).toHaveBeenLastCalledWith(expect.any(String), false);
+    expect(screen.queryByTestId("db-tx-commit")).not.toBeInTheDocument();
+  });
+
+  it("keeps the toggle disabled until connected and hides it for other engines", async () => {
+    fakeTx();
+    ipcMock.dbConnect.mockRejectedValueOnce(new Error("offline"));
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitFor(() => expect(ipcMock.dbConnect).toHaveBeenCalled());
+    expect(screen.getByTestId("db-tx-mode")).toBeDisabled();
+    expect(screen.getByTestId("db-tx-mode")).toHaveTextContent("Auto");
+    cleanup();
+
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    render(<DbClientTab tabId="tab-2" info={{ ...postgresInfo, engine: "ClickHouse" }} visible />);
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    expect(screen.queryByTestId("db-tx-mode")).not.toBeInTheDocument();
+    expect(ipcMock.dbTxStatus).not.toHaveBeenCalled();
   });
 });

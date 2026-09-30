@@ -36,6 +36,8 @@ import {
   ChevronDown,
   Languages,
   Pencil,
+  GitCommitHorizontal,
+  Undo2,
 } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import {
@@ -45,6 +47,10 @@ import {
   dbExecute,
   dbExecuteStream,
   dbCancel,
+  dbTxCommit,
+  dbTxRollback,
+  dbTxSetManual,
+  dbTxStatus,
   dbAppendHistory,
   dbClearHistory,
   dbDeleteHistory,
@@ -69,6 +75,7 @@ import {
   type DbQueryWorkspaceTab,
   type DbSavedQuery,
   type DbSqlHistoryEntry,
+  type DbTxStatus,
 } from "../../lib/ipc";
 import { SchemaTree, type SchemaTreeSelectedObject } from "./SchemaTree";
 import { QueryLibraryPanel } from "./QueryLibraryPanel";
@@ -734,6 +741,62 @@ export default function DbClientTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
+  const [txStatus, setTxStatus] = useState<DbTxStatus | null>(null);
+  const txStatusRef = useRef<DbTxStatus | null>(null);
+  const applyTxStatus = useCallback((next: DbTxStatus | null) => {
+    txStatusRef.current = next;
+    setTxStatus(next);
+  }, []);
+  const txAvailable = supportsManualCommit(info.engine);
+
+  const refreshTxStatus = useCallback(async () => {
+    if (!connectionSessionId || !txAvailable) return;
+    try {
+      applyTxStatus(await dbTxStatus(connectionSessionId));
+    } catch {
+      // Status is advisory; the next statement refreshes it again.
+    }
+  }, [applyTxStatus, connectionSessionId, txAvailable]);
+
+  useEffect(() => {
+    applyTxStatus(null);
+    void refreshTxStatus();
+  }, [applyTxStatus, refreshTxStatus]);
+
+  const toggleTxMode = useCallback(async () => {
+    const current = txStatusRef.current;
+    if (!connectionSessionId || !current?.supported) return;
+    const manual = !current.manual;
+    if (!manual && current.pending > 0) {
+      const confirmed = await confirmAppDialog({
+        title: "Switch to auto-commit",
+        message: `${current.pending} pending statement(s) will be committed.`,
+        confirmLabel: "Commit and switch",
+      });
+      if (!confirmed) return;
+    }
+    try {
+      applyTxStatus(await dbTxSetManual(connectionSessionId, manual));
+      setStatusMessage(manual ? "Manual commit: changes stay pending until Commit." : "Auto-commit enabled.");
+    } catch (err) {
+      setStatusMessage(`Transaction mode change failed: ${String(err)}`);
+    }
+  }, [applyTxStatus, connectionSessionId, setStatusMessage]);
+
+  const endTransaction = useCallback(
+    async (commit: boolean) => {
+      if (!connectionSessionId) return;
+      const pending = txStatusRef.current?.pending ?? 0;
+      try {
+        applyTxStatus(await (commit ? dbTxCommit : dbTxRollback)(connectionSessionId));
+        setStatusMessage(`${commit ? "Committed" : "Rolled back"} ${pending} pending statement(s).`);
+      } catch (err) {
+        setStatusMessage(`${commit ? "Commit" : "Rollback"} failed: ${String(err)}`);
+      }
+    },
+    [applyTxStatus, connectionSessionId, setStatusMessage],
+  );
+
   useEffect(() => {
     let cancelled = false;
     setWorkspaceReady(false);
@@ -1373,8 +1436,9 @@ export default function DbClientTab({
       const finished = finishExecutionRun(run, Date.now());
       const needsAttention = finished.entries.some((entry) => entry.status === "failed" || entry.status === "cancelled");
       publishRun(finished, needsAttention ? true : undefined);
+      if (txStatusRef.current?.manual) await refreshTxStatus();
     },
-    [appendSqlHistory, rowLimit, setStatusMessage, statementRangesForRun, streamQueryIntoSheet, tabLimit],
+    [appendSqlHistory, refreshTxStatus, rowLimit, setStatusMessage, statementRangesForRun, streamQueryIntoSheet, tabLimit],
   );
 
   const insertQueryFromOutside = useCallback(
@@ -1623,12 +1687,13 @@ export default function DbClientTab({
         if (!connectionSessionId) throw new Error("Database connection is still starting.");
         await dbExecute(connectionSessionId, sql);
       }
+      if (txStatusRef.current?.manual) await refreshTxStatus();
       setStatusMessage(
         `Submitted grid changes: ${payload.counts.inserted} added, ${payload.counts.updated} modified, ${payload.counts.deleted} deleted.`,
       );
       await refreshSheet(panelId, sheetId, "clearView");
     },
-    [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache, panels, refreshSheet, setStatusMessage],
+    [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache, panels, refreshSheet, refreshTxStatus, setStatusMessage],
   );
 
   const onSchemaLoaded = useCallback((tables: Map<string, string[]>) => {
@@ -2902,6 +2967,11 @@ export default function DbClientTab({
                 onRunCurrent={runCurrentStatement}
                 onExplain={() => void explainCurrentStatement()}
                 onCancel={() => cancelQuery(activePanel.id)}
+                txAvailable={txAvailable}
+                txStatus={txStatus}
+                onToggleTx={() => void toggleTxMode()}
+                onCommitTx={() => void endTransaction(true)}
+                onRollbackTx={() => void endTransaction(false)}
                 onFormat={() => formatPanel(activePanel)}
                 onToggleStatement={toggleStatementPanel}
                 onToggleHistory={toggleHistoryPanel}
@@ -3003,6 +3073,11 @@ export default function DbClientTab({
   );
 }
 
+/** Engines whose sessions support the manual-commit toolbar (DB-TX-001). */
+function supportsManualCommit(engine: string): boolean {
+  return engine === "MySQL" || engine === "PostgreSQL";
+}
+
 function EditorToolbar({
   engine,
   schemas,
@@ -3018,6 +3093,11 @@ function EditorToolbar({
   onRunCurrent,
   onExplain,
   onCancel,
+  txAvailable,
+  txStatus,
+  onToggleTx,
+  onCommitTx,
+  onRollbackTx,
   onFormat,
   onToggleStatement,
   onToggleHistory,
@@ -3043,6 +3123,11 @@ function EditorToolbar({
   onRunCurrent: () => void;
   onExplain: () => void;
   onCancel: () => void;
+  txAvailable: boolean;
+  txStatus: DbTxStatus | null;
+  onToggleTx: () => void;
+  onCommitTx: () => void;
+  onRollbackTx: () => void;
   onFormat: () => void;
   onToggleStatement: () => void;
   onToggleHistory: () => void;
@@ -3056,6 +3141,7 @@ function EditorToolbar({
 }) {
   const t = useT();
   const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const txManual = txStatus?.manual === true;
   const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
   const input = "taomni-input h-6 w-[68px] text-[11px]";
   return (
@@ -3092,6 +3178,41 @@ function EditorToolbar({
       <button type="button" className={btn} onClick={onCancel} disabled={!running} title="Cancel query">
         <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} /> Cancel
       </button>
+      {txAvailable && (
+        <>
+          <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
+          <button
+            type="button"
+            className={btn}
+            onClick={onToggleTx}
+            disabled={running || !txStatus?.supported}
+            title={txManual ? "Manual commit (click for auto-commit)" : "Auto-commit (click for manual commit)"}
+            data-testid="db-tx-mode"
+            data-mode={txManual ? "manual" : "auto"}
+            aria-pressed={txManual}
+          >
+            {txManual ? "Manual" : "Auto"}
+          </button>
+          {txManual && (
+            <>
+              <button type="button" className={btn} onClick={onCommitTx} disabled={running} title="Commit" data-testid="db-tx-commit">
+                <GitCommitHorizontal className="w-3.5 h-3.5" /> Commit
+              </button>
+              <button type="button" className={btn} onClick={onRollbackTx} disabled={running} title="Rollback" data-testid="db-tx-rollback">
+                <Undo2 className="w-3.5 h-3.5" /> Rollback
+              </button>
+              <span
+                className="text-[11px] tabular-nums"
+                style={{ color: txStatus && txStatus.pending > 0 ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
+                title="Statements executed since the last commit or rollback"
+                data-testid="db-tx-pending"
+              >
+                Pending: {txStatus?.pending ?? 0}
+              </span>
+            </>
+          )}
+        </>
+      )}
       <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
       <button type="button" className={btn} onClick={onFormat} title="Format SQL">
         <Sparkles className="w-3.5 h-3.5" /> Format

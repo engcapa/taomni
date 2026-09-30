@@ -732,6 +732,10 @@
 - `[data-testid="db-execution-log-entry"]` — display [optional] — F-DB-1.execution-log-entry
 - `[data-testid="db-execution-log-summary"]` — display [optional] — F-DB-1.execution-log-summary
 - `[data-testid="result-sheet-tab"]` — interactive [optional] — F-DB-1.result-sheet-tab
+- `[data-testid="db-tx-mode"]` — interactive [optional] — F-DB-1.tx-mode
+- `[data-testid="db-tx-commit"]` — interactive [optional] — F-DB-1.tx-commit
+- `[data-testid="db-tx-rollback"]` — interactive [optional] — F-DB-1.tx-rollback
+- `[data-testid="db-tx-pending"]` — display [optional] — F-DB-1.tx-pending
 - `[data-testid="db-chat-toggle"]` — interactive [optional] — F-DB-1.chat-toggle
 - `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach
 
