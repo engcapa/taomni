@@ -3,8 +3,8 @@ title: Execution log records a failed statement and the statements that did not 
 description: |
   DB-EXEC-001 V4. Opens the offline MySQL session scaffold (browser preview has
   no database, so every statement fails), runs two statements with the Run
-  toolbar button, and verifies the Log tab becomes active with one FAILED and
-  one NOT RUN entry plus a summary. Success paths are covered by the native case
+  toolbar button, answers Stop in the DB-EXEC-002 error prompt, and verifies the
+  Log tab becomes active with one FAILED and one NOT RUN entry plus a summary. Success paths are covered by the native case
   TC-DB-EXEC-001-execution-log-native.
 covers:
 - F-DB-1
@@ -55,6 +55,8 @@ steps:
 - press: Mod+a
 - type: SELECT 1 AS a; SELECT 2 AS b;
 - click: '[data-testid="db-run-all"]'
+- wait_for: '[data-testid="choice-dialog"]'
+- click: '[data-testid="choice-dialog-cancel"]'
 - wait_for: '[data-testid="db-execution-log"]'
 - assert_attribute:
     selector: '[data-testid="result-log-tab"]'
