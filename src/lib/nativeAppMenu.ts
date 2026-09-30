@@ -187,6 +187,7 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
     { type: "item", id: "sockscap", label: t("menu.sockscap"), action: "sockscap" },
     { type: "item", id: "git", label: t("menu.gitRepository"), action: "git" },
     { type: "item", id: "code-workspace", label: t("menu.codeWorkspace"), action: "code-workspace" },
+    { type: "item", id: "mail-unified", label: t("tabs.mailUnified"), action: "mail-unified" },
     { type: "item", id: "lan-chat", label: t("tabs.lanChat"), action: "lan-chat" },
     { type: "item", id: "network-tools", label: t("menu.networkTools"), action: "tools" },
     { type: "separator" },

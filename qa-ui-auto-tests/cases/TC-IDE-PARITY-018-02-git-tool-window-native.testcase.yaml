@@ -1,0 +1,149 @@
+id: TC-IDE-PARITY-018-02
+title: Native workspace Git tool window reads two real repositories without writing
+description: 'ED-PARITY-018 A1/A3 native case on the parity008 two-repository fixture: Alt+9 opens the workspace Git tool window over real repositories, lists both repos'' changes, and hiding it keeps the dirty editor text while every repository''s index, refs and worktree bytes stay unchanged.
+
+
+  Mode: native.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- git
+- ed-parity-018
+- native-gate
+- p1
+modes:
+- native
+native_platforms:
+- Windows
+- Linux
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-parity008-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-parity008-native","name":"parity008","roots":[{"id":"parity008","name":"parity008","path":"${fixture.parity008_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"parity008","path":"repo-a/same.txt"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- seed_storage:
+    key: taomni.git.workspace.changes.tree
+    value: '"flat"'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: edit-kept
+- wait_for: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-git-panel-toggle"]:not([disabled])'
+    timeout_sec: 60
+- press:
+    key: Alt+9
+    macos_key: Alt+9
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for:
+    selector: '[data-testid="code-workspace-git-tool-window"] [data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+    timeout_sec: 60
+- assert_items:
+    selector: '[data-testid="code-workspace-git-tool-window"] [data-testid="workspace-change-row"]'
+    attribute: aria-label
+    equals:
+    - repo-a same.txt Staged
+    - repo-a untracked.txt Untracked
+    - repo-b same.txt Modified
+- screenshot: tc-ide-parity-018-02-git-tool-window.png
+- press:
+    key: Shift+Escape
+    selector: '[data-testid="code-workspace-git-tool-window"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    state: detached
+    timeout_sec: 10
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - edit-kept
+- assert_visible: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+- assert_file_sha256:
+    path: ${fixture.parity008_repo_a}/.git/index
+    equals: ${fixture.parity008_repo_a_index_sha256}
+- assert_file_sha256:
+    path: ${fixture.parity008_repo_b}/.git/index
+    equals: ${fixture.parity008_repo_b_index_sha256}
+- assert_file_sha256:
+    path: ${fixture.parity008_repo_a}/.git/refs/heads/main
+    equals: ${fixture.parity008_repo_a_main_sha256}
+- assert_file_sha256:
+    path: ${fixture.parity008_repo_b}/.git/refs/heads/main
+    equals: ${fixture.parity008_repo_b_main_sha256}
+- assert_file_sha256:
+    path: ${fixture.parity008_repo_a}/same.txt
+    equals: ${fixture.parity008_repo_a_worktree_sha256}
+- assert_file_sha256:
+    path: ${fixture.parity008_repo_b}/same.txt
+    equals: ${fixture.parity008_repo_b_worktree_sha256}
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1：打包应用中 Alt+9 打开 workspace Git 工具窗，列出两个真实仓库的变更，repo 标识不串。
+    actions:
+    - 15
+    checkpoints:
+    - step: 16
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-git-tool-window\"] [data-testid=\"workspace-change-row\"][data-repo-root$=\"repo-b\"][data-path=\"same.txt\"]", "timeout_sec": 60}}'
+    - step: 17
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-git-tool-window\"] [data-testid=\"workspace-change-row\"]", "attribute": "aria-label", "equals": ["repo-a same.txt Staged", "repo-a untracked.txt Untracked", "repo-b same.txt Modified"]}}'
+    results:
+    - 17
+  - id: R2
+    requirement: A3：隐藏工具窗后编辑器文本与 dirty 保留；两个仓库 index/refs/worktree 字节不变（零 Git 写入）。
+    actions:
+    - 19
+    checkpoints:
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 10}}'
+    - step: 21
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["repo-a WORKTREE", "shared line", "edit-kept"]}}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-editor-tab-key][data-active=\"true\"][data-dirty=\"true\"]"}'
+    - step: 23
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/.git/index", "equals": "${fixture.parity008_repo_a_index_sha256}"}}'
+    - step: 24
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/.git/index", "equals": "${fixture.parity008_repo_b_index_sha256}"}}'
+    - step: 25
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/.git/refs/heads/main", "equals": "${fixture.parity008_repo_a_main_sha256}"}}'
+    - step: 26
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/.git/refs/heads/main", "equals": "${fixture.parity008_repo_b_main_sha256}"}}'
+    - step: 27
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/same.txt", "equals": "${fixture.parity008_repo_a_worktree_sha256}"}}'
+    - step: 28
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/same.txt", "equals": "${fixture.parity008_repo_b_worktree_sha256}"}}'
+    results:
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+  visual:
+  - check: 不声明视觉结论。
+    method: not-applicable
+    reason: native 只证明 repo 读取与零写入。
+  native:
+  - check: Windows/Linux 打包应用 + 真实 git；macOS 与 008-03 相同未纳入。
+    method: automated
+    reason: native runner 驱动打包 WebView。

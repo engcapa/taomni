@@ -84,7 +84,8 @@
           "parity006_replace",
           "parity008_git",
           "parity009_ssr",
-          "parity007_extract"
+          "parity007_extract",
+          "mail_server"
         ]
       },
       "uniqueItems": true
@@ -1046,6 +1047,190 @@
               "type": "string"
             }
           }
+        },
+        "mail_server_assert_idle_clients": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "equals"
+          ],
+          "properties": {
+            "equals": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "mail_server_deliver": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            },
+            "prefix": {
+              "type": "string",
+              "minLength": 1
+            },
+            "thread": {
+              "type": "boolean"
+            },
+            "list_unsubscribe": {
+              "type": "string",
+              "minLength": 1
+            },
+            "invite": {
+              "type": "string",
+              "minLength": 1
+            },
+            "read_receipt": {
+              "type": "boolean"
+            }
+          }
+        },
+        "mail_server_assert_caldav_contains": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "mail_server_assert_smtp_contains": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "mail_server_expunge_newest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "mail_server_set_flags_newest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "flags"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            },
+            "flags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "mail_server_assert_list_matches": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "folder": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unread": {
+                  "type": "boolean"
+                },
+                "timeout_sec": {
+                  "type": "number",
+                  "minimum": 1
+                }
+              }
+            }
+          ]
+        },
+        "mail_server_assert_folder_count": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "folder"
+          ],
+          "properties": {
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            },
+            "min": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "equals": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "has_subject": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lacks_subject": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
         }
       }
     },
@@ -1656,6 +1841,10 @@
           "properties": {
             "key": {
               "type": "string"
+            },
+            "macos_key": {
+              "type": "string",
+              "description": "Chord used instead of key on macOS, where the IDEA macOS keymap binds a different stroke (e.g. Meta+1 for Alt+1)."
             },
             "selector": {
               "$ref": "#/$defs/selector"

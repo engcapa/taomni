@@ -71,7 +71,7 @@ steps:
       column: 33
 - assert_text:
     selector: '[data-testid="status-bar-workspace-cursor"]'
-    contains: Ln 13, Col 34
+    contains: '13:34'
     timeout_sec: 10
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
@@ -203,8 +203,7 @@ verification:
     - step: 12
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lightbulb\"]", "timeout_sec": 90}}'
     - step: 15
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "Ln
-        13, Col 34", "timeout_sec": 10}}'
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"13:34\", \"timeout_sec\": 10}}"
     - step: 17
       expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "timeout_sec": 90}}'
     - step: 18

@@ -23,6 +23,13 @@ import {
 import { useSessionImportExport } from "../components/menubar/useSessionImportExport";
 import type { AppCommand } from "../components/menubar/commands";
 import { buildAppMenuSpec, installAppMenu, type MenuActionId } from "../lib/nativeAppMenu";
+import {
+  LEGACY_MAIL_HEADER_LIMIT_PER_FOLDER,
+  LEGACY_MAIL_HEADER_RETENTION_DAYS,
+  mailHeaderLimitOption,
+} from "../lib/mailSync";
+import { parseMailIdentities } from "../lib/mailIdentities";
+import { parseSpecialFolders } from "../lib/mailFolders";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
@@ -37,6 +44,7 @@ import { CodeWorkspaceTab, type CodeWorkspaceGitManagerPayload } from "../compon
 import type { WorkspaceCommandRegistration } from "../components/editor/workspace/workspaceCommands";
 import { resolveShellShortcutRoute } from "../components/editor/workspace/shellShortcutRouter";
 import { decideWorkspaceGitSync } from "../lib/workspaceGitManagerSync";
+import { shellKeyClaimed } from "../lib/shellKeyClaims";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
@@ -51,6 +59,7 @@ import { FileBrowser, type SftpPendingUploadRequest } from "../components/filebr
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
 import { MailClientTab } from "../components/mail/MailClientTab";
+import { MailUnifiedTab } from "../components/mail/MailUnifiedTab";
 import { sessionToObjectStorageConfig, objectStorageHasVaultSecret } from "../lib/objectStorage";
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { useSftpStore } from "../stores/sftpStore";
@@ -531,6 +540,7 @@ function sessionToMailTabInfo(
       username: session.username || emailAddress || null,
       password,
       security: mailSecurityFromOptions(opts.mailImapSecurity, "tls"),
+      trustedCert: str("mailImapTrustedCert") || null,
     },
     smtp: {
       host: str("mailSmtpHost"),
@@ -539,6 +549,7 @@ function sessionToMailTabInfo(
       password: smtpUseImapAuth ? password : smtpPassword,
       security: mailSecurityFromOptions(opts.mailSmtpSecurity, "tls"),
       useImapAuth: smtpUseImapAuth,
+      trustedCert: str("mailSmtpTrustedCert") || null,
     },
     oauth: {
       clientId: str("mailOauthClientId") || null,
@@ -553,11 +564,38 @@ function sessionToMailTabInfo(
       onOpen: opts.mailSyncOnOpen !== false,
       intervalMinutes: mailNumberOption(opts, "mailSyncIntervalMinutes", 5, 1),
       maxFetchPerSync: mailNumberOption(opts, "mailMaxFetchPerSync", 200, 1),
+      idle: opts.mailIdlePush !== false,
+      desktopNotify: opts.mailDesktopNotify === true,
+      subscribedOnly: opts.mailSubscribedOnly === true,
     },
+    specialFolders: parseSpecialFolders(opts.mailSpecialFolders),
+    undoSendSeconds: mailNumberOption(opts, "mailUndoSendSeconds", 0, 0),
+    carddav: typeof opts.mailCardDavUrl === "string" && opts.mailCardDavUrl.trim()
+      ? {
+        url: opts.mailCardDavUrl.trim(),
+        username: typeof opts.mailCardDavUsername === "string" && opts.mailCardDavUsername.trim()
+          ? opts.mailCardDavUsername.trim()
+          : null,
+      }
+      : null,
+    caldav: typeof opts.mailCalDavUrl === "string" && opts.mailCalDavUrl.trim()
+      ? {
+        url: opts.mailCalDavUrl.trim(),
+        username: typeof opts.mailCalDavUsername === "string" && opts.mailCalDavUsername.trim()
+          ? opts.mailCalDavUsername.trim()
+          : null,
+      }
+      : null,
+    receiptPolicy: opts.mailReceiptPolicy === "always" || opts.mailReceiptPolicy === "never" ? opts.mailReceiptPolicy : "ask",
+    incoming: opts.mailIncoming === "pop3" ? "pop3" : "imap",
+    pop3LeaveDays: opts.mailPop3LeaveDays === undefined || opts.mailPop3LeaveDays === null || String(opts.mailPop3LeaveDays).trim() === ""
+      ? null
+      : mailNumberOption(opts, "mailPop3LeaveDays", 0, 0),
     cache: {
-      enabled: opts.mailCacheEnabled !== false,
-      headerRetentionDays: mailNumberOption(opts, "mailHeaderRetentionDays", 30, 1),
-      headerLimitPerFolder: mailNumberOption(opts, "mailHeaderLimitPerFolder", 2000, 1),
+      // POP3 mail lives only in the local store, so its cache is always on.
+      enabled: opts.mailCacheEnabled !== false || opts.mailIncoming === "pop3",
+      headerRetentionDays: mailHeaderLimitOption(opts, "mailHeaderRetentionDays", LEGACY_MAIL_HEADER_RETENTION_DAYS),
+      headerLimitPerFolder: mailHeaderLimitOption(opts, "mailHeaderLimitPerFolder", LEGACY_MAIL_HEADER_LIMIT_PER_FOLDER),
       bodyRecentLimit: mailNumberOption(opts, "mailBodyRecentLimit", 200, 0),
       bodyMaxBytes: mailNumberOption(opts, "mailBodyMaxBytes", 262144, 1024),
       attachmentCache: opts.mailAttachmentCache === true,
@@ -567,6 +605,8 @@ function sessionToMailTabInfo(
       enabled: opts.mailAiEnabled !== false,
       skipBodyConfirm: opts.mailAiSkipBodyConfirm === true,
     },
+    saveSentCopy: opts.mailSaveSentCopy === "on" ? true : opts.mailSaveSentCopy === "off" ? false : null,
+    identities: parseMailIdentities(opts.mailIdentities),
   };
 }
 
@@ -3133,7 +3173,7 @@ export function MainLayout() {
       } else if (session.session_type === "Browser") {
         openBrowserSession(session);
       } else if (session.session_type === "Mail") {
-        openMailTab(session);
+        openMailTab(session, parsed.authData ?? undefined);
       } else if (COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) {
         openCommandTerminalTab(session);
       } else if (
@@ -3474,6 +3514,44 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
+  /** Unified mail across every saved mail account (TASK-16, DEC-12). */
+  const openUnifiedMailTab = useCallback(() => {
+    const existing = tabsRef.current.find((tab) => tab.type === "mail-unified");
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    addTab({
+      id: "mail-unified",
+      type: "mail-unified",
+      title: t("tabs.mailUnified"),
+      closable: true,
+    });
+  }, [addTab, setActiveTab]);
+
+  // Saved mail sessions plus every open mail tab (quick-connect accounts are
+  // not saved); an open tab's info wins because it carries its credentials.
+  const unifiedMailAccounts = useMemo(() => {
+    const byId = new Map<string, MailTabInfo>();
+    for (const session of sessions) {
+      if (session.session_type !== "Mail") continue;
+      byId.set(session.id, sessionToMailTabInfo(
+        session,
+        passwordRefFromOptions(session) ?? undefined,
+        mailSmtpPasswordRefFromOptions(session) ?? undefined,
+      ));
+    }
+    for (const tab of tabs) {
+      if (tab.type === "mail" && tab.mail) byId.set(tab.mail.sessionId, tab.mail);
+    }
+    return [...byId.values()];
+  }, [sessions, tabs]);
+
+  const openMailAccountById = useCallback((sessionId: string) => {
+    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    if (session) openQueuedSession(session);
+  }, [openQueuedSession]);
+
   // Initialize LanChat at app startup (not only when the tab opens) so roster,
   // unread, and desktop notifications work even while the tab is closed.
   useEffect(() => {
@@ -3604,6 +3682,9 @@ export function MainLayout() {
       case "lan-chat":
         openLanChatTab();
         break;
+      case "mail-unified":
+        openUnifiedMailTab();
+        break;
       case "help":
         setShowAbout(true);
         break;
@@ -3690,7 +3771,9 @@ export function MainLayout() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const tabIndex = macCommandDigitIndex(event);
-      if (tabIndex !== null) {
+      // A focused surface that binds the same chord (Code Workspace Cmd+1
+      // Project on macOS) keeps it; its own keymap dispatches the action.
+      if (tabIndex !== null && !shellKeyClaimed(event)) {
         event.preventDefault();
         event.stopPropagation();
 
@@ -4525,6 +4608,16 @@ export function MainLayout() {
 
                 {activeTab?.type === "lan-chat" && <LanChatGate />}
 
+                {tabs.some((tab) => tab.type === "mail-unified") && (
+                  <div className="absolute inset-0" style={{ display: activeTab?.type === "mail-unified" ? "block" : "none" }}>
+                    <MailUnifiedTab
+                      accounts={unifiedMailAccounts}
+                      visible={activeTab?.type === "mail-unified"}
+                      onOpenAccount={openMailAccountById}
+                    />
+                  </div>
+                )}
+
                 {/* VNC tabs — always mounted so connection survives tab switches */}
                 {vncTabs.map((tab) => {
                   const vnc = tab.vnc;
@@ -4733,6 +4826,7 @@ export function MainLayout() {
                   activeTab.type !== "redis" &&
                   activeTab.type !== "hbase-shell" &&
                   activeTab.type !== "mail" &&
+                  activeTab.type !== "mail-unified" &&
                   activeTab.type !== "settings" &&
                   activeTab.type !== "git" &&
                   activeTab.type !== "nettools" &&

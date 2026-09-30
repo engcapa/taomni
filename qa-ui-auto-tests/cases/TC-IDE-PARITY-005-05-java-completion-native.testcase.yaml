@@ -251,7 +251,7 @@ steps:
       equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtiSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 5, Col 37
+      contains: '5:37'
   - press: Mod+s
   - press: Control+Space
   - wait_for: '.cm-tooltip-autocomplete'
@@ -287,7 +287,7 @@ steps:
       equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtiSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 5, Col 37
+      contains: '5:37'
   - press: Control+Space
   - wait_for: '.cm-tooltip-autocomplete'
   - parity005_native_trace:
@@ -321,7 +321,7 @@ steps:
       equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtiSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 5, Col 37
+      contains: '5:37'
   - press: Control+Space
   - wait_for: '.cm-tooltip-autocomplete'
   - parity005_native_trace:
@@ -352,7 +352,7 @@ steps:
       equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Object typeProbe = StringUtiSuffix;', '        new StringBuilder().append("seed");', '    }', '}', '']
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 5, Col 37
+      contains: '5:37'
   - click: '[data-testid="theme-cycle"]'
   - click: '[data-testid="theme-cycle"]'
   - assert_localstorage: {key: taomni.appTheme.v1, equals: dark}

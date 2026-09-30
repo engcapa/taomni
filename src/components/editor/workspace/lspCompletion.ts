@@ -117,6 +117,12 @@ export interface LspCompletionHooks {
    */
   onScopeFallback?: (state: CompletionScopeFactsState, reason: CompletionInvocationReason) => void;
   /**
+   * ED-PARITY-020 DEC-ALIGN-09: the provider is unavailable at a member
+   * access (`obj.`). Buffer words would masquerade as members there, so the
+   * source returns nothing and names the unavailable service through this hook.
+   */
+  onProviderUnavailable?: (info: { explicit: boolean }) => void;
+  /**
    * Resolve gate surface (§8.19.4). When wired, a resolve timeout/failure
    * presents Retry / Insert-without-import instead of inserting anything.
    * Hosts without a gate surface get the block-only behaviour: nothing is
@@ -149,6 +155,7 @@ export interface FixtureCompletionHooks {
    */
   projectScope?: CompletionScopeFactsState;
   onScopeFallback?: (state: CompletionScopeFactsState, reason: CompletionInvocationReason) => void;
+  onProviderUnavailable?: (info: { explicit: boolean }) => void;
 }
 
 let completionRequestIdCounter = 0;
@@ -2002,9 +2009,16 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
     }
 
     // Identity is captured at request start; a request without provable
-    // identity is typed unavailable and falls back to buffer words.
+    // identity is typed unavailable and falls back to buffer words — except at
+    // a member access, where words would pose as members (DEC-ALIGN-09).
+    const memberAccess = charBefore === "." || preWordChar === ".";
+    const unavailableFallback = () => {
+      if (!memberAccess) return completeAnyWord(context);
+      hooks.onProviderUnavailable?.({ explicit: context.explicit });
+      return null;
+    };
     const identityAtStart = hooks.identity();
-    if (!identityAtStart) return completeAnyWord(context);
+    if (!identityAtStart) return unavailableFallback();
     completionRequestIdCounter += 1;
     const token: CompletionRequestToken = {
       ...identityAtStart,
@@ -2104,14 +2118,14 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
     }
     if (result === null) {
       recordCompletionTelemetry(token, "failed", { reason: "fetch-failed" });
-      return completeAnyWord(context);
+      return unavailableFallback();
     }
     // Inactive/unavailable provider is unavailable regardless of item count:
     // stale non-empty items from a stopped/restarted session must never enter
     // the popup (§8.16.2 containment).
     if (!result.status.active) {
       recordCompletionTelemetry(token, "unavailable", { reason: "provider-inactive" });
-      return completeAnyWord(context);
+      return unavailableFallback();
     }
 
     recordCompletionInvocationEvidence({
@@ -2409,5 +2423,6 @@ export function createFixtureCompletionSource(hooks: FixtureCompletionHooks): Co
     getDocumentRevision: hooks.getDocumentRevision ?? (() => identity.documentRevision),
     reportDiagnostic: hooks.reportDiagnostic ?? (() => {}),
     onScopeFallback: hooks.onScopeFallback,
+    onProviderUnavailable: hooks.onProviderUnavailable,
   });
 }

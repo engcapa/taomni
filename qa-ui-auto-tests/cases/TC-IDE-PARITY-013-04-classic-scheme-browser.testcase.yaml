@@ -1,0 +1,154 @@
+id: TC-IDE-PARITY-013-04
+title: Taomni Classic keymap keeps F12 = Go to Definition; IDEA defaults restore Jump to Last Tool Window
+description: 'ED-PARITY-013 A2.5/DEC-013-06 browser case. The built-in read-only Taomni Classic scheme restores the pre-migration F12 binding and clears the new IDEA owner, persists only its id as the active scheme, and switching back to IDEA defaults makes F12 reopen the last tool window again.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- keymap
+- ed-parity-013
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+6
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Shift+Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+A
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- type:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    text: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- select_option:
+    selector: '[data-testid="keymap-scheme-select"]'
+    label: Taomni Classic
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Go to Definition
+- assert_text:
+    selector: '[data-testid="keymap-row-workspace.gotoDefinition"]'
+    contains: F12
+- fill:
+    selector: '[data-testid="keymap-action-filter"]'
+    value: Jump to Last Tool Window
+- assert_visible: '[data-testid="keymap-no-shortcut-workspace.jumpToLastToolWindow"]'
+- click: '[data-testid="keymap-settings-apply"]'
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: F12
+- wait: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    equal: 0
+- assert_localstorage:
+    key: taomni.codeWorkspace.keymap.v3:active
+    equals: builtin:taomni-classic
+- click: '[data-testid="code-workspace-tab"]'
+- press: Control+Shift+A
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- type:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    text: Keymap Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Keymap Settings'
+- wait_for: '[data-testid="workspace-keymap-settings-dialog"]'
+- select_option:
+    selector: '[data-testid="keymap-scheme-select"]'
+    label: IDEA defaults (default)
+- click: '[data-testid="keymap-settings-apply"]'
+- click: '[data-testid="keymap-settings-close"]'
+- wait_for:
+    selector: '[data-testid="workspace-keymap-settings-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: F12
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    timeout_sec: 10
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A2.5：Taomni Classic 方案下 Go to Definition 显示 F12，Jump to Last Tool Window 无快捷键。
+    actions:
+    - 24
+    checkpoints:
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-row-workspace.gotoDefinition\"]", "contains": "F12"}}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"keymap-no-shortcut-workspace.jumpToLastToolWindow\"]"}'
+    results:
+    - 26
+    - 28
+  - id: R2
+    requirement: A2.5：Apply Classic 后 F12 不再打开工具窗，存储只记录内置方案 id。
+    actions:
+    - 29
+    - 33
+    checkpoints:
+    - step: 35
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "equal": 0}}'
+    - step: 36
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.keymap.v3:active", "equals": "builtin:taomni-classic"}}'
+    results:
+    - 35
+    - 36
+  - id: R3
+    requirement: DEC-013-05：切回 IDEA defaults 后 F12 重新打开上次工具窗（Problems）。
+    actions:
+    - 13
+    - 43
+    - 48
+    checkpoints:
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
+    - step: 49
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
+    results:
+    - 49
+  visual:
+  - check: 方案下拉中 Taomni Classic 文案完整。
+    method: manual
+    reason: 像素需人工评审。
+  native:
+  - check: 不涉及 native 边界。
+    method: not-applicable
+    reason: 方案选择与派发均为 renderer 行为。

@@ -10,6 +10,8 @@ interface StructurePopupProps {
   loading: boolean;
   /** Why the list may be empty, e.g. the language server being unavailable. */
   unavailableReason?: string | null;
+  /** ED-PARITY-014 DEC-014-04: symbols come from the grammar, not a provider. */
+  syntaxOnly?: boolean;
   onClose: () => void;
   onPick: (symbol: LspDocumentSymbol) => void;
 }
@@ -57,6 +59,7 @@ export function StructurePopup({
   symbols,
   loading,
   unavailableReason = null,
+  syntaxOnly = false,
   onClose,
   onPick,
 }: StructurePopupProps) {
@@ -108,6 +111,23 @@ export function StructurePopup({
         if (unavailableReason) return unavailableReason;
         return query ? "No matching symbols" : "No symbols in this file";
       }}
+      header={
+        // IDEA titles File Structure with the file name.
+        <div className="flex h-7 shrink-0 items-center gap-2 border-b border-[var(--taomni-code-border)] px-3 text-[11px]">
+          <span data-testid="code-workspace-structure-title" className="min-w-0 flex-1 truncate font-medium text-[var(--taomni-code-text)]">
+            {fileTitle ?? "File structure"}
+          </span>
+          {syntaxOnly && (
+            <span
+              data-testid="code-workspace-structure-syntax-only"
+              title="The language server is unavailable; this outline is parsed from the file's syntax only"
+              className="shrink-0 rounded border border-amber-500/40 px-1 text-[10px] text-amber-600 dark:text-amber-400"
+            >
+              syntax only
+            </span>
+          )}
+        </div>
+      }
       footer={
         <>
           <span>↑↓ select</span>

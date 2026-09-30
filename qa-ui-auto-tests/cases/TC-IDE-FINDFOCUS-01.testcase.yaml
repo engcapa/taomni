@@ -299,7 +299,7 @@ steps:
     value: no-result
 - assert_text:
     selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
-    contains: 0 matches
+    contains: 0 results
 - click: '[data-testid="code-workspace-editor-search"] button[aria-label="Use regular expression"]'
 - fill:
     selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
@@ -319,7 +319,7 @@ steps:
     value: ''
 - assert_text:
     selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
-    contains: 0 matches
+    contains: 0 results
 - fill:
     selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
     value: tree
@@ -361,6 +361,7 @@ steps:
     selector: '[data-testid="code-workspace-save-observation"]'
     name: data-dirty
     equals: 'false'
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - click: '[data-testid="code-workspace-split-right"]'
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"]'
@@ -382,6 +383,7 @@ steps:
     selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
     contains: 2 / 2
 - press: Escape
+- click: '[data-testid="code-workspace-toolbar-more"]'
 - click: '[data-testid="code-workspace-split-unsplit-all"]'
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"]'
@@ -496,14 +498,14 @@ verification:
     - 177
     - 178
     - 183
-    - 186
-    - 188
+    - 187
     - 189
     - 190
-    - 192
-    - 194
-    - 196
+    - 191
+    - 193
+    - 195
     - 197
+    - 199
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -701,7 +703,7 @@ verification:
         "regex": "^$"}}'
     - step: 155
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
-        "contains": "0 matches"}}'
+        "contains": "0 results"}}'
     - step: 158
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
         "contains": "Invalid pattern"}}'
@@ -710,7 +712,7 @@ verification:
         "contains": "1 / 2"}}'
     - step: 163
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
-        "contains": "0 matches"}}'
+        "contains": "0 results"}}'
     - step: 165
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
         "contains": "1 / 2"}}'
@@ -734,36 +736,36 @@ verification:
     - step: 185
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-dirty", "equals": "false"}}'
-    - step: 187
+    - step: 188
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
-    - step: 191
+    - step: 192
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-search\"]", "equal": 1}}'
-    - step: 193
+    - step: 194
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
         "contains": "1 / 2"}}'
-    - step: 195
+    - step: 196
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status",
         "contains": "2 / 2"}}'
-    - step: 198
+    - step: 200
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 199
+    - step: 201
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
         "equal": 3}}'
-    - step: 200
+    - step: 202
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)",
         "regex": "^Project\\ tree\\ example$"}}'
-    - step: 201
+    - step: 203
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)",
         "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
-    - step: 202
+    - step: 204
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)",
         "regex": "^$"}}'
     results:
-    - 198
-    - 199
     - 200
     - 201
     - 202
+    - 203
+    - 204
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

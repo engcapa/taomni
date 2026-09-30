@@ -1,0 +1,109 @@
+id: TC-MAIL-TAG-01
+title: Mail tags are stored as IMAP keywords and survive a full resync
+description: 'TASK-11 (AC-34): tagging a message "Important" stores Thunderbird''s
+
+  $label1 keyword on the server; the tag dot shows in the list, the tag quick
+
+  filter narrows to it, and a manual Sync (full reconcile of server flags)
+
+  keeps it. Browser mode uses the stub server; native mode uses the real
+
+  backend against the fake IMAP server.
+
+  '
+covers:
+- F-MAIL-8
+tags:
+- mail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- right_click: '[data-testid="mail-message-row"]'
+- click: '[data-testid="mail-menu-tag"]'
+- click: '[data-testid="mail-menu-tag-label1"]'
+- wait_for:
+    selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
+    timeout_sec: 15
+- assert_count:
+    selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
+    equal: 1
+- select_option:
+    selector: '[data-testid="mail-quick-filter-tag"]'
+    value: $label1
+- assert_count:
+    selector: '[data-testid="mail-message-row"]'
+    equal: 1
+- click: '[data-testid="mail-sync-button"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: new headers across
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
+    timeout_sec: 15
+- assert_count:
+    selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
+    equal: 1
+- screenshot: mail-tag-01.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 标记“Important”后列表显示标签、标签过滤只剩该邮件，完整对账同步后标签仍在（服务器保存了 $label1）（AC-34）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 10
+    - 11
+    - 14
+    - 16
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 12
+      expectation: '{"wait_for": "tag dot"}'
+    - step: 13
+      expectation: '{"assert_count": {"equal": 1}}'
+    - step: 15
+      expectation: '{"assert_count": {"equal": 1}}'
+    - step: 17
+      expectation: '{"assert_text": {"contains": "new headers across"}}'
+    - step: 19
+      expectation: '{"assert_count": {"equal": 1}}'
+    results:
+    - 13
+    - 15
+    - 19
+  visual:
+  - check: 截图中标签色点与过滤状态清晰。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实 IMAP STORE 关键字与全量标志对账；browser 仅验证渲染层与桩模型；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

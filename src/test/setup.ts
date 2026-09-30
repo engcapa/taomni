@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { createElement, forwardRef, useImperativeHandle, type HTMLAttributes, type ReactNode, type Ref } from "react";
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
 
 vi.mock("mermaid", () => ({
   default: {
@@ -122,3 +122,9 @@ if (typeof Range !== "undefined") {
     toJSON: () => ({}),
   })) as unknown as Range["getBoundingClientRect"];
 }
+
+// ED-PARITY-013: tests that pin a keymap platform must not leak it.
+afterEach(async () => {
+  const { setKeymapPlatformOverride } = await import("../components/editor/workspace/workspaceKeymapPlatform");
+  setKeymapPlatformOverride(null);
+});

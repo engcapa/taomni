@@ -1,0 +1,207 @@
+id: TC-IDE-PARITY-017-03
+title: Native JDT LS in-place rename previews both files and undoes in one step
+description: 'ED-PARITY-017 A1/A2 native case on the in-repo maven-single sample and the CI-provisioned JDT LS: Shift+F6 on a static method opens the in-place naming session; the cross-file rename previews true before/after lines for Greeter.java and Caller.java; Do Refactor updates the buffer and the unopened file on disk; one undo restores both.
+
+
+  Mode: native.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- refactor
+- ed-parity-017
+- native-gate
+- provider-fixture
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- java_sample_projects
+- jdtls_required
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-p017","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/Greeter.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- host_write_file:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/Greeter.java
+    text: "package com.example.single;\n\npublic class Greeter {\n    public static String greet() {\n        return \"hi\";\n    }\n}\n"
+- host_write_file:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java
+    text: "package com.example.single;\n\npublic class Caller {\n    String call() {\n        return Greeter.greet();\n    }\n}\n"
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: public static String greet()
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 120
+- wait: 3
+- press:
+    key: Mod+Home
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowDown
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowDown
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowDown
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: End
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: Shift+F6
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    timeout_sec: 60
+- assert_attribute:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    name: value
+    equals: greet
+- assert_text:
+    selector: .cm-inline-rename-target
+    contains: greet
+- assert_count:
+    selector: '[data-testid="text-input-dialog"]'
+    equal: 0
+- screenshot: tc-ide-parity-017-03-inline.png
+- fill:
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+    value: salute
+- press:
+    key: Enter
+    selector: '[data-testid="code-workspace-inline-rename-input"]'
+- wait_for:
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="refactoring-preview-row"][data-path$="Caller.java"] [data-testid="refactoring-preview-before"]'
+    contains: return Greeter.greet();
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="refactoring-preview-row"][data-path$="Caller.java"] [data-testid="refactoring-preview-after"]'
+    contains: return Greeter.salute();
+- assert_text:
+    selector: '[data-testid="refactoring-preview-row"][data-path$="Greeter.java"] [data-testid="refactoring-preview-after"]'
+    contains: public static String salute() {
+- assert_count:
+    selector: '[data-testid="refactoring-preview-source-unavailable"]'
+    equal: 0
+- screenshot: tc-ide-parity-017-03-preview.png
+- click: '[data-testid="refactoring-preview-apply"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: public static String salute()
+    timeout_sec: 30
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java
+    contains: Greeter.salute()
+    timeout_sec: 30
+- press:
+    key: Mod+z
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: public static String greet()
+    timeout_sec: 30
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java
+    contains: Greeter.greet()
+    timeout_sec: 30
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1：真实 JDT LS 下 Shift+F6 打开行内命名（预填 provider 名称、加框），不弹 Rename 对话框。
+    actions:
+    - 26
+    checkpoints:
+    - step: 13
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 120}}'
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "timeout_sec": 60}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "name": "value", "equals": "greet"}}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": ".cm-inline-rename-target", "contains": "greet"}}'
+    - step: 30
+      expectation: '{"assert_count": {"selector": "[data-testid=\"text-input-dialog\"]", "equal": 0}}'
+    results:
+    - 28
+    - 29
+    - 30
+  - id: R2
+    requirement: A2：跨文件 rename 的 Preview 显示两个文件的真实改前/改后行；Do Refactor 后编辑器与未打开文件的磁盘内容一致更新；一次 Undo 同时恢复两个文件。
+    actions:
+    - 33
+    - 40
+    - 43
+    checkpoints:
+    - step: 34
+      expectation: '{"wait_for": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "timeout_sec": 60}}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"Caller.java\"] [data-testid=\"refactoring-preview-before\"]", "contains": "return Greeter.greet();", "timeout_sec": 10}}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"Caller.java\"] [data-testid=\"refactoring-preview-after\"]", "contains": "return Greeter.salute();"}}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"Greeter.java\"] [data-testid=\"refactoring-preview-after\"]", "contains": "public static String salute() {"}}'
+    - step: 38
+      expectation: '{"assert_count": {"selector": "[data-testid=\"refactoring-preview-source-unavailable\"]", "equal": 0}}'
+    - step: 41
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "public static String salute()", "timeout_sec": 30}}'
+    - step: 42
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java", "contains": "Greeter.salute()", "timeout_sec": 30}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "public static String greet()", "timeout_sec": 30}}'
+    - step: 45
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java", "contains": "Greeter.greet()", "timeout_sec": 30}}'
+    results:
+    - 35
+    - 36
+    - 37
+    - 42
+    - 44
+    - 45
+  visual:
+  - check: 不声明视觉结论。
+    method: not-applicable
+    reason: native 证明 provider 编辑、preview 与磁盘结果。
+  native:
+  - check: Linux/Windows/macOS 打包应用 + 真实 JDT LS。
+    method: automated
+    reason: native runner 驱动打包 WebView。

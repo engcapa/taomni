@@ -29,6 +29,10 @@ import {
 import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
 import { ensureVaultReady } from "../../lib/vaultGate";
+import { MAIL_HEADER_LIMITS_EXPLICIT_KEY, mailHeaderLimitOption } from "../../lib/mailSync";
+import { MAIL_SPECIAL_FOLDER_KEYS, parseSpecialFolders, type MailSpecialFolderKey } from "../../lib/mailFolders";
+import { parseMailIdentities } from "../../lib/mailIdentities";
+import { MailIdentitiesEditor } from "./MailIdentitiesEditor";
 import {
   selectFilePath,
   selectFolderPath,
@@ -47,7 +51,7 @@ import {
   type WslDistro,
   type LocalShellOption,
 } from "../../lib/ipc";
-import type { DbConnectInfo, HBaseConnectInfo } from "../../types";
+import type { DbConnectInfo, HBaseConnectInfo, MailIdentity } from "../../types";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import {
   DEFAULT_NETWORK_SETTINGS,
@@ -110,6 +114,7 @@ import { LocalShellOptionsForm } from "./forms/LocalShellOptionsForm";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { MailAppearanceSettings } from "../mail/MailAppearanceSettings";
 import {
+  mailAutoconfig,
   mailOAuthAuthorize,
   mailOAuthDeviceComplete,
   mailOAuthDeviceStart,
@@ -1381,8 +1386,22 @@ function MailSettings({
   bodyMaxBytes, setBodyMaxBytes,
   attachmentCache, setAttachmentCache,
   syncOnOpen, setSyncOnOpen,
+  idlePush, setIdlePush,
+  subscribedOnly, setSubscribedOnly,
+  incoming, setIncoming,
+  pop3LeaveDays, setPop3LeaveDays,
+  undoSendSeconds, setUndoSendSeconds,
+  cardDavUrl, setCardDavUrl,
+  cardDavUsername, setCardDavUsername,
+  calDavUrl, setCalDavUrl,
+  calDavUsername, setCalDavUsername,
+  receiptPolicy, setReceiptPolicy,
+  specialFolders, setSpecialFolders,
+  desktopNotify, setDesktopNotify,
   syncIntervalMinutes, setSyncIntervalMinutes,
   maxFetchPerSync, setMaxFetchPerSync,
+  saveSentCopy, setSaveSentCopy,
+  identities, setIdentities,
   aiEnabled, setAiEnabled,
   aiSkipBodyConfirm, setAiSkipBodyConfirm,
   vaultState,
@@ -1428,13 +1447,62 @@ function MailSettings({
   bodyMaxBytes: string; setBodyMaxBytes: (v: string) => void;
   attachmentCache: boolean; setAttachmentCache: (v: boolean) => void;
   syncOnOpen: boolean; setSyncOnOpen: (v: boolean) => void;
+  idlePush: boolean; setIdlePush: (v: boolean) => void;
+  subscribedOnly: boolean; setSubscribedOnly: (v: boolean) => void;
+  incoming: "imap" | "pop3"; setIncoming: (v: "imap" | "pop3") => void;
+  pop3LeaveDays: string; setPop3LeaveDays: (v: string) => void;
+  undoSendSeconds: string; setUndoSendSeconds: (v: string) => void;
+  cardDavUrl: string; setCardDavUrl: (v: string) => void;
+  cardDavUsername: string; setCardDavUsername: (v: string) => void;
+  calDavUrl: string; setCalDavUrl: (v: string) => void;
+  calDavUsername: string; setCalDavUsername: (v: string) => void;
+  receiptPolicy: string; setReceiptPolicy: (v: string) => void;
+  specialFolders: Partial<Record<MailSpecialFolderKey, string>>;
+  setSpecialFolders: (v: Partial<Record<MailSpecialFolderKey, string>>) => void;
+  desktopNotify: boolean; setDesktopNotify: (v: boolean) => void;
   syncIntervalMinutes: string; setSyncIntervalMinutes: (v: string) => void;
   maxFetchPerSync: string; setMaxFetchPerSync: (v: string) => void;
+  saveSentCopy: string; setSaveSentCopy: (v: string) => void;
+  identities: MailIdentity[]; setIdentities: (v: MailIdentity[]) => void;
   aiEnabled: boolean; setAiEnabled: (v: boolean) => void;
   aiSkipBodyConfirm: boolean; setAiSkipBodyConfirm: (v: boolean) => void;
   vaultState: "empty" | "locked" | "unlocked";
 }) {
   const isOAuth = authMode === "oauth2";
+  // TASK-14: fill servers from the address (built-in table, then ISPDB).
+  const [autoconfigOnline, setAutoconfigOnline] = useState(true);
+  const [autoconfigBusy, setAutoconfigBusy] = useState(false);
+  const [autoconfigResult, setAutoconfigResult] = useState<string | null>(null);
+  const detectMailSettings = async () => {
+    setAutoconfigBusy(true);
+    setAutoconfigResult(null);
+    try {
+      const found = await mailAutoconfig(username, autoconfigOnline);
+      if (!found) {
+        setAutoconfigResult("No settings found; enter the servers manually.");
+        return;
+      }
+      if (found.provider !== "custom" && found.provider !== provider) {
+        setProvider(found.provider);
+      } else {
+        setImapHost(found.imap.host);
+        setImapPort(String(found.imap.port));
+        setImapSecurity(found.imap.security);
+        setSmtpHost(found.smtp.host);
+        setSmtpPort(String(found.smtp.port));
+        setSmtpSecurity(found.smtp.security);
+        setSmtpUseImapAuth(true);
+      }
+      const label = found.source === "builtin" ? "built-in" : found.source === "guess" ? "guessed" : found.source;
+      setAutoconfigResult(
+        `Found (${label}): ${found.imap.host}:${found.imap.port} / ${found.smtp.host}:${found.smtp.port}`,
+      );
+    } catch (e) {
+      setAutoconfigResult(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAutoconfigBusy(false);
+    }
+  };
   const oauthSupported = supportsMailOAuthProvider(provider);
   const effectiveOauthFlow = effectiveMailOAuthFlow(provider, oauthFlow);
   const usesDeviceCode = oauthSupported && effectiveOauthFlow === "device";
@@ -1480,7 +1548,40 @@ function MailSettings({
         )}
       </Field>
 
-      <Field label="IMAP server">
+      <Field label="Incoming">
+        <select
+          className="taomni-input w-40"
+          value={incoming}
+          aria-label="Mail incoming protocol"
+          data-testid="mail-incoming-protocol"
+          onChange={(e) => {
+            const next = e.target.value === "pop3" ? "pop3" : "imap";
+            setIncoming(next);
+            // Keep the port on the new protocol's default for the chosen security.
+            const tls = imapSecurity === "TLS";
+            setImapPort(String(next === "pop3" ? (tls ? 995 : 110) : tls ? 993 : 143));
+          }}
+        >
+          <option value="imap">IMAP (server folders)</option>
+          <option value="pop3">POP3 (local folders)</option>
+        </select>
+        {incoming === "pop3" && (
+          <>
+            <span className="ml-3 text-[var(--taomni-text-muted)]">Delete from server after</span>
+            <input
+              className="taomni-input w-14 ml-1"
+              value={pop3LeaveDays}
+              placeholder="never"
+              aria-label="POP3 leave on server days"
+              data-testid="mail-pop3-leave-days"
+              onChange={(e) => setPop3LeaveDays(e.target.value.replace(/[^0-9]/g, ""))}
+            />
+            <span className="ml-1 text-[var(--taomni-text-muted)]">days (blank = keep, 0 = at once)</span>
+          </>
+        )}
+      </Field>
+
+      <Field label={incoming === "pop3" ? "POP3 server" : "IMAP server"}>
         <input
           className="taomni-input w-72"
           value={imapHost}
@@ -1504,6 +1605,27 @@ function MailSettings({
           placeholder="name@example.com"
           onChange={(e) => setUsername(e.target.value)}
         />
+        <button
+          type="button"
+          className="taomni-btn h-7 px-2 ml-2"
+          data-testid="mail-autoconfig"
+          disabled={autoconfigBusy || !username.includes("@")}
+          onClick={() => void detectMailSettings()}
+        >
+          {autoconfigBusy ? "Detecting…" : "Detect settings"}
+        </button>
+        <label
+          className="ml-2 inline-flex items-center gap-1 text-[var(--taomni-text-muted)]"
+          title="Also asks autoconfig.thunderbird.net and the provider's autoconfig host, which reveals the address's domain"
+        >
+          <Checkbox checked={autoconfigOnline} onChange={setAutoconfigOnline} dataTestId="mail-autoconfig-online" />
+          Online lookup
+        </label>
+        {autoconfigResult && (
+          <span className="ml-2 text-[11px] text-[var(--taomni-text-muted)]" data-testid="mail-autoconfig-result">
+            {autoconfigResult}
+          </span>
+        )}
       </Field>
 
       {isOAuth && (
@@ -1636,6 +1758,9 @@ function MailSettings({
           placeholder="Default text appended to new messages and replies"
           onChange={(e) => setSignature(e.target.value)}
         />
+      </Field>
+      <Field label="Identities">
+        <MailIdentitiesEditor identities={identities} onChange={setIdentities} />
       </Field>
 
       <Field label="IMAP security">
@@ -1775,6 +1900,121 @@ function MailSettings({
         />
       </Field>
 
+      <Field label="New mail">
+        <label className="flex items-center gap-1.5">
+          <Checkbox checked={idlePush} onChange={setIdlePush} dataTestId="mail-idle-push" />
+          Instant push (IMAP IDLE) while the tab is open
+        </label>
+        <label className="ml-3 flex items-center gap-1.5">
+          <Checkbox checked={desktopNotify} onChange={setDesktopNotify} dataTestId="mail-desktop-notify" />
+          Desktop notification
+        </label>
+      </Field>
+
+      <Field label="Folders">
+        <label className="flex items-center gap-1.5">
+          <Checkbox checked={subscribedOnly} onChange={setSubscribedOnly} dataTestId="mail-subscribed-only-setting" />
+          Show and sync only subscribed folders
+        </label>
+      </Field>
+
+      <Field label="Special folders">
+        <div className="flex flex-wrap items-center gap-2" data-testid="mail-special-folders">
+          {MAIL_SPECIAL_FOLDER_KEYS.map((key) => (
+            <label key={key} className="inline-flex items-center gap-1">
+              <span className="text-[var(--taomni-text-muted)] capitalize">{key}</span>
+              <input
+                className="taomni-input w-28"
+                value={specialFolders[key] ?? ""}
+                placeholder="auto"
+                aria-label={`Mail ${key} folder`}
+                data-testid={`mail-special-folder-${key}`}
+                onChange={(e) => setSpecialFolders({ ...specialFolders, [key]: e.target.value })}
+              />
+            </label>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="Sent copy">
+        <select
+          className="taomni-input w-72"
+          value={saveSentCopy}
+          aria-label="Mail save sent copy"
+          data-testid="mail-save-sent-copy"
+          onChange={(e) => setSaveSentCopy(e.target.value)}
+        >
+          <option value="auto">Automatic (Gmail/Outlook file it themselves)</option>
+          <option value="on">Always save a copy to Sent</option>
+          <option value="off">Never save a copy</option>
+        </select>
+      </Field>
+
+      <Field label="Undo send">
+        <input
+          className="taomni-input w-16"
+          value={undoSendSeconds}
+          aria-label="Mail undo send seconds"
+          data-testid="mail-undo-send-seconds"
+          onChange={(e) => setUndoSendSeconds(e.target.value)}
+        />
+        <span className="ml-1 text-[var(--taomni-text-muted)]">seconds to cancel after Send (0 = off)</span>
+      </Field>
+
+      <Field label="Read receipts">
+        <select
+          className="taomni-input w-56"
+          value={receiptPolicy}
+          aria-label="Answer read receipt requests"
+          data-testid="mail-receipt-policy"
+          onChange={(e) => setReceiptPolicy(e.target.value)}
+        >
+          <option value="ask">Ask me when a sender requests one</option>
+          <option value="always">Always send</option>
+          <option value="never">Never send</option>
+        </select>
+      </Field>
+
+      <Field label="CardDAV">
+        <input
+          className="taomni-input w-72"
+          value={cardDavUrl}
+          placeholder="https://carddav.example.com/ (blank = local address book)"
+          aria-label="CardDAV address book URL"
+          data-testid="mail-carddav-url"
+          onChange={(e) => setCardDavUrl(e.target.value)}
+        />
+        <input
+          className="taomni-input w-40 ml-2"
+          value={cardDavUsername}
+          placeholder="username (default: IMAP)"
+          aria-label="CardDAV username"
+          data-testid="mail-carddav-username"
+          onChange={(e) => setCardDavUsername(e.target.value)}
+        />
+        <span className="ml-1 text-[var(--taomni-text-muted)]">uses the mail password</span>
+      </Field>
+
+      <Field label="CalDAV">
+        <input
+          className="taomni-input w-72"
+          value={calDavUrl}
+          placeholder="https://caldav.example.com/ (blank = no agenda)"
+          aria-label="CalDAV calendar URL"
+          data-testid="mail-caldav-url"
+          onChange={(e) => setCalDavUrl(e.target.value)}
+        />
+        <input
+          className="taomni-input w-40 ml-2"
+          value={calDavUsername}
+          placeholder="username (default: IMAP)"
+          aria-label="CalDAV username"
+          data-testid="mail-caldav-username"
+          onChange={(e) => setCalDavUsername(e.target.value)}
+        />
+        <span className="ml-1 text-[var(--taomni-text-muted)]">agenda, accepted invitations and reminders</span>
+      </Field>
+
       <Field label="Cache">
         <label className="flex items-center gap-1.5">
           <Checkbox checked={cacheEnabled} onChange={setCacheEnabled} />
@@ -1809,6 +2049,8 @@ function MailSettings({
           className="taomni-input w-20 ml-1"
           value={headerLimitPerFolder}
           aria-label="Mail header limit per folder"
+          placeholder="0"
+          title="0 keeps every header (full local index)"
           onChange={(e) => setHeaderLimitPerFolder(e.target.value)}
         />
         <span className="ml-3 text-[var(--taomni-text-muted)]">Days</span>
@@ -1816,8 +2058,11 @@ function MailSettings({
           className="taomni-input w-16 ml-1"
           value={headerRetentionDays}
           aria-label="Mail header retention days"
+          placeholder="0"
+          title="0 keeps headers of any age; otherwise by server arrival time"
           onChange={(e) => setHeaderRetentionDays(e.target.value)}
         />
+        <span className="ml-1 text-[11px] text-[var(--taomni-text-muted)]">0 = all</span>
         <span className="ml-3 text-[var(--taomni-text-muted)]">Bodies</span>
         <input
           className="taomni-input w-16 ml-1"
@@ -2604,14 +2849,28 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailOauthStatus, setMailOauthStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [mailCacheEnabled, setMailCacheEnabled] = useState(() => optionBoolean(initialOptions, "mailCacheEnabled", true));
   const [mailSaveDirectory, setMailSaveDirectory] = useState(() => optionString(initialOptions, "mailSaveDirectory", ""));
-  const [mailHeaderRetentionDays, setMailHeaderRetentionDays] = useState(() => optionString(initialOptions, "mailHeaderRetentionDays", "30"));
-  const [mailHeaderLimitPerFolder, setMailHeaderLimitPerFolder] = useState(() => optionString(initialOptions, "mailHeaderLimitPerFolder", "2000"));
+  const [mailHeaderRetentionDays, setMailHeaderRetentionDays] = useState(() => String(mailHeaderLimitOption(initialOptions, "mailHeaderRetentionDays", 30)));
+  const [mailHeaderLimitPerFolder, setMailHeaderLimitPerFolder] = useState(() => String(mailHeaderLimitOption(initialOptions, "mailHeaderLimitPerFolder", 2000)));
   const [mailBodyRecentLimit, setMailBodyRecentLimit] = useState(() => optionString(initialOptions, "mailBodyRecentLimit", "200"));
   const [mailBodyMaxBytes, setMailBodyMaxBytes] = useState(() => optionString(initialOptions, "mailBodyMaxBytes", "262144"));
   const [mailAttachmentCache, setMailAttachmentCache] = useState(() => optionBoolean(initialOptions, "mailAttachmentCache", false));
   const [mailSyncOnOpen, setMailSyncOnOpen] = useState(() => optionBoolean(initialOptions, "mailSyncOnOpen", true));
+  const [mailIdlePush, setMailIdlePush] = useState(() => optionBoolean(initialOptions, "mailIdlePush", true));
+  const [mailSubscribedOnly, setMailSubscribedOnly] = useState(() => optionBoolean(initialOptions, "mailSubscribedOnly", false));
+  const [mailIncoming, setMailIncoming] = useState<"imap" | "pop3">(() => (optionString(initialOptions, "mailIncoming", "imap") === "pop3" ? "pop3" : "imap"));
+  const [mailPop3LeaveDays, setMailPop3LeaveDays] = useState(() => optionString(initialOptions, "mailPop3LeaveDays", ""));
+  const [mailUndoSendSeconds, setMailUndoSendSeconds] = useState(() => optionString(initialOptions, "mailUndoSendSeconds", "0"));
+  const [mailCardDavUrl, setMailCardDavUrl] = useState(() => optionString(initialOptions, "mailCardDavUrl", ""));
+  const [mailCardDavUsername, setMailCardDavUsername] = useState(() => optionString(initialOptions, "mailCardDavUsername", ""));
+  const [mailCalDavUrl, setMailCalDavUrl] = useState(() => optionString(initialOptions, "mailCalDavUrl", ""));
+  const [mailCalDavUsername, setMailCalDavUsername] = useState(() => optionString(initialOptions, "mailCalDavUsername", ""));
+  const [mailReceiptPolicy, setMailReceiptPolicy] = useState(() => optionString(initialOptions, "mailReceiptPolicy", "ask"));
+  const [mailSpecialFolders, setMailSpecialFolders] = useState(() => parseSpecialFolders(initialOptions.mailSpecialFolders));
+  const [mailDesktopNotify, setMailDesktopNotify] = useState(() => optionBoolean(initialOptions, "mailDesktopNotify", false));
   const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
   const [mailMaxFetchPerSync, setMailMaxFetchPerSync] = useState(() => optionString(initialOptions, "mailMaxFetchPerSync", "200"));
+  const [mailSaveSentCopy, setMailSaveSentCopy] = useState(() => optionString(initialOptions, "mailSaveSentCopy", "auto"));
+  const [mailIdentityList, setMailIdentityList] = useState<MailIdentity[]>(() => parseMailIdentities(initialOptions.mailIdentities));
   const [mailAiEnabled, setMailAiEnabled] = useState(() => optionBoolean(initialOptions, "mailAiEnabled", true));
   const [mailAiSkipBodyConfirm, setMailAiSkipBodyConfirm] = useState(() => optionBoolean(initialOptions, "mailAiSkipBodyConfirm", false));
 
@@ -2959,12 +3218,27 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailSaveDirectory,
           mailHeaderRetentionDays,
           mailHeaderLimitPerFolder,
+          [MAIL_HEADER_LIMITS_EXPLICIT_KEY]: true,
           mailBodyRecentLimit,
           mailBodyMaxBytes,
           mailAttachmentCache,
           mailSyncOnOpen,
+          mailIdlePush,
+          mailSubscribedOnly,
+          mailIncoming,
+          mailPop3LeaveDays,
+          mailUndoSendSeconds,
+          mailCardDavUrl: mailCardDavUrl.trim(),
+          mailCardDavUsername: mailCardDavUsername.trim(),
+          mailCalDavUrl: mailCalDavUrl.trim(),
+          mailCalDavUsername: mailCalDavUsername.trim(),
+          mailReceiptPolicy,
+          mailSpecialFolders: JSON.stringify(parseSpecialFolders(mailSpecialFolders)),
+          mailDesktopNotify,
           mailSyncIntervalMinutes,
           mailMaxFetchPerSync,
+          mailSaveSentCopy,
+          mailIdentities: JSON.stringify(parseMailIdentities(mailIdentityList)),
           mailAiEnabled,
           mailAiSkipBodyConfirm,
         }
@@ -3527,14 +3801,28 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailOauthStatus(null);
     setMailCacheEnabled(optionBoolean(nextOptions, "mailCacheEnabled", true));
     setMailSaveDirectory(optionString(nextOptions, "mailSaveDirectory", ""));
-    setMailHeaderRetentionDays(optionString(nextOptions, "mailHeaderRetentionDays", "30"));
-    setMailHeaderLimitPerFolder(optionString(nextOptions, "mailHeaderLimitPerFolder", "2000"));
+    setMailHeaderRetentionDays(String(mailHeaderLimitOption(nextOptions, "mailHeaderRetentionDays", 30)));
+    setMailHeaderLimitPerFolder(String(mailHeaderLimitOption(nextOptions, "mailHeaderLimitPerFolder", 2000)));
     setMailBodyRecentLimit(optionString(nextOptions, "mailBodyRecentLimit", "200"));
     setMailBodyMaxBytes(optionString(nextOptions, "mailBodyMaxBytes", "262144"));
     setMailAttachmentCache(optionBoolean(nextOptions, "mailAttachmentCache", false));
     setMailSyncOnOpen(optionBoolean(nextOptions, "mailSyncOnOpen", true));
+    setMailIdlePush(optionBoolean(nextOptions, "mailIdlePush", true));
+    setMailSubscribedOnly(optionBoolean(nextOptions, "mailSubscribedOnly", false));
+    setMailIncoming(optionString(nextOptions, "mailIncoming", "imap") === "pop3" ? "pop3" : "imap");
+    setMailPop3LeaveDays(optionString(nextOptions, "mailPop3LeaveDays", ""));
+    setMailUndoSendSeconds(optionString(nextOptions, "mailUndoSendSeconds", "0"));
+    setMailCardDavUrl(optionString(nextOptions, "mailCardDavUrl", ""));
+    setMailCardDavUsername(optionString(nextOptions, "mailCardDavUsername", ""));
+    setMailCalDavUrl(optionString(nextOptions, "mailCalDavUrl", ""));
+    setMailCalDavUsername(optionString(nextOptions, "mailCalDavUsername", ""));
+    setMailReceiptPolicy(optionString(nextOptions, "mailReceiptPolicy", "ask"));
+    setMailSpecialFolders(parseSpecialFolders(nextOptions.mailSpecialFolders));
+    setMailDesktopNotify(optionBoolean(nextOptions, "mailDesktopNotify", false));
     setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
     setMailMaxFetchPerSync(optionString(nextOptions, "mailMaxFetchPerSync", "200"));
+    setMailSaveSentCopy(optionString(nextOptions, "mailSaveSentCopy", "auto"));
+    setMailIdentityList(parseMailIdentities(nextOptions.mailIdentities));
     setMailAiEnabled(optionBoolean(nextOptions, "mailAiEnabled", true));
     setMailAiSkipBodyConfirm(optionBoolean(nextOptions, "mailAiSkipBodyConfirm", false));
     setOss(ossFormFromOptions(session?.options_json));
@@ -4645,8 +4933,22 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 bodyMaxBytes={mailBodyMaxBytes} setBodyMaxBytes={setMailBodyMaxBytes}
                 attachmentCache={mailAttachmentCache} setAttachmentCache={setMailAttachmentCache}
                 syncOnOpen={mailSyncOnOpen} setSyncOnOpen={setMailSyncOnOpen}
+                idlePush={mailIdlePush} setIdlePush={setMailIdlePush}
+                subscribedOnly={mailSubscribedOnly} setSubscribedOnly={setMailSubscribedOnly}
+                incoming={mailIncoming} setIncoming={setMailIncoming}
+                pop3LeaveDays={mailPop3LeaveDays} setPop3LeaveDays={setMailPop3LeaveDays}
+                undoSendSeconds={mailUndoSendSeconds} setUndoSendSeconds={setMailUndoSendSeconds}
+                cardDavUrl={mailCardDavUrl} setCardDavUrl={setMailCardDavUrl}
+                cardDavUsername={mailCardDavUsername} setCardDavUsername={setMailCardDavUsername}
+                calDavUrl={mailCalDavUrl} setCalDavUrl={setMailCalDavUrl}
+                calDavUsername={mailCalDavUsername} setCalDavUsername={setMailCalDavUsername}
+                receiptPolicy={mailReceiptPolicy} setReceiptPolicy={setMailReceiptPolicy}
+                specialFolders={mailSpecialFolders} setSpecialFolders={setMailSpecialFolders}
+                desktopNotify={mailDesktopNotify} setDesktopNotify={setMailDesktopNotify}
                 syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}
                 maxFetchPerSync={mailMaxFetchPerSync} setMaxFetchPerSync={setMailMaxFetchPerSync}
+                saveSentCopy={mailSaveSentCopy} setSaveSentCopy={setMailSaveSentCopy}
+                identities={mailIdentityList} setIdentities={setMailIdentityList}
                 aiEnabled={mailAiEnabled} setAiEnabled={setMailAiEnabled}
                 aiSkipBodyConfirm={mailAiSkipBodyConfirm} setAiSkipBodyConfirm={setMailAiSkipBodyConfirm}
                 vaultState={vaultState}

@@ -61,6 +61,11 @@ export interface PersistedEditorViewState {
   textIdentity?: string;
   /** Horizontal scroll offset (ED-MAIN-009); legacy snapshots default to 0. */
   scrollLeft?: number;
+  /**
+   * ED-PARITY-012: the user expanded the default import fold in this view, so
+   * a remount keeps the imports expanded instead of folding them again.
+   */
+  importsExpanded?: boolean;
 }
 
 /** leaf id -> file key -> view state. */
@@ -174,6 +179,7 @@ const BOTTOM_DOCK_TABS: BottomDockTabId[] = [
   "tests",
   "coverage",
   "debug",
+  "git",
 ];
 const RIGHT_PANE_TABS: RightPaneTabId[] = ["outline", "documentation"];
 
@@ -316,6 +322,7 @@ function normalizeEditorViewState(value: unknown): PersistedEditorViewState | nu
     ...(asViewOffset(source.scrollLeft) !== null
       ? { scrollLeft: asViewOffset(source.scrollLeft) ?? 0 }
       : {}),
+    ...(source.importsExpanded === true ? { importsExpanded: true } : {}),
   };
 }
 

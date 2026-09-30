@@ -140,7 +140,7 @@ steps:
   - press: ArrowLeft
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 5, Col 18
+      contains: '5:18'
   - wait: 0.5
   - press: Control+Space
   - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
@@ -177,7 +177,7 @@ steps:
       equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 5, Col 18
+      contains: '5:18'
   - press: Control+Space
   - parity005_trace: {pending: 0}
   - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
@@ -223,15 +223,15 @@ steps:
       equals: ['package parity005;', 'import java.lang.StringBuilder;', '', 'public class Main {', '    void sample() {', '        StringBuilder();', '    }', '}', '']
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 6, Col 23
+      contains: '6:23'
   - press: Tab
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 6, Col 24
+      contains: '6:24'
   - press: Shift+Tab
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 6, Col 23
+      contains: '6:23'
   - press: Tab
   - assert_items:
       selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -291,6 +291,7 @@ steps:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       contains: Stri;
   - set_viewport: {width: 1440, height: 900}
+  - click: '[data-testid="code-workspace-toolbar-more"]'
   - click: '[data-testid="code-workspace-split-right"]'
   - assert_count: {selector: '[data-testid="code-workspace-editor"] .cm-content', equal: 2}
   - click: '[data-testid="code-workspace-editor"] .cm-content >> nth=0'
@@ -451,19 +452,19 @@ verification:
       results: [159, 162]
     - id: ED-PARITY-005-V2-shared-history
       requirement: Two UI views of Main.java show the same atomic acceptance; Undo from the sibling view restores both and removes the import.
-      actions: [164, 174, 177, 180, 181]
+      actions: [165, 175, 178, 181, 182]
       checkpoints:
-        - step: 165
+        - step: 166
           expectation: The split exposes two editor views.
-        - step: 178
-          expectation: Both views show the same single import.
         - step: 179
+          expectation: Both views show the same single import.
+        - step: 180
           expectation: Both views show the accepted snippet text.
-        - step: 182
-          expectation: One Undo in the sibling view restores the prefix in both views.
         - step: 183
+          expectation: One Undo in the sibling view restores the prefix in both views.
+        - step: 184
           expectation: The import is absent from both views after Undo.
-      results: [165, 178, 179, 182, 183]
+      results: [166, 179, 180, 183, 184]
   visual:
     - check: Selected row, documentation, popup anchor, density and clipping against IDEA R1/R2/R6.
       method: manual

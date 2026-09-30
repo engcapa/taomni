@@ -221,9 +221,11 @@ def step_press(ctx: StepContext, args: Any) -> None:
         key, selector = args, None
     elif isinstance(args, dict):
         key = args["key"]
+        if platform.system() == "Darwin" and isinstance(args.get("macos_key"), str):
+            key = args["macos_key"]
         selector = args.get("selector")
     else:
-        raise StepError("press: expected string or {key, selector?}")
+        raise StepError("press: expected string or {key, macos_key?, selector?}")
     if ctx.dry_run:
         return
     # Platform Command-Mod: `Mod+X` drives Meta+X on macOS (where CodeMirror

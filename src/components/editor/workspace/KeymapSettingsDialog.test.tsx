@@ -41,11 +41,24 @@ function makeSnapshotItems(
   return host.getSnapshot();
 }
 
+/** DEC-013-08: the action tree starts collapsed like IDEA's; expand every group. */
+function expandKeymapGroups() {
+  for (const group of screen.queryAllByRole("treeitem", { expanded: false })) {
+    if (group.getAttribute("data-testid")?.startsWith("keymap-group-")) fireEvent.click(group);
+  }
+}
+
+function renderKeymap(ui: Parameters<typeof render>[0]) {
+  const result = render(ui);
+  expandKeymapGroups();
+  return result;
+}
+
 function setup() {
   const scheme = createKeymapScheme({ id: "s1", name: "User", base: "idea-windows-linux", now: 1 });
   const schemes = [scheme];
   const onApplyScheme = vi.fn((_updated: KeymapSchemeV3 | null) => undefined);
-  const renderResult = render(
+  const renderResult = renderKeymap(
     <KeymapSettingsDialog
       open
       snapshot={[makeSnapshotItem("test.action")]}
@@ -74,6 +87,8 @@ describe("§8.19.2 two-stroke shortcut recorder", () => {
     const { onApplyScheme } = setup();
     fireEvent.click(screen.getByTestId("keymap-add-test.action"));
     expect(screen.getByText(/press keys/)).toBeTruthy();
+    // DEC-013-08: a second stroke is recorded only with "Second stroke" on.
+    fireEvent.click(screen.getByTestId("keymap-recorder-second-stroke"));
 
     key("k", { ctrlKey: true });
     // Live display shows physical code while recording.
@@ -101,6 +116,7 @@ describe("§8.19.2 two-stroke shortcut recorder", () => {
   it("Backspace removes the last recorded stroke before confirmation", () => {
     const { onApplyScheme } = setup();
     fireEvent.click(screen.getByTestId("keymap-add-test.action"));
+    fireEvent.click(screen.getByTestId("keymap-recorder-second-stroke"));
     key("k", { ctrlKey: true });
     key("s");
     expect(screen.getByText(/\[KeyK, KeyS\]/)).toBeTruthy();
@@ -134,7 +150,7 @@ describe("§8.19.2 two-stroke shortcut recorder", () => {
     };
     base.bindings = setActionBindings(base, "test.action", [existing]).bindings;
     const onApplyScheme = vi.fn();
-    render(
+    renderKeymap(
       <KeymapSettingsDialog
         open
         snapshot={[makeSnapshotItem("test.action", base)]}
@@ -197,7 +213,7 @@ describe("ED-PARITY-004 counterexamples (D1/D2)", () => {
       { id: "editor.replace", keybinding: "Ctrl+R" },
     ], scheme);
     expect(items.length).toBe(2);
-    render(
+    renderKeymap(
       <KeymapSettingsDialog
         open
         snapshot={withScheme}
@@ -236,7 +252,7 @@ function renderDialog(
   const onSchemesChange = (handlers.onSchemesChange ?? vi.fn()) as ReturnType<typeof vi.fn<(schemes: readonly KeymapSchemeV3[]) => void>>;
   const onActiveSchemeChange = (handlers.onActiveSchemeChange ?? vi.fn()) as ReturnType<typeof vi.fn<(id: string | null) => void>>;
   const onClose = (handlers.onClose ?? vi.fn()) as ReturnType<typeof vi.fn<() => void>>;
-  const result = render(
+  const result = renderKeymap(
     <KeymapSettingsDialog
       open
       snapshot={snapshot}
@@ -305,7 +321,9 @@ describe("ED-PARITY-004 DEC-02/03/04 draft, conflict warning and Apply boundary"
     fireEvent.click(screen.getByTestId("keymap-settings-apply"));
     expect(onApplyScheme).toHaveBeenCalledTimes(1);
     const applied = onApplyScheme.mock.calls[0][0]!;
-    expect(applied.bindings["editor.replace"]).toHaveLength(1);
+    // DEC-013-12: like IDEA's Add Keyboard Shortcut, the new chord is appended
+    // to the inherited Ctrl+R instead of replacing it.
+    expect(applied.bindings["editor.replace"]).toHaveLength(2);
     // DEC-04: the previous holder loses the contested stroke...
     expect(applied.bindings["editor.find"]).toEqual([]);
     // ...and the editor row visibly drops its Ctrl+F swatch.
@@ -370,10 +388,11 @@ describe("ED-PARITY-004 DEC-02/03/04 draft, conflict warning and Apply boundary"
     key("Enter");
     fireEvent.click(screen.getByTestId("keymap-settings-apply"));
     const applied = onApplyScheme.mock.calls[0][0]!;
-    // Only the real Ctrl+K landed; the composition/dead-key events were dropped.
-    expect(applied.bindings["editor.replace"]).toHaveLength(1);
-    const only = applied.bindings["editor.replace"][0];
-    expect(only.kind === "keyboard" && only.strokes.map((stroke) => stroke.code)).toEqual(["KeyK"]);
+    // Only the real Ctrl+K landed (appended to the inherited Ctrl+R); the
+    // composition/dead-key events were dropped.
+    expect(applied.bindings["editor.replace"]).toHaveLength(2);
+    const added = applied.bindings["editor.replace"][1];
+    expect(added.kind === "keyboard" && added.strokes.map((stroke) => stroke.code)).toEqual(["KeyK"]);
   });
 
   it("A1.6: Reset and Delete only touch the draft until Apply", () => {
@@ -395,5 +414,153 @@ describe("ED-PARITY-004 DEC-02/03/04 draft, conflict warning and Apply boundary"
     // Deleting the active scheme commits "fall back to the built-in defaults".
     expect(onApplyScheme).toHaveBeenCalledTimes(1);
     expect(onApplyScheme.mock.calls[0][0]).toBeNull();
+  });
+});
+
+function renderDefaultScheme(extra: Partial<Parameters<typeof KeymapSettingsDialog>[0]> = {}) {
+  const onApplyScheme = vi.fn<(scheme: KeymapSchemeV3 | null) => void>();
+  const onSchemesChange = vi.fn<(schemes: readonly KeymapSchemeV3[]) => void>();
+  const onClose = vi.fn<() => void>();
+  const result = render(
+    <KeymapSettingsDialog
+      open
+      snapshot={keymapFixture()}
+      schemes={[]}
+      activeSchemeId={null}
+      defaultSchemeName="IDEA defaults"
+      onActiveSchemeChange={vi.fn()}
+      onSchemesChange={onSchemesChange}
+      onApplyScheme={onApplyScheme}
+      onClose={onClose}
+      {...extra}
+    />,
+  );
+  return { onApplyScheme, onSchemesChange, onClose, ...result };
+}
+
+describe("ED-PARITY-013 Keymap tree, recording and scheme derivation", () => {
+  afterEach(cleanup);
+
+  it("A2.4: groups start collapsed and expand on click or while filtering", () => {
+    renderDefaultScheme();
+    const group = screen.getByTestId("keymap-group-Edit");
+    expect(group).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("keymap-row-editor.find")).toBeNull();
+    fireEvent.click(group);
+    expect(screen.getByTestId("keymap-row-editor.find")).toBeTruthy();
+    fireEvent.click(group);
+    fireEvent.change(screen.getByTestId("keymap-action-filter"), { target: { value: "replace" } });
+    expect(screen.getByTestId("keymap-row-editor.replace")).toBeTruthy();
+    expect(screen.queryByTestId("keymap-row-editor.find")).toBeNull();
+  });
+
+  it("A2.1: the default scheme is editable and derives a copy that appends, without writes before Apply", () => {
+    const { onApplyScheme, onSchemesChange } = renderDefaultScheme();
+    expandKeymapGroups();
+    fireEvent.click(screen.getByTestId("keymap-add-editor.replace"));
+    key("k", { ctrlKey: true, altKey: true });
+    key("Enter");
+    expect(onApplyScheme).not.toHaveBeenCalled();
+    expect(onSchemesChange).not.toHaveBeenCalled();
+    const select = screen.getByTestId("keymap-scheme-select") as HTMLSelectElement;
+    expect(select.selectedOptions[0]?.textContent).toBe("IDEA defaults (copy)");
+    expect(screen.getByTestId("keymap-replace-editor.replace-0").textContent).toContain("Ctrl+R");
+    expect(screen.getByTestId("keymap-replace-editor.replace-1").textContent).toContain("Ctrl+Alt+K");
+    fireEvent.click(screen.getByTestId("keymap-settings-apply"));
+    expect(onApplyScheme.mock.calls[0]?.[0]?.name).toBe("IDEA defaults (copy)");
+  });
+
+  it("A2.2: without Second stroke a new key replaces the first stroke", () => {
+    renderDefaultScheme();
+    expandKeymapGroups();
+    fireEvent.click(screen.getByTestId("keymap-add-editor.replace"));
+    expect(screen.getByRole("dialog", { name: "Keyboard Shortcut" })).toBeTruthy();
+    key("k", { ctrlKey: true, altKey: true });
+    key("j", { ctrlKey: true, altKey: true });
+    expect(screen.getByTestId("keymap-recorder-strokes").textContent).toBe("[KeyJ]");
+    fireEvent.click(screen.getByTestId("keymap-recorder-second-stroke"));
+    key("s", { ctrlKey: true });
+    expect(screen.getByTestId("keymap-recorder-strokes").textContent).toBe("[KeyJ, KeyS]");
+    fireEvent.click(screen.getByTestId("keymap-recorder-cancel"));
+    expect(screen.queryByTestId("keymap-recorder")).toBeNull();
+  });
+
+  it("A2.3: Find Actions by Shortcut filters to the holders of a stroke", () => {
+    renderDefaultScheme();
+    fireEvent.click(screen.getByTestId("keymap-find-by-shortcut"));
+    const field = screen.getByTestId("keymap-shortcut-filter");
+    fireEvent.keyDown(field, { key: "r", code: "KeyR", ctrlKey: true });
+    expect(screen.getByTestId("keymap-row-editor.replace")).toBeTruthy();
+    expect(screen.queryByTestId("keymap-row-editor.find")).toBeNull();
+    fireEvent.keyDown(field, { key: "q", code: "KeyQ", ctrlKey: true });
+    expect(screen.getByText("No actions use this shortcut.")).toBeTruthy();
+    fireEvent.keyDown(field, { key: "Escape", code: "Escape" });
+    expect(screen.getByTestId("keymap-action-filter")).toBeTruthy();
+  });
+
+  it("A2.4: the row context menu removes and resets shortcuts in the draft", () => {
+    renderDefaultScheme();
+    expandKeymapGroups();
+    fireEvent.contextMenu(screen.getByTestId("keymap-row-editor.find"));
+    const menu = screen.getByTestId("keymap-row-menu");
+    expect(menu.textContent).toContain("Add Keyboard Shortcut");
+    expect(menu.textContent).toContain("Add Mouse Shortcut");
+    expect(screen.getByTestId("keymap-row-menu-reset")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("keymap-row-menu-remove-0"));
+    expect(screen.getByTestId("keymap-no-shortcut-editor.find")).toBeTruthy();
+    fireEvent.contextMenu(screen.getByTestId("keymap-row-editor.find"));
+    fireEvent.click(screen.getByTestId("keymap-row-menu-reset"));
+    expect(screen.getByTestId("keymap-replace-editor.find-0").textContent).toContain("Ctrl+F");
+  });
+
+  it("A2.6: Add Mouse Shortcut rejects a plain click and records Ctrl+Click", () => {
+    const { onApplyScheme } = renderDefaultScheme();
+    expandKeymapGroups();
+    fireEvent.contextMenu(screen.getByTestId("keymap-row-editor.replace"));
+    fireEvent.click(screen.getByTestId("keymap-row-menu-add-mouse"));
+    const pad = screen.getByTestId("keymap-mouse-recorder-pad");
+    fireEvent.mouseDown(pad, { button: 0, detail: 1 });
+    expect(screen.getByTestId("keymap-mouse-recorder-hint")).toBeTruthy();
+    expect(screen.getByTestId("keymap-mouse-recorder-ok")).toBeDisabled();
+    fireEvent.mouseDown(pad, { button: 0, detail: 1, ctrlKey: true });
+    expect(screen.getByTestId("keymap-mouse-recorder-value").textContent).toContain("Ctrl+Click");
+    fireEvent.click(screen.getByTestId("keymap-mouse-recorder-ok"));
+    fireEvent.click(screen.getByTestId("keymap-settings-apply"));
+    const bindings = onApplyScheme.mock.calls[0]?.[0]?.bindings["editor.replace"] ?? [];
+    expect(bindings.map((binding) => binding.kind)).toEqual(["keyboard", "mouse"]);
+  });
+
+  it("A2.5: built-in presets are listed and derive an editable copy carrying their delta", () => {
+    const preset = setActionBindings(
+      { ...createKeymapScheme({ id: "builtin:classic", name: "Classic", base: "idea-windows-linux", now: 1 }), readOnly: true },
+      "editor.find",
+      [{ kind: "keyboard", strokes: [{ code: "F3", ctrl: false, alt: true, shift: false, meta: false }] }],
+    );
+    renderDefaultScheme({ presets: [preset] });
+    fireEvent.change(screen.getByTestId("keymap-scheme-select"), { target: { value: "builtin:classic" } });
+    expect(screen.getByTestId("keymap-scheme-reset")).toBeDisabled();
+    expandKeymapGroups();
+    fireEvent.click(screen.getByTestId("keymap-add-editor.replace"));
+    key("k", { ctrlKey: true, altKey: true });
+    key("Enter");
+    const select = screen.getByTestId("keymap-scheme-select") as HTMLSelectElement;
+    expect(select.selectedOptions[0]?.textContent).toBe("Classic (copy)");
+    expect(screen.getByTestId("keymap-replace-editor.find-0").textContent).toContain("Alt+F3");
+  });
+
+  it("DEC-013-10: closing hands focus back to the opener, else to the fallback", async () => {
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+    const fallback = vi.fn();
+    const { unmount } = renderDefaultScheme({ restoreFocusFallback: fallback });
+    unmount();
+    await Promise.resolve();
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+    const second = renderDefaultScheme({ restoreFocusFallback: fallback });
+    second.unmount();
+    await Promise.resolve();
+    expect(fallback).toHaveBeenCalledTimes(1);
   });
 });

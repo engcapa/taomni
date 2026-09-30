@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useT } from "../../../lib/i18n";
 import type { LspDiagnostic } from "../../../lib/editor/lsp";
 import type { LspFileState } from "./codeWorkspaceModel";
+import { languageServiceReadiness } from "./languageServiceReadiness";
 
 /**
  * True when the user should open Language Server settings.
@@ -39,25 +40,14 @@ export function LspStatusPill({
   const status = state.status;
   const errors = diagnostics.filter((item) => item.severity === 1).length;
   const warnings = diagnostics.filter((item) => item.severity === 2).length;
-  const runtimeError = status.error ?? state.error;
-  const name = status.displayName ?? "LSP";
-  // Older/browser status producers omit the field and remain ready-compatible.
-  const semanticReady = status.semanticReady !== false;
+  // ED-PARITY-015 DEC-015-01: the same readiness text Problems shows.
   // "starting…" only while a sync/open is in flight. A silent available+!active
   // after the process exits used to look stuck forever on "Java starting…".
-  const label = status.active
-    ? semanticReady
-      ? `${name}${errors || warnings ? ` · ${errors}E ${warnings}W` : ""}`
-      : `${name} indexing…`
-    : runtimeError
-      ? runtimeError
-      : !status.available && status.installHint
-        ? `Install: ${status.installHint}`
-        : !status.available
-          ? "No LSP"
-          : state.syncing
-            ? `${name} starting…`
-            : `${name} inactive`;
+  const readiness = languageServiceReadiness(state);
+  const semanticReady = readiness.kind === "ready";
+  const label = readiness.kind === "ready" && (errors || warnings)
+    ? `${readiness.name} · ${errors}E ${warnings}W`
+    : readiness.message;
   const showSettingsLink = lspNeedsSetup(state) && !!onOpenSettings;
   const settingsLabel = t("settings.languageServersOpenSettings");
   const title = showSettingsLink ? `${label} · ${settingsLabel}` : label;

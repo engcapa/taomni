@@ -3,6 +3,7 @@ import { AlertCircle, AlertTriangle, Hammer, Info, Loader2 } from "lucide-react"
 import type { LspDiagnostic } from "../../../../lib/editor/lsp";
 import { writeText } from "../../../../lib/clipboard";
 import { useContextMenu } from "../../../ContextMenu";
+import type { LanguageServiceReadiness } from "../languageServiceReadiness";
 
 export interface ProblemFileGroup {
   key: string;
@@ -41,6 +42,14 @@ interface ProblemsPanelProps {
    * full-project inspection stays "On-the-fly diagnostics only".
    */
   fullProjectNote?: string | null;
+  /**
+   * ED-PARITY-015 DEC-015-02/03: readiness of the active file's language
+   * service. Anything but "ready"/"idle" replaces the empty "No problems"
+   * state and marks existing results as possibly outdated.
+   */
+  readiness?: LanguageServiceReadiness | null;
+  onConfigureLanguageService?: () => void;
+  onRetryLanguageService?: () => void;
 }
 
 type SeverityKind = "error" | "warning" | "info";
@@ -73,8 +82,13 @@ export function ProblemsPanel({
   evidenceLine,
   suppressedInSource,
   fullProjectNote = null,
+  readiness = null,
+  onConfigureLanguageService,
+  onRetryLanguageService,
 }: ProblemsPanelProps) {
   const projectScope = scope === "project";
+  const serviceNotReady = !projectScope && !!readiness
+    && readiness.kind !== "ready" && readiness.kind !== "idle";
   const [visible, setVisible] = useState<Record<SeverityKind, boolean>>({
     error: true,
     warning: true,
@@ -153,6 +167,7 @@ export function ProblemsPanel({
           <button
             key={kind}
             type="button"
+            data-testid={`problems-severity-${kind}`}
             aria-label={`Show ${kind} diagnostics`}
             aria-pressed={visible[kind]}
             data-active={visible[kind] || undefined}
@@ -168,7 +183,51 @@ export function ProblemsPanel({
         </span>
       </div>
       <div className="flex-1 min-h-0 overflow-auto py-1">
-        {filteredFiles.length === 0 && (
+        {serviceNotReady && readiness && counts.error + counts.warning + counts.info > 0 && (
+          <div
+            data-testid="code-workspace-problems-stale"
+            data-state={readiness.kind}
+            role="status"
+            className="px-3 py-1 text-[10px] text-amber-600 dark:text-amber-400"
+          >
+            Results may be outdated: {readiness.message}
+          </div>
+        )}
+        {serviceNotReady && readiness && counts.error + counts.warning + counts.info === 0 && !loading && (
+          <div
+            data-testid="code-workspace-problems-provider-state"
+            data-state={readiness.kind}
+            role="status"
+            className="px-3 py-2 flex flex-wrap items-center gap-2 text-[var(--taomni-code-muted)]"
+          >
+            <span className="min-w-0 break-words">
+              {readiness.kind === "indexing" || readiness.kind === "starting"
+                ? `Analyzing… problems will appear when ${readiness.name} is ready`
+                : `Problems are unavailable: ${readiness.message}`}
+            </span>
+            {readiness.action === "configure" && onConfigureLanguageService && (
+              <button
+                type="button"
+                data-testid="code-workspace-problems-configure"
+                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[10px] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                onClick={onConfigureLanguageService}
+              >
+                Configure…
+              </button>
+            )}
+            {readiness.action === "retry" && onRetryLanguageService && (
+              <button
+                type="button"
+                data-testid="code-workspace-problems-retry"
+                className="rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[10px] text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                onClick={onRetryLanguageService}
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
+        {filteredFiles.length === 0 && !(serviceNotReady && counts.error + counts.warning + counts.info === 0 && !loading) && (
           <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
             {loading
               ? "Loading project problems…"
@@ -261,8 +320,13 @@ export function ProblemsPanel({
                       <span className="block text-[10px] text-[var(--taomni-code-muted)]">deprecated</span>
                     )}
                   </span>
-                  <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
-                    {diagnostic.range.start.line + 1}:{diagnostic.range.start.character + 1}
+                  {/* DEC-015-04: IDEA shows ":line"; the column stays in the tooltip. */}
+                  <span
+                    data-testid="problems-diagnostic-line"
+                    title={`Line ${diagnostic.range.start.line + 1}, column ${diagnostic.range.start.character + 1}`}
+                    className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]"
+                  >
+                    :{diagnostic.range.start.line + 1}
                   </span>
                 </button>
               );

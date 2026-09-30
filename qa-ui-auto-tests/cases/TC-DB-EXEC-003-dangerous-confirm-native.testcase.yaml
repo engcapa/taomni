@@ -1,0 +1,134 @@
+id: TC-DB-EXEC-003-dangerous-confirm-native
+title: Native DROP confirmation keeps the table on Cancel and drops it on Execute
+description: |
+  DB-EXEC-003 V5. Creates a scratch table on a real MySQL/MariaDB session, runs
+  DROP TABLE and cancels the confirmation, proves the table still answers a
+  SELECT, then runs DROP again with Execute and proves a follow-up SELECT fails.
+covers:
+- F-DB-1
+tags:
+- database
+- sql
+- dangerous-statement
+- db-parity
+- native-boundary
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- mysql_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-db-exec-danger-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.database.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.database.port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.database.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.database.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.database.database}
+- click: '[data-testid="db-save-in-vault"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-exec-danger
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-pw1"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-db-exec-danger-master
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-db-exec-danger-master
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-exec-danger"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-db-exec-danger"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- wait_for:
+    selector: '[data-testid="schema-tree"]'
+    timeout_sec: 30
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: CREATE TABLE IF NOT EXISTS qa_db_exec003_t (id INT);
+- click: '[data-testid="db-run-all"]'
+- wait_for:
+    selector: '[data-testid="result-log-tab"]'
+    timeout_sec: 60
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-run"]:first-of-type [data-testid="db-execution-log-summary"]'
+    contains: 'Success: 1'
+    timeout_sec: 60
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: DROP TABLE qa_db_exec003_t;
+- click: '[data-testid="db-run-all"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: '[DROP]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT COUNT(*) AS n FROM qa_db_exec003_t;
+- click: '[data-testid="db-run-all"]'
+- wait_for:
+    selector: '[data-testid="query-result-grid"]'
+    timeout_sec: 60
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-run"]:first-of-type [data-testid="db-execution-log-summary"]'
+    contains: 'Success: 1'
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: DROP TABLE qa_db_exec003_t;
+- click: '[data-testid="db-run-all"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-run"]:first-of-type [data-testid="db-execution-log-summary"]'
+    contains: 'Success: 1'
+    timeout_sec: 60
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT COUNT(*) AS n FROM qa_db_exec003_t;
+- click: '[data-testid="db-run-all"]'
+- wait_for:
+    selector: '[data-testid="db-execution-log"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="db-execution-log-run"]:first-of-type [data-testid="db-execution-log-summary"]'
+    contains: 'Failed: 1'
+- screenshot: db-exec-003-dangerous-confirm-native.png

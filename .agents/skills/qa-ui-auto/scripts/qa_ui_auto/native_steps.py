@@ -157,9 +157,12 @@ def _press(ctx: NativeStepContext, args: Any) -> str:
         key, selector = args, None
     elif isinstance(args, dict) and "key" in args:
         key = str(args["key"])
+        # IDEA's macOS keymap binds some actions to a different stroke.
+        if platform.system() == "Darwin" and isinstance(args.get("macos_key"), str):
+            key = str(args["macos_key"])
         selector = args.get("selector")
     else:
-        raise StepError(f"press: expected string or {{key, selector?}}, got {args!r}")
+        raise StepError(f"press: expected string or {{key, macos_key?, selector?}}, got {args!r}")
     if selector:
         ctx.session.focus(selector)
     return ctx.session.press_combo(key)
@@ -1936,7 +1939,23 @@ def _do_native_pointer_drag(ctx: NativeStepContext, args: Any) -> str:
         "if (!(root instanceof HTMLElement)) return null;"
         "const lines = Array.from(root.querySelectorAll('.cm-line'));"
         f"const points = {json.dumps([start, end])};"
+        # Lines are document lines: with folded ranges (e.g. the default
+        # import fold) the n-th rendered `.cm-line` is not document line n,
+        # so resolve through the CodeMirror view when it is reachable.
+        "const content = root.matches('.cm-content') ? root : root.querySelector('.cm-content');"
+        "const view = content?.cmTile?.root?.view ?? null;"
+        "const locateInView = ({line,column}) => {"
+        " const doc = view.state.doc;"
+        " if (line > doc.lines) return null;"
+        " const docLine = doc.line(line);"
+        " if (column > docLine.length) return null;"
+        " const caret = view.coordsAtPos(docLine.from + column);"
+        " if (!caret) return null;"
+        " return {x:Math.round(caret.left), y:Math.round((caret.top + caret.bottom) / 2),"
+        "  lineLength:docLine.length};"
+        "};"
         "const locate = ({line,column}) => {"
+        " if (view?.state?.doc && typeof view.coordsAtPos === 'function') return locateInView({line,column});"
         " const el = lines[line - 1];"
         " if (!(el instanceof HTMLElement) || column > (el.textContent?.length ?? 0)) return null;"
         " const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);"
@@ -2625,6 +2644,162 @@ def _find_quiet(ctx: NativeStepContext, selector: str) -> bool:
         return True
     except Exception:  # noqa: BLE001
         return False
+
+
+def _mail_server() -> Any:
+    from . import mail_fake_server
+
+    server = mail_fake_server.ACTIVE
+    if server is None:
+        raise StepError("mail_server_*: the mail_server fixture is not active")
+    return server
+
+
+def _mail_args(args: Any, name: str, *, need_count: bool = True) -> tuple[str, int]:
+    args = args if isinstance(args, dict) else {}
+    count = args.get("count", 0)
+    if need_count and (not isinstance(count, int) or count < 1):
+        raise StepError(f"{name}: expected {{count: positive int, folder?}}")
+    return str(args.get("folder") or "INBOX"), int(count or 0)
+
+
+@_verb("mail_server_deliver")
+def _do_mail_server_deliver(ctx: NativeStepContext, args: Any) -> str:
+    folder, count = _mail_args(args, "mail_server_deliver")
+    uids = _mail_server().state.deliver(folder, count, prefix=str(args.get("prefix") or "QA"),
+                                        thread=bool(args.get("thread")),
+                                        list_unsubscribe=args.get("list_unsubscribe") or None,
+                                        invite=args.get("invite") or None,
+                                        read_receipt=bool(args.get("read_receipt")))
+    return f"delivered {len(uids)} to {folder} (uids {uids[0]}..{uids[-1]})"
+
+
+@_verb("mail_server_expunge_newest")
+def _do_mail_server_expunge_newest(ctx: NativeStepContext, args: Any) -> str:
+    folder, count = _mail_args(args, "mail_server_expunge_newest")
+    state = _mail_server().state
+    uids = state.newest_uids(folder, count)
+    state.expunge(folder, uids)
+    return f"expunged {uids} from {folder}"
+
+
+@_verb("mail_server_set_flags_newest")
+def _do_mail_server_set_flags_newest(ctx: NativeStepContext, args: Any) -> str:
+    folder, count = _mail_args(args, "mail_server_set_flags_newest")
+    flags = args.get("flags")
+    if not isinstance(flags, list):
+        raise StepError("mail_server_set_flags_newest: flags must be a list")
+    state = _mail_server().state
+    uids = state.newest_uids(folder, count)
+    state.set_flags(folder, uids, [str(flag) for flag in flags])
+    return f"set {flags} on {uids} in {folder}"
+
+
+@_verb("mail_server_assert_folder_count")
+def _do_mail_server_assert_folder_count(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    folder = str(args.get("folder") or "INBOX")
+    minimum = int(args.get("min", 0))
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 20))
+    count = -1
+    while time.time() < deadline:
+        count = state.count(folder)
+        subjects = state.subjects(folder)
+        if (
+            count >= minimum
+            and ("equals" not in args or count == int(args["equals"]))
+            and ("has_subject" not in args or args["has_subject"] in subjects)
+            and ("lacks_subject" not in args or args["lacks_subject"] not in subjects)
+        ):
+            return f"{folder} has {count} messages on the server"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_folder_count: {folder} has {count}, expected {args!r}")
+
+
+@_verb("mail_server_assert_idle_clients")
+def _do_mail_server_assert_idle_clients(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    if not isinstance(args.get("equals"), int):
+        raise StepError("mail_server_assert_idle_clients: expected {equals: int, timeout_sec?}")
+    expected = int(args["equals"])
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 10))
+    count = -1
+    while time.time() < deadline:
+        count = state.idle_clients()
+        if count == expected:
+            return f"{count} IDLE connection(s) on the fake server"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_idle_clients: {count} IDLE clients, expected {expected}")
+
+
+@_verb("mail_server_assert_caldav_contains")
+def _do_mail_server_assert_caldav_contains(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    text = args.get("text")
+    if not isinstance(text, str) or not text:
+        raise StepError("mail_server_assert_caldav_contains: expected {text: str, timeout_sec?}")
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 20))
+    while time.time() < deadline:
+        if state.caldav_contains(text):
+            return f"fake CalDAV holds a resource containing {text!r}"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_caldav_contains: no CalDAV resource contains {text!r} "
+                    f"({len(state.caldav)} stored)")
+
+
+@_verb("mail_server_assert_smtp_contains")
+def _do_mail_server_assert_smtp_contains(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    text = args.get("text")
+    if not isinstance(text, str) or not text:
+        raise StepError("mail_server_assert_smtp_contains: expected {text: str, timeout_sec?}")
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 20))
+    while time.time() < deadline:
+        if state.smtp_contains(text):
+            return f"fake SMTP received a message containing {text!r}"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_smtp_contains: no SMTP message contains {text!r} "
+                    f"({len(state.smtp_messages)} received)")
+
+
+@_verb("mail_server_assert_list_matches")
+def _do_mail_server_assert_list_matches(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    folder = str(args.get("folder") or "INBOX")
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 30))
+    observed: Any = None
+    while time.time() < deadline:
+        with state.lock:
+            messages = state.folders[folder].messages
+            server = len(messages)
+            server_unread = sum(1 for m in messages.values() if "\\Seen" not in m.flags)
+        observed = ctx.session.execute(
+            "const el = document.querySelector('[data-testid=\"mail-message-count\"]');"
+            "return {shown: el ? Number(el.getAttribute('data-count')) : -1,"
+            " hasMore: el ? el.getAttribute('data-has-more') : null,"
+            " unreadRows: document.querySelectorAll('[data-testid=\"mail-message-row\"][data-unread=\"true\"]').length};"
+        )
+        if (
+            isinstance(observed, dict)
+            and observed.get("shown") == server
+            and observed.get("hasMore") == "false"
+            and (not args.get("unread") or observed.get("unreadRows") == server_unread)
+        ):
+            return f"list matches server: {server} messages, {server_unread} unread"
+        if isinstance(observed, dict) and observed.get("hasMore") == "true":
+            # Like a user scrolling to the end: load the next cached page.
+            ctx.session.execute(
+                "document.querySelector('[data-testid=\"mail-load-more\"]:not([disabled])')?.click(); return true;"
+            )
+        time.sleep(0.5)
+    raise StepError(
+        f"mail_server_assert_list_matches: server={server} unread={server_unread} ui={observed!r}"
+    )
 
 
 def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:

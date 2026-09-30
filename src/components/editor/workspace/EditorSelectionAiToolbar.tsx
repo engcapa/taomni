@@ -61,8 +61,12 @@ export function EditorSelectionAiToolbar({
 
   const TOOLBAR_HEIGHT = 34;
   const PADDING = 8;
-  const placeAbove = rect.top > TOOLBAR_HEIGHT + PADDING;
-  const top = placeAbove ? rect.top - TOOLBAR_HEIGHT - PADDING : rect.bottom + PADDING;
+  // ED-PARITY-011 DEC-011-07: below the selection first, so the toolbar never
+  // covers the line above (IDEA has no floating toolbar over code); above only
+  // when the viewport bottom leaves no room.
+  const viewportHeight = typeof window === "undefined" ? 800 : window.innerHeight;
+  const placeBelow = rect.bottom + PADDING + TOOLBAR_HEIGHT + PADDING <= viewportHeight;
+  const top = placeBelow ? rect.bottom + PADDING : Math.max(PADDING, rect.top - TOOLBAR_HEIGHT - PADDING);
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - 480));
 
   const languageBadge = t(answerLanguageLabelKey(answerLanguage));

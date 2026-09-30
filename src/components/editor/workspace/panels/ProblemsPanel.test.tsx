@@ -187,3 +187,80 @@ describe("ProblemsPanel", () => {
     expect(onAddToBaseline).toHaveBeenCalledWith(files[0].key, files[0].diagnostics[0]);
   });
 });
+
+describe("ED-PARITY-015: Problems language-service readiness", () => {
+  afterEach(() => cleanup());
+
+  it("shows the unavailable reason with Configure instead of No problems", () => {
+    const onConfigure = vi.fn();
+    render(
+      <ProblemsPanel
+        files={[]}
+        onOpenProblem={vi.fn()}
+        readiness={{ kind: "not-installed", name: "Java", message: "Install: jdtls", action: "configure" }}
+        onConfigureLanguageService={onConfigure}
+        onRetryLanguageService={vi.fn()}
+      />,
+    );
+    const state = screen.getByTestId("code-workspace-problems-provider-state");
+    expect(state).toHaveAttribute("data-state", "not-installed");
+    expect(state).toHaveTextContent("Problems are unavailable: Install: jdtls");
+    expect(screen.queryByText("No problems in open files")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("code-workspace-problems-retry")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("code-workspace-problems-configure"));
+    expect(onConfigure).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers Retry for a failed service and no button while indexing", () => {
+    const onRetry = vi.fn();
+    const { rerender } = render(
+      <ProblemsPanel
+        files={[]}
+        onOpenProblem={vi.fn()}
+        readiness={{ kind: "failed", name: "Java", message: "jdtls exited (code 1)", action: "retry" }}
+        onRetryLanguageService={onRetry}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("code-workspace-problems-retry"));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    rerender(
+      <ProblemsPanel
+        files={[]}
+        onOpenProblem={vi.fn()}
+        readiness={{ kind: "indexing", name: "Java", message: "Java indexing…", action: null }}
+        onRetryLanguageService={onRetry}
+      />,
+    );
+    expect(screen.getByTestId("code-workspace-problems-provider-state")).toHaveTextContent("Analyzing… problems will appear when Java is ready");
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
+  it("keeps real results and marks them outdated when the service is not ready", () => {
+    render(
+      <ProblemsPanel
+        files={files}
+        onOpenProblem={vi.fn()}
+        readiness={{ kind: "starting", name: "Java", message: "Java starting…", action: null }}
+      />,
+    );
+    expect(screen.getByTestId("code-workspace-problems-stale")).toHaveTextContent("Results may be outdated: Java starting…");
+    expect(screen.getByText("Broken expression")).toBeInTheDocument();
+    expect(screen.queryByTestId("code-workspace-problems-provider-state")).not.toBeInTheDocument();
+  });
+
+  it("says No problems only when the service is ready or there is none for the file", () => {
+    const { rerender } = render(
+      <ProblemsPanel files={[]} onOpenProblem={vi.fn()} readiness={{ kind: "ready", name: "Java", message: "Java", action: null }} />,
+    );
+    expect(screen.getByText("No problems in open files")).toBeInTheDocument();
+    rerender(<ProblemsPanel files={[]} onOpenProblem={vi.fn()} readiness={{ kind: "idle", name: "LSP", message: "No LSP", action: null }} />);
+    expect(screen.getByText("No problems in open files")).toBeInTheDocument();
+  });
+
+  it("ends each row with IDEA's :line and keeps the column in the tooltip", () => {
+    render(<ProblemsPanel files={files} onOpenProblem={vi.fn()} />);
+    const line = screen.getAllByTestId("problems-diagnostic-line")[0];
+    expect(line).toHaveTextContent(":4");
+    expect(line).toHaveAttribute("title", "Line 4, column 3");
+  });
+});

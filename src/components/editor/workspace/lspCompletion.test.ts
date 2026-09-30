@@ -240,6 +240,20 @@ describe("createLspCompletionSource", () => {
     expect(result?.options.some((option) => option.label === "workspace")).toBe(true);
   });
 
+  it("ED-PARITY-020: offers no buffer words at a member access when the service is inactive", async () => {
+    const fetch = vi.fn(async () => completionResult([], false));
+    const onProviderUnavailable = vi.fn();
+    const source = createFixtureCompletionSource({ fetch, triggerCharacters: () => [], onProviderUnavailable });
+
+    const result = await source(contextAt("calculator calculator.ca", 24));
+
+    expect(result).toBeNull();
+    expect(onProviderUnavailable).toHaveBeenCalledWith({ explicit: false });
+    // Outside a member access the word fallback stays.
+    const plain = await source(contextAt("workspace wor", 13));
+    expect(plain?.options.some((option) => option.label === "workspace")).toBe(true);
+  });
+
   it("uses filterText for matching and sortText for ordering metadata", async () => {
     const fetch = vi.fn(async (): Promise<LspCompletionResult> => ({
       status: status(true),

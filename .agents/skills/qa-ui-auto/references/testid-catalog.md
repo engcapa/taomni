@@ -161,6 +161,9 @@
 - `[data-testid="editor-context-goto-definition"]` — interactive [optional] — F25.3.context-goto-definition
 - `[data-testid="editor-context-goto-declaration"]` — interactive [optional] — F25.3.context-goto-declaration
 - `[data-testid="editor-context-format"]` — interactive [optional] — F25.3.context-format
+- `[data-testid="editor-context-goto"]` — interactive [optional] — F25.3.editor-context-goto
+- `[data-testid="context-menu-item-close-other-tabs"]` — interactive [optional] — F25.3.tab-menu-close-other-tabs
+- `[data-testid="context-menu-item-close-tabs-to-the-right"]` — interactive [optional] — F25.3.tab-menu-close-tabs-right
 
 ## code-workspace/editor-shell (F25.5)
 
@@ -185,6 +188,38 @@
 - `[data-testid="refactoring-preview-apply"]` — interactive [optional] — F25.5.refactoring-preview-apply
 - `[data-testid="refactoring-preview-select-none"]` — interactive [optional] — F25.5.refactoring-preview-select-none
 - `[data-testid="refactoring-preview-cancel"]` — interactive [optional] — F25.5.refactoring-preview-cancel
+- `[data-testid="refactoring-preview-row"]` — display [optional] — F25.5.refactoring-preview-row
+- `[data-testid="refactoring-preview-before"]` — display [optional] — F25.5.refactoring-preview-before
+- `[data-testid="refactoring-preview-after"]` — display [optional] — F25.5.refactoring-preview-after
+- `[data-testid="refactoring-preview-source-unavailable"]` — display [optional] — F25.5.refactoring-preview-source-unavailable
+- `[data-testid="code-workspace-error-stripe"]` — display [optional] — F25.5.error-stripe
+- `[data-testid="code-workspace-error-stripe-mark"]` — interactive [optional] — F25.5.error-stripe-mark
+- `[data-testid="code-workspace-run-gutter"]` — interactive [optional] — F25.5.run-gutter
+- `[data-testid="code-workspace-run-gutter-run"]` — display [optional] — F25.5.run-gutter-run
+- `[data-testid="code-workspace-run-gutter-debug"]` — display [optional] — F25.5.run-gutter-debug
+- `.cm-git-change-marker.cm-git-change-modified` — interactive [optional] — F25.5.git-change-marker-modified
+- `.cm-lsp-usage` — display [optional] — F25.5.lsp-usage-mark
+- `[data-testid="code-workspace-git-diff-peek"]` — display [optional] — F25.5.git-diff-peek
+- `[data-testid="git-diff-peek-previous"]` — interactive [optional] — F25.5.git-diff-peek-previous
+- `[data-testid="git-diff-peek-next"]` — interactive [optional] — F25.5.git-diff-peek-next
+- `[data-testid="git-diff-peek-rollback-btn"]` — interactive [optional] — F25.5.git-diff-peek-rollback
+- `[data-testid="git-diff-peek-show-diff"]` — interactive [optional] — F25.5.git-diff-peek-show-diff
+- `[data-testid="git-diff-peek-copy"]` — display [optional] — F25.5.git-diff-peek-copy
+- `[data-testid="git-diff-peek-position"]` — display [optional] — F25.5.git-diff-peek-position
+- `[data-testid="git-diff-peek-old-line"]` — display [optional] — F25.5.git-diff-peek-old-line
+- `[data-testid="git-diff-peek-new-line"]` — display [optional] — F25.5.git-diff-peek-new-line
+- `[data-testid="code-workspace-inline-rename"]` — display [optional] — F25.5.inline-rename-session
+- `.cm-inline-rename-target` — display [optional] — F25.5.inline-rename-target-mark
+- `[data-testid="code-workspace-inline-rename-input"]` — interactive [optional] — F25.5.inline-rename-input
+- `[data-testid="code-workspace-inline-rename-suggestions"]` — display [optional] — F25.5.inline-rename-suggestions
+- `[data-testid="code-workspace-inline-rename-suggestion"]` — display [optional] — F25.5.inline-rename-suggestion
+- `[data-testid="code-workspace-inline-rename-hint"]` — display [optional] — F25.5.inline-rename-hint
+- `[data-testid="code-workspace-inline-rename-error"]` — display [optional] — F25.5.inline-rename-error
+- `[data-testid="code-workspace-inline-rename-options"]` — display [optional] — F25.5.inline-rename-options
+- `[data-testid="code-workspace-inline-rename-option-comments"]` — display [optional] — F25.5.inline-rename-option-comments
+- `[data-testid="code-workspace-inline-rename-option-comments-reason"]` — display [optional] — F25.5.inline-rename-option-comments-reason
+- `[data-testid="code-workspace-inline-rename-option-modal"]` — interactive [optional] — F25.5.inline-rename-option-modal
+- `[data-testid="code-workspace-inline-rename-open-dialog"]` — interactive [optional] — F25.5.inline-rename-open-dialog
 - `[data-testid^="code-workspace-intention-"]` — interactive [optional] — F25.5.intention-candidate-item
 - `[data-testid="extract-method-name-prompt"]` — display [optional] — F25.5.extract-method-name-prompt
 - `[data-testid="refactor-recovery-review"]` — display [optional] — F25.5.refactor-recovery-review
@@ -325,6 +360,80 @@
 - `[data-testid="keymap-settings-ok"]` — interactive [optional] — F25.5.keymap-settings-ok
 - `[data-testid="keymap-settings-cancel"]` — interactive [optional] — F25.5.keymap-settings-cancel
 - `[data-testid="keymap-settings-apply"]` — interactive [optional] — F25.5.keymap-settings-apply
+- `[data-testid="code-workspace-toolbar-more"]` — interactive — F25.5.toolbar-more
+- `[data-testid="code-workspace-toolbar-more-menu"]` — display [optional] — F25.5.toolbar-more-menu
+- `[data-testid="code-workspace-toolbar-search"]` — interactive [optional] — F25.5.toolbar-search
+- `[data-testid="code-workspace-toolbar-settings"]` — interactive [optional] — F25.5.toolbar-settings
+- `[data-testid="code-workspace-tool-rail-left"]` — display [optional] — F25.5.tool-rail-left
+- `[data-testid="code-workspace-tool-rail-right"]` — display [optional] — F25.5.tool-rail-right
+- `[data-testid="code-workspace-tool-rail-project"]` — interactive [optional] — F25.5.tool-rail-button
+  ↳ `[data-testid="code-workspace-tool-rail-structure"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-commit"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-documentation"]` — alias
+- `[data-testid="code-workspace-tool-window-header"]` — display [optional] — F25.5.tool-window-header
+- `[data-testid="code-workspace-tool-window-title"]` — display [optional] — F25.5.tool-window-title
+- `[data-testid="code-workspace-tool-window-hide"]` — interactive [optional] — F25.5.tool-window-hide
+- `[data-testid="code-workspace-tool-window-options"]` — interactive [optional] — F25.5.tool-window-options
+- `[data-testid="code-workspace-bottom-tab-overflow-problems"]` — interactive [optional] — F25.5.bottom-tool-overflow-item
+- `[data-testid="code-workspace-terminal-dock"]` — display [optional] — F25.5.terminal-dock-panel
+  ↳ `[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]` — alias
+  ↳ `[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]` — alias
+- `header [data-testid="code-workspace-split-right"]` — display [optional] — F25.5.toolbar-split-right-in-header
+- `[data-testid="code-workspace-ai-selection-toolbar"]` — display [optional] — F25.5.ai-selection-toolbar
+- `[data-testid="code-workspace-goto-line-dialog"]` — display [optional] — F25.5.goto-line-dialog
+- `[data-testid="code-workspace-goto-line-input"]` — interactive [optional] — F25.5.goto-line-input
+- `[data-testid="code-workspace-goto-line-ok"]` — interactive [optional] — F25.5.goto-line-ok
+- `[data-testid="code-workspace-goto-line-cancel"]` — interactive [optional] — F25.5.goto-line-cancel
+- `[data-testid="code-workspace-goto-line-error"]` — display [optional] — F25.5.goto-line-error
+- `[data-testid="code-workspace-structure-popup"]` — display [optional] — F25.5.structure-popup
+- `[data-testid="recent-locations-dialog"]` — display [optional] — F25.5.recent-locations-dialog
+- `[data-testid="code-workspace-problems-provider-state"]` — display [optional] — F25.5.problems-provider-state
+- `[data-testid="code-workspace-problems-stale"]` — display [optional] — F25.5.problems-stale
+- `[data-testid="code-workspace-problems-configure"]` — interactive [optional] — F25.5.problems-configure
+- `[data-testid="code-workspace-problems-retry"]` — interactive [optional] — F25.5.problems-retry
+- `[data-testid="problems-diagnostic-line"]` — display [optional] — F25.5.problems-diagnostic-line
+- `[data-testid="code-workspace-structure-title"]` — display [optional] — F25.5.structure-title
+- `[data-testid="code-workspace-structure-syntax-only"]` — display [optional] — F25.5.structure-syntax-only
+- `[data-testid="search-everywhere-selected-path"]` — display [optional] — F25.5.search-everywhere-selected-path
+- `[data-testid="code-workspace-recent-files-tool-window-problems"]` — interactive [optional] — F25.5.recent-files-tool-window
+  ↳ `[data-testid="code-workspace-recent-files-tool-window-project"]` — alias
+- `[data-testid="code-workspace-recent-files-tool-windows"]` — display [optional] — F25.5.recent-files-tool-windows
+- `[data-testid="code-workspace-recent-files-recent-locations"]` — interactive [optional] — F25.5.recent-files-recent-locations
+- `[data-testid="code-workspace-recent-files-edited-only"]` — interactive [optional] — F25.5.recent-files-edited-only
+- `[data-testid="code-workspace-recent-files-path"]` — display [optional] — F25.5.recent-files-path
+- `[data-testid="code-workspace-git-tool-window"]` — display [optional] — F25.5.git-tool-window
+- `[data-testid="code-workspace-git-tool-window-empty"]` — display [optional] — F25.5.git-tool-window-empty
+- `[data-testid="code-workspace-code-insight-notice"]` — display [optional] — F25.5.code-insight-notice
+- `[data-testid="code-workspace-code-insight-configure"]` — interactive [optional] — F25.5.code-insight-configure
+- `[data-testid="problems-severity-error"]` — interactive [optional] — F25.5.problems-severity-filter
+  ↳ `[data-testid="problems-severity-warning"]` — alias
+  ↳ `[data-testid="problems-severity-info"]` — alias
+- `[data-testid="code-workspace-empty-editor"]` — display [optional] — F25.5.empty-editor-hints
+  ↳ `[data-testid="code-workspace-empty-editor-hint"]` — alias
+- `[data-testid="keymap-group-Navigation"]` — interactive [optional] — F25.5.keymap-group
+- `[data-testid="keymap-find-by-shortcut"]` — interactive [optional] — F25.5.keymap-find-by-shortcut
+- `[data-testid="keymap-shortcut-filter"]` — interactive [optional] — F25.5.keymap-shortcut-filter
+- `[data-testid="keymap-row-menu"]` — display [optional] — F25.5.keymap-row-menu
+- `[data-testid="keymap-row-menu-add-keyboard"]` — interactive [optional] — F25.5.keymap-row-menu-add-keyboard
+- `[data-testid="keymap-row-menu-add-mouse"]` — interactive [optional] — F25.5.keymap-row-menu-add-mouse
+- `[data-testid="keymap-recorder-second-stroke"]` — interactive [optional] — F25.5.keymap-recorder-second-stroke
+- `[data-testid="keymap-mouse-recorder-pad"]` — interactive [optional] — F25.5.keymap-mouse-recorder-pad
+- `[data-testid="keymap-mouse-recorder-hint"]` — display [optional] — F25.5.keymap-mouse-recorder-hint
+- `[data-testid="keymap-mouse-recorder-value"]` — display [optional] — F25.5.keymap-mouse-recorder-value
+- `[data-testid="keymap-mouse-recorder-ok"]` — interactive [optional] — F25.5.keymap-mouse-recorder-ok
+- `[data-testid="keymap-row-workspace.recentFiles"]` — interactive [optional] — F25.5.keymap-row-action
+  ↳ `[data-testid="keymap-row-workspace.goToFile"]` — alias
+  ↳ `[data-testid="keymap-row-workspace.gotoDefinition"]` — alias
+- `[data-testid="keymap-add-workspace.recentFiles"]` — interactive [optional] — F25.5.keymap-add-action
+- `[data-testid="keymap-replace-editor.replace-1"]` — display [optional] — F25.5.keymap-replace-appended-slot
+  ↳ `[data-testid="keymap-replace-workspace.recentFiles-1"]` — alias
+- `[data-testid="keymap-no-shortcut-workspace.jumpToLastToolWindow"]` — display [optional] — F25.5.keymap-no-shortcut-action
+- `[data-testid="code-workspace-recent-files"]` — display [optional] — F25.5.recent-files-popup
+- `[data-testid="code-workspace-right-pane"]` — display [optional] — F25.5.workspace-right-pane
+- `[data-workspace-focus="terminal"]` — interactive [optional] — F25.5.workspace-terminal-dock
+- `[data-testid="keymap-migration-notice"]` — display [optional] — F25.5.keymap-migration-notice
+- `[data-testid="search-everywhere-shortcut-workspace.format"]` — display [optional] — F25.5.search-everywhere-action-shortcut
+- `[data-testid="search-everywhere-assign-shortcut-hint"]` — display [optional] — F25.5.search-everywhere-assign-shortcut-hint
 - `[data-testid="code-workspace-parameter-info"]` — display [optional] — F25.5.parameter-info-tooltip
 - `[data-testid="code-workspace-quick-doc"]` — display [optional] — F25.5.quick-doc-popup
 - `[data-testid="code-workspace-editor-banners"]` — display [optional] — F25.5.editor-banners
@@ -414,6 +523,7 @@
 - `[data-testid="code-workspace-bottom-tab-build"]` — interactive — F25.1.build-tab
 - `[data-testid="code-workspace-bottom-tab-tests"]` — interactive — F25.1.tests-tab
 - `[data-testid="code-workspace-bottom-tab-debug"]` — interactive — F25.1.debug-tab
+- `[data-testid="code-workspace-bottom-tab-git"]` — interactive [optional] — F25.1.bottom-tab-git
 - `[data-testid="code-workspace-bottom-tab-overflow"]` — interactive [optional] — F25.1.bottom-tab-overflow
 - `[data-testid="code-workspace-bottom-tab-overflow-menu"]` — display [optional] — F25.1.bottom-tab-overflow-menu
 - `[data-testid="code-workspace-bottom-tab-overflow-build"]` — interactive [optional] — F25.1.bottom-tab-overflow-build
@@ -686,6 +796,14 @@
 - `[data-testid="sql-editor"]` — display [optional] — F-DB-1.sql-editor
 - `[data-testid="sql-completion-status"]` — display [optional] — F-DB-1.sql-completion-status
 - `[data-testid="query-result-grid"]` — display [optional] — F-DB-1.query-result-grid
+- `[data-testid="query-result-grid"] button[title="Row 1"]` — interactive [optional] — F-DB-1.query-result-row-1
+- `[data-testid="query-result-grid"] button[aria-label="Delete row"]` — interactive [optional] — F-DB-1.query-result-delete-row
+- `[data-testid="query-result-grid"] button[aria-label="Submit grid edits"]` — interactive [optional] — F-DB-1.query-result-submit-edits
+- `[data-testid="query-result-row"]` — display [optional] — F-DB-1.query-result-row
+- `[data-testid="query-result-sort-header"]` — interactive [optional] — F-DB-1.query-result-sort-header
+- `[data-testid="query-result-row-count"]` — display [optional] — F-DB-1.query-result-row-count
+- `[data-testid="query-result-grid"] button[aria-label="Filter rows"]` — interactive [optional] — F-DB-1.query-result-filter-toggle
+- `[data-testid="query-result-grid"] input[placeholder="Filter rows"]` — interactive [optional] — F-DB-1.query-result-filter-input
 - `[data-testid="query-result-generated-sql"]` — display [optional] — F-DB-1.query-result-generated-sql
 - `[data-testid="query-result-generated-sql-copy"]` — interactive [optional] — F-DB-1.query-result-generated-sql-copy
 - `[data-testid="query-result-generated-sql-query"]` — interactive [optional] — F-DB-1.query-result-generated-sql-query
@@ -724,11 +842,33 @@
 - `[data-testid="db-tab-limit"]` — interactive [optional] — F-DB-1.tab-limit
 - `[data-testid="db-run-current-statement"]` — interactive [optional] — F-DB-1.run-current-statement
 - `[data-testid="db-connection-error-banner"]` — display [optional] — F-DB-1.connection-error-banner
+- `[data-testid="db-run-all"]` — interactive [optional] — F-DB-1.run-all
+- `[data-testid="db-explain-current"]` — interactive [optional] — F-DB-1.explain-current
+- `[data-testid="result-log-tab"]` — interactive [optional] — F-DB-1.result-log-tab
+- `[data-testid="db-execution-log"]` — display [optional] — F-DB-1.execution-log
+- `[data-testid="db-execution-log-run"]` — display [optional] — F-DB-1.execution-log-run
+- `[data-testid="db-execution-log-entry"]` — display [optional] — F-DB-1.execution-log-entry
+- `[data-testid="db-execution-log-summary"]` — display [optional] — F-DB-1.execution-log-summary
+- `[data-testid="result-sheet-tab"]` — interactive [optional] — F-DB-1.result-sheet-tab
+- `[data-testid="db-tx-mode"]` — interactive [optional] — F-DB-1.tx-mode
+- `[data-testid="db-tx-commit"]` — interactive [optional] — F-DB-1.tx-commit
+- `[data-testid="db-tx-rollback"]` — interactive [optional] — F-DB-1.tx-rollback
+- `[data-testid="db-tx-pending"]` — display [optional] — F-DB-1.tx-pending
 - `[data-testid="db-chat-toggle"]` — interactive [optional] — F-DB-1.chat-toggle
 - `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach
 
 ## editor/structural-search (F25.6)
 
+- `[data-testid="structural-search-templates"]` — display [optional] — F25.6.structural-search-templates
+- `[data-testid="structural-search-template-item"]` — interactive [optional] — F25.6.structural-search-template-item
+- `[data-testid="structural-search-add-filter"]` — interactive [optional] — F25.6.structural-search-add-filter
+- `[data-testid="structural-search-filter-menu"]` — display [optional] — F25.6.structural-search-filter-menu
+- `[data-testid="structural-search-filter-option-text"]` — interactive [optional] — F25.6.structural-search-filter-option
+  ↳ `[data-testid="structural-search-filter-option-count"]` — alias
+  ↳ `[data-testid="structural-search-filter-option-type"]` — alias
+  ↳ `[data-testid="structural-search-filter-option-reference"]` — alias
+  ↳ `[data-testid="structural-search-filter-option-script"]` — alias
+- `[data-testid="structural-search-filter-reason"]` — display [optional] — F25.6.structural-search-filter-reason
 - `[data-testid="structural-search-dialog"]` — display — F25.6.structural-search-dialog
 - `[data-testid="structural-search-template"]` — interactive — F25.6.structural-search-template
 - `[data-testid="structural-search-language"]` — display — F25.6.structural-search-language
@@ -801,6 +941,47 @@
 - `[data-testid="git-diff-stage"]` — interactive [optional] — F26.2.git-diff-stage
 - `[data-testid="git-diff-unstage"]` — interactive [optional] — F26.2.git-diff-unstage
 
+## mail/account (F-MAIL-16)
+
+- `[data-testid="mail-autoconfig"]` — interactive — F-MAIL-16.autoconfig
+- `[data-testid="mail-autoconfig-online"]` — interactive — F-MAIL-16.autoconfig-online
+- `[data-testid="mail-autoconfig-result"]` — display — F-MAIL-16.autoconfig-result
+- `[data-testid="mail-cert-review"]` — interactive [optional] — F-MAIL-16.cert-review
+- `[data-testid="mail-cert-dialog"]` — display [optional] — F-MAIL-16.cert-dialog
+- `[data-testid="mail-cert-fingerprint"]` — display [optional] — F-MAIL-16.cert-fingerprint
+- `[data-testid="mail-cert-trust"]` — interactive [optional] — F-MAIL-16.cert-trust
+
+## mail/attachments (F-MAIL-15)
+
+- `[data-testid="mail-attach-reminder"]` — display — F-MAIL-15.attach-reminder
+- `[data-testid="mail-attach-reminder-send"]` — interactive — F-MAIL-15.attach-reminder-send
+
+## mail/calendar (F-MAIL-18)
+
+- `[data-testid="mail-invite-card"]` — display — F-MAIL-18.invite-card
+- `[data-testid="mail-invite-summary"]` — display — F-MAIL-18.invite-summary
+- `[data-testid="mail-invite-accept"]` — interactive — F-MAIL-18.invite-accept
+- `[data-testid="mail-invite-responded"]` — display — F-MAIL-18.invite-responded
+- `[data-testid="mail-invite-tentative"]` — interactive [optional] — F-MAIL-18.invite-tentative
+- `[data-testid="mail-invite-decline"]` — interactive [optional] — F-MAIL-18.invite-decline
+- `[data-testid="mail-invite-export"]` — interactive [optional] — F-MAIL-18.invite-export
+- `[data-testid="mail-invite-open"]` — interactive [optional] — F-MAIL-18.invite-open
+
+## mail/calendar (F-MAIL-22)
+
+- `[data-testid="mail-agenda-open"]` — interactive — F-MAIL-22.agenda-open
+- `[data-testid="mail-agenda-close"]` — interactive [optional] — F-MAIL-22.agenda-close
+- `[data-testid="mail-agenda"]` — display [optional] — F-MAIL-22.agenda
+- `[data-testid="mail-agenda-event"]` — display — F-MAIL-22.agenda-event
+- `[data-testid="mail-agenda-sync"]` — interactive [optional] — F-MAIL-22.agenda-sync
+- `[data-testid="mail-agenda-error"]` — display [optional] — F-MAIL-22.agenda-error
+- `[data-testid="mail-agenda-empty"]` — display [optional] — F-MAIL-22.agenda-empty
+- `[data-testid="mail-invite-in-calendar"]` — display — F-MAIL-22.invite-in-calendar
+- `[data-testid="mail-invite-add-calendar"]` — interactive [optional] — F-MAIL-22.invite-add-calendar
+- `[data-testid="mail-invite-calendar-error"]` — display [optional] — F-MAIL-22.invite-calendar-error
+- `[data-testid="mail-caldav-url"]` — interactive [optional] — F-MAIL-22.caldav-url
+- `[data-testid="mail-caldav-username"]` — interactive [optional] — F-MAIL-22.caldav-username
+
 ## mail/compose (F-MAIL-1)
 
 - `[data-testid="mail-client-tab"]` — display — F-MAIL-1.mail-client-tab
@@ -813,6 +994,27 @@
 - `[data-testid="mail-recipient-suggestions"]` — display — F-MAIL-1.recipient-suggestions
 - `[data-testid="mail-recipient-suggestion"]` — interactive — F-MAIL-1.recipient-suggestion
 - `[data-testid="mail-compose-send"]` — interactive [optional] — F-MAIL-1.compose-send
+
+## mail/compose (F-MAIL-13)
+
+- `[data-testid="mail-compose-send-later"]` — interactive — F-MAIL-13.compose-send-later
+- `[data-testid="mail-send-later-panel"]` — display [optional] — F-MAIL-13.send-later-panel
+- `[data-testid="mail-send-later-at"]` — interactive [optional] — F-MAIL-13.send-later-at
+- `[data-testid="mail-send-later-confirm"]` — interactive — F-MAIL-13.send-later-confirm
+- `[data-testid="mail-compose-read-receipt"]` — interactive [optional] — F-MAIL-13.compose-read-receipt
+- `[data-testid="mail-receipt-banner"]` — display — F-MAIL-13.receipt-banner
+- `[data-testid="mail-receipt-send"]` — interactive — F-MAIL-13.receipt-send
+- `[data-testid="mail-receipt-ignore"]` — interactive [optional] — F-MAIL-13.receipt-ignore
+- `[data-testid="mail-receipt-policy"]` — interactive [optional] — F-MAIL-13.receipt-policy
+- `[data-testid="mail-outbox-count"]` — display — F-MAIL-13.outbox-count
+- `[data-testid="mail-drafts-tab-outbox"]` — interactive — F-MAIL-13.drafts-tab-outbox
+- `[data-testid="mail-outbox-row"]` — display — F-MAIL-13.outbox-row
+- `[data-testid="mail-outbox-state"]` — display [optional] — F-MAIL-13.outbox-state
+- `[data-testid="mail-outbox-send-all"]` — interactive — F-MAIL-13.outbox-send-all
+- `[data-testid="mail-outbox-send"]` — interactive [optional] — F-MAIL-13.outbox-send
+- `[data-testid="mail-undo-send"]` — display [optional] — F-MAIL-13.undo-send
+- `[data-testid="mail-undo-send-button"]` — interactive [optional] — F-MAIL-13.undo-send-button
+- `[data-testid="mail-undo-send-seconds"]` — interactive [optional] — F-MAIL-13.undo-send-seconds
 
 ## mail/compose (F-MAIL-2)
 
@@ -850,6 +1052,116 @@
 - `[data-testid="mail-compose-attachment-chip"]` — display — F-MAIL-2.compose-attachment-chip
 - `[data-testid="mail-compose-save-draft"]` — interactive — F-MAIL-2.compose-save-draft
 
+## mail/compose (F-MAIL-6)
+
+- `[data-testid="mail-thread-view-toggle"]` — interactive — F-MAIL-6.thread-view-toggle
+- `[data-testid="mail-thread-expand"]` — interactive [optional] — F-MAIL-6.thread-expand
+- `[data-testid="mail-save-sent-copy"]` — interactive [optional] — F-MAIL-6.save-sent-copy
+
+## mail/compose (F-MAIL-9)
+
+- `[data-testid="mail-compose-from"]` — interactive [optional] — F-MAIL-9.compose-from
+- `[data-testid="mail-compose-save-template"]` — interactive — F-MAIL-9.compose-save-template
+- `[data-testid="mail-compose-discard"]` — interactive — F-MAIL-9.compose-discard
+- `[data-testid="mail-drafts-tab-templates"]` — interactive — F-MAIL-9.drafts-tab-templates
+- `[data-testid="mail-drafts-tab-drafts"]` — interactive [optional] — F-MAIL-9.drafts-tab-drafts
+- `[data-testid="mail-template-row"]` — interactive — F-MAIL-9.template-row
+- `[data-testid="mail-identities-editor"]` — display [optional] — F-MAIL-9.identities-editor
+- `[data-testid="mail-identity-add"]` — interactive [optional] — F-MAIL-9.identity-add
+
+## mail/contacts (F-MAIL-21)
+
+- `[data-testid="mail-address-book-open"]` — interactive — F-MAIL-21.address-book-open
+- `[data-testid="mail-address-book-close"]` — interactive — F-MAIL-21.address-book-close
+- `[data-testid="mail-address-book"]` — display [optional] — F-MAIL-21.address-book
+- `[data-testid="mail-contact-new"]` — interactive — F-MAIL-21.contact-new
+- `[data-testid="mail-contact-name"]` — interactive — F-MAIL-21.contact-name
+- `[data-testid="mail-contact-email"]` — interactive — F-MAIL-21.contact-email
+- `[data-testid="mail-contact-save"]` — interactive — F-MAIL-21.contact-save
+- `[data-testid="mail-contact-row"]` — display — F-MAIL-21.contact-row
+- `[data-testid="mail-contact-search"]` — interactive [optional] — F-MAIL-21.contact-search
+- `[data-testid="mail-contact-phone"]` — interactive [optional] — F-MAIL-21.contact-phone
+- `[data-testid="mail-contact-org"]` — interactive [optional] — F-MAIL-21.contact-org
+- `[data-testid="mail-contact-edit"]` — interactive [optional] — F-MAIL-21.contact-edit
+- `[data-testid="mail-contact-delete"]` — interactive [optional] — F-MAIL-21.contact-delete
+- `[data-testid="mail-contact-compose"]` — interactive [optional] — F-MAIL-21.contact-compose
+- `[data-testid="mail-carddav-sync"]` — interactive [optional] — F-MAIL-21.carddav-sync
+- `[data-testid="mail-carddav-errors"]` — display [optional] — F-MAIL-21.carddav-errors
+- `[data-testid="mail-menu-add-contact"]` — interactive [optional] — F-MAIL-21.menu-add-contact
+- `[data-testid="mail-carddav-url"]` — interactive [optional] — F-MAIL-21.carddav-url
+- `[data-testid="mail-carddav-username"]` — interactive [optional] — F-MAIL-21.carddav-username
+
+## mail/filters (F-MAIL-19)
+
+- `[data-testid="mail-filters-open"]` — interactive — F-MAIL-19.filters-open
+- `[data-testid="mail-filters-close"]` — interactive — F-MAIL-19.filters-close
+- `[data-testid="mail-filters-panel"]` — display [optional] — F-MAIL-19.filters-panel
+- `[data-testid="mail-filter-new"]` — interactive — F-MAIL-19.filter-new
+- `[data-testid="mail-filter-row"]` — display — F-MAIL-19.filter-row
+- `[data-testid="mail-filter-name"]` — interactive — F-MAIL-19.filter-name
+- `[data-testid="mail-filter-condition-field"]` — interactive — F-MAIL-19.filter-condition-field
+- `[data-testid="mail-filter-condition-op"]` — interactive [optional] — F-MAIL-19.filter-condition-op
+- `[data-testid="mail-filter-condition-value"]` — interactive — F-MAIL-19.filter-condition-value
+- `[data-testid="mail-filter-action-folder"]` — interactive — F-MAIL-19.filter-action-folder
+- `[data-testid="mail-filter-save"]` — interactive — F-MAIL-19.filter-save
+- `[data-testid="mail-filter-match"]` — interactive [optional] — F-MAIL-19.filter-match
+- `[data-testid="mail-filter-on-incoming"]` — interactive [optional] — F-MAIL-19.filter-on-incoming
+- `[data-testid="mail-filter-add-condition"]` — interactive [optional] — F-MAIL-19.filter-add-condition
+- `[data-testid="mail-filter-add-action"]` — interactive [optional] — F-MAIL-19.filter-add-action
+- `[data-testid="mail-filter-action-kind"]` — interactive [optional] — F-MAIL-19.filter-action-kind
+- `[data-testid="mail-filter-action-tag"]` — interactive [optional] — F-MAIL-19.filter-action-tag
+- `[data-testid="mail-filter-action-address"]` — interactive [optional] — F-MAIL-19.filter-action-address
+- `[data-testid="mail-filter-run-all"]` — interactive [optional] — F-MAIL-19.filter-run-all
+- `[data-testid="mail-filter-run"]` — interactive [optional] — F-MAIL-19.filter-run
+- `[data-testid="mail-filter-edit"]` — interactive [optional] — F-MAIL-19.filter-edit
+- `[data-testid="mail-filter-delete"]` — interactive [optional] — F-MAIL-19.filter-delete
+- `[data-testid="mail-filter-enabled"]` — interactive [optional] — F-MAIL-19.filter-enabled
+- `[data-testid="mail-menu-create-filter"]` — interactive [optional] — F-MAIL-19.menu-create-filter
+- `[data-testid="mail-filters-recent-errors"]` — display [optional] — F-MAIL-19.filters-recent-errors
+
+## mail/folders (F-MAIL-11)
+
+- `[data-testid="mail-subscriptions-open"]` — interactive — F-MAIL-11.subscriptions-open
+- `[data-testid="mail-subscriptions-dialog"]` — display — F-MAIL-11.subscriptions-dialog
+- `[data-testid="mail-subscription-row"]` — display — F-MAIL-11.subscription-row
+- `[data-testid="mail-subscription-toggle"]` — interactive — F-MAIL-11.subscription-toggle
+- `[data-testid="mail-subscribed-only"]` — interactive — F-MAIL-11.subscribed-only
+- `[data-testid="mail-subscribed-only-setting"]` — interactive [optional] — F-MAIL-11.subscribed-only-setting
+- `[data-testid="mail-special-folders"]` — display [optional] — F-MAIL-11.special-folders
+
+## mail/list (F-MAIL-12)
+
+- `[data-testid="mail-message-row"][aria-pressed="true"]` — interactive — F-MAIL-12.message-row-shortcuts
+- `[data-testid="mail-folder-row"][data-folder-name="Archive"]` — interactive — F-MAIL-12.folder-drop-target
+
+## mail/lists (F-MAIL-14)
+
+- `[data-testid="mail-unsubscribe"]` — interactive — F-MAIL-14.unsubscribe
+
+## mail/organize (F-MAIL-8)
+
+- `[data-testid="mail-menu-tag"]` — interactive — F-MAIL-8.menu-tag
+- `[data-testid="mail-menu-tag-label1"]` — interactive — F-MAIL-8.menu-tag-label1
+- `[data-testid="mail-message-tag"]` — display — F-MAIL-8.message-tag
+- `[data-testid="mail-quick-filter-tag"]` — interactive — F-MAIL-8.quick-filter-tag
+- `[data-testid="mail-message-junk"]` — display [optional] — F-MAIL-8.message-junk
+
+## mail/pop3 (F-MAIL-17)
+
+- `[data-testid="mail-incoming-protocol"]` — interactive [optional] — F-MAIL-17.incoming-protocol
+- `[data-testid="mail-pop3-leave-days"]` — interactive [optional] — F-MAIL-17.pop3-leave-days
+
+## mail/search (F-MAIL-7)
+
+- `[data-testid="mail-search-input"]` — interactive — F-MAIL-7.search-input
+- `[data-testid="mail-search-scope"]` — interactive — F-MAIL-7.search-scope
+- `[data-testid="mail-search-field"]` — interactive [optional] — F-MAIL-7.search-field
+- `[data-testid="mail-search-server"]` — interactive [optional] — F-MAIL-7.search-server
+- `[data-testid="mail-quick-filter-unread"]` — interactive — F-MAIL-7.quick-filter-unread
+- `[data-testid="mail-quick-filter-flagged"]` — interactive [optional] — F-MAIL-7.quick-filter-flagged
+- `[data-testid="mail-quick-filter-attachments"]` — interactive [optional] — F-MAIL-7.quick-filter-attachments
+- `[data-testid="mail-message-folder"]` — display [optional] — F-MAIL-7.message-folder
+
 ## mail/settings (F-MAIL-4)
 
 - `[data-testid="mail-appearance-settings"]` — display — F-MAIL-4.mail-appearance-settings
@@ -859,10 +1171,49 @@
 - `input[aria-label="Mail background hex"]` — interactive — F-MAIL-4.mail-background
 - `input[aria-label="Mail foreground hex"]` — interactive — F-MAIL-4.mail-foreground
 
+## mail/sync (F-MAIL-10)
+
+- `[data-testid="mail-idle-status"]` — display — F-MAIL-10.idle-status
+- `[data-testid="mail-idle-push"]` — interactive [optional] — F-MAIL-10.idle-push-setting
+- `[data-testid="mail-desktop-notify"]` — interactive [optional] — F-MAIL-10.desktop-notify-setting
+
 ## mail/sync (F-MAIL-3)
 
 - `[data-testid="mail-sync-button"]` — interactive — F-MAIL-3.sync-button
 - `[data-testid="mail-body-warming-progress"]` — display [optional] — F-MAIL-3.body-warming-progress
+
+## mail/sync (F-MAIL-5)
+
+- `[data-testid="mail-message-count"]` — display — F-MAIL-5.message-count
+- `[data-testid="mail-message-row"]` — interactive — F-MAIL-5.message-row
+- `[data-testid="mail-folder-row"]` — interactive — F-MAIL-5.folder-row
+- `[data-testid="mail-sync-progress"]` — display [optional] — F-MAIL-5.sync-progress
+- `[data-testid="mail-backfill-progress"]` — display [optional] — F-MAIL-5.backfill-progress
+- `[data-testid="mail-folder-sync-error"]` — display [optional] — F-MAIL-5.folder-sync-error
+- `[data-testid="mail-load-more"]` — interactive [optional] — F-MAIL-5.load-more
+
+## mail/unified (F-MAIL-20)
+
+- `[data-testid="sidebar-tool-mail-unified"]` — interactive — F-MAIL-20.open-unified
+- `[data-testid="context-menu-item-mail-unified"]` — interactive [optional] — F-MAIL-20.open-unified-menu
+- `[data-testid="mail-unified-tab"]` — display — F-MAIL-20.unified-tab
+- `[data-testid="mail-unified-refresh"]` — interactive — F-MAIL-20.unified-refresh
+- `[data-testid="mail-unified-status"]` — display — F-MAIL-20.unified-status
+- `[data-testid="mail-unified-row"]` — interactive — F-MAIL-20.unified-row
+- `[data-testid="mail-unified-reader"]` — display — F-MAIL-20.unified-reader
+- `[data-testid="mail-unified-delete"]` — interactive — F-MAIL-20.unified-delete
+- `[data-testid="mail-unified-move"]` — interactive [optional] — F-MAIL-20.unified-move
+- `[data-testid="mail-unified-toggle-read"]` — interactive [optional] — F-MAIL-20.unified-toggle-read
+- `[data-testid="mail-unified-toggle-star"]` — interactive [optional] — F-MAIL-20.unified-toggle-star
+- `[data-testid="mail-unified-open-account"]` — interactive [optional] — F-MAIL-20.unified-open-account
+- `[data-testid="mail-unified-view-inbox"]` — interactive [optional] — F-MAIL-20.unified-view-inbox
+- `[data-testid="mail-unified-view-sent"]` — interactive [optional] — F-MAIL-20.unified-view-sent
+- `[data-testid="mail-unified-view-drafts"]` — interactive [optional] — F-MAIL-20.unified-view-drafts
+- `[data-testid="mail-unified-view-starred"]` — interactive [optional] — F-MAIL-20.unified-view-starred
+- `[data-testid="mail-unified-count"]` — display [optional] — F-MAIL-20.unified-count
+- `[data-testid="mail-unified-account"]` — display [optional] — F-MAIL-20.unified-account-badge
+- `[data-testid="mail-unified-account-error"]` — display [optional] — F-MAIL-20.unified-account-error
+- `[data-testid="mail-unified-empty"]` — display [optional] — F-MAIL-20.unified-empty
 
 ## main (F1.2)
 
@@ -911,6 +1262,11 @@
 - `[data-testid="status-bar-workspace-encoding"]` — interactive [optional] — F1.7.workspace-encoding
 - `[data-testid="status-bar-workspace-eol"]` — interactive [optional] — F1.7.workspace-eol
 - `[data-testid="status-bar-workspace-cursor"]` — display [optional] — F1.7.workspace-cursor
+- `[data-testid="status-bar-workspace-navbar"]` — display [optional] — F1.7.workspace-navbar
+  ↳ `[data-testid="status-bar-workspace-navbar-segment"]` — alias
+- `[data-testid="status-bar-workspace-navbar-host"]` — display [optional] — F1.7.workspace-navbar-host
+- `[data-testid="status-bar-workspace-readonly"]` — display [optional] — F1.7.workspace-readonly
+- `[data-testid="status-bar-workspace-widgets"]` — display [optional] — F1.7.workspace-status-widgets
 - `[data-testid="status-bar-workspace-large-file"]` — display [optional] — F1.7.workspace-large-file
 
 ## main/tabs (F1.5)
@@ -1715,6 +2071,11 @@
 - `[data-testid="confirm-dialog-message"]` — display [optional] — F-Confirm-1.confirm-dialog-message
 - `[data-testid="confirm-dialog-cancel"]` — interactive [optional] — F-Confirm-1.confirm-dialog-cancel
 - `[data-testid="confirm-dialog-confirm"]` — interactive [optional] — F-Confirm-1.confirm-dialog-confirm
+- `[data-testid="choice-dialog"]` — display [optional] — F-Confirm-1.choice-dialog
+- `[data-testid="choice-dialog-message"]` — display [optional] — F-Confirm-1.choice-dialog-message
+- `[data-testid="choice-dialog-primary"]` — interactive [optional] — F-Confirm-1.choice-dialog-primary
+- `[data-testid="choice-dialog-secondary"]` — interactive [optional] — F-Confirm-1.choice-dialog-secondary
+- `[data-testid="choice-dialog-cancel"]` — interactive [optional] — F-Confirm-1.choice-dialog-cancel
 - `[data-testid="alert-dialog"]` — display [optional] — F-Confirm-1.alert-dialog
 - `[data-testid="alert-dialog-message"]` — display [optional] — F-Confirm-1.alert-dialog-message
 - `[data-testid="alert-dialog-ok"]` — interactive [optional] — F-Confirm-1.alert-dialog-ok

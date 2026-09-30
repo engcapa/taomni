@@ -26,6 +26,10 @@ import { CodeWorkspaceTab, debugCurrentLineForFile, extractContextSnippet } from
 import { emit, type UnlistenFn } from "@tauri-apps/api/event";
 import { WORKSPACE_RECOVERY_STORAGE_PREFIX, hasBlockingDiskEffectResolution, listDiskEffectLedgerEntries, resolveDiskEffectLedgerEntry } from "./workspace/workspaceRecovery";
 import type { WorkspaceCommandRegistration } from "./workspace/workspaceCommands";
+import { setKeymapPlatformOverride } from "./workspace/workspaceKeymapPlatform";
+import { resetKeymapDefaultsMigrationNoticeForTests } from "./workspace/workspaceKeymapScheme";
+import { IDEA_XWIN_KEYMAP } from "./workspace/__fixtures__/ideaXWinKeymap";
+import { ACCEPTED_IDEA_KEYMAP_DIFFERENCES } from "./workspace/__fixtures__/ideaKeymapAcceptedDifferences";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import {
   getRefactorRecoveryJournalV2,
@@ -378,6 +382,12 @@ vi.mock("../terminal/TerminalPanel", () => ({
     </div>
   ),
 }));
+
+/** ED-PARITY-010: secondary toolbar controls live behind the ⋮ "More actions" menu. */
+function toolbarControl(testId: string): HTMLElement {
+  if (!screen.queryByTestId(testId)) fireEvent.click(screen.getByTestId("code-workspace-toolbar-more"));
+  return screen.getByTestId(testId);
+}
 
 function file(
   path: string,
@@ -1357,7 +1367,7 @@ describe("CodeWorkspaceTab", () => {
     expect(window.localStorage.getItem("taomni.codeViewProfile.v1")).toBeNull();
 
     const appearanceKey = editorAppearanceProfileStorageKey("ws-appearance");
-    fireEvent.click(screen.getByTestId("code-workspace-zoom-in"));
+    fireEvent.click(toolbarControl("code-workspace-zoom-in"));
     let saved = JSON.parse(window.localStorage.getItem(appearanceKey) ?? "{}");
     expect(saved.profile.fontSizePx).toBe(14);
     expect(document.documentElement.style.getPropertyValue("--taomni-code-font-size")).toBe("");
@@ -1374,7 +1384,7 @@ describe("CodeWorkspaceTab", () => {
     expect(saved.profile.fontSizePx).toBe(15);
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("14");
 
-    fireEvent.click(screen.getByTestId("code-workspace-zoom-out"));
+    fireEvent.click(toolbarControl("code-workspace-zoom-out"));
     saved = JSON.parse(window.localStorage.getItem(appearanceKey) ?? "{}");
     expect(saved.profile.fontSizePx).toBe(14);
 
@@ -1672,7 +1682,7 @@ describe("CodeWorkspaceTab", () => {
     expect(screen.getByTestId("code-workspace-git-diff-peek")).toHaveTextContent("previous");
     expect(screen.getByTestId("code-workspace-git-diff-peek")).toHaveTextContent("value");
 
-    const blameToggle = screen.getByTestId("code-workspace-inline-blame-toggle");
+    const blameToggle = toolbarControl("code-workspace-inline-blame-toggle");
     expect(blameToggle).not.toBeDisabled();
     fireEvent.click(blameToggle);
     await waitFor(() => expect(gitMocks.gitBlameLines).toHaveBeenCalledWith("/repo/app", "src/main.ts", 1, 1));
@@ -1961,15 +1971,15 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() =>
       expect(screen.getByTitle("app / b.ts").closest("div")).toHaveAttribute("data-active"));
 
-    fireEvent.click(screen.getByTestId("code-workspace-nav-back"));
+    fireEvent.click(toolbarControl("code-workspace-nav-back"));
     await waitFor(() =>
       expect(screen.getByTitle("app / a.ts").closest("div")).toHaveAttribute("data-active"));
-    expect(screen.getByTestId("code-workspace-nav-back")).toBeDisabled();
+    expect(toolbarControl("code-workspace-nav-back")).toBeDisabled();
 
-    fireEvent.click(screen.getByTestId("code-workspace-nav-forward"));
+    fireEvent.click(toolbarControl("code-workspace-nav-forward"));
     await waitFor(() =>
       expect(screen.getByTitle("app / b.ts").closest("div")).toHaveAttribute("data-active"));
-    expect(screen.getByTestId("code-workspace-nav-forward")).toBeDisabled();
+    expect(toolbarControl("code-workspace-nav-forward")).toBeDisabled();
 
     // Ctrl+E preselects the previously active file; Enter flips back to it.
     fireEvent.keyDown(window, { key: "e", ctrlKey: true });
@@ -2162,7 +2172,7 @@ describe("CodeWorkspaceTab", () => {
     await screen.findByTitle("app / a.ts");
     // The tab strip renders while the file is still loading; wait for the
     // loaded file header (size text) before invoking the structure popup.
-    await screen.findByText("12 B");
+    await waitFor(() => expect(screen.getByTestId("code-workspace-file-status").getAttribute("title")).toContain("12 B"));
 
     fireEvent.keyDown(window, { key: "F12", ctrlKey: true });
     const popup = await screen.findByTestId("code-workspace-structure-popup");
@@ -2226,7 +2236,7 @@ describe("CodeWorkspaceTab", () => {
     renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
     await waitFor(() => expect(lspMocks.lspDocumentSymbols).toHaveBeenCalled());
-    fireEvent.click(screen.getByTestId("code-workspace-right-pane-toggle"));
+    fireEvent.click(toolbarControl("code-workspace-right-pane-toggle"));
 
     expect(screen.getByRole("tab", { name: "Outline", selected: true })).toBeInTheDocument();
     const outline = await screen.findByTestId("code-workspace-outline-pane");
@@ -4083,6 +4093,8 @@ describe("CodeWorkspaceTab", () => {
 
     renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
+    // The document must be open with the provider before Alt+Enter asks it.
+    await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled());
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
     fireEvent.click(await screen.findByRole("button", { name: "Rename file" }));
 
@@ -4166,7 +4178,7 @@ describe("CodeWorkspaceTab", () => {
 
     renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
-    await screen.findByText("9 B");
+    await waitFor(() => expect(screen.getByTestId("code-workspace-file-status").getAttribute("title")).toContain("9 B"));
     await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled());
     // Wait until the LSP status is no longer idle so capabilities are in state.
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
@@ -4718,6 +4730,8 @@ describe("CodeWorkspaceTab", () => {
       displayName: "Java",
       available: true,
       active: true,
+      // A real jdtls advertises definition; Ctrl+B is host-dispatched (ED-PARITY-013).
+      capabilities: defaultCapabilities({ definition: true }),
     });
     const classUri = "jdt://contents/java.base/java.lang/String.class?=java.base";
     workspaceMocks.workspaceReadFile.mockResolvedValue(
@@ -4768,7 +4782,8 @@ describe("CodeWorkspaceTab", () => {
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
 
-    fireEvent.keyDown(content!, { key: "F12" });
+    // ED-PARITY-013: F12 is Jump to Last Tool Window; Ctrl+B navigates.
+    fireEvent.keyDown(content!, { key: "b", code: "KeyB", ctrlKey: true });
 
     await waitFor(() => expect(lspMocks.lspReadUriContents).toHaveBeenCalledWith(
       expect.objectContaining({ rootPath: "/repo/app", filePath: "src/Main.java" }),
@@ -4800,7 +4815,7 @@ describe("CodeWorkspaceTab", () => {
         },
       }],
     });
-    fireEvent.keyDown(rendered.container.querySelector<HTMLElement>(".cm-content")!, { key: "F12" });
+    fireEvent.keyDown(rendered.container.querySelector<HTMLElement>(".cm-content")!, { key: "b", code: "KeyB", ctrlKey: true });
 
     await waitFor(() => expect(lspMocks.lspReadUriContents).toHaveBeenCalledWith(
       expect.objectContaining({ filePath: "src/Main.java", documentUri: classUri }),
@@ -4830,6 +4845,8 @@ describe("CodeWorkspaceTab", () => {
       displayName: "Java",
       available: true,
       active: true,
+      // A real jdtls advertises definition; Ctrl+B is host-dispatched (ED-PARITY-013).
+      capabilities: defaultCapabilities({ definition: true }),
     });
     const classUri = "jdt://contents/guava-33.jar/com.google.common.base/Strings.class?=guava";
     workspaceMocks.workspaceReadFile.mockResolvedValue(
@@ -4867,7 +4884,7 @@ describe("CodeWorkspaceTab", () => {
 
     const rendered = renderWorkspace(workspace);
     await screen.findByTitle("app / src/Main.java");
-    fireEvent.keyDown(rendered.container.querySelector<HTMLElement>(".cm-content")!, { key: "F12" });
+    fireEvent.keyDown(rendered.container.querySelector<HTMLElement>(".cm-content")!, { key: "b", code: "KeyB", ctrlKey: true });
 
     // Decompiled banner + Download sources button appear for the library buffer.
     const downloadBtn = await screen.findByTestId("code-workspace-download-sources");
@@ -4906,6 +4923,8 @@ describe("CodeWorkspaceTab", () => {
       displayName: "Java",
       available: true,
       active: true,
+      // A real jdtls advertises definition; Ctrl+B is host-dispatched (ED-PARITY-013).
+      capabilities: defaultCapabilities({ definition: true }),
     });
     const classUri = "jdt://contents/legacy.jar/com.legacy/Widget.class?=legacy";
     workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Main.java", "class Main { Widget w; }"));
@@ -4940,7 +4959,7 @@ describe("CodeWorkspaceTab", () => {
 
     const rendered = renderWorkspace(workspace);
     await screen.findByTitle("app / src/Main.java");
-    fireEvent.keyDown(rendered.container.querySelector<HTMLElement>(".cm-content")!, { key: "F12" });
+    fireEvent.keyDown(rendered.container.querySelector<HTMLElement>(".cm-content")!, { key: "b", code: "KeyB", ctrlKey: true });
 
     const downloadBtn = await screen.findByTestId("code-workspace-download-sources");
     fireEvent.click(downloadBtn);
@@ -5026,10 +5045,10 @@ describe("CodeWorkspaceTab", () => {
     await screen.findByTitle("app / src/main.ts");
     await waitFor(() => expect(lspMocks.lspDocumentHighlights).toHaveBeenCalled());
 
-    const inlayHintsToggle = screen.getByTestId("code-workspace-inlay-hints-toggle");
+    const inlayHintsToggle = toolbarControl("code-workspace-inlay-hints-toggle");
     expect(inlayHintsToggle).not.toBeDisabled();
     fireEvent.click(inlayHintsToggle);
-    await waitFor(() => expect(inlayHintsToggle).toHaveAttribute("aria-pressed", "true"));
+    await waitFor(() => expect(toolbarControl("code-workspace-inlay-hints-toggle")).toHaveAttribute("aria-pressed", "true"));
     await waitFor(() => expect(lspMocks.lspInlayHints).toHaveBeenCalled());
     expect(window.localStorage.getItem("taomni.codeWorkspace.intelligence.v1.instance-intelligence"))
       .toContain('"inlayHintsEnabled":true');
@@ -6042,7 +6061,7 @@ describe("CodeWorkspaceTab", () => {
     renderWorkspace(workspace);
     await screen.findAllByText("Program.cs");
     await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+    fireEvent.click(toolbarControl("code-workspace-split-right"));
 
     await waitFor(() => expect(
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-split").splitOrientation,
@@ -6094,7 +6113,7 @@ describe("CodeWorkspaceTab", () => {
 
     renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
-    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+    fireEvent.click(toolbarControl("code-workspace-split-right"));
     await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
 
     const panes = screen.getAllByTestId("code-workspace-editor-pane");
@@ -6229,7 +6248,7 @@ describe("CodeWorkspaceTab", () => {
     await screen.findAllByTitle("app / src/main.ts");
     await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+    fireEvent.click(toolbarControl("code-workspace-split-right"));
     await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
 
     const panes = screen.getAllByTestId("code-workspace-editor-pane");
@@ -6381,7 +6400,7 @@ describe("CodeWorkspaceTab", () => {
     // file and the new (right) leaf becomes active.
     const tabButton = within(screen.getByTestId("code-workspace-editor-tab-strip")).getByTitle("app / src/main/example.txt");
     fireEvent.contextMenu(tabButton, { clientX: 10, clientY: 10 });
-    fireEvent.click(await screen.findByRole("button", { name: "Open in Split Right" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Split Right" }));
     await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
     const panes = screen.getAllByTestId("code-workspace-editor-pane");
     const leftPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
@@ -6544,7 +6563,7 @@ describe("CodeWorkspaceTab", () => {
     ).toEqual([firstKey, secondKey]));
 
     lspMocks.lspCloseDocument.mockRejectedValueOnce(new Error("policy didClose failed"));
-    fireEvent.click(screen.getByTestId("code-workspace-tab-policy-settings"));
+    fireEvent.click(toolbarControl("code-workspace-tab-policy-settings"));
     fireEvent.change(await screen.findByTestId("workspace-tab-policy-limit"), {
       target: { value: "1" },
     });
@@ -7128,7 +7147,7 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-bookmark-history").activeKey,
     ).toBe("root:app:src/two.ts"));
-    const backButton = screen.getByTestId("code-workspace-nav-back");
+    const backButton = toolbarControl("code-workspace-nav-back");
     await waitFor(() => expect(backButton).not.toBeDisabled());
     fireEvent.click(backButton);
     await waitFor(() => expect(
@@ -7261,8 +7280,8 @@ describe("CodeWorkspaceTab", () => {
       expect(ui.editorGroups.primary.activeKey).toBe("root:app:src/main.ts");
       expect(ui.editorGroups.secondary.activeKey).toBe("root:app:src/util.ts");
     });
-    expect(screen.getByTestId("code-workspace-project-collapsed-rail")).toBeInTheDocument();
-    expect(screen.getByTestId("code-workspace-project-expand")).toBeInTheDocument();
+    // ED-PARITY-010: the Project stripe button replaces the collapsed rail.
+    expect(screen.getByTestId("code-workspace-tool-rail-project")).toHaveAttribute("aria-pressed", "false");
     expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/main.ts");
     expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/util.ts");
     expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/other.ts");
@@ -7374,15 +7393,14 @@ describe("CodeWorkspaceTab", () => {
       expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-collapse").languagePanelOpen)
         .toBe(false);
     });
-    expect(screen.getByTestId("code-workspace-project-collapsed-rail")).toBeInTheDocument();
-    expect(screen.getByTestId("code-workspace-project-expand")).toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-tool-rail-project")).toHaveAttribute("aria-pressed", "false");
 
-    fireEvent.click(screen.getByTestId("code-workspace-project-expand"));
+    fireEvent.click(screen.getByTestId("code-workspace-tool-rail-project"));
     await waitFor(() => {
       expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-collapse").languagePanelOpen)
         .toBe(true);
     });
-    expect(screen.queryByTestId("code-workspace-project-collapsed-rail")).toBeNull();
+    expect(screen.getByTestId("code-workspace-tool-rail-project")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("code-workspace-tree-collapse")).toBeInTheDocument();
   });
 
@@ -8316,17 +8334,17 @@ end_of_record
     await screen.findByTitle("app / src/Program.cs");
 
     // Split editor right
-    const splitRightBtn = screen.getByTestId("code-workspace-split-right");
+    const splitRightBtn = toolbarControl("code-workspace-split-right");
     fireEvent.click(splitRightBtn);
 
     // Sync scroll button should appear
-    const syncScrollBtn = await screen.findByTestId("code-workspace-split-sync-scroll");
-    expect(syncScrollBtn).toBeInTheDocument();
-    expect(syncScrollBtn).toHaveAttribute("aria-pressed", "false");
+    toolbarControl("code-workspace-split-sync-scroll");
+    expect(toolbarControl("code-workspace-split-sync-scroll")).toBeInTheDocument();
+    expect(toolbarControl("code-workspace-split-sync-scroll")).toHaveAttribute("aria-pressed", "false");
 
     // Click to enable synchronized scrolling
-    fireEvent.click(syncScrollBtn);
-    expect(syncScrollBtn).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(toolbarControl("code-workspace-split-sync-scroll"));
+    expect(toolbarControl("code-workspace-split-sync-scroll")).toHaveAttribute("aria-pressed", "true");
     expect(useAppStore.getState().statusMessage).toBe("Synchronized split scrolling enabled");
 
     // Toggle via command
@@ -8402,7 +8420,9 @@ end_of_record
       expect(screen.queryByTestId("code-workspace-search-everywhere")).not.toBeInTheDocument();
     });
 
-    // macOS sends the Command chord; it must open the same Files view.
+    // macOS sends the Command chord; it must open the same Files view. Cmd
+    // aliases exist only on macOS (ED-PARITY-013 DEC-013-01).
+    setKeymapPlatformOverride("mac");
     await act(async () => {
       fireEvent.keyDown(window, {
         key: "N",
@@ -8786,7 +8806,7 @@ end_of_record
       const rendered = renderWorkspace(workspace);
       await screen.findByTitle("app / src/main.ts");
       // Split right: the new leaf owns main.ts and becomes active…
-      fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+      fireEvent.click(toolbarControl("code-workspace-split-right"));
       await waitFor(() => expect(
         selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-switcher-reopen").splitOrientation,
       ).toBe("vertical"));
@@ -8802,7 +8822,7 @@ end_of_record
       });
 
       // Collapse the split: other.ts's owning leaf disappears entirely.
-      fireEvent.click(screen.getByTestId("code-workspace-split-close"));
+      fireEvent.click(toolbarControl("code-workspace-split-close"));
       await waitFor(() => expect(
         selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-switcher-reopen").splitOrientation,
       ).toBeNull());
@@ -12632,7 +12652,7 @@ end_of_record
         expect(heads).toContain(40);
       }, { timeout: 4000 });
 
-      fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+      fireEvent.click(toolbarControl("code-workspace-split-right"));
       await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
       const panes = screen.getAllByTestId("code-workspace-editor-pane");
       const secondView = EditorView.findFromDOM(panes[1]!.querySelector(".cm-editor")!)!;
@@ -14573,7 +14593,7 @@ end_of_record
 
       const dialog = await screen.findByTestId("refactoring-preview-dialog");
       // Switch the active view while the rename is paused on the preview.
-      fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+      fireEvent.click(toolbarControl("code-workspace-split-right"));
       await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane").length).toBeGreaterThan(1));
 
       fireEvent.click(within(dialog).getByTestId("refactoring-preview-apply"));
@@ -14609,5 +14629,145 @@ end_of_record
       expect(input).toHaveValue("extracted");
     });
 
+  });
+  describe("ED-PARITY-013 IDEA keymap alignment", () => {
+    const javaWorkspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-parity-013",
+      workspaceInstanceId: "instance-parity-013",
+      name: "Parity 013",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/App.java" },
+    };
+
+    let mountCounter = 0;
+    let instanceId = "";
+    async function mountJava() {
+      workspaceMocks.workspaceReadFile.mockResolvedValue(
+        file("src/App.java", "public class App {\n  int total = 1;\n}\n"),
+      );
+      const onCommandsChange = vi.fn();
+      mountCounter += 1;
+      instanceId = `instance-parity-013-${mountCounter}`;
+      const rendered = renderWorkspace(
+        { ...javaWorkspace, workspaceId: `ws-parity-013-${mountCounter}`, workspaceInstanceId: instanceId },
+        { onCommandsChange },
+      );
+      await screen.findByTitle("app / src/App.java");
+      const latest = () => {
+        const calls = onCommandsChange.mock.calls;
+        return (calls[calls.length - 1]?.[1] as WorkspaceCommandRegistration).snapshot;
+      };
+      await waitFor(() => expect(latest().some((item) => item.id === "editor.find")).toBe(true));
+      return { rendered, latest };
+    }
+
+    it("A4.2: every mapped action's Linux bindings match IDEA XWin, except accepted DEC differences", async () => {
+      setKeymapPlatformOverride("linux");
+      const { latest } = await mountJava();
+      const snapshot = latest();
+      const report: string[] = [];
+      for (const entry of IDEA_XWIN_KEYMAP) {
+        const item = snapshot.find((candidate) => candidate.id === entry.taomniActionId);
+        const taomni = item?.keybindings ?? [];
+        const idea = entry.ideaBindings;
+        const primaryPresent = idea.length === 0 || taomni.includes(idea[0]!);
+        const extras = taomni.filter((label) => !idea.includes(label));
+        const accepted = ACCEPTED_IDEA_KEYMAP_DIFFERENCES[entry.taomniActionId];
+        if ((!item || !primaryPresent || extras.length > 0) && !accepted) {
+          report.push(`${entry.taomniActionId} (${entry.ideaActionId}): taomni=[${taomni.join(", ")}] idea=[${idea.join(", ")}]`);
+        }
+      }
+      expect(report).toEqual([]);
+    });
+    it("A4.1/A1.1: Ctrl+Shift+A opens Find Action without editing; Alt+Enter assigns a shortcut", async () => {
+      setKeymapPlatformOverride("linux");
+      const { rendered } = await mountJava();
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+      const before = content.textContent;
+      await act(async () => {
+        fireEvent.keyDown(content, { key: "A", code: "KeyA", ctrlKey: true, shiftKey: true });
+      });
+      const overlay = await screen.findByTestId("code-workspace-search-everywhere");
+      expect(within(overlay).getByRole("tab", { name: "Actions" })).toHaveAttribute("aria-selected", "true");
+      const input = within(overlay).getByRole("searchbox");
+      fireEvent.change(input, { target: { value: "reformat" } });
+      expect(content.textContent).toBe(before);
+      expect(within(overlay).getByTestId("search-everywhere-shortcut-workspace.format")).toHaveTextContent("Ctrl+Alt+L");
+      expect(overlay.textContent).not.toMatch(/ARROW|ENTER|SPACE|Meta\+/);
+      await act(async () => {
+        fireEvent.keyDown(input, { key: "Enter", altKey: true });
+      });
+      await screen.findByTestId("workspace-keymap-settings-dialog");
+      expect(screen.getByTestId("keymap-recorder")).toBeInTheDocument();
+      expect(screen.getByTestId("keymap-action-filter")).toHaveValue("Format Document");
+      // An unbound Ctrl+Shift+letter never edits the document (DEC-013-04).
+      fireEvent.keyDown(screen.getByTestId("keymap-recorder"), { key: "Escape" });
+      fireEvent.keyDown(window, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByTestId("workspace-keymap-settings-dialog")).not.toBeInTheDocument());
+      fireEvent.keyDown(content, { key: "Q", code: "KeyQ", ctrlKey: true, shiftKey: true });
+      expect(content.textContent).toBe(before);
+    });
+
+    it("A4.2: F12 jumps to the last tool window, Shift+Esc hides it, Ctrl+Shift+F12 toggles all", async () => {
+      setKeymapPlatformOverride("linux");
+      const { rendered } = await mountJava();
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+      await act(async () => {
+        fireEvent.keyDown(content, { key: "6", code: "Digit6", altKey: true });
+      });
+      await waitFor(() => expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), instanceId).bottomDockOpen).toBe(true));
+      await act(async () => {
+        useCodeWorkspaceStore.getState().patchInstance(instanceId, { bottomDockOpen: false });
+      });
+      await act(async () => {
+        fireEvent.keyDown(content, { key: "F12", code: "F12" });
+      });
+      await waitFor(() => {
+        const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), instanceId);
+        expect(ui.bottomDockOpen).toBe(true);
+        expect(ui.bottomDockTab).toBe("problems");
+      });
+      const ui = () => selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), instanceId);
+      // Shift+Esc from the editor hides that last active tool window.
+      await act(async () => {
+        fireEvent.keyDown(content, { key: "Escape", code: "Escape", shiftKey: true });
+      });
+      await waitFor(() => expect(ui().bottomDockOpen).toBe(false));
+      // Ctrl+Shift+F12 hides every tool window, and the second press restores them.
+      expect(ui().languagePanelOpen).toBe(true);
+      await act(async () => {
+        fireEvent.keyDown(content, { key: "F12", code: "F12", ctrlKey: true, shiftKey: true });
+      });
+      await waitFor(() => expect(ui().languagePanelOpen).toBe(false));
+      await act(async () => {
+        fireEvent.keyDown(content, { key: "F12", code: "F12", ctrlKey: true, shiftKey: true });
+      });
+      await waitFor(() => expect(ui().languagePanelOpen).toBe(true));
+    });
+
+    it("DEC-013-06: migration notice shows once for a profile with prior workspace data", async () => {
+      resetKeymapDefaultsMigrationNoticeForTests();
+      window.localStorage.removeItem("taomni.codeWorkspace.keymap.v3:defaults-revision");
+      // Seeded settings alone (e.g. a JDK path) are not prior workspace use.
+      window.localStorage.setItem("taomni.codeWorkspace.lspJavaHome.v1", "/jdk");
+      await mountJava();
+      expect(screen.queryByTestId("keymap-migration-notice")).not.toBeInTheDocument();
+      cleanup();
+      resetKeymapDefaultsMigrationNoticeForTests();
+      window.localStorage.removeItem("taomni.codeWorkspace.keymap.v3:defaults-revision");
+      window.localStorage.setItem("taomni.codeWorkspace.layout.v2.previous-session", "{}");
+      await mountJava();
+      const notice = await screen.findByTestId("keymap-migration-notice");
+      expect(notice).toHaveTextContent("Taomni Classic");
+      fireEvent.click(screen.getByTestId("keymap-migration-dismiss"));
+      expect(screen.queryByTestId("keymap-migration-notice")).not.toBeInTheDocument();
+      expect(window.localStorage.getItem("taomni.codeWorkspace.keymap.v3:defaults-revision")).toBe("2");
+      cleanup();
+      resetKeymapDefaultsMigrationNoticeForTests();
+      await mountJava();
+      expect(screen.queryByTestId("keymap-migration-notice")).not.toBeInTheDocument();
+    });
   });
 });

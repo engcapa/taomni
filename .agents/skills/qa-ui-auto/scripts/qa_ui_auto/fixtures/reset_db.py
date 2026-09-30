@@ -10,6 +10,7 @@ verified data/config/cache roots. Never resolve or clear the production profile.
 
 from __future__ import annotations
 
+import errno
 import os
 import shutil
 import time
@@ -133,9 +134,11 @@ def _remove_native_profile(target: Path, timeout_sec: float = 10.0) -> None:
             # while releasing a handle. Treat only those known transient cases
             # as retryable and re-check the validated target boundary.
             winerror = getattr(error, "winerror", None)
+            # POSIX: the exiting app can still create files (SQLite journals,
+            # WebKit caches) while rmtree walks, leaving ENOTEMPTY/EBUSY.
             transient = isinstance(error, (FileNotFoundError, PermissionError)) or (
                 winerror in _WINDOWS_PROFILE_TRANSIENT_ERRORS
-            )
+            ) or getattr(error, "errno", None) in (errno.ENOTEMPTY, errno.EBUSY)
             if not transient:
                 raise
             if not target.exists():

@@ -36,7 +36,7 @@ steps:
   - press: ArrowLeft
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 5, Col 18
+      contains: '5:18'
   - press: Control+Space
   - wait_for: '.cm-tooltip-autocomplete li:has-text("StringUtils")'
   - wait: 0.12
@@ -50,7 +50,7 @@ steps:
       equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        StringUtiSuffix;', '    }', '}', '']
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: Ln 5, Col 18
+      contains: '5:18'
   - parity005_trace: {fetch: 1, resolve: 1, pending: 0}
   - wait: 0.5
   - press: Control+Space
@@ -139,7 +139,7 @@ steps:
   - press: ArrowLeft
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: 'Ln 5, Col 18'
+      contains: '5:18'
   - parity005_set_mode: empty
   - press: Control+Space
   - parity005_trace: {fetch: 7}

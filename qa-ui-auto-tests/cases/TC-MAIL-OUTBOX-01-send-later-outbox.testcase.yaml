@@ -1,0 +1,140 @@
+id: TC-MAIL-OUTBOX-01
+title: Mail queues a message with Send later and sends it from the Outbox
+description: 'TASK-17 (docs-feature/mail-thunderbird-parity-design.md AC-49).
+
+  Composes a message and schedules it with Send later (default: one hour
+
+  ahead) so it waits in the local Outbox, then sends it at once from
+
+  Drafts > Outbox with Send all and requires the Sent copy on the server and
+
+  an empty Outbox.
+
+  Browser mode drives the stub server model (renderer orchestration only);
+
+  native mode runs the real Tauri backend SMTP send and IMAP APPEND against
+
+  the in-process fake servers started by the mail_server fixture.
+
+  '
+covers:
+- F-MAIL-13
+tags:
+- mail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- click: '[data-testid="mail-compose-open"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- fill:
+    selector: '[data-testid="mail-recipient-to"] input'
+    value: receiver@example.com
+- press: Enter
+- fill:
+    selector: '[data-testid="mail-compose-subject"]'
+    value: Queued in the Outbox
+- type:
+    selector: '[data-testid="mail-compose-editor"]'
+    text: Sent later from the Outbox
+- click: '[data-testid="mail-compose-send-later"]'
+- click: '[data-testid="mail-send-later-confirm"]'
+- wait_for:
+    selector: '[data-testid="mail-compose-dialog"]'
+    state: detached
+- wait_for:
+    selector: '[data-testid="mail-outbox-count"][data-count="1"]'
+    timeout_sec: 15
+- click: '[data-testid="mail-drafts-open"]'
+- click: '[data-testid="mail-drafts-tab-outbox"]'
+- assert_text:
+    selector: '[data-testid="mail-outbox-row"]'
+    contains: Queued in the Outbox
+    timeout_sec: 10
+- click: '[data-testid="mail-outbox-send-all"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Sent 1 queued message
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Sent
+    min: 1
+    timeout_sec: 20
+- wait_for:
+    selector: '[data-testid="mail-outbox-count"]'
+    state: detached
+    timeout_sec: 10
+- screenshot: mail-outbox-01-sent.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Send later 把邮件放入本地 Outbox 而不立即发送；工具栏显示 Outbox 计数 1，Outbox 页签列出该邮件。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 19
+    - 20
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached"}}'
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-outbox-count\"][data-count=\"1\"]", "timeout_sec": 15}}'
+    - step: 21
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-outbox-row\"]", "contains": "Queued in the Outbox", "timeout_sec": 10}}'
+    results:
+    - 18
+    - 21
+  - id: R2
+    requirement: Outbox 的 Send all 发出邮件：状态提示已发送，服务器 Sent 有副本，Outbox 计数消失（AC-49）。
+    actions:
+    - 22
+    checkpoints:
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Sent 1 queued message", "timeout_sec": 30}}'
+    - step: 24
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1, "timeout_sec": 20}}'
+    - step: 25
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-outbox-count\"]", "state": "detached", "timeout_sec": 10}}'
+    results:
+    - 23
+    - 24
+    - 25
+  visual:
+  - check: 截图中 Outbox 已空、状态栏提示发送成功。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实后端 SMTP 发送与 Sent 副本；browser 仅验证渲染层；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

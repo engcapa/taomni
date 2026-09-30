@@ -121,6 +121,8 @@ Both support `prompt` (generate a reusable design prompt), `design` (investigate
 
 For Code Workspace IDEA parity cards, use `.agents/skills/code-workspace-idea-task/` and the active backlog; historical design documents are background rather than a task queue. Task decomposition alone does not authorize starting multiple agents or changing shared boards.
 
+For database-session parity (SQL `database` and `hbase-shell` sessions, taking the best of DBeaver CE/PRO and DbVisualizer Pro per scenario; P0 audit → P1 plan → P2 develop → P3 review), use `.agents/skills/db-client-parity/` for stage selection and `.agents/skills/db-client-task/` for the `DB-*` board at `docs-feature/db-client-parity/backlog.md`.
+
 ## Commits, Pull Requests, and Local Data
 
 - Use scoped conventional commits such as `fix(code-workspace): ...` and `feat(settings): ...`. PRs should describe the change, affected areas, linked issues, checks performed, and screenshots/recordings for visible UI changes

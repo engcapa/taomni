@@ -1,0 +1,160 @@
+id: TC-IDE-PARITY-013-02
+title: 'IDEA XWin default bindings: F12, Shift+Esc, Ctrl+Shift+F12, Alt+7 and key labels'
+description: 'ED-PARITY-013 A4.2/A4.3/A1.2/A3.3 browser case. After the DEC-013-05 migration F12 jumps to the last active tool window (Problems, focused), Shift+Esc hides the active tool window from either the editor or the tool window and returns focus to the editor, Ctrl+Shift+F12 hides and restores every tool window, and Alt+7 opens Structure. Search Everywhere shows no raw ARROWLEFT/ENTER/SPACE key names and no Meta+ bindings outside macOS. A repeated Ctrl+Shift+A keeps one Find Action instance.
+
+
+  Mode: browser — renderer dispatch and layout state.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- keymap
+- ed-parity-013
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+A
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 30
+- eval_readonly:
+    expression: '!/ARROW|ENTER|SPACE/.test(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-search-everywhere\"]").innerText) && (/mac/i.test(navigator.platform) || !/Meta[+]/.test(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-search-everywhere\"]").innerText))'
+    expect_truthy: true
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+6
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Shift+Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    state: detached
+    timeout_sec: 5
+- press: F12
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    timeout_sec: 10
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"]:focus-within'
+    timeout_sec: 5
+- press: Shift+Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
+    state: detached
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.activeElement?.classList?.contains("cm-content") === true
+    expect_truthy: true
+- press: Control+Shift+F12
+- assert_not_visible: '[data-testid="code-workspace-tree-add-folder"]'
+- press: Control+Shift+F12
+- assert_visible: '[data-testid="code-workspace-tree-add-folder"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+7
+- assert_visible: '[data-testid="code-workspace-right-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+A
+- press: Control+Shift+A
+- assert_count:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    equal: 1
+- screenshot: tc-ide-parity-013-02-bindings.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A4.3：Find Action 列表中的快捷键无原始全大写键名，Win/Linux 无 Meta+。
+    actions:
+    - 13
+    checkpoints:
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 30}}'
+    - step: 15
+      expectation: '{"eval_readonly": {"expression": "!/ARROW|ENTER|SPACE/.test(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-search-everywhere\\\"]\").innerText) && (/mac/i.test(navigator.platform) || !/Meta[+]/.test(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-search-everywhere\\\"]\").innerText))", "expect_truthy": true}}'
+    results:
+    - 15
+  - id: R2
+    requirement: A4.2 F12/Shift+Esc：F12 重新打开并聚焦上次工具窗（Problems）；Shift+Esc 从编辑器或工具窗隐藏当前工具窗并把焦点交回编辑器。
+    actions:
+    - 19
+    - 22
+    - 24
+    - 27
+    checkpoints:
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
+    - step: 25
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
+    - step: 26
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"]:focus-within", "timeout_sec": 5}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
+    - step: 29
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\") === true", "expect_truthy": true}}'
+    results:
+    - 23
+    - 25
+    - 26
+    - 28
+    - 29
+  - id: R3
+    requirement: A4.2 Ctrl+Shift+F12/Alt+7：隐藏全部工具窗后再次按下恢复；Alt+7 打开 Structure 窗。
+    actions:
+    - 30
+    - 32
+    - 35
+    checkpoints:
+    - step: 31
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-add-folder\"]"}'
+    - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-add-folder\"]"}'
+    - step: 36
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    results:
+    - 31
+    - 33
+    - 36
+  - id: R4
+    requirement: A3.3：重复 Ctrl+Shift+A 只保留一个 Find Action 实例。
+    actions:
+    - 38
+    - 39
+    checkpoints:
+    - step: 40
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "equal": 1}}'
+    results:
+    - 40
+  visual:
+  - check: 工具窗隐藏/恢复后编辑器区域无残留空白。
+    method: manual
+    reason: 布局像素需人工评审。
+  native:
+  - check: 系统级 F12/Shift+Esc 与窗口管理器冲突需 native 观察，本用例不声明。
+    method: external
+    reason: browser 不经过系统键盘。

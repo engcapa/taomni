@@ -175,7 +175,9 @@ export function useWorkspaceNavigation({
       void openFile(ref, groupId ? { groupId } : undefined);
       return;
     }
-    void openFile(ref, { preview: true });
+    // DEC-ALIGN-10 / ED-PARITY-011 DEC-011-04: like IDEA, Go to File opens a
+    // formal tab; only a project-tree single click produces a preview tab.
+    void openFile(ref);
   }, [openFile, setSearchEverywhereOpen, splitLayoutLeaf, workspaceInstanceId]);
 
   const noteCaretPosition = useCallback((key: string, position: WorkspaceNavPosition) => {

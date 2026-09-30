@@ -1,3 +1,33 @@
+import {
+  installStubMailQaControl,
+  stubMailAppend,
+  stubMailClearCache,
+  stubMailExpunge,
+  stubMailFindHeader,
+  stubMailListCached,
+  stubMailListFolders,
+  stubMailSearch,
+  stubMailSyncAll,
+  stubMailSyncFolder,
+  stubMailIdleStart,
+  stubMailSetSubscription,
+  stubMailIdleStop,
+  stubMailRecordSent,
+  stubMailTransfer,
+  stubMailUpdateCachedFlags,
+  type Seed as MailStubSeed,
+  type StubMailSearchQuery,
+} from "./mailServerStub";
+import { stubApplyFilters, stubListFilters, stubSaveFilters } from "./mailFiltersStub";
+import {
+  stubAddressBookSuggestions,
+  stubDeleteAddressBookEntry,
+  stubListAddressBook,
+  stubSaveAddressBookEntry,
+} from "./mailContactsStub";
+import type { MailAddressBookEntry } from "../lib/mailContacts";
+import { stubAddInviteToCalendar, stubCalDavSync, stubListAgenda } from "./mailCalendarStub";
+import type { MailFilter } from "../lib/mailFilters";
 import type { SessionConfig, SessionGroup, LocalShellOption, LocalDirectoryShortcut, IpcRunSnapshotRecord, IpcSnapshotEntry } from "../lib/ipc";
 import {
   isSshSession,
@@ -1379,22 +1409,6 @@ function stubMailAccountId(args?: InvokeArgs): string {
   return ((args?.accountId as string | undefined) ?? config?.sessionId ?? "stub-mail").trim() || "stub-mail";
 }
 
-function stubMailFolderList(accountId: string) {
-  const now = Math.floor(Date.now() / 1000);
-  return MAIL_STUB_FOLDERS.map((folder) => ({
-    accountId,
-    name: folder.name,
-    displayName: folder.displayName,
-    delimiter: "/",
-    flags: [],
-    uidValidity: 1,
-    uidNext: 100,
-    total: folder.total,
-    unread: folder.unread,
-    updatedAt: now,
-  }));
-}
-
 function stubMailMessages(accountId: string, folder: string) {
   const now = Math.floor(Date.now() / 1000);
   const inbox = [
@@ -1469,8 +1483,17 @@ function stubMailMessages(accountId: string, folder: string) {
   return inbox;
 }
 
+const mailStubSeed: MailStubSeed = (accountId) => ({
+  meta: MAIL_STUB_FOLDERS.map((folder) => ({ name: folder.name, displayName: folder.displayName })),
+  messages: (folder) => stubMailMessages(accountId, folder),
+});
+
+if (typeof window !== "undefined") installStubMailQaControl(mailStubSeed);
+
 function stubMailBody(accountId: string, folder: string, uid: number) {
-  const header = stubMailMessages(accountId, folder).find((message) => message.uid === uid) ?? stubMailMessages(accountId, folder)[0];
+  const header = stubMailFindHeader(accountId, mailStubSeed, folder, uid)
+    ?? stubMailMessages(accountId, folder).find((message) => message.uid === uid)
+    ?? stubMailMessages(accountId, folder)[0];
   const html = uid === 89
     ? `<h2>Ops Digest</h2><p>The reader sanitizes HTML and blocks tracking images.</p><p><img src="https://example.com/tracker.png" alt="tracker"></p><table><tr><td>Queue</td><td>Healthy</td></tr></table>`
     : null;
@@ -3972,7 +3995,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     // ---------- Mail client commands (browser preview stubs) ----------
     case "mail_list_cached_folders": {
-      return stubMailFolderList(stubMailAccountId(args as InvokeArgs | undefined)) as T;
+      return stubMailListFolders(stubMailAccountId(args as InvokeArgs | undefined), mailStubSeed) as T;
     }
     case "mail_list_cached_messages": {
       const invokeArgs = args as InvokeArgs | undefined;
@@ -3980,7 +4003,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
       const limit = Math.max(0, Number((invokeArgs?.limit as number | undefined) ?? 200));
       const offset = Math.max(0, Number((invokeArgs?.offset as number | undefined) ?? 0));
-      return stubMailMessages(accountId, folder).slice(offset, offset + limit) as T;
+      return stubMailListCached(accountId, mailStubSeed, folder, limit, offset) as T;
     }
     case "mail_sync_headers": {
       const invokeArgs = args as InvokeArgs | undefined;
@@ -3993,7 +4016,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return {
         accountId,
         folder,
-        folders: stubMailFolderList(accountId),
+        folders: stubMailListFolders(accountId, mailStubSeed),
         messages: page,
         fetchedMessages: page.length,
         cachedBodies: page.filter((message) => message.bodyCached).length,
@@ -4003,18 +4026,60 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         hasMore: offset + page.length < messages.length,
       } as T;
     }
+    case "mail_idle_start": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = ((invokeArgs?.folder as string | null | undefined) ?? "INBOX") || "INBOX";
+      return stubMailIdleStart(stubMailAccountId(invokeArgs), folder) as T;
+    }
+    case "mail_idle_stop": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubMailIdleStop(String(invokeArgs?.accountId ?? "")) as T;
+    }
+    case "mail_sync_folder": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const folder = ((invokeArgs?.folder as string | null | undefined) ?? "INBOX") || "INBOX";
+      const mode = (invokeArgs?.mode as string | null | undefined) ?? "auto";
+      const limit = Math.max(1, Number((invokeArgs?.limit as number | null | undefined) ?? 200));
+      return stubMailSyncFolder(accountId, mailStubSeed, folder, mode, limit) as T;
+    }
     case "mail_sync_all_folders": {
       const invokeArgs = args as InvokeArgs | undefined;
       const accountId = stubMailAccountId(invokeArgs);
-      const folders = stubMailFolderList(accountId);
-      const messages = folders.flatMap((folder) => stubMailMessages(accountId, folder.name));
+      const limit = Math.max(1, Number((invokeArgs?.limit as number | null | undefined) ?? 50));
+      const config = invokeArgs?.config as { sync?: { subscribedOnly?: boolean } } | undefined;
+      return stubMailSyncAll(accountId, mailStubSeed, limit, config?.sync?.subscribedOnly === true) as T;
+    }
+    case "mail_autoconfig": {
+      // Browser preview: the backend's built-in table for a few domains only.
+      const email = String((args as InvokeArgs | undefined)?.email ?? "");
+      const domain = email.split("@")[1]?.toLowerCase() ?? "";
+      const table: Record<string, [string, string, string]> = {
+        "qq.com": ["custom", "imap.qq.com", "smtp.qq.com"],
+        "163.com": ["custom", "imap.163.com", "smtp.163.com"],
+        "gmail.com": ["gmail", "imap.gmail.com", "smtp.gmail.com"],
+      };
+      const hit = table[domain];
+      if (!hit) return null as T;
       return {
-        accountId,
-        folders,
-        fetchedMessages: messages.length,
-        cachedBodies: messages.filter((message) => message.bodyCached).length,
-        syncedAt: Math.floor(Date.now() / 1000),
+        source: "builtin",
+        provider: hit[0],
+        imap: { host: hit[1], port: 993, security: "TLS" },
+        smtp: { host: hit[2], port: 465, security: "TLS" },
       } as T;
+    }
+    case "mail_list_folders": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubMailListFolders(stubMailAccountId(invokeArgs), mailStubSeed) as T;
+    }
+    case "mail_set_folder_subscription": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubMailSetSubscription(
+        stubMailAccountId(invokeArgs),
+        mailStubSeed,
+        String(invokeArgs?.folder ?? ""),
+        invokeArgs?.subscribed === true,
+      ) as T;
     }
     case "mail_get_message_body": {
       const invokeArgs = args as InvokeArgs | undefined;
@@ -4031,12 +4096,161 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "mail_mark_read": {
       const invokeArgs = args as InvokeArgs | undefined;
       const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
-      const uids = Array.isArray(invokeArgs?.uids) ? invokeArgs?.uids as unknown[] : [];
+      const uids = Array.isArray(invokeArgs?.uids) ? (invokeArgs?.uids as unknown[]).map(Number) : [];
       const all = Boolean(invokeArgs?.all);
+      stubMailUpdateCachedFlags(stubMailAccountId(invokeArgs), folder, uids, ["\\Seen"], []);
       return { folder, marked: all ? 1 : uids.length } as T;
     }
     case "mail_send_message": {
-      return { accepted: true, response: "browser-preview accepted" } as T;
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const request = (invokeArgs?.request as {
+        to?: string[];
+        subject?: string;
+        textBody?: string | null;
+        inReplyTo?: string | null;
+        references?: string[];
+        draftId?: string | null;
+      } | undefined) ?? {};
+      const messageId = `<sent-${Date.now()}@taomni.local>`;
+      stubMailRecordSent(`Subject: ${request.subject ?? ""}\n\n${request.textBody ?? ""}`);
+      stubMailAppend(accountId, mailStubSeed, "Sent", {
+        subject: request.subject ?? "",
+        messageId,
+        flags: ["\\Seen"],
+        to: (request.to ?? []).map((address) => ({ name: address, address })),
+        from: { name: "Preview User", address: "user@example.com" },
+        snippet: (request.textBody ?? "").slice(0, 200),
+        inReplyTo: request.inReplyTo?.replace(/^<|>$/g, "") ?? null,
+        references: (request.references ?? []).map((id) => id.replace(/^<|>$/g, "")),
+      });
+      const drafted = request.draftId
+        ? loadMailDrafts().find((draft) => draft.id === request.draftId)
+        : undefined;
+      if (drafted?.remoteDraftFolder && drafted.remoteDraftUid) {
+        stubMailExpunge(accountId, mailStubSeed, drafted.remoteDraftFolder, drafted.remoteDraftUid);
+      }
+      return { accepted: true, response: "browser-preview accepted", sentCopyFolder: "Sent" } as T;
+    }
+    case "mail_list_filters":
+      return stubListFilters(stubMailAccountId(args as InvokeArgs | undefined)) as T;
+    case "mail_save_filters": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const filters = (invokeArgs?.filters as MailFilter[] | undefined) ?? [];
+      return stubSaveFilters(stubMailAccountId(invokeArgs), mailStubSeed, filters) as T;
+    }
+    case "mail_apply_filters": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubApplyFilters(
+        stubMailAccountId(invokeArgs),
+        mailStubSeed,
+        (invokeArgs?.folder as string | undefined) ?? "INBOX",
+        String(invokeArgs?.trigger ?? "manual"),
+        {
+          uids: (invokeArgs?.uids as number[] | null | undefined) ?? null,
+          filterIds: (invokeArgs?.filterIds as string[] | null | undefined) ?? null,
+          trashFolder: (invokeArgs?.trashFolder as string | null | undefined) ?? null,
+        },
+      ) as T;
+    }
+    case "mail_export_filters":
+      return stubListFilters(stubMailAccountId(args as InvokeArgs | undefined)).length as T;
+    case "mail_import_filters":
+      return stubListFilters(stubMailAccountId(args as InvokeArgs | undefined)) as T;
+    case "mail_get_invite": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uid = Number(invokeArgs?.uid ?? 0);
+      return (stubMailFindHeader(stubMailAccountId(invokeArgs), mailStubSeed, folder, uid)?.invite ?? null) as T;
+    }
+    case "mail_respond_invite": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uid = Number(invokeArgs?.uid ?? 0);
+      const invite = stubMailFindHeader(stubMailAccountId(invokeArgs), mailStubSeed, folder, uid)?.invite;
+      if (!invite) throw new Error("this message has no calendar invitation");
+      const partstat = ({ accept: "ACCEPTED", tentative: "TENTATIVE", decline: "DECLINED" } as Record<string, string>)[
+        String(invokeArgs?.response ?? "")
+      ];
+      if (!partstat) throw new Error(`unknown invitation response ${String(invokeArgs?.response)}`);
+      // Like the backend: an iTIP REPLY to the organizer (not stored in Sent).
+      stubMailRecordSent(`METHOD:REPLY\nUID:${invite.uid}\nATTENDEE;PARTSTAT=${partstat}:mailto:user@example.com`);
+      return { partstat, sentTo: invite.organizer.email } as T;
+    }
+    case "mail_set_flags": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uids = Array.isArray(invokeArgs?.uids) ? (invokeArgs?.uids as unknown[]).map(Number) : [];
+      const add = Array.isArray(invokeArgs?.add) ? (invokeArgs?.add as string[]) : [];
+      const remove = Array.isArray(invokeArgs?.remove) ? (invokeArgs?.remove as string[]) : [];
+      const updated = stubMailUpdateCachedFlags(stubMailAccountId(invokeArgs), folder, uids, add, remove);
+      return { folder, updated } as T;
+    }
+    case "mail_move_messages":
+    case "mail_copy_messages":
+    case "mail_delete_messages": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uids = Array.isArray(invokeArgs?.uids) ? (invokeArgs?.uids as unknown[]).map(Number) : [];
+      const target = (invokeArgs?.targetFolder as string | undefined) ?? null;
+      const count = stubMailTransfer(
+        stubMailAccountId(invokeArgs),
+        mailStubSeed,
+        folder,
+        uids,
+        cmd === "mail_delete_messages" ? null : target,
+        cmd === "mail_copy_messages",
+      );
+      return (cmd === "mail_delete_messages" ? { folder, deleted: count } : { folder, target, count }) as T;
+    }
+    case "mail_search_messages": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubMailSearch(
+        stubMailAccountId(invokeArgs),
+        mailStubSeed,
+        (invokeArgs?.query as StubMailSearchQuery | undefined) ?? {},
+        "cache",
+      ) as T;
+    }
+    case "mail_search_server": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubMailSearch(
+        stubMailAccountId(invokeArgs),
+        mailStubSeed,
+        (invokeArgs?.query as StubMailSearchQuery | undefined) ?? {},
+        "server",
+        (invokeArgs?.folder as string | undefined) ?? "INBOX",
+      ) as T;
+    }
+    case "mail_store_remote_draft": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const draftId = (invokeArgs?.draftId as string | undefined) ?? "";
+      const drafts = loadMailDrafts();
+      const draft = drafts.find((item) => item.accountId === accountId && item.id === draftId);
+      if (!draft) throw new Error(`draft ${draftId} not found`);
+      if (draft.remoteDraftFolder && draft.remoteDraftUid) {
+        stubMailExpunge(accountId, mailStubSeed, draft.remoteDraftFolder, draft.remoteDraftUid);
+      }
+      const uid = stubMailAppend(accountId, mailStubSeed, "Drafts", {
+        subject: draft.subject,
+        flags: ["\\Draft", "\\Seen"],
+        snippet: draft.textBody.slice(0, 200),
+      });
+      const stored = { ...draft, remoteDraftFolder: "Drafts", remoteDraftUid: uid };
+      saveMailDrafts(drafts.map((item) => (item === draft ? stored : item)));
+      return stored as T;
+    }
+    case "mail_discard_remote_draft": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const draftId = (invokeArgs?.draftId as string | undefined) ?? "";
+      const drafts = loadMailDrafts();
+      const draft = drafts.find((item) => item.accountId === accountId && item.id === draftId);
+      if (!draft?.remoteDraftFolder || !draft.remoteDraftUid) return false as T;
+      stubMailExpunge(accountId, mailStubSeed, draft.remoteDraftFolder, draft.remoteDraftUid);
+      saveMailDrafts(drafts.map((item) => (item === draft ? { ...draft, remoteDraftFolder: null, remoteDraftUid: null } : item)));
+      return true as T;
     }
     case "mail_list_drafts": {
       const accountId = stubMailAccountId(args as InvokeArgs | undefined);
@@ -4065,7 +4279,63 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const accountId = stubMailAccountId(invokeArgs);
       const query = (invokeArgs?.query as string | undefined) ?? "";
       const limit = Math.max(1, Math.min(20, Number((invokeArgs?.limit as number | undefined) ?? 8)));
-      return stubMailContacts(accountId, query, limit) as T;
+      // Address book entries first, like the backend (TASK-19).
+      const seen = new Set<string>();
+      return [...stubAddressBookSuggestions(accountId, query, limit), ...stubMailContacts(accountId, query, limit)]
+        .filter((hit) => {
+          const key = hit.email.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, limit) as T;
+    }
+    case "mail_list_address_book":
+      return stubListAddressBook(stubMailAccountId(args as InvokeArgs | undefined)) as T;
+    case "mail_save_address_book_entry": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubSaveAddressBookEntry(stubMailAccountId(invokeArgs), invokeArgs?.entry as MailAddressBookEntry) as T;
+    }
+    case "mail_delete_address_book_entry": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubDeleteAddressBookEntry(stubMailAccountId(invokeArgs), String(invokeArgs?.uid ?? "")) as T;
+    }
+    case "mail_import_vcards":
+    case "mail_export_vcards":
+      throw new Error("vCard files need the desktop app");
+    case "mail_carddav_sync":
+      throw new Error("CardDAV sync needs the desktop app");
+    case "mail_send_receipt": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uid = Number(invokeArgs?.uid ?? 0);
+      const accountId = stubMailAccountId(invokeArgs);
+      const header = stubMailFindHeader(accountId, mailStubSeed, folder, uid);
+      if (!header?.receiptTo) throw new Error("the sender did not ask for a read receipt");
+      stubMailRecordSent(
+        `To: <${header.receiptTo}>\nContent-Type: multipart/report; report-type=disposition-notification\n`
+        + `Original-Message-ID: ${header.messageId}\nDisposition: ${invokeArgs?.automatic ? "automatic-action" : "manual-action"}`,
+      );
+      stubMailUpdateCachedFlags(accountId, folder, [uid], ["$MDNSent"], []);
+      return { sentTo: header.receiptTo } as T;
+    }
+    case "mail_list_agenda": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubListAgenda(stubMailAccountId(invokeArgs), Number(invokeArgs?.days ?? 14)) as T;
+    }
+    case "mail_caldav_sync": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const config = invokeArgs?.config as { caldav?: { url?: string } | null } | undefined;
+      return stubCalDavSync(stubMailAccountId(invokeArgs), config?.caldav?.url ?? "") as T;
+    }
+    case "mail_add_invite_to_calendar": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const folder = (invokeArgs?.folder as string | undefined) ?? "INBOX";
+      const uid = Number(invokeArgs?.uid ?? 0);
+      const accountId = stubMailAccountId(invokeArgs);
+      const invite = stubMailFindHeader(accountId, mailStubSeed, folder, uid)?.invite;
+      if (!invite) throw new Error("this message has no calendar invitation");
+      return stubAddInviteToCalendar(accountId, invite, (invokeArgs?.partstat as string | null | undefined) ?? null) as T;
     }
     case "mail_test_connection": {
       return { imapOk: true, smtpOk: true, folderCount: MAIL_STUB_FOLDERS.length } as T;
@@ -4099,6 +4369,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "mail_clear_cache": {
+      stubMailClearCache(stubMailAccountId(args as InvokeArgs | undefined));
       return undefined as T;
     }
     case "db_append_history": {
