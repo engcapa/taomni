@@ -63,6 +63,7 @@ steps:
 - press:
     key: Alt+1
     macos_key: Meta+1
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed
@@ -73,6 +74,7 @@ steps:
 - press:
     key: Alt+1
     macos_key: Meta+1
+    selector: '[data-testid="code-workspace-tree-pane"]'
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed
@@ -80,6 +82,7 @@ steps:
 - press:
     key: Alt+1
     macos_key: Meta+1
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed

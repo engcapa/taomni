@@ -229,6 +229,7 @@
   - tab 菜单顺序按 IDEA：Close 组 → Copy Path/Reference… → Split Right/Split and Move Right/Split Down/Split and Move Down → Pin Tab、Configure Editor Tabs… → Bookmarks › → Open In › → Local History ›、Git › → Rename File…；单 tab 时 Close Other Tabs 禁用。
   - 所有菜单项有助记符、快捷键来自 013 的格式化函数、可用态来自同一 Action Registry 判定；菜单在视口内翻转，不压到状态栏。
   - 项目树菜单本轮未采样，P1 先补采 IDEA 参照。
+- P1 设计：[ed-parity-021-context-menus-design.md](ed-parity-021-context-menus-design.md)。
 - 必须保留：现有菜单动作的执行路径、prepared evaluation 冻结、调试/AI 入口可发现性。
 - 依赖：013。
 - 验收：`ED-PARITY-021-A1`、`ED-PARITY-021-A2`、`ED-PARITY-021-A3`。

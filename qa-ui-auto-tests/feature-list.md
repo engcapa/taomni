@@ -7740,6 +7740,18 @@ controls:
     selector: '[data-testid="editor-context-format"]'
     kind: interactive
     optional: true
+  - id: editor-context-goto          # ED-PARITY-021 Go To › submenu parent
+    selector: '[data-testid="editor-context-goto"]'
+    kind: interactive
+    optional: true
+  - id: tab-menu-close-other-tabs    # ED-PARITY-021 tab menu availability
+    selector: '[data-testid="context-menu-item-close-other-tabs"]'
+    kind: interactive
+    optional: true
+  - id: tab-menu-close-tabs-right
+    selector: '[data-testid="context-menu-item-close-tabs-to-the-right"]'
+    kind: interactive
+    optional: true
 -->
 
 - 编辑器外观配置支持字体族、字号、行高、连字、高对比度主题、活动/全部编辑器缩放范围、软换行路径 glob、虚拟光标空间与面包屑多语言过滤。

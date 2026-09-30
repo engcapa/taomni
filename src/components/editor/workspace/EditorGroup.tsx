@@ -621,10 +621,23 @@ export function EditorGroup({
 
   const showTabMenu = (event: React.MouseEvent, key: string) => {
     const pinned = pinnedSet.has(key);
+    const index = openOrder.indexOf(key);
+    const hasOthers = openOrder.length > 1;
+    const hasRight = index >= 0 && index < openOrder.length - 1;
+    // ED-PARITY-021 DEC-021-02: IDEA tab menu order — close group, copy path,
+    // splits, pin, Open In ›, Local History; availability follows the tab set.
     tabMenu.show(event, [
-      { label: pinned ? "Unpin Tab" : "Pin Tab", onClick: () => onPin(key, !pinned) },
-      { label: "Open in Split Right", onClick: () => onSplitRight(key) },
-      { label: "Open in Split Down", onClick: () => onSplitDown(key) },
+      { label: "Close", shortcut: "Ctrl+F4", onClick: () => onClose(key) },
+      { label: "Close Other Tabs", disabled: !hasOthers, onClick: () => onCloseOthers(key) },
+      { label: "Close All Tabs", onClick: onCloseAll },
+      { label: "Close Unmodified Tabs", onClick: onCloseUnmodified },
+      { label: "Close Tabs to the Right", disabled: !hasRight, onClick: () => onCloseRight(key) },
+      { separator: true, label: "" },
+      { label: "Copy Path", onClick: () => onCopyPath(key, true) },
+      { label: "Copy Relative Path", onClick: () => onCopyPath(key, false) },
+      { separator: true, label: "" },
+      { label: "Split Right", onClick: () => onSplitRight(key) },
+      { label: "Split Down", onClick: () => onSplitDown(key) },
       ...(onMoveTabToNextSplit ? [
         { label: "Move Tab to Next Split", onClick: () => onMoveTabToNextSplit(key) },
       ] : []),
@@ -632,20 +645,17 @@ export function EditorGroup({
         { label: "Move Tab to Previous Split", onClick: () => onMoveTabToPreviousSplit(key) },
       ] : []),
       { separator: true, label: "" },
-      { label: "Close", shortcut: "Ctrl+F4", onClick: () => onClose(key) },
-      { label: "Close Others", onClick: () => onCloseOthers(key) },
-      { label: "Close Tabs to the Right", onClick: () => onCloseRight(key) },
-      { label: "Close Unmodified", onClick: onCloseUnmodified },
+      { label: pinned ? "Unpin Tab" : "Pin Tab", onClick: () => onPin(key, !pinned) },
       { separator: true, label: "" },
-      { label: "Close All", onClick: onCloseAll },
-      { separator: true, label: "" },
-      { label: "Copy Path", onClick: () => onCopyPath(key, true) },
-      { label: "Copy Relative Path", onClick: () => onCopyPath(key, false) },
-      { label: "Reveal in Project Tree", shortcut: "Alt+F1", onClick: () => onRevealInTree(key) },
-      { label: "Reveal in Explorer", onClick: () => onRevealInSystem(key) },
-      { label: "Open in Terminal", onClick: () => onOpenInTerminal(key) },
+      {
+        label: "Open In",
+        children: [
+          { label: "Project View", shortcut: "Alt+F1", onClick: () => onRevealInTree(key) },
+          { label: "Explorer", onClick: () => onRevealInSystem(key) },
+          { label: "Terminal", onClick: () => onOpenInTerminal(key) },
+        ],
+      },
       ...(onLocalHistory ? [
-        { separator: true as const, label: "" },
         { label: "Local History…", onClick: () => onLocalHistory(key) },
       ] : []),
     ]);

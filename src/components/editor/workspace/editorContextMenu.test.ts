@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { MenuItem } from "../../ContextMenu";
 import type { PreparedActionEvaluation } from "./workspaceActionHost";
 import {
   buildEditorContextMenuItems,
@@ -28,6 +29,19 @@ function binding(
   return { actionId, prepare, run: execute, execute };
 }
 
+/** Depth-first rows including submenu children (ED-PARITY-021 Go To ›, AI ›). */
+function menu(input: BuildEditorContextMenuInput): MenuItem[] {
+  const out: MenuItem[] = [];
+  const walk = (items: MenuItem[]) => {
+    for (const item of items) {
+      out.push(item);
+      if (item.children) walk(item.children);
+    }
+  };
+  walk(buildEditorContextMenuItems(input));
+  return out;
+}
+
 function baseInput(
   overrides: Partial<BuildEditorContextMenuInput> = {},
 ): BuildEditorContextMenuInput {
@@ -43,7 +57,7 @@ function baseInput(
 
 describe("buildEditorContextMenuItems", () => {
   it("projects disabled rows from unavailable prepared evaluations", () => {
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       bindings: {
         "workspace.gotoDefinition": binding("workspace.gotoDefinition"),
         "workspace.gotoDeclaration": binding("workspace.gotoDeclaration"),
@@ -56,7 +70,7 @@ describe("buildEditorContextMenuItems", () => {
   });
 
   it("disables rows with no binding at all (host did not prepare them)", () => {
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       hasSelection: true,
       bindings: {
         "workspace.editor.copy": binding("workspace.editor.copy"),
@@ -70,7 +84,7 @@ describe("buildEditorContextMenuItems", () => {
 
   it("executes the same frozen evaluation the enabled state came from", () => {
     const copyBinding = binding("workspace.editor.copy");
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       hasSelection: true,
       bindings: { "workspace.editor.copy": copyBinding },
     }));
@@ -98,25 +112,25 @@ describe("buildEditorContextMenuItems", () => {
       "workspace.editor.paste",
     ];
     const bindings = Object.fromEntries(actionIds.map((id) => [id, binding(id)]));
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       hasSelection: true,
       bindings,
     }));
     const expected = [
       // ED-PARITY-013 DEC-013-05: Go to Definition has no default key (F12 is
       // IDEA Jump to Last Tool Window).
-      ["editor-context-goto-definition", "Go to Definition", undefined],
-      ["editor-context-goto-declaration", "Go to Declaration", "Ctrl+B"],
-      ["editor-context-goto-type-definition", "Go to Type Definition", "Ctrl+Shift+B"],
-      ["editor-context-goto-implementation", "Go to Implementation", "Ctrl+Alt+B"],
+      ["editor-context-goto-definition", "Definition", undefined],
+      ["editor-context-goto-declaration", "Declaration or Usages", "Ctrl+B"],
+      ["editor-context-goto-type-definition", "Type Declaration", "Ctrl+Shift+B"],
+      ["editor-context-goto-implementation", "Implementation(s)", "Ctrl+Alt+B"],
       ["editor-context-find-usages", "Find Usages", "Alt+F7"],
       ["editor-context-call-hierarchy", "Call Hierarchy", "Ctrl+Alt+H"],
       ["editor-context-type-hierarchy", "Type Hierarchy", "Ctrl+H"],
-      ["editor-context-rename", "Rename Symbol…", "Shift+F6"],
-      ["editor-context-safe-delete", "Safe Delete Symbol…", "Alt+Delete"],
+      ["editor-context-rename", "Rename…", "Shift+F6"],
+      ["editor-context-safe-delete", "Safe Delete…", "Alt+Delete"],
       ["editor-context-quick-doc", "Quick Documentation", "Ctrl+Q"],
-      ["editor-context-code-actions", "Show Code Actions…", "Alt+Enter"],
-      ["editor-context-format", "Format Selection", "Ctrl+Alt+L"],
+      ["editor-context-code-actions", "Show Context Actions", "Alt+Enter"],
+      ["editor-context-format", "Reformat Selection", "Ctrl+Alt+L"],
       ["editor-context-cut", "Cut", "Ctrl+X"],
       ["editor-context-copy", "Copy", "Ctrl+C"],
       ["editor-context-paste", "Paste", "Ctrl+V"],
@@ -136,30 +150,33 @@ describe("buildEditorContextMenuItems", () => {
         }),
     );
     void boundIds;
-    expect(items.filter((entry) => entry.testId?.startsWith("editor-context-")))
+    // Leaf rows plus the two submenu parents (Go To ›, Refactor ›).
+    expect(items.filter((entry) => entry.testId?.startsWith("editor-context-") && !entry.children))
       .toHaveLength(expected.length);
+    expect(items.filter((entry) => entry.children).map((entry) => entry.testId))
+      .toEqual(["editor-context-goto", "editor-context-refactor"]);
   });
 
   it("labels format by selection state", () => {
     const bindings = { "workspace.format": binding("workspace.format") };
-    expect(buildEditorContextMenuItems(baseInput({ hasSelection: false, bindings }))
-      .find((i) => i.testId === "editor-context-format")?.label).toBe("Format Document");
-    expect(buildEditorContextMenuItems(baseInput({ hasSelection: true, bindings }))
-      .find((i) => i.testId === "editor-context-format")?.label).toBe("Format Selection");
+    expect(menu(baseInput({ hasSelection: false, bindings }))
+      .find((i) => i.testId === "editor-context-format")?.label).toBe("Reformat Code");
+    expect(menu(baseInput({ hasSelection: true, bindings }))
+      .find((i) => i.testId === "editor-context-format")?.label).toBe("Reformat Selection");
   });
 
   it("adds Run to Cursor only while a debug session is active", () => {
-    expect(buildEditorContextMenuItems(baseInput())
+    expect(menu(baseInput())
       .find((i) => i.testId === "editor-context-run-to-cursor")).toBeUndefined();
 
     const runToCursor = binding("workspace.runToCursor");
-    const stopped = buildEditorContextMenuItems(baseInput({ debug: { runToCursor } }));
+    const stopped = menu(baseInput({ debug: { runToCursor } }));
     const item = stopped.find((i) => i.testId === "editor-context-run-to-cursor");
     expect(item?.disabled).toBe(false);
     item?.onClick?.();
     expect(runToCursor.execute).toHaveBeenCalledTimes(1);
 
-    const paused = buildEditorContextMenuItems(baseInput({
+    const paused = menu(baseInput({
       debug: {
         runToCursor: binding("workspace.runToCursor", { available: false }),
       },
@@ -169,11 +186,11 @@ describe("buildEditorContextMenuItems", () => {
 
   it("offers a field data-breakpoint row only when the host resolved one", () => {
     const runToCursor = binding("workspace.runToCursor");
-    expect(buildEditorContextMenuItems(baseInput({ debug: { runToCursor } }))
+    expect(menu(baseInput({ debug: { runToCursor } }))
       .find((item) => item.testId === "editor-context-add-data-breakpoint")).toBeUndefined();
 
     const dataBreakpoint = binding("workspace.addDataBreakpoint");
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       debug: { runToCursor, dataBreakpoint },
     }));
     const item = items.find((entry) => entry.testId === "editor-context-add-data-breakpoint");
@@ -188,7 +205,7 @@ describe("buildEditorContextMenuItems", () => {
       "workspace.gotoDeclaration": "Ctrl+Alt+Left",
       "workspace.format": undefined,
     };
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       shortcutFor: (actionId) => labels[actionId],
     }));
     expect(items.find((entry) => entry.testId === "editor-context-goto-definition")?.shortcut).toBe("F12");
@@ -198,12 +215,12 @@ describe("buildEditorContextMenuItems", () => {
   });
 
   it("adds the AI section only when a host supplies it and never selection-gates it", () => {
-    expect(buildEditorContextMenuItems(baseInput())
+    expect(menu(baseInput())
       .find((i) => i.testId === "editor-context-ai-explain-syntax")).toBeUndefined();
 
     const explainSyntax = binding("workspace.aiExplainSyntax");
     const explainCode = binding("workspace.aiExplainCode");
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       ai: {
         explainSyntaxLabel: "Explain Syntax…",
         explainCodeLabel: "Explain Code…",
@@ -229,7 +246,7 @@ describe("buildEditorContextMenuItems", () => {
     const auto = binding("workspace.aiSetAnswerLanguage");
     const zhCn = binding("workspace.aiSetAnswerLanguage");
     const en = binding("workspace.aiSetAnswerLanguage");
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       ai: {
         explainSyntaxLabel: "Explain Syntax…",
         explainCodeLabel: "Explain Code…",
@@ -259,7 +276,7 @@ describe("buildEditorContextMenuItems", () => {
   });
 
   it("sits the language submenu right after the explain actions", () => {
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       ai: {
         explainSyntaxLabel: "Explain Syntax…",
         explainCodeLabel: "Explain Code…",
@@ -282,7 +299,7 @@ describe("buildEditorContextMenuItems", () => {
   });
 
   it("omits the submenu when the host passes no answer-language config", () => {
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       ai: {
         explainSyntaxLabel: "Explain Syntax…",
         explainCodeLabel: "Explain Code…",
@@ -298,7 +315,7 @@ describe("buildEditorContextMenuItems", () => {
     const secondaryCopy = binding("workspace.editor.copy", { available: true });
     const secondaryPaste = binding("workspace.editor.paste", { available: false });
 
-    const items = buildEditorContextMenuItems(baseInput({
+    const items = menu(baseInput({
       hasSelection: true,
       bindings: {
         "workspace.editor.cut": secondaryCut,
@@ -318,7 +335,7 @@ describe("buildEditorContextMenuItems", () => {
   });
 
   it("rebuilds context menu items with updated state when selection changes", () => {
-    const withoutSelection = buildEditorContextMenuItems(baseInput({
+    const withoutSelection = menu(baseInput({
       hasSelection: false,
       bindings: {
         "workspace.format": binding("workspace.format"),
@@ -327,11 +344,11 @@ describe("buildEditorContextMenuItems", () => {
       },
     }));
 
-    expect(withoutSelection.find((i) => i.testId === "editor-context-format")?.label).toBe("Format Document");
+    expect(withoutSelection.find((i) => i.testId === "editor-context-format")?.label).toBe("Reformat Code");
     expect(withoutSelection.find((i) => i.testId === "editor-context-cut")?.disabled).toBe(true);
     expect(withoutSelection.find((i) => i.testId === "editor-context-copy")?.disabled).toBe(true);
 
-    const withSelection = buildEditorContextMenuItems(baseInput({
+    const withSelection = menu(baseInput({
       hasSelection: true,
       bindings: {
         "workspace.format": binding("workspace.format"),
@@ -340,8 +357,42 @@ describe("buildEditorContextMenuItems", () => {
       },
     }));
 
-    expect(withSelection.find((i) => i.testId === "editor-context-format")?.label).toBe("Format Selection");
+    expect(withSelection.find((i) => i.testId === "editor-context-format")?.label).toBe("Reformat Selection");
     expect(withSelection.find((i) => i.testId === "editor-context-cut")?.disabled).toBe(false);
     expect(withSelection.find((i) => i.testId === "editor-context-copy")?.disabled).toBe(false);
+  });
+});
+
+describe("ED-PARITY-021: IDEA editor menu structure", () => {
+  it("puts Show Context Actions first and groups navigation, folding, refactor and AI", () => {
+    const top = buildEditorContextMenuItems(baseInput({
+      bindings: {
+        "workspace.editor.foldAll": binding("workspace.editor.foldAll"),
+        "workspace.editor.unfoldAll": binding("workspace.editor.unfoldAll"),
+      },
+      ai: {
+        explainSyntaxLabel: "Explain Syntax…",
+        explainCodeLabel: "Explain Code…",
+        explainSyntax: binding("workspace.aiExplainSyntax"),
+        explainCode: binding("workspace.aiExplainCode"),
+      },
+    }));
+    const rows = top.filter((item) => !item.separator).map((item) => item.testId);
+    expect(rows).toEqual([
+      "editor-context-code-actions",
+      "editor-context-cut",
+      "editor-context-copy",
+      "editor-context-paste",
+      "editor-context-find-usages",
+      "editor-context-goto",
+      "editor-context-quick-doc",
+      "editor-context-folding",
+      "editor-context-rename",
+      "editor-context-refactor",
+      "editor-context-format",
+      "editor-context-ai",
+    ]);
+    expect(top.find((item) => item.testId === "editor-context-folding")?.children?.map((item) => item.testId))
+      .toEqual(["editor-context-fold-all", "editor-context-unfold-all"]);
   });
 });

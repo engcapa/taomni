@@ -6400,7 +6400,7 @@ describe("CodeWorkspaceTab", () => {
     // file and the new (right) leaf becomes active.
     const tabButton = within(screen.getByTestId("code-workspace-editor-tab-strip")).getByTitle("app / src/main/example.txt");
     fireEvent.contextMenu(tabButton, { clientX: 10, clientY: 10 });
-    fireEvent.click(await screen.findByRole("button", { name: "Open in Split Right" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Split Right" }));
     await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
     const panes = screen.getAllByTestId("code-workspace-editor-pane");
     const leftPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;

@@ -161,6 +161,9 @@
 - `[data-testid="editor-context-goto-definition"]` — interactive [optional] — F25.3.context-goto-definition
 - `[data-testid="editor-context-goto-declaration"]` — interactive [optional] — F25.3.context-goto-declaration
 - `[data-testid="editor-context-format"]` — interactive [optional] — F25.3.context-format
+- `[data-testid="editor-context-goto"]` — interactive [optional] — F25.3.editor-context-goto
+- `[data-testid="context-menu-item-close-other-tabs"]` — interactive [optional] — F25.3.tab-menu-close-other-tabs
+- `[data-testid="context-menu-item-close-tabs-to-the-right"]` — interactive [optional] — F25.3.tab-menu-close-tabs-right
 
 ## code-workspace/editor-shell (F25.5)
 

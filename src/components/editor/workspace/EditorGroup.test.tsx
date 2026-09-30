@@ -173,8 +173,23 @@ describe("EditorGroup tabs", () => {
     expect(onPin).toHaveBeenCalledWith("b", true);
 
     fireEvent.contextMenu(screen.getByTitle("repo / b.ts"), { clientX: 10, clientY: 10 });
-    fireEvent.click(screen.getByRole("button", { name: "Close Others" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close Other Tabs" }));
     expect(onCloseOthers).toHaveBeenCalledWith("b");
+  });
+
+  it("ED-PARITY-021: disables Close Other Tabs with a single tab and lists IDEA's order", () => {
+    render(<EditorGroup {...props({ openOrder: ["b"], activeKey: "b" })} />);
+    fireEvent.contextMenu(screen.getByTitle("repo / b.ts"), { clientX: 10, clientY: 10 });
+    expect(screen.getByRole("button", { name: "Close Other Tabs" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Close Tabs to the Right" })).toBeDisabled();
+    const labels = screen.getAllByRole("button")
+      .map((button) => button.textContent?.trim() ?? "")
+      .filter((label) => /^(Close|Copy Path|Split Right|Pin Tab|Open In)/.test(label));
+    expect(labels[0]).toMatch(/^Close/);
+    expect(labels.findIndex((label) => label.startsWith("Copy Path")))
+      .toBeLessThan(labels.findIndex((label) => label.startsWith("Split Right")));
+    expect(labels.findIndex((label) => label.startsWith("Split Right")))
+      .toBeLessThan(labels.findIndex((label) => label.startsWith("Pin Tab")));
   });
 
   it("exposes path, tree, explorer, and terminal actions from the tab menu", () => {
@@ -189,15 +204,16 @@ describe("EditorGroup tabs", () => {
       onOpenInTerminal,
     })} />);
 
-    const openMenuAndClick = (label: string) => {
+    const openMenuAndClick = (label: string, submenu?: string) => {
       fireEvent.contextMenu(screen.getByTitle("repo / b.ts"), { clientX: 10, clientY: 10 });
+      if (submenu) fireEvent.mouseEnter(screen.getByRole("button", { name: new RegExp(`^${submenu}`) }));
       fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${label}`) }));
     };
     openMenuAndClick("Copy Path");
     openMenuAndClick("Copy Relative Path");
-    openMenuAndClick("Reveal in Project Tree");
-    openMenuAndClick("Reveal in Explorer");
-    openMenuAndClick("Open in Terminal");
+    openMenuAndClick("Project View", "Open In");
+    openMenuAndClick("Explorer", "Open In");
+    openMenuAndClick("Terminal", "Open In");
 
     expect(onCopyPath).toHaveBeenNthCalledWith(1, "b", true);
     expect(onCopyPath).toHaveBeenNthCalledWith(2, "b", false);

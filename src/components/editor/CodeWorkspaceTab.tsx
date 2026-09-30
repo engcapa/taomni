@@ -18764,6 +18764,8 @@ export function CodeWorkspaceTab({
             )),
           }),
           "workspace.format": prepareBinding("workspace.format"),
+          "workspace.editor.foldAll": prepareBinding("workspace.editor.foldAll"),
+          "workspace.editor.unfoldAll": prepareBinding("workspace.editor.unfoldAll"),
           "workspace.editor.cut": portBinding("workspace.editor.cut", "cut"),
           "workspace.editor.copy": portBinding("workspace.editor.copy", "copy"),
           "workspace.editor.paste": portBinding("workspace.editor.paste", "paste"),
