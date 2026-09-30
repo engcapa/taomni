@@ -51,6 +51,13 @@ impl SpecialFolder {
         }
     }
 
+    fn override_key(self) -> &'static str {
+        match self {
+            Self::Sent => "sent",
+            Self::Drafts => "drafts",
+        }
+    }
+
     fn create_name(self) -> &'static str {
         match self {
             Self::Sent => "Sent",
@@ -168,12 +175,15 @@ impl ActiveImapSession {
     /// Resolve (or create) the special folder.
     fn special_folder(
         &mut self,
-        account_id: &str,
+        config: &MailAccountConfig,
         kind: SpecialFolder,
         create: bool,
     ) -> Result<Option<String>, String> {
-        let folders = self.list_folders(account_id)?;
-        if let Some(name) = special_folder_name(&folders, kind) {
+        let folders = self.list_folders(&config.session_id)?;
+        if let Some(name) =
+            super::folders::special_folder_override(config, &folders, kind.override_key())
+                .or_else(|| special_folder_name(&folders, kind))
+        {
             return Ok(Some(name));
         }
         if !create {
@@ -277,7 +287,7 @@ pub(super) fn send_and_store_copy(
         let mut sent_folder = None;
         if let Some(bytes) = &copy {
             let folder = imap
-                .special_folder(&account_id, SpecialFolder::Sent, true)?
+                .special_folder(&account.config, SpecialFolder::Sent, true)?
                 .ok_or_else(|| "no Sent folder".to_string())?;
             imap.append(&folder, bytes, &["\\Seen"])?;
             sent_folder = Some(folder);
@@ -377,7 +387,7 @@ pub async fn mail_store_remote_draft(
             ImapSessionOpts::default(),
             |imap| {
                 let folder = imap
-                    .special_folder(&op_account_id, SpecialFolder::Drafts, true)?
+                    .special_folder(&account.config, SpecialFolder::Drafts, true)?
                     .ok_or_else(|| "no Drafts folder".to_string())?;
                 imap.append(&folder, &bytes, &["\\Draft", "\\Seen"])?;
                 let uid = imap.uid_by_message_id(&folder, &message_id)?;

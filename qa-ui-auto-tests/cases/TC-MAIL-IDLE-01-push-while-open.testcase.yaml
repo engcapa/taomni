@@ -45,7 +45,7 @@ steps:
 - mail_server_assert_list_matches:
     timeout_sec: 60
 - wait_for:
-    selector: '[data-testid="mail-idle-status"][data-state="ready"]'
+    selector: '[data-testid="mail-idle-status"][data-active="true"]'
     timeout_sec: 30
 - mail_server_assert_idle_clients:
     equals: 1
@@ -83,7 +83,7 @@ verification:
     - step: 8
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-idle-status\"][data-state=\"ready\"]", "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-idle-status\"][data-active=\"true\"]", "timeout_sec": 30}}'
     - step: 10
       expectation: '{"mail_server_assert_idle_clients": {"equals": 1, "timeout_sec": 20}}'
     - step: 12

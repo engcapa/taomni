@@ -37,6 +37,26 @@ class FakeFolder:
     messages: dict[int, FakeMessage] = field(default_factory=dict)
 
 
+_TOKEN_LOCK = threading.Lock()
+_TOKEN_COUNTER = 0
+
+
+def _unique_token() -> str:
+    """Letters-only unique id part: digits here would make IMAP TEXT searches
+    for numbered subjects ("Needle 0007") match unrelated Message-ID headers."""
+    global _TOKEN_COUNTER
+    with _TOKEN_LOCK:
+        _TOKEN_COUNTER += 1
+        value = _TOKEN_COUNTER
+    letters = ""
+    while True:
+        value, rem = divmod(value, 26)
+        letters = chr(ord("a") + rem) + letters
+        if value == 0:
+            break
+    return f"q{letters}"
+
+
 def build_message(subject: str, sender: str = "QA Sender <qa-sender@example.com>",
                   to: str = "qa@example.com", body: str | None = None,
                   date: datetime | None = None, message_id: str | None = None,
@@ -44,7 +64,7 @@ def build_message(subject: str, sender: str = "QA Sender <qa-sender@example.com>
     date = date or datetime.now(timezone.utc)
     slug = re.sub(r"[^A-Za-z0-9]+", "-", subject).strip("-") or "message"
     text = body if body is not None else f"Body of {subject}\r\n"
-    message_id = message_id or f"{slug}-{time.time_ns()}@qa.taomni"
+    message_id = message_id or f"{slug}.{_unique_token()}@qa.taomni"
     thread = ""
     if ancestry:
         refs = " ".join(f"<{item}>" for item in ancestry)
@@ -70,6 +90,8 @@ class FakeMailState:
         self.log: list[str] = []
         self.smtp_messages: list[dict] = []
         self.idle_waiters: list[threading.Event] = []
+        # Folders missing from LSUB; everything else is subscribed.
+        self.unsubscribed: set[str] = set()
 
     def idle_clients(self) -> int:
         """Connections currently in IDLE (AC-37: zero after the tab closes)."""
@@ -92,7 +114,7 @@ class FakeMailState:
                 uid = entry.uid_next
                 entry.uid_next += 1
                 subject = f"{prefix} {index + 1:04d}"
-                message_id = f"{prefix}-{index + 1}-{time.time_ns()}@qa.taomni".replace(" ", "-")
+                message_id = f"{prefix}-{index + 1}.{_unique_token()}@qa.taomni".replace(" ", "-")
                 raw = build_message(subject, message_id=message_id, ancestry=list(ancestry) if thread else None)
                 ancestry.append(message_id)
                 entry.messages[uid] = FakeMessage(raw=raw, internal_ts=int(time.time()) + index, modseq=modseq)
@@ -278,7 +300,7 @@ class _ImapHandler(socketserver.StreamRequestHandler):
             ok = f"{tag} OK done\r\n"
             out: list[bytes] = []
             with state.lock:
-                if upper.startswith(("LOGIN", "NOOP", "AUTHENTICATE", "ENABLE", "SUBSCRIBE", "UNSUBSCRIBE")):
+                if upper.startswith(("LOGIN", "NOOP", "AUTHENTICATE", "ENABLE")):
                     pass
                 elif upper.startswith("LOGOUT"):
                     self.send("* BYE bye\r\n" + ok)
@@ -286,10 +308,19 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                 elif upper.startswith("CAPABILITY"):
                     out.append(b"* CAPABILITY IMAP4rev1 UIDPLUS MOVE IDLE CONDSTORE SPECIAL-USE\r\n")
                 elif upper.startswith(("LIST", "LSUB")):
+                    lsub = upper.startswith("LSUB")
                     specials = {"Sent": "\\Sent", "Drafts": "\\Drafts", "Trash": "\\Trash", "Archive": "\\Archive"}
                     for name in state.folders:
+                        if lsub and name in state.unsubscribed:
+                            continue
                         attrs = "\\HasNoChildren" + (f" {specials[name]}" if name in specials else "")
-                        out.append(f'* {"LSUB" if upper.startswith("LSUB") else "LIST"} ({attrs}) "/" {_quote(name)}\r\n'.encode())
+                        out.append(f'* {"LSUB" if lsub else "LIST"} ({attrs}) "/" {_quote(name)}\r\n'.encode())
+                elif upper.startswith(("SUBSCRIBE", "UNSUBSCRIBE")):
+                    name, _ = _first_arg(rest.split(" ", 1)[1] if " " in rest else "")
+                    if upper.startswith("UNSUBSCRIBE"):
+                        state.unsubscribed.add(name)
+                    else:
+                        state.unsubscribed.discard(name)
                 elif upper.startswith(("EXAMINE", "SELECT")):
                     name, tail = _first_arg(rest.split(" ", 1)[1] if " " in rest else "")
                     folder = state.folders.get(name)

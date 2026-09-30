@@ -29,6 +29,7 @@ import {
   mailHeaderLimitOption,
 } from "../lib/mailSync";
 import { parseMailIdentities } from "../lib/mailIdentities";
+import { parseSpecialFolders } from "../lib/mailFolders";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
@@ -561,7 +562,9 @@ function sessionToMailTabInfo(
       maxFetchPerSync: mailNumberOption(opts, "mailMaxFetchPerSync", 200, 1),
       idle: opts.mailIdlePush !== false,
       desktopNotify: opts.mailDesktopNotify === true,
+      subscribedOnly: opts.mailSubscribedOnly === true,
     },
+    specialFolders: parseSpecialFolders(opts.mailSpecialFolders),
     cache: {
       enabled: opts.mailCacheEnabled !== false,
       headerRetentionDays: mailHeaderLimitOption(opts, "mailHeaderRetentionDays", LEGACY_MAIL_HEADER_RETENTION_DAYS),

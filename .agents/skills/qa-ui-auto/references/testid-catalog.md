@@ -866,6 +866,16 @@
 - `[data-testid="mail-identities-editor"]` — display [optional] — F-MAIL-9.identities-editor
 - `[data-testid="mail-identity-add"]` — interactive [optional] — F-MAIL-9.identity-add
 
+## mail/folders (F-MAIL-11)
+
+- `[data-testid="mail-subscriptions-open"]` — interactive — F-MAIL-11.subscriptions-open
+- `[data-testid="mail-subscriptions-dialog"]` — display — F-MAIL-11.subscriptions-dialog
+- `[data-testid="mail-subscription-row"]` — display — F-MAIL-11.subscription-row
+- `[data-testid="mail-subscription-toggle"]` — interactive — F-MAIL-11.subscription-toggle
+- `[data-testid="mail-subscribed-only"]` — interactive — F-MAIL-11.subscribed-only
+- `[data-testid="mail-subscribed-only-setting"]` — interactive [optional] — F-MAIL-11.subscribed-only-setting
+- `[data-testid="mail-special-folders"]` — display [optional] — F-MAIL-11.special-folders
+
 ## mail/organize (F-MAIL-8)
 
 - `[data-testid="mail-menu-tag"]` — interactive — F-MAIL-8.menu-tag

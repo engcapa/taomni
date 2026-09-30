@@ -46,6 +46,8 @@ pub struct FakeState {
     pub highest_modseq: u64,
     /// Every command line received (tag stripped), for assertions.
     pub log: Vec<String>,
+    /// Folders not reported by LSUB (everything else is subscribed).
+    pub unsubscribed: std::collections::BTreeSet<String>,
 }
 
 #[derive(Clone)]
@@ -71,6 +73,7 @@ impl FakeImap {
             condstore,
             highest_modseq: 1,
             log: Vec::new(),
+            unsubscribed: Default::default(),
         }));
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake imap");
         let port = listener.local_addr().unwrap().port();
@@ -355,6 +358,21 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                 out.push_str(" CONDSTORE");
             }
             out.push_str("\r\n");
+        } else if upper.starts_with("LSUB") {
+            for name in state.folders.keys() {
+                if !state.unsubscribed.contains(name) {
+                    out.push_str(&format!("* LSUB () \"/\" {}\r\n", quote(name)));
+                }
+            }
+        } else if upper.starts_with("UNSUBSCRIBE") || upper.starts_with("SUBSCRIBE") {
+            let unsubscribe = upper.starts_with("UNSUBSCRIBE");
+            let offset = if unsubscribe { 11 } else { 9 };
+            let (name, _) = split_first_arg(&rest[offset..]);
+            if unsubscribe {
+                state.unsubscribed.insert(name);
+            } else {
+                state.unsubscribed.remove(&name);
+            }
         } else if upper.starts_with("LIST") {
             for name in state.folders.keys() {
                 out.push_str(&format!(
@@ -601,8 +619,13 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                     .values()
                     .filter(|m| !m.flags.iter().any(|f| f == "\\Seen"))
                     .count();
+                let modseq = if state.condstore {
+                    format!(" HIGHESTMODSEQ {}", state.highest_modseq)
+                } else {
+                    String::new()
+                };
                 out.push_str(&format!(
-                    "* STATUS {} (MESSAGES {} UNSEEN {} UIDNEXT {} UIDVALIDITY {})\r\n",
+                    "* STATUS {} (MESSAGES {} UNSEEN {} UIDNEXT {} UIDVALIDITY {}{modseq})\r\n",
                     quote(&name),
                     folder.messages.len(),
                     unseen,

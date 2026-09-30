@@ -101,6 +101,8 @@ export interface MailSyncAllResult {
   failedFolders?: MailFolderError[];
   /** Folders whose catch-up needs more steps (call mailSyncFolder). */
   pendingFolders?: string[];
+  /** Folders a STATUS check proved unchanged (periodic scans only). */
+  unchangedFolders?: string[];
   cachedBodies: number;
   syncedAt: number;
 }
@@ -155,6 +157,17 @@ export function mailSearchMessages(accountId: string, query: MailSearchQuery): P
 export function mailSearchServer(config: MailTabInfo, folder: string, query: MailSearchQuery): Promise<MailMessageHeader[]> {
   return withVaultLockedNotice(() =>
     invoke<MailMessageHeader[]>("mail_search_server", { config, folder, query }),
+  );
+}
+
+/** SUBSCRIBE/UNSUBSCRIBE a folder; resolves to the refreshed folder list. */
+export function mailSetFolderSubscription(
+  config: MailTabInfo,
+  folder: string,
+  subscribed: boolean,
+): Promise<MailFolder[]> {
+  return withVaultLockedNotice(() =>
+    invoke<MailFolder[]>("mail_set_folder_subscription", { config, folder, subscribed }),
   );
 }
 

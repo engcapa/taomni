@@ -10,6 +10,7 @@ import {
   stubMailSyncAll,
   stubMailSyncFolder,
   stubMailIdleStart,
+  stubMailSetSubscription,
   stubMailIdleStop,
   stubMailTransfer,
   stubMailUpdateCachedFlags,
@@ -4035,7 +4036,17 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       const invokeArgs = args as InvokeArgs | undefined;
       const accountId = stubMailAccountId(invokeArgs);
       const limit = Math.max(1, Number((invokeArgs?.limit as number | null | undefined) ?? 50));
-      return stubMailSyncAll(accountId, mailStubSeed, limit) as T;
+      const config = invokeArgs?.config as { sync?: { subscribedOnly?: boolean } } | undefined;
+      return stubMailSyncAll(accountId, mailStubSeed, limit, config?.sync?.subscribedOnly === true) as T;
+    }
+    case "mail_set_folder_subscription": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      return stubMailSetSubscription(
+        stubMailAccountId(invokeArgs),
+        mailStubSeed,
+        String(invokeArgs?.folder ?? ""),
+        invokeArgs?.subscribed === true,
+      ) as T;
     }
     case "mail_get_message_body": {
       const invokeArgs = args as InvokeArgs | undefined;

@@ -28,6 +28,7 @@ import {
   ImageOff,
   Inbox,
   Link as LinkIcon,
+  ListChecks,
   Loader2,
   Mail as MailIcon,
   MailOpen,
@@ -74,6 +75,7 @@ import {
   mailSaveRaw,
   mailSendMessage,
   mailSetFlags,
+  mailSetFolderSubscription,
   mailSearchContacts,
   mailSearchMessages,
   mailSearchServer,
@@ -98,6 +100,13 @@ import {
 } from "../../lib/mail";
 import { listen } from "@tauri-apps/api/event";
 import { notifyDesktop } from "../../lib/lanNotify";
+import {
+  isSelectable,
+  isSubscribed,
+  loadSubscribedOnly,
+  saveSubscribedOnly,
+  visibleFolders,
+} from "../../lib/mailFolders";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
 import {
   DEFAULT_IDENTITY_ID,
@@ -578,7 +587,14 @@ const SPECIAL_FOLDER_MATCHERS: Record<SpecialFolderKind, { flag: string; names: 
   sent: { flag: "sent", names: ["sent", "已发送", "已傳送", "寄件"] },
 };
 
-function folderMatchesSpecial(folder: MailFolder, kind: SpecialFolderKind): boolean {
+function folderMatchesSpecial(
+  folder: MailFolder,
+  kind: SpecialFolderKind,
+  overrides?: MailTabInfo["specialFolders"],
+): boolean {
+  // A manual choice in the account settings beats attributes and names.
+  const manual = overrides?.[kind];
+  if (manual) return folder.name === manual || folderLabel(folder) === manual;
   const matcher = SPECIAL_FOLDER_MATCHERS[kind];
   if (folder.flags.some((flag) => flag.toLowerCase().includes(matcher.flag))) return true;
   const haystack = `${folder.name} ${folderLabel(folder)}`.toLowerCase();
@@ -1114,6 +1130,15 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const pushMailNew = useTaoAlertStore((s) => s.pushMailNew);
 
   const displayFolders = folders.length > 0 ? folders : [{ ...DEFAULT_FOLDER, accountId: info.sessionId }];
+  // TASK-10: "show only subscribed folders" (per account, this browser).
+  const [subscribedOnly, setSubscribedOnlyState] = useState(
+    () => loadSubscribedOnly(info.sessionId, info.sync.subscribedOnly ?? false),
+  );
+  const subscribedOnlyRef = useRef(subscribedOnly);
+  subscribedOnlyRef.current = subscribedOnly;
+  const treeFolders = useMemo(() => visibleFolders(displayFolders, subscribedOnly), [displayFolders, subscribedOnly]);
+  const [subscriptionsOpen, setSubscriptionsOpen] = useState(false);
+  const [subscriptionBusy, setSubscriptionBusy] = useState<string | null>(null);
   const oauthReauthRequired = isOAuthReauthRequired(error);
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
   const batchSize = useMemo(() => refreshBatchSize(info), [info.sync.maxFetchPerSync]);
@@ -1736,8 +1761,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   }, [fetchBodyForMessage, info.cache.bodyRecentLimit, info.cache.enabled, info.sessionId]);
 
   const isNewMailExcludedFolder = useCallback((folder: MailFolder) =>
-    NEW_MAIL_EXCLUDED_KINDS.some((kind) => folderMatchesSpecial(folder, kind))
-    || /draft|草稿/i.test(`${folder.name} ${folderLabel(folder)}`), []);
+    NEW_MAIL_EXCLUDED_KINDS.some((kind) => folderMatchesSpecial(folder, kind, info.specialFolders))
+    || /draft|草稿/i.test(`${folder.name} ${folderLabel(folder)}`), [info.specialFolders]);
 
   const isNewMailExcludedName = useCallback((name: string) => {
     const folder = foldersRef.current.find((entry) => entry.name === name);
@@ -1759,6 +1784,30 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     foldersRef.current = next;
     if (visibleRef.current) setFolders(next);
   }, []);
+
+  const setSubscribedOnly = useCallback((value: boolean) => {
+    setSubscribedOnlyState(value);
+    saveSubscribedOnly(info.sessionId, value);
+  }, [info.sessionId]);
+
+  const toggleSubscription = useCallback(async (folder: MailFolder, subscribed: boolean) => {
+    setSubscriptionBusy(folder.name);
+    setError(null);
+    try {
+      const listed = await mailSetFolderSubscription(info, folder.name, subscribed);
+      // Only the attributes change; keep cached counts and watermarks.
+      const merged = foldersRef.current.map((entry) => {
+        const remote = listed.find((candidate) => candidate.name === entry.name);
+        return remote ? { ...entry, flags: remote.flags } : entry;
+      });
+      foldersRef.current = merged;
+      setFolders(merged);
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+    } finally {
+      setSubscriptionBusy(null);
+    }
+  }, [info]);
 
   /** Reload the visible list from the cache, keeping the loaded depth. */
   const reloadVisibleFromCache = useCallback(async (folder: string) => {
@@ -1991,7 +2040,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
     try {
       // Manual sync reconciles every cached message; periodic scans only the newest window.
-      const result = await mailSyncAllFolders(info, { limit, includeBodies, fullReconcile: !quiet });
+      const result = await mailSyncAllFolders(
+        { ...info, sync: { ...info.sync, subscribedOnly: subscribedOnlyRef.current } },
+        { limit, includeBodies, fullReconcile: !quiet },
+      );
       foldersRef.current = result.folders;
       let newMessages = countNewMail(result.newUnseenByFolder, result.folders, isNewMailExcludedFolder);
       const pending = (result.pendingFolders ?? [])
@@ -3268,7 +3320,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   };
 
   const resolveSpecialFolder = (kind: SpecialFolderKind): string | null =>
-    displayFolders.find((folder) => folderMatchesSpecial(folder, kind))?.name ?? null;
+    displayFolders.find((folder) => folderMatchesSpecial(folder, kind, info.specialFolders))?.name ?? null;
 
   const resolveInboxFolder = (): string =>
     displayFolders.find((folder) => folder.name.toUpperCase() === "INBOX")?.name
@@ -3710,7 +3762,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
 
   const folderMenuItems = (folder: MailFolder): MenuItem[] => {
-    const isTrashLike = folderMatchesSpecial(folder, "trash") || folderMatchesSpecial(folder, "junk");
+    const isTrashLike = folderMatchesSpecial(folder, "trash", info.specialFolders)
+      || folderMatchesSpecial(folder, "junk", info.specialFolders);
     return [
       { label: "Open folder", icon: folderIcon(folder), onClick: () => handleFolderSelect(folder) },
       { label: "Search in this folder", icon: <Search className="w-3.5 h-3.5" />, onClick: () => handleSearchInFolder(folder) },
@@ -4013,6 +4066,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
             className="h-7 px-1.5 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]"
             data-testid="mail-idle-status"
             data-state={idleState}
+            data-active={idleState === "ready" || idleState === "changed" ? "true" : "false"}
             title={idleState === "ready" || idleState === "changed"
               ? "Instant push (IMAP IDLE) active"
               : "Instant push unavailable; polling"}
@@ -4320,9 +4374,19 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 <div className="h-8 shrink-0 flex items-center px-3 text-[12px] font-semibold border-b border-[var(--taomni-divider)]">
                   Mailbox
                   {loadingFolders && <Loader2 className="w-3.5 h-3.5 ml-auto animate-spin text-[var(--taomni-text-muted)]" />}
+                  <button
+                    type="button"
+                    className={`${loadingFolders ? "ml-1" : "ml-auto"} h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]`}
+                    title="Manage folder subscriptions"
+                    aria-label="Manage folder subscriptions"
+                    data-testid="mail-subscriptions-open"
+                    onClick={() => setSubscriptionsOpen(true)}
+                  >
+                    <ListChecks className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 <div className="flex-1 min-h-0 py-1 overflow-auto">
-                  {displayFolders.map((folder) => {
+                  {treeFolders.map((folder) => {
                     const active = folder.name === selectedFolder;
                     const label = folderLabel(folder);
                     return (
@@ -4802,6 +4866,60 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           >
             <div className="flex-1 min-h-0">
               {renderReaderSurface(popupMessage, true)}
+            </div>
+          </MailDraggableDialog>
+        </div>
+      )}
+
+      {subscriptionsOpen && (
+        <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title="Folder subscriptions"
+            icon={<ListChecks className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Folder subscriptions"
+            minWidth={360}
+            minHeight={280}
+            className="w-[min(520px,90vw)] h-[min(520px,78vh)] min-h-[300px]"
+            onClose={() => setSubscriptionsOpen(false)}
+          >
+            <div className="h-9 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[12px]">
+              <label className="inline-flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={subscribedOnly}
+                  data-testid="mail-subscribed-only"
+                  onChange={(event) => setSubscribedOnly(event.target.checked)}
+                />
+                Show only subscribed folders
+              </label>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto p-2" data-testid="mail-subscriptions-dialog">
+              {displayFolders.filter(isSelectable).map((folder) => {
+                const subscribed = isSubscribed(folder);
+                const inbox = folder.name.toUpperCase() === "INBOX";
+                return (
+                  <label
+                    key={folder.name}
+                    className="h-7 px-2 flex items-center gap-2 rounded text-[12px] hover:bg-[var(--taomni-hover)]"
+                    style={{ paddingLeft: `${8 + Math.min(folderDepth(folder), 6) * 14}px` }}
+                    data-testid="mail-subscription-row"
+                    data-folder-name={folder.name}
+                    data-subscribed={subscribed ? "true" : "false"}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={subscribed}
+                      disabled={inbox || subscriptionBusy != null}
+                      aria-label={`Subscribe to ${folderLabel(folder)}`}
+                      data-testid="mail-subscription-toggle"
+                      onChange={(event) => void toggleSubscription(folder, event.target.checked)}
+                    />
+                    <span className="text-[var(--taomni-text-muted)]">{folderIcon(folder)}</span>
+                    <span className="min-w-0 flex-1 truncate">{folderLabel(folder)}</span>
+                    {subscriptionBusy === folder.name && <Loader2 className="w-3 h-3 animate-spin" />}
+                  </label>
+                );
+              })}
             </div>
           </MailDraggableDialog>
         </div>

@@ -5449,6 +5449,51 @@ controls:
 - 邮件标签打开期间，为 INBOX 建立独立的 IMAP IDLE 连接（每 25 分钟重发），收到 EXISTS/EXPUNGE/FETCH 后执行一次无缺口的静默补齐；服务器不支持 IDLE 或断线时按退避重连，期间仍按间隔轮询，不漏邮件。
 - 工具栏在 Sync 旁显示 “Push/Poll” 状态；关闭标签立即断开 IDLE 连接（DEC-01：不做后台收信）。
 - 会话编辑器 “New mail” 可关闭即时推送，或开启新邮件系统通知（仅在标签打开期间发送）。
+
+---
+
+### 13.11 文件夹订阅、特殊文件夹与 STATUS 快速扫描 ✅
+
+<!-- feature
+id: F-MAIL-11
+status: done
+area: mail/folders
+components: [MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailFolders.ts
+  - src/components/session/SessionEditor.tsx
+  - src-tauri/src/mail/folders.rs
+controls:
+  - id: subscriptions-open
+    selector: '[data-testid="mail-subscriptions-open"]'
+    kind: interactive
+  - id: subscriptions-dialog
+    selector: '[data-testid="mail-subscriptions-dialog"]'
+    kind: display
+  - id: subscription-row
+    selector: '[data-testid="mail-subscription-row"]'
+    kind: display
+  - id: subscription-toggle
+    selector: '[data-testid="mail-subscription-toggle"]'
+    kind: interactive
+  - id: subscribed-only
+    selector: '[data-testid="mail-subscribed-only"]'
+    kind: interactive
+  - id: subscribed-only-setting
+    selector: '[data-testid="mail-subscribed-only-setting"]'
+    kind: interactive
+    optional: true       # session editor; quick connect uses the dialog toggle
+  - id: special-folders
+    selector: '[data-testid="mail-special-folders"]'
+    kind: display
+    optional: true       # session editor
+-->
+
+- 文件夹属性按 RFC 形式保存（`\Noselect`、`\Sent`），LSUB 报告的文件夹带 `\Subscribed`（RFC 5258）；服务器没有订阅数据时视为全部已订阅。
+- 文件夹栏 “Manage folder subscriptions” 对话框调用 SUBSCRIBE/UNSUBSCRIBE；“Show only subscribed folders”（按账户保存）开启后未订阅文件夹不在树中显示，也不参与全文件夹同步（INBOX 始终保留）。
+- 会话编辑器 “Special folders” 可手动指定 Sent/Drafts/Trash/Junk/Archive，优先于 SPECIAL-USE 属性与名称匹配（中文或自定义命名）。
+- 定时的全文件夹扫描在服务器支持 CONDSTORE 时先发 `STATUS (MESSAGES UNSEEN UIDNEXT UIDVALIDITY HIGHESTMODSEQ)`，未变化的文件夹只更新计数、跳过 EXAMINE/SEARCH；手动同步始终完整对账。
 ---
 
 ## 14. SocksCap 网络流量路由

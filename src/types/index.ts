@@ -322,7 +322,11 @@ export interface MailTabInfo {
     idle?: boolean;
     /** Desktop notification for new mail while the tab is open. */
     desktopNotify?: boolean;
+    /** Hide and skip unsubscribed folders (LSUB; TASK-10). */
+    subscribedOnly?: boolean;
   };
+  /** Manual special folders: sent/drafts/trash/junk/archive -> folder name. */
+  specialFolders?: Partial<Record<"sent" | "drafts" | "trash" | "junk" | "archive", string>>;
   cache: MailCacheSettings;
   ai: MailAiSettings;
   /** Store sent mail in the Sent folder via IMAP; null = automatic by provider. */

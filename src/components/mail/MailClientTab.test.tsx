@@ -38,6 +38,7 @@ const mailMocks = vi.hoisted(() => ({
   mailTestConnection: vi.fn(),
   mailIdleStart: vi.fn(),
   mailIdleStop: vi.fn(),
+  mailSetFolderSubscription: vi.fn(),
 }));
 
 const eventMocks = vi.hoisted(() => ({
@@ -379,7 +380,7 @@ describe("MailClientTab", () => {
     fireEvent.click(screen.getByTestId("mail-sync-button"));
 
     await waitFor(() => expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledWith(
-      info,
+      { ...info, sync: { ...info.sync, subscribedOnly: false } },
       { limit: 50, includeBodies: false, fullReconcile: true },
     ));
     expect(await screen.findByText(/Header arrived before the body cache is warm/)).toBeInTheDocument();
@@ -724,7 +725,7 @@ describe("MailClientTab", () => {
     });
 
     expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledWith(
-      intervalInfo,
+      { ...intervalInfo, sync: { ...intervalInfo.sync, subscribedOnly: false } },
       { limit: 50, includeBodies: false, fullReconcile: false },
     );
     // Sent is excluded from new-mail alerts.
@@ -965,13 +966,38 @@ describe("MailClientTab", () => {
     const push = eventMocks.handlers.get("mail://idle")!;
     act(() => push({ payload: { accountId: "someone-else", folder: "INBOX", kind: "changed" } }));
     act(() => push({ payload: { accountId: info.sessionId, folder: "INBOX", kind: "ready" } }));
-    expect(await screen.findByTestId("mail-idle-status")).toHaveAttribute("data-state", "ready");
+    expect(await screen.findByTestId("mail-idle-status")).toHaveAttribute("data-active", "true");
     act(() => push({ payload: { accountId: info.sessionId, folder: "INBOX", kind: "changed" } }));
     await waitFor(() => expect(mailMocks.mailSyncFolder.mock.calls.length).toBeGreaterThan(before), { timeout: 3000 });
 
     view.unmount();
     expect(mailMocks.mailIdleStop).toHaveBeenCalledWith(info.sessionId);
     expect(eventMocks.handlers.has("mail://idle")).toBe(false);
+  });
+
+  it("manages folder subscriptions and hides unsubscribed folders (TASK-10)", async () => {
+    window.localStorage.clear();
+    const inbox: MailFolder = { ...folder, flags: ["\\Subscribed"] };
+    const work: MailFolder = { ...folder, name: "Work", displayName: "Work", flags: ["\\Subscribed"] };
+    const old: MailFolder = { ...folder, name: "Old", displayName: "Old", flags: [] };
+    mailMocks.mailListCachedFolders.mockResolvedValue([inbox, work, old]);
+    mailMocks.mailSetFolderSubscription.mockResolvedValue([inbox, work, { ...old, flags: ["\\Subscribed"] }]);
+    renderMailbox();
+    const folderRow = (name: string) =>
+      document.querySelector(`[data-testid="mail-folder-row"][data-folder-name="${name}"]`);
+    await waitFor(() => expect(folderRow("Old")).not.toBeNull());
+
+    fireEvent.click(screen.getByTestId("mail-subscriptions-open"));
+    fireEvent.click(await screen.findByTestId("mail-subscribed-only"));
+    await waitFor(() => expect(folderRow("Old")).toBeNull());
+    expect(folderRow("Work")).not.toBeNull();
+    expect(window.localStorage.getItem(`taomni.mail.subscribedOnly:${info.sessionId}`)).toBe("true");
+
+    const oldRow = document.querySelector('[data-testid="mail-subscription-row"][data-folder-name="Old"]') as HTMLElement;
+    fireEvent.click(within(oldRow).getByTestId("mail-subscription-toggle"));
+    await waitFor(() => expect(mailMocks.mailSetFolderSubscription).toHaveBeenCalledWith(info, "Old", true));
+    await waitFor(() => expect(folderRow("Old")).not.toBeNull());
+    window.localStorage.clear();
   });
 
   it("waits for background sync instead of dropping a manual sync click", async () => {

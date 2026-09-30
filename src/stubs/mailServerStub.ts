@@ -44,6 +44,8 @@ interface StubFolderState {
 interface StubAccountState {
   folders: Map<string, StubFolderState>;
   meta: StubFolderMeta[];
+  /** Folders missing from LSUB (TASK-10); everything else is subscribed. */
+  unsubscribed: Set<string>;
 }
 
 const accounts = new Map<string, StubAccountState>();
@@ -57,7 +59,7 @@ function account(accountId: string, seed: Seed): StubAccountState {
   let state = accounts.get(accountId);
   if (state) return state;
   const { meta, messages } = seed(accountId);
-  state = { folders: new Map(), meta };
+  state = { folders: new Map(), meta, unsubscribed: new Set() };
   for (const folder of meta) {
     const seeded = messages(folder.name);
     const server = new Map(seeded.map((message) => [message.uid, { ...message }]));
@@ -96,7 +98,7 @@ function folderPayload(accountId: string, state: StubAccountState, meta: StubFol
     name: meta.name,
     displayName: meta.displayName,
     delimiter: "/",
-    flags: [],
+    flags: state.unsubscribed.has(meta.name) ? [] : ["\\Subscribed"],
     uidValidity: 1,
     uidNext: folder.uidNext,
     total: folder.server.size,
@@ -198,12 +200,20 @@ export function stubMailSyncFolder(
   };
 }
 
-export function stubMailSyncAll(accountId: string, seed: Seed, limit: number) {
+export function stubMailSetSubscription(accountId: string, seed: Seed, folder: string, subscribed: boolean) {
+  const state = account(accountId, seed);
+  if (subscribed) state.unsubscribed.delete(folder);
+  else state.unsubscribed.add(folder);
+  return stubMailListFolders(accountId, seed);
+}
+
+export function stubMailSyncAll(accountId: string, seed: Seed, limit: number, subscribedOnly = false) {
   const state = account(accountId, seed);
   const newUnseenByFolder: Record<string, number> = {};
   const pendingFolders: string[] = [];
   let fetchedMessages = 0;
   for (const meta of state.meta) {
+    if (subscribedOnly && meta.name.toUpperCase() !== "INBOX" && state.unsubscribed.has(meta.name)) continue;
     const step = stubMailSyncFolder(accountId, seed, meta.name, "auto", limit);
     fetchedMessages += step.fetched;
     if (step.newUnseen) newUnseenByFolder[meta.name] = step.newUnseen;

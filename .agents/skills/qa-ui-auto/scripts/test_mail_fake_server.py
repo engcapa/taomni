@@ -96,6 +96,18 @@ class FakeMailServerTest(unittest.TestCase):
         self.assertEqual(self.server.state.idle_clients(), 0)
         sock.close()
 
+    def test_subscriptions(self) -> None:
+        client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
+        client.login("qa", "x")
+        self.assertEqual(client.unsubscribe("Archive")[0], "OK")
+        typ, data = client.lsub()
+        names = b" ".join(data)
+        self.assertIn(b'"Sent"', names)
+        self.assertNotIn(b'"Archive"', names)
+        client.subscribe("Archive")
+        self.assertIn(b'"Archive"', b" ".join(client.lsub()[1]))
+        client.logout()
+
     def test_append_and_smtp(self) -> None:
         client = imaplib.IMAP4("127.0.0.1", self.server.imap_port)
         client.login("qa", "x")

@@ -30,6 +30,7 @@ import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
 import { ensureVaultReady } from "../../lib/vaultGate";
 import { MAIL_HEADER_LIMITS_EXPLICIT_KEY, mailHeaderLimitOption } from "../../lib/mailSync";
+import { MAIL_SPECIAL_FOLDER_KEYS, parseSpecialFolders, type MailSpecialFolderKey } from "../../lib/mailFolders";
 import { parseMailIdentities } from "../../lib/mailIdentities";
 import { MailIdentitiesEditor } from "./MailIdentitiesEditor";
 import {
@@ -1385,6 +1386,8 @@ function MailSettings({
   attachmentCache, setAttachmentCache,
   syncOnOpen, setSyncOnOpen,
   idlePush, setIdlePush,
+  subscribedOnly, setSubscribedOnly,
+  specialFolders, setSpecialFolders,
   desktopNotify, setDesktopNotify,
   syncIntervalMinutes, setSyncIntervalMinutes,
   maxFetchPerSync, setMaxFetchPerSync,
@@ -1436,6 +1439,9 @@ function MailSettings({
   attachmentCache: boolean; setAttachmentCache: (v: boolean) => void;
   syncOnOpen: boolean; setSyncOnOpen: (v: boolean) => void;
   idlePush: boolean; setIdlePush: (v: boolean) => void;
+  subscribedOnly: boolean; setSubscribedOnly: (v: boolean) => void;
+  specialFolders: Partial<Record<MailSpecialFolderKey, string>>;
+  setSpecialFolders: (v: Partial<Record<MailSpecialFolderKey, string>>) => void;
   desktopNotify: boolean; setDesktopNotify: (v: boolean) => void;
   syncIntervalMinutes: string; setSyncIntervalMinutes: (v: string) => void;
   maxFetchPerSync: string; setMaxFetchPerSync: (v: string) => void;
@@ -1798,6 +1804,31 @@ function MailSettings({
           <Checkbox checked={desktopNotify} onChange={setDesktopNotify} dataTestId="mail-desktop-notify" />
           Desktop notification
         </label>
+      </Field>
+
+      <Field label="Folders">
+        <label className="flex items-center gap-1.5">
+          <Checkbox checked={subscribedOnly} onChange={setSubscribedOnly} dataTestId="mail-subscribed-only-setting" />
+          Show and sync only subscribed folders
+        </label>
+      </Field>
+
+      <Field label="Special folders">
+        <div className="flex flex-wrap items-center gap-2" data-testid="mail-special-folders">
+          {MAIL_SPECIAL_FOLDER_KEYS.map((key) => (
+            <label key={key} className="inline-flex items-center gap-1">
+              <span className="text-[var(--taomni-text-muted)] capitalize">{key}</span>
+              <input
+                className="taomni-input w-28"
+                value={specialFolders[key] ?? ""}
+                placeholder="auto"
+                aria-label={`Mail ${key} folder`}
+                data-testid={`mail-special-folder-${key}`}
+                onChange={(e) => setSpecialFolders({ ...specialFolders, [key]: e.target.value })}
+              />
+            </label>
+          ))}
+        </div>
       </Field>
 
       <Field label="Sent copy">
@@ -2655,6 +2686,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailAttachmentCache, setMailAttachmentCache] = useState(() => optionBoolean(initialOptions, "mailAttachmentCache", false));
   const [mailSyncOnOpen, setMailSyncOnOpen] = useState(() => optionBoolean(initialOptions, "mailSyncOnOpen", true));
   const [mailIdlePush, setMailIdlePush] = useState(() => optionBoolean(initialOptions, "mailIdlePush", true));
+  const [mailSubscribedOnly, setMailSubscribedOnly] = useState(() => optionBoolean(initialOptions, "mailSubscribedOnly", false));
+  const [mailSpecialFolders, setMailSpecialFolders] = useState(() => parseSpecialFolders(initialOptions.mailSpecialFolders));
   const [mailDesktopNotify, setMailDesktopNotify] = useState(() => optionBoolean(initialOptions, "mailDesktopNotify", false));
   const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
   const [mailMaxFetchPerSync, setMailMaxFetchPerSync] = useState(() => optionString(initialOptions, "mailMaxFetchPerSync", "200"));
@@ -3013,6 +3046,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailAttachmentCache,
           mailSyncOnOpen,
           mailIdlePush,
+          mailSubscribedOnly,
+          mailSpecialFolders: JSON.stringify(parseSpecialFolders(mailSpecialFolders)),
           mailDesktopNotify,
           mailSyncIntervalMinutes,
           mailMaxFetchPerSync,
@@ -3587,6 +3622,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailAttachmentCache(optionBoolean(nextOptions, "mailAttachmentCache", false));
     setMailSyncOnOpen(optionBoolean(nextOptions, "mailSyncOnOpen", true));
     setMailIdlePush(optionBoolean(nextOptions, "mailIdlePush", true));
+    setMailSubscribedOnly(optionBoolean(nextOptions, "mailSubscribedOnly", false));
+    setMailSpecialFolders(parseSpecialFolders(nextOptions.mailSpecialFolders));
     setMailDesktopNotify(optionBoolean(nextOptions, "mailDesktopNotify", false));
     setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
     setMailMaxFetchPerSync(optionString(nextOptions, "mailMaxFetchPerSync", "200"));
@@ -4703,6 +4740,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 attachmentCache={mailAttachmentCache} setAttachmentCache={setMailAttachmentCache}
                 syncOnOpen={mailSyncOnOpen} setSyncOnOpen={setMailSyncOnOpen}
                 idlePush={mailIdlePush} setIdlePush={setMailIdlePush}
+                subscribedOnly={mailSubscribedOnly} setSubscribedOnly={setMailSubscribedOnly}
+                specialFolders={mailSpecialFolders} setSpecialFolders={setMailSpecialFolders}
                 desktopNotify={mailDesktopNotify} setDesktopNotify={setMailDesktopNotify}
                 syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}
                 maxFetchPerSync={mailMaxFetchPerSync} setMaxFetchPerSync={setMailMaxFetchPerSync}

@@ -41,6 +41,7 @@ use crate::terminal::network::NetworkSettings;
 
 #[cfg(test)]
 mod fake_imap;
+pub mod folders;
 pub mod idle;
 pub mod outgoing;
 pub mod search;
@@ -329,6 +330,9 @@ pub struct MailSyncSettings {
     pub interval_minutes: u32,
     #[serde(default = "default_max_fetch_per_sync")]
     pub max_fetch_per_sync: u32,
+    /// Hide and skip folders the server does not list as subscribed (LSUB).
+    #[serde(default)]
+    pub subscribed_only: bool,
 }
 
 impl Default for MailSyncSettings {
@@ -337,6 +341,7 @@ impl Default for MailSyncSettings {
             on_open: true,
             interval_minutes: default_sync_interval_minutes(),
             max_fetch_per_sync: default_max_fetch_per_sync(),
+            subscribed_only: false,
         }
     }
 }
@@ -372,6 +377,10 @@ pub struct MailAccountConfig {
     /// automatic: off for Gmail/Outlook (the server files it), on otherwise.
     #[serde(default)]
     pub save_sent_copy: Option<bool>,
+    /// Manual special folders (`sent`, `drafts`, `trash`, `junk`, `archive`
+    /// -> server folder name); beats SPECIAL-USE and name matching.
+    #[serde(default)]
+    pub special_folders: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -522,6 +531,8 @@ pub struct MailSyncAllResult {
     pub failed_folders: Vec<MailFolderError>,
     /// Folders whose catch-up was bounded by `limit` and needs more steps.
     pub pending_folders: Vec<String>,
+    /// Folders a STATUS check proved unchanged (skipped by a periodic scan).
+    pub unchanged_folders: Vec<String>,
     pub cached_bodies: usize,
     pub synced_at: i64,
 }
@@ -788,6 +799,24 @@ impl ActiveImapSession {
             Self::Plain { session, .. } => {
                 sync::imap_sync_folder_step(session, account, folder, state, params)
             }
+        }
+    }
+
+    fn set_subscription(&mut self, folder: &str, subscribed: bool) -> Result<(), String> {
+        match self {
+            Self::Tls { session, .. } => {
+                folders::imap_set_subscription(session, folder, subscribed)
+            }
+            Self::Plain { session, .. } => {
+                folders::imap_set_subscription(session, folder, subscribed)
+            }
+        }
+    }
+
+    fn folder_status(&mut self, folder: &str, condstore: bool) -> Option<folders::FolderStatus> {
+        match self {
+            Self::Tls { session, .. } => folders::imap_folder_status(session, folder, condstore),
+            Self::Plain { session, .. } => folders::imap_folder_status(session, folder, condstore),
         }
     }
 
@@ -1799,6 +1828,7 @@ pub async fn mail_sync_all_folders(
     } else {
         MailSyncRequestMode::Reconcile
     };
+    let skip_unchanged = cache_enabled && reconcile_mode == MailSyncRequestMode::Reconcile;
     let sync_states: HashMap<String, FolderSyncState> = if cache_enabled {
         with_mail_db(&state, &account_id, |db| {
             let mut states = HashMap::new();
@@ -1821,17 +1851,35 @@ pub async fn mail_sync_all_folders(
             &handle,
             ImapSessionOpts::default(),
             |imap| {
-                let listed = imap.list_folders(&account.config.session_id)?;
+                let mut listed = imap.list_folders(&account.config.session_id)?;
                 let condstore = imap.has_capability("CONDSTORE");
+                let subscribed_only = account.config.sync.subscribed_only;
                 let mut outcomes: Vec<FolderStepOutcome> = Vec::new();
                 let mut failed: Vec<MailFolderError> = Vec::new();
                 let mut pending: Vec<String> = Vec::new();
-                for folder in &listed {
-                    if folder_is_noselect(folder) {
+                let mut skipped: Vec<String> = Vec::new();
+                for folder in listed.iter_mut() {
+                    if folder_is_noselect(folder)
+                        || !folders::folder_visible(folder, subscribed_only)
+                    {
                         continue;
                     }
                     let name = folder.name.clone();
                     let mut folder_state = sync_states.get(&name).cloned().unwrap_or_default();
+                    // Periodic scans: one STATUS round trip proves an idle
+                    // folder unchanged (AC-33); manual syncs always reconcile.
+                    if skip_unchanged && condstore {
+                        if let Some(status) = imap.folder_status(&name, condstore) {
+                            if folders::folder_unchanged(&folder_state, &status) {
+                                folder.total = status.messages;
+                                folder.unread = status.unseen;
+                                folder.uid_next = status.uid_next;
+                                folder.uid_validity = status.uid_validity;
+                                skipped.push(name);
+                                continue;
+                            }
+                        }
+                    }
                     let mut folder_outcomes = Vec::new();
                     let mut error = None;
                     // A repair (pre-watermark cache) is followed by the real catch-up.
@@ -1896,13 +1944,13 @@ pub async fn mail_sync_all_folders(
                     outcomes.extend(folder_outcomes);
                 }
                 pending.dedup();
-                Ok((listed, outcomes, failed, pending))
+                Ok((listed, outcomes, failed, pending, skipped))
             },
         )
     })
     .await
     .map_err(|e| format!("mail sync all task failed: {e}"))??;
-    let (listed, outcomes, failed, pending) = result;
+    let (listed, outcomes, failed, pending, skipped) = result;
 
     let mut new_unseen_by_folder: HashMap<String, usize> = HashMap::new();
     let mut fetched_messages = 0usize;
@@ -1947,6 +1995,7 @@ pub async fn mail_sync_all_folders(
         new_unseen_by_folder,
         failed_folders: failed,
         pending_folders: pending,
+        unchanged_folders: skipped,
         cached_bodies,
         synced_at: now_ts(),
     })
@@ -3676,7 +3725,7 @@ fn imap_list_folders<T: Read + Write>(
         .list(None, Some("*"))
         .map_err(|e| format!("IMAP LIST failed: {e}"))?;
     let now = now_ts();
-    Ok(names
+    let mut listed: Vec<MailFolder> = names
         .iter()
         .map(|name| {
             let raw_name = name.name().to_string();
@@ -3688,7 +3737,7 @@ fn imap_list_folders<T: Read + Write>(
                 flags: name
                     .attributes()
                     .iter()
-                    .map(|attr| format!("{attr:?}"))
+                    .map(folders::attribute_string)
                     .collect(),
                 uid_validity: None,
                 uid_next: None,
@@ -3698,7 +3747,10 @@ fn imap_list_folders<T: Read + Write>(
                 ..MailFolder::default()
             }
         })
-        .collect())
+        .collect();
+    drop(names);
+    folders::mark_subscribed(&mut listed, folders::imap_subscribed_names(session));
+    Ok(listed)
 }
 
 fn imap_unread_count<T: Read + Write>(
@@ -6339,6 +6391,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 cache: MailCacheSettings::default(),
                 ai: MailAiSettings::default(),
                 save_sent_copy: None,
+                special_folders: HashMap::new(),
             },
             auth_mode: MailAuthMode::Password,
             network_settings: None,
@@ -6555,6 +6608,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 cache: MailCacheSettings::default(),
                 ai: MailAiSettings::default(),
                 save_sent_copy: None,
+                special_folders: HashMap::new(),
             },
             auth_mode: MailAuthMode::OAuth2,
             network_settings: None,
