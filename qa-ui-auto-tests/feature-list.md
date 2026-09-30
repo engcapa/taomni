@@ -4484,6 +4484,31 @@ controls:
     selector: '[data-testid="db-connection-error-banner"]'
     kind: display
     optional: true       # connection failed; editor and Query Library remain mounted
+  # DB parity batch 1 (docs-feature/db-client-parity/batch1-plan.md).
+  - id: run-all
+    selector: '[data-testid="db-run-all"]'
+    kind: interactive
+    optional: true       # toolbar Run (all statements / selection) inside a SQL tab
+  - id: result-log-tab
+    selector: '[data-testid="result-log-tab"]'
+    kind: interactive
+    optional: true       # DB-EXEC-001: appears after the first run in a query panel
+  - id: execution-log
+    selector: '[data-testid="db-execution-log"]'
+    kind: display
+    optional: true       # DB-EXEC-001: per-statement status table with run summary
+  - id: execution-log-entry
+    selector: '[data-testid="db-execution-log-entry"]'
+    kind: display
+    optional: true       # one row per statement; data-status = success/failed/cancelled/skipped/not-run
+  - id: execution-log-summary
+    selector: '[data-testid="db-execution-log-summary"]'
+    kind: display
+    optional: true
+  - id: result-sheet-tab
+    selector: '[data-testid="result-sheet-tab"]'
+    kind: interactive
+    optional: true       # one tab per executed statement with a result sheet
   # Shared tab actions — chat / detach.
   - id: chat-toggle
     selector: '[data-testid="db-chat-toggle"]'

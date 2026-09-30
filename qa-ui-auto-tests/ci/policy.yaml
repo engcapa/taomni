@@ -269,6 +269,8 @@ cases:
 - TC-auto-F-DB-1-query-tab-rename-native-restore
 - TC-auto-F-DB-1-schema-tree-double-click-qualified-native
 - TC-auto-F-DB-1-sql-session-scaffold
+- TC-DB-EXEC-001-execution-log-browser
+- TC-DB-EXEC-001-execution-log-native
 - TC-auto-F-DB-2-redis-session-scaffold
 - TC-auto-F-DB-3-hbase-query-library
 - TC-auto-F-Detach-1-terminal-detach

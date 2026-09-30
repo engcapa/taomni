@@ -724,6 +724,12 @@
 - `[data-testid="db-tab-limit"]` — interactive [optional] — F-DB-1.tab-limit
 - `[data-testid="db-run-current-statement"]` — interactive [optional] — F-DB-1.run-current-statement
 - `[data-testid="db-connection-error-banner"]` — display [optional] — F-DB-1.connection-error-banner
+- `[data-testid="db-run-all"]` — interactive [optional] — F-DB-1.run-all
+- `[data-testid="result-log-tab"]` — interactive [optional] — F-DB-1.result-log-tab
+- `[data-testid="db-execution-log"]` — display [optional] — F-DB-1.execution-log
+- `[data-testid="db-execution-log-entry"]` — display [optional] — F-DB-1.execution-log-entry
+- `[data-testid="db-execution-log-summary"]` — display [optional] — F-DB-1.execution-log-summary
+- `[data-testid="result-sheet-tab"]` — interactive [optional] — F-DB-1.result-sheet-tab
 - `[data-testid="db-chat-toggle"]` — interactive [optional] — F-DB-1.chat-toggle
 - `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach
 

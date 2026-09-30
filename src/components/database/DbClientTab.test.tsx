@@ -994,3 +994,91 @@ describe("DbClientTab connection lifecycle", () => {
     expect(screen.getAllByTestId("db-query-history-entry-name")).toHaveLength(1);
   });
 });
+
+type StreamEvent = { kind: "columns" | "rows" | "done"; columns?: unknown[]; rows?: unknown[][]; rowsAffected?: number; durationMs?: number; warnings?: string[] };
+
+function streamOk(onEvent: (event: StreamEvent) => void) {
+  onEvent({ kind: "columns", columns: [{ name: "one", type: "int4" }] });
+  onEvent({ kind: "rows", rows: [["1"]] });
+  onEvent({ kind: "done", rowsAffected: 0, durationMs: 3, warnings: [] });
+}
+
+describe("DbClientTab execution log", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    localStorage.clear();
+    dbChildProps.editorInitialDocFallback = "select 1";
+  });
+
+  it("logs every statement, switches to the Log after a failure and keeps result sheets", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "select 1;\nselect missing;\nselect 3";
+    ipcMock.dbExecuteStream.mockImplementation(async (_session: string, sql: string, _max: number | null, onEvent: (event: StreamEvent) => void) => {
+      if (sql.includes("missing")) throw new Error("1146 (42S02): Table 'missing' doesn't exist");
+      streamOk(onEvent);
+    });
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+
+    await waitFor(() => expect(screen.getByTestId("db-execution-log")).toBeInTheDocument());
+    expect(screen.getByTestId("result-log-tab")).toHaveAttribute("data-active", "true");
+    const entries = screen.getAllByTestId("db-execution-log-entry");
+    expect(entries.map((entry) => entry.getAttribute("data-status"))).toEqual(["success", "failed", "not-run"]);
+    expect(screen.getAllByTestId("db-execution-log-message")[1]).toHaveTextContent("Table 'missing' doesn't exist");
+    expect(screen.getByTestId("db-execution-log-summary")).toHaveTextContent("Success: 1 · Failed: 1 · Not run: 1");
+    expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(2);
+    expect(ipcMock.dbAppendHistory).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getAllByTestId("result-sheet-tab")[0]);
+    expect(screen.queryByTestId("db-execution-log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("result-log-tab")).toHaveAttribute("data-active", "false");
+  });
+
+  it("stays on the last result sheet when every statement succeeds", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "select 1;\nselect 2";
+    ipcMock.dbExecuteStream.mockImplementation(async (_session: string, _sql: string, _max: number | null, onEvent: (event: StreamEvent) => void) => {
+      streamOk(onEvent);
+    });
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+
+    await waitFor(() => expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(2));
+    await waitFor(() => expect(screen.getByTestId("result-log-tab")).toHaveAttribute("data-active", "false"));
+    fireEvent.click(screen.getByTestId("result-log-tab"));
+    expect(screen.getAllByTestId("db-execution-log-entry").map((entry) => entry.getAttribute("data-status"))).toEqual([
+      "success",
+      "success",
+    ]);
+    expect(screen.getByTestId("db-execution-log-summary")).toHaveTextContent("Success: 2 · Failed: 0");
+  });
+
+  it("marks a cancelled statement and the following ones as not run", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "select sleep(30);\nselect 2";
+    const pending = deferred<void>();
+    ipcMock.dbExecuteStream.mockImplementation(async () => {
+      await pending.promise;
+      throw new Error("Query execution was interrupted");
+    });
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(screen.getByTitle("Cancel query")).not.toBeDisabled());
+    fireEvent.click(screen.getByTitle("Cancel query"));
+    await act(async () => pending.resolve());
+
+    await waitFor(() => expect(screen.getByTestId("db-execution-log")).toBeInTheDocument());
+    expect(screen.getAllByTestId("db-execution-log-entry").map((entry) => entry.getAttribute("data-status"))).toEqual([
+      "cancelled",
+      "not-run",
+    ]);
+    expect(ipcMock.dbCancel).toHaveBeenCalled();
+  });
+});

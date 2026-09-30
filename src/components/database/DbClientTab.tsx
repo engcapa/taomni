@@ -30,6 +30,7 @@ import {
   RefreshCw,
   Trash2,
   Crosshair,
+  ScrollText,
   Check,
   ChevronDown,
   Languages,
@@ -104,6 +105,15 @@ import {
 import { buildDbAiPrompt, truncateStatement } from "../../lib/database/dbAiPrompts";
 import { registerQueryTab } from "../../lib/queryRegistry";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
+import { ExecutionLogView } from "./ExecutionLogView";
+import {
+  type ExecutionLogRun,
+  createExecutionRun,
+  finishExecutionRun,
+  patchExecutionEntry,
+  prependExecutionRun,
+  replaceExecutionRun,
+} from "../../lib/dbExecutionLog";
 import { splitSqlStatementRanges, sqlStatementRangesForExecution, type SqlStatementRange } from "../../lib/sqlStatements";
 import { writeText } from "../../lib/clipboard";
 import { createDbMetadataCache } from "../../lib/dbMetadataCache";
@@ -211,6 +221,10 @@ interface PanelState {
   displayName: string | null;
   dirty: boolean;
   createdAt: number;
+  /** In-memory execution log, newest run first (not persisted). */
+  log: ExecutionLogRun[];
+  /** The Log tab is shown instead of the active result sheet. */
+  logActive: boolean;
 }
 
 interface QueryWorkspacePanelCache {
@@ -305,6 +319,15 @@ function formatDurationMs(durationMs: number | null | undefined): string | null 
   if (ms < 1000) return `${ms} ms`;
   if (ms < 10_000) return `${(ms / 1000).toFixed(1)} s`;
   return `${Math.round(ms / 1000)} s`;
+}
+
+function successMessage(summary: QueryExecutionSummary): string {
+  if (summary.hasResultSet) {
+    const rows = summary.rowCount ?? 0;
+    return `${rows} row${rows === 1 ? "" : "s"} fetched`;
+  }
+  const affected = summary.rowsAffected ?? 0;
+  return affected === 0 ? "OK. No rows were affected" : `${affected} row${affected === 1 ? "" : "s"} affected`;
 }
 
 function hashSqlText(sql: string): string {
@@ -471,6 +494,8 @@ function newPanel(patch: Partial<PanelState> = {}): PanelState {
     displayName: null,
     dirty: false,
     createdAt: Date.now(),
+    log: [],
+    logActive: false,
     ...patch,
   };
 }
@@ -601,6 +626,8 @@ export default function DbClientTab({
   // accumulates in one editor, instead of scattering across panels.
   const echoPanelIdRef = useRef<string | null>(null);
   const timersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  /** Set when the user cancels, so the failing statement is logged as cancelled. */
+  const cancelRequestedRef = useRef<Record<string, boolean>>({});
   const panelsRef = useRef<PanelState[]>(panels);
   const tabLimitRef = useRef(tabLimit);
   const activePanelIdRef = useRef(activePanelId);
@@ -1253,12 +1280,34 @@ export default function DbClientTab({
       historyRef.current[panelId] = nextHistory.slice(0, MAX_HISTORY);
 
       const baseOrdinal = panel?.sheets.length ?? 0;
+      let run = createExecutionRun(statementRanges.map((range) => range.sql), Date.now());
+      const publishRun = (next: ExecutionLogRun, logActive?: boolean) => {
+        run = next;
+        setPanels((prev) =>
+          prev.map((p) =>
+            p.id === panelId
+              ? {
+                  ...p,
+                  log: p.log.some((candidate) => candidate.id === next.id)
+                    ? replaceExecutionRun(p.log, next)
+                    : prependExecutionRun(p.log, next),
+                  logActive: logActive ?? p.logActive,
+                }
+              : p,
+          ),
+        );
+      };
+      // Read through a closure: the flag is flipped asynchronously by cancelQuery.
+      const cancelRequested = () => cancelRequestedRef.current[panelId] === true;
+      cancelRequestedRef.current[panelId] = false;
+      publishRun(run);
       for (const [index, statement] of statementRanges.entries()) {
         const sourceRef = sourceRefForRange(panelId, statement, options.origin ?? "editor", {
           historyId: options.historyId,
           parentSheetId: options.parentSheetId,
         });
         const sheet = newResultSheet(statement.sql, baseOrdinal + index + 1, rowLimit, sourceRef);
+        const entryId = run.entries[index].id;
         setPanels((prev) =>
           prev.map((p) => {
             if (p.id !== panelId) return p;
@@ -1267,13 +1316,28 @@ export default function DbClientTab({
               ...p,
               sheets,
               activeSheetId: sheet.id,
+              logActive: false,
             };
           }),
         );
+        publishRun(patchExecutionEntry(run, entryId, { status: "running", startedAt: sheet.createdAt, sheetId: sheet.id }));
         const summary = await streamQueryIntoSheet(panelId, sheet.id, statement.sql, rowLimit);
+        const cancelled = !summary.ok && cancelRequested();
+        publishRun(
+          patchExecutionEntry(run, entryId, {
+            status: summary.ok ? "success" : cancelled ? "cancelled" : "failed",
+            durationMs: summary.durationMs,
+            rowCount: summary.hasResultSet ? summary.rowCount : null,
+            rowsAffected: summary.rowsAffected,
+            message: summary.ok ? successMessage(summary) : summary.error,
+          }),
+        );
         await appendSqlHistory(statement.sql, sheet.createdAt, summary, panelId);
         if (!summary.ok) break;
       }
+      const finished = finishExecutionRun(run, Date.now());
+      const needsAttention = finished.entries.some((entry) => entry.status === "failed" || entry.status === "cancelled");
+      publishRun(finished, needsAttention ? true : undefined);
     },
     [appendSqlHistory, rowLimit, statementRangesForRun, streamQueryIntoSheet, tabLimit],
   );
@@ -1419,6 +1483,11 @@ export default function DbClientTab({
   }, [visible, info.engine, info.host, captureDbFrame, setStatusMessage]);
 
   const cancelQuery = useCallback((panelId?: string) => {
+    for (const panel of panelsRef.current) {
+      if ((!panelId || panel.id === panelId) && panel.sheets.some((sheet) => sheet.running)) {
+        cancelRequestedRef.current[panel.id] = true;
+      }
+    }
     setPanels((prev) =>
       prev.map((p) =>
         panelId && p.id !== panelId
@@ -2859,7 +2928,8 @@ export default function DbClientTab({
                   <ResultArea
                     panel={activePanel}
                     sqlEngine={info.engine}
-                    onSheetSelect={(sheetId) => patchPanel(activePanel.id, { activeSheetId: sheetId })}
+                    onSheetSelect={(sheetId) => patchPanel(activePanel.id, { activeSheetId: sheetId, logActive: false })}
+                    onShowLog={() => patchPanel(activePanel.id, { logActive: true })}
                     onSheetClose={(sheetId) => closeResultSheet(activePanel.id, sheetId)}
                     onCloseSheets={(sheetIds) => closeResultSheets(activePanel.id, sheetIds)}
                     onTabChange={(sheetId, tab) => patchSheet(activePanel.id, sheetId, { resultTab: tab })}
@@ -2943,7 +3013,7 @@ function EditorToolbar({
       className="h-8 shrink-0 flex items-center gap-1 px-2"
       style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
     >
-      <button type="button" className={btn} onClick={onRun} disabled={running} title={runAllTitle}>
+      <button type="button" className={btn} onClick={onRun} disabled={running} title={runAllTitle} data-testid="db-run-all">
         <Play className="w-3.5 h-3.5" style={{ color: "#62d36f" }} /> Run
       </button>
       <button type="button" className={btn} onClick={onRunSelection} disabled={running} title={runSelectionTitle}>
@@ -3274,9 +3344,11 @@ function ResultArea({
   onGeneratedSqlQuery,
   onCancel,
   onStatus,
+  onShowLog,
 }: {
   panel: PanelState;
   sqlEngine: string;
+  onShowLog: () => void;
   onSheetSelect: (sheetId: string) => void;
   onSheetClose: (sheetId: string) => void;
   onCloseSheets: (sheetIds: string[]) => void;
@@ -3294,8 +3366,11 @@ function ResultArea({
 }) {
   const t = useT();
   const sheetMenu = useContextMenu();
-  const sheet = activeSheet(panel);
+  const showingLog = panel.logActive && panel.log.length > 0;
+  const sheet = showingLog ? null : activeSheet(panel);
   const tab = "h-6 px-3 text-[11px] inline-flex items-center";
+  const latestRun = panel.log[0] ?? null;
+  const latestRunHasFailure = !!latestRun?.entries.some((entry) => entry.status === "failed" || entry.status === "cancelled");
   const waitingForFirstResult =
     !!sheet?.running &&
     sheet.result !== null &&
@@ -3357,8 +3432,32 @@ function ResultArea({
         className="h-7 shrink-0 flex items-end gap-1 px-1 overflow-hidden"
         style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
       >
+        {panel.log.length > 0 && (
+          <button
+            type="button"
+            data-testid="result-log-tab"
+            data-active={showingLog ? "true" : "false"}
+            className="h-6 shrink-0 px-2 inline-flex items-center gap-1 text-[11px]"
+            style={{
+              background: showingLog ? "var(--taomni-tab-active)" : "var(--taomni-tab-inactive)",
+              color: showingLog ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
+              border: "1px solid var(--taomni-tab-border)",
+              borderBottom: showingLog ? "1px solid var(--taomni-tab-active)" : "1px solid var(--taomni-divider)",
+              borderTopLeftRadius: 4,
+              borderTopRightRadius: 4,
+            }}
+            onClick={onShowLog}
+            title="Execution log"
+          >
+            <ScrollText className="w-3 h-3" />
+            Log
+            {latestRunHasFailure && <span className="text-[10px]" style={{ color: "#d9534f" }}>●</span>}
+          </button>
+        )}
         {panel.sheets.length === 0 ? (
-          <span className="px-2 pb-1 text-[11px] text-[var(--taomni-text-muted)]">Result sheets</span>
+          panel.log.length === 0 && (
+            <span className="px-2 pb-1 text-[11px] text-[var(--taomni-text-muted)]">Result sheets</span>
+          )
         ) : (
           panel.sheets.map((resultSheet) => {
             const active = resultSheet.id === sheet?.id;
@@ -3437,7 +3536,9 @@ function ResultArea({
         </div>
       )}
       <div className="flex-1 min-h-0 flex flex-col">
-        {!sheet ? (
+        {showingLog ? (
+          <ExecutionLogView runs={panel.log} onSelectSheet={onSheetSelect} />
+        ) : !sheet ? (
           <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
             Run a query to create a result sheet.
           </div>
