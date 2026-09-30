@@ -202,6 +202,7 @@
 - 交付：组合收口、三端可访问性/快捷键/缩放/主题验证和正式 IDEA comparison。
 - 主要文件：各任务最终组合后的实际路径、QA cases、comparison records、feature catalog。
 - 必须保留：三端构建兼容、当前端真机证据、其他端明确未验证；不把 browser 代替 native。
+- P1 设计：[ed-parity-019-closure-design.md](ed-parity-019-closure-design.md)。
 - 验收：`ED-PARITY-019-A1`、`ED-PARITY-019-A2`、`ED-PARITY-019-A3`。
 
 <a id="ed-parity-020"></a>

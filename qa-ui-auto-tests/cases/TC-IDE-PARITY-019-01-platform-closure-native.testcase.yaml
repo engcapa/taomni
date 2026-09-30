@@ -1,0 +1,212 @@
+id: TC-IDE-PARITY-019-01
+title: Three-platform shortcut, focus, 200% zoom, theme, role/state and restore closure
+description: 'ED-PARITY-019 A2 native closure case run on Linux WebKitGTK, Windows WebView2 and macOS WKWebView: role/name/state of the editor, rail and tabs; the platform Find Action chord and Esc focus return; 200% editor zoom with the high-contrast scheme (shortcuts and focus still work); and window reload restoring appearance and the active tab. IME is covered by TC-IDE-IMPROVE-008 on Linux only.
+
+
+  Mode: native.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-019
+- accessibility
+- native-gate
+- p0
+modes:
+- native
+native_platforms:
+- Linux
+- macOS
+- Windows
+fixtures:
+- reset_db
+- workspace_root
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-ed019","name":"qa-ed019","roots":[{"id":"qa-ed019","name":"qa-ed019","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-ed019","path":"notes.txt"},"lastOpenedAt":1756500000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    timeout_sec: 60
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    name: role
+    equals: textbox
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    name: aria-multiline
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_visible: '[data-testid="code-workspace-editor-tab-strip"] [role="tab"][aria-selected="true"]'
+- press:
+    key: Control+Shift+A
+    macos_key: Meta+Shift+A
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 15
+- assert_visible: '[data-testid="code-workspace-search-everywhere"] [role="tab"][aria-selected="true"]'
+- press:
+    key: Escape
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    state: detached
+    timeout_sec: 5
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content:focus'
+    timeout_sec: 5
+- press:
+    key: Control+Shift+A
+    macos_key: Meta+Shift+A
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    value: Editor Appearance Settings
+- click: '[data-testid="code-workspace-search-everywhere"] >> text=Editor Appearance Settings'
+- wait_for: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+- fill:
+    selector: '[data-testid="workspace-editor-appearance-font-size-px"]'
+    value: '26'
+- click: '[data-testid="workspace-editor-appearance-high-contrast"]'
+- click: '[data-testid="workspace-editor-appearance-apply"]'
+- wait_for:
+    selector: '[data-testid="workspace-editor-appearance-settings-dialog"]'
+    state: detached
+    timeout_sec: 10
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content[data-editor-color-scheme="high-contrast"]'
+    timeout_sec: 10
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.cm-content')).fontSize
+    contains: 26px
+- screenshot: tc-ide-parity-019-01-zoom-contrast.png
+- press:
+    key: Control+Shift+A
+    macos_key: Meta+Shift+A
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    timeout_sec: 15
+- press:
+    key: Escape
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    state: detached
+    timeout_sec: 5
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content:focus'
+    timeout_sec: 5
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content[data-editor-color-scheme="high-contrast"]'
+    timeout_sec: 60
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.cm-content')).fontSize
+    contains: 26px
+- assert_visible: '[data-testid="code-workspace-editor-tab-strip"] [role="tab"][aria-selected="true"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A2 role/name/state：编辑器 role=textbox + aria-multiline，Project rail aria-pressed，活动编辑器 tab role=tab + aria-selected。
+    actions:
+    - 9
+    checkpoints:
+    - step: 10
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name": "role", "equals": "textbox"}}'
+    - step: 11
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "name": "aria-multiline", "equals": "true"}}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"] [role=\"tab\"][aria-selected=\"true\"]"}'
+    results:
+    - 10
+    - 11
+    - 12
+    - 13
+  - id: R2
+    requirement: A2 快捷键与焦点：平台 Find Action（Ctrl+Shift+A / Cmd+Shift+A）打开 Actions 标签，Esc 关闭后焦点回编辑器。
+    actions:
+    - 14
+    - 17
+    checkpoints:
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 15}}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-search-everywhere\"] [role=\"tab\"][aria-selected=\"true\"]"}'
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 19
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content:focus", "timeout_sec": 5}}'
+    results:
+    - 15
+    - 16
+    - 19
+  - id: R3
+    requirement: A2 缩放与主题：编辑器 200%（13→26px）+ 高对比主题生效；缩放下快捷键与焦点返回仍工作。
+    actions:
+    - 23
+    - 25
+    - 26
+    - 27
+    - 32
+    checkpoints:
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]"}'
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-editor-color-scheme=\"high-contrast\"]", "timeout_sec": 10}}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''.cm-content'')).fontSize", "contains": "26px"}}'
+    - step: 33
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 15}}'
+    - step: 36
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content:focus", "timeout_sec": 5}}'
+    results:
+    - 29
+    - 30
+    - 33
+    - 36
+  - id: R4
+    requirement: A2 窗口恢复：重载后重新进入 workspace，外观（26px、高对比）与活动编辑器 tab 恢复。
+    actions:
+    - 37
+    checkpoints:
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content[data-editor-color-scheme=\"high-contrast\"]", "timeout_sec": 60}}'
+    - step: 41
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''.cm-content'')).fontSize", "contains": "26px"}}'
+    - step: 42
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"] [role=\"tab\"][aria-selected=\"true\"]"}'
+    results:
+    - 40
+    - 41
+    - 42
+  visual:
+  - check: 三端截图对照缩放与高对比。
+    method: manual
+    reason: 截图随 CI 工件保存；视觉比较不自动判定。
+  native:
+  - check: Linux/Windows/macOS 打包应用。
+    method: automated
+    reason: native runner 驱动三端 WebView；IME 仅 Linux fcitx5（IMPROVE-008），Windows/macOS IME unverified。
