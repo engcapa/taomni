@@ -1,0 +1,4 @@
+interface:
+  display_name: "DB Client Parity Task"
+  short_description: "Add, plan, claim, deliver and review one DB-* card aligned to DBeaver and DbVisualizer"
+  default_prompt: "Use $db-client-task with docs-feature/db-client-parity/backlog.md to deliver one claimable DB-* card, allowing the spec's UI refactor and using focused iteration plus batched live-db/native verification."
