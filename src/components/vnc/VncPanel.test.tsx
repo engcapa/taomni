@@ -7,6 +7,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 
 import { useVncStore, type VncConnectionState } from "../../stores/vncStore";
 import VncPanel from "./VncPanel";
+import { DEFAULT_VNC_VIEWER_OPTIONS } from "../../lib/vncOptions";
 
 class MockWebSocket {
   static readonly OPEN = 1;
@@ -251,5 +252,259 @@ describe("VncPanel RealVNC-aligned input", () => {
       { kind: "key", down: false, keysym: 0xffe9 },
       { kind: "key", down: false, keysym: 0xffe3 },
     ]);
+  });
+});
+
+function connectCalls() {
+  return mocks.invoke.mock.calls.filter(([command]) => command === "vnc_connect");
+}
+
+describe("VncPanel connection lifecycle (VNC-SESS-003)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    MockWebSocket.instances = [];
+    vi.stubGlobal("WebSocket", MockWebSocket as unknown as typeof WebSocket);
+    useVncStore.setState({ connections: {} });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    mocks.invoke.mockReset();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  const structured = (code: string, stage: string, retryable: boolean, message: string) =>
+    new Error(JSON.stringify({ code, stage, retryable, message }));
+
+  it("asks before an unencrypted connection and retries with the confirmation", async () => {
+    let calls = 0;
+    mocks.invoke.mockImplementation((command: string) => {
+      if (command === "vnc_connect") {
+        calls += 1;
+        if (calls === 1) {
+          return Promise.reject(structured("unencrypted-confirmation-required", "security", false, "unencrypted connection requires confirmation"));
+        }
+        return Promise.resolve({ session_id: "s", ws_port: 41000, ws_token: "t", width: 0, height: 0, name: "" });
+      }
+      return Promise.resolve("");
+    });
+    render(<VncPanel tabId="vnc-tab" host="h.test" port={5900} visible />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(connectCalls()[0][1]).toMatchObject({ allowUnencrypted: false });
+    expect(screen.getByTestId("vnc-overlay-unencrypted")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("vnc-unencrypted-continue"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(connectCalls()).toHaveLength(2);
+    expect(connectCalls()[1][1]).toMatchObject({ allowUnencrypted: true });
+  });
+
+  it("shows the authentication form after a failed attempt and reconnects with the typed password", async () => {
+    let calls = 0;
+    mocks.invoke.mockImplementation((command: string) => {
+      if (command === "vnc_connect") {
+        calls += 1;
+        if (calls === 1) return Promise.reject(structured("authentication-failed", "authentication", false, "authentication failed (result=1)"));
+        return Promise.resolve({ session_id: "s", ws_port: 41000, ws_token: "t", width: 0, height: 0, name: "" });
+      }
+      return Promise.resolve("");
+    });
+    const onCredentialsChange = vi.fn();
+    render(<VncPanel tabId="vnc-tab" host="h.test" port={5900} password="old" visible onCredentialsChange={onCredentialsChange} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByTestId("vnc-auth-error")).toHaveTextContent("authentication failed");
+    fireEvent.change(screen.getByTestId("vnc-auth-password"), { target: { value: "new-secret" } });
+    fireEvent.click(screen.getByTestId("vnc-auth-remember"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("vnc-auth-ok"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(connectCalls()[1][1]).toMatchObject({ password: "new-secret" });
+    expect(onCredentialsChange).toHaveBeenCalledWith({ username: "", password: "new-secret" });
+  });
+
+  it("Stop cancels the attempt in flight", async () => {
+    mocks.invoke.mockImplementation((command: string) => {
+      if (command === "vnc_connect") return new Promise(() => {});
+      return Promise.resolve(true);
+    });
+    render(<VncPanel tabId="vnc-tab" host="h.test" port={5900} visible />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const attemptId = (connectCalls()[0][1] as { attemptId: string }).attemptId;
+    expect(attemptId).toBeTruthy();
+    act(() => {
+      fireEvent.click(screen.getByTestId("vnc-connect-stop"));
+    });
+    expect(mocks.invoke).toHaveBeenCalledWith("vnc_cancel_connect", { attemptId });
+    expect(screen.getByTestId("vnc-overlay-disconnected")).toBeInTheDocument();
+  });
+
+  it("keeps reconnecting a dropped session with backoff", async () => {
+    mocks.invoke.mockImplementation((command: string) => {
+      if (command === "vnc_connect") {
+        return Promise.resolve({ session_id: "s", ws_port: 41000, ws_token: "t", width: 0, height: 0, name: "" });
+      }
+      return Promise.resolve("");
+    });
+    render(<VncPanel tabId="vnc-tab" host="h.test" port={5900} visible />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    for (let round = 0; round < 4; round += 1) {
+      const socket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+      act(() => {
+        socket.onmessage?.({
+          data: JSON.stringify({ type: "disconnected", code: "connection-lost", stage: "runtime", retryable: true, reason: "lost" }),
+        } as MessageEvent);
+      });
+      expect(screen.getByTestId("vnc-overlay-reconnecting")).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(16_000);
+      });
+    }
+    // Four drops, four automatic reconnects (the old policy gave up after three).
+    expect(connectCalls()).toHaveLength(5);
+  });
+});
+
+describe("VncPanel viewer options (VNC-CLIP-001, VNC-PERF-004, VNC-INPUT-003)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    MockWebSocket.instances = [];
+    vi.stubGlobal("WebSocket", MockWebSocket as unknown as typeof WebSocket);
+    mocks.invoke.mockImplementation((command: string) => {
+      if (command === "vnc_connect") {
+        return Promise.resolve({ session_id: "vnc-session", ws_port: 41000, ws_token: "relay-token", width: 1920, height: 1080, name: "windows-host" });
+      }
+      return Promise.resolve("local text");
+    });
+    useVncStore.setState({ connections: {} });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    mocks.invoke.mockReset();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it("does not push the local clipboard when the session connects", async () => {
+    const { socket } = await renderConnected();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    const texts = socket.send.mock.calls.map(([payload]) => payload).filter((payload) => typeof payload === "string");
+    expect(texts.filter((text) => String(text).includes("ext_clipboard"))).toEqual([]);
+  });
+
+  it("sends the picture quality chosen in the session menu", async () => {
+    const { socket, canvas } = await renderConnected();
+    act(() => {
+      fireEvent.keyDown(canvas, { key: "F8", code: "F8" });
+    });
+    act(() => {
+      fireEvent.mouseEnter(screen.getByTestId("vnc-menu-quality"));
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("vnc-quality-low"));
+    });
+    const binary = socket.send.mock.calls
+      .map(([payload]) => payload)
+      .filter((payload): payload is ArrayBuffer => payload instanceof ArrayBuffer)
+      .map((payload) => Array.from(new Uint8Array(payload)));
+    expect(binary).toContainEqual([5, 3]);
+  });
+
+  it("honours a custom session menu key", async () => {
+    const { socket, canvas } = await renderConnected({
+      viewerOptions: { ...DEFAULT_VNC_VIEWER_OPTIONS, menuKey: "F9" },
+    });
+    act(() => {
+      fireEvent.keyDown(canvas, { key: "F8", code: "F8" });
+      fireEvent.keyUp(canvas, { key: "F8", code: "F8" });
+    });
+    expect(screen.queryByTestId("vnc-menu-send-cad")).toBeNull();
+    expect(sentMessages(socket).filter((message) => message.kind === "key")).toEqual([
+      { kind: "key", down: true, keysym: 0xffc5 },
+      { kind: "key", down: false, keysym: 0xffc5 },
+    ]);
+    act(() => {
+      fireEvent.keyDown(canvas, { key: "F9", code: "F9" });
+    });
+    expect(screen.getByTestId("vnc-menu-send-cad")).toBeInTheDocument();
+  });
+
+  it("releases the keysym a key pressed and drops key-ups whose press went elsewhere", async () => {
+    const { socket, canvas } = await renderConnected();
+    act(() => {
+      // Esc closing the session menu: only its key-up reaches the canvas.
+      fireEvent.keyUp(canvas, { key: "Escape", code: "Escape" });
+      fireEvent.keyDown(canvas, { key: "a", code: "KeyA" });
+      fireEvent.keyUp(canvas, { key: "A", code: "KeyA", shiftKey: true });
+    });
+    expect(sentMessages(socket).filter((message) => message.kind === "key")).toEqual([
+      { kind: "key", down: true, keysym: 0x61 },
+      { kind: "key", down: false, keysym: 0x61 },
+    ]);
+  });
+
+  it("drops the synthetic Ctrl that Windows sends with AltGr", async () => {
+    const platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+    try {
+      const { socket, canvas } = await renderConnected();
+      const key = (type: string, init: KeyboardEventInit) =>
+        canvas.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init }));
+      act(() => {
+        key("keydown", { key: "Control", code: "ControlLeft", ctrlKey: true });
+        key("keydown", { key: "AltGraph", code: "AltRight", ctrlKey: true, altKey: true });
+        key("keydown", { key: "@", code: "KeyQ", ctrlKey: true, altKey: true });
+        key("keyup", { key: "@", code: "KeyQ" });
+        key("keyup", { key: "Control", code: "ControlLeft" });
+        key("keyup", { key: "AltGraph", code: "AltRight" });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      expect(sentMessages(socket).filter((message) => message.kind === "key")).toEqual([
+        { kind: "key", down: true, keysym: 0xfe03 },
+        { kind: "key", down: true, keysym: 0x40 },
+        { kind: "key", down: false, keysym: 0x40 },
+        { kind: "key", down: false, keysym: 0xfe03 },
+      ]);
+    } finally {
+      platform.mockRestore();
+    }
+  });
+
+  it("still sends a plain Ctrl press on Windows", async () => {
+    const platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+    try {
+      const { socket, canvas } = await renderConnected();
+      act(() => {
+        canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "Control", code: "ControlLeft", ctrlKey: true, bubbles: true, cancelable: true }));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      act(() => {
+        canvas.dispatchEvent(new KeyboardEvent("keyup", { key: "Control", code: "ControlLeft", bubbles: true, cancelable: true }));
+      });
+      expect(sentMessages(socket).filter((message) => message.kind === "key")).toEqual([
+        { kind: "key", down: true, keysym: 0xffe3 },
+        { kind: "key", down: false, keysym: 0xffe3 },
+      ]);
+    } finally {
+      platform.mockRestore();
+    }
   });
 });

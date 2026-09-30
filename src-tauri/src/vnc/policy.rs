@@ -14,6 +14,9 @@ pub enum VncSecurityPolicy {
     LegacyCompatible,
     /// Explicitly permit an unauthenticated RFB security type.
     AllowNone,
+    /// RealVNC "Prefer off": use an unencrypted authenticated type (VNCAuth,
+    /// RA2ne) when offered, otherwise the strongest encrypted one.
+    PreferOff,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Default)]
@@ -84,6 +87,14 @@ impl VncSecurityPolicy {
                 "encrypted VNC policy is unavailable until VeNCrypt/TLS with server identity verification is implemented".into(),
             ));
         }
+        if matches!(self, Self::PreferOff) {
+            if offered.contains(&AUTH) {
+                return Ok(AUTH);
+            }
+            if let Some(kind) = RA2NE.iter().find(|kind| offered.contains(kind)) {
+                return Ok(*kind);
+            }
+        }
         if let Some(kind) = RA2.iter().find(|kind| offered.contains(kind)) {
             return Ok(*kind);
         }
@@ -114,6 +125,12 @@ impl VncSecurityPolicy {
             return Err(SecurityPolicyError(
                 "encrypted VNC policy requires authenticated TLS; anonymous RFB TLS does not verify server identity".into(),
             ));
+        }
+        if matches!(self, Self::PreferOff)
+            && let Ok(kind) = self.choose(offered)
+            && matches!(kind, 2 | 6 | 130)
+        {
+            return Ok(kind);
         }
         if offered.contains(&ANONYMOUS_TLS) {
             return Ok(ANONYMOUS_TLS);
@@ -172,6 +189,14 @@ mod tests {
             VncSecurityPolicy::LegacyCompatible.choose_outer(&[18, 2]),
             Ok(18)
         );
+    }
+
+    #[test]
+    fn prefer_off_picks_vncauth_over_anonymous_tls() {
+        assert_eq!(VncSecurityPolicy::PreferOff.choose_outer(&[18, 2]), Ok(2));
+        assert_eq!(VncSecurityPolicy::PreferOff.choose_outer(&[18, 5]), Ok(18));
+        assert_eq!(VncSecurityPolicy::PreferOff.choose(&[5, 6]), Ok(6));
+        assert!(VncSecurityPolicy::PreferOff.choose(&[1]).is_err());
     }
 
     #[test]

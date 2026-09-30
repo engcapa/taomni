@@ -18,16 +18,14 @@ use uuid::Uuid;
 
 use crate::terminal::network::NetworkSettings;
 use crate::vnc::clipboard::{
-    ACTION_NOTIFY, ACTION_PROVIDE, ACTION_REQUEST, ClipboardFormats, ENCODING_EXTENDED_CLIPBOARD,
-    ENCODING_EXTENDED_CLIPBOARD_LEGACY, ExtendedClipboardMsg, FORMAT_HTML, FORMAT_RTF, FORMAT_TEXT,
+    ACTION_NOTIFY, ACTION_PROVIDE, ACTION_REQUEST, ClipboardFormats, ExtendedClipboardMsg,
+    FORMAT_HTML, FORMAT_RTF, FORMAT_TEXT,
     SUPPORTED_ACTIONS, build_caps_body, build_notify_body, build_provide_body, build_request_body,
 };
-use crate::vnc::encodings::{
-    DecodedCursor, ENCODING_DESKTOP_SIZE, ENCODING_POINTER_POS, ENCODING_RICH_CURSOR,
-    ENCODING_X_CURSOR,
-};
+use crate::vnc::encodings::DecodedCursor;
 use crate::vnc::framebuffer::{Damage, FbRect, SharedFramebuffer};
 use crate::vnc::policy::{VncClipboardPolicy, VncSecurityPolicy};
+use crate::vnc::quality::{QualityController, VncPictureQuality};
 use crate::vnc::queue::{FrameQueueReceiver, FrameQueueSender, QueuedWsOutgoing};
 use crate::vnc::rfb::{RfbConnection, RfbWriter, RuntimeStats, ServerMessage, encoding_name};
 
@@ -65,6 +63,8 @@ pub enum VncControl {
     ExtendedClipboard(ClipboardFormats),
     Refresh,
     Ack,
+    /// Picture quality chosen in the session menu (VNC-PERF-004).
+    SetQuality(VncPictureQuality),
     Disconnect,
 }
 
@@ -163,7 +163,9 @@ enum WsOutgoingText {
     Stats {
         requested_encoding: &'static str,
         last_encoding: &'static str,
-        pixel_format: &'static str,
+        pixel_format: String,
+        quality: &'static str,
+        quality_level: &'static str,
         wire_kbps: u64,
         line_kbps: Option<u64>,
         updates_per_sec: f32,
@@ -172,10 +174,45 @@ enum WsOutgoingText {
     },
 }
 
-/// Pixel format requested by `set_pixel_format_rgba`.
-const PIXEL_FORMAT_LABEL: &str = "depth 24 (32 bpp) little-endian rgb888";
-const REQUESTED_ENCODING_LABEL: &str = "ZRLE";
 const STATS_INTERVAL: Duration = Duration::from_secs(1);
+/// RealVNC `KeepAliveInterval` / `KeepAliveResponseTimeout` (VNC-SESS-003):
+/// after this much server silence send a 1x1 probe; after as much again
+/// without any answer the connection is considered lost.
+pub(crate) const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
+pub(crate) const KEEPALIVE_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
+const RELAY_TICK: Duration = Duration::from_millis(250);
+
+/// Options the viewer negotiates with the server (VNC-CONN-001).
+#[derive(Debug, Clone, Copy)]
+pub struct VncRelayOptions {
+    pub picture_quality: VncPictureQuality,
+    /// ClientInit shared flag (RealVNC `Shared=True`).
+    pub shared: bool,
+    /// Proceed when only an unencrypted security type is available; false
+    /// stops before authentication so the viewer can warn (VNC-SESS-003).
+    pub allow_unencrypted: bool,
+    pub keepalive_interval: Duration,
+    pub keepalive_timeout: Duration,
+}
+
+impl Default for VncRelayOptions {
+    fn default() -> Self {
+        Self {
+            picture_quality: VncPictureQuality::default(),
+            shared: true,
+            allow_unencrypted: true,
+            keepalive_interval: KEEPALIVE_INTERVAL,
+            keepalive_timeout: KEEPALIVE_RESPONSE_TIMEOUT,
+        }
+    }
+}
+
+/// Labels of the current encoding profile for Session Information.
+struct StatsLabels {
+    requested: &'static str,
+    quality: &'static str,
+    level: &'static str,
+}
 
 // ── Public session handle ───────────────────────────────────────────
 
@@ -269,6 +306,13 @@ struct FrameFlow {
     last_ack: Instant,
     request_deferred: bool,
     frames_sent: u64,
+    /// FramebufferUpdateRequests not yet answered by an update. Pixel-format
+    /// switches wait for zero (DEC-VNC-15).
+    outstanding: u32,
+    last_update_at: Instant,
+    /// Last byte-level sign of life from the server (any message).
+    last_server_at: Instant,
+    probe_sent_at: Option<Instant>,
 }
 
 impl FrameFlow {
@@ -279,6 +323,11 @@ impl FrameFlow {
             last_ack: Instant::now(),
             request_deferred: false,
             frames_sent: 0,
+            // The handshake already sent the first full request.
+            outstanding: 1,
+            last_update_at: Instant::now(),
+            last_server_at: Instant::now(),
+            probe_sent_at: None,
         }
     }
 
@@ -335,7 +384,12 @@ impl StatsWindow {
         }
     }
 
-    fn observe(&mut self, stats: RuntimeStats, frames_sent: u64) -> Option<String> {
+    fn observe(
+        &mut self,
+        stats: RuntimeStats,
+        frames_sent: u64,
+        labels: &StatsLabels,
+    ) -> Option<String> {
         if !self.initialized {
             self.initialized = true;
             self.wire_bytes = stats.wire_bytes;
@@ -366,9 +420,11 @@ impl StatsWindow {
         let updates = stats.updates.saturating_sub(self.updates);
         let frames = frames_sent.saturating_sub(self.frames);
         let message = WsOutgoingText::Stats {
-            requested_encoding: REQUESTED_ENCODING_LABEL,
+            requested_encoding: labels.requested,
             last_encoding: stats.last_encoding.map(encoding_name).unwrap_or("-"),
-            pixel_format: PIXEL_FORMAT_LABEL,
+            pixel_format: stats.pixel_format.label(),
+            quality: labels.quality,
+            quality_level: labels.level,
             wire_kbps: (stats.wire_bytes.saturating_sub(self.wire_bytes) as f32 * 8.0
                 / 1000.0
                 / seconds) as u64,
@@ -435,6 +491,69 @@ fn flush_frame(
     true
 }
 
+type SharedQuality = Arc<std::sync::Mutex<QualityController>>;
+
+fn stats_labels(quality: &SharedQuality) -> StatsLabels {
+    match quality.lock() {
+        Ok(quality) => StatsLabels {
+            requested: quality.applied().requested_label(),
+            quality: quality.preset().label(),
+            level: quality.level().label(),
+        },
+        Err(_) => StatsLabels {
+            requested: "-",
+            quality: "-",
+            level: "-",
+        },
+    }
+}
+
+/// Send the pending encoding profile: SetEncodings, SetPixelFormat when it
+/// changed, and a full update request so the new quality shows at once.
+/// Callers make sure no update is outstanding when the format changes.
+fn apply_pending_quality(
+    writer: &mut RfbWriter,
+    quality: &SharedQuality,
+    flow: &SharedFrameFlow,
+) -> Result<bool, String> {
+    let Some((profile, format_changed)) = quality
+        .lock()
+        .map_err(|_| "VNC quality lock poisoned".to_string())?
+        .take_pending()
+    else {
+        return Ok(false);
+    };
+    writer.set_encodings(&profile.encodings)?;
+    if format_changed {
+        writer.set_pixel_format(profile.pixel_format)?;
+    }
+    writer.request_update(false)?;
+    if let Ok(mut flow) = flow.lock() {
+        flow.outstanding = flow.outstanding.saturating_add(1);
+    }
+    Ok(true)
+}
+
+/// Whether the pending quality change can be sent now.
+fn quality_ready(quality: &SharedQuality, flow: &SharedFrameFlow) -> bool {
+    let Ok(quality) = quality.lock() else {
+        return false;
+    };
+    if !quality.has_pending() {
+        return false;
+    }
+    if !quality.pending_needs_sync() {
+        return true;
+    }
+    flow.lock().map(|flow| flow.outstanding == 0).unwrap_or(false)
+}
+
+fn note_request(flow: &SharedFrameFlow) {
+    if let Ok(mut flow) = flow.lock() {
+        flow.outstanding = flow.outstanding.saturating_add(1);
+    }
+}
+
 fn damage_full_framebuffer(flow: &SharedFrameFlow, framebuffer: &SharedFramebuffer) {
     let size = framebuffer
         .lock()
@@ -457,9 +576,43 @@ pub async fn spawn_vnc_relay(
     security_policy: VncSecurityPolicy,
     view_only: bool,
     clipboard_policy: VncClipboardPolicy,
+    options: VncRelayOptions,
+    attempt: CancellationToken,
+) -> Result<VncSession, String> {
+    tokio::select! {
+        result = spawn_vnc_relay_inner(
+            host,
+            port,
+            username,
+            password,
+            network,
+            security_policy,
+            view_only,
+            clipboard_policy,
+            options,
+            attempt.clone(),
+        ) => result,
+        _ = attempt.cancelled() => Err("VNC connection attempt stopped by the user".into()),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn spawn_vnc_relay_inner(
+    host: String,
+    port: u16,
+    username: Option<String>,
+    password: Option<String>,
+    network: Option<NetworkSettings>,
+    security_policy: VncSecurityPolicy,
+    view_only: bool,
+    clipboard_policy: VncClipboardPolicy,
+    options: VncRelayOptions,
+    attempt: CancellationToken,
 ) -> Result<VncSession, String> {
     let cancel = CancellationToken::new();
     let ws_token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+    let quality = QualityController::new(options.picture_quality);
+    let initial_profile = quality.applied().clone();
 
     // 1. Connect + handshake + auth. Route proxy and SSH-jump connections
     // through the shared loopback forwarder, allowing the synchronous RA2
@@ -472,10 +625,24 @@ pub async fn spawn_vnc_relay(
         &host,
         security_policy,
         VNC_AUTH_TIMEOUT,
+        options.allow_unencrypted,
     )
     .await?;
     let mut tls_guard = ForwardTaskGuard(prepared.tls_task);
-    let (rfb, writer, server_init) = tokio::task::spawn_blocking(move || {
+    // Stop closes the socket so the blocking authentication read returns
+    // instead of waiting for a slow server (VNC-SESS-003).
+    let stop_handle = prepared
+        .stream
+        .try_clone()
+        .map_err(|e| format!("clone VNC stream for stop: {e}"))?;
+    let stop_watch = {
+        let attempt = attempt.clone();
+        tokio::spawn(async move {
+            attempt.cancelled().await;
+            let _ = stop_handle.shutdown(std::net::Shutdown::Both);
+        })
+    };
+    let handshake = tokio::task::spawn_blocking(move || {
         let mut rfb = RfbConnection::from_negotiated_stream(
             prepared.stream,
             VNC_AUTH_TIMEOUT,
@@ -485,39 +652,31 @@ pub async fn spawn_vnc_relay(
             prepared.pending_security,
             prepared.outer_security_type,
         )?;
+        rfb.set_shared(options.shared);
         let server_init = rfb.authenticate_with_policy(
             username.as_deref(),
             password.as_deref(),
             security_policy,
         )?;
-        rfb.set_pixel_format_rgba()?;
-        rfb.set_encodings(&[
-            16,
-            5,
-            1,
-            0,
-            ENCODING_DESKTOP_SIZE,
-            ENCODING_POINTER_POS,
-            ENCODING_X_CURSOR,
-            ENCODING_RICH_CURSOR,
-            ENCODING_EXTENDED_CLIPBOARD,
-            ENCODING_EXTENDED_CLIPBOARD_LEGACY,
-        ])?;
+        // Encodings and pixel format come from the picture-quality profile
+        // (quality.rs): ZRLE > Hextile > Tight > CopyRect > Raw for High,
+        // Tight + JPEG first for Medium/Low. DesktopSize keeps server-driven
+        // resolution changes working; ExtendedClipboard advertises
+        // multi-format clipboard exchange.
+        rfb.set_pixel_format(initial_profile.pixel_format)?;
+        rfb.set_encodings(&initial_profile.encodings)?;
         rfb.request_update(false)?;
         rfb.enter_runtime_mode()?;
         let writer = rfb.take_writer()?;
         Ok::<_, String>((rfb, writer, server_init))
-    })
-    .await
-    .map_err(|e| format!("VNC handshake worker failed: {e}"))??;
-
-    // Encoding preference: ZRLE (bandwidth) > Hextile (tile cache) > CopyRect
-    // (scroll) > Raw (fallback). DesktopSize must be listed so server-driven
-    // resolution changes keep working. Tight is intentionally omitted — the
-    // decoder in encodings.rs is not RFC-compliant and would desync the stream.
-    // ExtendedClipboard is a pseudo-encoding advertising support for
-    // multi-format clipboard exchange (HTML/RTF/UTF-8); the server only sends
-    // extended ClientCutText when both sides have advertised it.
+    });
+    let handshake = handshake.await;
+    stop_watch.abort();
+    if attempt.is_cancelled() {
+        return Err("VNC connection attempt stopped by the user".into());
+    }
+    let (rfb, writer, server_init) =
+        handshake.map_err(|e| format!("VNC handshake worker failed: {e}"))??;
     // 2. Bind WS listener on dynamic port
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -565,6 +724,8 @@ pub async fn spawn_vnc_relay(
             shutdown_stream,
             view_only,
             clipboard_policy,
+            Arc::new(std::sync::Mutex::new(quality)),
+            options,
         )
         .await
         {
@@ -598,6 +759,8 @@ async fn run_relay(
     shutdown_stream: std::net::TcpStream,
     view_only: bool,
     clipboard_policy: VncClipboardPolicy,
+    quality: SharedQuality,
+    options: VncRelayOptions,
 ) -> Result<(), String> {
     let ws_stream = accept_authorized_ws(listener, &ws_token, &cancel).await?;
 
@@ -761,11 +924,16 @@ async fn run_relay(
     let writer_for_caps = writer.clone();
     let flow_read = flow.clone();
     let framebuffer_read = framebuffer.clone();
+    let quality_read = quality.clone();
     let mut vnc_read = tokio::spawn(async move {
         let mut published_framebuffer_size = initial_framebuffer_size;
         let mut framebuffer_generation = 0u64;
         let mut window = StatsWindow::new();
         while let Some(result) = server_message_rx.recv().await {
+            if let Ok(mut flow) = flow_read.lock() {
+                flow.last_server_at = Instant::now();
+                flow.probe_sent_at = None;
+            }
             let (msg, fb_width, fb_height, stats) = match result {
                 Ok(value) => value,
                 Err(message) => {
@@ -806,9 +974,17 @@ async fn run_relay(
                         .unwrap();
                         let _ = ws_out.send_critical_control(json);
                     }
+                    if let Ok(mut quality) = quality_read.lock() {
+                        quality.observe_update(
+                            stats.last_update_pixel_rects > 0,
+                            stats.last_update_tight_rects > 0,
+                        );
+                    }
                     let request_now = {
                         match flow_read.lock() {
                             Ok(mut flow) => {
+                                flow.outstanding = flow.outstanding.saturating_sub(1);
+                                flow.last_update_at = Instant::now();
                                 for rect in rects {
                                     flow.damage.add(rect);
                                 }
@@ -822,10 +998,29 @@ async fn run_relay(
                     {
                         let mut writer = rfb_writer_for_read.lock().await;
                         writer.set_framebuffer_size(fb_width, fb_height);
-                        // Pipeline the next incremental request immediately so
-                        // server encoding overlaps relay and WebView painting.
-                        if request_now {
-                            let _ = writer.request_update(true);
+                        let pending_quality = quality_read
+                            .lock()
+                            .map(|quality| quality.has_pending())
+                            .unwrap_or(false);
+                        if pending_quality && quality_ready(&quality_read, &flow_read) {
+                            // The switch includes its own full update request.
+                            if let Err(error) =
+                                apply_pending_quality(&mut writer, &quality_read, &flow_read)
+                            {
+                                tracing::warn!(%error, "VNC picture quality switch failed");
+                            }
+                        } else if request_now && !pending_quality {
+                            // Pipeline the next incremental request immediately so
+                            // server encoding overlaps relay and WebView painting.
+                            if writer.request_update(true).is_ok() {
+                                note_request(&flow_read);
+                            }
+                        } else if request_now {
+                            // A pixel-format switch waits for the outstanding
+                            // update; no new request until it has been sent.
+                            if let Ok(mut flow) = flow_read.lock() {
+                                flow.request_deferred = false;
+                            }
                         }
                     }
                     if let Some(cursor) = cursor {
@@ -848,7 +1043,11 @@ async fn run_relay(
                     }
                     flush_frame(&flow_read, &framebuffer_read, &ws_out);
                     let frames_sent = flow_read.lock().map(|flow| flow.frames_sent).unwrap_or(0);
-                    if let Some(json) = window.observe(stats, frames_sent) {
+                    let labels = stats_labels(&quality_read);
+                    if let Some(json) = window.observe(stats, frames_sent, &labels) {
+                        if let Ok(mut quality) = quality_read.lock() {
+                            quality.observe_line_speed(window.line_kbps);
+                        }
                         let _ = ws_out.send_control(json);
                     }
                 }
@@ -892,6 +1091,7 @@ async fn run_relay(
     let flow_ctrl = flow.clone();
     let framebuffer_ctrl = framebuffer.clone();
     let ws_out_ctrl = ws_out_tx.clone();
+    let quality_ctrl = quality.clone();
     let mut vnc_ctrl = tokio::spawn(async move {
         let mut deferred_ctrl: Option<VncControl> = None;
         let mut last_pointer_buttons = 0u8;
@@ -933,7 +1133,16 @@ async fn run_relay(
                     };
                     flush_frame(&flow_ctrl, &framebuffer_ctrl, &ws_out_ctrl);
                     if deferred {
-                        rfb_ctrl.lock().await.request_update(true)
+                        let mut writer = rfb_ctrl.lock().await;
+                        if quality_ready(&quality_ctrl, &flow_ctrl) {
+                            apply_pending_quality(&mut writer, &quality_ctrl, &flow_ctrl).map(|_| ())
+                        } else {
+                            let result = writer.request_update(true);
+                            if result.is_ok() {
+                                note_request(&flow_ctrl);
+                            }
+                            result
+                        }
                     } else {
                         Ok(())
                     }
@@ -1024,7 +1233,22 @@ async fn run_relay(
                     }
                     damage_full_framebuffer(&flow_ctrl, &framebuffer_ctrl);
                     flush_frame(&flow_ctrl, &framebuffer_ctrl, &ws_out_ctrl);
-                    rfb_ctrl.lock().await.request_update(false)
+                    let result = rfb_ctrl.lock().await.request_update(false);
+                    if result.is_ok() {
+                        note_request(&flow_ctrl);
+                    }
+                    result
+                }
+                VncControl::SetQuality(preset) => {
+                    if let Ok(mut quality) = quality_ctrl.lock() {
+                        quality.set_preset(preset);
+                    }
+                    if quality_ready(&quality_ctrl, &flow_ctrl) {
+                        let mut writer = rfb_ctrl.lock().await;
+                        apply_pending_quality(&mut writer, &quality_ctrl, &flow_ctrl).map(|_| ())
+                    } else {
+                        Ok(())
+                    }
                 }
                 VncControl::Disconnect => {
                     cl_cancel.cancel();
@@ -1033,6 +1257,71 @@ async fn run_relay(
             };
             if let Err(e) = result {
                 tracing::error!("VNC control error: {}", e);
+            }
+        }
+    });
+
+    // Task: relay tick — force an overdue pixel-format switch (the server
+    // merged our requests) and run the KeepAlive probe (VNC-SESS-003).
+    let tick_flow = flow.clone();
+    let tick_quality = quality.clone();
+    let tick_writer = writer.clone();
+    let tick_out = ws_out_tx.clone();
+    let tick_cancel = cancel.clone();
+    let mut relay_tick = tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(RELAY_TICK);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            tokio::select! {
+                _ = ticker.tick() => {}
+                _ = tick_cancel.cancelled() => break,
+            }
+            let (last_update, last_server, probe_sent) = match tick_flow.lock() {
+                Ok(flow) => (flow.last_update_at, flow.last_server_at, flow.probe_sent_at),
+                Err(_) => break,
+            };
+            let overdue = tick_quality
+                .lock()
+                .map(|quality| quality.pending_overdue(last_update))
+                .unwrap_or(false);
+            if overdue {
+                if let Ok(mut flow) = tick_flow.lock() {
+                    flow.outstanding = 0;
+                }
+                let mut writer = tick_writer.lock().await;
+                if let Err(error) = apply_pending_quality(&mut writer, &tick_quality, &tick_flow) {
+                    tracing::warn!(%error, "VNC picture quality switch failed");
+                }
+            }
+            match probe_sent {
+                Some(sent) if sent.elapsed() >= options.keepalive_timeout => {
+                    let error = crate::vnc::error::VncError::classify(format!(
+                        "VNC keepalive: no response from the server for {} s",
+                        (last_server.elapsed().as_secs())
+                    ));
+                    let json = serde_json::to_string(&WsOutgoingText::Disconnected {
+                        code: error.code,
+                        stage: error.stage,
+                        retryable: error.retryable,
+                        reason: error.message,
+                    })
+                    .unwrap();
+                    let _ = tick_out.send_critical_control(json);
+                    // Give the writer a moment to deliver the reason.
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    tick_cancel.cancel();
+                    break;
+                }
+                None if last_server.elapsed() >= options.keepalive_interval => {
+                    let sent = tick_writer.lock().await.request_probe();
+                    if sent.is_ok() {
+                        if let Ok(mut flow) = tick_flow.lock() {
+                            flow.outstanding = flow.outstanding.saturating_add(1);
+                            flow.probe_sent_at = Some(Instant::now());
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     });
@@ -1082,6 +1371,9 @@ async fn run_relay(
         r = &mut idle_watch => {
             if let Err(e) = r { tracing::error!("idle_watch: {}", e); }
         }
+        r = &mut relay_tick => {
+            if let Err(e) = r { tracing::error!("relay_tick: {}", e); }
+        }
     }
 
     cancel.cancel();
@@ -1093,6 +1385,7 @@ async fn run_relay(
     vnc_read.abort();
     vnc_ctrl.abort();
     idle_watch.abort();
+    relay_tick.abort();
     Ok(())
 }
 
@@ -1285,6 +1578,7 @@ fn parse_binary_control(bytes: &[u8]) -> Option<VncControl> {
             Some(VncControl::Pointer { x, y, buttons })
         }
         4 if bytes.len() == 1 => Some(VncControl::Refresh),
+        5 if bytes.len() == 2 => VncPictureQuality::from_wire(bytes[1]).map(VncControl::SetQuality),
         _ => None,
     }
 }
@@ -1355,7 +1649,10 @@ fn control_allowed(
                 })
                 .is_some_and(|total| total <= limits.max_clipboard_decompressed_bytes)
         }
-        VncControl::Refresh | VncControl::Ack | VncControl::Disconnect => true,
+        VncControl::Refresh
+        | VncControl::Ack
+        | VncControl::SetQuality(_)
+        | VncControl::Disconnect => true,
     }
 }
 
@@ -1437,6 +1734,7 @@ async fn accept_authorized_ws(
 
 #[cfg(test)]
 mod tests {
+    use crate::vnc::encodings::ENCODING_DESKTOP_SIZE;
     use super::*;
     use tokio::sync::oneshot;
     use tokio_tungstenite::connect_async;
@@ -1610,6 +1908,11 @@ mod tests {
     #[test]
     fn stats_window_merges_back_to_back_updates_into_one_line_speed_sample() {
         let mut window = StatsWindow::new();
+        let labels = StatsLabels {
+            requested: "ZRLE",
+            quality: "automatic",
+            level: "high",
+        };
         let t0 = Instant::now();
         let update = |start_ms: u64, end_ms: u64, bytes: u64, updates: u64| RuntimeStats {
             wire_bytes: 0,
@@ -1619,16 +1922,17 @@ mod tests {
             last_update_micros: (end_ms - start_ms) * 1000,
             last_update_started_at: Some(t0 + Duration::from_millis(start_ms)),
             last_update_finished_at: Some(t0 + Duration::from_millis(end_ms)),
+            ..RuntimeStats::default()
         };
         // Two halves of one 1 MB transfer 10 ms apart, then a later small update.
-        window.observe(update(0, 40, 500_000, 1), 1);
-        window.observe(update(50, 100, 500_000, 2), 1);
+        window.observe(update(0, 40, 500_000, 1), 1, &labels);
+        window.observe(update(50, 100, 500_000, 2), 1, &labels);
         assert!(window.line_kbps.is_none(), "burst still open");
-        window.observe(update(600, 601, 1_000, 3), 2);
+        window.observe(update(600, 601, 1_000, 3), 2, &labels);
         // 1_000_000 bytes over 100 ms = 80_000 kbit/s.
         assert_eq!(window.line_kbps, Some(80_000));
         // A lone small transfer never produces a sample.
-        window.observe(update(2_000, 2_001, 1_000, 4), 3);
+        window.observe(update(2_000, 2_001, 1_000, 4), 3, &labels);
         assert_eq!(window.line_kbps, Some(80_000));
     }
 
@@ -1815,6 +2119,8 @@ mod tests {
             VncSecurityPolicy::AllowNone,
             false,
             VncClipboardPolicy::Disabled,
+            VncRelayOptions::default(),
+            CancellationToken::new(),
         )
         .await
         .unwrap();

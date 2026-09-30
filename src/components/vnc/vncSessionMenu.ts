@@ -1,5 +1,6 @@
 import type { MenuItem } from "../ContextMenu";
 import { VNC_SCALE_PERCENTAGES, type VncScaling } from "../../lib/vnc";
+import type { VncPictureQuality } from "../../lib/vncOptions";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
@@ -11,6 +12,9 @@ export interface VncSessionMenuState {
   altLatched: boolean;
   scaling: VncScaling;
   preserveAspect: boolean;
+  pictureQuality: VncPictureQuality;
+  /** Client-to-server clipboard allowed (Send clipboard as keystrokes). */
+  clipboardToServer: boolean;
 }
 
 export interface VncSessionMenuActions {
@@ -23,6 +27,9 @@ export interface VncSessionMenuActions {
   togglePreserveAspect: () => void;
   refreshScreen: () => void;
   showSessionInfo: () => void;
+  showProperties: () => void;
+  setPictureQuality: (quality: VncPictureQuality) => void;
+  sendClipboardAsKeys: () => void;
   closeConnection: () => void;
 }
 
@@ -43,6 +50,12 @@ export function buildVncSessionMenuItems(
     testId,
     checked: state.scaling === value,
     onClick: () => actions.setScaling(value),
+  });
+  const qualityItem = (value: VncPictureQuality, label: string): MenuItem => ({
+    label,
+    testId: `vnc-quality-${value}`,
+    checked: state.pictureQuality === value,
+    onClick: () => actions.setPictureQuality(value),
   });
   return [
     {
@@ -71,6 +84,12 @@ export function buildVncSessionMenuItems(
       testId: "vnc-menu-send-cad",
       disabled: inputDisabled,
       onClick: actions.sendCtrlAltDel,
+    },
+    {
+      label: t("vnc.sendClipboardAsKeys"),
+      testId: "vnc-menu-send-clipboard-keys",
+      disabled: inputDisabled || !state.clipboardToServer,
+      onClick: actions.sendClipboardAsKeys,
     },
     {
       label: t("vnc.ctrlKey"),
@@ -114,6 +133,16 @@ export function buildVncSessionMenuItems(
       ],
     },
     {
+      label: t("vnc.pictureQuality"),
+      testId: "vnc-menu-quality",
+      children: [
+        qualityItem("automatic", t("vnc.qualityAutomatic")),
+        qualityItem("high", t("vnc.qualityHigh")),
+        qualityItem("medium", t("vnc.qualityMedium")),
+        qualityItem("low", t("vnc.qualityLow")),
+      ],
+    },
+    {
       label: t("vnc.refreshScreen"),
       testId: "vnc-menu-refresh",
       onClick: actions.refreshScreen,
@@ -123,6 +152,11 @@ export function buildVncSessionMenuItems(
       label: t("vnc.sessionInfo"),
       testId: "vnc-menu-info",
       onClick: actions.showSessionInfo,
+    },
+    {
+      label: t("vnc.properties"),
+      testId: "vnc-menu-properties",
+      onClick: actions.showProperties,
     },
   ];
 }

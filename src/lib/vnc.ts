@@ -75,7 +75,9 @@ export type VncSecurityPolicy =
   | "require-encryption"
   | "prefer-encryption"
   | "legacy-compatible"
-  | "allow-none";
+  | "allow-none"
+  /** RealVNC "Prefer off": unencrypted VNCAuth when offered. */
+  | "prefer-off";
 
 export type VncClipboardPolicy =
   | "disabled"
@@ -92,6 +94,16 @@ export interface VncConnectResult {
   name: string;
 }
 
+/** Connection-time viewer options (VNC-CONN-001 / VNC-SESS-003). */
+export interface VncConnectExtras {
+  pictureQuality?: "automatic" | "high" | "medium" | "low";
+  shared?: boolean;
+  /** False asks the backend to stop before authenticating over an unencrypted link. */
+  allowUnencrypted?: boolean;
+  /** Lets `vncCancelConnect` stop this attempt. */
+  attemptId?: string;
+}
+
 export async function vncConnect(
   host: string,
   port: number,
@@ -101,6 +113,7 @@ export async function vncConnect(
   securityPolicy: VncSecurityPolicy = "prefer-encryption",
   viewOnly = false,
   clipboardPolicy: VncClipboardPolicy = "bidirectional",
+  extras: VncConnectExtras = {},
 ): Promise<VncConnectResult> {
   return invoke<VncConnectResult>("vnc_connect", {
     host,
@@ -111,7 +124,16 @@ export async function vncConnect(
     securityPolicy,
     viewOnly,
     clipboardPolicy,
+    pictureQuality: extras.pictureQuality ?? null,
+    shared: extras.shared ?? null,
+    allowUnencrypted: extras.allowUnencrypted ?? null,
+    attemptId: extras.attemptId ?? null,
   });
+}
+
+/** Stop an in-flight `vncConnect` started with `attemptId`. */
+export async function vncCancelConnect(attemptId: string): Promise<boolean> {
+  return invoke<boolean>("vnc_cancel_connect", { attemptId });
 }
 
 export interface VncDetachClaim {
@@ -123,6 +145,8 @@ export interface VncDetachClaim {
   security_policy: VncSecurityPolicy;
   view_only: boolean;
   clipboard_policy: VncClipboardPolicy;
+  /** Serialized viewer options (vncOptions.ts); absent in older claims. */
+  viewer_options_json?: string | null;
 }
 
 export async function vncCreateDetachClaim(claim: VncDetachClaim): Promise<string> {
@@ -234,12 +258,18 @@ export interface VncSessionStats {
   updates_per_sec: number;
   frames_per_sec: number;
   update_ms: number;
+  /** Picture quality preset and the tier it currently resolves to. */
+  quality?: string;
+  quality_level?: string;
 }
 
 function validStats(msg: Record<string, unknown>): boolean {
   const shortText = (value: unknown) => typeof value === "string" && value.length <= 128;
+  const optionalText = (value: unknown) => value === undefined || shortText(value);
   const finite = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0;
   return shortText(msg.requested_encoding)
+    && optionalText(msg.quality)
+    && optionalText(msg.quality_level)
     && shortText(msg.last_encoding)
     && shortText(msg.pixel_format)
     && finite(msg.wire_kbps)
@@ -371,6 +401,11 @@ export function encodeWsPointer(x: number, y: number, buttons: number): ArrayBuf
 
 export function encodeWsRefresh(): ArrayBuffer {
   return new Uint8Array([4]).buffer;
+}
+
+/** Picture quality control: 0 automatic, 1 high, 2 medium, 3 low. */
+export function encodeWsQuality(quality: number): ArrayBuffer {
+  return new Uint8Array([5, quality & 0xff]).buffer;
 }
 
 /** Parse a binary frame header: [x(2B), y(2B), w(2B), h(2B)] — all big-endian. */

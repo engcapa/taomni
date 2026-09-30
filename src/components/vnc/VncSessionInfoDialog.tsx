@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import type { VncSessionStats } from "../../lib/vnc";
+import type { VncPaintStats } from "../../lib/vncFramePainter";
 import { useT } from "../../lib/i18n";
 import { useFocusReturn } from "../editor/workspace/useFocusReturn";
 
@@ -14,6 +15,8 @@ export interface VncSessionInfo {
   encrypted: boolean;
   proxied: boolean;
   stats: VncSessionStats | null;
+  /** WebView main-thread paint cost (VNC-PERF-003). */
+  paint?: VncPaintStats | null;
 }
 
 function formatKbps(value: number | null | undefined): string {
@@ -35,11 +38,34 @@ export function VncSessionInfoDialog({ info, onClose }: { info: VncSessionInfo; 
   }, []);
 
   const stats = info.stats;
+  const qualityLabel = (value: string) => {
+    switch (value) {
+      case "automatic":
+        return t("vnc.qualityAutomatic");
+      case "high":
+        return t("vnc.qualityHigh");
+      case "medium":
+        return t("vnc.qualityMedium");
+      case "low":
+        return t("vnc.qualityLow");
+      default:
+        return value;
+    }
+  };
   const rows: Array<[string, string]> = [
     [t("vnc.infoDesktopName"), info.desktopName || "-"],
     [t("vnc.infoDevice"), info.device],
     [t("vnc.infoSize"), info.width && info.height ? `${info.width} x ${info.height}` : "-"],
     [t("vnc.infoPixelFormat"), stats?.pixel_format ?? t("vnc.infoCollecting")],
+    [
+      t("vnc.infoQuality"),
+      stats?.quality
+        ? t("vnc.infoQualityValue", {
+          preset: qualityLabel(stats.quality),
+          level: qualityLabel(stats.quality_level ?? stats.quality),
+        })
+        : t("vnc.infoCollecting"),
+    ],
     [t("vnc.infoRequestedEncoding"), stats?.requested_encoding ?? t("vnc.infoCollecting")],
     [t("vnc.infoLastEncoding"), stats?.last_encoding ?? t("vnc.infoCollecting")],
     [
@@ -56,6 +82,17 @@ export function VncSessionInfoDialog({ info, onClose }: { info: VncSessionInfo; 
         : t("vnc.infoCollecting"),
     ],
     [t("vnc.infoDecode"), stats ? `${stats.update_ms.toFixed(1)} ms` : t("vnc.infoCollecting")],
+    [
+      t("vnc.infoPaint"),
+      info.paint
+        ? t("vnc.infoPaintValue", {
+          avg: info.paint.avgPaintMs.toFixed(1),
+          full: info.paint.fullFrame
+            ? (info.paint.fullFrame.receiveMs + info.paint.fullFrame.paintMs).toFixed(1)
+            : "-",
+        })
+        : t("vnc.infoCollecting"),
+    ],
     [t("vnc.infoProtocol"), info.protocol || "-"],
     [
       t("vnc.infoSecurity"),

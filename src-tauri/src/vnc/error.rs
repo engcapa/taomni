@@ -34,7 +34,14 @@ impl VncError {
             message.push_str("...");
         }
         let lower = message.to_ascii_lowercase();
-        let (code, stage, retryable) = if lower.contains("dns") {
+        let (code, stage, retryable) = if lower.contains("unencrypted connection requires confirmation")
+        {
+            ("unencrypted-confirmation-required", VncStage::Security, false)
+        } else if lower.contains("attempt stopped by the user") {
+            ("connection-stopped", VncStage::Runtime, false)
+        } else if lower.contains("keepalive") {
+            ("keepalive-timeout", VncStage::Runtime, true)
+        } else if lower.contains("dns") {
             ("dns-failed", VncStage::Dns, true)
         } else if lower.contains("proxy") || lower.contains("jump host") {
             ("network-route-failed", VncStage::Proxy, true)
@@ -113,6 +120,22 @@ mod tests {
         );
         assert!(VncError::classify("read failed: unexpected EOF").retryable);
         assert!(!VncError::classify("server rejected connection: authentication failed").retryable);
+    }
+
+    #[test]
+    fn lifecycle_codes_are_distinct() {
+        let warn = VncError::classify(
+            "unencrypted connection requires confirmation: the server offers no encrypted security type",
+        );
+        assert_eq!(warn.code, "unencrypted-confirmation-required");
+        assert!(!warn.retryable);
+        assert_eq!(
+            VncError::classify("VNC connection attempt stopped by the user").code,
+            "connection-stopped"
+        );
+        let keepalive = VncError::classify("VNC keepalive: no response from the server for 60 s");
+        assert_eq!(keepalive.code, "keepalive-timeout");
+        assert!(keepalive.retryable);
     }
 
     #[test]

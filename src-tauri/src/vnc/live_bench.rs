@@ -103,14 +103,30 @@ fn profile_encodings(profile: &str) -> Option<Vec<i32>> {
         ENCODING_POINTER_POS,
         ENCODING_RICH_CURSOR,
     ];
-    let base: Vec<i32> = match profile {
+    let base: Vec<i32> = match profile.split_once('+').map_or(profile, |(name, _)| name) {
         "production" => vec![16, 5, 1, 0],
         "zrle" => vec![16, 1, 0],
         "hextile" => vec![5, 1, 0],
         "raw" => vec![0],
+        // VNC-PERF-004 Picture quality tiers (quality.rs).
+        "tight" => vec![7, 16, 5, 1, 0],
+        "tight-medium" => vec![7, 16, 5, 1, 0, -32 + 6, -256 + 6],
+        "tight-low" => vec![7, 16, 5, 1, 0, -32 + 2, -256 + 9],
         _ => return None,
     };
     Some(base.into_iter().chain(pseudo).collect())
+}
+
+/// `<encodings>+rgb222` / `+rgb111` / `+rgb565` request a reduced colour
+/// level (the non-Tight Medium/Low fallback); plain profiles use rgb888.
+fn profile_pixel_format(profile: &str) -> crate::vnc::pixel::PixelFormat {
+    use crate::vnc::pixel::PixelFormat;
+    match profile.split_once('+').map(|(_, colour)| colour) {
+        Some("rgb222") => PixelFormat::RGB222,
+        Some("rgb111") => PixelFormat::RGB111,
+        Some("rgb565") => PixelFormat::RGB565,
+        _ => PixelFormat::RGB888,
+    }
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -212,7 +228,7 @@ fn live_full_frame_benchmark() {
             .expect("authenticate");
         let handshake_ms = connect_started.elapsed().as_secs_f64() * 1000.0;
         rfb.enter_runtime_mode().unwrap();
-        rfb.set_pixel_format_rgba().unwrap();
+        rfb.set_pixel_format(profile_pixel_format(profile)).unwrap();
         rfb.set_encodings(&encodings).unwrap();
         proxy.recording.store(true, Ordering::Release);
         rfb.request_update(false).unwrap();
@@ -292,7 +308,13 @@ fn start_replay_server(width: u16, height: u16, frame: Arc<Vec<u8>>) -> u16 {
     port
 }
 
-fn replay_once(width: u16, height: u16, frame: Arc<Vec<u8>>, encodings: &[i32]) -> FrameStats {
+fn replay_once(
+    width: u16,
+    height: u16,
+    frame: Arc<Vec<u8>>,
+    encodings: &[i32],
+    pixel_format: crate::vnc::pixel::PixelFormat,
+) -> FrameStats {
     let port = start_replay_server(width, height, frame);
     let stream = TcpStream::connect(("127.0.0.1", port)).expect("connect replay");
     let mut rfb = RfbConnection::from_stream(
@@ -305,7 +327,7 @@ fn replay_once(width: u16, height: u16, frame: Arc<Vec<u8>>, encodings: &[i32]) 
     rfb.authenticate_with_policy(None, None, VncSecurityPolicy::AllowNone)
         .expect("replay auth");
     rfb.enter_runtime_mode().unwrap();
-    rfb.set_pixel_format_rgba().unwrap();
+    rfb.set_pixel_format(pixel_format).unwrap();
     rfb.set_encodings(encodings).unwrap();
     rfb.request_update(false).unwrap();
     read_until_update(&mut rfb, None)
@@ -345,7 +367,9 @@ fn replay_decode_benchmark() {
         };
         let frame = Arc::new(std::fs::read(&path).expect("read capture"));
         let mut samples: Vec<FrameStats> = (0..rounds)
-            .map(|_| replay_once(width, height, frame.clone(), &encodings))
+            .map(|_| {
+                replay_once(width, height, frame.clone(), &encodings, profile_pixel_format(profile))
+            })
             .collect();
         samples.sort_by(|a, b| a.wall_ms.total_cmp(&b.wall_ms));
         let median = samples[samples.len() / 2];
@@ -365,4 +389,107 @@ fn replay_decode_benchmark() {
             },
         );
     }
+}
+
+/// In-memory ZRLE breakdown for VNC-PERF-003: total decode of the recorded
+/// full-screen update versus inflate alone (fresh stream, same bodies).
+#[test]
+#[ignore = "requires TAOMNI_VNC_CAPTURE_DIR with a zrle-WxH.rfb capture"]
+fn replay_zrle_breakdown() {
+    use crate::vnc::encodings::{ZrleDecoder, decode_zrle_into};
+    use crate::vnc::pixel::PixelConverter;
+    let Some(dir) = capture_dir() else {
+        eprintln!("TAOMNI_VNC_CAPTURE_DIR unset; skipping");
+        return;
+    };
+    let Some(path) = std::fs::read_dir(&dir)
+        .expect("read capture dir")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.file_name().is_some_and(|name| name.to_string_lossy().starts_with("zrle-")))
+    else {
+        eprintln!("no zrle capture; skipping");
+        return;
+    };
+    let frame = std::fs::read(&path).expect("read capture");
+    // FramebufferUpdate: type, pad, count, then rect headers + ZRLE bodies.
+    let count = u16::from_be_bytes([frame[2], frame[3]]) as usize;
+    let mut rects = Vec::new();
+    let mut pos = 4usize;
+    for _ in 0..count {
+        let field = |at: usize| u16::from_be_bytes([frame[at], frame[at + 1]]);
+        let (w, h) = (field(pos + 4), field(pos + 6));
+        let encoding = i32::from_be_bytes(frame[pos + 8..pos + 12].try_into().unwrap());
+        pos += 12;
+        if encoding != 16 {
+            continue;
+        }
+        let len = u32::from_be_bytes(frame[pos..pos + 4].try_into().unwrap()) as usize;
+        rects.push((w, h, pos, len));
+        pos += 4 + len;
+    }
+    let rounds: usize = std::env::var("TAOMNI_VNC_ROUNDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10);
+    let limits = DecodeLimits::default();
+    let conv = PixelConverter::default();
+    let mut totals = Vec::new();
+    let mut inflates = Vec::new();
+    let mut rs_inflates = Vec::new();
+    let mut inflated_bytes = 0usize;
+    for _ in 0..rounds {
+        let mut dec = ZrleDecoder::new();
+        let started = Instant::now();
+        for &(w, h, at, len) in &rects {
+            let mut out = vec![0u8; usize::from(w) * usize::from(h) * 4];
+            let mut cursor = std::io::Cursor::new(&frame[at..at + 4 + len]);
+            decode_zrle_into(&mut cursor, w, h, &mut dec, &limits, &conv, &mut out).unwrap();
+        }
+        totals.push(started.elapsed().as_secs_f64() * 1000.0);
+
+        let mut inflater = flate2::Decompress::new(true);
+        let mut sink = vec![0u8; 64 * 1024 * 1024];
+        let started = Instant::now();
+        let mut produced = 0usize;
+        for &(_, _, at, len) in &rects {
+            let body = &frame[at + 4..at + 4 + len];
+            let before_in = inflater.total_in();
+            let before_out = inflater.total_out();
+            inflater
+                .decompress(body, &mut sink[produced..], flate2::FlushDecompress::Sync)
+                .unwrap();
+            assert_eq!((inflater.total_in() - before_in) as usize, len);
+            produced += (inflater.total_out() - before_out) as usize;
+        }
+        inflates.push(started.elapsed().as_secs_f64() * 1000.0);
+
+        let mut inflater = zlib_rs::Inflate::new(true, 15);
+        let started = Instant::now();
+        let mut produced = 0usize;
+        for &(_, _, at, len) in &rects {
+            let body = &frame[at + 4..at + 4 + len];
+            let before_in = inflater.total_in();
+            let before_out = inflater.total_out();
+            inflater
+                .decompress(body, &mut sink[produced..], zlib_rs::InflateFlush::SyncFlush)
+                .unwrap();
+            assert_eq!((inflater.total_in() - before_in) as usize, len);
+            produced += (inflater.total_out() - before_out) as usize;
+        }
+        rs_inflates.push(started.elapsed().as_secs_f64() * 1000.0);
+        inflated_bytes = produced;
+    }
+    totals.sort_by(f64::total_cmp);
+    inflates.sort_by(f64::total_cmp);
+    rs_inflates.sort_by(f64::total_cmp);
+    println!(
+        "VNC-ZRLE-BREAKDOWN rects={} inflated_kib={} total_median_ms={:.2} flate2_inflate_median_ms={:.2} zlib_rs_inflate_median_ms={:.2} build={}",
+        rects.len(),
+        inflated_bytes / 1024,
+        totals[totals.len() / 2],
+        inflates[inflates.len() / 2],
+        rs_inflates[rs_inflates.len() / 2],
+        if cfg!(debug_assertions) { "debug" } else { "release" },
+    );
 }

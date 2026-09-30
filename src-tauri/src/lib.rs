@@ -794,6 +794,8 @@ pub fn run() {
             vnc::vnc_test_connection,
             vnc::vnc_create_detach_claim,
             vnc::vnc_consume_detach_claim,
+            vnc::vnc_cancel_connect,
+            vnc::keyboard_hook::vnc_set_special_key_capture,
             rdp::rdp_connect,
             rdp::rdp_disconnect,
             rdp::rdp_test_connection,

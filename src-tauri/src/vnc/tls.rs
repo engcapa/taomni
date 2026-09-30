@@ -23,19 +23,32 @@ pub(crate) async fn prepare_rfb_transport(
     host: &str,
     policy: VncSecurityPolicy,
     timeout: Duration,
+    allow_unencrypted: bool,
 ) -> Result<PreparedRfbTransport, String> {
     socket
         .set_nodelay(true)
         .map_err(|e| format!("configure VNC upstream TCP_NODELAY: {e}"))?;
-    tokio::time::timeout(timeout, negotiate_outer_security(socket, host, policy))
-        .await
-        .map_err(|_| "VNC security negotiation timed out".to_string())?
+    tokio::time::timeout(
+        timeout,
+        negotiate_outer_security(socket, host, policy, allow_unencrypted),
+    )
+    .await
+    .map_err(|_| "VNC security negotiation timed out".to_string())?
 }
+
+/// Security types whose session data travels in the clear.
+fn unencrypted_security_type(sec_type: u8) -> bool {
+    matches!(sec_type, 1 | 2 | 6 | 130)
+}
+
+const UNENCRYPTED_CONFIRMATION: &str =
+    "unencrypted connection requires confirmation: the server offers no encrypted security type";
 
 async fn negotiate_outer_security(
     mut socket: TcpStream,
     host: &str,
     policy: VncSecurityPolicy,
+    allow_unencrypted: bool,
 ) -> Result<PreparedRfbTransport, String> {
     let mut banner = [0u8; 12];
     socket
@@ -63,6 +76,9 @@ async fn negotiate_outer_security(
         let chosen = policy.choose_outer(&[sec_type as u8]).map_err(|e| e.0)?;
         if chosen == SEC_TYPE_ANONYMOUS_TLS {
             return Err("RFB 3.3 anonymous TLS negotiation is not supported".into());
+        }
+        if !allow_unencrypted && unencrypted_security_type(chosen) {
+            return Err(UNENCRYPTED_CONFIRMATION.into());
         }
         return plain_transport(socket, proto_minor, Some(PendingSecurity::V33(sec_type)));
     }
@@ -97,6 +113,11 @@ async fn negotiate_outer_security(
         .await
         .map_err(|e| format!("read security types: {e}"))?;
     let chosen = policy.choose_outer(&types).map_err(|e| e.0)?;
+    // RealVNC warns before any credential is exchanged; stop here so the
+    // viewer can ask (VNC-SESS-003, DEC-VNC-19).
+    if !allow_unencrypted && unencrypted_security_type(chosen) {
+        return Err(UNENCRYPTED_CONFIRMATION.into());
+    }
     socket
         .write_u8(chosen)
         .await
@@ -273,6 +294,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn unencrypted_security_stops_before_the_choice_when_not_confirmed() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            stream.write_all(b"RFB 003.008
+").await.unwrap();
+            let mut banner = [0u8; 12];
+            stream.read_exact(&mut banner).await.unwrap();
+            stream.write_all(&[1, 2]).await.unwrap();
+            // The client must close without choosing a security type.
+            let mut rest = Vec::new();
+            let _ = stream.read_to_end(&mut rest).await;
+            rest
+        });
+        let socket = TcpStream::connect(address).await.unwrap();
+        let error = match prepare_rfb_transport(
+            socket,
+            "127.0.0.1",
+            VncSecurityPolicy::PreferEncryption,
+            Duration::from_secs(5),
+            false,
+        )
+        .await
+        {
+            Ok(_) => panic!("unencrypted VNCAuth must need confirmation"),
+            Err(error) => error,
+        };
+        assert!(error.contains("requires confirmation"), "{error}");
+        assert!(server.await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
     async fn delayed_plain_vncauth_succeeds_with_authentication_timeout() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
@@ -306,6 +360,7 @@ mod tests {
             "127.0.0.1",
             VncSecurityPolicy::LegacyCompatible,
             Duration::from_secs(1),
+            true,
         )
         .await
         .unwrap();
@@ -363,6 +418,7 @@ mod tests {
             "127.0.0.1",
             VncSecurityPolicy::PreferEncryption,
             Duration::from_secs(5),
+            true,
         )
         .await
         .unwrap();
@@ -411,6 +467,7 @@ mod tests {
             &host,
             VncSecurityPolicy::PreferEncryption,
             Duration::from_secs(45),
+            true,
         )
         .await
         .unwrap();

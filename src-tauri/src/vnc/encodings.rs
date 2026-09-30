@@ -1,7 +1,8 @@
-use flate2::{Decompress, FlushDecompress};
+use zlib_rs::{Inflate, InflateFlush};
 use std::io::Read;
 
 use crate::vnc::limits::DecodeLimits;
+use crate::vnc::pixel::PixelConverter;
 
 // Pixel decoders write straight into a caller-owned, tightly packed RGBA
 // scratch block of `w*h*4` bytes (stride `w*4`). The RFB connection then blits
@@ -60,6 +61,29 @@ fn check_scratch(out: &[u8], w: u16, h: u16) -> Result<(), String> {
     Ok(())
 }
 
+/// Expand packed `R, G, B` pixels (ZRLE CPIXEL / Tight TPIXEL) into opaque
+/// RGBA. Every pixel but possibly the last is loaded as one little-endian
+/// `u32` that overlaps the next pixel's first byte, which keeps the loop to a
+/// load, an OR and a store per pixel (VNC-PERF-003).
+#[inline]
+pub(crate) fn rgb_to_rgba(src: &[u8], dst: &mut [u8]) {
+    let pixels = dst.len() / 4;
+    debug_assert!(src.len() >= pixels * 3);
+    let mut written = 0usize;
+    for (out, window) in dst
+        .chunks_exact_mut(4)
+        .zip(src.windows(4).step_by(3))
+    {
+        let value = u32::from_le_bytes([window[0], window[1], window[2], window[3]]) | 0xFF00_0000;
+        out.copy_from_slice(&value.to_le_bytes());
+        written += 1;
+    }
+    for index in written..pixels {
+        let s = index * 3;
+        dst[index * 4..index * 4 + 4].copy_from_slice(&[src[s], src[s + 1], src[s + 2], 255]);
+    }
+}
+
 /// Fill a sub-rectangle of a packed RGBA block with one colour.
 fn fill_block(
     out: &mut [u8],
@@ -80,16 +104,29 @@ fn fill_block(
 
 // ── Raw encoding (type 0) ──────────────────────────────────────────
 
-/// Read a Raw-encoded rectangle: `w*h` PIXEL units of 4 bytes each (per the
-/// RGBA32 pixel format we negotiate). Alpha is forced to 0xFF because many
-/// servers leave it at 0.
-pub fn decode_raw_into<R: Read>(r: &mut R, w: u16, h: u16, out: &mut [u8]) -> Result<(), String> {
+/// Read a Raw-encoded rectangle: `w*h` PIXELs of the negotiated format. The
+/// default RGBA32 format is read in place; alpha is forced to 0xFF because
+/// many servers leave it at 0.
+pub fn decode_raw_into<R: Read>(
+    r: &mut R,
+    w: u16,
+    h: u16,
+    conv: &PixelConverter,
+    out: &mut [u8],
+) -> Result<(), String> {
     check_scratch(out, w, h)?;
-    r.read_exact(out)
-        .map_err(|e| format!("raw: read pixels: {}", e))?;
-    for pixel in out.chunks_exact_mut(4) {
-        pixel[3] = 255;
+    if conv.format().is_native_rgba() {
+        r.read_exact(out)
+            .map_err(|e| format!("raw: read pixels: {}", e))?;
+        for pixel in out.chunks_exact_mut(4) {
+            pixel[3] = 255;
+        }
+        return Ok(());
     }
+    let mut wire = vec![0u8; usize::from(w) * usize::from(h) * conv.bytes_per_pixel()];
+    r.read_exact(&mut wire)
+        .map_err(|e| format!("raw: read pixels: {}", e))?;
+    conv.convert_row(&wire, out);
     Ok(())
 }
 
@@ -131,11 +168,19 @@ pub fn decode_hextile_into<R: Read>(
     rect_w: u16,
     rect_h: u16,
     state: &mut HextileState,
+    conv: &PixelConverter,
     out: &mut [u8],
 ) -> Result<(), String> {
     check_scratch(out, rect_w, rect_h)?;
     let stride = usize::from(rect_w);
+    let bpp = conv.bytes_per_pixel();
     let mut tile_raw = [0u8; 16 * 16 * 4];
+    let read_pixel = |r: &mut R, what: &str| -> Result<[u8; 4], String> {
+        let mut pixel = [0u8; 4];
+        r.read_exact(&mut pixel[..bpp])
+            .map_err(|e| format!("hextile: {what}: {e}"))?;
+        Ok(conv.pixel(&pixel[..bpp]))
+    };
 
     let mut tile_y = 0u16;
     while tile_y < rect_h {
@@ -148,30 +193,22 @@ pub fn decode_hextile_into<R: Read>(
             let subenc = read_u8(r).map_err(|e| format!("hextile: subenc: {}", e))?;
 
             if subenc & HEXTILE_RAW != 0 {
-                let bytes = &mut tile_raw[..tw * th * 4];
+                let bytes = &mut tile_raw[..tw * th * bpp];
                 r.read_exact(bytes)
                     .map_err(|e| format!("hextile: raw tile pixels: {}", e))?;
-                for (row, chunk) in bytes.chunks_exact(tw * 4).enumerate() {
+                for (row, chunk) in bytes.chunks_exact(tw * bpp).enumerate() {
                     let start = ((ty + row) * stride + tx) * 4;
-                    let dst = &mut out[start..start + tw * 4];
-                    dst.copy_from_slice(chunk);
-                    for pixel in dst.chunks_exact_mut(4) {
-                        pixel[3] = 255;
-                    }
+                    conv.convert_row(chunk, &mut out[start..start + tw * 4]);
                 }
                 tile_x += tile_w;
                 continue;
             }
 
             if subenc & HEXTILE_BG_SPECIFIED != 0 {
-                r.read_exact(&mut state.bg)
-                    .map_err(|e| format!("hextile: bg: {}", e))?;
-                state.bg[3] = 255;
+                state.bg = read_pixel(r, "bg")?;
             }
             if subenc & HEXTILE_FG_SPECIFIED != 0 {
-                r.read_exact(&mut state.fg)
-                    .map_err(|e| format!("hextile: fg: {}", e))?;
-                state.fg[3] = 255;
+                state.fg = read_pixel(r, "fg")?;
             }
 
             fill_block(out, stride, tx, ty, tw, th, state.bg);
@@ -182,11 +219,7 @@ pub fn decode_hextile_into<R: Read>(
                 let coloured = subenc & HEXTILE_SUBRECTS_COLOURED != 0;
                 for _ in 0..n_subrects {
                     let colour = if coloured {
-                        let mut c = [0u8; 4];
-                        r.read_exact(&mut c)
-                            .map_err(|e| format!("hextile: sr colour: {}", e))?;
-                        c[3] = 255;
-                        c
+                        read_pixel(r, "sr colour")?
                     } else {
                         state.fg
                     };
@@ -219,7 +252,9 @@ pub fn decode_hextile_into<R: Read>(
 /// every ZRLE rectangle in the session, so the decoder state cannot be
 /// discarded between rectangles.
 pub struct ZrleDecoder {
-    inflater: Decompress,
+    /// zlib-rs: ~1.7x the inflate throughput of the stock zlib that flate2
+    /// resolves to here (VNC-PERF-003).
+    inflater: Inflate,
     /// Decompressed bytes already produced but not yet consumed by a tile.
     buf: Vec<u8>,
     /// Read cursor into `buf`.
@@ -231,7 +266,7 @@ pub struct ZrleDecoder {
 impl ZrleDecoder {
     pub fn new() -> Self {
         Self {
-            inflater: Decompress::new(/* zlib */ true),
+            inflater: Inflate::new(/* zlib header */ true, 15),
             buf: Vec::new(),
             pos: 0,
             compressed: Vec::new(),
@@ -253,6 +288,7 @@ pub fn decode_zrle_into<R: Read>(
     rect_h: u16,
     dec: &mut ZrleDecoder,
     limits: &DecodeLimits,
+    conv: &PixelConverter,
     out: &mut [u8],
 ) -> Result<(), String> {
     check_scratch(out, rect_w, rect_h)?;
@@ -271,6 +307,13 @@ pub fn decode_zrle_into<R: Read>(
         dec.compressed = compressed;
         return Err(format!("zrle: body: {}", e));
     }
+    // Large rectangles (full-screen updates) inflate on a helper thread
+    // while this thread decodes tiles from the bytes already produced.
+    if compressed.len() >= ZRLE_PIPELINE_MIN_COMPRESSED && dec.pos >= dec.buf.len() {
+        let result = decode_zrle_pipelined(dec, &compressed, rect_w, rect_h, limits, conv, out);
+        dec.compressed = compressed;
+        return result;
+    }
     let inflated = inflate_into(dec, &compressed, limits);
     dec.compressed = compressed;
     inflated?;
@@ -285,6 +328,7 @@ pub fn decode_zrle_into<R: Read>(
             zrle_decode_tile(
                 &dec.buf,
                 &mut dec.pos,
+                conv,
                 out,
                 stride,
                 usize::from(tile_x),
@@ -309,11 +353,166 @@ pub fn decode_zrle_into<R: Read>(
     Ok(())
 }
 
+/// Compressed ZRLE bodies at least this large use the overlapped decoder.
+const ZRLE_PIPELINE_MIN_COMPRESSED: usize = 256 * 1024;
+/// Inflate output handed to the tile decoder per step.
+const ZRLE_PIPELINE_CHUNK: usize = 256 * 1024;
+
+/// Upper bound of the inflated bytes of one ZRLE rectangle: per tile one
+/// subencoding byte and a 127-colour palette, per pixel at most a CPIXEL plus
+/// one run-length byte. A valid stream never produces more.
+fn zrle_inflated_bound(rect_w: u16, rect_h: u16, cpixel: usize) -> usize {
+    let tiles = usize::from(rect_w).div_ceil(64) * usize::from(rect_h).div_ceil(64);
+    tiles * (1 + 127 * cpixel) + usize::from(rect_w) * usize::from(rect_h) * (cpixel + 1)
+}
+
+/// VNC-PERF-003: overlap inflate (helper thread) with tile decoding (this
+/// thread). The inflater writes into reserved capacity that is never
+/// reallocated; the decoder only reads bytes the inflater has published with
+/// a Release store, so producer and consumer touch disjoint memory. A tile
+/// that runs out of published bytes is decoded again once more arrive.
+fn decode_zrle_pipelined(
+    dec: &mut ZrleDecoder,
+    compressed: &[u8],
+    rect_w: u16,
+    rect_h: u16,
+    limits: &DecodeLimits,
+    conv: &PixelConverter,
+    out: &mut [u8],
+) -> Result<(), String> {
+    use std::mem::MaybeUninit;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    let bound = zrle_inflated_bound(rect_w, rect_h, conv.cpixel_bytes());
+    if bound > limits.max_decompressed_rect_bytes {
+        return Err("zrle: decompressed output exceeds configured limit".into());
+    }
+    dec.buf.clear();
+    dec.pos = 0;
+    dec.buf.reserve(bound);
+    let base = dec.buf.as_mut_ptr() as usize;
+    let produced = AtomicUsize::new(0);
+    let finished = AtomicBool::new(false);
+    let inflater = &mut dec.inflater;
+    let stride = usize::from(rect_w);
+
+    let (inflate_result, decode_result) = std::thread::scope(|scope| {
+        let producer = scope.spawn(|| {
+            let mut consumed = 0usize;
+            let mut written = 0usize;
+            let result = loop {
+                let room = (bound - written).min(ZRLE_PIPELINE_CHUNK);
+                if room == 0 {
+                    break if consumed < compressed.len() {
+                        Err("zrle: stream inflates beyond the rectangle bound".to_string())
+                    } else {
+                        Ok(())
+                    };
+                }
+                // SAFETY: [written, written + room) lies inside the reserved,
+                // never-reallocated capacity and is not yet published to the
+                // consumer, which only reads [0, produced).
+                let spare = unsafe {
+                    std::slice::from_raw_parts_mut(
+                        (base as *mut MaybeUninit<u8>).add(written),
+                        room,
+                    )
+                };
+                let in_before = inflater.total_in();
+                let out_before = inflater.total_out();
+                let status = match inflater.decompress_uninit(
+                    &compressed[consumed..],
+                    spare,
+                    InflateFlush::NoFlush,
+                ) {
+                    Ok(status) => status,
+                    Err(e) => break Err(format!("zrle: inflate: {}", e.as_str())),
+                };
+                let used = (inflater.total_in() - in_before) as usize;
+                let made = (inflater.total_out() - out_before) as usize;
+                consumed += used;
+                written += made;
+                produced.store(written, Ordering::Release);
+                if matches!(status, zlib_rs::Status::StreamEnd)
+                    || (consumed >= compressed.len() && made < room)
+                    || (used == 0 && made == 0)
+                {
+                    break Ok(());
+                }
+            };
+            finished.store(true, Ordering::Release);
+            result.map(|()| written)
+        });
+
+        let mut pos = 0usize;
+        let mut decode = || -> Result<(), String> {
+            let mut tile_y = 0u16;
+            while tile_y < rect_h {
+                let tile_h = 64u16.min(rect_h - tile_y);
+                let mut tile_x = 0u16;
+                while tile_x < rect_w {
+                    let tile_w = 64u16.min(rect_w - tile_x);
+                    loop {
+                        let done = finished.load(Ordering::Acquire);
+                        let available = produced.load(Ordering::Acquire);
+                        // SAFETY: bytes below `available` were initialised by
+                        // the producer before its Release store.
+                        let buf =
+                            unsafe { std::slice::from_raw_parts(base as *const u8, available) };
+                        let start = pos;
+                        match zrle_decode_tile(
+                            buf,
+                            &mut pos,
+                            conv,
+                            out,
+                            stride,
+                            usize::from(tile_x),
+                            usize::from(tile_y),
+                            usize::from(tile_w),
+                            usize::from(tile_h),
+                        ) {
+                            Ok(()) => break,
+                            Err(error) if !done && error.starts_with("zrle: eof") => {
+                                pos = start;
+                                while !finished.load(Ordering::Acquire)
+                                    && produced.load(Ordering::Acquire) == available
+                                {
+                                    std::thread::yield_now();
+                                }
+                            }
+                            Err(error) => return Err(error),
+                        }
+                    }
+                    tile_x += tile_w;
+                }
+                tile_y += tile_h;
+            }
+            Ok(())
+        };
+        let decoded = decode();
+        let inflated = producer
+            .join()
+            .unwrap_or_else(|_| Err("zrle: inflate worker panicked".into()));
+        (inflated, decoded.map(|()| pos))
+    });
+
+    let written = inflate_result?;
+    // SAFETY: the producer initialised exactly `written` bytes of capacity.
+    unsafe { dec.buf.set_len(written) };
+    dec.pos = decode_result?;
+    if dec.pos >= dec.buf.len() {
+        dec.buf.clear();
+        dec.pos = 0;
+    }
+    Ok(())
+}
+
 /// Feed the newly-arrived bytes into the persistent inflater. It is NOT
-/// enough to stop as soon as the input slice has been fully consumed:
-/// miniz_oxide buffers input internally, so queued output must be drained with
-/// an extra empty-input call before the tile decoder runs (otherwise it hits
-/// `eof cpixel`).
+/// enough to stop as soon as the input slice has been fully consumed: the
+/// inflater may hold queued output, which must be drained with an extra
+/// empty-input call before the tile decoder runs (otherwise it hits
+/// `eof cpixel`). Output goes into uninitialised spare capacity, so the
+/// multi-megabyte growth step is never zero-filled.
 fn inflate_into(
     dec: &mut ZrleDecoder,
     compressed: &[u8],
@@ -331,7 +530,7 @@ fn inflate_into(
         if next_len > limits.max_decompressed_rect_bytes.saturating_add(dec.pos) {
             return Err("zrle: decompressed output exceeds configured limit".into());
         }
-        dec.buf.resize(next_len, 0);
+        dec.buf.reserve(step);
 
         let input_slice: &[u8] = if src_consumed < compressed.len() {
             &compressed[src_consumed..]
@@ -342,19 +541,18 @@ fn inflate_into(
         let tin_before = dec.inflater.total_in();
         let tout_before = dec.inflater.total_out();
 
+        let spare = &mut dec.buf.spare_capacity_mut()[..step];
         let status = dec
             .inflater
-            .decompress(
-                input_slice,
-                &mut dec.buf[current_len..],
-                FlushDecompress::None,
-            )
-            .map_err(|e| format!("zrle: inflate: {}", e))?;
+            .decompress_uninit(input_slice, spare, InflateFlush::NoFlush)
+            .map_err(|e| format!("zrle: inflate: {}", e.as_str()))?;
 
         let consumed_in = (dec.inflater.total_in() - tin_before) as usize;
         let produced_out = (dec.inflater.total_out() - tout_before) as usize;
 
-        dec.buf.truncate(current_len + produced_out);
+        // SAFETY: the inflater initialised exactly `produced_out` bytes of the
+        // spare capacity it was given (at most `step`, reserved above).
+        unsafe { dec.buf.set_len(current_len + produced_out) };
         src_consumed += consumed_in;
 
         // All input fed in AND the inflater has nothing more to emit.
@@ -365,7 +563,7 @@ fn inflate_into(
         if consumed_in == 0 && produced_out == 0 {
             break;
         }
-        if matches!(status, flate2::Status::StreamEnd) {
+        if matches!(status, zlib_rs::Status::StreamEnd) {
             break;
         }
     }
@@ -381,6 +579,7 @@ fn inflate_into(
 fn zrle_decode_tile(
     buf: &[u8],
     pos: &mut usize,
+    conv: &PixelConverter,
     out: &mut [u8],
     stride: usize,
     tx: usize,
@@ -397,21 +596,27 @@ fn zrle_decode_tile(
 
     let row_start = |row: usize| ((ty + row) * stride + tx) * 4;
 
+    let cpx = conv.cpixel_bytes();
+    let native = conv.is_native();
+
     if subenc == 0 {
         // Raw CPIXEL stream.
-        let bytes = pixel_count * 3;
+        let bytes = pixel_count * cpx;
         let src = buf
             .get(*pos..*pos + bytes)
             .ok_or_else(|| "zrle: eof cpixel".to_string())?;
         for row in 0..h {
             let start = row_start(row);
             let dst = &mut out[start..start + w * 4];
-            let src_row = &src[row * w * 3..(row + 1) * w * 3];
-            for (pixel, cpixel) in dst.chunks_exact_mut(4).zip(src_row.chunks_exact(3)) {
-                pixel[0] = cpixel[0];
-                pixel[1] = cpixel[1];
-                pixel[2] = cpixel[2];
-                pixel[3] = 255;
+            let src_row = &src[row * w * cpx..(row + 1) * w * cpx];
+            if native {
+                // The rest of the tile lets every pixel of the row take the
+                // overlapping-load path.
+                rgb_to_rgba(&src[row * w * cpx..], dst);
+            } else {
+                for (pixel, cpixel) in dst.chunks_exact_mut(4).zip(src_row.chunks_exact(cpx)) {
+                    pixel.copy_from_slice(&conv.cpixel(cpixel));
+                }
             }
         }
         *pos += bytes;
@@ -419,7 +624,7 @@ fn zrle_decode_tile(
     }
 
     if subenc == 1 {
-        let c = read_cpixel(buf, pos)?;
+        let c = read_cpixel(buf, pos, conv)?;
         fill_block(out, stride, tx, ty, w, h, c);
         return Ok(());
     }
@@ -429,7 +634,7 @@ fn zrle_decode_tile(
         let palette_size = subenc as usize;
         let mut palette = [[0u8; 4]; 16];
         for slot in palette.iter_mut().take(palette_size) {
-            *slot = read_cpixel(buf, pos)?;
+            *slot = read_cpixel(buf, pos, conv)?;
         }
         let bpp: usize = if palette_size == 2 {
             1
@@ -474,12 +679,22 @@ fn zrle_decode_tile(
         };
         let mut palette = [[0u8; 4]; 128];
         for slot in palette.iter_mut().take(palette_size) {
-            *slot = read_cpixel(buf, pos)?;
+            *slot = read_cpixel(buf, pos, conv)?;
         }
         let mut filled = 0usize;
+        let (mut row, mut col) = (0usize, 0usize);
         while filled < pixel_count {
             let (colour, run_len) = if subenc == 128 {
-                let colour = read_cpixel(buf, pos)?;
+                let colour = if native {
+                    let s = *pos;
+                    let Some(src) = buf.get(s..s + 3) else {
+                        return Err("zrle: eof cpixel".to_string());
+                    };
+                    *pos += 3;
+                    [src[0], src[1], src[2], 255]
+                } else {
+                    read_cpixel(buf, pos, conv)?
+                };
                 (colour, read_zrle_run_length(buf, pos)?)
             } else {
                 let idx_byte = *buf
@@ -500,16 +715,25 @@ fn zrle_decode_tile(
                 (colour, run)
             };
             let mut take = run_len.min(pixel_count - filled);
+            filled += take;
+            // Track the row/column instead of dividing per run: most runs in
+            // photographic tiles are a single pixel.
             while take > 0 {
-                let row = filled / w;
-                let col = filled % w;
                 let span = take.min(w - col);
                 let start = row_start(row) + col * 4;
-                for pixel in out[start..start + span * 4].chunks_exact_mut(4) {
-                    pixel.copy_from_slice(&colour);
+                if span == 1 {
+                    out[start..start + 4].copy_from_slice(&colour);
+                } else {
+                    for pixel in out[start..start + span * 4].chunks_exact_mut(4) {
+                        pixel.copy_from_slice(&colour);
+                    }
                 }
-                filled += span;
                 take -= span;
+                col += span;
+                if col == w {
+                    col = 0;
+                    row += 1;
+                }
             }
         }
         return Ok(());
@@ -518,15 +742,16 @@ fn zrle_decode_tile(
     Err(format!("zrle: unsupported subencoding {}", subenc))
 }
 
-/// Read a CPIXEL (3 bytes R, G, B). Alpha is always 0xFF.
-fn read_cpixel(buf: &[u8], pos: &mut usize) -> Result<[u8; 4], String> {
+/// Read one CPIXEL (3 bytes R, G, B for the default format). Alpha is always 0xFF.
+#[inline]
+fn read_cpixel(buf: &[u8], pos: &mut usize, conv: &PixelConverter) -> Result<[u8; 4], String> {
     let s = *pos;
-    if s + 3 > buf.len() {
+    let len = conv.cpixel_bytes();
+    let Some(src) = buf.get(s..s + len) else {
         return Err("zrle: eof cpixel".to_string());
-    }
-    let out = [buf[s], buf[s + 1], buf[s + 2], 255];
-    *pos += 3;
-    Ok(out)
+    };
+    *pos += len;
+    Ok(conv.cpixel(src))
 }
 
 /// ZRLE run length: bytes of 255 accumulate, the first byte < 255 terminates.
@@ -554,6 +779,7 @@ pub fn read_rich_cursor<R: Read>(
     hotspot_y: u16,
     width: u16,
     height: u16,
+    conv: &PixelConverter,
 ) -> Result<DecodedCursor, String> {
     if width == 0 || height == 0 {
         return Ok(DecodedCursor {
@@ -575,19 +801,23 @@ pub fn read_rich_cursor<R: Read>(
         ));
     }
 
-    let pixel_bytes = usize::from(width)
+    let pixel_count = usize::from(width)
         .checked_mul(usize::from(height))
-        .and_then(|pixels| pixels.checked_mul(4))
+        .ok_or_else(|| "rich cursor pixel byte count overflow".to_string())?;
+    let pixel_bytes = pixel_count
+        .checked_mul(conv.bytes_per_pixel())
         .ok_or_else(|| "rich cursor pixel byte count overflow".to_string())?;
     let mask_stride = usize::from(width).div_ceil(8);
     let mask_bytes = mask_stride
         .checked_mul(usize::from(height))
         .ok_or_else(|| "rich cursor mask byte count overflow".to_string())?;
 
-    let mut rgba = vec![0u8; pixel_bytes];
+    let mut wire = vec![0u8; pixel_bytes];
     reader
-        .read_exact(&mut rgba)
+        .read_exact(&mut wire)
         .map_err(|e| format!("rich cursor pixels: {e}"))?;
+    let mut rgba = vec![0u8; pixel_count * 4];
+    conv.convert_row(&wire, &mut rgba);
     let mut mask = vec![0u8; mask_bytes];
     reader
         .read_exact(&mut mask)
@@ -706,9 +936,9 @@ mod tests {
         let bytes: Vec<u8> = vec![10, 20, 30, 0, 40, 50, 60, 0];
         let mut cur = Cursor::new(bytes);
         let mut rgba = vec![0u8; 8];
-        decode_raw_into(&mut cur, 2, 1, &mut rgba).unwrap();
+        decode_raw_into(&mut cur, 2, 1, &PixelConverter::default(), &mut rgba).unwrap();
         assert_eq!(rgba, vec![10, 20, 30, 255, 40, 50, 60, 255]);
-        assert!(decode_raw_into(&mut Cursor::new(vec![0u8; 8]), 3, 1, &mut rgba).is_err());
+        assert!(decode_raw_into(&mut Cursor::new(vec![0u8; 8]), 3, 1, &PixelConverter::default(), &mut rgba).is_err());
     }
 
     #[test]
@@ -716,7 +946,7 @@ mod tests {
         let mut payload = vec![10, 20, 30, 0, 40, 50, 60, 0, 70, 80, 90, 0];
         payload.push(0b1010_0000);
         let mut reader = Cursor::new(payload);
-        let cursor = read_rich_cursor(&mut reader, 1, 0, 3, 1).unwrap();
+        let cursor = read_rich_cursor(&mut reader, 1, 0, 3, 1, &PixelConverter::default()).unwrap();
         assert_eq!((cursor.hotspot_x, cursor.hotspot_y), (1, 0));
         assert_eq!((cursor.width, cursor.height), (3, 1));
         assert_eq!(
@@ -727,8 +957,8 @@ mod tests {
 
     #[test]
     fn rich_cursor_rejects_invalid_geometry() {
-        assert!(read_rich_cursor(&mut Cursor::new(Vec::<u8>::new()), 3, 0, 3, 1).is_err());
-        assert!(read_rich_cursor(&mut Cursor::new(Vec::<u8>::new()), 0, 0, 513, 1).is_err());
+        assert!(read_rich_cursor(&mut Cursor::new(Vec::<u8>::new()), 3, 0, 3, 1, &PixelConverter::default()).is_err());
+        assert!(read_rich_cursor(&mut Cursor::new(Vec::<u8>::new()), 0, 0, 513, 1, &PixelConverter::default()).is_err());
     }
 
     #[test]
@@ -768,6 +998,17 @@ mod tests {
     }
 
     #[test]
+    fn rgb_expansion_handles_the_last_pixel_without_overreading() {
+        let src = [1u8, 2, 3, 4, 5, 6, 7, 8, 9];
+        let mut dst = [0u8; 12];
+        rgb_to_rgba(&src, &mut dst);
+        assert_eq!(dst, [1, 2, 3, 255, 4, 5, 6, 255, 7, 8, 9, 255]);
+        let mut one = [0u8; 4];
+        rgb_to_rgba(&src[..3], &mut one);
+        assert_eq!(one, [1, 2, 3, 255]);
+    }
+
+    #[test]
     fn copyrect_source_reads_exactly_four_bytes() {
         let mut payload = Cursor::new(vec![0u8, 2, 0, 3, 9]);
         assert_eq!(read_copyrect_source(&mut payload).unwrap(), (2, 3));
@@ -782,7 +1023,7 @@ mod tests {
         let mut cur = Cursor::new(&payload);
         let mut st = HextileState::new();
         let mut rgba = vec![0u8; 8];
-        decode_hextile_into(&mut cur, 2, 1, &mut st, &mut rgba).unwrap();
+        decode_hextile_into(&mut cur, 2, 1, &mut st, &PixelConverter::default(), &mut rgba).unwrap();
         // Alpha forced to 255.
         assert_eq!(rgba, vec![255, 0, 0, 255, 0, 255, 0, 255]);
         // No trailing bytes consumed from the cursor.
@@ -800,7 +1041,7 @@ mod tests {
         let mut cur = Cursor::new(&payload);
         let mut st = HextileState::new();
         let mut rgba = vec![0u8; 32 * 4];
-        decode_hextile_into(&mut cur, 32, 1, &mut st, &mut rgba).unwrap();
+        decode_hextile_into(&mut cur, 32, 1, &mut st, &PixelConverter::default(), &mut rgba).unwrap();
         for p in rgba.chunks_exact(4) {
             assert_eq!(p, &[255, 0, 0, 255]);
         }
@@ -819,7 +1060,7 @@ mod tests {
         payload.extend_from_slice(&[0x11, 0x10]);
         let mut st = HextileState::new();
         let mut rgba = vec![0u8; 20 * 2 * 4];
-        decode_hextile_into(&mut Cursor::new(&payload), 20, 2, &mut st, &mut rgba).unwrap();
+        decode_hextile_into(&mut Cursor::new(&payload), 20, 2, &mut st, &PixelConverter::default(), &mut rgba).unwrap();
         let px = |x: usize, y: usize| &rgba[(y * 20 + x) * 4..(y * 20 + x) * 4 + 4];
         assert_eq!(px(16, 0), &[0, 0, 255, 255]);
         assert_eq!(px(17, 1), &[0, 255, 0, 255]);
@@ -853,6 +1094,7 @@ mod tests {
             64,
             &mut dec,
             &DecodeLimits::default(),
+            &PixelConverter::default(),
             &mut rgba,
         )
         .unwrap();
@@ -889,6 +1131,7 @@ mod tests {
             16,
             &mut dec,
             &DecodeLimits::default(),
+            &PixelConverter::default(),
             &mut rgba,
         )
         .unwrap();
@@ -948,6 +1191,7 @@ mod tests {
             64,
             &mut dec,
             &DecodeLimits::default(),
+            &PixelConverter::default(),
             &mut rgba,
         )
         .unwrap();
@@ -963,10 +1207,85 @@ mod tests {
             64,
             &mut dec,
             &DecodeLimits::default(),
+            &PixelConverter::default(),
             &mut rgba,
         )
         .unwrap();
         assert_eq!(rgba[0..4], [0, 0, 255, 255]);
+    }
+
+    #[test]
+    fn zrle_large_rectangles_decode_through_the_overlapped_inflater() {
+        use flate2::{Compress, Compression, FlushCompress};
+
+        // 512x256 raw tiles of pseudo-random pixels: incompressible, so the
+        // body exceeds the pipelined threshold. A second small rectangle on
+        // the same zlib stream must still decode sequentially afterwards.
+        let (w, h) = (512u16, 256u16);
+        let mut seed = 0x1234_5678u32;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            seed
+        };
+        let mut expected = vec![0u8; usize::from(w) * usize::from(h) * 4];
+        let mut tiles = Vec::new();
+        for ty in (0..h).step_by(64) {
+            for tx in (0..w).step_by(64) {
+                tiles.push(0u8);
+                for y in ty..ty + 64 {
+                    for x in tx..tx + 64 {
+                        let value = next().to_le_bytes();
+                        tiles.extend_from_slice(&value[..3]);
+                        let at = (usize::from(y) * usize::from(w) + usize::from(x)) * 4;
+                        expected[at..at + 4].copy_from_slice(&[value[0], value[1], value[2], 255]);
+                    }
+                }
+            }
+        }
+        let mut stream = Compress::new(Compression::fast(), true);
+        let mut emit = |input: &[u8]| {
+            let mut out = vec![0u8; input.len() + input.len() / 10 + 1024];
+            let before = stream.total_out();
+            stream.compress(input, &mut out, FlushCompress::Sync).unwrap();
+            out.truncate((stream.total_out() - before) as usize);
+            let mut payload = (out.len() as u32).to_be_bytes().to_vec();
+            payload.extend(out);
+            payload
+        };
+        let first = emit(&tiles);
+        assert!(first.len() > ZRLE_PIPELINE_MIN_COMPRESSED);
+        let second = emit(&[1, 9, 8, 7]);
+
+        let mut dec = ZrleDecoder::new();
+        let mut rgba = vec![0u8; expected.len()];
+        decode_zrle_into(
+            &mut Cursor::new(&first),
+            w,
+            h,
+            &mut dec,
+            &DecodeLimits::default(),
+            &PixelConverter::default(),
+            &mut rgba,
+        )
+        .unwrap();
+        assert!(rgba == expected, "pipelined decode differs from the source pixels");
+        assert_eq!(dec.pos, 0);
+        assert!(dec.buf.is_empty());
+
+        let mut small = vec![0u8; 4 * 4 * 4];
+        decode_zrle_into(
+            &mut Cursor::new(&second),
+            4,
+            4,
+            &mut dec,
+            &DecodeLimits::default(),
+            &PixelConverter::default(),
+            &mut small,
+        )
+        .unwrap();
+        assert!(small.chunks_exact(4).all(|p| p == [9, 8, 7, 255]));
     }
 
     #[test]
@@ -1040,6 +1359,7 @@ mod tests {
             rect_h,
             &mut dec,
             &DecodeLimits::default(),
+            &PixelConverter::default(),
             &mut rgba,
         )
         .unwrap();

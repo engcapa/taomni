@@ -55,7 +55,15 @@
 | DEC-VNC-08 | 滚轮以 100 CSS 像素（行模式 3 行）为一格累积，每格立即发送按下+释放并保留已按下的键；单事件最多 10 格。 | agent 自决 | 对应 RealVNC `ScrollWheelThreshold=120` 的一格一步语义。 |
 | DEC-VNC-09 | F8 为会话菜单键（与 RealVNC `MenuKey` 默认一致），菜单内 “Send F8” 发送该键；可配置菜单键归 VNC-CONN-001。 | agent 自决 | RealVNC 默认。 |
 | DEC-VNC-10 | 标签页内 “全屏” 使用 Fullscreen API 作用于会话容器；独立窗口使用 OS 全屏。真正的屏幕级全屏与顶端自动隐藏工具栏归 VNC-VIEW-002。 | agent 自决 | 标签页受主窗口约束。 |
-| DEC-VNC-11 | 画质预设：服务器支持 Tight 时用 JPEG 质量/压缩等级伪编码实现 High/Medium/Low；只支持 ZRLE/Hextile 时用降色深像素格式；Automatic 依据会话信息的线路速度估计切换。 | 待 P1 细化 | RealVNC Picture quality 语义（色深）+ 带宽收益。 |
+| DEC-VNC-11 | 画质预设：服务器支持 Tight 时用 JPEG 质量/压缩等级伪编码实现 High/Medium/Low；只支持 ZRLE/Hextile 时用降色深像素格式；Automatic 依据会话信息的线路速度估计切换。 | P1 已细化（[P1 §2](vnc-p1-batch2-design.md#perf-004)） | RealVNC Picture quality 语义（色深）+ 带宽收益。 |
+| DEC-VNC-12 | 按需绘制：帧边界到达才调度一次 rAF，绘制后 ACK。 | agent 自决 | 空闲会话零 rAF 负载。 |
+| DEC-VNC-13 | CopyRect 仍在后端帧缓冲内移动；OffscreenCanvas/Worker 不采用。 | agent 自决，可推翻 | 保留截图/GIF 采集源，WKWebView 支持不完整。 |
+| DEC-VNC-14 | flate2 使用 zlib-rs 后端。 | agent 自决 | inflate 是 ZRLE 回放的主要成本。 |
+| DEC-VNC-15 | 像素格式只在无未完成更新请求时切换，读线程在下一个更新开始时应用。 | agent 自决 | 避免旧格式更新被按新格式解码。 |
+| DEC-VNC-16 | Windows 用进程内低级键盘钩子实现特殊键直通；macOS/Linux 不实现。 | agent 自决，可推翻 | RealVNC `SendSpecialKeys=True`；其他端需要系统权限。 |
+| DEC-VNC-17 | AltGr 合成的左 Ctrl 不发送；死键发组合结果；本机 IME 不参与。 | agent 自决 | 与 RealVNC fixture 实测对照。 |
+| DEC-VNC-18 | 全屏 = OS 窗口全屏 + 固定定位覆盖，不用 Fullscreen API，Esc 转发远端。 | agent 自决 | 与 RealVNC 全屏按键行为一致。 |
+| DEC-VNC-19 | 未加密警告在认证前出现；自动重连持续退避；KeepAlive 30/30 s。 | agent 自决 | RealVNC `WarnUnencrypted` / `AutoReconnect` / `KeepAlive*` 默认值。 |
 
 ## 5. 交互与 UI 总体合同
 
@@ -98,6 +106,7 @@
 - 交付：评估并实现三端可用的更快绘制路径（按需 rAF、单帧 ImageData 复用、CopyRect 作为画布内复制、OffscreenCanvas/Worker 可用时启用）；ZRLE inflate 与 palette-RLE 热路径优化。
 - 主要文件：`VncPanel.tsx`（或抽出的渲染器）、`src/lib/vnc.ts`、`encodings.rs`。
 - 必须保留：帧边界 ACK 语义、尺寸校验、截图/GIF 采集源。
+- P1 设计：[vnc-p1-batch2-design.md](vnc-p1-batch2-design.md#perf-003)。
 - 验收：
   - **VNC-PERF-003-A1**：native 下 1680×1050 全帧从 WS 到画布完成的主线程耗时有测量记录，三种 WebView 各自记录或标注未验证。
   - **VNC-PERF-003-A2**：ZRLE 全帧回放解码 ≤ 35 ms（release）。
@@ -107,6 +116,7 @@
 ### VNC-PERF-004 Picture quality 与自适应编码
 
 - 交付：Automatic / High / Medium / Low 画质（DEC-VNC-11）；Tight（含 JPEG、四个 zlib 流、filter）解码；质量/压缩伪编码；降色深像素格式；Automatic 按线路速度切换。
+- P1 设计：[vnc-p1-batch2-design.md](vnc-p1-batch2-design.md#perf-004)。
 - 验收：
   - **VNC-PERF-004-A1**：Tight 解码器通过 RFC 向量与真实服务器实测，stream 不失步。
   - **VNC-PERF-004-A2**：限速链路（≤10 Mbit/s）上 Low/Medium 的全屏刷新字节与时间和 RealVNC 同档对比有记录，Taomni 不劣于 RealVNC。
@@ -150,6 +160,7 @@
 ### VNC-INPUT-003 特殊键直通、键盘布局与输入法
 
 - 交付：Pass special keys（Win、Alt+Tab、Alt+Esc、Ctrl+Esc、PrtScn）需要各平台原生键盘钩子的方案评估与实现；AltGr、死键、输入法组合期间的策略；Relative Pointer Motion 评估。
+- P1 设计：[vnc-p1-batch2-design.md](vnc-p1-batch2-design.md#input-003)。
 - 验收：
   - **VNC-INPUT-003-A1**：三端分别记录 Win/Cmd、Alt+Tab、PrtScn 的实际去向，Windows 至少实现可开关的直通。
   - **VNC-INPUT-003-A2**：德/法布局 AltGr 与死键、中文输入法下的按键转发与 RealVNC 对照有结论。
@@ -169,6 +180,7 @@
 ### VNC-VIEW-002 屏幕级全屏、自动隐藏工具栏与多显示器
 
 - 交付：标签页会话进入屏幕级全屏（Tauri 窗口全屏 + 容器全屏）；全屏时顶端悬停滑出工具栏（Exit full screen、Scale、Send Ctrl+Alt+Del、菜单、End session），可钉住；多显示器跨屏评估。
+- P1 设计：[vnc-p1-batch2-design.md](vnc-p1-batch2-design.md#view-002)。
 - 验收：
   - **VNC-VIEW-002-A1**：全屏进入/退出、Esc 与 F8 行为、焦点与键盘转发三端记录。
   - **VNC-VIEW-002-A2**：顶端工具栏出现/隐藏时机与 RealVNC 对照。
@@ -199,6 +211,7 @@
 ### VNC-SESS-003 连接生命周期
 
 - 交付：未加密连接警告（含 “不再提示”）、交互式认证框（用户名/密码/记住密码）、连接中 Stop、按 RealVNC `AutoReconnect` 的重连策略与提示、KeepAlive 探测与断线检测。
+- P1 设计：[vnc-p1-batch2-design.md](vnc-p1-batch2-design.md#sess-003)。
 - 验收：
   - **VNC-SESS-003-A1**：四类对话框/状态的文案、按钮和焦点与 RealVNC 对照。
   - **VNC-SESS-003-A2**：认证失败、服务器慢认证（本服务器 25 s）、网络中断、用户取消分别有正确的结构化状态与恢复入口。
@@ -207,6 +220,7 @@
 ### VNC-CONN-001 连接属性与持久化选项
 
 - 交付：会话编辑器 VNC 页扩展：画质、缩放默认值与保持宽高比、view-only、Shared、按键直通、剪贴板收/发开关、AcceptBell、菜单键；会话内 “属性” 入口。
+- P1 设计：[vnc-p1-batch2-design.md](vnc-p1-batch2-design.md#conn-001)。
 - 验收：
   - **VNC-CONN-001-A1**：选项与 RealVNC Options/Expert 对应关系表，旧会话数据读取不变。
   - **VNC-CONN-001-A2**：修改后重连生效，detach claim 与独立窗口保留相同选项。
@@ -215,6 +229,7 @@
 ### VNC-CLIP-001 剪贴板策略对齐
 
 - 交付：默认不在连接时推送本地剪贴板（RealVNC `SendInitialClipboard=False`），以焦点/指针进入/本地变化驱动同步并降低轮询；“剪贴板作为按键发送”；服务端剪贴板宽限时间。
+- P1 设计：[vnc-p1-batch2-design.md](vnc-p1-batch2-design.md#clip-001)。
 - 验收：
   - **VNC-CLIP-001-A1**：连接、切换焦点、复制、粘贴四个时机的收发与 RealVNC 对照。
   - **VNC-CLIP-001-A2**：ExtendedClipboard 与 legacy 回退、中文与富文本、方向策略保持。
@@ -223,6 +238,7 @@
 ### VNC-QA-001 三端收口与正式 RealVNC 对比
 
 - 交付：Windows WebView2、macOS WKWebView、Linux WebKitGTK 的 native 性能与交互记录；RealVNC 对比记录汇总；QA 用例与 feature catalog 同步。
+- P1 设计：[vnc-p1-batch2-design.md](vnc-p1-batch2-design.md#qa-001)。
 - 验收：
   - **VNC-QA-001-A1**：所有 done 卡的功能、交互、鼠标键盘、性能对比可追溯到同一参照与方法，`different`/`unverified` 单独保留。
   - **VNC-QA-001-A2**：当前端 native 组合回归通过；其他端未执行项有后续步骤。

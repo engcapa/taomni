@@ -104,6 +104,9 @@ libc = "0.2"
 font-kit = "0.14"
 dirs = "6"
 flate2 = "1"
+# Persistent-stream inflate for VNC ZRLE/Tight (VNC-PERF-003). flate2 resolves to
+# stock C zlib in this dependency graph; zlib-rs inflates the same streams faster.
+zlib-rs = { version = "0.6", default-features = false, features = ["std"] }
 # Read source files returned as jar:/kls: definition URIs without extracting
 # archives to the workspace. Keep formats narrow: SDK/source JARs use deflate.
 zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }
@@ -211,6 +214,9 @@ socket2 = { version = "0.6", features = ["all"] }
 tauri-plugin-notification = "2.4.0"
 xcap = { version = "0.9.6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
+# Tight JPEG rectangles in the VNC client (VNC-PERF-004); already in the tree via image/tiff.
+zune-jpeg = "0.5"
+zune-core = "0.5"
 tauri-plugin-dialog = "2.7.3"
 sqlparser = "0.62.0"
 scopeguard = "1.2"
@@ -327,6 +333,8 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 
 [dev-dependencies]
 tempfile = "3"
+# JPEG encoder for Tight decoder tests only.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 # Shrink debug artifacts for this heavy Tauri crate. Default `debug = 2` (full
 # DWARF) balloons `target/` via rlibs, the main binary, incremental caches, and

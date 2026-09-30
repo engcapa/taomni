@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::vnc::clipboard::{
@@ -13,7 +14,9 @@ use crate::vnc::encodings::{
 };
 use crate::vnc::framebuffer::{FbRect, Framebuffer, SharedFramebuffer};
 use crate::vnc::limits::DecodeLimits;
+use crate::vnc::pixel::{PixelConverter, PixelFormat};
 use crate::vnc::policy::VncSecurityPolicy;
+use crate::vnc::tight::{self, ENCODING_TIGHT, TightDecoder};
 
 const SEC_TYPE_NONE: u8 = 1;
 const SEC_TYPE_VNC_AUTH: u8 = 2;
@@ -99,6 +102,15 @@ pub struct RfbConnection {
     hextile_state: HextileState,
     /// ZRLE uses a single zlib stream for the whole session.
     zrle_decoder: ZrleDecoder,
+    /// Tight keeps four zlib streams for the whole session.
+    tight_decoder: TightDecoder,
+    /// Wire pixel format of the rectangles currently being decoded.
+    pixel: PixelConverter,
+    /// A SetPixelFormat the writer sent while no update was outstanding; the
+    /// next FramebufferUpdate is the first one in that format.
+    pending_pixel_format: Arc<Mutex<Option<PixelFormat>>>,
+    /// ClientInit shared flag (RealVNC `Shared`, default true).
+    shared: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +124,7 @@ pub struct RfbWriter {
     secure_output: Option<AesEax>,
     width: u16,
     height: u16,
+    pending_pixel_format: Arc<Mutex<Option<PixelFormat>>>,
 }
 
 impl RfbConnection {
@@ -219,7 +232,16 @@ impl RfbConnection {
             proto_minor,
             hextile_state: HextileState::new(),
             zrle_decoder: ZrleDecoder::new(),
+            tight_decoder: TightDecoder::new(),
+            pixel: PixelConverter::default(),
+            pending_pixel_format: Arc::new(Mutex::new(None)),
+            shared: true,
         })
+    }
+
+    /// ClientInit shared flag; set before authenticating.
+    pub fn set_shared(&mut self, shared: bool) {
+        self.shared = shared;
     }
 
     pub fn protocol_version(&self) -> String {
@@ -357,7 +379,7 @@ impl RfbConnection {
         }
 
         // ClientInit: send shared flag
-        self.write_all(&[1])
+        self.write_all(&[u8::from(self.shared)])
             .map_err(|e| format!("write client init: {}", e))?;
         self.flush().map_err(|e| format!("flush: {}", e))?;
 
@@ -422,7 +444,7 @@ impl RfbConnection {
         match sec_type {
             1 => {
                 // None — no authentication, proceed directly to ClientInit
-                self.write_all(&[1])
+                self.write_all(&[u8::from(self.shared)])
                     .map_err(|e| format!("write client init: {}", e))?;
                 self.flush().map_err(|e| format!("flush: {}", e))?;
                 self.read_server_init()
@@ -441,7 +463,7 @@ impl RfbConnection {
                     return Err(format!("authentication failed (result={})", result));
                 }
 
-                self.write_all(&[1])
+                self.write_all(&[u8::from(self.shared)])
                     .map_err(|e| format!("write client init: {}", e))?;
                 self.flush().map_err(|e| format!("flush: {}", e))?;
                 self.read_server_init()
@@ -684,57 +706,24 @@ impl RfbConnection {
     }
 
     /// Request pixel format: 32-bit true-colour with depth 24 so ZRLE can use
-    /// the 3-byte CPIXEL form.
+    /// the 3-byte CPIXEL form and rectangles copy straight into RGBA.
     pub fn set_pixel_format_rgba(&mut self) -> Result<(), String> {
-        let mut msg = vec![0u8; 20];
-        msg[0] = 0; // SetPixelFormat message type
-        msg[1] = 0; // padding
-        msg[2] = 0; // padding
-        msg[3] = 0; // padding
-        // Pixel format:
-        msg[4] = 32; // bits-per-pixel
-        msg[5] = 24; // depth: 24 so ZRLE's CPIXEL rule kicks in
-        msg[6] = 0; // big-endian false (little-endian)
-        msg[7] = 1; // true-colour
-        msg[8] = 0; // red-max hi
-        msg[9] = 255; // red-max lo
-        msg[10] = 0; // green-max hi
-        msg[11] = 255; // green-max lo
-        msg[12] = 0; // blue-max hi
-        msg[13] = 255; // blue-max lo
-        msg[14] = 0; // red-shift (R at byte 0 in little-endian)
-        msg[15] = 8; // green-shift (G at byte 1)
-        msg[16] = 16; // blue-shift (B at byte 2)
-        msg[17] = 0; // padding
-        msg[18] = 0; // padding
-        msg[19] = 0; // padding
+        self.set_pixel_format(PixelFormat::RGB888)
+    }
 
-        self.write_all(&msg)
+    /// Request a pixel format before the first update request.
+    pub fn set_pixel_format(&mut self, format: PixelFormat) -> Result<(), String> {
+        self.write_all(&set_pixel_format_message(format))
             .map_err(|e| format!("write set pixel format: {}", e))?;
         self.flush().map_err(|e| format!("flush: {}", e))?;
-
+        self.pixel = PixelConverter::new(format);
+        self.stats.pixel_format = format;
         Ok(())
     }
 
     /// Request encodings in preference order.
     pub fn set_encodings(&mut self, encodings: &[i32]) -> Result<(), String> {
-        let count = u16::try_from(encodings.len())
-            .map_err(|_| "too many VNC encodings requested".to_string())?;
-        let message_len = encodings
-            .len()
-            .checked_mul(4)
-            .and_then(|bytes| bytes.checked_add(4))
-            .ok_or_else(|| "VNC encoding list length overflow".to_string())?;
-        let mut msg = vec![0u8; message_len];
-        msg[0] = 2; // SetEncodings
-        msg[1] = 0;
-        msg[2..4].copy_from_slice(&count.to_be_bytes());
-
-        for (i, enc) in encodings.iter().enumerate() {
-            let off = 4 + i * 4;
-            msg[off..off + 4].copy_from_slice(&enc.to_be_bytes());
-        }
-
+        let msg = set_encodings_message(encodings)?;
         self.write_all(&msg)
             .map_err(|e| format!("write set encodings: {}", e))?;
         self.flush().map_err(|e| format!("flush: {}", e))?;
@@ -817,6 +806,7 @@ impl RfbConnection {
             secure_output,
             width: self.width,
             height: self.height,
+            pending_pixel_format: self.pending_pixel_format.clone(),
         })
     }
 
@@ -887,6 +877,17 @@ impl RfbConnection {
     }
 
     fn read_framebuffer_update(&mut self) -> Result<ServerMessage, String> {
+        // The writer only switches formats while no update is outstanding, so
+        // this update is the first one encoded in the new format.
+        if let Some(format) = self
+            .pending_pixel_format
+            .lock()
+            .map_err(|_| "VNC pixel format lock poisoned".to_string())?
+            .take()
+        {
+            self.pixel = PixelConverter::new(format);
+            self.stats.pixel_format = format;
+        }
         self.read_exact(&mut [0u8; 1])
             .map_err(|e| format!("read fu padding: {}", e))?;
         let num_rects = self.read_u16()? as usize;
@@ -896,6 +897,8 @@ impl RfbConnection {
 
         let update_started = std::time::Instant::now();
         let wire_before = self.read_buffer.total;
+        let mut pixel_rects = 0u16;
+        let mut tight_rects = 0u16;
         let mut damage: Vec<FbRect> = Vec::with_capacity(num_rects.min(64));
         let mut cursor = None;
         let mut pointer_pos = None;
@@ -934,8 +937,12 @@ impl RfbConnection {
 
             let rect = FbRect::new(x, y, w, h);
             match encoding {
-                0 | 5 | 16 => {
+                0 | 5 | 16 | ENCODING_TIGHT => {
                     self.stats.last_encoding = Some(encoding);
+                    pixel_rects = pixel_rects.saturating_add(1);
+                    if encoding == ENCODING_TIGHT {
+                        tight_rects = tight_rects.saturating_add(1);
+                    }
                     self.decode_pixels(encoding, w, h)?;
                     self.lock_framebuffer()?.blit(rect, &self.scratch)?;
                     damage.push(rect);
@@ -958,8 +965,9 @@ impl RfbConnection {
                     damage.push(FbRect::new(0, 0, w, h));
                 }
                 ENCODING_RICH_CURSOR => {
+                    let conv = self.pixel.clone();
                     cursor = Some(self.decode_via_reader(|reader| {
-                        encodings::read_rich_cursor(reader, x, y, w, h)
+                        encodings::read_rich_cursor(reader, x, y, w, h, &conv)
                     })?);
                 }
                 ENCODING_X_CURSOR => {
@@ -980,6 +988,8 @@ impl RfbConnection {
         }
 
         self.stats.updates += 1;
+        self.stats.last_update_pixel_rects = pixel_rects;
+        self.stats.last_update_tight_rects = tight_rects;
         self.stats.last_update_wire_bytes = self.read_buffer.total - wire_before;
         self.stats.last_update_micros = update_started.elapsed().as_micros() as u64;
         self.stats.last_update_started_at = Some(update_started);
@@ -1005,14 +1015,33 @@ impl RfbConnection {
             scratch,
             hextile_state,
             zrle_decoder,
+            tight_decoder,
+            pixel,
             ..
         } = self;
-        scratch.resize(bytes, 0);
+        if scratch.capacity() < bytes {
+            // A fresh zeroed allocation maps zero pages lazily instead of
+            // memsetting megabytes the decoder overwrites anyway.
+            *scratch = vec![0u8; bytes];
+        } else {
+            scratch.resize(bytes, 0);
+        }
         let mut reader = RfbStreamReader::new(stream, secure_io.as_mut(), read_buffer);
         match encoding {
-            0 => encodings::decode_raw_into(&mut reader, w, h, scratch),
-            5 => encodings::decode_hextile_into(&mut reader, w, h, hextile_state, scratch),
-            16 => encodings::decode_zrle_into(&mut reader, w, h, zrle_decoder, &limits, scratch),
+            0 => encodings::decode_raw_into(&mut reader, w, h, pixel, scratch),
+            5 => encodings::decode_hextile_into(&mut reader, w, h, hextile_state, pixel, scratch),
+            16 => encodings::decode_zrle_into(
+                &mut reader,
+                w,
+                h,
+                zrle_decoder,
+                &limits,
+                pixel,
+                scratch,
+            ),
+            ENCODING_TIGHT => {
+                tight::decode_tight_into(&mut reader, w, h, tight_decoder, &limits, pixel, scratch)
+            }
             other => Err(format!("unsupported pixel encoding {other}")),
         }
     }
@@ -1086,11 +1115,16 @@ const RUNTIME_READ_BUFFER_BYTES: usize = 256 * 1024;
 
 /// Runtime counters. `wire_bytes` counts plaintext RFB bytes read after
 /// `enter_runtime_mode` (TLS/RA2 framing overhead excluded).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct RuntimeStats {
     pub wire_bytes: u64,
     pub updates: u64,
     pub last_encoding: Option<i32>,
+    /// Pixel format of the latest decoded update.
+    pub pixel_format: PixelFormat,
+    /// Pixel rectangles (and Tight ones among them) in the latest update.
+    pub last_update_pixel_rects: u16,
+    pub last_update_tight_rects: u16,
     /// Bytes and time from the first rectangle header to the end of the last
     /// FramebufferUpdate; large updates approximate the line speed.
     pub last_update_wire_bytes: u64,
@@ -1099,11 +1133,54 @@ pub struct RuntimeStats {
     pub last_update_finished_at: Option<std::time::Instant>,
 }
 
+impl Default for RuntimeStats {
+    fn default() -> Self {
+        Self {
+            wire_bytes: 0,
+            updates: 0,
+            last_encoding: None,
+            pixel_format: PixelFormat::RGB888,
+            last_update_pixel_rects: 0,
+            last_update_tight_rects: 0,
+            last_update_wire_bytes: 0,
+            last_update_micros: 0,
+            last_update_started_at: None,
+            last_update_finished_at: None,
+        }
+    }
+}
+
+fn set_encodings_message(encodings: &[i32]) -> Result<Vec<u8>, String> {
+    let count = u16::try_from(encodings.len())
+        .map_err(|_| "too many VNC encodings requested".to_string())?;
+    let message_len = encodings
+        .len()
+        .checked_mul(4)
+        .and_then(|bytes| bytes.checked_add(4))
+        .ok_or_else(|| "VNC encoding list length overflow".to_string())?;
+    let mut msg = vec![0u8; message_len];
+    msg[0] = 2; // SetEncodings
+    msg[2..4].copy_from_slice(&count.to_be_bytes());
+    for (i, enc) in encodings.iter().enumerate() {
+        let off = 4 + i * 4;
+        msg[off..off + 4].copy_from_slice(&enc.to_be_bytes());
+    }
+    Ok(msg)
+}
+
+fn set_pixel_format_message(format: PixelFormat) -> [u8; 20] {
+    let mut msg = [0u8; 20];
+    // Message type 0 and three bytes of padding, then PIXEL_FORMAT.
+    msg[4..20].copy_from_slice(&format.to_wire());
+    msg
+}
+
 pub fn encoding_name(encoding: i32) -> &'static str {
     match encoding {
         0 => "Raw",
         1 => "CopyRect",
         5 => "Hextile",
+        7 => "Tight",
         16 => "ZRLE",
         _ => "Unknown",
     }
@@ -1222,6 +1299,38 @@ impl RfbWriter {
     pub fn set_framebuffer_size(&mut self, width: u16, height: u16) {
         self.width = width;
         self.height = height;
+    }
+
+    /// Switch the wire pixel format mid-session. Callers send this only
+    /// while no FramebufferUpdateRequest is outstanding, so the reader can
+    /// apply the format to the very next update.
+    pub fn set_pixel_format(&mut self, format: PixelFormat) -> Result<(), String> {
+        *self
+            .pending_pixel_format
+            .lock()
+            .map_err(|_| "VNC pixel format lock poisoned".to_string())? = Some(format);
+        self.write_all(&set_pixel_format_message(format))
+            .map_err(|e| format!("write set pixel format: {}", e))?;
+        self.flush().map_err(|e| format!("flush: {}", e))
+    }
+
+    /// Replace the encoding preference list mid-session.
+    pub fn set_encodings(&mut self, encodings: &[i32]) -> Result<(), String> {
+        self.write_all(&set_encodings_message(encodings)?)
+            .map_err(|e| format!("write set encodings: {}", e))?;
+        self.flush().map_err(|e| format!("flush: {}", e))
+    }
+
+    /// Non-incremental request for one pixel: a liveness probe that every
+    /// server must answer (KeepAlive, VNC-SESS-003).
+    pub fn request_probe(&mut self) -> Result<(), String> {
+        let mut msg = [0u8; 10];
+        msg[0] = 3;
+        msg[6..8].copy_from_slice(&1u16.to_be_bytes());
+        msg[8..10].copy_from_slice(&1u16.to_be_bytes());
+        self.write_all(&msg)
+            .map_err(|e| format!("write keepalive request: {}", e))?;
+        self.flush().map_err(|e| format!("flush: {}", e))
     }
 
     /// Send FramebufferUpdateRequest. incremental=true skips unchanged regions.

@@ -115,6 +115,8 @@ import {
   mailOAuthDeviceStart,
 } from "../../lib/mail";
 import { useT, type TranslateFn } from "../../lib/i18n";
+import { normalizeVncScaling, VNC_SCALE_PERCENTAGES } from "../../lib/vnc";
+import { parseVncViewerOptions, writeVncViewerOptions, type VncViewerOptions } from "../../lib/vncOptions";
 import {
   PathMappingsEditor,
   parsePathMappings as parsePathMappingsFromOptions,
@@ -2702,13 +2704,16 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   /* --- VNC production policies --- */
   const [vncSecurityPolicy, setVncSecurityPolicy] = useState<
-    "require-encryption" | "prefer-encryption" | "legacy-compatible" | "allow-none"
+    "require-encryption" | "prefer-encryption" | "legacy-compatible" | "allow-none" | "prefer-off"
   >(() => {
     const value = optionString(initialOptions, "vncSecurityPolicy", "prefer-encryption");
     return value === "require-encryption" || value === "legacy-compatible" || value === "allow-none"
+      || value === "prefer-off"
       ? value
       : "prefer-encryption";
   });
+  // VNC-CONN-001: RealVNC Options, saved as flat vnc* keys (vncOptions.ts).
+  const [vncViewer, setVncViewer] = useState<VncViewerOptions>(() => parseVncViewerOptions(initialOptions));
   const [vncViewOnly, setVncViewOnly] = useState(() => optionBoolean(initialOptions, "vncViewOnly", false));
   const [vncClipboardPolicy, setVncClipboardPolicy] = useState<
     "disabled" | "client-to-server" | "server-to-client" | "bidirectional"
@@ -2912,7 +2917,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         : {};
     const vncOverrides: Record<string, unknown> =
       proto === "VNC"
-        ? { vncSecurityPolicy, vncViewOnly, vncClipboardPolicy }
+        ? writeVncViewerOptions({ vncSecurityPolicy, vncViewOnly, vncClipboardPolicy }, vncViewer)
         : {};
     const dbOverrides: Record<string, unknown> = isDb
       ? {
@@ -3478,11 +3483,13 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       const policy = optionString(nextOptions, "vncSecurityPolicy", "prefer-encryption");
       setVncSecurityPolicy(
         policy === "require-encryption" || policy === "legacy-compatible" || policy === "allow-none"
+          || policy === "prefer-off"
           ? policy
           : "prefer-encryption",
       );
     }
     setVncViewOnly(optionBoolean(nextOptions, "vncViewOnly", false));
+    setVncViewer(parseVncViewerOptions(nextOptions));
     {
       const policy = optionString(nextOptions, "vncClipboardPolicy", "bidirectional");
       setVncClipboardPolicy(
@@ -4575,8 +4582,50 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   <option value="prefer-encryption">Prefer strongest supported</option>
                   <option value="require-encryption">Require encrypted RA2</option>
                   <option value="legacy-compatible">Legacy compatible (no None)</option>
+                  <option value="prefer-off">Prefer off (unencrypted VNCAuth when offered)</option>
                   <option value="allow-none">Allow unauthenticated None</option>
                 </select>
+              </Field>
+              <Field label="Picture quality">
+                <select data-testid="session-vnc-quality" className="taomni-input w-64" value={vncViewer.pictureQuality} onChange={(event) => setVncViewer((current) => ({ ...current, pictureQuality: event.target.value as VncViewerOptions["pictureQuality"] }))}>
+                  <option value="automatic">Automatic</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </Field>
+              <Field label="Scaling">
+                <div className="flex items-center gap-3">
+                  <select data-testid="session-vnc-scaling" className="taomni-input w-40" value={String(vncViewer.scaling)} onChange={(event) => setVncViewer((current) => ({ ...current, scaling: normalizeVncScaling(event.target.value) }))}>
+                    <option value="auto">Automatic</option>
+                    <option value="fit">Scale to fit window</option>
+                    <option value="fit-width">Scale to fit width</option>
+                    <option value="fit-height">Scale to fit height</option>
+                    {VNC_SCALE_PERCENTAGES.map((percent) => (
+                      <option key={percent} value={String(percent)}>{percent}%</option>
+                    ))}
+                  </select>
+                  <label className="flex items-center gap-2">
+                    <input data-testid="session-vnc-preserve-aspect" type="checkbox" className="taomni-checkbox" checked={vncViewer.preserveAspect} onChange={(event) => setVncViewer((current) => ({ ...current, preserveAspect: event.target.checked }))} />
+                    Preserve aspect ratio
+                  </label>
+                </div>
+              </Field>
+              <Field label="Keys">
+                <div className="flex flex-col gap-1">
+                  <label className="flex items-center gap-2">
+                    <input data-testid="session-vnc-special-keys" type="checkbox" className="taomni-checkbox" checked={vncViewer.passSpecialKeys} onChange={(event) => setVncViewer((current) => ({ ...current, passSpecialKeys: event.target.checked }))} />
+                    Pass special keys (Win, Alt+Tab, PrtScn) to the remote (Windows)
+                  </label>
+                  <label className="flex items-center gap-2">
+                    Session menu key
+                    <select data-testid="session-vnc-menu-key" className="taomni-input w-24" value={vncViewer.menuKey} onChange={(event) => setVncViewer((current) => ({ ...current, menuKey: event.target.value as VncViewerOptions["menuKey"] }))}>
+                      {(["F8", "F9", "F10", "F11", "F12", "none"] as const).map((key) => (
+                        <option key={key} value={key}>{key === "none" ? "None" : key}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </Field>
               <Field label="Clipboard">
                 <select data-testid="session-vnc-clipboard-policy" className="taomni-input w-64" value={vncClipboardPolicy} onChange={(event) => setVncClipboardPolicy(event.target.value as typeof vncClipboardPolicy)}>
@@ -4591,6 +4640,32 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   <input data-testid="session-vnc-view-only" type="checkbox" className="taomni-checkbox" checked={vncViewOnly} onChange={(event) => setVncViewOnly(event.target.checked)} />
                   View only (keyboard and pointer input disabled)
                 </label>
+              </Field>
+              <Field label="Clipboard on connect">
+                <label className="flex items-center gap-2">
+                  <input data-testid="session-vnc-initial-clipboard" type="checkbox" className="taomni-checkbox" checked={vncViewer.sendInitialClipboard} onChange={(event) => setVncViewer((current) => ({ ...current, sendInitialClipboard: event.target.checked }))} />
+                  Send the local clipboard when connecting
+                </label>
+              </Field>
+              <Field label="Connection">
+                <div className="flex flex-col gap-1">
+                  <label className="flex items-center gap-2">
+                    <input data-testid="session-vnc-shared" type="checkbox" className="taomni-checkbox" checked={vncViewer.shared} onChange={(event) => setVncViewer((current) => ({ ...current, shared: event.target.checked }))} />
+                    Share the desktop with other viewers
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input data-testid="session-vnc-warn-unencrypted" type="checkbox" className="taomni-checkbox" checked={vncViewer.warnUnencrypted} onChange={(event) => setVncViewer((current) => ({ ...current, warnUnencrypted: event.target.checked }))} />
+                    Warn before an unencrypted connection
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input data-testid="session-vnc-auto-reconnect" type="checkbox" className="taomni-checkbox" checked={vncViewer.autoReconnect} onChange={(event) => setVncViewer((current) => ({ ...current, autoReconnect: event.target.checked }))} />
+                    Reconnect automatically when the connection drops
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input data-testid="session-vnc-bell" type="checkbox" className="taomni-checkbox" checked={vncViewer.acceptBell} onChange={(event) => setVncViewer((current) => ({ ...current, acceptBell: event.target.checked }))} />
+                    Play the remote bell
+                  </label>
+                </div>
               </Field>
               <div className="col-span-12 rounded border px-3 py-2 text-[11px] text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
                 VNCAuth and RA2ne authenticate but do not encrypt framebuffer traffic. None is rejected unless explicitly allowed.

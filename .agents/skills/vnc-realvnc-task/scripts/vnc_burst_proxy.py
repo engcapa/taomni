@@ -5,6 +5,7 @@ Point any VNC client (Taomni, RealVNC Viewer) at 127.0.0.1:<listen> and the
 proxy forwards to the real server while logging one line per burst:
 
     python vnc_burst_proxy.py --target HOST:5900 --listen 5977 --out bursts.jsonl
+    python vnc_burst_proxy.py ... --rate-kbps 10000   # emulate a 10 Mbit/s link
 
 A burst is downstream data separated from the next chunk by more than
 --gap-ms of silence. Each record carries start offset, duration, downstream and
@@ -96,14 +97,43 @@ class Recorder:
                 self._emit()
 
 
-def pump(src: socket.socket, dst: socket.socket, on_bytes) -> None:
+class Pacer:
+    """Token-bucket pacing of one direction to --rate-kbps (0 = unlimited)."""
+
+    SLICE = 16 * 1024
+
+    def __init__(self, rate_kbps: float) -> None:
+        self.bytes_per_s = rate_kbps * 1000.0 / 8.0
+        self.next_at = 0.0
+
+    def send(self, dst: socket.socket, data: bytes) -> None:
+        if self.bytes_per_s <= 0:
+            dst.sendall(data)
+            return
+        for offset in range(0, len(data), self.SLICE):
+            piece = data[offset:offset + self.SLICE]
+            now = time.perf_counter()
+            self.next_at = max(self.next_at, now)
+            wait = self.next_at - now
+            if wait > 0:
+                time.sleep(wait)
+            dst.sendall(piece)
+            self.next_at += len(piece) / self.bytes_per_s
+
+
+def pump(src: socket.socket, dst: socket.socket, on_bytes, pacer: "Pacer | None" = None) -> None:
     try:
         while True:
             data = src.recv(262144)
             if not data:
                 break
-            on_bytes(len(data))
-            dst.sendall(data)
+            if pacer and pacer.bytes_per_s > 0:
+                # Time the burst by delivery to the client, not arrival.
+                pacer.send(dst, data)
+                on_bytes(len(data))
+            else:
+                on_bytes(len(data))
+                dst.sendall(data)
     except OSError:
         pass
     finally:
@@ -121,6 +151,8 @@ def main() -> None:
     parser.add_argument("--gap-ms", type=float, default=120.0)
     parser.add_argument("--out")
     parser.add_argument("--up-log", help="append '<perf_counter> <bytes>' per upstream chunk")
+    parser.add_argument("--rate-kbps", type=float, default=0.0,
+                        help="pace each direction to this line rate (0 = unlimited)")
     args = parser.parse_args()
     host, _, port = args.target.rpartition(":")
     recorder = Recorder(args.out, args.gap_ms, args.up_log)
@@ -143,8 +175,10 @@ def main() -> None:
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         with recorder.lock:
             recorder.connection += 1
-        threading.Thread(target=pump, args=(server, client, recorder.down), daemon=True).start()
-        threading.Thread(target=pump, args=(client, server, recorder.up), daemon=True).start()
+        threading.Thread(target=pump, args=(server, client, recorder.down, Pacer(args.rate_kbps)),
+                         daemon=True).start()
+        threading.Thread(target=pump, args=(client, server, recorder.up, Pacer(args.rate_kbps)),
+                         daemon=True).start()
 
 
 if __name__ == "__main__":

@@ -137,6 +137,11 @@ describe("VNC WebSocket protocol", () => {
       securityPolicy: "require-encryption",
       viewOnly: true,
       clipboardPolicy: "server-to-client",
+      // Older callers pass no viewer extras; the backend keeps its defaults.
+      pictureQuality: null,
+      shared: null,
+      allowUnencrypted: null,
+      attemptId: null,
     });
     expect(mocks.invoke).toHaveBeenNthCalledWith(2, "vnc_test_connection", {
       host: "vnc.example.test",

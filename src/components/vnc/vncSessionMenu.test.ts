@@ -14,6 +14,9 @@ function actions(): VncSessionMenuActions {
     togglePreserveAspect: vi.fn(),
     refreshScreen: vi.fn(),
     showSessionInfo: vi.fn(),
+    showProperties: vi.fn(),
+    setPictureQuality: vi.fn(),
+    sendClipboardAsKeys: vi.fn(),
     closeConnection: vi.fn(),
   };
 }
@@ -26,6 +29,8 @@ const BASE: VncSessionMenuState = {
   altLatched: false,
   scaling: "auto",
   preserveAspect: true,
+  pictureQuality: "automatic",
+  clipboardToServer: true,
 };
 
 describe("VNC session menu (RealVNC F8 order)", () => {
@@ -38,12 +43,15 @@ describe("VNC session menu (RealVNC F8 order)", () => {
       "vnc-menu-fullscreen",
       "vnc-menu-send-f8",
       "vnc-menu-send-cad",
+      "vnc-menu-send-clipboard-keys",
       "vnc-menu-ctrl",
       "vnc-menu-alt",
       "vnc-menu-scale-auto",
       "vnc-menu-scaling",
+      "vnc-menu-quality",
       "vnc-menu-refresh",
       "vnc-menu-info",
+      "vnc-menu-properties",
     ]);
   });
 
@@ -69,5 +77,21 @@ describe("VNC session menu (RealVNC F8 order)", () => {
     buildVncSessionMenuItems({ ...BASE, scaling: 100 }, handlers, t)
       .find((item) => item.testId === "vnc-menu-scale-auto")?.onClick?.();
     expect(handlers.setScaling).toHaveBeenLastCalledWith("auto");
+  });
+
+  it("offers RealVNC picture quality presets and gates clipboard keystrokes", () => {
+    const handlers = actions();
+    const items = buildVncSessionMenuItems({ ...BASE, pictureQuality: "medium", clipboardToServer: false }, handlers, t);
+    const quality = items.find((item) => item.testId === "vnc-menu-quality")?.children ?? [];
+    expect(quality.map((item) => item.testId)).toEqual([
+      "vnc-quality-automatic",
+      "vnc-quality-high",
+      "vnc-quality-medium",
+      "vnc-quality-low",
+    ]);
+    expect(quality.find((item) => item.testId === "vnc-quality-medium")?.checked).toBe(true);
+    quality.find((item) => item.testId === "vnc-quality-low")?.onClick?.();
+    expect(handlers.setPictureQuality).toHaveBeenCalledWith("low");
+    expect(items.find((item) => item.testId === "vnc-menu-send-clipboard-keys")?.disabled).toBe(true);
   });
 });
