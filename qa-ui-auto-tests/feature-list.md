@@ -6344,6 +6344,70 @@ controls:
     selector: '[data-testid="refactoring-preview-source-unavailable"]'
     kind: display
     optional: true       # typed notice when a usage's source text cannot be read
+  - id: error-stripe
+    selector: '[data-testid="code-workspace-error-stripe"]'
+    kind: display
+    optional: true       # ED-PARITY-022 right-edge error stripe
+  - id: error-stripe-mark
+    selector: '[data-testid="code-workspace-error-stripe-mark"]'
+    kind: interactive
+    optional: true       # stripe mark (data-kind/data-line); click moves the caret
+  - id: run-gutter
+    selector: '[data-testid="code-workspace-run-gutter"]'
+    kind: interactive
+    optional: true       # run ▶ backed by real run facts (data-line)
+  - id: run-gutter-run
+    selector: '[data-testid="code-workspace-run-gutter-run"]'
+    kind: display
+    optional: true       # Run item of the run gutter menu
+  - id: run-gutter-debug
+    selector: '[data-testid="code-workspace-run-gutter-debug"]'
+    kind: display
+    optional: true       # Debug item of the run gutter menu
+  - id: git-change-marker-modified
+    selector: '.cm-git-change-marker.cm-git-change-modified'
+    kind: interactive
+    optional: true       # VCS gutter modified bar; click opens the change popup
+  - id: lsp-usage-mark
+    selector: '.cm-lsp-usage'
+    kind: display
+    optional: true       # provider caret usage highlight
+  - id: git-diff-peek
+    selector: '[data-testid="code-workspace-git-diff-peek"]'
+    kind: display
+    optional: true       # VCS change popup (data-change-kind/data-change-index)
+  - id: git-diff-peek-previous
+    selector: '[data-testid="git-diff-peek-previous"]'
+    kind: interactive
+    optional: true       # previous change
+  - id: git-diff-peek-next
+    selector: '[data-testid="git-diff-peek-next"]'
+    kind: interactive
+    optional: true       # next change
+  - id: git-diff-peek-rollback
+    selector: '[data-testid="git-diff-peek-rollback-btn"]'
+    kind: interactive
+    optional: true       # Rollback lines as one undoable edit
+  - id: git-diff-peek-show-diff
+    selector: '[data-testid="git-diff-peek-show-diff"]'
+    kind: interactive
+    optional: true       # HEAD ↔ buffer compare
+  - id: git-diff-peek-copy
+    selector: '[data-testid="git-diff-peek-copy"]'
+    kind: display
+    optional: true       # copy HEAD lines
+  - id: git-diff-peek-position
+    selector: '[data-testid="git-diff-peek-position"]'
+    kind: display
+    optional: true       # N of M changes
+  - id: git-diff-peek-old-line
+    selector: '[data-testid="git-diff-peek-old-line"]'
+    kind: display
+    optional: true       # HEAD line
+  - id: git-diff-peek-new-line
+    selector: '[data-testid="git-diff-peek-new-line"]'
+    kind: display
+    optional: true       # buffer line
   - id: inline-rename-session
     selector: '[data-testid="code-workspace-inline-rename"]'
     kind: display

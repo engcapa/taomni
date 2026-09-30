@@ -146,6 +146,8 @@ import {
 } from "./lspCompletion";
 import type { CompletionScopeFactsState } from "./completionScopeAdapter";
 import { createDiagnosticChrome } from "./lspDiagnosticChrome";
+import { createErrorStripe, setErrorStripeSources } from "./errorStripe";
+import { createRunGutter, setRunGutter, type RunGutterTarget } from "./runGutter";
 import {
   createLspOverlayChrome,
   createLspSemanticTokenChrome,
@@ -544,6 +546,9 @@ interface CodeMirrorHostProps {
   onExpandSelection?: (selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   onLightbulb?: (line: number) => void;
   onGitChangeClick?: (change: GitLineChange) => void;
+  /** ED-PARITY-022 DEC-022-03: run gutter targets backed by real run facts. */
+  runGutterTargets?: RunGutterTarget[];
+  onRunGutterClick?: (target: RunGutterTarget, anchor: { x: number; y: number }) => void;
   /** Toggle a breakpoint at a 1-based line (breakpoint gutter click). */
   onToggleBreakpoint?: (line: number) => void;
   /** Edit a breakpoint's condition/logpoint at a 1-based line (gutter right-click). */
@@ -1677,6 +1682,7 @@ function positionCompletionInfo(view: EditorView, list: Rect, option: Rect, info
 const EMPTY_DIAGNOSTICS: LspDiagnostic[] = [];
 const EMPTY_HIGHLIGHTS: LspDocumentHighlight[] = [];
 const EMPTY_INLAY_HINTS: LspInlayHint[] = [];
+const EMPTY_RUN_GUTTER_TARGETS: RunGutterTarget[] = [];
 const EMPTY_SEMANTIC_TOKENS: LspSemanticToken[] = [];
 const EMPTY_GIT_CHANGES: GitLineChange[] = [];
 const EMPTY_DEBUG_BREAKPOINTS: DebugBreakpointMarker[] = [];
@@ -2186,6 +2192,7 @@ function areCodeMirrorHostPropsEqual(prev: CodeMirrorHostProps, next: CodeMirror
   if (!sameOptionalArray(prev.inlayHints, next.inlayHints)) return false;
   if (!sameOptionalArray(prev.semanticTokens, next.semanticTokens)) return false;
   if (!sameOptionalArray(prev.gitChanges, next.gitChanges)) return false;
+  if (!sameOptionalArray(prev.runGutterTargets, next.runGutterTargets)) return false;
   if (!sameOptionalArray(prev.debugBreakpoints, next.debugBreakpoints)) return false;
   if (!sameOptionalArray(prev.completionTriggers, next.completionTriggers)) return false;
   if (!sameOptionalArray(prev.signatureTriggers, next.signatureTriggers)) return false;
@@ -2335,6 +2342,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onExpandSelection,
   onLightbulb,
   onGitChangeClick,
+  runGutterTargets = EMPTY_RUN_GUTTER_TARGETS,
+  onRunGutterClick,
   onToggleBreakpoint,
   onEditBreakpoint,
   onContextMenu,
@@ -2863,6 +2872,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const onGitChangeClickRef = useRef(onGitChangeClick);
+  const onRunGutterClickRef = useRef(onRunGutterClick);
   const onContextMenuRef = useRef(onContextMenu);
   const onToggleRenderedDocRawRef = useRef(onToggleRenderedDocRaw);
   const completionTriggersRef = useRef(completionTriggers ?? []);
@@ -2908,6 +2918,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onExpandSelectionRef.current = onExpandSelection;
   onLightbulbRef.current = onLightbulb;
   onGitChangeClickRef.current = onGitChangeClick;
+  onRunGutterClickRef.current = onRunGutterClick;
   onToggleBreakpointRef.current = onToggleBreakpoint;
   onEditBreakpointRef.current = onEditBreakpoint;
   debugStepRef.current = debugStep;
@@ -3287,6 +3298,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           semanticTokens,
         )),
         LSP_INTELLIGENCE_THEME,
+        // ED-PARITY-022 DEC-022-01: right-edge error stripe (read-only marks).
+        createErrorStripe({ diagnostics, gitChanges, usages: highlights }),
+        createRunGutter({
+          targets: runGutterTargets,
+          onClick: (target, anchor) => onRunGutterClickRef.current?.(target, anchor),
+        }),
         gitCompartment.current.of(createGitEditorChrome(
           gitChanges,
           gitBlame,
@@ -4278,6 +4295,31 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       effects: updateLspOverlayChrome(highlights, inlayHints),
     });
   }, [highlights, inlayHints]);
+
+  // The stripe is secondary chrome: update it after the frame so document and
+  // decoration transactions keep their single synchronous dispatch.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const view = viewRef.current;
+      if (!view || !view.dom.isConnected) return;
+      view.dispatch({
+        effects: setErrorStripeSources.of({ diagnostics, gitChanges, usages: highlights }),
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [diagnostics, gitChanges, highlights]);
+
+  const runGutterClick = useCallback(
+    (target: RunGutterTarget, anchor: { x: number; y: number }) => onRunGutterClickRef.current?.(target, anchor),
+    [],
+  );
+  const renderedRunGutterRef = useRef(runGutterTargets);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || renderedRunGutterRef.current === runGutterTargets) return;
+    renderedRunGutterRef.current = runGutterTargets;
+    view.dispatch({ effects: setRunGutter.of({ targets: runGutterTargets, onClick: runGutterClick }) });
+  }, [runGutterClick, runGutterTargets]);
 
   useEffect(() => {
     const view = viewRef.current;

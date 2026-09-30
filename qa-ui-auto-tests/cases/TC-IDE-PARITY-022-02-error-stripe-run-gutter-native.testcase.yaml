@@ -1,0 +1,187 @@
+id: TC-IDE-PARITY-022-02
+title: Native JDT LS error stripe, run gutter menu and semantic caret usages
+description: 'ED-PARITY-022 A2/A3 native case on the in-repo maven-single sample and the CI-provisioned JDT LS: App.java with one type error and one raw-type warning shows error/warning marks on the right error stripe (click moves the caret), run gutter icons on the class and main lines backed by real run facts with a Run/Debug menu, and provider-backed caret usage highlights, all without editing the buffer.
+
+
+  Mode: native.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- editor-surface
+- ed-parity-022
+- native-gate
+- provider-fixture
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- java_sample_projects
+- jdtls_required
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-p022","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- host_write_file:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    text: "package com.example.single;\n\npublic class App {\n\n    public static void main(String[] args) {\n        int count = \"text\";\n        java.util.List raw = null;\n        System.out.println(count + \" \" + raw);\n    }\n}\n"
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: java.util.List raw
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 120
+- wait_for:
+    selector: '[data-testid="code-workspace-error-stripe-mark"][data-kind="error"][data-line="6"]'
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="code-workspace-error-stripe-mark"][data-kind="warning"][data-line="7"]'
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="code-workspace-run-gutter"][data-line="5"]'
+    timeout_sec: 60
+- assert_visible: '[data-testid="code-workspace-run-gutter"][data-line="3"]'
+- screenshot: tc-ide-parity-022-02-surface.png
+- click: '[data-testid="code-workspace-run-gutter"][data-line="5"]'
+- wait_for: '[data-testid="code-workspace-run-gutter-run"]'
+- assert_visible: '[data-testid="code-workspace-run-gutter-debug"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-run-gutter-run"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-error-stripe-mark"][data-kind="error"][data-line="6"]'
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: '6:1'
+    timeout_sec: 10
+- press:
+    key: End
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- press:
+    key: ArrowLeft
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for:
+    selector: .cm-lsp-usage
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="code-workspace-error-stripe-mark"][data-kind="usage"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+    equal: 0
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A2/DEC-022-01：真实 JDT LS 诊断在右侧 error stripe 以错误/警告刻度出现在对应行；点击错误刻度把 caret 移到第 6 行，文档不变。
+    actions:
+    - 23
+    checkpoints:
+    - step: 12
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 120}}'
+    - step: 13
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"error\"][data-line=\"6\"]", "timeout_sec": 60}}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"warning\"][data-line=\"7\"]", "timeout_sec": 30}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "6:1", "timeout_sec": 10}}'
+    - step: 40
+      expectation: '{"assert_count": {"selector": "[data-editor-tab-key][data-active=\"true\"][data-dirty=\"true\"]", "equal": 0}}'
+    results:
+    - 13
+    - 14
+    - 24
+    - 40
+  - id: R2
+    requirement: A2/DEC-022-03：有真实运行 facts 的 App.java 在类声明与 main 行显示运行图标；点击弹出 Run/Debug 菜单，Esc 关闭。
+    actions:
+    - 18
+    - 21
+    checkpoints:
+    - step: 15
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-run-gutter\"][data-line=\"5\"]", "timeout_sec": 60}}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-run-gutter\"][data-line=\"3\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-run-gutter-run\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-run-gutter-debug\"]"}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-run-gutter-run\"]", "state": "detached", "timeout_sec": 5}}'
+    results:
+    - 15
+    - 16
+    - 19
+    - 20
+    - 22
+  - id: R3
+    requirement: A2/DEC-022-04：caret 停在 count 上时由 provider 语义高亮用法（刻度同步进入 stripe）；gutter/stripe 更新不产生编辑或 dirty。
+    actions:
+    - 37
+    checkpoints:
+    - step: 38
+      expectation: '{"wait_for": {"selector": ".cm-lsp-usage", "timeout_sec": 30}}'
+    - step: 39
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"usage\"]", "timeout_sec": 10}}'
+    - step: 40
+      expectation: '{"assert_count": {"selector": "[data-editor-tab-key][data-active=\"true\"][data-dirty=\"true\"]", "equal": 0}}'
+    results:
+    - 38
+    - 40
+  visual:
+  - check: 不声明视觉结论。
+    method: not-applicable
+    reason: native 证明 provider 数据与交互。
+  native:
+  - check: Linux/Windows/macOS 打包应用 + 真实 JDT LS。
+    method: automated
+    reason: native runner 驱动打包 WebView。

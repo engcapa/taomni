@@ -70,7 +70,10 @@ import type { EditorGroupId } from "../../../stores/codeWorkspaceStore";
 import type { GitBlameLine } from "../../../lib/git";
 import type { WorkspaceActionHost } from "./workspaceActionHost";
 import type { GitLineChange } from "./gitEditorChrome";
+import type { RunGutterTarget } from "./runGutter";
 import { rollbackGitLineChange } from "./gitEditorChrome";
+import { EditorView } from "@codemirror/view";
+import { writeText } from "../../../lib/clipboard";
 import type { DebugBreakpointMarker } from "./debugEditorChrome";
 import type { DebugStepAction } from "./dapDebugModel";
 import { GitDiffPeek } from "./GitDiffPeek";
@@ -143,6 +146,11 @@ interface EditorGroupProps {
   activeSemanticTokens?: LspSemanticToken[];
   activeGitChanges: GitLineChange[];
   activeGitBlame: GitBlameLine | null;
+  /** ED-PARITY-022 DEC-022-02: open HEAD ↔ buffer diff for the active file. */
+  onShowGitDiff?: (key: string) => void;
+  /** ED-PARITY-022 DEC-022-03: run gutter targets of the active file (real run facts only). */
+  activeRunGutterTargets?: RunGutterTarget[];
+  onRunGutterClick?: (target: RunGutterTarget, anchor: { x: number; y: number }) => void;
   /** Active file code coverage. */
   activeCoverage?: FileCoverage | null;
   /** Coverage overlay enabled. */
@@ -328,6 +336,9 @@ export function EditorGroup({
   activeSemanticTokens = [],
   activeGitChanges,
   activeGitBlame,
+  onShowGitDiff,
+  activeRunGutterTargets,
+  onRunGutterClick,
   activeCoverage,
   coverageEnabled = true,
   activeCodeStyle,
@@ -936,17 +947,59 @@ export function EditorGroup({
                     </div>
                   )}
                 </div>
-                {gitDiffPeek && (
-                  <GitDiffPeek
-                    change={gitDiffPeek}
-                    onClose={() => setGitDiffPeek(null)}
-                    onRollback={(change) => {
-                      const newDoc = rollbackGitLineChange(activeFile.text, change);
-                      if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
-                      onChangeText(activeFile.key, newDoc);
-                    }}
-                  />
-                )}
+                {gitDiffPeek && (() => {
+                  const peekIndex = Math.max(0, activeGitChanges.findIndex((change) => (
+                    change.startLine === gitDiffPeek.startLine && change.kind === gitDiffPeek.kind
+                  )));
+                  const step = (delta: number) => {
+                    const count = activeGitChanges.length;
+                    if (count < 2) return;
+                    const next = activeGitChanges[(peekIndex + delta + count) % count];
+                    if (next) setGitDiffPeek(next);
+                  };
+                  return (
+                    <GitDiffPeek
+                      change={gitDiffPeek}
+                      index={peekIndex}
+                      total={activeGitChanges.length}
+                      onClose={() => setGitDiffPeek(null)}
+                      onPrevious={() => step(-1)}
+                      onNext={() => step(1)}
+                      onShowDiff={onShowGitDiff ? () => onShowGitDiff(activeFile.key) : undefined}
+                      onCopy={(change) => { void writeText(change.oldText); }}
+                      onRollback={(change) => {
+                        const newDoc = rollbackGitLineChange(activeFile.text, change);
+                        if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
+                        // DEC-022-02: Rollback is one ordinary, undoable editor
+                        // edit (Ctrl+Z restores the lines) instead of a buffer
+                        // snapshot outside the editor history.
+                        const host = editorPaneRef.current?.querySelector<HTMLElement>(
+                          '[data-testid="code-workspace-editor"] .cm-editor',
+                        );
+                        const view = host ? EditorView.findFromDOM(host) : null;
+                        const current = view?.state.doc.toString();
+                        if (view && current === activeFile.text) {
+                          let from = 0;
+                          while (from < current.length && from < newDoc.length && current[from] === newDoc[from]) from += 1;
+                          let endOld = current.length;
+                          let endNew = newDoc.length;
+                          while (endOld > from && endNew > from && current[endOld - 1] === newDoc[endNew - 1]) {
+                            endOld -= 1;
+                            endNew -= 1;
+                          }
+                          view.dispatch({
+                            changes: { from, to: endOld, insert: newDoc.slice(from, endNew) },
+                            userEvent: "input.rollback",
+                            scrollIntoView: true,
+                          });
+                          view.focus();
+                          return;
+                        }
+                        onChangeText(activeFile.key, newDoc);
+                      }}
+                    />
+                  );
+                })()}
                 {activeFile.loading ? (
                   <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -986,6 +1039,8 @@ export function EditorGroup({
                         semanticTokens={activeSemanticTokens}
                         gitChanges={activeGitChanges}
                         gitBlame={activeGitBlame}
+                        runGutterTargets={activeRunGutterTargets}
+                        onRunGutterClick={onRunGutterClick}
                         fileCoverage={activeCoverage}
                         coverageEnabled={coverageEnabled}
                         reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
@@ -1069,6 +1124,8 @@ export function EditorGroup({
                       semanticTokens={activeSemanticTokens}
                       gitChanges={activeGitChanges}
                       gitBlame={activeGitBlame}
+                      runGutterTargets={activeRunGutterTargets}
+                      onRunGutterClick={onRunGutterClick}
                       fileCoverage={activeCoverage}
                       coverageEnabled={coverageEnabled}
                       debugBreakpoints={activeDebugBreakpoints}

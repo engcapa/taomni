@@ -424,6 +424,7 @@ import {
   type InlineRenameRange,
 } from "./workspace/inlineRename";
 import { readRefactorOptionsMode, writeRefactorOptionsMode } from "./workspace/refactorOptions";
+import { javaMainRunLines, type RunGutterTarget } from "./workspace/runGutter";
 import { RefactorRecoveryReviewDialog } from "./workspace/RefactorRecoveryReviewDialog";
 import {
   buildRefactorPlan,
@@ -1340,6 +1341,8 @@ type RenameSymbolAtResult = {
   /** The provider refused the name before any write; the caller may retry. */
   retryable?: boolean;
 };
+
+const EMPTY_RUN_GUTTER: RunGutterTarget[] = [];
 
 /** ED-PARITY-017: outcome of one in-place naming session. */
 type InlineNameResult =
@@ -7784,12 +7787,15 @@ export function CodeWorkspaceTab({
     let cancelled = false;
     const position = cursorPositions[groupId] ?? { line: 0, character: 0 };
     const descriptor = lspDescriptorForFile(file);
+    // ED-PARITY-022 DEC-022-04: Java usages are semantic; while the provider
+    // cannot answer, show none rather than a same-text imitation.
+    const semanticOnly = /\.java$/i.test(file.ref.path);
     if (!activeCapabilities?.documentHighlight || !descriptor) {
       const timer = window.setTimeout(() => {
         if (!cancelled && canApply()) {
           setHighlightsByGroup((current) => ({
             ...current,
-            [groupId]: fallbackWordHighlights(file.text, position),
+            [groupId]: semanticOnly ? [] : fallbackWordHighlights(file.text, position),
           }));
         }
       }, LSP_HIGHLIGHT_IDLE_DELAY_MS);
@@ -7817,7 +7823,7 @@ export function CodeWorkspaceTab({
           if (cancelled || !canApply() || !isCurrentLspDocumentRequest(file, epoch)) return;
           setHighlightsByGroup((current) => ({
             ...current,
-            [groupId]: fallbackWordHighlights(file.text, position),
+            [groupId]: semanticOnly ? [] : fallbackWordHighlights(file.text, position),
           }));
         });
     }, LSP_HIGHLIGHT_IDLE_DELAY_MS);
@@ -13024,6 +13030,27 @@ export function CodeWorkspaceTab({
     setStatusMessage("Occurrence highlights cleared");
     return true;
   }, [activeEditorGroupId, setStatusMessage]);
+
+  /** ED-PARITY-022 DEC-022-02: VCS popup Show Diff — HEAD (read-only) ↔ buffer. */
+  const showGitHeadDiff = useCallback((key: string) => {
+    const file = openFilesRef.current[key];
+    const head = gitHeadTextByFile[key];
+    if (!file || !head || typeof head.text !== "string") {
+      setStatusMessage("Show Diff is unavailable: the HEAD revision of this file is not loaded");
+      return;
+    }
+    const target = compareTargetForOpenFile(file, undefined);
+    const result = createFileCompareSession(
+      { title: `${file.title} (HEAD)`, text: head.text ?? "", source: "file", readOnly: true },
+      compareDescriptorForOpenFile(file, "buffer", file.path, file.text, file.title),
+      target,
+    );
+    if (!result.session) {
+      setStatusMessage(result.error ?? "Show Diff is unavailable for this file");
+      return;
+    }
+    setActiveCompareSession(result.session);
+  }, [gitHeadTextByFile, setStatusMessage]);
 
   const compareWithClipboard = useCallback(async () => {
     const file = activeFile;
@@ -20291,6 +20318,7 @@ export function CodeWorkspaceTab({
     workspaceInstanceId,
   ]);
 
+
   const startDebugActiveTarget = useCallback(() => {
     // A Java source without a selected structured debug configuration uses the
     // compatibility jdtls launch path. Once a configuration supplies a debug
@@ -20423,6 +20451,40 @@ export function CodeWorkspaceTab({
     setStatusMessage,
     startDebugActiveFile,
   ]);
+
+  // ED-PARITY-022 DEC-022-03: run gutter ▶ only where a detected run
+  // configuration of this very file exists (no facts → no icon).
+  const runGutterKey = useMemo(() => {
+    if (!activeFile || !activeFileIsJava || !activeRunConfiguration?.sourceFile) return "";
+    const absolute = absolutePathForOpenFile(activeFile);
+    if (!absolute || !fsPathEquals(normalizeFsPath(activeRunConfiguration.sourceFile), normalizeFsPath(absolute))) return "";
+    const { classLine, mainLine } = javaMainRunLines(activeFile.text);
+    if (mainLine === null) return "";
+    return JSON.stringify({
+      label: activeRunConfiguration.label,
+      lines: classLine !== null && classLine !== mainLine ? [classLine, mainLine] : [mainLine],
+    });
+  }, [absolutePathForOpenFile, activeFile, activeFileIsJava, activeRunConfiguration]);
+  const activeRunGutterTargets = useMemo<RunGutterTarget[]>(() => {
+    if (!runGutterKey) return [];
+    const parsed = JSON.parse(runGutterKey) as { label: string; lines: number[] };
+    return parsed.lines.map((line) => ({ line, label: parsed.label }));
+  }, [runGutterKey]);
+  const handleRunGutterClick = useCallback((target: RunGutterTarget, anchor: { x: number; y: number }) => {
+    openEditorContextMenuAt(anchor.x, anchor.y, [
+      {
+        label: `Run '${target.label}'`,
+        testId: "code-workspace-run-gutter-run",
+        shortcut: "Ctrl+Shift+F10",
+        onClick: () => { void runActiveJavaFileRef.current(); },
+      },
+      {
+        label: `Debug '${target.label}'`,
+        testId: "code-workspace-run-gutter-debug",
+        onClick: () => startDebugActiveTarget(),
+      },
+    ]);
+  }, [openEditorContextMenuAt, startDebugActiveTarget]);
 
   /**
    * Attach to a JVM already running with `-agentlib:jdwp=...,server=y,address=…`
@@ -20843,6 +20905,9 @@ export function CodeWorkspaceTab({
         activeInlayHints={inlayHintsByGroup[groupId] ?? []}
         activeSemanticTokens={semanticTokensByGroup[groupId] ?? []}
         activeGitChanges={groupFile ? gitLineChangesByFile[groupFile.key] ?? [] : []}
+        onShowGitDiff={showGitHeadDiff}
+        activeRunGutterTargets={groupFile && groupFile.key === activeKey ? activeRunGutterTargets : EMPTY_RUN_GUTTER}
+        onRunGutterClick={handleRunGutterClick}
         activeGitBlame={gitBlameByGroup[groupId] ?? null}
         activeCoverage={groupFile && coverageReport ? findFileCoverage(coverageReport, absolutePathForOpenFile(groupFile) ?? groupFile.languagePath) : null}
         coverageEnabled={coverageOverlayEnabled}

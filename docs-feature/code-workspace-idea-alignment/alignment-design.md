@@ -251,6 +251,7 @@
   - 参数名 inlay 与 Code Vision 分开：本卡只做参数名 inlay；Code Vision 不在本批次。
 - 必须保留：现有折叠、断点 gutter、调试行标记、blame 开关、性能（大文件 gutter 更新预算）。
 - 依赖：011、018（Git 数据与执行动作）、015（语义数据）。
+- P1 设计：[ed-parity-022-gutter-stripe-design.md](ed-parity-022-gutter-stripe-design.md)。
 - 验收：`ED-PARITY-022-A1`、`ED-PARITY-022-A2`、`ED-PARITY-022-A3`。
 
 ## 7. 验收条件

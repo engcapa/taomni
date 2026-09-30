@@ -1,0 +1,221 @@
+id: TC-IDE-PARITY-022-01
+title: VCS change popup (prev/next, Show Diff, undoable Rollback) and error stripe marks
+description: 'ED-PARITY-022 A1/A2/A3 browser case on the parity008 controlled Git fixture: the VCS gutter colours modified/added lines; clicking opens IDEA''s change popup with HEAD/buffer lines, 1 of 2 and previous/next; Show Diff opens a HEAD↔buffer compare; Rollback is one undoable edit; the right error stripe shows VCS and TODO marks that move the caret on click; no run icon appears without run facts.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- git
+- editor-surface
+- ed-parity-022
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - ''
+- wait_for:
+    selector: .cm-git-change-marker.cm-git-change-modified
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="code-workspace-error-stripe-mark"][data-kind="git-modified"][data-line="1"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="code-workspace-run-gutter"]'
+    equal: 0
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+End
+- type: '// TODO: check'
+- wait_for:
+    selector: '[data-testid="code-workspace-error-stripe-mark"][data-kind="todo"][data-line="3"]'
+    timeout_sec: 10
+- wait_for:
+    selector: '[data-testid="code-workspace-error-stripe-mark"][data-kind="git-modified"][data-line="3"]'
+    timeout_sec: 30
+- click: .cm-git-change-marker.cm-git-change-modified
+- wait_for: '[data-testid="code-workspace-git-diff-peek"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-git-diff-peek"]'
+    name: data-change-kind
+    equals: modified
+- assert_text:
+    selector: '[data-testid="git-diff-peek-old-line"]'
+    contains: repo-a HEAD
+- assert_text:
+    selector: '[data-testid="git-diff-peek-new-line"]'
+    contains: repo-a WORKTREE
+- assert_text:
+    selector: '[data-testid="git-diff-peek-position"]'
+    contains: 1 of 2
+- click: '[data-testid="git-diff-peek-next"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-git-diff-peek"]'
+    name: data-change-index
+    equals: '1'
+- click: '[data-testid="git-diff-peek-previous"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-git-diff-peek"]'
+    name: data-change-index
+    equals: '0'
+- click: '[data-testid="git-diff-peek-show-diff"]'
+- wait_for: '[data-testid="code-workspace-compare-dialog"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-compare-dialog"]'
+    contains: same.txt (HEAD)
+- assert_count:
+    selector: '[data-testid="code-workspace-git-diff-peek"]'
+    equal: 0
+- click: '[data-testid="compare-dialog-close"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-compare-dialog"]'
+    state: detached
+    timeout_sec: 5
+- click: .cm-git-change-marker.cm-git-change-modified
+- wait_for: '[data-testid="code-workspace-git-diff-peek"]'
+- click: '[data-testid="git-diff-peek-rollback-btn"]'
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a HEAD
+    - shared line
+    - '// TODO: check'
+- wait_for:
+    selector: '[data-testid="code-workspace-error-stripe-mark"][data-kind="git-modified"][data-line="1"]'
+    state: detached
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Mod+z
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - '// TODO: check'
+- wait_for:
+    selector: '[data-testid="code-workspace-error-stripe-mark"][data-kind="git-modified"][data-line="1"]'
+    timeout_sec: 30
+- click: '[data-testid="code-workspace-error-stripe-mark"][data-kind="todo"]'
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: '3:1'
+    timeout_sec: 5
+- assert_items:
+    selector: '[data-testid="code-workspace-editor"] .cm-line'
+    equals:
+    - repo-a WORKTREE
+    - shared line
+    - '// TODO: check'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1/DEC-022-02：VCS 变更条按类型着色（修改）并在第 3 行出现第二处变更；点击弹出 IDEA 变更弹层：HEAD/缓冲区行、1 of 2、上一处/下一处在两处变更间切换。
+    actions:
+    - 12
+    - 15
+    - 21
+    - 23
+    checkpoints:
+    - step: 6
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["repo-a WORKTREE", "shared line", ""]}}'
+    - step: 7
+      expectation: '{"wait_for": {"selector": ".cm-git-change-marker.cm-git-change-modified", "timeout_sec": 30}}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"git-modified\"][data-line=\"3\"]", "timeout_sec": 30}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-git-diff-peek\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-git-diff-peek\"]", "name": "data-change-kind", "equals": "modified"}}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"git-diff-peek-old-line\"]", "contains": "repo-a HEAD"}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"git-diff-peek-new-line\"]", "contains": "repo-a WORKTREE"}}'
+    - step: 20
+      expectation: '{"assert_text": {"selector": "[data-testid=\"git-diff-peek-position\"]", "contains": "1 of 2"}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-git-diff-peek\"]", "name": "data-change-index", "equals": "1"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-git-diff-peek\"]", "name": "data-change-index", "equals": "0"}}'
+    results:
+    - 18
+    - 19
+    - 20
+    - 22
+    - 24
+  - id: R2
+    requirement: A1：Show Diff 打开 HEAD（只读）↔ 缓冲区对比并关闭弹层；Rollback 是一次普通编辑，变更条消失，Ctrl+Z 恢复原行与变更条。
+    actions:
+    - 25
+    - 29
+    - 33
+    - 37
+    checkpoints:
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-compare-dialog\"]"}'
+    - step: 27
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-compare-dialog\"]", "contains": "same.txt (HEAD)"}}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-git-diff-peek\"]", "equal": 0}}'
+    - step: 34
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["repo-a HEAD", "shared line", "// TODO: check"]}}'
+    - step: 35
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"git-modified\"][data-line=\"1\"]", "state": "detached", "timeout_sec": 30}}'
+    - step: 38
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["repo-a WORKTREE", "shared line", "// TODO: check"]}}'
+    - step: 39
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"git-modified\"][data-line=\"1\"]", "timeout_sec": 30}}'
+    results:
+    - 27
+    - 34
+    - 35
+    - 38
+    - 39
+  - id: R3
+    requirement: A2/DEC-022-01/03：右侧 error stripe 显示 VCS 与 TODO 刻度，点击刻度把 caret 移到该行且不修改文档；无运行 facts 时不显示运行图标。
+    actions:
+    - 40
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"git-modified\"][data-line=\"1\"]", "timeout_sec": 10}}'
+    - step: 9
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-run-gutter\"]", "equal": 0}}'
+    - step: 13
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"todo\"][data-line=\"3\"]", "timeout_sec": 10}}'
+    - step: 41
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "3:1", "timeout_sec": 5}}'
+    - step: 42
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["repo-a WORKTREE", "shared line", "// TODO: check"]}}'
+    results:
+    - 8
+    - 9
+    - 13
+    - 41
+    - 42
+  visual:
+  - check: 对照 IDEA 变更条弹层与 error stripe。
+    method: manual
+    reason: Commit this change 输入框与 Rollback 图标布局 different。
+  native:
+  - check: browser 使用受控 Git provider。
+    method: not-applicable
+    reason: 真实 JDT LS 诊断刻度与运行图标由 TC-IDE-PARITY-022-02 证明。

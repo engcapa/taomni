@@ -98,11 +98,11 @@
 参照：[总体设计](alignment-design.md#ed-parity-021) / [P1 设计与用例](ed-parity-021-context-menus-design.md) / [控件级复核 §6](references/idea-control-audit-20260929.md#menus)。
 
 ### ED-PARITY-022 Gutter、滚动条标记与用法高亮对齐
-<!-- ide-task {"id":"ED-PARITY-022","status":"deferred","priority":"P1","size":"L","depends_on":["ED-PARITY-011","ED-PARITY-015","ED-PARITY-018"],"spec":"docs-feature/code-workspace-idea-alignment/alignment-design.md#ed-parity-022","acceptance":["ED-PARITY-022-A1","ED-PARITY-022-A2","ED-PARITY-022-A3"],"required_evidence":["code-audit","unit","browser","native","provider","idea-comparison"],"audit":{"date":"2026-09-29","head":"06ef13d0","finding":"IDEA gutter 含 VCS 变更条（点击出行内 diff/Rollback/Commit this change）、运行三角菜单、灯泡，右侧 error stripe 显示错误/用法/TODO/查找刻度，caret 用法高亮与参数 inlay；Taomni browser 只有行号与折叠。"},"prior_completion":{"kind":"new-task","completed":false},"p0":{"audit_id":"LIVE-IDEA-20260929","requirements":["REQ-04","REQ-07"],"scenarios":["CW-EDIT-005","CW-GIT-001","CW-RUN-001"],"planning_required":true},"updated_at":"2026-09-29T09:00:00Z"} -->
+<!-- ide-task {"id":"ED-PARITY-022","status":"ready","priority":"P1","size":"L","depends_on":["ED-PARITY-011","ED-PARITY-015","ED-PARITY-018"],"spec":"docs-feature/code-workspace-idea-alignment/alignment-design.md#ed-parity-022","acceptance":["ED-PARITY-022-A1","ED-PARITY-022-A2","ED-PARITY-022-A3"],"required_evidence":["code-audit","unit","browser","native","provider","idea-comparison"],"audit":{"date":"2026-09-29","head":"06ef13d0","finding":"IDEA gutter 含 VCS 变更条（点击出行内 diff/Rollback/Commit this change）、运行三角菜单、灯泡，右侧 error stripe 显示错误/用法/TODO/查找刻度，caret 用法高亮与参数 inlay；Taomni browser 只有行号与折叠。"},"prior_completion":{"kind":"new-task","completed":false},"p0":{"audit_id":"LIVE-IDEA-20260929","requirements":["REQ-04","REQ-07"],"scenarios":["CW-EDIT-005","CW-GIT-001","CW-RUN-001"],"planning_required":false},"updated_at":"2026-09-29T09:00:00Z"} -->
 
 目标：补齐 VCS 变更条与行内 diff、运行/调试 gutter、error stripe、caret 用法高亮、参数名 inlay 和默认折叠，并在数据不可用时不显示伪造标记。
 
-参照：[总体设计](alignment-design.md#ed-parity-022) / [控件级复核 §2、§8](references/idea-control-audit-20260929.md#editor-surface)。
+参照：[总体设计](alignment-design.md#ed-parity-022) / [P1 设计与用例](ed-parity-022-gutter-stripe-design.md) / [控件级复核 §2、§8](references/idea-control-audit-20260929.md#editor-surface)。
 
 ## 当前批次边界
 
