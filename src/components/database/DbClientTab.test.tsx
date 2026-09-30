@@ -235,6 +235,16 @@ vi.mock("../../lib/capture", () => ({
   safeFilePart: (value: string) => value,
 }));
 
+/**
+ * The schema tree appears on the commit that connects; the mocked editor
+ * registers its handle in a passive effect that may flush later. Flush
+ * effects so toolbar clicks read the editor document.
+ */
+async function waitForConnectedEditor() {
+  await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+  await act(async () => undefined);
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -515,7 +525,7 @@ describe("DbClientTab connection lifecycle", () => {
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
 
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     expect(getQueryTab("tab-1")).toBeTruthy();
     const entry = getQueryTab("tab-1");
     expect(entry).toBeTruthy();
@@ -558,7 +568,7 @@ describe("DbClientTab connection lifecycle", () => {
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
 
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     fireEvent.click(screen.getByTitle("Run (F5)"));
 
     await waitFor(() => {
@@ -573,7 +583,7 @@ describe("DbClientTab connection lifecycle", () => {
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
 
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     expect(screen.getByTestId("db-tab-limit")).toHaveValue(2);
 
     fireEvent.click(screen.getByTitle("New query panel"));
@@ -593,7 +603,7 @@ describe("DbClientTab connection lifecycle", () => {
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
 
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
 
     // Open three result sheets (one Run per statement for a stable tab order).
     for (let count = 1; count <= 3; count += 1) {
@@ -672,7 +682,7 @@ describe("DbClientTab connection lifecycle", () => {
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
 
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     fireEvent.click(screen.getByTitle("Run (F5)"));
 
     await waitFor(() => expect(screen.getByTestId("query-result-grid")).toBeInTheDocument());
@@ -705,7 +715,7 @@ describe("DbClientTab connection lifecycle", () => {
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
 
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     fireEvent.click(screen.getByTitle("Run (F5)"));
     await waitFor(() => expect(screen.getByTestId("query-result-grid")).toBeInTheDocument());
 
@@ -735,7 +745,7 @@ describe("DbClientTab connection lifecycle", () => {
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
 
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     fireEvent.click(screen.getByTitle("Current statement actions"));
     await waitFor(() => expect(screen.getByTestId("db-current-statement-panel")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("db-current-statement-run"));
@@ -752,7 +762,7 @@ describe("DbClientTab connection lifecycle", () => {
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
 
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     expect(screen.getByTestId("db-run-current-statement")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("db-run-current-statement"));
 
@@ -796,7 +806,7 @@ describe("DbClientTab connection lifecycle", () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
 
     fireEvent.doubleClick(screen.getByTestId("db-query-tab"));
     const input = await screen.findByTestId("db-query-tab-input");
@@ -826,7 +836,7 @@ describe("DbClientTab connection lifecycle", () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
 
     fireEvent.doubleClick(screen.getByTestId("db-query-tab"));
     const input = await screen.findByTestId("db-query-tab-input");
@@ -881,7 +891,7 @@ describe("DbClientTab connection lifecycle", () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
 
     fireEvent.contextMenu(screen.getByTestId("db-query-tab"));
 
@@ -1043,7 +1053,7 @@ describe("DbClientTab execution log", () => {
     });
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     fireEvent.click(screen.getByTitle("Run (F5)"));
 
     await waitFor(() => expect(screen.getByTestId("db-execution-log")).toBeInTheDocument());
@@ -1068,7 +1078,7 @@ describe("DbClientTab execution log", () => {
     });
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     fireEvent.click(screen.getByTitle("Run (F5)"));
 
     await waitFor(() => expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(2));
@@ -1081,6 +1091,27 @@ describe("DbClientTab execution log", () => {
     expect(screen.getByTestId("db-execution-log-summary")).toHaveTextContent("Success: 2 · Failed: 0");
   });
 
+  it("keeps the Log open when it is selected while a run is in progress", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "select 1;\nselect 2";
+    const first = deferred<void>();
+    ipcMock.dbExecuteStream.mockImplementation(async (_session: string, sql: string, _max: number | null, onEvent: (event: StreamEvent) => void) => {
+      if (sql === "select 1") await first.promise;
+      streamOk(onEvent);
+    });
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitForConnectedEditor();
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+    await waitFor(() => expect(screen.getByTestId("result-log-tab")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("result-log-tab"));
+    await act(async () => first.resolve());
+
+    await waitFor(() => expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(2));
+    await waitFor(() => expect(screen.getByTestId("db-execution-log-summary")).toHaveTextContent("Success: 2"));
+    expect(screen.getByTestId("result-log-tab")).toHaveAttribute("data-active", "true");
+  });
+
   it("marks a cancelled statement and the following ones as not run", async () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
     dbChildProps.editorInitialDocFallback = "select sleep(30);\nselect 2";
@@ -1091,7 +1122,7 @@ describe("DbClientTab execution log", () => {
     });
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     fireEvent.click(screen.getByTitle("Run (F5)"));
     await waitFor(() => expect(screen.getByTitle("Cancel query")).not.toBeDisabled());
     fireEvent.click(screen.getByTitle("Cancel query"));
@@ -1126,7 +1157,7 @@ describe("DbClientTab error choice", () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
     dbChildProps.editorInitialDocFallback = doc;
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     fireEvent.click(screen.getByTitle("Run (F5)"));
   }
 
@@ -1192,7 +1223,7 @@ describe("DbClientTab error choice", () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
     dbChildProps.editorInitialDocFallback = "select 1;\nselect 2";
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     fireEvent.click(screen.getByTestId("db-explain-current"));
 
     await waitFor(() => {
@@ -1207,7 +1238,7 @@ describe("DbClientTab error choice", () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
     dbChildProps.editorInitialDocFallback = "create table t (id int)";
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     fireEvent.click(screen.getByTestId("db-explain-current"));
 
     await waitFor(() => expect(dialogMock.alert).toHaveBeenCalledTimes(1));
@@ -1322,7 +1353,7 @@ describe("DbClientTab manual commit", () => {
 
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
     render(<DbClientTab tabId="tab-2" info={{ ...postgresInfo, engine: "ClickHouse" }} visible />);
-    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    await waitForConnectedEditor();
     expect(screen.queryByTestId("db-tx-mode")).not.toBeInTheDocument();
     expect(ipcMock.dbTxStatus).not.toHaveBeenCalled();
   });

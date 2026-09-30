@@ -1381,7 +1381,8 @@ export default function DbClientTab({
               ...p,
               sheets,
               activeSheetId: sheet.id,
-              logActive: false,
+              // A run starts on its results; a Log opened mid-run stays open.
+              logActive: index === 0 ? false : p.logActive,
             };
           }),
         );
