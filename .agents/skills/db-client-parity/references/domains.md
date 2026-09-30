@@ -8,7 +8,8 @@ P0 以此为矩阵的起始分类，不是现状结论。DBeaver 列是待用目
 - 参照：DBeaver（Community 为通用基线，PRO 独有功能纳入）与 DbVisualizer Pro，按 [取长规则](ui-alignment.md#取长规则) 为每个场景选主参照。矩阵每个场景标 `ref: dbeaver-ce|dbeaver-pro|dbvis-pro` 的已观测来源和主参照；PRO 场景必须引用对应的 PRO 参考包。
 - PRO 功能逐项判定，不整体排除：与桌面单用户数据库会话相关的纳入；依赖 DBeaver 服务端/团队协作/云账号体系的（如 Team 共享、Cloud Explorer）由 P0 判为 `不适用` 并写原因，或经用户确认后以 Taomni 等价能力对齐。
 - 非目标：`redis` TabKind（用户明确纳入时再建域）；可视化查询构建器（DBeaver Visual Query Builder / DbVisualizer Query Builder）；结果集图表与仪表盘（Chart 视图、PRO 图表）。用户已于 2026-09-30 明确排除后两项。
-- 引擎：`DbHandle` 的全部引擎都要支持，但参照采集先只用 MariaDB 12.1.2（共享测试库）。其他引擎的差异在其 fixture 就绪后再采，之前记为“未验证”。Taomni 特有 AI 能力（`dbAiPrompts.ts`、Ask AI 菜单等）保留并纳入回归，不以 DBeaver 为目标。
+- 引擎：`DbHandle` 的全部引擎都要支持，但参照采集先只用 MariaDB 12.1.2（共享测试库）。其他引擎的差异在其 fixture 就绪后再采，之前记为“未验证”。
+- 2026-09-30 用户决定：ER 图不支持（`ER` 域不产卡）；DBeaver PRO 暂不采集，PRO 独有场景在有参照前不产卡；结果集排序以 DbVisualizer 为准（单击列头在客户端切换，另有 ORDER BY 重载入口）。Taomni 特有 AI 能力（`dbAiPrompts.ts`、Ask AI 菜单等）保留并纳入回归，不以 DBeaver 为目标。
 
 ## SQL 会话域
 
@@ -21,7 +22,7 @@ P0 以此为矩阵的起始分类，不是现状结论。DBeaver 列是待用目
 | `GRID` 结果集 | 网格/文本/记录视图、分页取数、排序/过滤、多结果标签、值查看器、NULL 显示、高级复制、行数统计 | 分组/透视、结果集比较（图表不在目标内） | `QueryResultGrid.tsx` |
 | `EDIT` 数据编辑 | 单元格编辑、增删/复制行、保存前 DML 预览、取消修改、无主键只读 | 批量/测试数据生成 | `QueryResultGrid.tsx`（`QueryGridCommitPayload`）、`DbClientTab.tsx` `commitGridChanges` |
 | `OBJ` 对象 | 表属性页（列、约束、外键、索引、DDL、数据）、界面修改并预览 SQL | —— | `DbObjectDetailDialog.tsx`；`db_describe_table`、`db_list_indexes`、`db_list_foreign_keys`、`db_object_ddl`、`db_table_stats` |
-| `ER` 图 | 表关系 ER 图查看/导出 | 正向工程、模型设计 | 待 P0 定位 |
+| `ER` 图（不支持） | —— | —— | 用户决定不做 |
 | `TX` 事务 | 自动/手动提交、提交/回滚、待提交提示、关闭时未提交处理 | 事务日志增强 | 待 P0 定位 |
 | `XFER` 数据传输 | 导出 CSV/JSON/SQL/XLSX、导入 CSV、表到表 | Excel/更多格式导入、传输任务 | `QueryResultGrid.tsx` 导出（`ExportTarget`） |
 | `CMP` 比较 | —— | 数据比较、schema 比较与同步脚本 | 待 P0 定位 |
@@ -41,7 +42,7 @@ P0 以此为矩阵的起始分类，不是现状结论。DBeaver 列是待用目
 | `GRID` | Grid/Text 视图（Chart 不在目标内）；分页；内联过滤；选区聚合；列头自动宽度/排序/查找/隐藏/换行；复制为格式化文本、逗号列表、IN 子句、HTML；在电子表格中打开；结果集标签页固定/重命名/浮动/平铺/载回编辑器 |
 | `EDIT` | Save Edits、插入/复制/删除行、在窗口中编辑行或单元格、批量设置选中单元格、撤销单元格修改 |
 | `OBJ` | 按引擎 profile 定义的对象视图页签（如 MySQL 表：Info、Columns、Native DDL、Triggers；视图：Info、Columns、Data、Row Count、Grants、DDL）；Create/Alter Table 列编辑器 |
-| `ER` | 对象导航图（navigator graph） |
+| `ER` | 对象导航图（不在目标内） |
 | `TX` | 提交、回滚、切换自动提交（工具栏与右键） |
 | `XFER` | 导出：可见/全部/选区；导入 |
 | `CMP` | Tools → Compare；Compare to Saved |
