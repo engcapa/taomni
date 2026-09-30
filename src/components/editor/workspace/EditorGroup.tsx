@@ -782,10 +782,13 @@ export function EditorGroup({
                   data-pinned={pinned || undefined}
                   data-dirty={file.dirty || undefined}
                   data-has-errors={filesWithErrors?.has(key) || undefined}
+                  role="presentation"
                   className="relative h-full min-w-[96px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)] data-[active=true]:after:pointer-events-none data-[active=true]:after:absolute data-[active=true]:after:inset-x-1 data-[active=true]:after:inset-y-1 data-[active=true]:after:rounded-md data-[active=true]:after:border data-[active=true]:after:border-[var(--taomni-accent)]/70"
                 >
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={active}
                     className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
                     title={file.subtitle}
                     onClick={() => onActivate(key)}
@@ -808,6 +811,7 @@ export function EditorGroup({
                     type="button"
                     className="h-full w-6 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
                     title="Close"
+                    aria-label={`Close ${file.title}`}
                     onClick={() => onClose(key)}
                   >
                     <X className="w-3 h-3" />
