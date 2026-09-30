@@ -97,6 +97,8 @@ import {
   type MailMessageBody,
   type MailMessageHeader,
   type MailSearchField,
+  type MailSendRequest,
+  type MailSendResult,
   type MailSyncRequestMode,
 } from "../../lib/mail";
 import { listen } from "@tauri-apps/api/event";
@@ -108,6 +110,15 @@ import {
   saveSubscribedOnly,
   visibleFolders,
 } from "../../lib/mailFolders";
+import {
+  fromDateTimeLocal,
+  isOutbox,
+  isTransientSendError,
+  outboxNextAttemptAt,
+  outboxState,
+  toDateTimeLocal,
+  type MailOutboxState,
+} from "../../lib/mailOutbox";
 import { isEditableTarget, mailShortcutAction, type MailShortcutAction } from "../../lib/mailShortcuts";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
 import {
@@ -215,6 +226,8 @@ interface ComposeDraft {
   richFormatUsed: boolean;
   /** Sending identity (DEFAULT_IDENTITY_ID = account address). */
   identityId?: string | null;
+  /** Ask for a read receipt (RFC 8098). */
+  readReceipt?: boolean;
 }
 
 type RecipientFieldKey = "to" | "cc" | "bcc";
@@ -770,8 +783,16 @@ function serializeDraftContent(draft: ComposeDraft): string {
   });
 }
 
+/** Reply context without the Outbox queue state (editing leaves the Outbox). */
+function withoutOutbox(context: MailDraftContext | null | undefined): MailDraftContext | null {
+  if (!context) return null;
+  const { outbox: _outbox, ...rest } = context;
+  return rest;
+}
+
 function draftFromSaved(saved: MailDraft): ComposeDraft {
   return {
+    readReceipt: outboxState(saved)?.readReceipt ?? false,
     id: saved.id,
     to: parseRecipientsText(saved.to.join(", ")),
     cc: parseRecipientsText(saved.cc.join(", ")),
@@ -780,7 +801,7 @@ function draftFromSaved(saved: MailDraft): ComposeDraft {
     htmlBody: saved.htmlBody || plainTextToMailHtml(saved.textBody),
     textBody: saved.textBody,
     attachments: saved.attachments ?? [],
-    replyContext: saved.replyContext ?? null,
+    replyContext: withoutOutbox(saved.replyContext),
     richFormatUsed: hasRichMailFormatting(saved.htmlBody),
     identityId: saved.replyContext?.identityId ?? null,
   };
@@ -1075,11 +1096,22 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [draft, setDraft] = useState<ComposeDraft>(EMPTY_DRAFT);
   const [drafts, setDrafts] = useState<MailDraft[]>([]);
   const [draftsOpen, setDraftsOpen] = useState(false);
-  const [draftsTab, setDraftsTab] = useState<"drafts" | "templates">("drafts");
+  const [draftsTab, setDraftsTab] = useState<"drafts" | "templates" | "outbox">("drafts");
   const visibleDrafts = useMemo(
-    () => drafts.filter((saved) => isTemplate(saved) === (draftsTab === "templates")),
+    () => drafts.filter((saved) => {
+      if (draftsTab === "outbox") return isOutbox(saved);
+      if (isOutbox(saved)) return false;
+      return isTemplate(saved) === (draftsTab === "templates");
+    }),
     [drafts, draftsTab],
   );
+  const outboxCount = useMemo(() => drafts.filter(isOutbox).length, [drafts]);
+  const [sendLaterOpen, setSendLaterOpen] = useState(false);
+  const [sendLaterAt, setSendLaterAt] = useState("");
+  const [undoSend, setUndoSend] = useState<{ draftId: string; until: number } | null>(null);
+  const [undoNow, setUndoNow] = useState(() => Date.now());
+  const undoTimerRef = useRef<number | null>(null);
+  const outboxBusyIdsRef = useRef(new Set<string>());
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState<RecipientSearchState>({
@@ -2742,6 +2774,21 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const openSavedDraft = (saved: MailDraft) => {
     const next = draftFromSaved(saved);
+    if (isOutbox(saved)) {
+      // Editing a queued message takes it out of the Outbox (Thunderbird).
+      void mailSaveDraft(info.sessionId, {
+        id: saved.id,
+        to: saved.to,
+        cc: saved.cc,
+        bcc: saved.bcc,
+        subject: saved.subject,
+        textBody: saved.textBody,
+        htmlBody: saved.htmlBody,
+        attachments: saved.attachments,
+        replyContext: withoutOutbox(saved.replyContext),
+      }).then((plain) => setDrafts((current) => current.map((item) => (item.id === plain.id ? plain : item))))
+        .catch((e) => console.debug("mail: could not move draft out of the Outbox", e));
+    }
     setDraft(next);
     lastSavedDraftJsonRef.current = serializeDraftContent(next);
     setRecipientSearch({ field: null, query: "", suggestions: [], loading: false });
@@ -2848,62 +2895,280 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }, false);
   };
 
-  const handleSendDraft = async () => {
+  /** MIME request for a composer draft, or an error to show. */
+  const buildSendRequest = (source: ComposeDraft): MailSendRequest | string => {
     // Convert compose-time data-URL previews (data-taomni-cid) to cid: for MIME.
-    const htmlBody = prepareMailHtmlForSend(draft.htmlBody);
-    const textBody = draft.textBody.trim() || mailHtmlToPlainText(htmlBody);
-    const sendHtml = draft.richFormatUsed || hasRichMailFormatting(htmlBody);
-    const request = {
-      to: draft.to.map(formatRecipientForSend),
-      cc: draft.cc.map(formatRecipientForSend),
-      bcc: draft.bcc.map(formatRecipientForSend),
-      subject: draft.subject.trim(),
+    const htmlBody = prepareMailHtmlForSend(source.htmlBody);
+    const textBody = source.textBody.trim() || mailHtmlToPlainText(htmlBody);
+    const sendHtml = source.richFormatUsed || hasRichMailFormatting(htmlBody);
+    const recipients = [...source.to, ...source.cc, ...source.bcc];
+    if (recipients.length === 0) return "At least one recipient is required.";
+    const invalidRecipient = recipients.find((recipient) => !isValidEmailAddress(recipient.email));
+    if (invalidRecipient) return `Invalid recipient: ${recipientLabel(invalidRecipient)}`;
+    return {
+      to: source.to.map(formatRecipientForSend),
+      cc: source.cc.map(formatRecipientForSend),
+      bcc: source.bcc.map(formatRecipientForSend),
+      subject: source.subject.trim(),
       textBody,
       htmlBody: sendHtml ? htmlBody : null,
-      attachments: draft.attachments.map((attachment) => ({
+      attachments: source.attachments.map((attachment) => ({
         path: attachment.path,
         name: attachment.name ?? null,
         contentType: attachment.contentType ?? null,
         inline: attachment.inline ?? false,
         contentId: attachment.contentId ?? null,
       })),
-      ...threadHeadersFor(draft.replyContext),
-      draftId: draft.id ?? null,
-      ...identitySendFields(identityById(draft.identityId)),
+      ...threadHeadersFor(source.replyContext),
+      draftId: source.id ?? null,
+      ...identitySendFields(identityById(source.identityId)),
+      requestReadReceipt: source.readReceipt === true,
     };
-    const recipients = [...draft.to, ...draft.cc, ...draft.bcc];
-    if (recipients.length === 0) {
-      setError("At least one recipient is required.");
+  };
+
+  const sentStatus = (result: MailSendResult) => {
+    if (!result.accepted) {
+      setStatus(result.response || "SMTP send returned no acceptance");
+    } else if (result.sentCopyError) {
+      setStatus("Message sent");
+      setError(`Message sent, but saving the Sent copy failed: ${result.sentCopyError}`);
+    } else {
+      setStatus(result.sentCopyFolder ? `Message sent; copy saved to ${result.sentCopyFolder}` : "Message sent");
+    }
+  };
+
+  /** Save a composer draft into the local Outbox (TASK-17). */
+  const queueToOutbox = async (
+    source: ComposeDraft,
+    queue: Pick<MailOutboxState, "sendAt"> & Partial<MailOutboxState>,
+  ): Promise<MailDraft | null> => {
+    const outbox: MailOutboxState = {
+      queuedAt: Math.floor(Date.now() / 1000),
+      attempts: 0,
+      lastError: null,
+      readReceipt: source.readReceipt === true,
+      ...queue,
+    };
+    try {
+      const saved = await mailSaveDraft(info.sessionId, {
+        id: source.id ?? null,
+        to: source.to.map(formatRecipientForSend),
+        cc: source.cc.map(formatRecipientForSend),
+        bcc: source.bcc.map(formatRecipientForSend),
+        subject: source.subject,
+        textBody: source.textBody || mailHtmlToPlainText(source.htmlBody),
+        htmlBody: sanitizeMailComposeHtml(source.htmlBody),
+        attachments: source.attachments,
+        replyContext: { ...(draftContextWithIdentity(source) ?? {}), outbox },
+      });
+      setDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      return saved;
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+      return null;
+    }
+  };
+
+  const closeComposer = () => {
+    setComposeOpen(false);
+    setSendLaterOpen(false);
+    setDraft(emptyComposeDraft());
+  };
+
+  /** Send one queued message; failures stay queued with a retry backoff. */
+  const sendOutboxItem = async (saved: MailDraft, manual = false): Promise<boolean> => {
+    const state = outboxState(saved);
+    if (!state || outboxBusyIdsRef.current.has(saved.id)) return false;
+    const built = buildSendRequest(draftFromSaved(saved));
+    if (typeof built === "string") {
+      if (manual) setError(built);
+      return false;
+    }
+    outboxBusyIdsRef.current.add(saved.id);
+    try {
+      const result = await mailSendMessage(info, { ...built, draftId: saved.id });
+      await mailDeleteDraft(info.sessionId, saved.id).catch(() => undefined);
+      setDrafts((current) => current.filter((item) => item.id !== saved.id));
+      sentStatus(result);
+      return true;
+    } catch (e) {
+      const message = mailClientErrorMessage(e);
+      const next: MailOutboxState = { ...state, attempts: state.attempts + 1, lastError: message };
+      try {
+        const updated = await mailSaveDraft(info.sessionId, {
+          id: saved.id,
+          to: saved.to,
+          cc: saved.cc,
+          bcc: saved.bcc,
+          subject: saved.subject,
+          textBody: saved.textBody,
+          htmlBody: saved.htmlBody,
+          attachments: saved.attachments,
+          replyContext: { ...(saved.replyContext ?? {}), outbox: next },
+        });
+        setDrafts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      } catch (saveError) {
+        console.debug("mail: outbox retry state not saved", saveError);
+      }
+      if (manual) setError(`Sending "${saved.subject || "(no subject)"}" failed: ${message}`);
+      return false;
+    } finally {
+      outboxBusyIdsRef.current.delete(saved.id);
+    }
+  };
+
+  /** Send every due (or, when `all`, every) queued message. */
+  const processOutbox = async (all = false) => {
+    let list: MailDraft[];
+    try {
+      list = await mailListDrafts(info.sessionId);
+    } catch (e) {
+      console.debug("mail: outbox list failed", e);
       return;
     }
-    const invalidRecipient = recipients.find((recipient) => !isValidEmailAddress(recipient.email));
-    if (invalidRecipient) {
-      setError(`Invalid recipient: ${recipientLabel(invalidRecipient)}`);
+    setDrafts(list);
+    const now = Math.floor(Date.now() / 1000);
+    const pendingUndo = undoSendRef.current?.draftId;
+    const editing = composeDraftIdRef.current;
+    const due = list.filter((saved) => {
+      const state = outboxState(saved);
+      // Skip the undo-window message and one reopened in the composer.
+      if (!state || saved.id === pendingUndo || saved.id === editing) return false;
+      if (all) return true;
+      const at = outboxNextAttemptAt(state);
+      return at != null && at <= now;
+    });
+    let sent = 0;
+    for (const saved of due) {
+      if (await sendOutboxItem(saved, all)) sent += 1;
+    }
+    if (all && due.length > 0) {
+      setStatus(sent === due.length ? `Sent ${sent} queued message${sent === 1 ? "" : "s"}` : `Sent ${sent} of ${due.length} queued messages`);
+    }
+  };
+  const processOutboxRef = useRef(processOutbox);
+  processOutboxRef.current = processOutbox;
+  const undoSendRef = useRef(undoSend);
+  undoSendRef.current = undoSend;
+  const composeDraftIdRef = useRef<string | null>(null);
+  composeDraftIdRef.current = composeOpen ? draft.id ?? null : null;
+
+  // Outbox: send due messages only while the tab is open (DEC-01).
+  useEffect(() => {
+    const first = window.setTimeout(() => void processOutboxRef.current(), 3000);
+    const id = window.setInterval(() => void processOutboxRef.current(), 30_000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(id);
+    };
+  }, [info.sessionId]);
+
+  useEffect(() => {
+    if (!undoSend) return;
+    const id = window.setInterval(() => setUndoNow(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [undoSend]);
+
+  // A pending undo survives unmount in the Outbox and goes out on next open.
+  useEffect(() => () => {
+    if (undoTimerRef.current != null) window.clearTimeout(undoTimerRef.current);
+  }, []);
+
+  const handleSendDraft = async () => {
+    const built = buildSendRequest(draft);
+    if (typeof built === "string") {
+      setError(built);
+      return;
+    }
+    setError(null);
+    const undoSeconds = Math.max(0, Math.floor(info.undoSendSeconds ?? 0));
+    if (undoSeconds > 0) {
+      // Undo window: the message waits in the Outbox until the timer fires.
+      const until = Math.floor(Date.now() / 1000) + undoSeconds;
+      const queued = await queueToOutbox(draft, { sendAt: until });
+      if (!queued) return;
+      closeComposer();
+      setUndoSend({ draftId: queued.id, until });
+      setUndoNow(Date.now());
+      if (undoTimerRef.current != null) window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = window.setTimeout(() => {
+        undoTimerRef.current = null;
+        setUndoSend(null);
+        void sendOutboxItem(queued, true);
+      }, undoSeconds * 1000);
       return;
     }
     setSending(true);
-    setError(null);
     try {
-      const result = await mailSendMessage(info, request);
+      const result = await mailSendMessage(info, built);
       if (draft.id) {
         await mailDeleteDraft(info.sessionId, draft.id).catch(() => undefined);
         setDrafts((current) => current.filter((item) => item.id !== draft.id));
       }
-      if (!result.accepted) {
-        setStatus(result.response || "SMTP send returned no acceptance");
-      } else if (result.sentCopyError) {
-        setStatus("Message sent");
-        setError(`Message sent, but saving the Sent copy failed: ${result.sentCopyError}`);
-      } else {
-        setStatus(result.sentCopyFolder ? `Message sent; copy saved to ${result.sentCopyFolder}` : "Message sent");
-      }
-      setComposeOpen(false);
-      setDraft(emptyComposeDraft());
+      sentStatus(result);
+      closeComposer();
     } catch (e) {
-      setError(mailClientErrorMessage(e));
+      const message = mailClientErrorMessage(e);
+      // Offline / unreachable server: keep the message in the Outbox (AC-49).
+      if (isTransientSendError(message)) {
+        const now = Math.floor(Date.now() / 1000);
+        const queued = await queueToOutbox(draft, { sendAt: now, attempts: 1, lastError: message });
+        if (queued) {
+          closeComposer();
+          setStatus("Could not reach the mail server; the message is in the Outbox and retries while this tab is open");
+          return;
+        }
+      }
+      setError(message);
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSendLater = async () => {
+    const built = buildSendRequest(draft);
+    if (typeof built === "string") {
+      setError(built);
+      return;
+    }
+    const at = fromDateTimeLocal(sendLaterAt);
+    const queued = await queueToOutbox(draft, { sendAt: at });
+    if (!queued) return;
+    closeComposer();
+    setStatus(at
+      ? `Scheduled for ${new Date(at * 1000).toLocaleString()} (sends while this tab is open)`
+      : "Saved to Outbox; use Send now in Drafts > Outbox");
+  };
+
+  const handleUndoSend = async () => {
+    const pending = undoSend;
+    if (!pending) return;
+    if (undoTimerRef.current != null) {
+      window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    setUndoSend(null);
+    const saved = drafts.find((item) => item.id === pending.draftId)
+      ?? (await mailListDrafts(info.sessionId).catch(() => [] as MailDraft[])).find((item) => item.id === pending.draftId);
+    if (!saved) return;
+    const restored = draftFromSaved(saved);
+    // Back to a plain draft, then reopen it for editing.
+    await mailSaveDraft(info.sessionId, {
+      id: saved.id,
+      to: saved.to,
+      cc: saved.cc,
+      bcc: saved.bcc,
+      subject: saved.subject,
+      textBody: saved.textBody,
+      htmlBody: saved.htmlBody,
+      attachments: saved.attachments,
+      replyContext: withoutOutbox(saved.replyContext),
+    }).then((plain) => setDrafts((current) => current.map((item) => (item.id === plain.id ? plain : item))))
+      .catch((e) => console.debug("mail: undo could not clear outbox state", e));
+    setDraft(restored);
+    lastSavedDraftJsonRef.current = serializeDraftContent(restored);
+    setComposeOpen(true);
+    setStatus("Sending cancelled");
   };
 
   const addDraftAttachmentPaths = useCallback(async (paths: string[]) => {
@@ -4164,6 +4429,16 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         >
           <FileText className="w-3.5 h-3.5" />
           Drafts
+          {outboxCount > 0 && (
+            <span
+              className="ml-0.5 rounded px-1 text-[10px] leading-4 bg-[var(--taomni-accent)] text-white"
+              data-testid="mail-outbox-count"
+              data-count={outboxCount}
+              title={`${outboxCount} message${outboxCount === 1 ? "" : "s"} in the Outbox`}
+            >
+              {outboxCount}
+            </span>
+          )}
         </button>
         <button
           type="button"
@@ -5027,6 +5302,20 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         </div>
       )}
 
+      {undoSend && (
+        <div
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[160] h-9 px-3 rounded shadow-lg border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] flex items-center gap-3 text-[12px]"
+          role="status"
+          data-testid="mail-undo-send"
+        >
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          Sending in {Math.max(0, Math.ceil(undoSend.until - undoNow / 1000))}s…
+          <button type="button" className="taomni-btn h-7 px-2" data-testid="mail-undo-send-button" onClick={() => void handleUndoSend()}>
+            Undo
+          </button>
+        </div>
+      )}
+
       {subscriptionsOpen && (
         <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
           <MailDraggableDialog
@@ -5084,7 +5373,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       {draftsOpen && (
         <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
           <MailDraggableDialog
-            title={draftsTab === "drafts" ? "Drafts" : "Templates"}
+            title={draftsTab === "drafts" ? "Drafts" : draftsTab === "templates" ? "Templates" : "Outbox"}
             icon={<FileText className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
             ariaLabel="Drafts and templates"
             minWidth={420}
@@ -5097,7 +5386,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 {draftsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
               </button>
               <div className="flex items-center gap-1" role="tablist" aria-label="Drafts and templates">
-                {(["drafts", "templates"] as const).map((tab) => (
+                {(["drafts", "templates", "outbox"] as const).map((tab) => (
                   <button
                     key={tab}
                     type="button"
@@ -5107,24 +5396,41 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                     className={`taomni-btn h-7 px-2 text-[12px] ${draftsTab === tab ? "text-[var(--taomni-accent)]" : ""}`}
                     onClick={() => setDraftsTab(tab)}
                   >
-                    {tab === "drafts" ? "Drafts" : "Templates"}
+                    {tab === "drafts" ? "Drafts" : tab === "templates" ? "Templates" : `Outbox${outboxCount > 0 ? ` (${outboxCount})` : ""}`}
                   </button>
                 ))}
               </div>
               <span className="text-[12px] text-[var(--taomni-text-muted)]">
-                {visibleDrafts.length} {draftsTab === "drafts" ? "draft" : "template"}{visibleDrafts.length === 1 ? "" : "s"}
+                {visibleDrafts.length} {draftsTab === "drafts" ? "draft" : draftsTab === "templates" ? "template" : "queued message"}{visibleDrafts.length === 1 ? "" : "s"}
               </span>
+              {draftsTab === "outbox" && (
+                <button
+                  type="button"
+                  className="taomni-btn h-7 px-2 text-[12px] ml-auto inline-flex items-center gap-1.5"
+                  data-testid="mail-outbox-send-all"
+                  disabled={visibleDrafts.length === 0}
+                  onClick={() => void processOutbox(true)}
+                  title="Send every queued message now"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Send all
+                </button>
+              )}
             </div>
             <div className="flex-1 min-h-0 overflow-auto p-2" data-testid="mail-drafts-dialog">
               {visibleDrafts.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-                  {draftsTab === "drafts" ? "No saved drafts" : "No templates. Use \"Save as template\" in the composer."}
+                  {draftsTab === "drafts"
+                    ? "No saved drafts"
+                    : draftsTab === "templates"
+                      ? "No templates. Use \"Save as template\" in the composer."
+                      : "The Outbox is empty. Queued and scheduled messages send while this tab is open."}
                 </div>
               ) : visibleDrafts.map((saved) => (
                 <div
                   key={saved.id}
                   className="min-h-14 px-2 py-1.5 rounded border border-transparent hover:border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] flex items-center gap-2"
-                  data-testid={isTemplate(saved) ? "mail-template-row" : "mail-draft-row"}
+                  data-testid={isOutbox(saved) ? "mail-outbox-row" : isTemplate(saved) ? "mail-template-row" : "mail-draft-row"}
                 >
                   <button
                     type="button"
@@ -5135,11 +5441,33 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                     <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
                       {[...saved.to, ...saved.cc, ...saved.bcc].join(", ") || "(no recipients)"}
                     </div>
+                    {isOutbox(saved) && (() => {
+                      const state = outboxState(saved)!;
+                      const at = outboxNextAttemptAt(state);
+                      return (
+                        <div className="text-[10px] text-[var(--taomni-text-muted)]" data-testid="mail-outbox-state">
+                          {at ? `Sends ${new Date(at * 1000).toLocaleString()}` : "Waiting for Send now"}
+                          {state.lastError ? ` · attempt ${state.attempts} failed: ${state.lastError}` : ""}
+                        </div>
+                      );
+                    })()}
                     <div className="text-[10px] text-[var(--taomni-text-muted)]">
                       {formatShortDate(saved.updatedAt)}
                       {saved.attachments.length > 0 ? ` · ${saved.attachments.length} attachment${saved.attachments.length === 1 ? "" : "s"}` : ""}
                     </div>
                   </button>
+                  {isOutbox(saved) && (
+                    <button
+                      type="button"
+                      className="taomni-btn h-7 px-2 text-[12px] inline-flex items-center gap-1"
+                      data-testid="mail-outbox-send"
+                      title="Send this message now"
+                      onClick={() => void sendOutboxItem(saved, true)}
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      Send now
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
@@ -5386,6 +5714,55 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               <button type="button" className="taomni-btn h-7 px-3 text-[12px]" data-testid="mail-compose-discard" onClick={() => void discardCurrentDraft()} disabled={sending}>
                 Discard
               </button>
+              <label className="inline-flex items-center gap-1 text-[12px] text-[var(--taomni-text-muted)]" title="Ask the recipient's client to send a read receipt">
+                <input
+                  type="checkbox"
+                  checked={draft.readReceipt === true}
+                  data-testid="mail-compose-read-receipt"
+                  onChange={(event) => setDraft((current) => ({ ...current, readReceipt: event.target.checked }))}
+                />
+                Receipt
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  className="taomni-btn h-7 px-3 text-[12px]"
+                  data-testid="mail-compose-send-later"
+                  disabled={sending}
+                  onClick={() => {
+                    setSendLaterAt((current) => current || toDateTimeLocal(Math.floor(Date.now() / 1000) + 3600));
+                    setSendLaterOpen((open) => !open);
+                  }}
+                >
+                  Send later
+                </button>
+                {sendLaterOpen && (
+                  <div
+                    className="absolute bottom-9 right-0 z-10 w-72 p-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg text-[12px] flex flex-col gap-2"
+                    data-testid="mail-send-later-panel"
+                  >
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[var(--taomni-text-muted)]">Send at (empty = keep in Outbox)</span>
+                      <input
+                        type="datetime-local"
+                        className="taomni-input"
+                        value={sendLaterAt}
+                        data-testid="mail-send-later-at"
+                        onChange={(event) => setSendLaterAt(event.target.value)}
+                      />
+                    </label>
+                    <span className="text-[11px] text-[var(--taomni-text-muted)]">
+                      Scheduled mail only goes out while this account's tab is open.
+                    </span>
+                    <div className="flex justify-end gap-2">
+                      <button type="button" className="taomni-btn h-7 px-2" onClick={() => setSendLaterOpen(false)}>Cancel</button>
+                      <button type="button" className="taomni-btn h-7 px-2" data-primary="true" data-testid="mail-send-later-confirm" onClick={() => void handleSendLater()}>
+                        Queue
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" data-primary="true" data-testid="mail-compose-send" onClick={handleSendDraft} disabled={sending}>
                 {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 Send

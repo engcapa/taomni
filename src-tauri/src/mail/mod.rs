@@ -590,6 +590,44 @@ pub struct MailSendRequest {
     /// Reply-To of that identity (overrides the account Reply-To).
     #[serde(default)]
     pub reply_to: Option<String>,
+    /// Ask for a read receipt (RFC 8098 `Disposition-Notification-To`).
+    #[serde(default)]
+    pub request_read_receipt: bool,
+}
+
+/// `Disposition-Notification-To` (RFC 8098); lettre has no typed header.
+#[derive(Debug, Clone)]
+struct DispositionNotificationTo(String);
+
+impl lettre::message::header::Header for DispositionNotificationTo {
+    fn name() -> lettre::message::header::HeaderName {
+        lettre::message::header::HeaderName::new_from_ascii_str("Disposition-Notification-To")
+    }
+
+    fn parse(s: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(Self(s.trim().to_string()))
+    }
+
+    fn display(&self) -> lettre::message::header::HeaderValue {
+        lettre::message::header::HeaderValue::new(Self::name(), self.0.clone())
+    }
+}
+
+/// Queue state of a draft waiting in the local Outbox (TASK-17).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MailOutboxState {
+    /// Earliest send time (epoch seconds); `None` = wait for "Send now".
+    #[serde(default)]
+    pub send_at: Option<i64>,
+    #[serde(default)]
+    pub queued_at: i64,
+    #[serde(default)]
+    pub attempts: u32,
+    #[serde(default)]
+    pub last_error: Option<String>,
+    #[serde(default)]
+    pub read_receipt: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -656,6 +694,9 @@ pub struct MailDraftContext {
     /// Sending identity chosen in the composer.
     #[serde(default)]
     pub identity_id: Option<String>,
+    /// Present while the draft waits in the Outbox.
+    #[serde(default)]
+    pub outbox: Option<MailOutboxState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -4630,6 +4671,7 @@ fn build_send_message_with(
         ),
     };
     let from_address = from.email.clone();
+    let receipt_address = from_address.to_string();
     let mut builder = Message::builder()
         .from(from)
         .subject(request.subject.trim());
@@ -4674,6 +4716,10 @@ fn build_send_message_with(
     let references = thread_references(&request.references, request.in_reply_to.as_deref());
     if !references.is_empty() {
         builder = builder.references(references);
+    }
+    if request.request_read_receipt {
+        // Receipts go to the visible sender (identity), like Thunderbird.
+        builder = builder.header(DispositionNotificationTo(format!("<{receipt_address}>")));
     }
 
     let body = build_send_body_part(request)?;
@@ -6951,6 +6997,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             text_body: Some("Body".into()),
             html_body: None,
             attachments: vec![],
+            request_read_receipt: false,
         };
 
         assert_eq!(upsert_sent_contacts(&conn, "acct", &request).unwrap(), 1);
@@ -6976,6 +7023,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             draft_id: None,
             from: None,
             reply_to: None,
+            request_read_receipt: false,
         };
         let account = sample_resolved_account();
         let raw =
@@ -6988,6 +7036,17 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
         assert!(
             !raw.contains("hidden@example.com"),
             "SMTP message omits Bcc"
+        );
+        assert!(!raw.contains("Disposition-Notification-To"), "{raw}");
+        let receipt = MailSendRequest {
+            request_read_receipt: true,
+            ..request.clone()
+        };
+        let raw =
+            String::from_utf8(build_send_message(&account, &receipt).unwrap().formatted()).unwrap();
+        assert!(
+            raw.contains("Disposition-Notification-To: <sender@example.com>"),
+            "{raw}"
         );
 
         let copy = build_send_message_with(
@@ -7020,6 +7079,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             draft_id: None,
             from: Some("Support <support@example.com>".into()),
             reply_to: Some("help@example.com".into()),
+            request_read_receipt: false,
         };
         let message = build_send_message(&sample_resolved_account(), &request).unwrap();
         let raw = String::from_utf8(message.formatted()).unwrap();
@@ -7046,6 +7106,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             draft_id: None,
             from: None,
             reply_to: None,
+            request_read_receipt: false,
         };
         let options = MessageBuildOptions {
             self_envelope: true,
@@ -7101,6 +7162,7 @@ References: <a@x>
                 inline: false,
                 content_id: None,
             }],
+            request_read_receipt: false,
         };
 
         let message = build_send_message(&sample_resolved_account(), &request).unwrap();
@@ -7135,6 +7197,7 @@ References: <a@x>
                 inline: true,
                 content_id: Some("logo-1@inline.local".into()),
             }],
+            request_read_receipt: false,
         };
 
         let message = build_send_message(&sample_resolved_account(), &request).unwrap();
@@ -7181,6 +7244,7 @@ References: <a@x>
                     content_id: None,
                 },
             ],
+            request_read_receipt: false,
         };
 
         let message = build_send_message(&sample_resolved_account(), &request).unwrap();
@@ -7224,6 +7288,7 @@ References: <a@x>
                     subject: Some("Original".into()),
                     references: Vec::new(),
                     identity_id: None,
+                    outbox: None,
                 }),
                 remote_draft_folder: None,
                 remote_draft_uid: None,

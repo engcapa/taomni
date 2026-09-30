@@ -1387,6 +1387,7 @@ function MailSettings({
   syncOnOpen, setSyncOnOpen,
   idlePush, setIdlePush,
   subscribedOnly, setSubscribedOnly,
+  undoSendSeconds, setUndoSendSeconds,
   specialFolders, setSpecialFolders,
   desktopNotify, setDesktopNotify,
   syncIntervalMinutes, setSyncIntervalMinutes,
@@ -1440,6 +1441,7 @@ function MailSettings({
   syncOnOpen: boolean; setSyncOnOpen: (v: boolean) => void;
   idlePush: boolean; setIdlePush: (v: boolean) => void;
   subscribedOnly: boolean; setSubscribedOnly: (v: boolean) => void;
+  undoSendSeconds: string; setUndoSendSeconds: (v: string) => void;
   specialFolders: Partial<Record<MailSpecialFolderKey, string>>;
   setSpecialFolders: (v: Partial<Record<MailSpecialFolderKey, string>>) => void;
   desktopNotify: boolean; setDesktopNotify: (v: boolean) => void;
@@ -1843,6 +1845,17 @@ function MailSettings({
           <option value="on">Always save a copy to Sent</option>
           <option value="off">Never save a copy</option>
         </select>
+      </Field>
+
+      <Field label="Undo send">
+        <input
+          className="taomni-input w-16"
+          value={undoSendSeconds}
+          aria-label="Mail undo send seconds"
+          data-testid="mail-undo-send-seconds"
+          onChange={(e) => setUndoSendSeconds(e.target.value)}
+        />
+        <span className="ml-1 text-[var(--taomni-text-muted)]">seconds to cancel after Send (0 = off)</span>
       </Field>
 
       <Field label="Cache">
@@ -2687,6 +2700,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailSyncOnOpen, setMailSyncOnOpen] = useState(() => optionBoolean(initialOptions, "mailSyncOnOpen", true));
   const [mailIdlePush, setMailIdlePush] = useState(() => optionBoolean(initialOptions, "mailIdlePush", true));
   const [mailSubscribedOnly, setMailSubscribedOnly] = useState(() => optionBoolean(initialOptions, "mailSubscribedOnly", false));
+  const [mailUndoSendSeconds, setMailUndoSendSeconds] = useState(() => optionString(initialOptions, "mailUndoSendSeconds", "0"));
   const [mailSpecialFolders, setMailSpecialFolders] = useState(() => parseSpecialFolders(initialOptions.mailSpecialFolders));
   const [mailDesktopNotify, setMailDesktopNotify] = useState(() => optionBoolean(initialOptions, "mailDesktopNotify", false));
   const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
@@ -3047,6 +3061,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailSyncOnOpen,
           mailIdlePush,
           mailSubscribedOnly,
+          mailUndoSendSeconds,
           mailSpecialFolders: JSON.stringify(parseSpecialFolders(mailSpecialFolders)),
           mailDesktopNotify,
           mailSyncIntervalMinutes,
@@ -3623,6 +3638,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailSyncOnOpen(optionBoolean(nextOptions, "mailSyncOnOpen", true));
     setMailIdlePush(optionBoolean(nextOptions, "mailIdlePush", true));
     setMailSubscribedOnly(optionBoolean(nextOptions, "mailSubscribedOnly", false));
+    setMailUndoSendSeconds(optionString(nextOptions, "mailUndoSendSeconds", "0"));
     setMailSpecialFolders(parseSpecialFolders(nextOptions.mailSpecialFolders));
     setMailDesktopNotify(optionBoolean(nextOptions, "mailDesktopNotify", false));
     setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
@@ -4741,6 +4757,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 syncOnOpen={mailSyncOnOpen} setSyncOnOpen={setMailSyncOnOpen}
                 idlePush={mailIdlePush} setIdlePush={setMailIdlePush}
                 subscribedOnly={mailSubscribedOnly} setSubscribedOnly={setMailSubscribedOnly}
+                undoSendSeconds={mailUndoSendSeconds} setUndoSendSeconds={setMailUndoSendSeconds}
                 specialFolders={mailSpecialFolders} setSpecialFolders={setMailSpecialFolders}
                 desktopNotify={mailDesktopNotify} setDesktopNotify={setMailDesktopNotify}
                 syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}

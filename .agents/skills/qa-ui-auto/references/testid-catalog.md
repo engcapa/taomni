@@ -813,6 +813,23 @@
 - `[data-testid="mail-recipient-suggestion"]` — interactive — F-MAIL-1.recipient-suggestion
 - `[data-testid="mail-compose-send"]` — interactive [optional] — F-MAIL-1.compose-send
 
+## mail/compose (F-MAIL-13)
+
+- `[data-testid="mail-compose-send-later"]` — interactive — F-MAIL-13.compose-send-later
+- `[data-testid="mail-send-later-panel"]` — display [optional] — F-MAIL-13.send-later-panel
+- `[data-testid="mail-send-later-at"]` — interactive [optional] — F-MAIL-13.send-later-at
+- `[data-testid="mail-send-later-confirm"]` — interactive — F-MAIL-13.send-later-confirm
+- `[data-testid="mail-compose-read-receipt"]` — interactive [optional] — F-MAIL-13.compose-read-receipt
+- `[data-testid="mail-outbox-count"]` — display — F-MAIL-13.outbox-count
+- `[data-testid="mail-drafts-tab-outbox"]` — interactive — F-MAIL-13.drafts-tab-outbox
+- `[data-testid="mail-outbox-row"]` — display — F-MAIL-13.outbox-row
+- `[data-testid="mail-outbox-state"]` — display [optional] — F-MAIL-13.outbox-state
+- `[data-testid="mail-outbox-send-all"]` — interactive — F-MAIL-13.outbox-send-all
+- `[data-testid="mail-outbox-send"]` — interactive [optional] — F-MAIL-13.outbox-send
+- `[data-testid="mail-undo-send"]` — display [optional] — F-MAIL-13.undo-send
+- `[data-testid="mail-undo-send-button"]` — interactive [optional] — F-MAIL-13.undo-send-button
+- `[data-testid="mail-undo-send-seconds"]` — interactive [optional] — F-MAIL-13.undo-send-seconds
+
 ## mail/compose (F-MAIL-2)
 
 - `[data-testid="mail-drafts-open"]` — interactive — F-MAIL-2.drafts-open

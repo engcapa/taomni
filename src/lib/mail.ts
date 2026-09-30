@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { MailTabInfo } from "../types";
 import type { NetworkSettingsPayload } from "./networkSettings";
 import { withVaultLockedNotice } from "./ipc";
+import type { MailOutboxState } from "./mailOutbox";
 
 export interface MailAddress {
   name?: string | null;
@@ -301,6 +302,8 @@ export interface MailSendRequest {
   /** `From:` of a non-default identity ("Name <addr>"); null = account address. */
   from?: string | null;
   replyTo?: string | null;
+  /** Ask for a read receipt (Disposition-Notification-To). */
+  requestReadReceipt?: boolean;
 }
 
 export interface MailSendAttachment {
@@ -354,6 +357,8 @@ export interface MailDraftContext {
   references?: string[];
   /** Sending identity chosen in the composer. */
   identityId?: string | null;
+  /** Present while the message waits in the local Outbox (TASK-17). */
+  outbox?: MailOutboxState | null;
 }
 
 export interface MailDraft {

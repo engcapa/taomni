@@ -5519,6 +5519,79 @@ controls:
 - Thunderbird 风格快捷键（列表焦点下，输入框/编辑器内不生效）：F/B 下一封/上一封，N 下一封未读，R 回复，Shift+R 或 Ctrl/Cmd+Shift+R 全部回复，Ctrl/Cmd+L 转发，M 切换已读，S 星标，A 归档，J/Shift+J 垃圾/非垃圾，Del 删除，Ctrl/Cmd+Shift+K 聚焦搜索。Ctrl+Shift+L（聊天）与 Ctrl+Shift+S（服务器）保持全局含义。
 - 邮件行可拖到文件夹树：默认移动，按住 Ctrl（macOS 为 Option）复制；勾选多封时拖动全部勾选项。
 - 长列表的行使用 `content-visibility: auto`，屏幕外的行跳过布局和绘制，同时保留在 DOM 中（查找、无障碍与选择不受影响）；未引入虚拟列表依赖。
+
+---
+
+### 13.13 发件箱、稍后发送、撤销发送与已读回执 ✅
+
+<!-- feature
+id: F-MAIL-13
+status: done
+area: mail/compose
+components: [MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailOutbox.ts
+  - src/components/session/SessionEditor.tsx
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: compose-send-later
+    selector: '[data-testid="mail-compose-send-later"]'
+    kind: interactive
+  - id: send-later-panel
+    selector: '[data-testid="mail-send-later-panel"]'
+    kind: display
+    optional: true
+  - id: send-later-at
+    selector: '[data-testid="mail-send-later-at"]'
+    kind: interactive
+    optional: true
+  - id: send-later-confirm
+    selector: '[data-testid="mail-send-later-confirm"]'
+    kind: interactive
+  - id: compose-read-receipt
+    selector: '[data-testid="mail-compose-read-receipt"]'
+    kind: interactive
+    optional: true       # request flag only; covered by Vitest + Rust header test
+  - id: outbox-count
+    selector: '[data-testid="mail-outbox-count"]'
+    kind: display
+  - id: drafts-tab-outbox
+    selector: '[data-testid="mail-drafts-tab-outbox"]'
+    kind: interactive
+  - id: outbox-row
+    selector: '[data-testid="mail-outbox-row"]'
+    kind: display
+  - id: outbox-state
+    selector: '[data-testid="mail-outbox-state"]'
+    kind: display
+    optional: true
+  - id: outbox-send-all
+    selector: '[data-testid="mail-outbox-send-all"]'
+    kind: interactive
+  - id: outbox-send
+    selector: '[data-testid="mail-outbox-send"]'
+    kind: interactive
+    optional: true
+  - id: undo-send
+    selector: '[data-testid="mail-undo-send"]'
+    kind: display
+    optional: true       # needs an undo window > 0 (session setting)
+  - id: undo-send-button
+    selector: '[data-testid="mail-undo-send-button"]'
+    kind: interactive
+    optional: true
+  - id: undo-send-seconds
+    selector: '[data-testid="mail-undo-send-seconds"]'
+    kind: interactive
+    optional: true
+-->
+
+- 写信窗口 “Send later” 把邮件放入本地 Outbox，可指定发送时间（留空则等待手动发送）；Drafts 对话框新增 Outbox 页签，逐封 “Send now” 或 “Send all”，工具栏 Drafts 按钮显示 Outbox 数量。
+- 发送时服务器不可达（连接失败、DNS、超时、421/45x）会自动进入 Outbox，并按 1/2/5/10/30 分钟退避重试；认证失败或地址错误仍留在写信窗口提示。
+- 会话设置 “Undo send”（秒，默认 0）开启后，点 Send 先进入 Outbox 并显示倒计时与 Undo，撤销后回到编辑状态。
+- 限制（DEC-01）：Outbox、稍后发送与重试只在该账户标签打开期间执行，UI 中有说明。
+- “Receipt” 勾选后请求已读回执（`Disposition-Notification-To`，RFC 8098）；对收到的回执请求自动应答尚未实现。
 ---
 
 ## 14. SocksCap 网络流量路由

@@ -1,7 +1,7 @@
 import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MailTabInfo } from "../../types";
-import type { MailFolder, MailFolderSyncResult, MailMessageBody, MailMessageHeader } from "../../lib/mail";
+import type { MailDraft, MailFolder, MailFolderSyncResult, MailMessageBody, MailMessageHeader } from "../../lib/mail";
 import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { MailClientTab } from "./MailClientTab";
 import { useTaoAlertStore } from "../../stores/taoAlertStore";
@@ -886,6 +886,85 @@ describe("MailClientTab", () => {
       from: "Support <support@example.com>",
       replyTo: "help@example.com",
     });
+  });
+
+  function useDraftStore() {
+    const store: MailDraft[] = [];
+    mailMocks.mailSaveDraft.mockImplementation(async (_account: string, request: Partial<MailDraft>) => {
+      const id = request.id ?? `d${store.length + 1}`;
+      const saved = {
+        accountId: info.sessionId, to: [], cc: [], bcc: [], subject: "", textBody: "", htmlBody: "",
+        attachments: [], createdAt: 1, updatedAt: 1, ...request, id,
+      } as MailDraft;
+      const index = store.findIndex((item) => item.id === id);
+      if (index >= 0) store[index] = saved;
+      else store.push(saved);
+      return saved;
+    });
+    mailMocks.mailListDrafts.mockImplementation(async () => [...store]);
+    mailMocks.mailDeleteDraft.mockImplementation(async (_account: string, id: string) => {
+      const index = store.findIndex((item) => item.id === id);
+      if (index >= 0) store.splice(index, 1);
+    });
+    return store;
+  }
+
+  async function replyAndReach(testId: string) {
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    await screen.findByTestId("mail-compose-dialog");
+    return screen.getByTestId(testId);
+  }
+
+  it("queues Send later in the Outbox and sends it with Send all (TASK-17)", async () => {
+    const store = useDraftStore();
+    mailMocks.mailSendMessage.mockResolvedValue({ accepted: true, response: "ok", sentCopyFolder: "Sent" });
+    fireEvent.click(await replyAndReach("mail-compose-read-receipt"));
+    fireEvent.click(screen.getByTestId("mail-compose-send-later"));
+    fireEvent.change(screen.getByTestId("mail-send-later-at"), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("mail-send-later-confirm"));
+
+    await waitFor(() => expect(screen.queryByTestId("mail-compose-dialog")).toBeNull());
+    expect(store).toHaveLength(1);
+    expect(store[0].replyContext?.outbox).toMatchObject({ sendAt: null, attempts: 0, readReceipt: true });
+    expect(mailMocks.mailSendMessage).not.toHaveBeenCalled();
+    expect(await screen.findByTestId("mail-outbox-count")).toHaveTextContent("1");
+
+    fireEvent.click(screen.getByTestId("mail-drafts-open"));
+    fireEvent.click(await screen.findByTestId("mail-drafts-tab-outbox"));
+    expect(await screen.findByTestId("mail-outbox-row")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("mail-outbox-send-all"));
+    await waitFor(() => expect(mailMocks.mailSendMessage).toHaveBeenCalledTimes(1));
+    expect(mailMocks.mailSendMessage.mock.calls[0][1]).toMatchObject({ requestReadReceipt: true, draftId: "d1" });
+    await waitFor(() => expect(store).toHaveLength(0));
+    await waitFor(() => expect(screen.queryByTestId("mail-outbox-count")).toBeNull());
+  });
+
+  it("keeps a message in the Outbox when the server is unreachable (AC-49)", async () => {
+    const store = useDraftStore();
+    mailMocks.mailSendMessage.mockRejectedValue(new Error("SMTP connect failed: Connection refused"));
+    fireEvent.click(await replyAndReach("mail-compose-send"));
+    await waitFor(() => expect(screen.queryByTestId("mail-compose-dialog")).toBeNull());
+    expect(store[0].replyContext?.outbox).toMatchObject({ attempts: 1 });
+    expect(store[0].replyContext?.outbox?.lastError).toMatch(/Connection refused/);
+    expect(await screen.findByText(/message is in the Outbox/)).toBeInTheDocument();
+  });
+
+  it("undoes a send inside the undo window (AC-50)", async () => {
+    const store = useDraftStore();
+    mailMocks.mailSendMessage.mockResolvedValue({ accepted: true, response: "ok" });
+    render(<MailClientTab tabId="mail-tab" info={{ ...info, undoSendSeconds: 30 }} visible />);
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    fireEvent.click(await screen.findByTestId("mail-compose-send"));
+    expect(await screen.findByTestId("mail-undo-send")).toHaveTextContent(/Sending in \d+s/);
+    expect(store[0].replyContext?.outbox?.sendAt).toBeGreaterThan(Date.now() / 1000);
+
+    fireEvent.click(screen.getByTestId("mail-undo-send-button"));
+    expect(await screen.findByTestId("mail-compose-dialog")).toBeInTheDocument();
+    await waitFor(() => expect(store[0].replyContext?.outbox).toBeUndefined());
+    expect(mailMocks.mailSendMessage).not.toHaveBeenCalled();
   });
 
   it("saves a template and starts a new message from it (AC-30)", async () => {

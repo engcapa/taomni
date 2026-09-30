@@ -343,6 +343,7 @@ fn draft_send_request(draft: &MailDraft) -> MailSendRequest {
         draft_id: Some(draft.id.clone()),
         from: None,
         reply_to: None,
+        request_read_receipt: false,
     }
 }
 

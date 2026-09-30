@@ -565,6 +565,7 @@ function sessionToMailTabInfo(
       subscribedOnly: opts.mailSubscribedOnly === true,
     },
     specialFolders: parseSpecialFolders(opts.mailSpecialFolders),
+    undoSendSeconds: mailNumberOption(opts, "mailUndoSendSeconds", 0, 0),
     cache: {
       enabled: opts.mailCacheEnabled !== false,
       headerRetentionDays: mailHeaderLimitOption(opts, "mailHeaderRetentionDays", LEGACY_MAIL_HEADER_RETENTION_DAYS),

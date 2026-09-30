@@ -325,6 +325,8 @@ export interface MailTabInfo {
     /** Hide and skip unsubscribed folders (LSUB; TASK-10). */
     subscribedOnly?: boolean;
   };
+  /** Seconds a sent message can still be undone (0 = send immediately). */
+  undoSendSeconds?: number;
   /** Manual special folders: sent/drafts/trash/junk/archive -> folder name. */
   specialFolders?: Partial<Record<"sent" | "drafts" | "trash" | "junk" | "archive", string>>;
   cache: MailCacheSettings;
