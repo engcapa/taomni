@@ -66,9 +66,9 @@ steps:
     selector: '[data-testid="code-workspace-bottom-dock"][data-open]'
     state: detached
     timeout_sec: 5
-- eval_readonly:
-    expression: document.activeElement?.classList?.contains("cm-content") === true
-    expect_truthy: true
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] .cm-content:focus'
+    timeout_sec: 5
 - press: Control+Shift+F12
 - assert_not_visible: '[data-testid="code-workspace-tree-add-folder"]'
 - press: Control+Shift+F12
@@ -116,7 +116,7 @@ verification:
     - step: 28
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
     - step: 29
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\") === true", "expect_truthy": true}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content:focus", "timeout_sec": 5}}'
     results:
     - 23
     - 25

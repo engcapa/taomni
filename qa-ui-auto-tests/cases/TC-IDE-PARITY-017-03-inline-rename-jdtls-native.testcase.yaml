@@ -133,8 +133,20 @@ steps:
     contains: Greeter.salute()
     timeout_sec: 30
 - press:
+    key: Mod+s
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/Greeter.java
+    contains: salute()
+    timeout_sec: 30
+- wait: 1
+- press:
     key: Mod+z
     selector: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Undid
+    timeout_sec: 30
 - assert_text:
     selector: '[data-testid="code-workspace-editor"]'
     contains: public static String greet()
@@ -171,6 +183,7 @@ verification:
     - 33
     - 40
     - 43
+    - 46
     checkpoints:
     - step: 34
       expectation: '{"wait_for": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "timeout_sec": 60}}'
@@ -187,16 +200,20 @@ verification:
     - step: 42
       expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java", "contains": "Greeter.salute()", "timeout_sec": 30}}'
     - step: 44
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/Greeter.java", "contains": "salute()", "timeout_sec": 30}}'
+    - step: 47
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Undid", "timeout_sec": 30}}'
+    - step: 48
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "public static String greet()", "timeout_sec": 30}}'
-    - step: 45
+    - step: 49
       expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java", "contains": "Greeter.greet()", "timeout_sec": 30}}'
     results:
     - 35
     - 36
     - 37
     - 42
-    - 44
-    - 45
+    - 48
+    - 49
   visual:
   - check: 不声明视觉结论。
     method: not-applicable
