@@ -280,6 +280,7 @@ cases:
 - TC-DB-TX-001-manual-commit-browser
 - TC-DB-TX-001-manual-commit-native
 - TC-DB-EDIT-001-grid-sql-preview-native
+- TC-DB-GRID-001-sort-filter-count-native
 - TC-auto-F-DB-2-redis-session-scaffold
 - TC-auto-F-DB-3-hbase-query-library
 - TC-auto-F-Detach-1-terminal-detach

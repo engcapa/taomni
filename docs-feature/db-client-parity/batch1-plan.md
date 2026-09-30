@@ -169,3 +169,24 @@
 | V2 | A2 A3 A4 | mock `onPreviewChanges` | 网格删除一行后点 Submit | 确认消息含预览 SQL；取消不调用 `onCommitChanges`；预览抛错时消息只有数量 | unit | `QueryResultGrid.test.tsx` “previews grid SQL …”（P2 新增） |
 | V3 | A1 A3 | native，`mysql_required` | 有主键表删除第 1 行并 Submit：消息含 `DELETE FROM` 且无警告，确认后计数为 0；无主键表删除一行：消息含 `No primary key`，取消 | 与操作一致 | native | `qa-ui-auto-tests/cases/TC-DB-EDIT-001-grid-sql-preview-native.testcase.yaml`（P2 新增） |
 | — | — | browser | — | 浏览器预览没有可执行的数据库，得不到可编辑结果集；不设 browser 用例 | — | — |
+
+<a id="db-grid-001"></a>
+## DB-GRID-001 排序以 DbVisualizer 为准与过滤计数
+
+- 来源 / 范围 / 参照：DBV-GRID-01、DBV-GRID-02；所有 SQL 结果网格。`主参照: dbvis`（用户指定排序以 dbvis 为准；计数格式取 dbvis 状态栏 `10 [200]/4`）。
+- 当前事实：列头点击已是客户端升序 → 降序 → 取消，并可生成 ORDER BY 的 SQL；客户端过滤（Filter rows 与列过滤）后没有“过滤后 / 总数”计数。
+- 规则：网格工具栏末尾显示 `data-testid="query-result-row-count"`：未过滤时 `<行数>/<可见列数>`；过滤后 `<显示行数> [<总行数>]/<可见列数>`，并带 `data-filtered="true"`。行数包含标记删除但未提交的行（它们仍显示在网格中）。
+- 保留契约：排序循环、生成的 ORDER BY / WHERE SQL、面板状态栏的 `N rows` 不变。
+- 验收：
+  - `A1` 列头连续点击三次：升序 → 降序 → 恢复原始顺序，全程不重新执行 SQL（保留，补测试）。
+  - `A2` 过滤后计数为 `显示 [总数]/列数`，清空过滤恢复为 `总数/列数`。
+
+<a id="db-grid-001-test-cases"></a>
+### 测试用例
+
+| V | AC | 前置 / fixture | 操作 | 预期 | 层级 | 路径 / ID |
+|---|---|---|---|---|---|---|
+| V1 | A1 | 3 行结果 | 点击 `name` 列头三次 | 行顺序依次为升序、降序、原始；未调用刷新 | unit | `QueryResultGrid.test.tsx` “cycles sorting …”（P2 新增） |
+| V2 | A2 | 同上 | 打开 Filter rows 输入 `Ann`，再清空 | 计数 `3/3` → `2 [3]/3` → `3/3` | unit | `QueryResultGrid.test.tsx` “shows filtered row count …”（P2 新增） |
+| V3 | A1 A2 | native，`mysql_required` | `SELECT` 三行，点列头排序，Filter rows 输入过滤 | 计数 `3/2` → `1 [3]/2`；排序后首行变化 | native | `qa-ui-auto-tests/cases/TC-DB-GRID-001-sort-filter-count-native.testcase.yaml`（P2 新增） |
+| — | — | browser | — | 浏览器预览得不到结果网格；不设 browser 用例 | — | — |

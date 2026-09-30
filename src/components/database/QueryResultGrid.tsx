@@ -1483,6 +1483,7 @@ export function QueryResultGrid({
   }, [rowMatchesFilter, rows, sorts]);
 
   const orderedRows = useMemo(() => order.map((index) => rows[index]), [order, rows]);
+  const rowsFiltered = orderedRows.length < rows.length;
   const selectedRows = useMemo(
     () => orderedRows.filter((row) => selectedIds.has(row.id) && row.status !== "deleted"),
     [orderedRows, selectedIds],
@@ -2501,6 +2502,15 @@ export function QueryResultGrid({
           <ToolButton title="List view" active={viewMode === "list"} onClick={() => setViewMode("list")} icon={<List className="w-3.5 h-3.5" />} />
           <ToolButton title="Chart view" active={viewMode === "chart"} onClick={() => setViewMode("chart")} icon={<BarChart3 className="w-3.5 h-3.5" />} />
         </div>
+        {/* DbVisualizer-style count: shown [total]/columns while client filters hide rows. */}
+        <span
+          data-testid="query-result-row-count"
+          data-filtered={rowsFiltered ? "true" : "false"}
+          className="px-1 text-[10px] tabular-nums text-[var(--taomni-text-muted)]"
+          title={rowsFiltered ? "Rows shown [total rows] / columns" : "Rows / columns"}
+        >
+          {rowsFiltered ? `${orderedRows.length} [${rows.length}]` : rows.length}/{visibleColumnIndexes.length}
+        </span>
         {(pendingChangeCount > 0 || localNotice) && (
           <span className="max-w-[320px] truncate px-1 text-[10px] text-[var(--taomni-text-muted)]" title={localNotice}>
             {pendingChangeCount > 0
@@ -2624,6 +2634,9 @@ export function QueryResultGrid({
                     <button
                       type="button"
                       className="min-w-0 flex flex-1 items-center gap-1 bg-transparent p-0 text-left"
+                      data-testid="query-result-sort-header"
+                      data-column={col.name}
+                      data-sort={columnSort?.dir ?? "none"}
                       onClick={(event) => toggleSort(columnIndex, event.shiftKey)}
                     >
                       <span className="truncate flex-1">{col.name}</span>
@@ -2676,6 +2689,7 @@ export function QueryResultGrid({
                 return (
                   <div
                     key={row.id}
+                    data-testid="query-result-row"
                     className="flex absolute left-0 right-0"
                     style={{
                       top,

@@ -402,3 +402,39 @@ describe("QueryResultGrid save preview", () => {
     expect(message).toBe("Apply grid changes to the database?\n\nAdded: 0\nModified: 0\nDeleted: 1");
   });
 });
+
+describe("QueryResultGrid sorting and row count", () => {
+  const names = () =>
+    Array.from(screen.getByTestId("query-result-grid-scroll").querySelectorAll("div.flex.absolute")).map(
+      (row) => row.children[2]?.textContent,
+    );
+
+  it("cycles sorting ascending, descending, then original order on the client", () => {
+    const onRefresh = vi.fn();
+    render(<QueryResultGrid result={filterResult()} onRefresh={onRefresh} />);
+    expect(names()).toEqual(["Ann", "Anne", "Bob"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    expect(names()).toEqual(["Ann", "Bob", "Anne"]);
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    expect(names()).toEqual(["Anne", "Ann", "Bob"]);
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    expect(names()).toEqual(["Ann", "Anne", "Bob"]);
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it("shows the filtered row count as shown [total]/columns", () => {
+    render(<QueryResultGrid result={filterResult()} />);
+    const count = screen.getByTestId("query-result-row-count");
+    expect(count).toHaveTextContent("3/3");
+    expect(count).toHaveAttribute("data-filtered", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter rows" }));
+    fireEvent.change(screen.getByPlaceholderText("Filter rows"), { target: { value: "Ann" } });
+    expect(count).toHaveTextContent("2 [3]/3");
+    expect(count).toHaveAttribute("data-filtered", "true");
+
+    fireEvent.change(screen.getByPlaceholderText("Filter rows"), { target: { value: "" } });
+    expect(count).toHaveTextContent("3/3");
+  });
+});

@@ -4364,6 +4364,26 @@ controls:
     selector: '[data-testid="query-result-grid"] button[aria-label="Submit grid edits"]'
     kind: interactive
     optional: true       # DB-EDIT-001: confirmation lists the SQL and a no-primary-key warning
+  - id: query-result-row
+    selector: '[data-testid="query-result-row"]'
+    kind: display
+    optional: true       # one per rendered table-view row, in display order
+  - id: query-result-sort-header
+    selector: '[data-testid="query-result-sort-header"]'
+    kind: interactive
+    optional: true       # DB-GRID-001: column header sort (asc → desc → none); data-column, data-sort
+  - id: query-result-row-count
+    selector: '[data-testid="query-result-row-count"]'
+    kind: display
+    optional: true       # DB-GRID-001: rows/columns, or shown [total]/columns with data-filtered="true"
+  - id: query-result-filter-toggle
+    selector: '[data-testid="query-result-grid"] button[aria-label="Filter rows"]'
+    kind: interactive
+    optional: true
+  - id: query-result-filter-input
+    selector: '[data-testid="query-result-grid"] input[placeholder="Filter rows"]'
+    kind: interactive
+    optional: true       # client-side cross-column substring filter
   - id: query-result-generated-sql
     selector: '[data-testid="query-result-generated-sql"]'
     kind: display

@@ -1,10 +1,13 @@
 import { StrictMode, forwardRef, useEffect, useImperativeHandle } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, configure, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import DbClientTab from "./DbClientTab";
 import type { DbConnectInfo } from "../../types";
 import type { DbQueryWorkspace, DbSavedQuery, DbSqlHistoryEntry } from "../../lib/ipc";
 import { getQueryTab } from "../../lib/queryRegistry";
+
+// Full DbClientTab mounts are heavy; the 1s default flakes when workers are busy.
+configure({ asyncUtilTimeout: 5000 });
 
 const ipcMock = vi.hoisted(() => ({
   dbConnect: vi.fn(),

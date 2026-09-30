@@ -689,6 +689,11 @@
 - `[data-testid="query-result-grid"] button[title="Row 1"]` — interactive [optional] — F-DB-1.query-result-row-1
 - `[data-testid="query-result-grid"] button[aria-label="Delete row"]` — interactive [optional] — F-DB-1.query-result-delete-row
 - `[data-testid="query-result-grid"] button[aria-label="Submit grid edits"]` — interactive [optional] — F-DB-1.query-result-submit-edits
+- `[data-testid="query-result-row"]` — display [optional] — F-DB-1.query-result-row
+- `[data-testid="query-result-sort-header"]` — interactive [optional] — F-DB-1.query-result-sort-header
+- `[data-testid="query-result-row-count"]` — display [optional] — F-DB-1.query-result-row-count
+- `[data-testid="query-result-grid"] button[aria-label="Filter rows"]` — interactive [optional] — F-DB-1.query-result-filter-toggle
+- `[data-testid="query-result-grid"] input[placeholder="Filter rows"]` — interactive [optional] — F-DB-1.query-result-filter-input
 - `[data-testid="query-result-generated-sql"]` — display [optional] — F-DB-1.query-result-generated-sql
 - `[data-testid="query-result-generated-sql-copy"]` — interactive [optional] — F-DB-1.query-result-generated-sql-copy
 - `[data-testid="query-result-generated-sql-query"]` — interactive [optional] — F-DB-1.query-result-generated-sql-query
