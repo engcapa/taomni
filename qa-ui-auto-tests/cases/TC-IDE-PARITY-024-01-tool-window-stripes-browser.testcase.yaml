@@ -122,6 +122,24 @@ steps:
 - click: '[data-testid="code-workspace-tree-dir"]'
 - click: '[data-testid="code-workspace-tree-select-opened"]'
 - assert_visible: '[data-testid="code-workspace-tree-file"][data-active="true"][aria-selected="true"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Alt+4
+- wait_for: '[data-testid="code-workspace-run-panel"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"]:focus-within'
+    timeout_sec: 5
+- press: Escape
+- eval_readonly:
+    expression: document.activeElement?.classList.contains('cm-content') === true
+    expect_truthy: true
+- press: Alt+7
+- wait_for:
+    selector: '[data-testid="code-workspace-tool-window-structure"]:focus-within'
+    timeout_sec: 5
+- press: Escape
+- eval_readonly:
+    expression: document.activeElement?.classList.contains('cm-content') === true
+    expect_truthy: true
 verification:
   review: reviewed
   requirements:
@@ -249,6 +267,31 @@ verification:
     - 60
     - 62
     - 65
+  - id: R7
+    requirement: A2：工具窗口内容经 portal 重新挂载后，Esc 仍按 IDEA 把焦点还给编辑器——Alt+4 打开 Run 并获焦后 Esc 回到编辑器；Alt+7 打开 Structure 后在其中按 Esc 同样回到编辑器。
+    actions:
+    - 66
+    - 67
+    - 70
+    - 72
+    - 74
+    checkpoints:
+    - step: 68
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-run-panel\"]"}'
+    - step: 69
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"]:focus-within", "timeout_sec": 5}}'
+    - step: 71
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    - step: 73
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tool-window-structure\"]:focus-within", "timeout_sec": 5}}'
+    - step: 75
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    results:
+    - 68
+    - 69
+    - 71
+    - 73
+    - 75
   visual:
   - check: stripe 名称字号、按钮间距、分隔线与 IDEA 2026.2 新 UI 对照。
     method: manual

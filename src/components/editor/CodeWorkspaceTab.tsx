@@ -15361,10 +15361,11 @@ export function CodeWorkspaceTab({
       id: "workspace.toggleDocumentationPane",
       title: "Toggle Outline Pane",
       category: "View",
-      // IDEA Alt+7 = Structure tool window.
+      // IDEA Alt+7 = Structure tool window: show and activate it, or hide
+      // it when it is already the active tool window.
       keybinding: "Alt+7",
       keywords: ["right", "outline", "structure", "symbols"],
-      run: toggleOutlinePane,
+      run: () => handleActivateToolWindow("structure"),
     },
     {
       id: "workspace.callHierarchy",
@@ -22944,6 +22945,8 @@ export function CodeWorkspaceTab({
           id={entry.id}
           label={entry.label}
           active={toolWindowLayout.isVisible(entry.id)}
+          // The terminal keeps Esc for the shell and the tree handles its own.
+          onEscape={entry.id === "terminal" || entry.id === "project" ? undefined : handleReturnToEditor}
         >
           {entry.content}
         </ToolWindowPortal>

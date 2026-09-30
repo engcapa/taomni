@@ -129,7 +129,7 @@ steps:
     selector: '[data-testid="debug-breakpoint-popup-condition"]'
 - assert_not_visible: '[data-testid="debug-breakpoint-popup"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: Control+Shift+F8
 - wait_for: '[data-testid="debug-breakpoints-dialog"]'
 - assert_count:
@@ -159,7 +159,7 @@ steps:
     selector: '[data-testid="code-workspace-editor"] [data-bp-gutter-line="2"] .taomni-bp'
     equal: 0
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+Home
+- press: Mod+Home
 - press: ArrowDown
 - press: ArrowDown
 - press: Control+Shift+F8
@@ -176,7 +176,7 @@ steps:
     selector: '[data-testid="debug-breakpoints-dialog-tree"]'
 - assert_not_visible: '[data-testid="debug-breakpoints-dialog"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
-- press: Control+End
+- press: Mod+End
 - press: Control+Alt+Shift+F8
 - assert_attribute:
     selector: '[data-testid="code-workspace-editor"] [data-bp-gutter-line="7"] .taomni-bp'

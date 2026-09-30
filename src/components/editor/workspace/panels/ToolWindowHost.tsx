@@ -57,16 +57,31 @@ export function ToolWindowPortal({
   id,
   label,
   active,
+  onEscape,
   children,
 }: {
   nodes: ToolWindowNodes;
   id: string;
   label: string;
   active: boolean;
+  /**
+   * IDEA: Esc inside a tool window returns focus to the editor. The portal
+   * breaks React bubbling to the area that hosts the content (the bottom
+   * dock's own handler never sees it), so each window handles it here.
+   */
+  onEscape?: () => void;
   children: ReactNode;
 }) {
   return createPortal(
-    <KeepAliveToolPanel active={active}>{children}</KeepAliveToolPanel>,
+    <div
+      style={{ display: "contents" }}
+      onKeyDown={onEscape ? (event) => {
+        if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;
+        onEscape();
+      } : undefined}
+    >
+      <KeepAliveToolPanel active={active}>{children}</KeepAliveToolPanel>
+    </div>,
     nodes.node(id, label),
     `tool-window-${id}`,
   );
