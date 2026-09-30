@@ -91,7 +91,6 @@ fn xcap_displays() -> anyhow::Result<Vec<DisplayInfo>> {
 
 #[cfg(target_os = "linux")]
 fn fallback_linux_display(app: &tauri::AppHandle) -> anyhow::Result<Vec<DisplayInfo>> {
-    use crate::servers::rdp::capture::Capturer;
     let log = crate::servers::engine::LogEmitter::new(app.clone(), crate::servers::ServerType::Rdp);
     let capturer =
         crate::servers::rdp::capture::create_capturer(&log).context("init screen capturer")?;

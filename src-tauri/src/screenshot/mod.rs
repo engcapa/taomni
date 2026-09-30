@@ -206,7 +206,7 @@ pub async fn screenshot_save_data_url(data_url: String) -> Result<ScreenshotFile
 }
 
 #[tauri::command]
-pub async fn screenshot_probe(app: AppHandle) -> Result<ScreenshotProbe, String> {
+pub async fn screenshot_probe() -> Result<ScreenshotProbe, String> {
     let base = tokio::task::spawn_blocking(|| crate::servers::rdp::capture::probe())
         .await
         .map_err(|e| format!("probe task failed: {e}"))?
@@ -270,7 +270,7 @@ pub async fn open_overlay(app: &AppHandle, display_id: Option<String>) -> Result
     });
 
     let url = WebviewUrl::App("index.html#screenshot-overlay".into());
-    WebviewWindowBuilder::new(&app, OVERLAY_LABEL, url)
+    WebviewWindowBuilder::new(app, OVERLAY_LABEL, url)
         .title("Screenshot")
         .position(origin.0 as f64, origin.1 as f64)
         .fullscreen(true)
