@@ -88,3 +88,28 @@
 | V3 | A4 A5 | confirm 返回 true / 普通语句 | 分别 Run | 确认后两条都执行；普通运行不调用 confirm | unit | 同上 |
 | V4 | A2 A3 A4 | browser，离线脚手架 | 输入 `DROP TABLE qa_x;` Run → Cancel；再次 Run → Execute | 第一次后无 Log 标签；第二次后 Log 有 1 条 failed（浏览器无数据库） | browser | `qa-ui-auto-tests/cases/TC-DB-EXEC-003-dangerous-confirm-browser.testcase.yaml`（P2 新增） |
 | V5 | A2 A3 A4 | native，`mysql_required` | 建表 → Run `DROP TABLE` → Cancel → 查询该表成功 → 再 Run `DROP TABLE` → Execute | 取消后表仍可查询；确认后 DROP 成功 | native | `qa-ui-auto-tests/cases/TC-DB-EXEC-003-dangerous-confirm-native.testcase.yaml`（P2 新增） |
+
+<a id="db-exec-004"></a>
+## DB-EXEC-004 当前语句的执行计划
+
+- 来源 / 范围 / 参照：DBV-EXEC-04；MySQL/MariaDB、StarRocks、PostgreSQL、PanWeiDB、ClickHouse、Presto/Trino；Oracle 与 SQL Server 暂不支持并给出原因。`主参照: dbeaver`（只分析光标所在语句，结果为独立标签）。放弃 DbVisualizer 对整个缓冲区逐条 Explain 的方式，因为那需要额外确认且容易误解。
+- 当前事实：只有 AI “解释语法”，没有 EXPLAIN 入口；`currentEditorStatement` 已能找到光标所在语句。
+- 规则（新增 `src/lib/sqlExplain.ts`）：去掉末尾分号；已经以 `EXPLAIN` 开头的语句原样执行；以 SELECT / WITH / INSERT / UPDATE / DELETE / REPLACE / VALUES / TABLE 开头的语句加 `EXPLAIN ` 前缀；其他语句返回原因 “Explain supports SELECT, WITH, INSERT, UPDATE, DELETE and REPLACE statements.”。Oracle：“Oracle EXPLAIN PLAN needs PLAN_TABLE and DBMS_XPLAN; not supported yet.”；SQL Server：“SQL Server SHOWPLAN must run in its own batch; not supported yet.”。`EXPLAIN` 不带 ANALYZE，不会执行 DML。
+- 目标：编辑器工具栏新增 `Explain` 按钮（`data-testid="db-explain-current"`），对光标所在语句执行生成的 EXPLAIN，结果页签标题为 `Explain`，同时进入执行日志。不支持时用提示框说明原因，不执行任何语句。
+- 保留契约：Run / Current / Selection 不变；日志与遇错处理（DB-EXEC-001/002）照常。
+- 验收：
+  - `A1` 规则函数对各引擎、已有 EXPLAIN、不可 Explain 的语句返回正确结果。
+  - `A2` 点击 Explain 执行光标所在语句的 EXPLAIN，结果页签标题为 `Explain`，日志记录 EXPLAIN 语句。
+  - `A3` 不支持的引擎或语句弹出原因，不调用执行接口。
+  - `A4` 不影响其他运行入口（保留）。
+
+<a id="db-exec-004-test-cases"></a>
+### 测试用例
+
+| V | AC | 前置 / fixture | 操作 | 预期 | 层级 | 路径 / ID |
+|---|---|---|---|---|---|---|
+| V1 | A1 | 无 | 调用 `explainSqlFor` | MySQL/PostgreSQL 加前缀并去掉分号；`EXPLAIN SELECT` 原样；`CREATE TABLE` 与 Oracle/SQL Server 返回原因 | unit | `src/lib/sqlExplain.test.ts`（P2 新增） |
+| V2 | A2 A4 | mock IPC | 编辑器 `select 1;\nselect 2`（光标在末尾），点击 Explain | 执行 `EXPLAIN select 2`；结果页签标题 `Explain` | unit | `DbClientTab.test.tsx` “explain …”（P2 新增） |
+| V3 | A3 | mock IPC，语句为 `create table t (id int)` | 点击 Explain | alert 被调用，`dbExecuteStream` 未调用 | unit | 同上 |
+| V4 | A2 | native，`mysql_required` | 输入 `SELECT * FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'mysql'`，点击 Explain | 结果页签标题 `Explain`，出现结果网格；日志 1 条 success，SQL 以 `EXPLAIN` 开头 | native | `qa-ui-auto-tests/cases/TC-DB-EXEC-004-explain-native.testcase.yaml`（P2 新增） |
+| V5 | A3 | browser，离线脚手架 | 输入 `CREATE TABLE qa_t (id INT)`，点击 Explain | 出现 `alert-dialog`，内容含 “Explain supports”；没有 Log 标签 | browser | `qa-ui-auto-tests/cases/TC-DB-EXEC-004-explain-browser.testcase.yaml`（P2 新增） |

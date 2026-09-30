@@ -30,6 +30,7 @@ import {
   RefreshCw,
   Trash2,
   Crosshair,
+  ListTree,
   ScrollText,
   Check,
   ChevronDown,
@@ -104,8 +105,9 @@ import {
 } from "../../lib/ai/answerLanguage";
 import { buildDbAiPrompt, truncateStatement } from "../../lib/database/dbAiPrompts";
 import { registerQueryTab } from "../../lib/queryRegistry";
-import { choiceAppDialog, confirmAppDialog } from "../../lib/appDialogs";
+import { alertAppDialog, choiceAppDialog, confirmAppDialog } from "../../lib/appDialogs";
 import { dangerousConfirmationMessage } from "../../lib/sqlDangerousStatements";
+import { explainSqlFor } from "../../lib/sqlExplain";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
 import { ExecutionLogView } from "./ExecutionLogView";
 import {
@@ -1263,6 +1265,8 @@ export default function DbClientTab({
         origin?: SqlStatementSourceRef["origin"];
         historyId?: string;
         parentSheetId?: string;
+        /** Overrides the default "Result N" title (e.g. "Explain"). */
+        sheetTitle?: string;
       } = {},
     ) => {
       const trimmed = sqlText.trim();
@@ -1323,6 +1327,7 @@ export default function DbClientTab({
           parentSheetId: options.parentSheetId,
         });
         const sheet = newResultSheet(statement.sql, baseOrdinal + index + 1, rowLimit, sourceRef);
+        if (options.sheetTitle) sheet.title = options.sheetTitle;
         const entryId = run.entries[index].id;
         setPanels((prev) =>
           prev.map((p) => {
@@ -2386,6 +2391,18 @@ export default function DbClientTab({
     return { panelId: panel.id, doc, range };
   };
 
+  const explainCurrentStatement = async (panelId: string = activePanel.id) => {
+    const action = currentEditorStatement(panelId);
+    if (!action) return;
+    const plan = explainSqlFor(info.engine, action.range.sql);
+    if (!plan.ok) {
+      setStatusMessage(plan.reason);
+      await alertAppDialog({ title: "Explain not available", message: plan.reason });
+      return;
+    }
+    await runQuery(action.panelId, plan.sql, { sheetTitle: "Explain" });
+  };
+
   const toggleStatementPanel = () => {
     if (statementAction?.panelId === activePanel.id) {
       setStatementAction(null);
@@ -2883,6 +2900,7 @@ export default function DbClientTab({
                   void runQuery(activePanel.id, payload.sql, { context: payload.context });
                 }}
                 onRunCurrent={runCurrentStatement}
+                onExplain={() => void explainCurrentStatement()}
                 onCancel={() => cancelQuery(activePanel.id)}
                 onFormat={() => formatPanel(activePanel)}
                 onToggleStatement={toggleStatementPanel}
@@ -2998,6 +3016,7 @@ function EditorToolbar({
   onRun,
   onRunSelection,
   onRunCurrent,
+  onExplain,
   onCancel,
   onFormat,
   onToggleStatement,
@@ -3022,6 +3041,7 @@ function EditorToolbar({
   onRun: () => void;
   onRunSelection: () => void;
   onRunCurrent: () => void;
+  onExplain: () => void;
   onCancel: () => void;
   onFormat: () => void;
   onToggleStatement: () => void;
@@ -3058,6 +3078,16 @@ function EditorToolbar({
         data-testid="db-run-current-statement"
       >
         <Crosshair className="w-3.5 h-3.5" /> Current
+      </button>
+      <button
+        type="button"
+        className={btn}
+        onClick={onExplain}
+        disabled={running}
+        title="Explain the statement at the cursor"
+        data-testid="db-explain-current"
+      >
+        <ListTree className="w-3.5 h-3.5" /> Explain
       </button>
       <button type="button" className={btn} onClick={onCancel} disabled={!running} title="Cancel query">
         <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} /> Cancel

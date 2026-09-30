@@ -275,6 +275,8 @@ cases:
 - TC-DB-EXEC-002-error-choice-native
 - TC-DB-EXEC-003-dangerous-confirm-browser
 - TC-DB-EXEC-003-dangerous-confirm-native
+- TC-DB-EXEC-004-explain-browser
+- TC-DB-EXEC-004-explain-native
 - TC-auto-F-DB-2-redis-session-scaffold
 - TC-auto-F-DB-3-hbase-query-library
 - TC-auto-F-Detach-1-terminal-detach

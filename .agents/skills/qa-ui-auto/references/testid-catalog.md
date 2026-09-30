@@ -725,6 +725,7 @@
 - `[data-testid="db-run-current-statement"]` — interactive [optional] — F-DB-1.run-current-statement
 - `[data-testid="db-connection-error-banner"]` — display [optional] — F-DB-1.connection-error-banner
 - `[data-testid="db-run-all"]` — interactive [optional] — F-DB-1.run-all
+- `[data-testid="db-explain-current"]` — interactive [optional] — F-DB-1.explain-current
 - `[data-testid="result-log-tab"]` — interactive [optional] — F-DB-1.result-log-tab
 - `[data-testid="db-execution-log"]` — display [optional] — F-DB-1.execution-log
 - `[data-testid="db-execution-log-run"]` — display [optional] — F-DB-1.execution-log-run

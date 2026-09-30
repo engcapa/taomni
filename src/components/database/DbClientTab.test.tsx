@@ -1176,6 +1176,34 @@ describe("DbClientTab error choice", () => {
     expect(dialogMock.confirm).not.toHaveBeenCalled();
   });
 
+  it("explains the statement at the cursor into an Explain sheet", async () => {
+    failWhen(() => false);
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "select 1;\nselect 2";
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("db-explain-current"));
+
+    await waitFor(() => {
+      const calls = ipcMock.dbExecuteStream.mock.calls as Array<[string, string, number, unknown]>;
+      expect(calls.map((call) => call[1])).toEqual(["EXPLAIN select 2"]);
+    });
+    await waitFor(() => expect(screen.getByTestId("result-sheet-tab")).toHaveTextContent("Explain"));
+  });
+
+  it("explains why a statement cannot be explained and runs nothing", async () => {
+    failWhen(() => false);
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "create table t (id int)";
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("db-explain-current"));
+
+    await waitFor(() => expect(dialogMock.alert).toHaveBeenCalledTimes(1));
+    expect(dialogMock.alert.mock.calls[0][0].message).toContain("Explain supports");
+    expect(ipcMock.dbExecuteStream).not.toHaveBeenCalled();
+  });
+
   it("does not ask when the last statement fails", async () => {
     failWhen((sql) => sql.startsWith("bad"));
     await runDoc("select 1;\nbad 2");

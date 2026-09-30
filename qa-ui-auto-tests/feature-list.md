@@ -4509,6 +4509,10 @@ controls:
     selector: '[data-testid="db-run-all"]'
     kind: interactive
     optional: true       # toolbar Run (all statements / selection) inside a SQL tab
+  - id: explain-current
+    selector: '[data-testid="db-explain-current"]'
+    kind: interactive
+    optional: true       # DB-EXEC-004: EXPLAIN the statement at the cursor
   - id: result-log-tab
     selector: '[data-testid="result-log-tab"]'
     kind: interactive
