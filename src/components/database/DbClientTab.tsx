@@ -104,6 +104,7 @@ import {
 } from "../../lib/ai/answerLanguage";
 import { buildDbAiPrompt, truncateStatement } from "../../lib/database/dbAiPrompts";
 import { registerQueryTab } from "../../lib/queryRegistry";
+import { choiceAppDialog } from "../../lib/appDialogs";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
 import { ExecutionLogView } from "./ExecutionLogView";
 import {
@@ -1300,6 +1301,7 @@ export default function DbClientTab({
       // Read through a closure: the flag is flipped asynchronously by cancelQuery.
       const cancelRequested = () => cancelRequestedRef.current[panelId] === true;
       cancelRequestedRef.current[panelId] = false;
+      let skipAllErrors = false;
       publishRun(run);
       for (const [index, statement] of statementRanges.entries()) {
         const sourceRef = sourceRefForRange(panelId, statement, options.origin ?? "editor", {
@@ -1333,7 +1335,21 @@ export default function DbClientTab({
           }),
         );
         await appendSqlHistory(statement.sql, sheet.createdAt, summary, panelId);
-        if (!summary.ok) break;
+        if (summary.ok) continue;
+        const hasMore = index < statementRanges.length - 1;
+        if (cancelled || !hasMore) break;
+        if (!skipAllErrors) {
+          const choice = await choiceAppDialog({
+            title: "Statement failed",
+            message: `Statement ${index + 1} of ${statementRanges.length} failed:\n${summary.error ?? "Unknown error"}\n\nSkip continues with the next statement. Skip all also ignores later errors in this run.`,
+            primaryLabel: "Skip all",
+            secondaryLabel: "Skip",
+            cancelLabel: "Stop",
+          });
+          if (choice === null) break;
+          if (choice === "primary") skipAllErrors = true;
+        }
+        publishRun(patchExecutionEntry(run, entryId, { message: `${summary.error ?? "Unknown error"} (skipped, run continued)` }));
       }
       const finished = finishExecutionRun(run, Date.now());
       const needsAttention = finished.entries.some((entry) => entry.status === "failed" || entry.status === "cancelled");

@@ -200,6 +200,18 @@ vi.mock("../tabbar/TabActionSlot", () => ({
     active ? <div data-testid="tab-action-slot">{children}</div> : null,
 }));
 
+const dialogMock = vi.hoisted(() => ({
+  choice: vi.fn(async (_options: { title?: string; message: string; primaryLabel: string; secondaryLabel: string; cancelLabel?: string }): Promise<"primary" | "secondary" | null> => null),
+  confirm: vi.fn(async (_options: { title?: string; message: string; confirmLabel?: string; danger?: boolean }) => true),
+  alert: vi.fn(async (_options: { title?: string; message: string }) => undefined),
+}));
+
+vi.mock("../../lib/appDialogs", () => ({
+  choiceAppDialog: dialogMock.choice,
+  confirmAppDialog: dialogMock.confirm,
+  alertAppDialog: dialogMock.alert,
+}));
+
 const contextMenuShow = vi.hoisted(() => vi.fn());
 
 vi.mock("../ContextMenu", () => ({
@@ -1080,5 +1092,64 @@ describe("DbClientTab execution log", () => {
       "not-run",
     ]);
     expect(ipcMock.dbCancel).toHaveBeenCalled();
+    expect(dialogMock.choice).not.toHaveBeenCalled();
+  });
+});
+
+describe("DbClientTab error choice", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    localStorage.clear();
+    dbChildProps.editorInitialDocFallback = "select 1";
+  });
+
+  function failWhen(match: (sql: string) => boolean) {
+    ipcMock.dbExecuteStream.mockImplementation(async (_session: string, sql: string, _max: number | null, onEvent: (event: StreamEvent) => void) => {
+      if (match(sql)) throw new Error(`boom: ${sql}`);
+      streamOk(onEvent);
+    });
+  }
+
+  async function runDoc(doc: string) {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = doc;
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    fireEvent.click(screen.getByTitle("Run (F5)"));
+  }
+
+  const statuses = () => screen.getAllByTestId("db-execution-log-entry").map((entry) => entry.getAttribute("data-status"));
+
+  it("asks on a middle failure: Skip continues, Stop halts the rest", async () => {
+    failWhen((sql) => sql.startsWith("bad"));
+    dialogMock.choice.mockResolvedValueOnce("secondary").mockResolvedValueOnce(null);
+    await runDoc("bad 1;\nbad 2;\nselect 3");
+
+    await waitFor(() => expect(dialogMock.choice).toHaveBeenCalledTimes(2));
+    expect(dialogMock.choice.mock.calls[0][0]).toMatchObject({ primaryLabel: "Skip all", secondaryLabel: "Skip", cancelLabel: "Stop" });
+    const message = dialogMock.choice.mock.calls[0][0].message;
+    expect(message).toContain("Statement 1 of 3 failed:\n");
+    expect(message).toContain("boom: bad 1");
+    await waitFor(() => expect(statuses()).toEqual(["failed", "failed", "not-run"]));
+    expect(screen.getAllByTestId("db-execution-log-message")[0]).toHaveTextContent("(skipped, run continued)");
+  });
+
+  it("Skip all continues without asking again", async () => {
+    failWhen((sql) => sql.startsWith("bad"));
+    dialogMock.choice.mockResolvedValueOnce("primary");
+    await runDoc("bad 1;\nbad 2;\nselect 3");
+
+    await waitFor(() => expect(statuses()).toEqual(["failed", "failed", "success"]));
+    expect(dialogMock.choice).toHaveBeenCalledTimes(1);
+    expect(ipcMock.dbExecuteStream).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not ask when the last statement fails", async () => {
+    failWhen((sql) => sql.startsWith("bad"));
+    await runDoc("select 1;\nbad 2");
+
+    await waitFor(() => expect(statuses()).toEqual(["success", "failed"]));
+    expect(dialogMock.choice).not.toHaveBeenCalled();
   });
 });

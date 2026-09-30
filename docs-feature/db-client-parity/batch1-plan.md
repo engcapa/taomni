@@ -35,3 +35,30 @@
 | V3 | A4 | mock IPC：第一条语句挂起 | Run 后点击 Cancel | 当前语句 `cancelled`，后续 `not-run` | unit | 同上 |
 | V4 | A1 A2 A3 | browser，离线脚手架 | 在编辑器输入两条语句并 Run | Log 可见；第一条 `failed`（浏览器预览无数据库），第二条 `not-run`；汇总含 `Failed: 1` | browser | `qa-ui-auto-tests/cases/db/TC-DB-EXEC-001-execution-log-browser.testcase.yaml`（P2 新增） |
 | V5 | A1 A2 A3 | native，`mysql_required` | 连接后执行 `SELECT 1 AS a; SELECT 2 AS b;`，打开 Log | 2 条 `success`，汇总含 `Success: 2`；停留在结果页签 | native | `qa-ui-auto-tests/cases/db/TC-DB-EXEC-001-execution-log-native.testcase.yaml`（P2 新增） |
+
+<a id="db-exec-002"></a>
+## DB-EXEC-002 多语句遇错时的选择
+
+- 来源 / 范围 / 参照：DBV-EXEC-02；全部 SQL 引擎；`主参照: dbeaver`（Execution Error：Stop / Retry / Skip / Skip all）。不做 Retry（重复执行同一条失败语句对 DML 有副作用风险，且用户可直接再次 Run）；不采用 DbVisualizer 的“默认继续”，因为静默继续会在一条 DDL 失败后继续执行依赖它的语句。
+- 当前事实：`runQuery` 在 `summary.ok === false` 时直接 `break`，没有任何提示。
+- 目标：一次运行中某条语句失败（非用户取消），且后面还有语句时，弹出选择框（`choice-dialog`）：标题 “Statement failed”，内容为 `Statement <n> of <total> failed:` + 错误文本。按钮：`Skip all`（主按钮，继续并且本次运行后续错误不再询问）、`Skip`（继续下一条）、`Stop`（取消按钮，停止，后续语句记为 not-run）。关闭对话框等同 Stop。最后一条语句失败、单条语句运行、用户取消都不弹框。
+- 日志：失败语句保持 `failed`，消息末尾追加 `(skipped, run continued)`；停止后剩余语句为 `not-run`。
+- 保留契约：DB-EXEC-001 的日志与自动切到 Log；每条执行过的语句仍写入 SQL 历史；取消仍直接停止。
+- 实施：`DbClientTab.tsx` 的 `runQuery`，使用 `choiceAppDialog`。
+- 验收：
+  - `A1` 中间语句失败时弹出选择框，显示语句序号、总数和错误。
+  - `A2` Skip 继续执行下一条语句，下一次失败会再次询问。
+  - `A3` Skip all 继续执行，且本次运行中之后的失败不再询问。
+  - `A4` Stop 或关闭对话框时停止，剩余语句记为 not-run。
+  - `A5` 最后一条失败、单条语句和用户取消都不弹框（保留：取消行为与 DB-EXEC-001 日志）。
+
+<a id="db-exec-002-test-cases"></a>
+### 测试用例
+
+| V | AC | 前置 / fixture | 操作 | 预期 | 层级 | 路径 / ID |
+|---|---|---|---|---|---|---|
+| V1 | A1 A2 A4 | mock IPC：第 1、2 条失败 | 3 条语句 Run；第一次选 Skip，第二次选 Stop | choice 被调用两次，消息含 `Statement 1 of 3 failed`；日志 failed / failed / not-run | unit | `DbClientTab.test.tsx` “error choice …”（P2 新增） |
+| V2 | A3 | mock IPC：第 1、2 条失败 | 3 条语句 Run，选 Skip all | 只询问一次，3 条都执行 | unit | 同上 |
+| V3 | A5 | mock IPC：最后一条失败 / 单条失败 | Run | 不调用 choice | unit | 同上 |
+| V4 | A1 A2 A4 | browser，离线脚手架（每条语句都会失败） | 3 条语句 Run；在第一个对话框点 Skip，第二个点 Stop | 日志 failed / failed / not-run，汇总含 `Failed: 2` | browser | `qa-ui-auto-tests/cases/TC-DB-EXEC-002-error-choice-browser.testcase.yaml`（P2 新增） |
+| V5 | A1 A2 | native，`mysql_required` | `SELECT 1; SELECT * FROM qa_db_missing_table_x; SELECT 3;`，对话框点 Skip | 日志 success / failed / success；结果页签 3 个 | native | `qa-ui-auto-tests/cases/TC-DB-EXEC-002-error-choice-native.testcase.yaml`（P2 新增） |

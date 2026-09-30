@@ -3770,6 +3770,26 @@ controls:
     selector: '[data-testid="confirm-dialog-confirm"]'
     kind: interactive
     optional: true
+  - id: choice-dialog              # same ConfirmDialog module, three-way choice variant
+    selector: '[data-testid="choice-dialog"]'
+    kind: display
+    optional: true
+  - id: choice-dialog-message
+    selector: '[data-testid="choice-dialog-message"]'
+    kind: display
+    optional: true
+  - id: choice-dialog-primary
+    selector: '[data-testid="choice-dialog-primary"]'
+    kind: interactive
+    optional: true
+  - id: choice-dialog-secondary
+    selector: '[data-testid="choice-dialog-secondary"]'
+    kind: interactive
+    optional: true
+  - id: choice-dialog-cancel
+    selector: '[data-testid="choice-dialog-cancel"]'
+    kind: interactive
+    optional: true
   - id: alert-dialog
     selector: '[data-testid="alert-dialog"]'
     kind: display

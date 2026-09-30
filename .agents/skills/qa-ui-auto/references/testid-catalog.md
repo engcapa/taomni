@@ -1721,6 +1721,11 @@
 - `[data-testid="confirm-dialog-message"]` — display [optional] — F-Confirm-1.confirm-dialog-message
 - `[data-testid="confirm-dialog-cancel"]` — interactive [optional] — F-Confirm-1.confirm-dialog-cancel
 - `[data-testid="confirm-dialog-confirm"]` — interactive [optional] — F-Confirm-1.confirm-dialog-confirm
+- `[data-testid="choice-dialog"]` — display [optional] — F-Confirm-1.choice-dialog
+- `[data-testid="choice-dialog-message"]` — display [optional] — F-Confirm-1.choice-dialog-message
+- `[data-testid="choice-dialog-primary"]` — interactive [optional] — F-Confirm-1.choice-dialog-primary
+- `[data-testid="choice-dialog-secondary"]` — interactive [optional] — F-Confirm-1.choice-dialog-secondary
+- `[data-testid="choice-dialog-cancel"]` — interactive [optional] — F-Confirm-1.choice-dialog-cancel
 - `[data-testid="alert-dialog"]` — display [optional] — F-Confirm-1.alert-dialog
 - `[data-testid="alert-dialog-message"]` — display [optional] — F-Confirm-1.alert-dialog-message
 - `[data-testid="alert-dialog-ok"]` — interactive [optional] — F-Confirm-1.alert-dialog-ok
