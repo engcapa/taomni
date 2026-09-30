@@ -13,6 +13,7 @@
 - [P1 交接提示词](handoff-p1.md)：将一张 deferred 卡细化为可开发工作包的固定入口。
 - [现场证据清单](evidence/live-audit-20260928.json)：本次采样身份与工件索引。
 - [控件级复核](references/idea-control-audit-20260929.md)：2026-09-29 逐控件、逐快捷键的 IDEA/Taomni 对照，及[证据清单](evidence/control-audit-20260929.json)。
+- [第二轮细节对齐设计](ed-parity-023-025-round2-design.md)：2026-09-30 用户反馈后的 ED-PARITY-023（Linux 输入卡顿）、024（工具窗口条/锚点/弹窗按键）、025（调试器断点与暂停态）。
 
 ## 当前结论
 
