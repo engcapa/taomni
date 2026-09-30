@@ -804,6 +804,16 @@
 
 ## editor/structural-search (F25.6)
 
+- `[data-testid="structural-search-templates"]` — display [optional] — F25.6.structural-search-templates
+- `[data-testid="structural-search-template-item"]` — interactive [optional] — F25.6.structural-search-template-item
+- `[data-testid="structural-search-add-filter"]` — interactive [optional] — F25.6.structural-search-add-filter
+- `[data-testid="structural-search-filter-menu"]` — display [optional] — F25.6.structural-search-filter-menu
+- `[data-testid="structural-search-filter-option-text"]` — interactive [optional] — F25.6.structural-search-filter-option
+  ↳ `[data-testid="structural-search-filter-option-count"]` — alias
+  ↳ `[data-testid="structural-search-filter-option-type"]` — alias
+  ↳ `[data-testid="structural-search-filter-option-reference"]` — alias
+  ↳ `[data-testid="structural-search-filter-option-script"]` — alias
+- `[data-testid="structural-search-filter-reason"]` — display [optional] — F25.6.structural-search-filter-reason
 - `[data-testid="structural-search-dialog"]` — display — F25.6.structural-search-dialog
 - `[data-testid="structural-search-template"]` — interactive — F25.6.structural-search-template
 - `[data-testid="structural-search-language"]` — display — F25.6.structural-search-language

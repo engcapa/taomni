@@ -6232,6 +6232,7 @@ files:
   - src/components/editor/workspace/languageServiceReadiness.ts
   - src/components/editor/workspace/CodeInsightNotice.tsx
   - src/components/editor/workspace/javaSyntaxOutline.ts
+  - src/components/editor/workspace/structuralSearchTemplates.ts
   - src/components/editor/workspace/KeymapMigrationNotice.tsx
   - src/components/editor/workspace/useFocusReturn.ts
   - src/components/editor/workspace/workspaceKeymapPlatform.ts
@@ -7774,6 +7775,35 @@ files:
   - src/stubs/parity009StructuralSearch.ts
   - src-tauri/src/structural_search.rs
 controls:
+  - id: structural-search-templates   # ED-PARITY-016 Recent / Existing Templates pane
+    selector: '[data-testid="structural-search-templates"]'
+    kind: display
+    optional: true
+  - id: structural-search-template-item
+    selector: '[data-testid="structural-search-template-item"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-add-filter
+    selector: '[data-testid="structural-search-add-filter"]'
+    kind: interactive
+    optional: true
+  - id: structural-search-filter-menu
+    selector: '[data-testid="structural-search-filter-menu"]'
+    kind: display
+    optional: true
+  - id: structural-search-filter-option
+    selector: '[data-testid="structural-search-filter-option-text"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="structural-search-filter-option-count"]'
+      - '[data-testid="structural-search-filter-option-type"]'
+      - '[data-testid="structural-search-filter-option-reference"]'
+      - '[data-testid="structural-search-filter-option-script"]'
+  - id: structural-search-filter-reason
+    selector: '[data-testid="structural-search-filter-reason"]'
+    kind: display
+    optional: true
   - id: structural-search-dialog
     selector: '[data-testid="structural-search-dialog"]'
     kind: display

@@ -170,6 +170,7 @@
 - 交付：Structural Search 的 IDEA 风格 dialog、scope/modifier、结果树、空态、取消和导航。
 - 主要文件：`StructuralSearchDialog.tsx`、`StructuralSearchPanel.tsx`、session、tree-sitter backend。
 - 必须保留：Java AST 精确结果、注释/字符串排除、取消释放、编辑器字节不变。
+- P1 设计：[ed-parity-016-structural-search-design.md](ed-parity-016-structural-search-design.md)。
 - 验收：`ED-PARITY-016-A1`、`ED-PARITY-016-A2`、`ED-PARITY-016-A3`。
 
 <a id="ed-parity-017"></a>
