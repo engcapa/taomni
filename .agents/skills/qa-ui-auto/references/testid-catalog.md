@@ -381,9 +381,13 @@
   ↳ `[data-testid="code-workspace-tool-window-structure"]` — alias
   ↳ `[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]` — alias
 - `[data-testid="code-workspace-tool-window-options-problems"]` — interactive [optional] — F25.5.tool-window-options-menu
+  ↳ `[data-testid="code-workspace-tool-window-options-terminal"]` — alias
   ↳ `[data-testid="code-workspace-tool-window-move"]` — alias
   ↳ `[data-testid="code-workspace-tool-window-move-bottom-left"]` — alias
 - `[data-testid="code-workspace-bottom-tab-overflow-run"]` — interactive [optional] — F25.5.tool-window-more-item
+- `[data-testid="code-workspace-tree-expand-all"]` — interactive [optional] — F25.5.project-header-actions
+  ↳ `[data-testid="code-workspace-tree-collapse-all"]` — alias
+  ↳ `[data-testid="code-workspace-tree-select-opened"]` — alias
 - `[data-testid="search-everywhere-tab-files"]` — interactive [optional] — F25.5.search-everywhere-tab
   ↳ `[data-testid="search-everywhere-tab-classes"]` — alias
   ↳ `[data-testid="search-everywhere-tab-symbols"]` — alias

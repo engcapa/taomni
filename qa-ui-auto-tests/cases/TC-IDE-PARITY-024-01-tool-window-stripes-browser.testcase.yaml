@@ -1,11 +1,9 @@
 id: TC-IDE-PARITY-024-01
 title: 'IDEA tool window stripes: names, resizable width, Move between anchors, Remove from Sidebar'
-description: 'ED-PARITY-024 A1/A2/A3 browser case: the stripes show tool window names at IDEA''s 59 px default, resize from their inner edge (40–100 px) and switch to 40 px icon-only via Show Tool Window Names. A stripe button''s context menu moves Problems to Right Top (its button and window follow; the bottom dock closes), Alt+6 toggles it there, the window''s ⋮ Move to returns it to Bottom Left. Structure opens below Project (IDEA Left Bottom). Remove from Sidebar drops Run''s button and More tool windows restores and shows it.
+description: 'ED-PARITY-024 A1/A2/A3 browser case: the stripes show tool window names at IDEA''s 59 px default, resize from their inner edge (40–100 px) and switch to 40 px icon-only via Show Tool Window Names. A stripe button''s context menu moves Problems to Right Top (its button and window follow; the bottom dock closes), Alt+6 toggles it there, the window''s ⋮ Move to returns it to Bottom Left. Structure opens below Project (IDEA Left Bottom). Remove from Sidebar drops Run''s button and More tool windows restores and shows it. The Project window header adds IDEA''s Expand All, Collapse All and Select Opened File.
 
 
-  Mode: browser.
-
-  '
+  Mode: browser.'
 covers:
 - F25.5
 tags:
@@ -114,6 +112,16 @@ steps:
     selector: '[data-testid="code-workspace-tool-window-title"]'
     contains: Run
 - screenshot: tc-ide-parity-024-01-stripes.png
+- click: '[data-testid="code-workspace-tree-expand-all"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][aria-expanded="true"]'
+- click: '[data-testid="code-workspace-tree-collapse-all"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-dir"][aria-expanded="true"]'
+    state: detached
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-tree-dir"]'
+- click: '[data-testid="code-workspace-tree-select-opened"]'
+- assert_visible: '[data-testid="code-workspace-tree-file"][data-active="true"][aria-selected="true"]'
 verification:
   review: reviewed
   requirements:
@@ -223,11 +231,29 @@ verification:
     - 53
     - 56
     - 57
+  - id: R6
+    requirement: A6：Project 工具窗口头部提供 IDEA 的 Expand All / Collapse All / Select Opened File——展开后出现展开目录、折叠后全部收起、选中其他节点后 Select Opened File 重新选中活动文件。
+    actions:
+    - 59
+    - 61
+    - 63
+    - 64
+    checkpoints:
+    - step: 60
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][aria-expanded=\"true\"]"}'
+    - step: 62
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-dir\"][aria-expanded=\"true\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 65
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-active=\"true\"][aria-selected=\"true\"]"}'
+    results:
+    - 60
+    - 62
+    - 65
   visual:
   - check: stripe 名称字号、按钮间距、分隔线与 IDEA 2026.2 新 UI 对照。
     method: manual
     reason: 像素级外观按 DEC-ALIGN-06 profile 另行比较。
   native:
-  - check: 打包 WebView 中移动 Terminal 保留会话由 TC-IDE-PARITY-024-03 覆盖。
+  - check: 打包 WebView 中移动 Terminal 保留会话由 TC-IDE-PARITY-024-03-tool-window-move-native 覆盖。
     method: external
     reason: browser 不经过打包 WebView，也没有真实 PTY。

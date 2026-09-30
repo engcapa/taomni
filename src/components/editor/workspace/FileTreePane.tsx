@@ -10,6 +10,8 @@ import {
 } from "react";
 import {
   ChevronLeft,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Columns2,
   File,
   FilePlus,
@@ -17,6 +19,7 @@ import {
   FolderPlus,
   List,
   ListTree,
+  LocateFixed,
   MoreHorizontal,
   Search,
   ZoomIn,
@@ -57,6 +60,13 @@ interface FileTreePaneProps {
   onRename: () => void;
   onDelete: () => void;
   onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
+  /** IDEA Project view header: Select Opened File (locate the active editor). */
+  onSelectOpenedFile?: () => void;
+  /** IDEA Project view header: Expand All / Collapse All. */
+  onExpandAll?: () => void;
+  onCollapseAll?: () => void;
+  /** IDEA tool window ⋮ Options (View Mode, Move to, Resize, Remove, Hide). */
+  toolWindowOptions?: () => MenuItem[];
   children: ReactNode;
 }
 
@@ -128,6 +138,10 @@ export function FileTreePane({
   onDelete,
   children,
   onKeyDown,
+  onSelectOpenedFile,
+  onExpandAll,
+  onCollapseAll,
+  toolWindowOptions,
 }: FileTreePaneProps) {
   const toolbarMenu = useContextMenu();
   const [toolbarWidth, setToolbarWidth] = useState(TREE_DEFAULT_WIDTH_ASSUMPTION);
@@ -166,6 +180,9 @@ export function FileTreePane({
     if (items.length > 0) {
       items.push({ separator: true, label: "" });
     }
+    if (onExpandAll && !visibility.showNewDirectory) {
+      items.push({ label: "Expand All", testId: "code-workspace-tree-menu-expand-all", onClick: onExpandAll }, { separator: true, label: "" });
+    }
     items.push(
       { label: "Rename", disabled: !canMutateSelection, onClick: onRename },
       { label: "Delete or remove", disabled: !canMutateSelection, onClick: onDelete },
@@ -197,6 +214,8 @@ export function FileTreePane({
         { label: "Flat file view", checked: viewMode === "flat", onClick: () => onViewModeChange("flat") },
       );
     }
+    const options = toolWindowOptions?.() ?? [];
+    if (options.length > 0) items.push({ separator: true, label: "" }, ...options);
     toolbarMenu.showAt(rect.right, rect.bottom, items);
   };
 
@@ -255,6 +274,30 @@ export function FileTreePane({
             />
           )}
           <div className="flex-1 min-w-0" />
+          {onSelectOpenedFile && (
+            <TreeIconButton
+              label="Select Opened File (Alt+F1)"
+              testId="code-workspace-tree-select-opened"
+              icon={<LocateFixed className="w-3.5 h-3.5" />}
+              onClick={onSelectOpenedFile}
+            />
+          )}
+          {onExpandAll && visibility.showNewDirectory && (
+            <TreeIconButton
+              label="Expand All"
+              testId="code-workspace-tree-expand-all"
+              icon={<ChevronsUpDown className="w-3.5 h-3.5" />}
+              onClick={onExpandAll}
+            />
+          )}
+          {onCollapseAll && (
+            <TreeIconButton
+              label="Collapse All"
+              testId="code-workspace-tree-collapse-all"
+              icon={<ChevronsDownUp className="w-3.5 h-3.5" />}
+              onClick={onCollapseAll}
+            />
+          )}
           <TreeIconButton
             label="More tree actions"
             testId="code-workspace-tree-toolbar-more"

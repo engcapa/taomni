@@ -261,6 +261,7 @@ cases:
 - TC-IDE-PARITY-013-05-find-action-platform-native
 - TC-IDE-PARITY-024-01
 - TC-IDE-PARITY-024-02
+- TC-IDE-PARITY-024-03-tool-window-move-native
 - TC-IDE-PARITY-025-01
 - TC-IDE-PARITY-025-02-debugger-native
 - TC-IDE-PARITY-007-01

@@ -8222,12 +8222,20 @@ controls:
     kind: interactive
     optional: true
     aliases:
+      - '[data-testid="code-workspace-tool-window-options-terminal"]'
       - '[data-testid="code-workspace-tool-window-move"]'
       - '[data-testid="code-workspace-tool-window-move-bottom-left"]'
   - id: tool-window-more-item         # More tool windows entries
     selector: '[data-testid="code-workspace-bottom-tab-overflow-run"]'
     kind: interactive
     optional: true
+  - id: project-header-actions        # ED-PARITY-024 IDEA Project header: Expand All / Collapse All / Select Opened File
+    selector: '[data-testid="code-workspace-tree-expand-all"]'
+    kind: interactive
+    optional: true       # Expand All folds into ⋯ at narrow widths
+    aliases:
+      - '[data-testid="code-workspace-tree-collapse-all"]'
+      - '[data-testid="code-workspace-tree-select-opened"]'
   - id: search-everywhere-tab         # ED-PARITY-024 category tabs (Tab / Shift+Tab)
     selector: '[data-testid="search-everywhere-tab-files"]'
     kind: interactive

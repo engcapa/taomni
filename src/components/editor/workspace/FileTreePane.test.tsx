@@ -182,6 +182,60 @@ describe("FileTreePane", () => {
     expect(screen.queryByText("Language Servers")).toBeNull();
   });
 
+  it("offers IDEA's Project header actions and the tool window options", () => {
+    const onSelectOpenedFile = vi.fn();
+    const onExpandAll = vi.fn();
+    const onCollapseAll = vi.fn();
+    const onMove = vi.fn();
+    const paneRef = createRef<HTMLElement>();
+    render(
+      <FileTreePane
+        paneRef={paneRef}
+        style={{}}
+        filter=""
+        onFilterChange={vi.fn()}
+        viewMode="tree"
+        onViewModeChange={vi.fn()}
+        fontSize={12}
+        minFontSize={10}
+        maxFontSize={20}
+        defaultFontSize={12}
+        onFontSizeChange={vi.fn()}
+        onOpenFile={vi.fn()}
+        onAddFolder={vi.fn()}
+        canCreate
+        canMutateSelection
+        onCreateFile={vi.fn()}
+        onCreateDirectory={vi.fn()}
+        onRename={vi.fn()}
+        onDelete={vi.fn()}
+        onSelectOpenedFile={onSelectOpenedFile}
+        onExpandAll={onExpandAll}
+        onCollapseAll={onCollapseAll}
+        toolWindowOptions={() => [{ label: "Move to", testId: "tool-window-move", onClick: onMove }]}
+      >
+        <button type="button">workspace root</button>
+      </FileTreePane>,
+    );
+    const pane = screen.getByTestId("code-workspace-tree-pane");
+    const width = TREE_TOOLBAR_WIDE_MIN_PX + 40;
+    pane.getBoundingClientRect = () => ({
+      width, height: 400, top: 0, left: 0, bottom: 400, right: width, x: 0, y: 0, toJSON: () => ({}),
+    });
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    fireEvent.click(screen.getByTestId("code-workspace-tree-select-opened"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-expand-all"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-collapse-all"));
+    expect(onSelectOpenedFile).toHaveBeenCalledOnce();
+    expect(onExpandAll).toHaveBeenCalledOnce();
+    expect(onCollapseAll).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByTestId("code-workspace-tree-toolbar-more"));
+    fireEvent.click(screen.getByTestId("tool-window-move"));
+    expect(onMove).toHaveBeenCalledOnce();
+  });
+
   it("places a panel-local collapse control on the tree toolbar row", () => {
     const onToggleCollapse = vi.fn();
     renderPane({ onToggleCollapse });

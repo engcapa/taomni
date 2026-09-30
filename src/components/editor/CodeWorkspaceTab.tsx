@@ -4374,6 +4374,37 @@ export function CodeWorkspaceTab({
     treePaneRef.current?.focus();
   }, [loadDir, setLanguagePanelOpen]);
 
+  /**
+   * IDEA Project view "Expand All": every root plus every directory listed so
+   * far; their unloaded sub-directories load now, so repeated use goes deeper
+   * without walking a whole large project at once.
+   */
+  const expandAllProjectTree = useCallback(() => {
+    const keys = new Set<string>();
+    const pending: Array<{ rootId: string; path: string }> = [];
+    for (const [key, state] of Object.entries(directories)) {
+      if (!state.loaded) continue;
+      const rootId = key.slice(0, key.indexOf(":"));
+      for (const entry of state.entries) {
+        if (entry.fileType !== "dir") continue;
+        const childKey = rootDirKey(rootId, entry.path);
+        keys.add(childKey);
+        if (!directories[childKey]?.loaded) pending.push({ rootId, path: entry.path });
+      }
+    }
+    setExpandedRoots(new Set(roots.map((root) => root.id)));
+    setExpandedDirs((current) => new Set([...current, ...keys]));
+    for (const root of roots) {
+      if (!directories[rootDirKey(root.id, "")]?.loaded) void loadDir(root.id, "");
+    }
+    for (const target of pending.slice(0, 200)) void loadDir(target.rootId, target.path);
+  }, [directories, loadDir, roots, setExpandedDirs, setExpandedRoots]);
+
+  /** IDEA Project view "Collapse All": back to the roots' top level. */
+  const collapseAllProjectTree = useCallback(() => {
+    setExpandedDirs(new Set());
+  }, [setExpandedDirs]);
+
   const revealEditorTabInExplorer = useCallback((key: string) => {
     const file = openFilesRef.current[key];
     if (!file) return;
@@ -22113,6 +22144,10 @@ export function CodeWorkspaceTab({
         onCreateDirectory={() => executeWorkspaceCommand("workspace.tree.newDirectory", { focus: "tree" })}
         onRename={() => executeWorkspaceCommand("workspace.tree.rename", { focus: "tree" })}
         onDelete={() => executeWorkspaceCommand("workspace.tree.delete", { focus: "tree" })}
+        onSelectOpenedFile={activeKey ? () => revealEditorTabInTree(activeKey) : undefined}
+        onExpandAll={expandAllProjectTree}
+        onCollapseAll={collapseAllProjectTree}
+        toolWindowOptions={() => toolWindowOptionsItems("project")}
       >
         <ProjectTree
           roots={roots}
