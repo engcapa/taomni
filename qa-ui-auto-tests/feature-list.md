@@ -4352,6 +4352,18 @@ controls:
     selector: '[data-testid="query-result-grid"]'
     kind: display
     optional: true
+  - id: query-result-row-1
+    selector: '[data-testid="query-result-grid"] button[title="Row 1"]'
+    kind: interactive
+    optional: true       # row-number button selects the first clean row
+  - id: query-result-delete-row
+    selector: '[data-testid="query-result-grid"] button[aria-label="Delete row"]'
+    kind: interactive
+    optional: true
+  - id: query-result-submit-edits
+    selector: '[data-testid="query-result-grid"] button[aria-label="Submit grid edits"]'
+    kind: interactive
+    optional: true       # DB-EDIT-001: confirmation lists the SQL and a no-primary-key warning
   - id: query-result-generated-sql
     selector: '[data-testid="query-result-generated-sql"]'
     kind: display

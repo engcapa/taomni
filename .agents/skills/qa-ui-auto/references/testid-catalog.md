@@ -686,6 +686,9 @@
 - `[data-testid="sql-editor"]` — display [optional] — F-DB-1.sql-editor
 - `[data-testid="sql-completion-status"]` — display [optional] — F-DB-1.sql-completion-status
 - `[data-testid="query-result-grid"]` — display [optional] — F-DB-1.query-result-grid
+- `[data-testid="query-result-grid"] button[title="Row 1"]` — interactive [optional] — F-DB-1.query-result-row-1
+- `[data-testid="query-result-grid"] button[aria-label="Delete row"]` — interactive [optional] — F-DB-1.query-result-delete-row
+- `[data-testid="query-result-grid"] button[aria-label="Submit grid edits"]` — interactive [optional] — F-DB-1.query-result-submit-edits
 - `[data-testid="query-result-generated-sql"]` — display [optional] — F-DB-1.query-result-generated-sql
 - `[data-testid="query-result-generated-sql-copy"]` — interactive [optional] — F-DB-1.query-result-generated-sql-copy
 - `[data-testid="query-result-generated-sql-query"]` — interactive [optional] — F-DB-1.query-result-generated-sql-query

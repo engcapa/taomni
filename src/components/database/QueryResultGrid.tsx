@@ -63,6 +63,7 @@ import {
 } from "../../lib/sqlDialect";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { alertAppDialog, confirmAppDialog } from "../../lib/appDialogs";
+import { gridChangeConfirmMessage, type GridChangePreview } from "../../lib/dbGridChanges";
 
 const ROW_HEIGHT = 26;
 const OVERSCAN = 12;
@@ -97,6 +98,8 @@ interface QueryResultGridProps {
   onRefresh?: (mode: QueryRefreshMode) => void;
   onCancel?: () => void;
   onCommitChanges?: (payload: QueryGridCommitPayload) => Promise<void>;
+  /** Generates the DML shown in the save confirmation before it runs. */
+  onPreviewChanges?: (payload: QueryGridCommitPayload) => Promise<GridChangePreview>;
   onGeneratedSqlSync?: (sql: string, mode: QueryGeneratedSqlSyncMode) => void;
   onGeneratedSqlQuery?: (sql: string, request?: DbResultSqlRewriteRequest) => void | Promise<void>;
   onStatus?: (message: string) => void;
@@ -1217,6 +1220,7 @@ export function QueryResultGrid({
   onRefresh,
   onCancel,
   onCommitChanges,
+  onPreviewChanges,
   onGeneratedSqlSync,
   onGeneratedSqlQuery,
   onStatus,
@@ -1834,9 +1838,17 @@ export function QueryResultGrid({
         original: row.original ? [...row.original] : null,
       }));
     if (changes.length === 0) return;
+    const payload: QueryGridCommitPayload = { columns: result.columns, changes, counts: changeCounts };
+    let preview: GridChangePreview | null = null;
+    try {
+      preview = onPreviewChanges ? await onPreviewChanges(payload) : null;
+    } catch {
+      // Not previewable (e.g. not a simple SELECT); the submit reports why.
+      preview = null;
+    }
     const ok = await confirmAppDialog({
       title: "Apply grid changes",
-      message: `Apply grid changes to the database?\n\nAdded: ${changeCounts.inserted}\nModified: ${changeCounts.updated}\nDeleted: ${changeCounts.deleted}`,
+      message: gridChangeConfirmMessage(changeCounts, preview),
       confirmLabel: "Apply",
       danger: changeCounts.deleted > 0,
     });
@@ -1850,7 +1862,7 @@ export function QueryResultGrid({
     }
     setSubmittingChanges(true);
     try {
-      await onCommitChanges({ columns: result.columns, changes, counts: changeCounts });
+      await onCommitChanges(payload);
       const keptRows = rows.filter((row) => row.status !== "deleted");
       setRows(
         keptRows.map((row, index) => ({

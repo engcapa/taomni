@@ -145,3 +145,27 @@
 | V3 | A5 | mock IPC，引擎 ClickHouse | 渲染工具栏 | 没有 `db-tx-mode` | unit | 同上 |
 | V4 | A2 | native，`mysql_required` | 建表 `qa_tx_t`；切 Manual；插入一行，计数 1；Rollback；`select count(*)` 为 0；再插入并 Commit，计数 0，`select count(*)` 为 1 | 与操作一致 | native | `qa-ui-auto-tests/cases/TC-DB-TX-001-manual-commit-native.testcase.yaml`（P2 新增） |
 | V5 | A5 | browser，离线脚手架 | 打开 MySQL 会话（连接失败） | `db-tx-mode` 可见、禁用、文字 `Auto`；没有 `db-tx-commit` | browser | `qa-ui-auto-tests/cases/TC-DB-TX-001-manual-commit-browser.testcase.yaml`（P2 新增） |
+
+<a id="db-edit-001"></a>
+## DB-EDIT-001 保存数据编辑前的 SQL 预览
+
+- 来源 / 范围 / 参照：DBV-EDIT-01；所有支持网格回写的 SQL 引擎。`主参照: dbvis`（保存前列出将执行的语句；DBeaver 需另开 “Generate SQL” 才能看到）。无主键警告取 DBeaver 的 “No unique key” 提示。
+- 当前事实：`QueryResultGrid.submitChanges` 的确认框只显示增删改数量；`DbClientTab.commitGridChanges` 在确认后才查主键并生成 DML，没有主键时 WHERE 静默使用结果集全部列。
+- 规则（新增 `src/lib/dbGridChanges.ts`）：`buildGridChangeStatements` 按现有规则生成 INSERT / UPDATE / DELETE（有主键用主键列，否则用全部列；未改动的 UPDATE 跳过），并返回 `whereUsesAllColumns`。有 UPDATE / DELETE 且没有主键时给出警告 “No primary key found: UPDATE and DELETE match rows on every column and may change more than one row.”。确认框消息 = 原有数量 + 警告（如有）+ `SQL to execute (N):` 与最多 20 条语句（超出显示 `… and K more`）。
+- 目标：保存网格修改时，确认框在执行前列出语句与警告；确认后执行的正是预览的语句。生成失败（例如非简单 SELECT）时退回原来只显示数量的确认框，错误仍由提交流程报告。
+- 保留契约：取消不执行任何语句；提交后刷新结果页；Manual 提交模式下同样计入未提交数（DB-TX-001）。
+- 验收：
+  - `A1` 生成规则：主键 / 无主键、NULL 值、未改动 UPDATE 跳过，警告只在无主键且有 UPDATE / DELETE 时出现。
+  - `A2` 确认框列出将执行的 SQL，超过 20 条截断。
+  - `A3` 确认后执行的语句与预览一致；取消则不执行。
+  - `A4` 预览失败时退回数量确认（保留）。
+
+<a id="db-edit-001-test-cases"></a>
+### 测试用例
+
+| V | AC | 前置 / fixture | 操作 | 预期 | 层级 | 路径 / ID |
+|---|---|---|---|---|---|---|
+| V1 | A1 A2 | 无 | 调用 `buildGridChangeStatements` / `gridChangeConfirmMessage` | 语句、`whereUsesAllColumns`、警告与截断符合规则 | unit | `src/lib/dbGridChanges.test.ts`（P2 新增） |
+| V2 | A2 A3 A4 | mock `onPreviewChanges` | 网格删除一行后点 Submit | 确认消息含预览 SQL；取消不调用 `onCommitChanges`；预览抛错时消息只有数量 | unit | `QueryResultGrid.test.tsx` “previews grid SQL …”（P2 新增） |
+| V3 | A1 A3 | native，`mysql_required` | 有主键表删除第 1 行并 Submit：消息含 `DELETE FROM` 且无警告，确认后计数为 0；无主键表删除一行：消息含 `No primary key`，取消 | 与操作一致 | native | `qa-ui-auto-tests/cases/TC-DB-EDIT-001-grid-sql-preview-native.testcase.yaml`（P2 新增） |
+| — | — | browser | — | 浏览器预览没有可执行的数据库，得不到可编辑结果集；不设 browser 用例 | — | — |

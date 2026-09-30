@@ -115,6 +115,7 @@ import { registerQueryTab } from "../../lib/queryRegistry";
 import { alertAppDialog, choiceAppDialog, confirmAppDialog } from "../../lib/appDialogs";
 import { dangerousConfirmationMessage } from "../../lib/sqlDangerousStatements";
 import { explainSqlFor } from "../../lib/sqlExplain";
+import { buildGridChangeStatements, gridChangePreview, type GridChangePreview } from "../../lib/dbGridChanges";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
 import { ExecutionLogView } from "./ExecutionLogView";
 import {
@@ -138,9 +139,7 @@ import {
 } from "../../lib/databaseTabLimit";
 import {
   asSqlEngine,
-  quoteIdent as dialectQuoteIdent,
   qualifiedName as dialectQualifiedName,
-  sqlLiteral as dialectSqlLiteral,
   setDefaultSchemaSql,
   selectStatement as dialectSelectStatement,
 } from "../../lib/sqlDialect";
@@ -430,10 +429,6 @@ async function writeTextFile(path: string, text: string): Promise<void> {
   }
 }
 
-function quoteIdent(engine: string, ident: string): string {
-  return dialectQuoteIdent(asSqlEngine(engine), ident);
-}
-
 function qualifiedName(engine: string, schema: string | null, table: string, catalog?: string | null): string {
   return dialectQualifiedName(asSqlEngine(engine), { catalog, schema, name: table });
 }
@@ -477,20 +472,6 @@ function parseEditableSelectTarget(sql: string): { schema: string | null; table:
     : match[2]
     ? { schema: unquoteIdent(match[1]), table: unquoteIdent(match[2]) }
     : { schema: null, table: unquoteIdent(match[1]) };
-}
-
-function sqlLiteral(value: string | null): string {
-  return dialectSqlLiteral(value);
-}
-
-function whereForColumns(engine: string, columns: string[], allColumns: string[], values: (string | null)[]): string {
-  const clauses = columns.map((column) => {
-    const index = allColumns.findIndex((name) => name === column);
-    const value = index >= 0 ? values[index] : null;
-    const ident = quoteIdent(engine, column);
-    return value === null ? `${ident} IS NULL` : `${ident} = ${sqlLiteral(value)}`;
-  });
-  return clauses.length > 0 ? clauses.join(" AND ") : "1 = 0";
 }
 
 function newPanel(patch: Partial<PanelState> = {}): PanelState {
@@ -1633,9 +1614,10 @@ export default function DbClientTab({
     [patchSheet, rowLimit, streamQueryIntoSheet],
   );
 
-  const commitGridChanges = useCallback(
+  /** Generate the DML for grid edits so it can be previewed, then executed. */
+  const prepareGridChanges = useCallback(
     async (panelId: string, sheetId: string, payload: QueryGridCommitPayload) => {
-      const panel = panels.find((p) => p.id === panelId);
+      const panel = panelsRef.current.find((p) => p.id === panelId);
       const sheet = panel?.sheets.find((candidate) => candidate.id === sheetId);
       if (!panel || !sheet) throw new Error("Result sheet is no longer available.");
       const target = parseEditableSelectTarget(sheet.sql);
@@ -1653,35 +1635,26 @@ export default function DbClientTab({
       } catch {
         described = [];
       }
-      const resultColumnNames = payload.columns.map((column) => column.name);
-      const primaryKeys = described
-        .filter((column) => column.primaryKey && resultColumnNames.includes(column.name))
-        .map((column) => column.name);
-      const whereColumns = primaryKeys.length > 0 ? primaryKeys : resultColumnNames;
-      const statements: string[] = [];
-      for (const change of payload.changes) {
-        if (change.status === "inserted") {
-          const cols = resultColumnNames.map((name) => quoteIdent(info.engine, name)).join(", ");
-          const values = change.values.map(sqlLiteral).join(", ");
-          statements.push(`INSERT INTO ${tableName} (${cols}) VALUES (${values})`);
-        } else if (change.status === "updated") {
-          if (!change.original) continue;
-          const assignments = resultColumnNames
-            .map((name, index) =>
-              change.values[index] === change.original?.[index]
-                ? null
-                : `${quoteIdent(info.engine, name)} = ${sqlLiteral(change.values[index])}`,
-            )
-            .filter((value): value is string => Boolean(value));
-          if (assignments.length === 0) continue;
-          const where = whereForColumns(info.engine, whereColumns, resultColumnNames, change.original);
-          statements.push(`UPDATE ${tableName} SET ${assignments.join(", ")} WHERE ${where}`);
-        } else if (change.status === "deleted") {
-          if (!change.original) continue;
-          const where = whereForColumns(info.engine, whereColumns, resultColumnNames, change.original);
-          statements.push(`DELETE FROM ${tableName} WHERE ${where}`);
-        }
-      }
+      return buildGridChangeStatements({
+        engine: info.engine,
+        tableName,
+        columns: payload.columns.map((column) => column.name),
+        primaryKeys: described.filter((column) => column.primaryKey).map((column) => column.name),
+        changes: payload.changes,
+      });
+    },
+    [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache],
+  );
+
+  const previewGridChanges = useCallback(
+    async (panelId: string, sheetId: string, payload: QueryGridCommitPayload): Promise<GridChangePreview> =>
+      gridChangePreview(await prepareGridChanges(panelId, sheetId, payload)),
+    [prepareGridChanges],
+  );
+
+  const commitGridChanges = useCallback(
+    async (panelId: string, sheetId: string, payload: QueryGridCommitPayload) => {
+      const { statements } = await prepareGridChanges(panelId, sheetId, payload);
       if (statements.length === 0) return;
       for (const sql of statements) {
         if (!connectionSessionId) throw new Error("Database connection is still starting.");
@@ -1693,7 +1666,7 @@ export default function DbClientTab({
       );
       await refreshSheet(panelId, sheetId, "clearView");
     },
-    [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache, panels, refreshSheet, refreshTxStatus, setStatusMessage],
+    [connectionSessionId, prepareGridChanges, refreshSheet, refreshTxStatus, setStatusMessage],
   );
 
   const onSchemaLoaded = useCallback((tables: Map<string, string[]>) => {
@@ -3053,6 +3026,7 @@ export default function DbClientTab({
                     onTabChange={(sheetId, tab) => patchSheet(activePanel.id, sheetId, { resultTab: tab })}
                     onRefreshSheet={(sheetId, mode) => void refreshSheet(activePanel.id, sheetId, mode)}
                     onCommitGridChanges={(sheetId, payload) => commitGridChanges(activePanel.id, sheetId, payload)}
+                    onPreviewGridChanges={(sheetId, payload) => previewGridChanges(activePanel.id, sheetId, payload)}
                     onGeneratedSqlSync={(sheetId, sql, mode) =>
                       syncGeneratedSqlFromSheet(activePanel.id, sheetId, sql, mode)
                     }
@@ -3521,6 +3495,7 @@ function ResultArea({
   onTabChange,
   onRefreshSheet,
   onCommitGridChanges,
+  onPreviewGridChanges,
   onGeneratedSqlSync,
   onGeneratedSqlQuery,
   onCancel,
@@ -3536,6 +3511,7 @@ function ResultArea({
   onTabChange: (sheetId: string, tab: ResultSubTab) => void;
   onRefreshSheet: (sheetId: string, mode: QueryRefreshMode) => void;
   onCommitGridChanges: (sheetId: string, payload: QueryGridCommitPayload) => Promise<void>;
+  onPreviewGridChanges: (sheetId: string, payload: QueryGridCommitPayload) => Promise<GridChangePreview>;
   onGeneratedSqlSync: (sheetId: string, sql: string, mode: QueryGeneratedSqlSyncMode) => void;
   onGeneratedSqlQuery: (
     sheetId: string,
@@ -3740,6 +3716,7 @@ function ResultArea({
                 onRefresh={(mode) => onRefreshSheet(sheet.id, mode)}
                 onCancel={onCancel}
                 onCommitChanges={(payload) => onCommitGridChanges(sheet.id, payload)}
+                onPreviewChanges={(payload) => onPreviewGridChanges(sheet.id, payload)}
                 onGeneratedSqlSync={(sql, mode) => onGeneratedSqlSync(sheet.id, sql, mode)}
                 onGeneratedSqlQuery={(sql, rewriteRequest) => onGeneratedSqlQuery(sheet.id, sql, rewriteRequest)}
                 onStatus={onStatus}
