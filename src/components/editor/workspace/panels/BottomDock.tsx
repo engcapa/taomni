@@ -39,6 +39,14 @@ interface BottomDockProps {
    */
   railHost?: HTMLElement | null;
   onRestoreLayout?: () => void;
+  /**
+   * ED-PARITY-024 stripe mode: the workspace owns the stripe buttons and the
+   * tool window content (re-parentable hosts). The dock only lays out the
+   * visible panes — bottom-left (`activeTab` while `open`) and, split to its
+   * right, the bottom-right window — each with its own IDEA header.
+   */
+  renderPane?: (tabId: string, placement: "primary" | "secondary") => ReactNode;
+  secondaryTab?: string | null;
 }
 
 /**
@@ -78,6 +86,26 @@ function readStoredHeight(): number {
   return BOTTOM_DOCK_DEFAULT_HEIGHT;
 }
 
+const BOTTOM_SPLIT_RATIO_KEY = "taomni.codeWorkspace.bottomSplitRatio.v1";
+
+function readSplitRatio(): number {
+  try {
+    const parsed = Number(window.localStorage.getItem(BOTTOM_SPLIT_RATIO_KEY));
+    if (Number.isFinite(parsed) && parsed > 0.1 && parsed < 0.9) return parsed;
+  } catch {
+    // Ignore storage failures.
+  }
+  return 0.5;
+}
+
+function writeSplitRatio(ratio: number): void {
+  try {
+    window.localStorage.setItem(BOTTOM_SPLIT_RATIO_KEY, String(ratio));
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
 function writeStoredHeight(height: number): void {
   try {
     window.localStorage.setItem(BOTTOM_DOCK_HEIGHT_KEY, String(clampHeight(height)));
@@ -98,6 +126,8 @@ export function BottomDock({
   maxHeight = BOTTOM_DOCK_MAX_HEIGHT,
   railHost,
   onRestoreLayout,
+  renderPane,
+  secondaryTab = null,
 }: BottomDockProps) {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const active = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
@@ -222,6 +252,57 @@ export function BottomDock({
     }
   };
 
+  const [splitRatio, setSplitRatio] = useState(readSplitRatio);
+  const onSplitPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const container = event.currentTarget.parentElement;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const onMove = (moveEvent: PointerEvent) => {
+      if (rect.width <= 0) return;
+      const ratio = Math.max(0.15, Math.min(0.85, (moveEvent.clientX - rect.left) / rect.width));
+      setSplitRatio(ratio);
+    };
+    const finish = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      setSplitRatio((ratio) => {
+        writeSplitRatio(ratio);
+        return ratio;
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  };
+  /** Pane mode is open when either bottom pane shows, not only `open`. */
+  const onResizePointerDownAny = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    activeCleanUpRef.current?.();
+    const requestId = ++dragRequestIdRef.current;
+    const target = event.currentTarget;
+    target.setPointerCapture?.(event.pointerId);
+    dragRef.current = { startY: event.clientY, startHeight: preferredHeight, requestId };
+    const onMove = (moveEvent: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.requestId !== requestId) return;
+      setHeight(drag.startHeight + (drag.startY - moveEvent.clientY));
+    };
+    const onCleanUp = () => {
+      if (dragRequestIdRef.current !== requestId) return;
+      activeCleanUpRef.current = null;
+      dragRef.current = null;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onCleanUp);
+      window.removeEventListener("pointercancel", onCleanUp);
+    };
+    activeCleanUpRef.current = onCleanUp;
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onCleanUp);
+    window.addEventListener("pointercancel", onCleanUp);
+  };
+
   // Determine visible vs overflow tabs based on header width
   // Estimated ~100px per tab button + 50px controls margin
   const approxTabWidth = 100;
@@ -262,6 +343,64 @@ export function BottomDock({
       onEscape?.();
     }
   };
+
+  if (renderPane) {
+    const primaryVisible = open && !!active;
+    const secondaryVisible = !!secondaryTab;
+    const anyVisible = primaryVisible || secondaryVisible;
+    return (
+      <section
+        data-testid="code-workspace-bottom-dock"
+        data-open={anyVisible || undefined}
+        onKeyDown={handleDockKeyDown}
+        className={`relative flex shrink-0 flex-col bg-[var(--taomni-code-gutter-bg)] ${anyVisible ? "border-t border-[var(--taomni-code-border)]" : ""}`}
+      >
+        {anyVisible && (
+          <div
+            role="separator"
+            tabIndex={0}
+            aria-orientation="horizontal"
+            aria-label="Resize bottom panel"
+            aria-valuenow={effectiveHeight}
+            aria-valuemin={BOTTOM_DOCK_MIN_HEIGHT}
+            aria-valuemax={maxHeight}
+            data-testid="code-workspace-bottom-dock-resize"
+            className="h-1.5 cursor-row-resize bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] focus:bg-[var(--taomni-accent)] transition-colors"
+            onPointerDown={(event) => {
+              if (!anyVisible) return;
+              onResizePointerDownAny(event);
+            }}
+            onKeyDown={onResizeKeyDown}
+          />
+        )}
+        <div
+          hidden={!anyVisible}
+          data-testid="code-workspace-bottom-dock-body"
+          className="flex min-h-0 overflow-hidden"
+          style={{ height: anyVisible ? Math.max(0, effectiveHeight - 6) : 0 }}
+        >
+          {primaryVisible && active && (
+            <div className="min-h-0 min-w-0" style={{ flex: secondaryVisible ? `0 0 ${Math.round(splitRatio * 100)}%` : "1 1 auto" }}>
+              {renderPane(active.id, "primary")}
+            </div>
+          )}
+          {primaryVisible && secondaryVisible && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize bottom tool windows"
+              data-testid="code-workspace-bottom-dock-split"
+              className="w-1 shrink-0 cursor-col-resize bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)]"
+              onPointerDown={onSplitPointerDown}
+            />
+          )}
+          {secondaryVisible && secondaryTab && (
+            <div className="min-h-0 min-w-0 flex-1">{renderPane(secondaryTab, "secondary")}</div>
+          )}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section

@@ -240,6 +240,7 @@ import {
   type WorkspaceTabPolicyV3,
 } from "./workspace/workspaceTabPolicy";
 import {
+  WORKSPACE_BOTTOM_DOCK_WINDOWS,
   listToolWindowsForCycle,
   syncBottomDockToolWindows,
   unregisterAllToolWindows,
@@ -476,7 +477,7 @@ import {
   writeKeymapSchemes,
   type KeymapSchemeV3,
 } from "./workspace/workspaceKeymapScheme";
-import { TabSwitcher, type TabSwitcherEntry, type TabSwitcherToolWindow } from "./workspace/TabSwitcher";
+import { TabSwitcher, switcherArrowIndex, type TabSwitcherEntry, type TabSwitcherToolWindow } from "./workspace/TabSwitcher";
 import { DapAdapterGuideDialog } from "./workspace/DapAdapterGuideDialog";
 import { disabledReasonLabel } from "./workspace/workspaceCodeMirrorKeymap";
 import {
@@ -520,9 +521,12 @@ import {
   type ResourceCleanupHandlers,
   type ResourceCleanupOutcome,
 } from "./workspace/workspaceResourceRecoveryCoordinator";
-import { BottomDock, BOTTOM_DOCK_MIN_HEIGHT, BOTTOM_DOCK_MAX_HEIGHT, KeepAliveToolPanel } from "./workspace/panels/BottomDock";
-import { ToolWindowRail, type ToolWindowRailItem } from "./workspace/panels/ToolWindowRail";
+import { BottomDock, BOTTOM_DOCK_MIN_HEIGHT, BOTTOM_DOCK_MAX_HEIGHT, type BottomDockTab } from "./workspace/panels/BottomDock";
+import { MoreToolWindowsButton, ToolWindowRail, type ToolWindowRailItem } from "./workspace/panels/ToolWindowRail";
 import { useLatestHandlers } from "./workspace/useLatestHandlers";
+import { useToolWindowLayout, type ToolWindowLayoutEntry } from "./workspace/useToolWindowLayout";
+import { ToolWindowPane, ToolWindowPortal, ToolWindowSlot, ToolWindowSplitArea, useToolWindowNodes } from "./workspace/panels/ToolWindowHost";
+import { TOOL_WINDOW_ANCHORS, TOOL_WINDOW_ANCHOR_LABELS, anchorSide, type ToolWindowAnchor } from "./workspace/toolWindowLayout";
 import { workspaceNavigationSegments } from "./workspace/workspaceNavigationBar";
 import {
   ReferencesPanel,
@@ -967,6 +971,25 @@ function externalDiskSnapshot(file: WorkspaceFile): ExternalDiskSnapshot {
 // force-flush immediately so the server is not one keystroke behind.
 // Slightly longer than a single keystroke so jdtls is not flooded while still
 // feeling immediate once ensureLspDocumentSynced force-flushes for completion.
+/**
+ * ED-PARITY-024 tool windows and their IDEA new-UI default anchors: Project
+ * (left top) with Structure split below it (left bottom), Documentation on
+ * the right, and the bottom tool windows bottom-left.
+ */
+/** IDEA registers these on demand: the stripe button appears once opened. */
+const ON_DEMAND_TOOL_WINDOWS = new Set(["references", "call-hierarchy", "type-hierarchy", "coverage"]);
+const WORKSPACE_TOOL_WINDOW_LAYOUT_ENTRIES: readonly ToolWindowLayoutEntry[] = [
+  { id: "project", defaultAnchor: "left-top" },
+  { id: "structure", defaultAnchor: "left-bottom" },
+  { id: "documentation", defaultAnchor: "right-top" },
+  ...[...WORKSPACE_BOTTOM_DOCK_WINDOWS.map((window) => window.id), "git"].map((id) => ({
+    id,
+    defaultAnchor: "bottom-left" as const,
+    bottomDock: true,
+    hiddenUntilUsed: ON_DEMAND_TOOL_WINDOWS.has(id),
+  })),
+];
+
 const LSP_CHANGE_SYNC_DELAY_MS = 140;
 const LSP_FEATURE_SYNC_WAIT_MS = 400;
 const LSP_HIGHLIGHT_IDLE_DELAY_MS = 500;
@@ -1729,7 +1752,7 @@ export function CodeWorkspaceTab({
     languagePanelOpen,
     bottomDockOpen,
     bottomDockTab,
-    rightPaneOpen,
+    rightPaneOpen: rightPaneOpenStored,
     rightPaneTab,
     searchEverywhereOpen,
     searchEverywhereMode,
@@ -1977,13 +2000,11 @@ export function CodeWorkspaceTab({
     semanticIndex.invalidate("language-server-restarted");
   }, [semanticIndex.invalidate]);
 
-  const setBottomDockOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
-    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).bottomDockOpen;
-    patchWorkspaceUi(workspaceInstanceId, { bottomDockOpen: typeof open === "function" ? open(prev) : open });
+  const setBottomDockOpenRaw = useCallback((open: boolean) => {
+    patchWorkspaceUi(workspaceInstanceId, { bottomDockOpen: open });
   }, [patchWorkspaceUi, workspaceInstanceId]);
-  const setBottomDockTab = useCallback((tab: BottomDockTabId | ((prev: BottomDockTabId) => BottomDockTabId)) => {
-    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).bottomDockTab;
-    patchWorkspaceUi(workspaceInstanceId, { bottomDockTab: typeof tab === "function" ? tab(prev) : tab });
+  const setBottomDockTabRaw = useCallback((tab: string) => {
+    patchWorkspaceUi(workspaceInstanceId, { bottomDockTab: tab as BottomDockTabId });
   }, [patchWorkspaceUi, workspaceInstanceId]);
   const setLanguagePanelOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
     const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).languagePanelOpen;
@@ -1991,15 +2012,90 @@ export function CodeWorkspaceTab({
       languagePanelOpen: typeof open === "function" ? open(prev) : open,
     });
   }, [patchWorkspaceUi, workspaceInstanceId]);
+
+  // ED-PARITY-024: IDEA tool window placement. Project and the bottom-left
+  // dock keep their persisted flags; moved windows (and Structure/Docs) live
+  // in the layout controller. Legacy "open the dock on tab X" call sites are
+  // routed to X's current anchor below.
+  const toolWindowLayout = useToolWindowLayout(
+    workspaceInstanceId,
+    WORKSPACE_TOOL_WINDOW_LAYOUT_ENTRIES,
+    {
+      projectOpen: languagePanelOpen,
+      setProjectOpen: (open) => setLanguagePanelOpen(open),
+      bottomDockOpen,
+      bottomDockTab,
+      setBottomDockOpen: setBottomDockOpenRaw,
+      setBottomDockTab: setBottomDockTabRaw,
+    },
+    rightPaneOpenStored ? [rightPaneTab === "documentation" ? "documentation" : "structure"] : [],
+  );
+  const toolWindowLayoutRef = useRef(toolWindowLayout);
+  toolWindowLayoutRef.current = toolWindowLayout;
+  const toolWindowNodes = useToolWindowNodes();
+  const leftToolAreaOpen = toolWindowLayout.sideOpen("left");
+  const rightToolAreaOpen = toolWindowLayout.sideOpen("right");
+  /** A routed tab request suppresses the dock open that accompanies it. */
+  const routedDockRequestRef = useRef<{ tab: string; dockWasOpen: boolean } | null>(null);
+  const pendingDockOpenRef = useRef<{ tab: string; dockWasOpen: boolean } | null>(null);
+  const setBottomDockOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
+    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    const next = typeof open === "function" ? open(ui.bottomDockOpen) : open;
+    if (next && routedDockRequestRef.current) return;
+    if (next && !ui.bottomDockOpen) {
+      // The tab request of the same call site may follow; remember that the
+      // dock was closed so a routed tab can undo this open.
+      const request = { tab: "", dockWasOpen: false };
+      pendingDockOpenRef.current = request;
+      queueMicrotask(() => {
+        if (pendingDockOpenRef.current === request) pendingDockOpenRef.current = null;
+      });
+    }
+    setBottomDockOpenRaw(next);
+  }, [setBottomDockOpenRaw, workspaceInstanceId]);
+  const setBottomDockTab = useCallback((tab: BottomDockTabId | ((prev: BottomDockTabId) => BottomDockTabId)) => {
+    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    const next = typeof tab === "function" ? tab(ui.bottomDockTab) : tab;
+    const layout = toolWindowLayoutRef.current;
+    if (layout.anchorOf(next) !== "bottom-left") {
+      // A dock open issued just before this request (same call site) is undone.
+      if (pendingDockOpenRef.current) {
+        pendingDockOpenRef.current = null;
+        setBottomDockOpenRaw(false);
+      }
+      const request = { tab: next, dockWasOpen: ui.bottomDockOpen };
+      routedDockRequestRef.current = request;
+      queueMicrotask(() => {
+        if (routedDockRequestRef.current === request) routedDockRequestRef.current = null;
+      });
+      layout.show(next);
+      return;
+    }
+    setBottomDockTabRaw(next);
+  }, [setBottomDockOpenRaw, setBottomDockTabRaw, workspaceInstanceId]);
   const rightPanelRef = useRef<PanelImperativeHandle>(null);
   const lastRightPanelSizeRef = useRef(20);
+  /** Legacy right-pane API (Outline / Documentation) mapped onto tool windows. */
+  const rightPaneTabRef = useRef<RightPaneTabId>(rightPaneTab);
   const setRightPaneOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
-    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).rightPaneOpen;
-    patchWorkspaceUi(workspaceInstanceId, { rightPaneOpen: typeof open === "function" ? open(prev) : open });
+    const layout = toolWindowLayoutRef.current;
+    const tool = rightPaneTabRef.current === "documentation" ? "documentation" : "structure";
+    const next = typeof open === "function" ? open(layout.isVisible(tool)) : open;
+    if (next) layout.show(tool);
+    else layout.hide(tool);
+    patchWorkspaceUi(workspaceInstanceId, { rightPaneOpen: next });
   }, [patchWorkspaceUi, workspaceInstanceId]);
   const setRightPaneTab = useCallback((tab: RightPaneTabId) => {
+    const layout = toolWindowLayoutRef.current;
+    const previous = rightPaneTabRef.current === "documentation" ? "documentation" : "structure";
+    const nextTool = tab === "documentation" ? "documentation" : "structure";
+    rightPaneTabRef.current = tab;
+    if (previous !== nextTool && layout.isVisible(previous)) layout.show(nextTool);
     patchWorkspaceUi(workspaceInstanceId, { rightPaneTab: tab });
   }, [patchWorkspaceUi, workspaceInstanceId]);
+  // Readers of the legacy flag see whether the right-pane tool is visible.
+  const rightPaneOpen = toolWindowLayout.isVisible(rightPaneTab === "documentation" ? "documentation" : "structure");
+  void rightPaneOpenStored;
   const setSearchEverywhereOpen = useCallback((open: boolean) => {
     if (open && !selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).searchEverywhereOpen) {
       searchEverywhereTriggerRef.current = document.activeElement instanceof HTMLElement
@@ -12574,14 +12670,14 @@ export function CodeWorkspaceTab({
     const panel = projectPanelRef.current;
     if (!panel) return;
     const frame = requestAnimationFrame(() => {
-      if (!languagePanelOpen) {
+      if (!leftToolAreaOpen) {
         panel.collapse();
       } else {
         panel.resize(`${lastProjectPanelSizeRef.current}px`);
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [languagePanelOpen]);
+  }, [leftToolAreaOpen]);
 
   const handleProjectPanelResize = useCallback((size: PanelSize) => {
     const pixels = size.inPixels > 0 ? Math.round(size.inPixels) : 0;
@@ -12592,12 +12688,15 @@ export function CodeWorkspaceTab({
       // persistence happens on release via the group's onLayoutChanged.
       lastProjectPanelSizeRef.current = pixels;
     }
-    // Avoid store churn when the panel is already in the desired open/collapsed state.
-    setLanguagePanelOpen((open) => {
-      const next = size.asPercentage > 2 && (pixels > 40 || size.inPixels === 0);
-      return open === next ? open : next;
-    });
-  }, [setLanguagePanelOpen]);
+    // Dragging the area closed hides its tool windows; dragging it open
+    // shows Project (IDEA restores the last left window).
+    const next = size.asPercentage > 2 && (pixels > 40 || size.inPixels === 0);
+    const layout = toolWindowLayoutRef.current;
+    const areaOpen = layout.sideOpen("left");
+    if (next === areaOpen) return;
+    if (!next) layout.hideSide("left");
+    else layout.show(layout.visibleAt("left-top") ?? "project");
+  }, []);
 
   const [workspaceContainerHeight, setWorkspaceContainerHeight] = useState<number>(() => {
     return typeof window !== "undefined" ? window.innerHeight : 800;
@@ -12635,69 +12734,49 @@ export function CodeWorkspaceTab({
     setBottomDockHeightForTool(workspaceInstanceId, bottomDockTab, height);
   }, [bottomDockTab, setBottomDockHeightForTool, workspaceInstanceId]);
 
-  const handleActivateToolWindow = useCallback((toolId: string) => {
-    if (toolId === "project") {
-      const treeHasFocus = treePaneRef.current?.contains(document.activeElement);
-      if (!languagePanelOpen) {
-        setLanguagePanelOpen(true);
-        requestAnimationFrame(() => {
-          treePaneRef.current?.focus();
-        });
-      } else if (treeHasFocus) {
-        setLanguagePanelOpen(false);
-        handleReturnToEditor();
-      } else {
+  const focusToolWindowSoon = useCallback((toolId: string) => {
+    requestAnimationFrame(() => {
+      if (toolId === "project") {
         treePaneRef.current?.focus();
+        return;
       }
-      return;
-    }
+      const pane = document.querySelector(`[data-testid="code-workspace-tool-window-${toolId}"]`);
+      const target = pane?.querySelector<HTMLElement>('[data-tool-window-content] [tabindex="0"], [data-tool-window-content] button, [data-tool-window-content] input, [data-tool-window-content] textarea')
+        ?? pane?.querySelector<HTMLElement>("button");
+      target?.focus();
+    });
+  }, []);
 
-    if (toolId === "outline" || toolId === "structure") {
-      if (rightPaneOpen && rightPaneTab === "outline") {
-        setRightPaneOpen(false);
-        handleReturnToEditor();
-      } else {
-        setRightPaneTab("outline");
-        setRightPaneOpen(true);
-      }
-      return;
-    }
-
-    const bottomDockEl = document.querySelector('[data-testid="code-workspace-bottom-dock"]');
-    const dockHasFocus = bottomDockEl?.contains(document.activeElement);
-    if (!bottomDockOpen || bottomDockTab !== toolId) {
-      setBottomDockTab(toolId as BottomDockTabId);
-      setBottomDockOpen(true);
-      requestAnimationFrame(() => {
-        const el = document.querySelector<HTMLElement>(
-          '[data-testid="code-workspace-bottom-dock"] [tabindex="0"], [data-testid="code-workspace-bottom-dock"] button, [data-testid="code-workspace-bottom-dock"] input'
-        );
-        el?.focus();
-      });
-    } else if (dockHasFocus) {
-      setBottomDockOpen(false);
+  /**
+   * IDEA Activate<Tool>Window (Alt+N, stripe clicks): a hidden window is
+   * shown at its anchor and focused; a visible unfocused one takes focus; a
+   * focused one hides and returns focus to the editor.
+   */
+  const handleActivateToolWindow = useCallback((requestedId: string) => {
+    const toolId = requestedId === "outline" ? "structure" : requestedId;
+    const layout = toolWindowLayoutRef.current;
+    const pane = toolId === "project"
+      ? treePaneRef.current
+      : document.querySelector(`[data-testid="code-workspace-tool-window-${toolId}"]`);
+    const hasFocus = !!pane && pane.contains(document.activeElement);
+    if (!layout.isVisible(toolId)) {
+      if (toolId === "structure") rightPaneTabRef.current = "outline";
+      if (toolId === "documentation") rightPaneTabRef.current = "documentation";
+      layout.show(toolId);
+      focusToolWindowSoon(toolId);
+    } else if (hasFocus) {
+      layout.hide(toolId);
       handleReturnToEditor();
     } else {
-      const el = document.querySelector<HTMLElement>(
-        '[data-testid="code-workspace-bottom-dock"] [tabindex="0"], [data-testid="code-workspace-bottom-dock"] button, [data-testid="code-workspace-bottom-dock"] input'
-      );
-      el?.focus();
+      focusToolWindowSoon(toolId);
     }
-  }, [
-    bottomDockOpen,
-    bottomDockTab,
-    handleReturnToEditor,
-    languagePanelOpen,
-    rightPaneOpen,
-    rightPaneTab,
-    setBottomDockOpen,
-    setBottomDockTab,
-    setLanguagePanelOpen,
-    setRightPaneOpen,
-    setRightPaneTab,
-  ]);
+  }, [focusToolWindowSoon, handleReturnToEditor]);
 
   const handleRestoreToolWindowLayout = useCallback(() => {
+    // IDEA Window | Restore Default Layout: default anchors, Project only.
+    toolWindowLayoutRef.current.restoreDefaultLayout();
+    toolWindowLayoutRef.current.hideSide("right");
+    toolWindowLayoutRef.current.hide("structure");
     restoreDefaultToolWindowLayout(workspaceInstanceId);
     lastProjectPanelSizeRef.current = 452;
     try {
@@ -12817,25 +12896,25 @@ export function CodeWorkspaceTab({
     const panel = rightPanelRef.current;
     if (!panel) return;
     const frame = requestAnimationFrame(() => {
-      if (!rightPaneOpen) {
+      if (!rightToolAreaOpen) {
         panel.collapse();
       } else {
         panel.resize(`${lastRightPanelSizeRef.current}%`);
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [rightPaneOpen]);
+  }, [rightToolAreaOpen]);
 
   const handleRightPanelResize = useCallback((size: PanelSize) => {
     const percentage = size.asPercentage;
     if (percentage > 2) {
       lastRightPanelSizeRef.current = percentage;
     }
-    setRightPaneOpen((open) => {
-      const next = percentage > 2;
-      return open === next ? open : next;
-    });
-  }, [setRightPaneOpen]);
+    const layout = toolWindowLayoutRef.current;
+    const next = percentage > 2;
+    if (next === layout.sideOpen("right")) return;
+    if (!next) layout.hideSide("right");
+  }, []);
 
   const openTodosPane = useCallback(() => {
     setBottomDockTab("todos");
@@ -16410,7 +16489,6 @@ export function CodeWorkspaceTab({
 
   // ED-PARITY-010 DEC-010-01: IDEA tool window stripes. The bottom-dock tools
   // render their own buttons into `bottomRailHost` (same testids as before).
-  const [bottomRailHost, setBottomRailHost] = useState<HTMLDivElement | null>(null);
   const railShortcut = (actionId: string) => actionsController.host.effectiveKeybindingDisplay(actionId)[0];
   const leftToolRailItems: ToolWindowRailItem[] = [
     {
@@ -16722,6 +16800,22 @@ export function CodeWorkspaceTab({
         event.preventDefault();
         event.stopPropagation();
         setTabSwitcherOpen(false);
+        return;
+      }
+      // IDEA Switcher: arrows walk the columns while the modifier is held.
+      if (
+        tabSwitcherOpenRef.current
+        && (logicalKey === "arrowup" || logicalKey === "arrowdown" || logicalKey === "arrowleft" || logicalKey === "arrowright")
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        const snapshot = switcherSnapshotRef.current;
+        setTabSwitcherIndex((index) => switcherArrowIndex(
+          index,
+          logicalKey,
+          snapshot?.editors.length ?? 0,
+          snapshot?.tools.length ?? 0,
+        ));
         return;
       }
       // Bare Tab belongs to the focused native control outside the editor.
@@ -21231,6 +21325,828 @@ export function CodeWorkspaceTab({
     );
   };
 
+  // Bottom tool windows (IDEA bottom-docked set); rendered by the dock or,
+  // when moved, by another tool window area (ED-PARITY-024).
+  const bottomDockTabs: BottomDockTab[] = [
+    {
+      id: "problems",
+      label: "Problems",
+      icon: <AlertTriangle className="h-3.5 w-3.5" />,
+      badge: activeProblemCounts.errors > 0 || activeProblemCounts.warnings > 0 ? (
+        <span className="inline-flex items-center gap-1">
+          {activeProblemCounts.errors > 0 && <span className="text-red-500">{activeProblemCounts.errors}</span>}
+          {activeProblemCounts.warnings > 0 && <span className="text-amber-500">{activeProblemCounts.warnings}</span>}
+        </span>
+      ) : undefined,
+      content: (
+        <ProblemsPanel
+          files={problemsScopeFiles}
+          onOpenProblem={openProblem}
+          onQuickFix={(fileKey, diagnostic) => void openQuickFixForProblem(fileKey, diagnostic)}
+          onSuppress={suppressInspection}
+          onAddToBaseline={addInspectionBaseline}
+          scope={problemsScope}
+          onScopeChange={setProblemsScope}
+          onRebuild={() => void rebuildProject()}
+          rebuilding={rebuildingProject}
+          loading={problemsScope === "project" && projectProblemsLoading}
+          diagnosticTransform={inspectionTransform}
+          onOpenRelatedInformation={openRelatedDiagnostic}
+          evidenceLine={evidenceLineForProblem}
+          suppressedInSource={suppressedInSourceForProblem}
+          fullProjectNote={activeCapabilities?.workspaceDiagnostics === true
+            ? null
+            : "On-the-fly diagnostics only — this server does not expose workspace-wide diagnostics."}
+          readiness={activeKey ? languageServiceReadiness(activeLspState) : null}
+          onConfigureLanguageService={() => openLanguageServersSettings(activeLspState?.status?.presetId)}
+          onRetryLanguageService={restartLspServers}
+        />
+      ),
+    },
+    {
+      id: "analysis",
+      label: "Analysis",
+      icon: <Activity className="h-3.5 w-3.5" />,
+      badge: activeProblemCounts.errors + activeProblemCounts.warnings || undefined,
+      content: (
+        <AnalysisPanel
+          files={analysisFiles}
+          status={activeLspState?.status ?? null}
+          semanticTokenCount={semanticTokensByGroup[activeEditorGroupId]?.length ?? 0}
+          semanticIndex={semanticIndex.snapshot}
+          projectAnalysis={projectAnalysisSnapshot}
+          projectAnalysisProbing={projectAnalysisProbing}
+          onRefreshProjectAnalysis={refreshProjectAnalysis}
+          profile={inspectionProfile}
+          onUpdateRule={updateInspectionProfileRule}
+          onCreateBaseline={createInspectionBaselineFromScope}
+          onClearBaseline={clearInspectionBaselineEntries}
+          onRemoveBaselineEntry={removeInspectionBaseline}
+          onRemoveSuppression={removeInspectionSuppressionEntry}
+          onExportBaseline={() => void exportInspectionBaseline()}
+          onImportBaseline={() => void importInspectionBaselineFromClipboard()}
+          onOpenLocation={(location) => void openLspLocation(location)}
+          onOpenDiagnostic={openProblem}
+        />
+      ),
+    },
+    {
+      id: "search",
+      label: "Search",
+      icon: <Search className="h-3.5 w-3.5" />,
+      content: (
+        <FindInFilesPanel
+          roots={roots}
+          workspaceInstanceId={workspaceInstanceId}
+          focusNonce={searchFocusNonce}
+          focusTarget={searchFocusTarget}
+          includePreset={searchIncludePreset}
+          queryPreset={searchQueryPreset}
+          onOpenMatch={openSearchMatch}
+          onPrepareReplacePreimages={prepareReplacePreimages}
+          onReplaceMatches={async (matches, replacement, edit, snapshot) => {
+            void replacement;
+            if (!snapshot) {
+              const message = "Replace refused: replace preview snapshot missing";
+              setStatusMessage(message);
+              return { ok: false, message };
+            }
+            if (snapshot.requestIdentity && snapshot.requestIdentity.workspaceInstanceId !== workspaceInstanceId) {
+              const message = "Replace refused: workspace instance mismatch";
+              setStatusMessage(message);
+              return { ok: false, message };
+            }
+            // ED-FIND-004 A2/A3 / ED-REPAIR-002: pre-commit atomic whole-set preflight
+            // before the shared WorkspaceEdit path applies anything.
+            const byFile = new Map<string, WorkspaceSearchMatch[]>();
+            for (const match of matches) {
+              const absolute = replaceMatchAbsolutePath(match);
+              const list = byFile.get(absolute);
+              if (list) list.push(match);
+              else byFile.set(absolute, [match]);
+            }
+            if (byFile.size === 0) {
+              return { ok: false, message: "Nothing to replace" };
+            }
+
+            // ED-REPAIR-002: Validate selected matches and edits against the frozen snapshot
+            const selectedMatchKeys = new Set(matches.map(workspaceSearchMatchKey));
+            const expectedEdit = buildReplaceWorkspaceEdit(matches, snapshot.replacement);
+            const selectionValidation = validateReplacePreviewSelection(
+              snapshot,
+              selectedMatchKeys,
+              edit,
+              expectedEdit,
+            );
+            if (!selectionValidation.ok) {
+              const message = selectionValidation.reason ?? "Selection validation failed";
+              setStatusMessage(message);
+              return { ok: false, message };
+            }
+
+            // ED-REPAIR-002: Whole-set atomic preflight across ALL files before any mutation
+            const preflightInputs: ReplacePreflightFileInput[] = [];
+            const diskTexts = new Map<string, string>();
+            for (const absolute of byFile.keys()) {
+              const containing = rootsRef.current.find(
+                (root) => relativePathWithinRoot(root.path, absolute) !== null,
+              );
+              if (!containing) {
+                const message = `Replace refused: ${absolute} is outside the workspace`;
+                setStatusMessage(message);
+                return { ok: false, message };
+              }
+              const open = Object.values(openFilesRef.current).find((file) => {
+                const currentPath = absolutePathForOpenFile(file);
+                return currentPath !== null && fsPathEquals(currentPath, absolute);
+              });
+              let exists = false;
+              let diskHash: string | null = null;
+              let diskText: string | null = null;
+              let encoding: string | undefined;
+              let bom: boolean | undefined;
+              let eol: ("lf" | "crlf" | "cr") | undefined;
+              try {
+                const relative = relativePathWithinRoot(containing.path, absolute) ?? "";
+                const disk = await workspaceReadFile(containing.path, relative);
+                exists = true;
+                diskHash = disk.hash;
+                diskText = disk.text;
+                encoding = disk.encoding;
+                bom = disk.bom;
+                eol = disk.text.includes("\r\n") ? "crlf" : disk.text.includes("\r") && !disk.text.includes("\n") ? "cr" : "lf";
+              } catch {
+                exists = false;
+              }
+              if (diskText !== null) {
+                diskTexts.set(absolute, diskText);
+              }
+              preflightInputs.push({
+                path: absolute,
+                exists,
+                diskHash,
+                diskText,
+                encoding,
+                bom,
+                eol,
+                isOpen: Boolean(open),
+                openBufferRevision: open?.documentRevision ?? null,
+                openBufferDirty: open?.dirty ?? false,
+                openBufferReadOnly: Boolean(open?.library) || workspaceResourceOperationLockedRef.current,
+              });
+            }
+
+            const preflight = validateReplacePreflight(
+              snapshot,
+              workspaceInstanceId,
+              preflightInputs,
+            );
+
+            let modelMatches: ReturnType<typeof searchMatchesToReplaceInputs>;
+            try {
+              modelMatches = searchMatchesToReplaceInputs(matches);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              setStatusMessage(message);
+              return { ok: false, message };
+            }
+            const freshness = verifyReplaceMatchFreshness(diskTexts, modelMatches);
+            const conflicts = [
+              ...preflight.conflicts,
+              ...freshness.map((conflict) => ({
+                path: conflict.path,
+                reason: conflict.reason,
+              })),
+            ];
+            if (conflicts.length > 0) {
+              const message = `Replace blocked: ${conflicts.map((conflict) => `${conflict.path}: ${conflict.reason}`).join("; ")}`;
+              setStatusMessage(message);
+              return { ok: false, message };
+            }
+
+            // ED-AUDIT-003: the applier's per-operation ledger is the
+            // only truth for what actually changed. A failed or skipped
+            // document (readonly file, disk write failure, declined
+            // retry) must surface the real applied set — never a
+            // planned-count "all complete" report.
+            // ED-MAIN-005: hand the frozen preview hashes to the applier
+            // so the closed-file write precondition is the preview
+            // preimage, not the second read.
+            // ED-REPAIR-002: pass expectedPreimages to enforce open buffer revision and dirty
+            // integrity throughout mutation.
+            const selectedPaths = new Set(Array.from(byFile.keys(), replacePreimagePathKey));
+            const selectedSnapshot = {
+              ...snapshot,
+              preimages: snapshot.preimages?.filter((preimage) => selectedPaths.has(replacePreimagePathKey(preimage.path))),
+            };
+            const expectedDiskHashes = replacePreimageExpectedHashes(selectedSnapshot);
+            const summaryHolder: { current: WorkspaceEditApplyTransactionSummary | null } = { current: null };
+            const outcomes = await applyLspWorkspaceEdit(edit, {
+              label: "Replace in files",
+              kind: "replace",
+              expectedDiskHashes: expectedDiskHashes.size > 0 ? expectedDiskHashes : null,
+              expectedPreimages: selectedSnapshot.preimages ?? null,
+              onTransactionSummary: (summary) => {
+                summaryHolder.current = summary;
+              },
+            });
+            const report = summarizeReplaceCommitReport(outcomes, modelMatches);
+            const recoveryId = summaryHolder.current?.recoveryId ?? null;
+            const statusMsg = recoveryId && !report.ok && report.appliedCount > 0
+              ? `${report.message}; recovery required (entry: ${recoveryId})`
+              : report.message;
+            setStatusMessage(statusMsg);
+            return {
+              ok: report.ok,
+              appliedCount: report.appliedCount,
+              fileCount: report.fileCount,
+              ...(report.ok ? {} : { message: statusMsg }),
+            };
+          }}
+        />
+      ),
+    },
+    {
+      id: "structural",
+      label: "Structural Search",
+      icon: <Braces className="h-3.5 w-3.5" />,
+      badge: structuralSearch.result?.matches.length || undefined,
+      content: (
+        <StructuralSearchPanel session={structuralSearch} onOpenMatch={openStructuralMatch} />
+      ),
+    },
+    {
+      id: "references",
+      label: "References",
+      icon: <ListTree className="h-3.5 w-3.5" />,
+      badge: referencesResult.locations.length,
+      content: (
+        <ReferencesPanel
+          result={referencesResult}
+          roots={roots}
+          semanticIndex={semanticIndex.snapshot}
+          onOpenLocation={(location) => void openLspLocation(location)}
+          pinned={referencesPinned}
+          onPinChange={(pinned) => {
+            setReferencesPinned(pinned);
+            usageSessionRef.current?.setPinned(pinned);
+          }}
+          onRerun={rerunFindReferences}
+          scopeSelection={usagesScopeSelection}
+          recentSessions={usageSessionRef.current?.getRecent().map((snapshot) => ({
+            id: snapshot.id,
+            label: `${snapshot.symbol.displayName || "symbol"} · ${snapshot.envelope.results.length} · ${new Date(snapshot.createdAt).toLocaleTimeString()}`,
+          })) ?? []}
+          onRestoreRecent={(id) => {
+            usageSessionRef.current?.restore(id);
+            setUsagesRecentsRevision((revision) => revision + 1);
+          }}
+          recentsRevision={usagesRecentsRevision}
+        />
+      ),
+    },
+    {
+      id: "call-hierarchy",
+      label: "Call Hierarchy",
+      icon: <GitFork className="h-3.5 w-3.5" />,
+      content: (
+        <HierarchyPanel
+          mode="call"
+          root={callHierarchyRoot}
+          active={bottomDockOpen && bottomDockTab === "call-hierarchy"}
+          staleReason={(() => {
+            const provenance = hierarchyProvenanceRef.current.call;
+            if (!provenance || !callHierarchyRoot) return null;
+            void hierarchyProvenanceRevision;
+            if (provenance.generation !== lspSessionGeneration()) {
+              return "Provider restarted since this hierarchy was prepared";
+            }
+            const current = projectAnalysisSnapshot?.projectFingerprint ?? "";
+            if (current && provenance.projectFingerprint !== current) {
+              return "Project model changed since this hierarchy was prepared";
+            }
+            return null;
+          })()}
+          onRerunStale={() => void openHierarchy("call")}
+          onOpenLocation={(location) => void openLspLocation(location)}
+          queryHost={semanticQueryHostRef.current}
+          liveLspGeneration={lspSessionGeneration}
+          liveDocumentRevision={() => openFilesRef.current[callHierarchyRoot?.fileKey ?? ""]?.documentRevision ?? -1}
+          onStatus={(status) => {
+            if (activeFile) updateLspStatusForFile(activeFile, status);
+          }}
+        />
+      ),
+    },
+    {
+      id: "type-hierarchy",
+      label: "Type Hierarchy",
+      icon: <Network className="h-3.5 w-3.5" />,
+      content: (
+        <HierarchyPanel
+          mode="type"
+          root={typeHierarchyRoot}
+          active={bottomDockOpen && bottomDockTab === "type-hierarchy"}
+          staleReason={(() => {
+            const provenance = hierarchyProvenanceRef.current.type;
+            if (!provenance || !typeHierarchyRoot) return null;
+            void hierarchyProvenanceRevision;
+            if (provenance.generation !== lspSessionGeneration()) {
+              return "Provider restarted since this hierarchy was prepared";
+            }
+            const current = projectAnalysisSnapshot?.projectFingerprint ?? "";
+            if (current && provenance.projectFingerprint !== current) {
+              return "Project model changed since this hierarchy was prepared";
+            }
+            return null;
+          })()}
+          onRerunStale={() => void openHierarchy("type")}
+          onOpenLocation={(location) => void openLspLocation(location)}
+          queryHost={semanticQueryHostRef.current}
+          liveLspGeneration={lspSessionGeneration}
+          liveDocumentRevision={() => openFilesRef.current[typeHierarchyRoot?.fileKey ?? ""]?.documentRevision ?? -1}
+          onStatus={(status) => {
+            if (activeFile) updateLspStatusForFile(activeFile, status);
+          }}
+        />
+      ),
+    },
+    {
+      id: "todos",
+      label: "TODOs",
+      icon: <ListTodo className="h-3.5 w-3.5" />,
+      badge: (openFileTodos.length + bookmarks.length) > 0 ? (openFileTodos.length + bookmarks.length) : undefined,
+      content: (
+        <TodosBookmarksPanel
+          todos={openFileTodos}
+          bookmarks={bookmarks}
+          onOpenTodo={(item) => void openTodoOrBookmark(item)}
+          onOpenBookmark={(item) => void openTodoOrBookmark(item)}
+          onRemoveBookmark={removeBookmark}
+          onRenameBookmarkGroup={renameBookmarkGroup}
+        />
+      ),
+    },
+    {
+      id: "terminal",
+      label: "Terminal",
+      icon: <TerminalSquare className="h-3.5 w-3.5" />,
+      badge: undefined,
+      content: (
+        <TerminalDockPanel
+          ref={terminalDockRef}
+          workspaceInstanceId={workspaceInstanceId}
+          roots={roots}
+          defaultCwd={activeRoot?.path ?? roots[0]?.path ?? ""}
+          active={bottomDockOpen && bottomDockTab === "terminal"}
+        />
+      ),
+    },
+    {
+      id: "run",
+      label: "Run",
+      icon: <Play className="h-3.5 w-3.5" />,
+      content: (
+        <RunPanel
+          ref={runPanelRef}
+          workspaceInstanceId={workspaceInstanceId}
+          roots={roots}
+          active={bottomDockOpen && bottomDockTab === "run"}
+          onRun={runWorkspaceTask}
+          toolConfig={toolConfig}
+          onConfigureTools={() => setBuildRunToolsOpen(true)}
+        />
+      ),
+    },
+    {
+      id: "build",
+      label: "Build",
+      icon: <Hammer className="h-3.5 w-3.5" />,
+      content: (
+        <BuildPanel
+          workspaceInstanceId={workspaceInstanceId}
+          roots={roots}
+          active={bottomDockOpen && bottomDockTab === "build"}
+          onRunTask={(task, onExit) => runWorkspaceTask(task, onExit)}
+          toolConfig={toolConfig}
+          onLoadModules={(rootPath) =>
+            // A synthetic .java path selects the root's jdtls session
+            // (session keys on project scope, not on the file existing).
+            lspJavaModules(lspDescriptorForPath(rootPath, "__taomni_modules__.java"))}
+        />
+      ),
+    },
+    {
+      id: "tests",
+      label: "Tests",
+      icon: <FlaskConical className="h-3.5 w-3.5" />,
+      content: (
+        <TestsPanel
+          activeFileTitle={activeFileIsJava ? activeFile?.title ?? null : null}
+          canDiscover={activeFileIsJava}
+          active={bottomDockOpen && bottomDockTab === "tests"}
+          onDiscover={discoverActiveJavaTests}
+          onRun={runJavaTest}
+          onRerun={rerunStructuredTest}
+          onLoadResults={activeFile?.ref.kind === "root" ? loadActiveJavaTestResults : undefined}
+          results={activeFile?.ref.kind === "root" ? testResultsByRoot[activeFile.ref.rootId] ?? null : null}
+          onOpenFailure={openStructuredTestFailure}
+          onDebug={debugJavaTest}
+          runDisabled={javaTestBuildTool === null}
+        />
+      ),
+    },
+    {
+      id: "coverage",
+      label: "Coverage",
+      icon: <ShieldCheck className="h-3.5 w-3.5" />,
+      badge: coverageReport ? `${coverageReport.totalPercentage}%` : undefined,
+      content: (
+        <CoveragePanel
+          report={coverageReport}
+          coverageEnabled={coverageOverlayEnabled}
+          onToggleCoverage={() => setCoverageOverlayEnabled((prev) => !prev)}
+          onOpenFile={(path, line) => {
+            const ref = problemPathToRef(path);
+            if (ref) {
+              const targetLine = line && line > 0 ? line - 1 : 0;
+              const range = { start: { line: targetLine, character: 0 }, end: { line: targetLine, character: 0 } };
+              void openFile(ref).then(() => revealEditorLocation(fileKey(ref), range));
+            }
+          }}
+          onRefreshCoverage={() => void scanWorkspaceCoverage()}
+        />
+      ),
+    },
+    {
+      // ED-PARITY-018 DEC-018-01: the workspace Git tool window hosts the
+      // same Git manager as the Git tab, scoped to this workspace's repos.
+      id: "git",
+      label: "Git",
+      icon: <GitBranch className="h-3.5 w-3.5" />,
+      // Mounted on first open and kept, so the commit message and
+      // selection survive hiding the tool window.
+      content: gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
+        <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 outline-none">
+          <WorkspaceGitManager
+            workspaceName={title}
+            roots={gitRoots}
+            activeRepoRoot={activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null}
+            visible={bottomDockOpen && bottomDockTab === "git"}
+          />
+        </div>
+      ) : (
+        <div data-testid="code-workspace-git-tool-window-empty" role="status" className="px-3 py-3 text-[11px] text-[var(--taomni-code-muted)]">
+          {gitRootsLoading ? "Detecting Git repositories…" : "No Git repository in this workspace"}
+        </div>
+      ),
+    },
+    {
+      id: "debug",
+      label: "Debug",
+      icon: <Bug className="h-3.5 w-3.5" />,
+      content: (
+        <DebugPanel
+          debug={debug}
+          onStart={activeFileDebuggable ? startDebugActiveTarget : null}
+          onAttach={activeFileJavaRoot && debugRuntimeAvailable ? attachRemoteDebug : null}
+          onOpenFrame={openDebugFrame}
+          onOpenBreakpoint={(path, line, column) => openDebugFrame({ path, line, column })}
+          onOpenLocation={(path, line, column) => openDebugFrame({ path, line, column })}
+          editingBreakpoint={editingBreakpoint}
+          onEditingBreakpointChange={setEditingBreakpoint}
+          runtimeAvailable={debugRuntimeAvailable}
+          configurations={activeRunConfigurations
+            .filter((configuration) => configuration.kind !== "module")
+            .map((configuration) => {
+              const detectedDebug = configuration.debugConfigurationId
+                ? activeExecutionModel?.debugConfigurations.find((candidate) => (
+                  candidate.id === configuration.debugConfigurationId
+                ))
+                : undefined;
+              const rootId = activeFile?.ref.kind === "root" ? activeFile.ref.rootId : undefined;
+              const override = readRunConfigurationOverrides(workspaceInstanceId, rootId)[configuration.id];
+              const debugConfiguration = detectedDebug
+                ? applyRunOverrideToDebugConfiguration(
+                    detectedDebug,
+                    override,
+                    configuration.runtimeOptions,
+                    configuration.envFile,
+                  )
+                : undefined;
+              const canUseJavaCompatibilityDebug = activeFileJavaRoot
+                && !configuration.debugConfigurationId
+                && configuration.kind !== "debug-only";
+              const available = debugRuntimeAvailable
+                && (debugConfiguration
+                  ? debugConfiguration.available === true
+                  : canUseJavaCompatibilityDebug);
+              const diagnostic = !debugRuntimeAvailable
+                ? "Debugging is available in the desktop app only"
+                : debugConfiguration?.diagnostic
+                  ?? (!debugConfiguration && canUseJavaCompatibilityDebug
+                    ? undefined
+                    : "No available debug configuration is associated with this run target");
+              return {
+                id: configuration.id,
+                label: configuration.label,
+                source: configuration.configurationSource,
+                available,
+                diagnostic: available ? undefined : diagnostic,
+              };
+            })}
+          activeConfigurationId={activeRunConfiguration?.id ?? null}
+          workspaceInstanceId={workspaceInstanceId}
+          onActiveConfigurationChange={(configurationId) => {
+            if (!activeFile) return;
+            const sourceFile = absolutePathForOpenFile(activeFile);
+            if (sourceFile) writeActiveRunConfigurationSelection(
+              workspaceInstanceId,
+              sourceFile,
+              configurationId,
+            );
+          }}
+        />
+      ),
+    },
+  ];
+
+  // ED-PARITY-024: every tool window renders once into a re-parentable host;
+  // the area showing it adopts the host node (state survives moves).
+  const toolWindowContents: { id: string; label: string; content: ReactNode }[] = [
+    {
+      id: "project",
+      label: "Project",
+      content: (
+      <FileTreePane
+        paneRef={treePaneRef}
+        style={treePaneStyle}
+        onKeyDown={handleTreeKeyDown}
+        filter={treeFilter}
+        onFilterChange={setTreeFilter}
+        viewMode={treeViewMode}
+        onViewModeChange={setTreeViewMode}
+        fontSize={treeFontSize}
+        minFontSize={CODE_WORKSPACE_MIN_TREE_FONT_SIZE}
+        maxFontSize={CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
+        defaultFontSize={CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE}
+        onFontSizeChange={setTreeFontSize}
+        collapsed={!languagePanelOpen}
+        onToggleCollapse={toggleProjectTree}
+        onOpenFile={() => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" })}
+        onAddFolder={() => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" })}
+        canCreate={!!selectedRootDirectory}
+        canMutateSelection={!!selected}
+        onCreateFile={() => executeWorkspaceCommand("workspace.tree.newFile", { focus: "tree" })}
+        onCreateDirectory={() => executeWorkspaceCommand("workspace.tree.newDirectory", { focus: "tree" })}
+        onRename={() => executeWorkspaceCommand("workspace.tree.rename", { focus: "tree" })}
+        onDelete={() => executeWorkspaceCommand("workspace.tree.delete", { focus: "tree" })}
+      >
+        <ProjectTree
+          roots={roots}
+          looseFiles={looseFiles}
+          directories={directories}
+          compactChains={compactChains}
+          flatFiles={flatFiles}
+          treeViewMode={treeViewMode}
+          treeFilter={treeFilter}
+          expandedRoots={expandedRoots}
+          expandedDirs={expandedDirs}
+          selected={selected}
+          activeKey={activeKey}
+          openFiles={openFiles}
+          gitChangeByRootPath={gitChangeByRootPath}
+          {...projectTreeHandlers}
+        />
+      </FileTreePane>
+      ),
+    },
+    {
+      id: "structure",
+      label: "Structure",
+      content: (
+      <OutlinePane
+        symbols={breadcrumbSymbolsByGroup[activeEditorGroupId] ?? []}
+        position={cursorPositions[activeEditorGroupId] ?? { line: 0, character: 0 }}
+        loading={!!activeFile && (!!activeLspState?.syncing || (activeCapabilities?.documentSymbol === true && !activeLspState?.status))}
+        unavailableReason={!activeFile
+          ? "Open a file to view its outline"
+          : activeCapabilities?.documentSymbol === false
+            ? "Document symbols are not supported by this language server"
+            : null}
+        onPick={pickOutlineSymbol}
+      />
+      ),
+    },
+    {
+      id: "documentation",
+      label: "Documentation",
+      content: (
+      <DocumentationPane
+        content={pinnedDoc}
+        locked={pinnedDocLocked}
+        onUnlock={() => setPinnedDocLocked(false)}
+        onOpenSource={openReferenceSource}
+        canGoBack={referenceHistory.canGoBack}
+        canGoForward={referenceHistory.canGoForward}
+        onBack={referenceHistoryBack}
+        onForward={referenceHistoryForward}
+        onClear={() => {
+          setPinnedDoc(null);
+          setPinnedDocLocked(false);
+        }}
+      />
+      ),
+    },
+    ...bottomDockTabs.map((tab) => ({ id: tab.id, label: tab.label, content: tab.content })),
+  ];
+  const toolWindowLabel = (id: string) => toolWindowContents.find((entry) => entry.id === id)?.label ?? id;
+  // IDEA tool window ⋮ Options: View Mode, Move to, Resize, Remove from
+  // Sidebar (ToolWindowImpl.GearActionGroup), plus Hide / Restore Layout.
+  const stretchToolWindow = (id: string, direction: "left" | "right" | "up" | "down" | "maximize") => {
+    const side = anchorSide(toolWindowLayout.anchorOf(id));
+    const step = 40;
+    if (side === "bottom") {
+      const current = currentBottomDockHeight;
+      if (direction === "maximize") {
+        handleBottomDockHeightChange(current >= maxBottomDockHeight - 1 ? BOTTOM_DOCK_MIN_HEIGHT + 250 : maxBottomDockHeight);
+      } else if (direction === "up" || direction === "down") {
+        handleBottomDockHeightChange(current + (direction === "up" ? step : -step));
+      }
+      return;
+    }
+    const panel = side === "left" ? projectPanelRef.current : rightPanelRef.current;
+    if (!panel) return;
+    const size = panel.getSize();
+    const widen = side === "left" ? direction === "right" : direction === "left";
+    const narrow = side === "left" ? direction === "left" : direction === "right";
+    if (direction === "maximize") {
+      panel.resize("70%");
+      return;
+    }
+    if (!widen && !narrow) return;
+    panel.resize(`${Math.max(120, Math.round(size.inPixels + (widen ? step : -step)))}px`);
+  };
+  const toolWindowOptionsItems = (id: string): MenuItem[] => {
+    const anchor = toolWindowLayout.anchorOf(id);
+    const side = anchorSide(anchor);
+    return [
+      {
+        label: "View Mode",
+        testId: "code-workspace-tool-window-view-mode",
+        children: [
+          { label: "Dock Pinned", checked: true, onClick: () => undefined },
+          { label: "Dock Unpinned", disabled: true },
+          { label: "Undock", disabled: true },
+          { label: "Float", disabled: true },
+          { label: "Window", disabled: true },
+        ],
+      },
+      {
+        label: "Move to",
+        testId: "code-workspace-tool-window-move",
+        children: TOOL_WINDOW_ANCHORS.map((target) => ({
+          label: TOOL_WINDOW_ANCHOR_LABELS[target],
+          testId: `code-workspace-tool-window-move-${target}`,
+          checked: target === anchor,
+          onClick: () => toolWindowLayout.move(id, target),
+        })),
+      },
+      {
+        label: "Resize",
+        testId: "code-workspace-tool-window-resize",
+        children: [
+          { label: "Stretch to Left", disabled: side === "bottom", onClick: () => stretchToolWindow(id, "left") },
+          { label: "Stretch to Right", disabled: side === "bottom", onClick: () => stretchToolWindow(id, "right") },
+          { label: "Stretch to Top", disabled: side !== "bottom", onClick: () => stretchToolWindow(id, "up") },
+          { label: "Stretch to Bottom", disabled: side !== "bottom", onClick: () => stretchToolWindow(id, "down") },
+          { label: "", separator: true },
+          { label: "Maximize Tool Window", onClick: () => stretchToolWindow(id, "maximize") },
+        ],
+      },
+      { label: "", separator: true },
+      {
+        label: "Remove from Sidebar",
+        testId: "code-workspace-tool-window-remove",
+        onClick: () => {
+          toolWindowLayout.removeFromSidebar(id);
+          handleReturnToEditor();
+        },
+      },
+      { label: "", separator: true },
+      {
+        label: "Hide",
+        testId: "code-workspace-tool-window-options-hide",
+        shortcut: "Shift+Esc",
+        onClick: () => {
+          toolWindowLayout.hide(id);
+          handleReturnToEditor();
+        },
+      },
+      {
+        label: "Restore Default Layout",
+        testId: "code-workspace-tool-window-options-restore",
+        shortcut: "Shift+F12",
+        onClick: handleRestoreToolWindowLayout,
+      },
+    ];
+  };
+  const renderToolWindowPane = (id: string, options: { legacyTestIds?: boolean } = {}) => {
+    // Project keeps its own IDEA header (title, toolbar, ⋮, —) in FileTreePane.
+    if (id === "project") {
+      return <ToolWindowSlot nodes={toolWindowNodes} id="project" label="Project" />;
+    }
+    const title = toolWindowLabel(id);
+    return (
+      <ToolWindowPane
+        nodes={toolWindowNodes}
+        toolId={id}
+        title={title}
+        legacyTestIds={options.legacyTestIds}
+        optionsItems={toolWindowOptionsItems(id)}
+        onHide={() => {
+          toolWindowLayout.hide(id);
+          handleReturnToEditor();
+        }}
+      />
+    );
+  };
+  // ED-PARITY-024 stripes: every tool window's button sits on the stripe of
+  // its anchor (IDEA new UI), so a moved window's button moves with it.
+  const stripeMeta = new Map<string, { label: string; icon: ReactNode; badge?: ReactNode; shortcut?: string }>();
+  for (const item of [...leftToolRailItems, ...rightToolRailItems]) {
+    stripeMeta.set(item.id, { label: item.id === "documentation" ? "Documentation" : item.label, icon: item.icon, shortcut: item.shortcut });
+  }
+  for (const tab of bottomDockTabs) stripeMeta.set(tab.id, { label: tab.label, icon: tab.icon, badge: tab.badge });
+  const stripeToolIds = ["project", "structure", "documentation", ...bottomDockTabs.map((tab) => tab.id)];
+  const toggleToolWindowFromStripe = (id: string) => {
+    if (toolWindowLayout.isVisible(id)) {
+      toolWindowLayout.hide(id);
+      handleReturnToEditor();
+      return;
+    }
+    if (id === "structure") rightPaneTabRef.current = "outline";
+    if (id === "documentation") rightPaneTabRef.current = "documentation";
+    toolWindowLayout.show(id);
+  };
+  const stripeItem = (id: string): ToolWindowRailItem | null => {
+    const meta = stripeMeta.get(id);
+    if (!meta || !toolWindowLayout.onStripe(id)) return null;
+    const bottomTool = bottomDockTabs.some((tab) => tab.id === id);
+    return {
+      id,
+      label: meta.label,
+      icon: meta.icon,
+      badge: meta.badge,
+      shortcut: meta.shortcut,
+      anchor: toolWindowLayout.anchorOf(id),
+      active: toolWindowLayout.isVisible(id),
+      testId: bottomTool ? `code-workspace-bottom-tab-${id}` : `code-workspace-tool-rail-${id}`,
+      onSelect: () => toggleToolWindowFromStripe(id),
+    };
+  };
+  const stripeItemsAt = (anchor: ToolWindowAnchor) => stripeToolIds
+    .filter((id) => toolWindowLayout.anchorOf(id) === anchor)
+    .map(stripeItem)
+    .filter((item): item is ToolWindowRailItem => item !== null);
+  const commitStripeItem = leftToolRailItems.find((item) => item.id === "commit");
+  const leftStripeTop = [
+    ...stripeItemsAt("left-top"),
+    ...(commitStripeItem ? [{ ...commitStripeItem, active: toolWindowLayout.isVisible("git") }] : []),
+    ...stripeItemsAt("left-bottom"),
+  ];
+  const rightStripeTop = [...stripeItemsAt("right-top"), ...stripeItemsAt("right-bottom")];
+  const stripeCallbacks = {
+    showNames: toolWindowLayout.stripes.showNames,
+    onToggleShowNames: toolWindowLayout.toggleShowNames,
+    onMove: toolWindowLayout.move,
+    onHide: (id: string) => {
+      toolWindowLayout.hide(id);
+      handleReturnToEditor();
+    },
+    onRemoveFromSidebar: (id: string) => toolWindowLayout.removeFromSidebar(id),
+  };
+  const moreToolWindowsButton = (
+    <MoreToolWindowsButton
+      tools={stripeToolIds.map((id) => ({ id, label: stripeMeta.get(id)?.label ?? id, icon: stripeMeta.get(id)?.icon }))}
+      onPick={(id) => {
+        toolWindowLayout.restoreToSidebar(id);
+        if (!toolWindowLayout.isVisible(id)) toggleToolWindowFromStripe(id);
+      }}
+    />
+  );
+  const renderToolWindowSideArea = (side: "left" | "right") => {
+    const primary = toolWindowLayout.visibleAt(side === "left" ? "left-top" : "right-top");
+    const secondary = toolWindowLayout.visibleAt(side === "left" ? "left-bottom" : "right-bottom");
+    return (
+      <ToolWindowSplitArea
+        side={side}
+        primary={primary ? renderToolWindowPane(primary) : null}
+        secondary={secondary ? renderToolWindowPane(secondary) : null}
+      />
+    );
+  };
+
   return (
     <WorkspaceClipboardSessionContext.Provider value={clipboardHandle}>
       <WorkspaceObservationBoundary
@@ -21672,7 +22588,15 @@ export function CodeWorkspaceTab({
       )}
 
       <div className="flex-1 min-h-0 flex">
-        <ToolWindowRail side="left" top={leftToolRailItems} bottomSlotRef={setBottomRailHost} />
+        <ToolWindowRail
+          side="left"
+          top={leftStripeTop}
+          bottom={stripeItemsAt("bottom-left")}
+          footer={moreToolWindowsButton}
+          width={toolWindowLayout.stripeWidth("left")}
+          onResize={(width) => toolWindowLayout.setStripeWidth("left", width)}
+          {...stripeCallbacks}
+        />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex-1 min-h-0 flex">
         <PanelGroup
@@ -21701,56 +22625,17 @@ export function CodeWorkspaceTab({
           >
             <div
               className="h-full min-h-0 overflow-hidden"
-              style={languagePanelOpen ? undefined : { display: "none" }}
+              data-testid="code-workspace-left-tool-area"
+              style={leftToolAreaOpen ? undefined : { display: "none" }}
             >
-              <FileTreePane
-                paneRef={treePaneRef}
-                style={treePaneStyle}
-                onKeyDown={handleTreeKeyDown}
-                filter={treeFilter}
-                onFilterChange={setTreeFilter}
-                viewMode={treeViewMode}
-                onViewModeChange={setTreeViewMode}
-                fontSize={treeFontSize}
-                minFontSize={CODE_WORKSPACE_MIN_TREE_FONT_SIZE}
-                maxFontSize={CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
-                defaultFontSize={CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE}
-                onFontSizeChange={setTreeFontSize}
-                collapsed={!languagePanelOpen}
-                onToggleCollapse={toggleProjectTree}
-                onOpenFile={() => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" })}
-                onAddFolder={() => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" })}
-                canCreate={!!selectedRootDirectory}
-                canMutateSelection={!!selected}
-                onCreateFile={() => executeWorkspaceCommand("workspace.tree.newFile", { focus: "tree" })}
-                onCreateDirectory={() => executeWorkspaceCommand("workspace.tree.newDirectory", { focus: "tree" })}
-                onRename={() => executeWorkspaceCommand("workspace.tree.rename", { focus: "tree" })}
-                onDelete={() => executeWorkspaceCommand("workspace.tree.delete", { focus: "tree" })}
-              >
-                <ProjectTree
-                  roots={roots}
-                  looseFiles={looseFiles}
-                  directories={directories}
-                  compactChains={compactChains}
-                  flatFiles={flatFiles}
-                  treeViewMode={treeViewMode}
-                  treeFilter={treeFilter}
-                  expandedRoots={expandedRoots}
-                  expandedDirs={expandedDirs}
-                  selected={selected}
-                  activeKey={activeKey}
-                  openFiles={openFiles}
-                  gitChangeByRootPath={gitChangeByRootPath}
-                  {...projectTreeHandlers}
-                />
-              </FileTreePane>
+              {renderToolWindowSideArea("left")}
             </div>
           </Panel>
           <PanelResizeHandle
             id="code-workspace-project-resize-handle"
             data-testid="code-workspace-project-resize-handle"
-            disabled={!languagePanelOpen}
-            className={languagePanelOpen
+            disabled={!leftToolAreaOpen}
+            className={leftToolAreaOpen
               ? "w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-1.5 after:-right-1.5 after:z-20"
               : "hidden"}
           />
@@ -21767,7 +22652,7 @@ export function CodeWorkspaceTab({
           ) : renderRecursiveLayoutNode(workspaceUi.layoutTreeV2, renderEditorGroup)}
         </Panel>
           <PanelResizeHandle
-            className={rightPaneOpen
+            className={rightToolAreaOpen
               ? "w-1 bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
               : "hidden"}
           />
@@ -21785,631 +22670,48 @@ export function CodeWorkspaceTab({
             <aside
               data-testid="code-workspace-right-pane"
               className="h-full min-h-0 flex flex-col border-l border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
-              style={rightPaneOpen ? undefined : { display: "none" }}
+              style={rightToolAreaOpen ? undefined : { display: "none" }}
             >
-              <div role="tablist" aria-label="Right tool window" className="flex h-8 shrink-0 items-center border-b border-[var(--taomni-code-border)] px-1">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={rightPaneTab === "outline"}
-                  className="inline-flex h-7 items-center gap-1 rounded px-2 text-[10px] text-[var(--taomni-code-muted)] aria-selected:bg-[var(--taomni-code-active-line-bg)] aria-selected:text-[var(--taomni-code-text)]"
-                  onClick={() => setRightPaneTab("outline")}
-                >
-                  <ListTree className="h-3.5 w-3.5" />
-                  Outline
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={rightPaneTab === "documentation"}
-                  className="inline-flex h-7 items-center gap-1 rounded px-2 text-[10px] text-[var(--taomni-code-muted)] aria-selected:bg-[var(--taomni-code-active-line-bg)] aria-selected:text-[var(--taomni-code-text)]"
-                  onClick={() => setRightPaneTab("documentation")}
-                >
-                  <BookOpen className="h-3.5 w-3.5" />
-                  Documentation
-                </button>
-                <button
-                  type="button"
-                  aria-label="Close right pane"
-                  className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
-                  onClick={() => setRightPaneOpen(false)}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div role="tabpanel" className="min-h-0 flex-1">
-                <KeepAliveToolPanel active={rightPaneOpen}>
-                {rightPaneTab === "outline" ? (
-                  <OutlinePane
-                    symbols={breadcrumbSymbolsByGroup[activeEditorGroupId] ?? []}
-                    position={cursorPositions[activeEditorGroupId] ?? { line: 0, character: 0 }}
-                    loading={!!activeFile && (!!activeLspState?.syncing || (activeCapabilities?.documentSymbol === true && !activeLspState?.status))}
-                    unavailableReason={!activeFile
-                      ? "Open a file to view its outline"
-                      : activeCapabilities?.documentSymbol === false
-                        ? "Document symbols are not supported by this language server"
-                        : null}
-                    onPick={pickOutlineSymbol}
-                  />
-                ) : (
-                  <DocumentationPane
-                    content={pinnedDoc}
-                    locked={pinnedDocLocked}
-                    onUnlock={() => setPinnedDocLocked(false)}
-                    onOpenSource={openReferenceSource}
-                    canGoBack={referenceHistory.canGoBack}
-                    canGoForward={referenceHistory.canGoForward}
-                    onBack={referenceHistoryBack}
-                    onForward={referenceHistoryForward}
-                    onClear={() => {
-                      setPinnedDoc(null);
-                      setPinnedDocLocked(false);
-                    }}
-                  />
-                )}
-                </KeepAliveToolPanel>
-              </div>
+              {renderToolWindowSideArea("right")}
             </aside>
           </Panel>
       </PanelGroup>
         </div>
+      <div ref={toolWindowNodes.setParking} hidden data-testid="code-workspace-tool-window-parking" />
+      {toolWindowContents.map((entry) => (
+        <ToolWindowPortal
+          key={entry.id}
+          nodes={toolWindowNodes}
+          id={entry.id}
+          label={entry.label}
+          active={toolWindowLayout.isVisible(entry.id)}
+        >
+          {entry.content}
+        </ToolWindowPortal>
+      ))}
       <BottomDock
-        railHost={bottomRailHost}
         onRestoreLayout={handleRestoreToolWindowLayout}
-        open={bottomDockOpen}
+        renderPane={(id, placement) => renderToolWindowPane(id, { legacyTestIds: placement === "primary" })}
+        secondaryTab={toolWindowLayout.visibleAt("bottom-right")}
+        open={bottomDockOpen && toolWindowLayout.anchorOf(bottomDockTab) === "bottom-left"}
         height={currentBottomDockHeight}
         maxHeight={maxBottomDockHeight}
         onHeightChange={handleBottomDockHeightChange}
         onEscape={handleReturnToEditor}
         activeTab={bottomDockTab}
-        tabs={[
-          {
-            id: "problems",
-            label: "Problems",
-            icon: <AlertTriangle className="h-3.5 w-3.5" />,
-            badge: activeProblemCounts.errors > 0 || activeProblemCounts.warnings > 0 ? (
-              <span className="inline-flex items-center gap-1">
-                {activeProblemCounts.errors > 0 && <span className="text-red-500">{activeProblemCounts.errors}</span>}
-                {activeProblemCounts.warnings > 0 && <span className="text-amber-500">{activeProblemCounts.warnings}</span>}
-              </span>
-            ) : undefined,
-            content: (
-              <ProblemsPanel
-                files={problemsScopeFiles}
-                onOpenProblem={openProblem}
-                onQuickFix={(fileKey, diagnostic) => void openQuickFixForProblem(fileKey, diagnostic)}
-                onSuppress={suppressInspection}
-                onAddToBaseline={addInspectionBaseline}
-                scope={problemsScope}
-                onScopeChange={setProblemsScope}
-                onRebuild={() => void rebuildProject()}
-                rebuilding={rebuildingProject}
-                loading={problemsScope === "project" && projectProblemsLoading}
-                diagnosticTransform={inspectionTransform}
-                onOpenRelatedInformation={openRelatedDiagnostic}
-                evidenceLine={evidenceLineForProblem}
-                suppressedInSource={suppressedInSourceForProblem}
-                fullProjectNote={activeCapabilities?.workspaceDiagnostics === true
-                  ? null
-                  : "On-the-fly diagnostics only — this server does not expose workspace-wide diagnostics."}
-                readiness={activeKey ? languageServiceReadiness(activeLspState) : null}
-                onConfigureLanguageService={() => openLanguageServersSettings(activeLspState?.status?.presetId)}
-                onRetryLanguageService={restartLspServers}
-              />
-            ),
-          },
-          {
-            id: "analysis",
-            label: "Analysis",
-            icon: <Activity className="h-3.5 w-3.5" />,
-            badge: activeProblemCounts.errors + activeProblemCounts.warnings || undefined,
-            content: (
-              <AnalysisPanel
-                files={analysisFiles}
-                status={activeLspState?.status ?? null}
-                semanticTokenCount={semanticTokensByGroup[activeEditorGroupId]?.length ?? 0}
-                semanticIndex={semanticIndex.snapshot}
-                projectAnalysis={projectAnalysisSnapshot}
-                projectAnalysisProbing={projectAnalysisProbing}
-                onRefreshProjectAnalysis={refreshProjectAnalysis}
-                profile={inspectionProfile}
-                onUpdateRule={updateInspectionProfileRule}
-                onCreateBaseline={createInspectionBaselineFromScope}
-                onClearBaseline={clearInspectionBaselineEntries}
-                onRemoveBaselineEntry={removeInspectionBaseline}
-                onRemoveSuppression={removeInspectionSuppressionEntry}
-                onExportBaseline={() => void exportInspectionBaseline()}
-                onImportBaseline={() => void importInspectionBaselineFromClipboard()}
-                onOpenLocation={(location) => void openLspLocation(location)}
-                onOpenDiagnostic={openProblem}
-              />
-            ),
-          },
-          {
-            id: "search",
-            label: "Search",
-            icon: <Search className="h-3.5 w-3.5" />,
-            content: (
-              <FindInFilesPanel
-                roots={roots}
-                workspaceInstanceId={workspaceInstanceId}
-                focusNonce={searchFocusNonce}
-                focusTarget={searchFocusTarget}
-                includePreset={searchIncludePreset}
-                queryPreset={searchQueryPreset}
-                onOpenMatch={openSearchMatch}
-                onPrepareReplacePreimages={prepareReplacePreimages}
-                onReplaceMatches={async (matches, replacement, edit, snapshot) => {
-                  void replacement;
-                  if (!snapshot) {
-                    const message = "Replace refused: replace preview snapshot missing";
-                    setStatusMessage(message);
-                    return { ok: false, message };
-                  }
-                  if (snapshot.requestIdentity && snapshot.requestIdentity.workspaceInstanceId !== workspaceInstanceId) {
-                    const message = "Replace refused: workspace instance mismatch";
-                    setStatusMessage(message);
-                    return { ok: false, message };
-                  }
-                  // ED-FIND-004 A2/A3 / ED-REPAIR-002: pre-commit atomic whole-set preflight
-                  // before the shared WorkspaceEdit path applies anything.
-                  const byFile = new Map<string, WorkspaceSearchMatch[]>();
-                  for (const match of matches) {
-                    const absolute = replaceMatchAbsolutePath(match);
-                    const list = byFile.get(absolute);
-                    if (list) list.push(match);
-                    else byFile.set(absolute, [match]);
-                  }
-                  if (byFile.size === 0) {
-                    return { ok: false, message: "Nothing to replace" };
-                  }
-
-                  // ED-REPAIR-002: Validate selected matches and edits against the frozen snapshot
-                  const selectedMatchKeys = new Set(matches.map(workspaceSearchMatchKey));
-                  const expectedEdit = buildReplaceWorkspaceEdit(matches, snapshot.replacement);
-                  const selectionValidation = validateReplacePreviewSelection(
-                    snapshot,
-                    selectedMatchKeys,
-                    edit,
-                    expectedEdit,
-                  );
-                  if (!selectionValidation.ok) {
-                    const message = selectionValidation.reason ?? "Selection validation failed";
-                    setStatusMessage(message);
-                    return { ok: false, message };
-                  }
-
-                  // ED-REPAIR-002: Whole-set atomic preflight across ALL files before any mutation
-                  const preflightInputs: ReplacePreflightFileInput[] = [];
-                  const diskTexts = new Map<string, string>();
-                  for (const absolute of byFile.keys()) {
-                    const containing = rootsRef.current.find(
-                      (root) => relativePathWithinRoot(root.path, absolute) !== null,
-                    );
-                    if (!containing) {
-                      const message = `Replace refused: ${absolute} is outside the workspace`;
-                      setStatusMessage(message);
-                      return { ok: false, message };
-                    }
-                    const open = Object.values(openFilesRef.current).find((file) => {
-                      const currentPath = absolutePathForOpenFile(file);
-                      return currentPath !== null && fsPathEquals(currentPath, absolute);
-                    });
-                    let exists = false;
-                    let diskHash: string | null = null;
-                    let diskText: string | null = null;
-                    let encoding: string | undefined;
-                    let bom: boolean | undefined;
-                    let eol: ("lf" | "crlf" | "cr") | undefined;
-                    try {
-                      const relative = relativePathWithinRoot(containing.path, absolute) ?? "";
-                      const disk = await workspaceReadFile(containing.path, relative);
-                      exists = true;
-                      diskHash = disk.hash;
-                      diskText = disk.text;
-                      encoding = disk.encoding;
-                      bom = disk.bom;
-                      eol = disk.text.includes("\r\n") ? "crlf" : disk.text.includes("\r") && !disk.text.includes("\n") ? "cr" : "lf";
-                    } catch {
-                      exists = false;
-                    }
-                    if (diskText !== null) {
-                      diskTexts.set(absolute, diskText);
-                    }
-                    preflightInputs.push({
-                      path: absolute,
-                      exists,
-                      diskHash,
-                      diskText,
-                      encoding,
-                      bom,
-                      eol,
-                      isOpen: Boolean(open),
-                      openBufferRevision: open?.documentRevision ?? null,
-                      openBufferDirty: open?.dirty ?? false,
-                      openBufferReadOnly: Boolean(open?.library) || workspaceResourceOperationLockedRef.current,
-                    });
-                  }
-
-                  const preflight = validateReplacePreflight(
-                    snapshot,
-                    workspaceInstanceId,
-                    preflightInputs,
-                  );
-
-                  let modelMatches: ReturnType<typeof searchMatchesToReplaceInputs>;
-                  try {
-                    modelMatches = searchMatchesToReplaceInputs(matches);
-                  } catch (error) {
-                    const message = error instanceof Error ? error.message : String(error);
-                    setStatusMessage(message);
-                    return { ok: false, message };
-                  }
-                  const freshness = verifyReplaceMatchFreshness(diskTexts, modelMatches);
-                  const conflicts = [
-                    ...preflight.conflicts,
-                    ...freshness.map((conflict) => ({
-                      path: conflict.path,
-                      reason: conflict.reason,
-                    })),
-                  ];
-                  if (conflicts.length > 0) {
-                    const message = `Replace blocked: ${conflicts.map((conflict) => `${conflict.path}: ${conflict.reason}`).join("; ")}`;
-                    setStatusMessage(message);
-                    return { ok: false, message };
-                  }
-
-                  // ED-AUDIT-003: the applier's per-operation ledger is the
-                  // only truth for what actually changed. A failed or skipped
-                  // document (readonly file, disk write failure, declined
-                  // retry) must surface the real applied set — never a
-                  // planned-count "all complete" report.
-                  // ED-MAIN-005: hand the frozen preview hashes to the applier
-                  // so the closed-file write precondition is the preview
-                  // preimage, not the second read.
-                  // ED-REPAIR-002: pass expectedPreimages to enforce open buffer revision and dirty
-                  // integrity throughout mutation.
-                  const selectedPaths = new Set(Array.from(byFile.keys(), replacePreimagePathKey));
-                  const selectedSnapshot = {
-                    ...snapshot,
-                    preimages: snapshot.preimages?.filter((preimage) => selectedPaths.has(replacePreimagePathKey(preimage.path))),
-                  };
-                  const expectedDiskHashes = replacePreimageExpectedHashes(selectedSnapshot);
-                  const summaryHolder: { current: WorkspaceEditApplyTransactionSummary | null } = { current: null };
-                  const outcomes = await applyLspWorkspaceEdit(edit, {
-                    label: "Replace in files",
-                    kind: "replace",
-                    expectedDiskHashes: expectedDiskHashes.size > 0 ? expectedDiskHashes : null,
-                    expectedPreimages: selectedSnapshot.preimages ?? null,
-                    onTransactionSummary: (summary) => {
-                      summaryHolder.current = summary;
-                    },
-                  });
-                  const report = summarizeReplaceCommitReport(outcomes, modelMatches);
-                  const recoveryId = summaryHolder.current?.recoveryId ?? null;
-                  const statusMsg = recoveryId && !report.ok && report.appliedCount > 0
-                    ? `${report.message}; recovery required (entry: ${recoveryId})`
-                    : report.message;
-                  setStatusMessage(statusMsg);
-                  return {
-                    ok: report.ok,
-                    appliedCount: report.appliedCount,
-                    fileCount: report.fileCount,
-                    ...(report.ok ? {} : { message: statusMsg }),
-                  };
-                }}
-              />
-            ),
-          },
-          {
-            id: "structural",
-            label: "Structural Search",
-            icon: <Braces className="h-3.5 w-3.5" />,
-            badge: structuralSearch.result?.matches.length || undefined,
-            content: (
-              <StructuralSearchPanel session={structuralSearch} onOpenMatch={openStructuralMatch} />
-            ),
-          },
-          {
-            id: "references",
-            label: "References",
-            icon: <ListTree className="h-3.5 w-3.5" />,
-            badge: referencesResult.locations.length,
-            content: (
-              <ReferencesPanel
-                result={referencesResult}
-                roots={roots}
-                semanticIndex={semanticIndex.snapshot}
-                onOpenLocation={(location) => void openLspLocation(location)}
-                pinned={referencesPinned}
-                onPinChange={(pinned) => {
-                  setReferencesPinned(pinned);
-                  usageSessionRef.current?.setPinned(pinned);
-                }}
-                onRerun={rerunFindReferences}
-                scopeSelection={usagesScopeSelection}
-                recentSessions={usageSessionRef.current?.getRecent().map((snapshot) => ({
-                  id: snapshot.id,
-                  label: `${snapshot.symbol.displayName || "symbol"} · ${snapshot.envelope.results.length} · ${new Date(snapshot.createdAt).toLocaleTimeString()}`,
-                })) ?? []}
-                onRestoreRecent={(id) => {
-                  usageSessionRef.current?.restore(id);
-                  setUsagesRecentsRevision((revision) => revision + 1);
-                }}
-                recentsRevision={usagesRecentsRevision}
-              />
-            ),
-          },
-          {
-            id: "call-hierarchy",
-            label: "Call Hierarchy",
-            icon: <GitFork className="h-3.5 w-3.5" />,
-            content: (
-              <HierarchyPanel
-                mode="call"
-                root={callHierarchyRoot}
-                active={bottomDockOpen && bottomDockTab === "call-hierarchy"}
-                staleReason={(() => {
-                  const provenance = hierarchyProvenanceRef.current.call;
-                  if (!provenance || !callHierarchyRoot) return null;
-                  void hierarchyProvenanceRevision;
-                  if (provenance.generation !== lspSessionGeneration()) {
-                    return "Provider restarted since this hierarchy was prepared";
-                  }
-                  const current = projectAnalysisSnapshot?.projectFingerprint ?? "";
-                  if (current && provenance.projectFingerprint !== current) {
-                    return "Project model changed since this hierarchy was prepared";
-                  }
-                  return null;
-                })()}
-                onRerunStale={() => void openHierarchy("call")}
-                onOpenLocation={(location) => void openLspLocation(location)}
-                queryHost={semanticQueryHostRef.current}
-                liveLspGeneration={lspSessionGeneration}
-                liveDocumentRevision={() => openFilesRef.current[callHierarchyRoot?.fileKey ?? ""]?.documentRevision ?? -1}
-                onStatus={(status) => {
-                  if (activeFile) updateLspStatusForFile(activeFile, status);
-                }}
-              />
-            ),
-          },
-          {
-            id: "type-hierarchy",
-            label: "Type Hierarchy",
-            icon: <Network className="h-3.5 w-3.5" />,
-            content: (
-              <HierarchyPanel
-                mode="type"
-                root={typeHierarchyRoot}
-                active={bottomDockOpen && bottomDockTab === "type-hierarchy"}
-                staleReason={(() => {
-                  const provenance = hierarchyProvenanceRef.current.type;
-                  if (!provenance || !typeHierarchyRoot) return null;
-                  void hierarchyProvenanceRevision;
-                  if (provenance.generation !== lspSessionGeneration()) {
-                    return "Provider restarted since this hierarchy was prepared";
-                  }
-                  const current = projectAnalysisSnapshot?.projectFingerprint ?? "";
-                  if (current && provenance.projectFingerprint !== current) {
-                    return "Project model changed since this hierarchy was prepared";
-                  }
-                  return null;
-                })()}
-                onRerunStale={() => void openHierarchy("type")}
-                onOpenLocation={(location) => void openLspLocation(location)}
-                queryHost={semanticQueryHostRef.current}
-                liveLspGeneration={lspSessionGeneration}
-                liveDocumentRevision={() => openFilesRef.current[typeHierarchyRoot?.fileKey ?? ""]?.documentRevision ?? -1}
-                onStatus={(status) => {
-                  if (activeFile) updateLspStatusForFile(activeFile, status);
-                }}
-              />
-            ),
-          },
-          {
-            id: "todos",
-            label: "TODOs",
-            icon: <ListTodo className="h-3.5 w-3.5" />,
-            badge: (openFileTodos.length + bookmarks.length) > 0 ? (openFileTodos.length + bookmarks.length) : undefined,
-            content: (
-              <TodosBookmarksPanel
-                todos={openFileTodos}
-                bookmarks={bookmarks}
-                onOpenTodo={(item) => void openTodoOrBookmark(item)}
-                onOpenBookmark={(item) => void openTodoOrBookmark(item)}
-                onRemoveBookmark={removeBookmark}
-                onRenameBookmarkGroup={renameBookmarkGroup}
-              />
-            ),
-          },
-          {
-            id: "terminal",
-            label: "Terminal",
-            icon: <TerminalSquare className="h-3.5 w-3.5" />,
-            badge: undefined,
-            content: (
-              <TerminalDockPanel
-                ref={terminalDockRef}
-                workspaceInstanceId={workspaceInstanceId}
-                roots={roots}
-                defaultCwd={activeRoot?.path ?? roots[0]?.path ?? ""}
-                active={bottomDockOpen && bottomDockTab === "terminal"}
-              />
-            ),
-          },
-          {
-            id: "run",
-            label: "Run",
-            icon: <Play className="h-3.5 w-3.5" />,
-            content: (
-              <RunPanel
-                ref={runPanelRef}
-                workspaceInstanceId={workspaceInstanceId}
-                roots={roots}
-                active={bottomDockOpen && bottomDockTab === "run"}
-                onRun={runWorkspaceTask}
-                toolConfig={toolConfig}
-                onConfigureTools={() => setBuildRunToolsOpen(true)}
-              />
-            ),
-          },
-          {
-            id: "build",
-            label: "Build",
-            icon: <Hammer className="h-3.5 w-3.5" />,
-            content: (
-              <BuildPanel
-                workspaceInstanceId={workspaceInstanceId}
-                roots={roots}
-                active={bottomDockOpen && bottomDockTab === "build"}
-                onRunTask={(task, onExit) => runWorkspaceTask(task, onExit)}
-                toolConfig={toolConfig}
-                onLoadModules={(rootPath) =>
-                  // A synthetic .java path selects the root's jdtls session
-                  // (session keys on project scope, not on the file existing).
-                  lspJavaModules(lspDescriptorForPath(rootPath, "__taomni_modules__.java"))}
-              />
-            ),
-          },
-          {
-            id: "tests",
-            label: "Tests",
-            icon: <FlaskConical className="h-3.5 w-3.5" />,
-            content: (
-              <TestsPanel
-                activeFileTitle={activeFileIsJava ? activeFile?.title ?? null : null}
-                canDiscover={activeFileIsJava}
-                active={bottomDockOpen && bottomDockTab === "tests"}
-                onDiscover={discoverActiveJavaTests}
-                onRun={runJavaTest}
-                onRerun={rerunStructuredTest}
-                onLoadResults={activeFile?.ref.kind === "root" ? loadActiveJavaTestResults : undefined}
-                results={activeFile?.ref.kind === "root" ? testResultsByRoot[activeFile.ref.rootId] ?? null : null}
-                onOpenFailure={openStructuredTestFailure}
-                onDebug={debugJavaTest}
-                runDisabled={javaTestBuildTool === null}
-              />
-            ),
-          },
-          {
-            id: "coverage",
-            label: "Coverage",
-            icon: <ShieldCheck className="h-3.5 w-3.5" />,
-            badge: coverageReport ? `${coverageReport.totalPercentage}%` : undefined,
-            content: (
-              <CoveragePanel
-                report={coverageReport}
-                coverageEnabled={coverageOverlayEnabled}
-                onToggleCoverage={() => setCoverageOverlayEnabled((prev) => !prev)}
-                onOpenFile={(path, line) => {
-                  const ref = problemPathToRef(path);
-                  if (ref) {
-                    const targetLine = line && line > 0 ? line - 1 : 0;
-                    const range = { start: { line: targetLine, character: 0 }, end: { line: targetLine, character: 0 } };
-                    void openFile(ref).then(() => revealEditorLocation(fileKey(ref), range));
-                  }
-                }}
-                onRefreshCoverage={() => void scanWorkspaceCoverage()}
-              />
-            ),
-          },
-          {
-            // ED-PARITY-018 DEC-018-01: the workspace Git tool window hosts the
-            // same Git manager as the Git tab, scoped to this workspace's repos.
-            id: "git",
-            label: "Git",
-            icon: <GitBranch className="h-3.5 w-3.5" />,
-            // Mounted on first open and kept, so the commit message and
-            // selection survive hiding the tool window.
-            content: gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
-              <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 outline-none">
-                <WorkspaceGitManager
-                  workspaceName={title}
-                  roots={gitRoots}
-                  activeRepoRoot={activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null}
-                  visible={bottomDockOpen && bottomDockTab === "git"}
-                />
-              </div>
-            ) : (
-              <div data-testid="code-workspace-git-tool-window-empty" role="status" className="px-3 py-3 text-[11px] text-[var(--taomni-code-muted)]">
-                {gitRootsLoading ? "Detecting Git repositories…" : "No Git repository in this workspace"}
-              </div>
-            ),
-          },
-          {
-            id: "debug",
-            label: "Debug",
-            icon: <Bug className="h-3.5 w-3.5" />,
-            content: (
-              <DebugPanel
-                debug={debug}
-                onStart={activeFileDebuggable ? startDebugActiveTarget : null}
-                onAttach={activeFileJavaRoot && debugRuntimeAvailable ? attachRemoteDebug : null}
-                onOpenFrame={openDebugFrame}
-                onOpenBreakpoint={(path, line, column) => openDebugFrame({ path, line, column })}
-                onOpenLocation={(path, line, column) => openDebugFrame({ path, line, column })}
-                editingBreakpoint={editingBreakpoint}
-                onEditingBreakpointChange={setEditingBreakpoint}
-                runtimeAvailable={debugRuntimeAvailable}
-                configurations={activeRunConfigurations
-                  .filter((configuration) => configuration.kind !== "module")
-                  .map((configuration) => {
-                    const detectedDebug = configuration.debugConfigurationId
-                      ? activeExecutionModel?.debugConfigurations.find((candidate) => (
-                        candidate.id === configuration.debugConfigurationId
-                      ))
-                      : undefined;
-                    const rootId = activeFile?.ref.kind === "root" ? activeFile.ref.rootId : undefined;
-                    const override = readRunConfigurationOverrides(workspaceInstanceId, rootId)[configuration.id];
-                    const debugConfiguration = detectedDebug
-                      ? applyRunOverrideToDebugConfiguration(
-                          detectedDebug,
-                          override,
-                          configuration.runtimeOptions,
-                          configuration.envFile,
-                        )
-                      : undefined;
-                    const canUseJavaCompatibilityDebug = activeFileJavaRoot
-                      && !configuration.debugConfigurationId
-                      && configuration.kind !== "debug-only";
-                    const available = debugRuntimeAvailable
-                      && (debugConfiguration
-                        ? debugConfiguration.available === true
-                        : canUseJavaCompatibilityDebug);
-                    const diagnostic = !debugRuntimeAvailable
-                      ? "Debugging is available in the desktop app only"
-                      : debugConfiguration?.diagnostic
-                        ?? (!debugConfiguration && canUseJavaCompatibilityDebug
-                          ? undefined
-                          : "No available debug configuration is associated with this run target");
-                    return {
-                      id: configuration.id,
-                      label: configuration.label,
-                      source: configuration.configurationSource,
-                      available,
-                      diagnostic: available ? undefined : diagnostic,
-                    };
-                  })}
-                activeConfigurationId={activeRunConfiguration?.id ?? null}
-                workspaceInstanceId={workspaceInstanceId}
-                onActiveConfigurationChange={(configurationId) => {
-                  if (!activeFile) return;
-                  const sourceFile = absolutePathForOpenFile(activeFile);
-                  if (sourceFile) writeActiveRunConfigurationSelection(
-                    workspaceInstanceId,
-                    sourceFile,
-                    configurationId,
-                  );
-                }}
-              />
-            ),
-          },
-        ]}
+        tabs={bottomDockTabs}
         onOpenChange={setBottomDockOpen}
         onActiveTabChange={(tab) => setBottomDockTab(tab as BottomDockTabId)}
       />
         </div>
-        <ToolWindowRail side="right" top={rightToolRailItems} />
+        <ToolWindowRail
+          side="right"
+          top={rightStripeTop}
+          bottom={stripeItemsAt("bottom-right")}
+          width={toolWindowLayout.stripeWidth("right")}
+          onResize={(width) => toolWindowLayout.setStripeWidth("right", width)}
+          {...stripeCallbacks}
+        />
       </div>
       <TabSwitcher
         open={tabSwitcherOpen}

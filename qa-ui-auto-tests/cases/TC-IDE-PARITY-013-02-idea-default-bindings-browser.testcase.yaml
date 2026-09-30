@@ -75,7 +75,7 @@ steps:
 - assert_visible: '[data-testid="code-workspace-tree-add-folder"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Alt+7
-- assert_visible: '[data-testid="code-workspace-right-pane"]'
+- assert_visible: '[data-testid="code-workspace-tool-window-structure"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Control+Shift+A
 - press: Control+Shift+A
@@ -135,7 +135,7 @@ verification:
     - step: 33
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-add-folder\"]"}'
     - step: 36
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-window-structure\"]"}'
     results:
     - 31
     - 33

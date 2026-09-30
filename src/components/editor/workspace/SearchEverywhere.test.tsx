@@ -52,6 +52,20 @@ function renderPopup(overrides: Partial<Parameters<typeof SearchEverywhere>[0]> 
 describe("SearchEverywhere", () => {
   afterEach(() => cleanup());
 
+  it("switches category tabs with Tab and Shift+Tab like IDEA (SearchEverywhere.NextTab)", () => {
+    renderPopup({ initialMode: "files" });
+    const input = screen.getByLabelText("Go to file");
+    expect(screen.getByTestId("search-everywhere-tab-files")).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(input, { key: "Tab" });
+    expect(screen.getByTestId("search-everywhere-tab-symbols")).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(screen.getByLabelText("Go to symbol"), { key: "Tab", shiftKey: true });
+    fireEvent.keyDown(screen.getByLabelText("Go to file"), { key: "Tab", shiftKey: true });
+    expect(screen.getByTestId("search-everywhere-tab-classes")).toHaveAttribute("aria-selected", "true");
+    // Left/Right keep moving the caret in the query (IDEA does not switch tabs on arrows).
+    fireEvent.keyDown(screen.getByLabelText("Go to class"), { key: "ArrowRight" });
+    expect(screen.getByTestId("search-everywhere-tab-classes")).toHaveAttribute("aria-selected", "true");
+  });
+
   it("renders nothing while closed", () => {
     renderPopup({ open: false });
     expect(screen.queryByTestId("code-workspace-search-everywhere")).not.toBeInTheDocument();

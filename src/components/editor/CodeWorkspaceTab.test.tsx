@@ -2238,7 +2238,9 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(lspMocks.lspDocumentSymbols).toHaveBeenCalled());
     fireEvent.click(toolbarControl("code-workspace-right-pane-toggle"));
 
-    expect(screen.getByRole("tab", { name: "Outline", selected: true })).toBeInTheDocument();
+    // ED-PARITY-024: IDEA Structure is its own tool window (left bottom by default).
+    const structureWindow = await screen.findByTestId("code-workspace-tool-window-structure");
+    expect(within(structureWindow).getByTestId("code-workspace-tool-window-title-structure")).toHaveTextContent("Structure");
     const outline = await screen.findByTestId("code-workspace-outline-pane");
     expect(outline).toHaveTextContent("render");
     fireEvent.click(within(outline).getByText("render"));
@@ -2336,7 +2338,7 @@ describe("CodeWorkspaceTab", () => {
 
     const pane = await screen.findByTestId("code-workspace-documentation-pane");
     expect(pane).toHaveTextContent("Opens");
-    expect(screen.getByRole("tab", { name: "Documentation", selected: true })).toBeInTheDocument();
+    expect(await screen.findByTestId("code-workspace-tool-window-documentation")).toBeInTheDocument();
     expect(screen.queryByTestId("code-workspace-quick-doc")).not.toBeInTheDocument();
     expect(within(pane).queryByLabelText("Pinned")).not.toBeInTheDocument();
     expect(within(pane).queryByRole("button", { name: "Unpin documentation" })).not.toBeInTheDocument();

@@ -20,8 +20,21 @@ interface QuickPickOverlayProps<T> {
   header?: ReactNode;
   /** Static footer, or one derived from the selected result (IDEA path bar). */
   footer?: ReactNode | ((selected: T | null) => ReactNode);
-  /** Left column beside the result list (Recent Files tool windows). */
-  aside?: ReactNode;
+  /**
+   * Left column beside the result list (Recent Files tool windows). A render
+   * function receives the keyboard-selected aside row (IDEA Switcher: Left
+   * moves the selection into this column, Right back to the results).
+   */
+  aside?: ReactNode | ((state: { selectedIndex: number | null }) => ReactNode);
+  /** Keyboard-selectable rows in `aside`; 0 keeps the column pointer-only. */
+  asideItemCount?: number;
+  /** Enter on a keyboard-selected aside row. */
+  onAsideActivate?: (index: number) => void;
+  /**
+   * IDEA Search Everywhere: Tab / Shift+Tab switch the category tab
+   * (SearchEverywhere.NextTab / PrevTab) instead of moving DOM focus.
+   */
+  onTabNavigate?: (direction: 1 | -1) => void;
   onClose: () => void;
   onPick: (item: T, options?: { split: boolean }) => void;
   /** Called when Enter is pressed with no selectable results (e.g. Text search). */
@@ -53,6 +66,9 @@ export function QuickPickOverlay<T>({
   header,
   footer,
   aside,
+  asideItemCount = 0,
+  onAsideActivate,
+  onTabNavigate,
   onClose,
   onPick,
   onEnterEmpty,
@@ -63,6 +79,8 @@ export function QuickPickOverlay<T>({
   useFocusReturn(open);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  /** Keyboard pane: the result list, or the aside column (IDEA Switcher). */
+  const [asideIndex, setAsideIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const initialIndexRef = useRef(initialIndex);
@@ -75,6 +93,7 @@ export function QuickPickOverlay<T>({
     setQuery("");
     onQueryChangeRef.current?.("");
     setSelectedIndex(initialIndexRef.current);
+    setAsideIndex(null);
     // Focus after the overlay is painted.
     const id = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(id);
@@ -122,7 +141,43 @@ export function QuickPickOverlay<T>({
 
   if (!open) return null;
 
+  const asideActive = asideIndex !== null && asideItemCount > 0;
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.nativeEvent.isComposing) return;
+    const input = inputRef.current;
+    if (event.key === "Tab" && onTabNavigate && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      event.preventDefault();
+      onTabNavigate(event.shiftKey ? -1 : 1);
+      return;
+    }
+    if (asideActive) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const delta = event.key === "ArrowDown" ? 1 : -1;
+        setAsideIndex((current) => Math.max(0, Math.min(asideItemCount - 1, (current ?? 0) + delta)));
+        return;
+      }
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        setAsideIndex(null);
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        if (asideIndex !== null) onAsideActivate?.(asideIndex);
+        return;
+      }
+    } else if (
+      event.key === "ArrowLeft"
+      && asideItemCount > 0
+      && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey
+      && (!input || (input.selectionStart === 0 && input.selectionEnd === 0))
+    ) {
+      // Only at the start of the query, where Left cannot move the caret.
+      event.preventDefault();
+      setAsideIndex(Math.min(selected, asideItemCount - 1));
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       onClose();
@@ -181,6 +236,7 @@ export function QuickPickOverlay<T>({
               setQuery(next);
               onQueryChangeRef.current?.(next);
               setSelectedIndex(0);
+              setAsideIndex(null);
             }}
             onKeyDown={handleKeyDown}
           />
@@ -189,7 +245,7 @@ export function QuickPickOverlay<T>({
         <div className="min-h-0 flex-1 flex">
         {aside && (
           <div className="w-[190px] shrink-0 overflow-auto border-r border-[var(--taomni-code-border)] py-1 text-[11px]">
-            {aside}
+            {typeof aside === "function" ? aside({ selectedIndex: asideActive ? asideIndex : null }) : aside}
           </div>
         )}
         <div ref={listRef} className="min-h-0 min-w-0 flex-1 overflow-auto py-1 text-[11px]">
@@ -201,7 +257,7 @@ export function QuickPickOverlay<T>({
               key={itemKey(item)}
               type="button"
               data-index={index}
-              data-selected={index === selected || undefined}
+              data-selected={(!asideActive && index === selected) || undefined}
               className="h-7 w-full min-w-0 flex items-center gap-2 px-3 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-selection-match-bg)]"
               onMouseEnter={() => setSelectedIndex(index)}
               onClick={() => onPick(item)}

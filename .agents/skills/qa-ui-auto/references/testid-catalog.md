@@ -370,6 +370,23 @@
   ↳ `[data-testid="code-workspace-tool-rail-structure"]` — alias
   ↳ `[data-testid="code-workspace-tool-rail-commit"]` — alias
   ↳ `[data-testid="code-workspace-tool-rail-documentation"]` — alias
+- `[data-testid="code-workspace-tool-rail-left-resize"]` — interactive [optional] — F25.5.tool-rail-resize
+  ↳ `[data-testid="code-workspace-tool-rail-right-resize"]` — alias
+- `[data-testid="code-workspace-tool-rail-menu-move"]` — interactive [optional] — F25.5.tool-rail-menu
+  ↳ `[data-testid="code-workspace-tool-rail-menu-move-right-top"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-menu-remove"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-menu-show-names"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-menu-toggle"]` — alias
+- `[data-testid="code-workspace-tool-window-problems"]` — display [optional] — F25.5.tool-window-pane
+  ↳ `[data-testid="code-workspace-tool-window-structure"]` — alias
+  ↳ `[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]` — alias
+- `[data-testid="code-workspace-tool-window-options-problems"]` — interactive [optional] — F25.5.tool-window-options-menu
+  ↳ `[data-testid="code-workspace-tool-window-move"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-move-bottom-left"]` — alias
+- `[data-testid="code-workspace-bottom-tab-overflow-run"]` — interactive [optional] — F25.5.tool-window-more-item
+- `[data-testid="search-everywhere-tab-files"]` — interactive [optional] — F25.5.search-everywhere-tab
+  ↳ `[data-testid="search-everywhere-tab-classes"]` — alias
+  ↳ `[data-testid="search-everywhere-tab-symbols"]` — alias
 - `[data-testid="code-workspace-tool-window-header"]` — display [optional] — F25.5.tool-window-header
 - `[data-testid="code-workspace-tool-window-title"]` — display [optional] — F25.5.tool-window-title
 - `[data-testid="code-workspace-tool-window-hide"]` — interactive [optional] — F25.5.tool-window-hide

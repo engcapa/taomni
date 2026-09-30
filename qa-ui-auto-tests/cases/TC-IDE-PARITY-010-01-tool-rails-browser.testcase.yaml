@@ -84,13 +84,13 @@ steps:
     state: detached
     timeout_sec: 5
 - click: '[data-testid="code-workspace-tool-rail-structure"]'
-- assert_visible: '[data-testid="code-workspace-right-pane"]'
+- assert_visible: '[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]'
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-structure"]'
     name: aria-pressed
     equals: 'true'
 - click: '[data-testid="code-workspace-tool-rail-structure"]'
-- assert_not_visible: '[data-testid="code-workspace-right-pane"]'
+- assert_not_visible: '[data-testid="code-workspace-tool-window-structure"]'
 - click: '[data-testid="code-workspace-tool-rail-project"]'
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
@@ -171,7 +171,7 @@ verification:
     - 30
     - 32
   - id: R4
-    requirement: A4：右 rail Structure 与左 rail Project 按 IDEA 切换显隐；More tool windows 列出全部底部工具。
+    requirement: A4：Structure（IDEA 默认 Left Bottom，Project 下方分屏）与 Project 按 IDEA 切换显隐；More tool windows 列出全部工具窗。
     actions:
     - 33
     - 38
@@ -180,11 +180,11 @@ verification:
     - 44
     checkpoints:
     - step: 34
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-left-tool-area\"] [data-testid=\"code-workspace-tool-window-structure\"]"}'
     - step: 35
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-structure\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 37
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tool-window-structure\"]"}'
     - step: 39
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "false"}}'
     - step: 41

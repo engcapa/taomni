@@ -1,0 +1,233 @@
+id: TC-IDE-PARITY-024-01
+title: 'IDEA tool window stripes: names, resizable width, Move between anchors, Remove from Sidebar'
+description: 'ED-PARITY-024 A1/A2/A3 browser case: the stripes show tool window names at IDEA''s 59 px default, resize from their inner edge (40–100 px) and switch to 40 px icon-only via Show Tool Window Names. A stripe button''s context menu moves Problems to Right Top (its button and window follow; the bottom dock closes), Alt+6 toggles it there, the window''s ⋮ Move to returns it to Bottom Left. Structure opens below Project (IDEA Left Bottom). Remove from Sidebar drops Run''s button and More tool windows restores and shows it.
+
+
+  Mode: browser.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-024
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]:visible'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- dblclick: '[data-testid="code-workspace-tree-file"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tool-rail-left"]'
+    name: data-show-names
+    equals: 'true'
+- eval_readonly:
+    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-tool-rail-left\"]").getBoundingClientRect().width) === 59
+    expect_truthy: true
+- right_click: '[data-testid="code-workspace-bottom-tab-problems"]'
+- click: '[data-testid="code-workspace-tool-rail-menu-move"]'
+- click: '[data-testid="code-workspace-tool-rail-menu-move-right-top"]'
+- assert_visible: '[data-testid="code-workspace-tool-rail-right"] [data-testid="code-workspace-bottom-tab-problems"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-bottom-tab-problems"]'
+    name: aria-pressed
+    equals: 'false'
+- click: '[data-testid="code-workspace-bottom-tab-problems"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-right-pane"] [data-testid="code-workspace-tool-window-problems"]'
+    timeout_sec: 10
+- assert_attribute:
+    selector: '[data-testid="code-workspace-bottom-tab-problems"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_not_visible: '[data-testid="code-workspace-bottom-dock-body"]'
+- click: '[data-testid="code-workspace-bottom-tab-problems"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tool-window-problems"]'
+    state: detached
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.activeElement?.classList?.contains("cm-content") === true
+    expect_truthy: true
+- press: Alt+6
+- wait_for:
+    selector: '[data-testid="code-workspace-right-pane"] [data-testid="code-workspace-tool-window-problems"]'
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-tool-window-options-problems"]'
+- click: '[data-testid="code-workspace-tool-window-move"]'
+- click: '[data-testid="code-workspace-tool-window-move-bottom-left"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-dock"][data-open] [data-testid="code-workspace-tool-window-problems"]'
+    timeout_sec: 10
+- assert_visible: '[data-testid="code-workspace-tool-rail-left"] [data-testid="code-workspace-bottom-tab-problems"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-tool-window-title"]'
+    contains: Problems
+- click: '[data-testid="code-workspace-tool-rail-structure"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]'
+    timeout_sec: 10
+- assert_visible: '[data-testid="code-workspace-tree-add-folder"]'
+- right_click: '[data-testid="code-workspace-bottom-tab-terminal"]'
+- click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
+- eval_readonly:
+    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-tool-rail-left\"]").getBoundingClientRect().width) === 40
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="code-workspace-tool-rail-left-resize"]'
+    equal: 0
+- right_click: '[data-testid="code-workspace-bottom-tab-terminal"]'
+- click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
+- click: '[data-testid="code-workspace-tool-rail-left-resize"]'
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- press: ArrowRight
+- eval_readonly:
+    expression: Math.round(document.querySelector("[data-testid" + String.fromCharCode(61) + "\"code-workspace-tool-rail-left\"]").getBoundingClientRect().width) === 79
+    expect_truthy: true
+- right_click: '[data-testid="code-workspace-bottom-tab-run"]'
+- click: '[data-testid="code-workspace-tool-rail-menu-remove"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-bottom-tab-run"]'
+    equal: 0
+- click: '[data-testid="code-workspace-bottom-tab-overflow"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow-run"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-bottom-tab-run"][aria-pressed="true"]'
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="code-workspace-tool-window-title"]'
+    contains: Run
+- screenshot: tc-ide-parity-024-01-stripes.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1：左 stripe 显示工具窗名称，默认宽度 59 px（IDEA ResizeStripeManager 默认）。
+    actions:
+    - 12
+    checkpoints:
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-left\"]", "name": "data-show-names", "equals": "true"}}'
+    - step: 14
+      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\").getBoundingClientRect().width) === 59", "expect_truthy": true}}'
+    results:
+    - 13
+    - 14
+  - id: R2
+    requirement: A2：stripe 按钮右键 Move → Right Top 后按钮移到右 stripe（隐藏态不自动打开，同 IDEA）；点击后 Problems 在右侧打开且底部 dock 关闭；再点隐藏并把焦点交回编辑器；Alt+6 在右侧重新打开。
+    actions:
+    - 15
+    - 16
+    - 17
+    - 20
+    - 24
+    - 27
+    checkpoints:
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-right\"] [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]", "name": "aria-pressed", "equals": "false"}}'
+    - step: 21
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-right-pane\"] [data-testid=\"code-workspace-tool-window-problems\"]", "timeout_sec": 10}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 23
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-bottom-dock-body\"]"}'
+    - step: 25
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tool-window-problems\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 26
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\") === true", "expect_truthy": true}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-right-pane\"] [data-testid=\"code-workspace-tool-window-problems\"]", "timeout_sec": 10}}'
+    results:
+    - 18
+    - 19
+    - 21
+    - 23
+    - 25
+    - 26
+    - 28
+  - id: R3
+    requirement: A2：工具窗头 ⋮ → Move to → Bottom Left 把 Problems 送回底部 dock，按钮回到左 stripe 下组；Structure 在 Project 下方（Left Bottom）打开。
+    actions:
+    - 29
+    - 30
+    - 31
+    - 35
+    checkpoints:
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open] [data-testid=\"code-workspace-tool-window-problems\"]", "timeout_sec": 10}}'
+    - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-left\"] [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Problems"}}'
+    - step: 36
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-left-tool-area\"] [data-testid=\"code-workspace-tool-window-structure\"]", "timeout_sec": 10}}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-add-folder\"]"}'
+    results:
+    - 32
+    - 33
+    - 36
+    - 37
+  - id: R4
+    requirement: A1：Show Tool Window Names 关闭后 stripe 为 40 px 图标栏且不可拉伸；重新打开后内侧边缘可用键盘拉伸（每步 4 px）。
+    actions:
+    - 38
+    - 39
+    - 42
+    - 43
+    - 44
+    checkpoints:
+    - step: 40
+      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\").getBoundingClientRect().width) === 40", "expect_truthy": true}}'
+    - step: 41
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tool-rail-left-resize\"]", "equal": 0}}'
+    - step: 50
+      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\").getBoundingClientRect().width) === 79", "expect_truthy": true}}'
+    results:
+    - 40
+    - 41
+    - 50
+  - id: R5
+    requirement: A3：Remove from Sidebar 移除 Run 按钮；More tool windows 选择 Run 恢复按钮并在底部打开 Run。
+    actions:
+    - 51
+    - 52
+    - 54
+    - 55
+    checkpoints:
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"]", "equal": 0}}'
+    - step: 56
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"][aria-pressed=\"true\"]", "timeout_sec": 10}}'
+    - step: 57
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Run"}}'
+    results:
+    - 53
+    - 56
+    - 57
+  visual:
+  - check: stripe 名称字号、按钮间距、分隔线与 IDEA 2026.2 新 UI 对照。
+    method: manual
+    reason: 像素级外观按 DEC-ALIGN-06 profile 另行比较。
+  native:
+  - check: 打包 WebView 中移动 Terminal 保留会话由 TC-IDE-PARITY-024-03 覆盖。
+    method: external
+    reason: browser 不经过打包 WebView，也没有真实 PTY。

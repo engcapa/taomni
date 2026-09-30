@@ -8113,6 +8113,46 @@ controls:
       - '[data-testid="code-workspace-tool-rail-structure"]'
       - '[data-testid="code-workspace-tool-rail-commit"]'
       - '[data-testid="code-workspace-tool-rail-documentation"]'
+  - id: tool-rail-resize              # ED-PARITY-024 stripe width handle (names shown)
+    selector: '[data-testid="code-workspace-tool-rail-left-resize"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-rail-right-resize"]'
+  - id: tool-rail-menu                # ED-PARITY-024 stripe button context menu
+    selector: '[data-testid="code-workspace-tool-rail-menu-move"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-rail-menu-move-right-top"]'
+      - '[data-testid="code-workspace-tool-rail-menu-remove"]'
+      - '[data-testid="code-workspace-tool-rail-menu-show-names"]'
+      - '[data-testid="code-workspace-tool-rail-menu-toggle"]'
+  - id: tool-window-pane              # ED-PARITY-024 re-parentable tool window decorator
+    selector: '[data-testid="code-workspace-tool-window-problems"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-window-structure"]'
+      - '[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]'
+  - id: tool-window-options-menu      # ED-PARITY-024 ⋮ Options: View Mode / Move to / Resize / Remove
+    selector: '[data-testid="code-workspace-tool-window-options-problems"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-window-move"]'
+      - '[data-testid="code-workspace-tool-window-move-bottom-left"]'
+  - id: tool-window-more-item         # More tool windows entries
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-run"]'
+    kind: interactive
+    optional: true
+  - id: search-everywhere-tab         # ED-PARITY-024 category tabs (Tab / Shift+Tab)
+    selector: '[data-testid="search-everywhere-tab-files"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="search-everywhere-tab-classes"]'
+      - '[data-testid="search-everywhere-tab-symbols"]'
   - id: tool-window-header
     selector: '[data-testid="code-workspace-tool-window-header"]'
     kind: display

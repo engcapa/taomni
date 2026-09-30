@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { TabSwitcher, type TabSwitcherEntry } from "./TabSwitcher";
+import { TabSwitcher, switcherArrowIndex, type TabSwitcherEntry } from "./TabSwitcher";
 
 afterEach(cleanup);
 
@@ -72,5 +72,21 @@ describe("§8.18.5 TabSwitcher rendering", () => {
     expect(handlers.onCommit).toHaveBeenCalledWith(0);
     fireEvent.mouseDown(screen.getByTestId("workspace-tab-switcher"));
     expect(handlers.onCancel).toHaveBeenCalled();
+  });
+});
+
+describe("switcherArrowIndex (IDEA Switcher columns)", () => {
+  it("moves between the file and tool-window columns and within a column", () => {
+    // 3 files (0..2), 2 tool windows (3..4)
+    expect(switcherArrowIndex(1, "arrowleft", 3, 2)).toBe(4);
+    expect(switcherArrowIndex(2, "arrowleft", 3, 2)).toBe(4);
+    expect(switcherArrowIndex(0, "arrowleft", 3, 2)).toBe(3);
+    expect(switcherArrowIndex(4, "arrowright", 3, 2)).toBe(1);
+    expect(switcherArrowIndex(3, "arrowdown", 3, 2)).toBe(4);
+    expect(switcherArrowIndex(4, "arrowdown", 3, 2)).toBe(4);
+    expect(switcherArrowIndex(0, "arrowup", 3, 2)).toBe(0);
+    expect(switcherArrowIndex(1, "arrowdown", 3, 2)).toBe(2);
+    expect(switcherArrowIndex(1, "arrowleft", 3, 0)).toBe(1);
+    expect(switcherArrowIndex(0, "arrowright", 0, 2)).toBe(0);
   });
 });
