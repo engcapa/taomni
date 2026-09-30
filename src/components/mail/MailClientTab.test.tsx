@@ -17,6 +17,8 @@ const mailMocks = vi.hoisted(() => ({
   mailGetMessageBody: vi.fn(),
   mailIndexCachedContacts: vi.fn(),
   mailDeleteDraft: vi.fn(),
+  mailDiscardRemoteDraft: vi.fn(),
+  mailStoreRemoteDraft: vi.fn(),
   mailListDrafts: vi.fn(),
   mailListCachedFolders: vi.fn(),
   mailListCachedMessages: vi.fn(),
@@ -770,6 +772,45 @@ describe("MailClientTab", () => {
       { mode: "backfill", limit: 50 },
     ));
     expect(await screen.findByText("Older history")).toBeInTheDocument();
+  });
+
+  it("groups a reply chain into one expandable conversation (AC-24)", async () => {
+    const chain: MailMessageHeader[] = [
+      { ...message, uid: 1, messageId: "a@x", subject: "Plan", dateTs: 1, snippet: "first" },
+      { ...message, uid: 2, messageId: "b@x", subject: "Re: Plan", dateTs: 2, inReplyTo: "a@x", references: ["a@x"], snippet: "second" },
+      { ...message, uid: 3, messageId: "c@x", subject: "Re: Plan", dateTs: 3, inReplyTo: "b@x", references: ["a@x", "b@x"], snippet: "third" },
+    ];
+    mailMocks.mailListCachedMessages.mockResolvedValue(chain);
+    window.localStorage.removeItem("taomni.mail.threadView");
+
+    renderMailbox();
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(3));
+    fireEvent.click(screen.getByTestId("mail-thread-view-toggle"));
+    await waitFor(() => expect(screen.getAllByTestId("mail-message-row")).toHaveLength(1));
+    expect(screen.getByTestId("mail-thread-size")).toHaveTextContent("3");
+    fireEvent.click(screen.getByTestId("mail-thread-expand"));
+    const rows = screen.getAllByTestId("mail-message-row");
+    expect(rows.map((row) => row.getAttribute("data-thread-depth"))).toEqual(["0", "1", "2"]);
+    window.localStorage.removeItem("taomni.mail.threadView");
+  });
+
+  it("sends reply threading headers and reports the Sent copy (AC-20/AC-23)", async () => {
+    const parent: MailMessageHeader = { ...message, messageId: "parent@x", references: ["root@x"], inReplyTo: "root@x" };
+    mailMocks.mailListCachedMessages.mockResolvedValue([parent]);
+    mailMocks.mailGetMessageBody.mockResolvedValue({ ...messageBody, messageId: "parent@x" });
+    mailMocks.mailSendMessage.mockResolvedValue({ accepted: true, response: "ok", sentCopyFolder: "Sent" });
+
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByRole("button", { name: "Reply" }));
+    await screen.findByTestId("mail-compose-dialog");
+    fireEvent.click(screen.getByTestId("mail-compose-send"));
+
+    await waitFor(() => expect(mailMocks.mailSendMessage).toHaveBeenCalled());
+    const request = mailMocks.mailSendMessage.mock.calls[0][1];
+    expect(request.inReplyTo).toBe("parent@x");
+    expect(request.references).toEqual(["root@x"]);
+    expect(await screen.findByText(/copy saved to Sent/)).toBeInTheDocument();
   });
 
   it("skips overlapping periodic sync ticks while a sync is still running", async () => {

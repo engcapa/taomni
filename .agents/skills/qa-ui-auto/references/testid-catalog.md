@@ -849,6 +849,12 @@
 - `[data-testid="mail-compose-attachment-chip"]` — display — F-MAIL-2.compose-attachment-chip
 - `[data-testid="mail-compose-save-draft"]` — interactive — F-MAIL-2.compose-save-draft
 
+## mail/compose (F-MAIL-6)
+
+- `[data-testid="mail-thread-view-toggle"]` — interactive — F-MAIL-6.thread-view-toggle
+- `[data-testid="mail-thread-expand"]` — interactive [optional] — F-MAIL-6.thread-expand
+- `[data-testid="mail-save-sent-copy"]` — interactive [optional] — F-MAIL-6.save-sent-copy
+
 ## mail/settings (F-MAIL-4)
 
 - `[data-testid="mail-appearance-settings"]` — display — F-MAIL-4.mail-appearance-settings

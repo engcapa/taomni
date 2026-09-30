@@ -312,6 +312,8 @@ export interface MailTabInfo {
   };
   cache: MailCacheSettings;
   ai: MailAiSettings;
+  /** Store sent mail in the Sent folder via IMAP; null = automatic by provider. */
+  saveSentCopy?: boolean | null;
 }
 
 export interface GitTabInfo {

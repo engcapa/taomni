@@ -304,3 +304,5 @@ cases:
 - TC-auto-F8-2-tunnel-activity-log
 - TC-MAIL-SYNC-01
 - TC-MAIL-SYNC-02
+- TC-MAIL-SEND-01
+- TC-MAIL-THREAD-01

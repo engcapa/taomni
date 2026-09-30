@@ -572,6 +572,7 @@ function sessionToMailTabInfo(
       enabled: opts.mailAiEnabled !== false,
       skipBodyConfirm: opts.mailAiSkipBodyConfirm === true,
     },
+    saveSentCopy: opts.mailSaveSentCopy === "on" ? true : opts.mailSaveSentCopy === "off" ? false : null,
   };
 }
 

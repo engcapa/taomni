@@ -1,6 +1,8 @@
 import {
   installStubMailQaControl,
+  stubMailAppend,
   stubMailClearCache,
+  stubMailExpunge,
   stubMailFindHeader,
   stubMailListCached,
   stubMailListFolders,
@@ -4042,7 +4044,64 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return { folder, marked: all ? 1 : uids.length } as T;
     }
     case "mail_send_message": {
-      return { accepted: true, response: "browser-preview accepted" } as T;
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const request = (invokeArgs?.request as {
+        to?: string[];
+        subject?: string;
+        textBody?: string | null;
+        inReplyTo?: string | null;
+        references?: string[];
+        draftId?: string | null;
+      } | undefined) ?? {};
+      const messageId = `<sent-${Date.now()}@taomni.local>`;
+      stubMailAppend(accountId, mailStubSeed, "Sent", {
+        subject: request.subject ?? "",
+        messageId,
+        flags: ["\\Seen"],
+        to: (request.to ?? []).map((address) => ({ name: address, address })),
+        from: { name: "Preview User", address: "user@example.com" },
+        snippet: (request.textBody ?? "").slice(0, 200),
+        inReplyTo: request.inReplyTo?.replace(/^<|>$/g, "") ?? null,
+        references: (request.references ?? []).map((id) => id.replace(/^<|>$/g, "")),
+      });
+      const drafted = request.draftId
+        ? loadMailDrafts().find((draft) => draft.id === request.draftId)
+        : undefined;
+      if (drafted?.remoteDraftFolder && drafted.remoteDraftUid) {
+        stubMailExpunge(accountId, mailStubSeed, drafted.remoteDraftFolder, drafted.remoteDraftUid);
+      }
+      return { accepted: true, response: "browser-preview accepted", sentCopyFolder: "Sent" } as T;
+    }
+    case "mail_store_remote_draft": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const draftId = (invokeArgs?.draftId as string | undefined) ?? "";
+      const drafts = loadMailDrafts();
+      const draft = drafts.find((item) => item.accountId === accountId && item.id === draftId);
+      if (!draft) throw new Error(`draft ${draftId} not found`);
+      if (draft.remoteDraftFolder && draft.remoteDraftUid) {
+        stubMailExpunge(accountId, mailStubSeed, draft.remoteDraftFolder, draft.remoteDraftUid);
+      }
+      const uid = stubMailAppend(accountId, mailStubSeed, "Drafts", {
+        subject: draft.subject,
+        flags: ["\\Draft", "\\Seen"],
+        snippet: draft.textBody.slice(0, 200),
+      });
+      const stored = { ...draft, remoteDraftFolder: "Drafts", remoteDraftUid: uid };
+      saveMailDrafts(drafts.map((item) => (item === draft ? stored : item)));
+      return stored as T;
+    }
+    case "mail_discard_remote_draft": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const accountId = stubMailAccountId(invokeArgs);
+      const draftId = (invokeArgs?.draftId as string | undefined) ?? "";
+      const drafts = loadMailDrafts();
+      const draft = drafts.find((item) => item.accountId === accountId && item.id === draftId);
+      if (!draft?.remoteDraftFolder || !draft.remoteDraftUid) return false as T;
+      stubMailExpunge(accountId, mailStubSeed, draft.remoteDraftFolder, draft.remoteDraftUid);
+      saveMailDrafts(drafts.map((item) => (item === draft ? { ...draft, remoteDraftFolder: null, remoteDraftUid: null } : item)));
+      return true as T;
     }
     case "mail_list_drafts": {
       const accountId = stubMailAccountId(args as InvokeArgs | undefined);

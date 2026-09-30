@@ -52,6 +52,10 @@ export interface MailMessageHeader {
   snippet?: string | null;
   rawSize?: number | null;
   bodyCached: boolean;
+  /** Parent message id (no angle brackets). */
+  inReplyTo?: string | null;
+  /** Thread ancestry, oldest first (no angle brackets). */
+  references?: string[];
 }
 
 export interface MailMessageBody {
@@ -225,6 +229,10 @@ export interface MailSendRequest {
   textBody?: string | null;
   htmlBody?: string | null;
   attachments?: MailSendAttachment[];
+  inReplyTo?: string | null;
+  references?: string[];
+  /** Local draft whose server copy is removed after sending. */
+  draftId?: string | null;
 }
 
 export interface MailSendAttachment {
@@ -238,6 +246,9 @@ export interface MailSendAttachment {
 export interface MailSendResult {
   accepted: boolean;
   response: string;
+  /** Folder that received the stored copy (IMAP APPEND). */
+  sentCopyFolder?: string | null;
+  sentCopyError?: string | null;
 }
 
 export interface MailContactSuggestion {
@@ -271,6 +282,8 @@ export interface MailDraftContext {
   uid?: number | null;
   messageId?: string | null;
   subject?: string | null;
+  /** Thread ancestry of the replied-to message, oldest first. */
+  references?: string[];
 }
 
 export interface MailDraft {
@@ -436,6 +449,20 @@ export function mailSaveDraft(
 
 export function mailDeleteDraft(accountId: string, draftId: string): Promise<void> {
   return invoke("mail_delete_draft", { accountId, draftId });
+}
+
+/** Store (or replace) the draft's copy in the server Drafts folder. */
+export function mailStoreRemoteDraft(config: MailTabInfo, draftId: string): Promise<MailDraft> {
+  return withVaultLockedNotice(() =>
+    invoke<MailDraft>("mail_store_remote_draft", { config, draftId }),
+  );
+}
+
+/** Remove the draft's server copy; resolves false when it had none. */
+export function mailDiscardRemoteDraft(config: MailTabInfo, draftId: string): Promise<boolean> {
+  return withVaultLockedNotice(() =>
+    invoke<boolean>("mail_discard_remote_draft", { config, draftId }),
+  );
 }
 
 export function mailIndexCachedContacts(accountId: string): Promise<number> {

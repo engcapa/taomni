@@ -363,6 +363,20 @@ fn serve(stream: TcpStream, shared: Arc<Mutex<FakeState>>) -> std::io::Result<()
                     .filter(|(_, m)| !m.flags.iter().any(|f| f == "\\Seen"))
                     .map(|(uid, _)| *uid)
                     .collect()
+            } else if let Some(rest) = criteria.strip_prefix("HEADER MESSAGE-ID ") {
+                let wanted = unquote(rest).to_ascii_lowercase();
+                folder
+                    .messages
+                    .iter()
+                    .filter(|(_, message)| {
+                        String::from_utf8_lossy(&message.raw).lines().any(|line| {
+                            line.to_ascii_lowercase()
+                                .strip_prefix("message-id:")
+                                .is_some_and(|value| value.trim() == wanted)
+                        })
+                    })
+                    .map(|(uid, _)| *uid)
+                    .collect()
             } else if let Some(set) = criteria.strip_prefix("UID ") {
                 let ranges = parse_uid_set(set.trim(), max);
                 folder

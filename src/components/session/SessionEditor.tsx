@@ -1384,6 +1384,7 @@ function MailSettings({
   syncOnOpen, setSyncOnOpen,
   syncIntervalMinutes, setSyncIntervalMinutes,
   maxFetchPerSync, setMaxFetchPerSync,
+  saveSentCopy, setSaveSentCopy,
   aiEnabled, setAiEnabled,
   aiSkipBodyConfirm, setAiSkipBodyConfirm,
   vaultState,
@@ -1431,6 +1432,7 @@ function MailSettings({
   syncOnOpen: boolean; setSyncOnOpen: (v: boolean) => void;
   syncIntervalMinutes: string; setSyncIntervalMinutes: (v: string) => void;
   maxFetchPerSync: string; setMaxFetchPerSync: (v: string) => void;
+  saveSentCopy: string; setSaveSentCopy: (v: string) => void;
   aiEnabled: boolean; setAiEnabled: (v: boolean) => void;
   aiSkipBodyConfirm: boolean; setAiSkipBodyConfirm: (v: boolean) => void;
   vaultState: "empty" | "locked" | "unlocked";
@@ -1774,6 +1776,20 @@ function MailSettings({
           aria-label="Mail max fetch per sync"
           onChange={(e) => setMaxFetchPerSync(e.target.value)}
         />
+      </Field>
+
+      <Field label="Sent copy">
+        <select
+          className="taomni-input w-72"
+          value={saveSentCopy}
+          aria-label="Mail save sent copy"
+          data-testid="mail-save-sent-copy"
+          onChange={(e) => setSaveSentCopy(e.target.value)}
+        >
+          <option value="auto">Automatic (Gmail/Outlook file it themselves)</option>
+          <option value="on">Always save a copy to Sent</option>
+          <option value="off">Never save a copy</option>
+        </select>
       </Field>
 
       <Field label="Cache">
@@ -2618,6 +2634,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailSyncOnOpen, setMailSyncOnOpen] = useState(() => optionBoolean(initialOptions, "mailSyncOnOpen", true));
   const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
   const [mailMaxFetchPerSync, setMailMaxFetchPerSync] = useState(() => optionString(initialOptions, "mailMaxFetchPerSync", "200"));
+  const [mailSaveSentCopy, setMailSaveSentCopy] = useState(() => optionString(initialOptions, "mailSaveSentCopy", "auto"));
   const [mailAiEnabled, setMailAiEnabled] = useState(() => optionBoolean(initialOptions, "mailAiEnabled", true));
   const [mailAiSkipBodyConfirm, setMailAiSkipBodyConfirm] = useState(() => optionBoolean(initialOptions, "mailAiSkipBodyConfirm", false));
 
@@ -2972,6 +2989,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailSyncOnOpen,
           mailSyncIntervalMinutes,
           mailMaxFetchPerSync,
+          mailSaveSentCopy,
           mailAiEnabled,
           mailAiSkipBodyConfirm,
         }
@@ -3542,6 +3560,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setMailSyncOnOpen(optionBoolean(nextOptions, "mailSyncOnOpen", true));
     setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
     setMailMaxFetchPerSync(optionString(nextOptions, "mailMaxFetchPerSync", "200"));
+    setMailSaveSentCopy(optionString(nextOptions, "mailSaveSentCopy", "auto"));
     setMailAiEnabled(optionBoolean(nextOptions, "mailAiEnabled", true));
     setMailAiSkipBodyConfirm(optionBoolean(nextOptions, "mailAiSkipBodyConfirm", false));
     setOss(ossFormFromOptions(session?.options_json));
@@ -4654,6 +4673,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 syncOnOpen={mailSyncOnOpen} setSyncOnOpen={setMailSyncOnOpen}
                 syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}
                 maxFetchPerSync={mailMaxFetchPerSync} setMaxFetchPerSync={setMailMaxFetchPerSync}
+                saveSentCopy={mailSaveSentCopy} setSaveSentCopy={setMailSaveSentCopy}
                 aiEnabled={mailAiEnabled} setAiEnabled={setMailAiEnabled}
                 aiSkipBodyConfirm={mailAiSkipBodyConfirm} setAiSkipBodyConfirm={setMailAiSkipBodyConfirm}
                 vaultState={vaultState}

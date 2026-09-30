@@ -30,7 +30,7 @@ use super::{
 pub(super) const FLAG_RECONCILE_WINDOW: usize = 500;
 /// UIDs per `UID FETCH (FLAGS)` command.
 const FLAG_FETCH_CHUNK: usize = 1000;
-const MAIL_SCHEMA_VERSION: i64 = 2;
+const MAIL_SCHEMA_VERSION: i64 = 3;
 
 /// Which work a `mail_sync_folder` call should do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -149,6 +149,14 @@ pub fn migrate_mail_tables(conn: &Connection) -> SqlResult<()> {
         add_column_if_missing(conn, "mail_folders", name, decl)?;
     }
     add_column_if_missing(conn, "mail_messages", "internal_ts", "INTEGER")?;
+    // v3: reply threading.
+    add_column_if_missing(conn, "mail_messages", "in_reply_to", "TEXT")?;
+    add_column_if_missing(
+        conn,
+        "mail_messages",
+        "references_json",
+        "TEXT NOT NULL DEFAULT '[]'",
+    )?;
     conn.execute_batch(&format!("PRAGMA user_version = {MAIL_SCHEMA_VERSION};"))
 }
 

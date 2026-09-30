@@ -2647,7 +2647,8 @@ def _mail_args(args: Any, name: str, *, need_count: bool = True) -> tuple[str, i
 @_verb("mail_server_deliver")
 def _do_mail_server_deliver(ctx: NativeStepContext, args: Any) -> str:
     folder, count = _mail_args(args, "mail_server_deliver")
-    uids = _mail_server().state.deliver(folder, count, prefix=str(args.get("prefix") or "QA"))
+    uids = _mail_server().state.deliver(folder, count, prefix=str(args.get("prefix") or "QA"),
+                                        thread=bool(args.get("thread")))
     return f"delivered {len(uids)} to {folder} (uids {uids[0]}..{uids[-1]})"
 
 
@@ -2670,6 +2671,22 @@ def _do_mail_server_set_flags_newest(ctx: NativeStepContext, args: Any) -> str:
     uids = state.newest_uids(folder, count)
     state.set_flags(folder, uids, [str(flag) for flag in flags])
     return f"set {flags} on {uids} in {folder}"
+
+
+@_verb("mail_server_assert_folder_count")
+def _do_mail_server_assert_folder_count(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    folder = str(args.get("folder") or "INBOX")
+    minimum = int(args.get("min", 0))
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 20))
+    count = -1
+    while time.time() < deadline:
+        count = state.count(folder)
+        if count >= minimum and ("equals" not in args or count == int(args["equals"])):
+            return f"{folder} has {count} messages on the server"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_folder_count: {folder} has {count}, expected {args!r}")
 
 
 @_verb("mail_server_assert_list_matches")

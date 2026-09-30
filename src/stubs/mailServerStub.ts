@@ -24,6 +24,8 @@ type StubMailHeader = {
   snippet: string;
   rawSize: number;
   bodyCached: boolean;
+  inReplyTo?: string | null;
+  references?: string[];
 };
 
 type StubFolderMeta = { name: string; displayName: string };
@@ -219,6 +221,26 @@ export function stubMailSyncAll(accountId: string, seed: Seed, limit: number) {
   };
 }
 
+/** Browser model of IMAP APPEND (Sent copies, server drafts). */
+export function stubMailAppend(accountId: string, seed: Seed, folderName: string, message: Partial<StubMailHeader>): number {
+  const state = account(accountId, seed);
+  const folder = folderState(state, folderName);
+  const uid = folder.uidNext;
+  folder.uidNext += 1;
+  folder.server.set(uid, {
+    ...templateMessage(accountId, folderName, uid, message.subject ?? "(no subject)"),
+    ...message,
+    accountId,
+    folder: folderName,
+    uid,
+  });
+  return uid;
+}
+
+export function stubMailExpunge(accountId: string, seed: Seed, folderName: string, uid: number) {
+  folderState(account(accountId, seed), folderName).server.delete(uid);
+}
+
 export function stubMailClearCache(accountId: string) {
   const state = accounts.get(accountId);
   if (!state) return;
@@ -271,7 +293,7 @@ function templateMessage(accountId: string, folder: string, uid: number, subject
 }
 
 export interface StubMailQaControl {
-  deliver: (accountId: string, folder: string, count: number, prefix?: string) => number[];
+  deliver: (accountId: string, folder: string, count: number, prefix?: string, thread?: boolean) => number[];
   expunge: (accountId: string, folder: string, uids: number[]) => void;
   setFlags: (accountId: string, folder: string, uid: number, flags: string[]) => void;
   observe: (accountId: string, folder: string) => { server: number[]; cache: number[] };
@@ -281,14 +303,21 @@ export interface StubMailQaControl {
 
 export function installStubMailQaControl(seed: Seed): void {
   const control: StubMailQaControl = {
-    deliver(accountId, folderName, count, prefix = "QA") {
+    deliver(accountId, folderName, count, prefix = "QA", thread = false) {
       const state = account(accountId, seed);
       const folder = folderState(state, folderName);
       const uids: number[] = [];
+      const ancestry: string[] = [];
       for (let index = 0; index < count; index += 1) {
         const uid = folder.uidNext;
         folder.uidNext += 1;
-        folder.server.set(uid, templateMessage(accountId, folderName, uid, `${prefix} ${String(index + 1).padStart(4, "0")}`));
+        const message = templateMessage(accountId, folderName, uid, `${prefix} ${String(index + 1).padStart(4, "0")}`);
+        if (thread && ancestry.length > 0) {
+          message.inReplyTo = ancestry[ancestry.length - 1];
+          message.references = [...ancestry];
+        }
+        ancestry.push(message.messageId.replace(/^<|>$/g, ""));
+        folder.server.set(uid, message);
         uids.push(uid);
       }
       return uids;

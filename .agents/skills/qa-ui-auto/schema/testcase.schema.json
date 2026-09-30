@@ -1066,6 +1066,9 @@
             "prefix": {
               "type": "string",
               "minLength": 1
+            },
+            "thread": {
+              "type": "boolean"
             }
           }
         },
@@ -1133,6 +1136,31 @@
               }
             }
           ]
+        },
+        "mail_server_assert_folder_count": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "folder"
+          ],
+          "properties": {
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            },
+            "min": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "equals": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
         }
       }
     },

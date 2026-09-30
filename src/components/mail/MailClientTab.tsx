@@ -59,6 +59,8 @@ import {
   mailGetMessageBody,
   mailIndexCachedContacts,
   mailDeleteDraft,
+  mailDiscardRemoteDraft,
+  mailStoreRemoteDraft,
   mailListDrafts,
   mailListCachedFolders,
   mailListCachedMessages,
@@ -86,6 +88,7 @@ import {
   type MailMessageHeader,
   type MailSyncRequestMode,
 } from "../../lib/mail";
+import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
 import {
   countNewMail,
   folderHasMoreToLoad,
@@ -625,6 +628,8 @@ function mergeMessagePages(current: MailMessageHeader[], next: MailMessageHeader
   return sortMessages(Array.from(byKey.values()));
 }
 
+const MAIL_THREAD_VIEW_STORAGE_KEY = "taomni.mail.threadView";
+
 /** Headers per gap-free catch-up step (the loop repeats until caught up). */
 function catchupStepSize(info: MailTabInfo): number {
   return Math.max(20, Math.min(500, info.sync.maxFetchPerSync || 200));
@@ -632,6 +637,28 @@ function catchupStepSize(info: MailTabInfo): number {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function replyContextFor(
+  kind: "reply" | "replyAll" | "forward",
+  target: MailMessageHeader,
+): MailDraftContext {
+  const references = [...(target.references ?? [])];
+  if (target.inReplyTo && !references.includes(target.inReplyTo)) references.push(target.inReplyTo);
+  return {
+    kind,
+    folder: target.folder,
+    uid: target.uid,
+    messageId: target.messageId,
+    subject: target.subject,
+    references,
+  };
+}
+
+/** In-Reply-To / References for a reply; forwards start a new thread. */
+function threadHeadersFor(context: MailDraftContext | null | undefined): { inReplyTo: string | null; references: string[] } {
+  if (!context || context.kind === "forward" || !context.messageId) return { inReplyTo: null, references: [] };
+  return { inReplyTo: context.messageId, references: context.references ?? [] };
 }
 
 function draftWithSignature(draft: Partial<ComposeDraft>, signature: string | null | undefined): ComposeDraft {
@@ -945,6 +972,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [bodyCache, setBodyCache] = useState<Map<string, MailMessageBody>>(() => new Map());
   const [bodyLoadingKey, setBodyLoadingKey] = useState<string | null>(null);
   const [bodyWarming, setBodyWarming] = useState<BodyWarmState>({ active: false, done: 0, total: 0 });
+  const [threadView, setThreadView] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(MAIL_THREAD_VIEW_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(() => new Set());
   const [syncProgress, setSyncProgress] = useState<{ folder: string; fetched: number; remaining: number } | null>(null);
   const [backfillProgress, setBackfillProgress] = useState<{ folder: string; cached: number; total: number } | null>(null);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
@@ -1141,6 +1176,26 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       return haystack.includes(q);
     });
   }, [messages, query]);
+  const listRows = useMemo<MailThreadRow[]>(() => {
+    if (threadView) return flattenMailThreads(buildMailThreads(filteredMessages), expandedThreads);
+    return filteredMessages.map((message) => ({
+      message,
+      threadKey: messageKey(message),
+      depth: 0,
+      isRoot: true,
+      threadSize: 1,
+      threadUnread: isUnread(message) ? 1 : 0,
+      expanded: false,
+    }));
+  }, [expandedThreads, filteredMessages, threadView]);
+  const toggleThreadExpanded = useCallback((key: string) => {
+    setExpandedThreads((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
   const allFilteredMessagesChecked = filteredMessages.length > 0
     && filteredMessages.every((message) => checkedMessageKeys.has(messageKey(message)));
   const selectedBody = useMemo(() => {
@@ -2313,7 +2368,16 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       lastSavedDraftJsonRef.current = serialized;
       setDraft((current) => ({ ...current, id: saved.id }));
       setDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-      if (mode === "manual") setStatus("Draft saved");
+      if (mode === "manual") {
+        setStatus("Draft saved");
+        // Mirror explicit saves to the server Drafts folder (autosave stays local).
+        void mailStoreRemoteDraft(info, saved.id)
+          .then((stored) => {
+            setDrafts((current) => current.map((item) => (item.id === stored.id ? stored : item)));
+            if (stored.remoteDraftFolder) setStatus(`Draft saved to ${stored.remoteDraftFolder}`);
+          })
+          .catch((e) => setStatus(`Draft saved locally; server copy failed: ${mailClientErrorMessage(e)}`));
+      }
       return saved;
     } catch (e) {
       if (mode === "manual") setError(mailClientErrorMessage(e));
@@ -2334,6 +2398,11 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const deleteSavedDraft = async (saved: MailDraft) => {
     try {
+      if (saved.remoteDraftUid) {
+        await mailDiscardRemoteDraft(info, saved.id).catch((e) => {
+          console.debug("mail: discarding server draft failed", e);
+        });
+      }
       await mailDeleteDraft(info.sessionId, saved.id);
       setDrafts((current) => current.filter((item) => item.id !== saved.id));
       if (draft.id === saved.id) setDraft(emptyComposeDraft());
@@ -2381,7 +2450,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         : `Re: ${target.subject || "(no subject)"}`,
       htmlBody: replyBodyDraft.htmlBody,
       textBody: replyBodyDraft.textBody,
-      replyContext: { kind: "reply", folder: target.folder, uid: target.uid, messageId: target.messageId, subject: target.subject },
+      replyContext: replyContextFor("reply", target),
       richFormatUsed: true,
     }, false);
   };
@@ -2416,7 +2485,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         : `Re: ${target.subject || "(no subject)"}`,
       htmlBody: replyBodyDraft.htmlBody,
       textBody: replyBodyDraft.textBody,
-      replyContext: { kind: "replyAll", folder: target.folder, uid: target.uid, messageId: target.messageId, subject: target.subject },
+      replyContext: replyContextFor("replyAll", target),
       richFormatUsed: true,
     }, false);
   };
@@ -2440,6 +2509,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         inline: attachment.inline ?? false,
         contentId: attachment.contentId ?? null,
       })),
+      ...threadHeadersFor(draft.replyContext),
+      draftId: draft.id ?? null,
     };
     const recipients = [...draft.to, ...draft.cc, ...draft.bcc];
     if (recipients.length === 0) {
@@ -2459,7 +2530,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         await mailDeleteDraft(info.sessionId, draft.id).catch(() => undefined);
         setDrafts((current) => current.filter((item) => item.id !== draft.id));
       }
-      setStatus(result.accepted ? "Message sent" : result.response || "SMTP send returned no acceptance");
+      if (!result.accepted) {
+        setStatus(result.response || "SMTP send returned no acceptance");
+      } else if (result.sentCopyError) {
+        setStatus("Message sent");
+        setError(`Message sent, but saving the Sent copy failed: ${result.sentCopyError}`);
+      } else {
+        setStatus(result.sentCopyFolder ? `Message sent; copy saved to ${result.sentCopyFolder}` : "Message sent");
+      }
       setComposeOpen(false);
       setDraft(emptyComposeDraft());
     } catch (e) {
@@ -3068,7 +3146,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       subject: forwardSubject(target.subject),
       htmlBody: forwardBody.htmlBody,
       textBody: forwardBody.textBody,
-      replyContext: { kind: "forward", folder: target.folder, uid: target.uid, messageId: target.messageId, subject: target.subject },
+      replyContext: replyContextFor("forward", target),
       richFormatUsed: true,
     }, false);
   };
@@ -3896,6 +3974,25 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                     onChange={(event) => toggleFilteredMessagesChecked(event.target.checked)}
                   />
                   <span className="text-[12px] font-semibold truncate" title={activeFolder?.name}>{folderLabel(activeFolder)}</span>
+                  <button
+                    type="button"
+                    className={`taomni-btn h-6 px-1.5 text-[11px] inline-flex items-center gap-1 ${threadView ? "text-[var(--taomni-accent)]" : ""}`}
+                    data-testid="mail-thread-view-toggle"
+                    aria-pressed={threadView}
+                    title={threadView ? "Show messages unthreaded" : "Group messages into conversations"}
+                    onClick={() => {
+                      const next = !threadView;
+                      setThreadView(next);
+                      try {
+                        window.localStorage.setItem(MAIL_THREAD_VIEW_STORAGE_KEY, String(next));
+                      } catch {
+                        // Per-viewer convenience only.
+                      }
+                    }}
+                  >
+                    <MessageSquareReply className="w-3 h-3" />
+                    Threads
+                  </button>
                 </div>
                 <span
                   className="text-[11px] text-[var(--taomni-text-muted)]"
@@ -3922,12 +4019,16 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   </div>
                 ) : (
                   <>
-                    {filteredMessages.map((message) => {
+                    {listRows.map((row) => {
+                      const { message } = row;
                       const active = messageKey(message) === selectedMessageKey;
                       const unread = isUnread(message);
                       return (
                         <div
                           key={messageKey(message)}
+                          data-thread-key={threadView ? row.threadKey : undefined}
+                          data-thread-depth={threadView ? row.depth : undefined}
+                          style={threadView && row.depth > 0 ? { paddingLeft: `${12 + row.depth * 16}px` } : undefined}
                           role="button"
                           tabIndex={0}
                           aria-pressed={active}
@@ -3954,6 +4055,25 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                               onClick={(event) => event.stopPropagation()}
                               onChange={(event) => toggleMessageChecked(message, event.target.checked)}
                             />
+                            {threadView && row.isRoot && row.threadSize > 1 && (
+                              <button
+                                type="button"
+                                className="mt-0.5 shrink-0 inline-flex items-center gap-0.5 rounded px-1 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
+                                data-testid="mail-thread-expand"
+                                aria-expanded={row.expanded}
+                                aria-label={`${row.expanded ? "Collapse" : "Expand"} conversation of ${row.threadSize} messages`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleThreadExpanded(row.threadKey);
+                                }}
+                              >
+                                <ChevronDown className={`w-3 h-3 transition-transform ${row.expanded ? "" : "-rotate-90"}`} />
+                                <span data-testid="mail-thread-size">{row.threadSize}</span>
+                                {row.threadUnread > 0 && !row.expanded && (
+                                  <span className="text-[var(--taomni-accent)]">({row.threadUnread})</span>
+                                )}
+                              </button>
+                            )}
                             <div className="min-w-0 flex-1">
                               <div className={`min-w-0 text-[14px] leading-5 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "font-medium text-[var(--taomni-text-muted)]"}`}>
                                 {message.subject || "(no subject)"}

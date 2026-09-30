@@ -877,6 +877,8 @@ pub fn run() {
             mail::mail_sync_headers,
             mail::mail_sync_all_folders,
             mail::mail_sync_folder,
+            mail::outgoing::mail_store_remote_draft,
+            mail::outgoing::mail_discard_remote_draft,
             mail::mail_list_cached_folders,
             mail::mail_list_cached_messages,
             mail::mail_get_message_body,

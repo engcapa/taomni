@@ -38,13 +38,19 @@ class FakeFolder:
 
 def build_message(subject: str, sender: str = "QA Sender <qa-sender@example.com>",
                   to: str = "qa@example.com", body: str | None = None,
-                  date: datetime | None = None) -> bytes:
+                  date: datetime | None = None, message_id: str | None = None,
+                  ancestry: list[str] | None = None) -> bytes:
     date = date or datetime.now(timezone.utc)
     slug = re.sub(r"[^A-Za-z0-9]+", "-", subject).strip("-") or "message"
     text = body if body is not None else f"Body of {subject}\r\n"
+    message_id = message_id or f"{slug}-{time.time_ns()}@qa.taomni"
+    thread = ""
+    if ancestry:
+        refs = " ".join(f"<{item}>" for item in ancestry)
+        thread = f"In-Reply-To: <{ancestry[-1]}>\r\nReferences: {refs}\r\n"
     return (
         f"From: {sender}\r\nTo: {to}\r\nSubject: {subject}\r\n"
-        f"Date: {format_datetime(date)}\r\nMessage-ID: <{slug}-{time.time_ns()}@qa.taomni>\r\n"
+        f"Date: {format_datetime(date)}\r\nMessage-ID: <{message_id}>\r\n{thread}"
         f"MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n{text}"
     ).encode("utf-8")
 
@@ -70,16 +76,20 @@ class FakeMailState:
             waiter.set()
         return self.highest_modseq
 
-    def deliver(self, folder: str, count: int, prefix: str = "QA") -> list[int]:
+    def deliver(self, folder: str, count: int, prefix: str = "QA", thread: bool = False) -> list[int]:
         with self.lock:
             entry = self.folders.setdefault(folder, FakeFolder(uid_validity=2000 + len(self.folders)))
             modseq = self.bump()
             uids = []
+            ancestry: list[str] = []
             for index in range(count):
                 uid = entry.uid_next
                 entry.uid_next += 1
                 subject = f"{prefix} {index + 1:04d}"
-                entry.messages[uid] = FakeMessage(raw=build_message(subject), internal_ts=int(time.time()) + index, modseq=modseq)
+                message_id = f"{prefix}-{index + 1}-{time.time_ns()}@qa.taomni".replace(" ", "-")
+                raw = build_message(subject, message_id=message_id, ancestry=list(ancestry) if thread else None)
+                ancestry.append(message_id)
+                entry.messages[uid] = FakeMessage(raw=raw, internal_ts=int(time.time()) + index, modseq=modseq)
                 uids.append(uid)
             return uids
 
@@ -233,6 +243,16 @@ class _ImapHandler(socketserver.StreamRequestHandler):
                         hits = sorted(folder.messages)
                     elif criteria == "UNSEEN":
                         hits = [uid for uid, m in sorted(folder.messages.items()) if "\\Seen" not in m.flags]
+                    elif criteria.startswith("HEADER MESSAGE-ID "):
+                        wanted = _unquote(rest[rest.upper().index("MESSAGE-ID ") + 11:]).strip().lower()
+                        hits = [
+                            uid for uid, m in sorted(folder.messages.items())
+                            if any(
+                                line.lower().startswith("message-id:")
+                                and line.split(":", 1)[1].strip().lower() == wanted
+                                for line in m.raw.decode("utf-8", "replace").splitlines()
+                            )
+                        ]
                     elif criteria.startswith("UID "):
                         ranges = _uid_ranges(criteria[4:].strip(), maximum)
                         hits = [uid for uid in sorted(folder.messages) if _in(uid, ranges)]

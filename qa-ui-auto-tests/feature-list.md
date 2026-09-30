@@ -5245,6 +5245,42 @@ controls:
 - 定时刷新在 catch-up 之后对最新窗口对账，手工刷新对全区间对账：服务器端删除/移动的邮件从缓存移除，已读/未读/星标以 FETCH FLAGS 为准（CONDSTORE 可用时用 `CHANGEDSINCE`）。
 - 列表只读本地缓存；缓存到底后“加载更早邮件”向服务器回补历史，选中文件夹在后台回补并显示进度。默认保留全部邮件头（0 = 不限制），按天保留时使用服务器到达时间。
 - 同一 Quick Connect 邮件地址复用同一会话缓存；`mail://user:pass@host:port?security=none&smtp=host:port` 支持口令、明文/STARTTLS 与 SMTP 端点。
+
+---
+
+### 13.6 服务器草稿、已发送副本与会话线程 ✅
+
+<!-- feature
+id: F-MAIL-6
+status: done
+area: mail/compose
+components: [MailClientTab, SessionEditor]
+files:
+  - src/components/mail/MailClientTab.tsx
+  - src/lib/mailThreads.ts
+  - src/lib/mail.ts
+  - src/components/session/SessionEditor.tsx
+  - src/stubs/tauri-core.ts
+  - src-tauri/src/mail/outgoing.rs
+  - src-tauri/src/mail/mod.rs
+controls:
+  - id: thread-view-toggle
+    selector: '[data-testid="mail-thread-view-toggle"]'
+    kind: interactive
+  - id: thread-expand
+    selector: '[data-testid="mail-thread-expand"]'
+    kind: interactive
+    optional: true       # only rendered for conversations with more than one message
+  - id: save-sent-copy
+    selector: '[data-testid="mail-save-sent-copy"]'
+    kind: interactive
+    optional: true       # session editor mail settings; default automatic by provider
+-->
+
+- 回复/全部回复发送 `In-Reply-To` 与 `References`（转发开启新会话），Thunderbird/Gmail 可将回复归入原会话；同步时缓存每封邮件的 `In-Reply-To`/`References`（schema v3）。
+- 列表“Threads”切换按邮件头严格线程化（不按主题猜测），会话折叠为最新一封并显示数量与未读数，展开后按回复层级缩进；开关按查看者保存在 localStorage。
+- 发信成功后按账户设置把带 Bcc 的副本 APPEND 到 Sent（SPECIAL-USE 优先，找不到时按名称，缺失时创建）；Gmail/Outlook 默认不重复保存。副本失败不影响“已发送”，状态栏提示原因。
+- 手工保存草稿会把草稿 APPEND 到服务器 Drafts（`\Draft \Seen`，按 Message-ID 找回 UID 并替换旧副本）；发送或删除草稿时移除服务器副本；自动保存仍只写本地。
 ---
 
 ## 14. SocksCap 网络流量路由

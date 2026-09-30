@@ -41,9 +41,9 @@ def mail_server_deliver(ctx: StepContext, args: Any) -> None:
     _require_control(ctx)
     prefix = str(args.get("prefix") or "QA")
     delivered = ctx.page.evaluate(  # type: ignore[attr-defined]
-        f"""([folder, count, prefix]) => {_CONTROL}.accounts()
-              .map((id) => {_CONTROL}.deliver(id, folder, count, prefix).length)""",
-        [_folder(args), count, prefix],
+        f"""([folder, count, prefix, thread]) => {_CONTROL}.accounts()
+              .map((id) => {_CONTROL}.deliver(id, folder, count, prefix, thread).length)""",
+        [_folder(args), count, prefix, bool(args.get("thread"))],
     )
     if not delivered:
         raise StepError("mail_server_deliver: no browser mail account exists yet; open the mail tab first")
@@ -79,6 +79,30 @@ def mail_server_set_flags_newest(ctx: StepContext, args: Any) -> None:
             }})""",
         [_folder(args), count, [str(flag) for flag in flags]],
     )
+
+
+@verb("mail_server_assert_folder_count")
+def mail_server_assert_folder_count(ctx: StepContext, args: Any) -> None:
+    args = args if isinstance(args, dict) else {}
+    if ctx.dry_run:
+        return
+    _require_control(ctx)
+    folder = _folder(args)
+    minimum = int(args.get("min", 0))
+    deadline = time.time() + float(args.get("timeout_sec", 20))
+    count = -1
+    while time.time() < deadline:
+        count = ctx.page.evaluate(  # type: ignore[attr-defined]
+            f"""(folder) => {{
+              const ids = {_CONTROL}.accounts();
+              return ids.length ? {_CONTROL}.observe(ids[0], folder).server.length : -1;
+            }}""",
+            folder,
+        )
+        if count >= minimum and ("equals" not in args or count == int(args["equals"])):
+            return
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_folder_count: {folder} has {count}, expected {args!r}")
 
 
 @verb("mail_server_assert_list_matches")

@@ -41,6 +41,7 @@ use crate::terminal::network::NetworkSettings;
 
 #[cfg(test)]
 mod fake_imap;
+pub mod outgoing;
 mod sync;
 
 use sync::{FolderStepOutcome, FolderSyncState, StepParams};
@@ -365,6 +366,10 @@ pub struct MailAccountConfig {
     pub cache: MailCacheSettings,
     #[serde(default)]
     pub ai: MailAiSettings,
+    /// Store a copy of sent mail in the Sent folder (IMAP APPEND). `None` =
+    /// automatic: off for Gmail/Outlook (the server files it), on otherwise.
+    #[serde(default)]
+    pub save_sent_copy: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -442,6 +447,12 @@ pub struct MailMessageHeader {
     pub snippet: Option<String>,
     pub raw_size: Option<u32>,
     pub body_cached: bool,
+    /// `In-Reply-To` message id (without angle brackets).
+    #[serde(default)]
+    pub in_reply_to: Option<String>,
+    /// `References` message ids, oldest first (without angle brackets).
+    #[serde(default)]
+    pub references: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -550,6 +561,16 @@ pub struct MailSendRequest {
     pub html_body: Option<String>,
     #[serde(default)]
     pub attachments: Vec<MailSendAttachment>,
+    /// Message id this message replies to (brackets optional).
+    #[serde(default)]
+    pub in_reply_to: Option<String>,
+    /// Thread ancestry, oldest first (brackets optional).
+    #[serde(default)]
+    pub references: Vec<String>,
+    /// Local draft whose server copy (Drafts folder) should be removed after
+    /// a successful send.
+    #[serde(default)]
+    pub draft_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -571,6 +592,12 @@ pub struct MailSendAttachment {
 pub struct MailSendResult {
     pub accepted: bool,
     pub response: String,
+    /// Folder that received the copy of the sent message (IMAP APPEND).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sent_copy_folder: Option<String>,
+    /// Why no sent copy was stored, when saving one was attempted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sent_copy_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -604,6 +631,9 @@ pub struct MailDraftContext {
     pub message_id: Option<String>,
     #[serde(default)]
     pub subject: Option<String>,
+    /// Thread ancestry of the replied-to message, oldest first.
+    #[serde(default)]
+    pub references: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -2050,10 +2080,19 @@ pub async fn mail_send_message(
     validate_send_request(&request)?;
     let account_id = account.config.session_id.clone();
     let sent_request = request.clone();
+    let remote_draft = match request.draft_id.as_deref() {
+        Some(draft_id) => with_mail_db(&state, &account_id, |db| {
+            outgoing::remote_draft_location(db, &account_id, draft_id)
+        })?,
+        None => None,
+    };
+    let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
-    let result = tokio::task::spawn_blocking(move || send_smtp(&account, &request, &handle))
-        .await
-        .map_err(|e| format!("mail send task failed: {e}"))??;
+    let result = tokio::task::spawn_blocking(move || {
+        outgoing::send_and_store_copy(&pool, &account, &request, remote_draft, &handle)
+    })
+    .await
+    .map_err(|e| format!("mail send task failed: {e}"))??;
     if result.accepted {
         with_mail_db(&state, &account_id, |db| {
             upsert_sent_contacts(db, &account_id, &sent_request)
@@ -4155,7 +4194,7 @@ fn parse_fetch_header(
     let parsed = MessageParser::default().parse(header);
     let flags = fetch_flag_strings(fetch);
     let fallback_date = fetch.internal_date().map(|d| d.timestamp());
-    let (message_id, subject, from, to, cc, date_ts) = match parsed {
+    let (message_id, subject, from, to, cc, date_ts, in_reply_to, references) = match parsed {
         Some(message) => (
             message.message_id().map(clean_message_id),
             message.subject().unwrap_or("").to_string(),
@@ -4163,6 +4202,8 @@ fn parse_fetch_header(
             address_list(message.to()),
             address_list(message.cc()),
             message.date().map(|d| d.to_timestamp()).or(fallback_date),
+            header_message_ids(message.in_reply_to()).into_iter().next(),
+            header_message_ids(message.references()),
         ),
         None => (
             None,
@@ -4171,6 +4212,8 @@ fn parse_fetch_header(
             Vec::new(),
             Vec::new(),
             fallback_date,
+            None,
+            Vec::new(),
         ),
     };
     Some(MailMessageCached {
@@ -4191,6 +4234,8 @@ fn parse_fetch_header(
             snippet: None,
             raw_size: fetch.size,
             body_cached: false,
+            in_reply_to,
+            references,
         },
         body_text: None,
         body_html: None,
@@ -4198,6 +4243,25 @@ fn parse_fetch_header(
         internal_ts: fallback_date,
         flags_authoritative: true,
     })
+}
+
+/// Message ids of an `In-Reply-To` / `References` header, angle brackets
+/// stripped, in header order.
+fn header_message_ids(value: &mail_parser::HeaderValue<'_>) -> Vec<String> {
+    let raw: Vec<String> = match value {
+        mail_parser::HeaderValue::Text(text) => vec![text.to_string()],
+        mail_parser::HeaderValue::TextList(list) => list.iter().map(|t| t.to_string()).collect(),
+        _ => Vec::new(),
+    };
+    raw.iter()
+        .flat_map(|part| {
+            part.split_whitespace()
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .map(|id| clean_message_id(&id))
+        .filter(|id| !id.is_empty())
+        .collect()
 }
 
 /// FLAGS of a FETCH response as cache strings. `\Recent` is session-scoped
@@ -4256,6 +4320,8 @@ fn parse_body_message(
                         .map(|s| normalize_preview(s.as_ref())),
                     raw_size,
                     body_cached: true,
+                    in_reply_to: header_message_ids(message.in_reply_to()).into_iter().next(),
+                    references: header_message_ids(message.references()),
                 },
                 body_text: text,
                 body_html: html,
@@ -4284,6 +4350,8 @@ fn parse_body_message(
                     snippet: Some(normalize_preview(&text)),
                     raw_size,
                     body_cached: true,
+                    in_reply_to: None,
+                    references: Vec::new(),
                 },
                 body_text: Some(text),
                 body_html: None,
@@ -4313,6 +4381,12 @@ fn merge_body(target: &mut MailMessageCached, body: MailMessageCached) {
     }
     if target.header.date_ts.is_none() {
         target.header.date_ts = body.header.date_ts;
+    }
+    if target.header.in_reply_to.is_none() {
+        target.header.in_reply_to = body.header.in_reply_to;
+    }
+    if target.header.references.is_empty() {
+        target.header.references = body.header.references;
     }
     target.header.has_attachments = body.header.has_attachments;
     target.header.attachment_count = body.header.attachment_count;
@@ -4344,6 +4418,8 @@ fn empty_cached_message(account_id: &str, folder: &str, uid: u32) -> MailMessage
             snippet: None,
             raw_size: None,
             body_cached: false,
+            in_reply_to: None,
+            references: Vec::new(),
         },
         body_text: None,
         body_html: None,
@@ -4353,12 +4429,37 @@ fn empty_cached_message(account_id: &str, folder: &str, uid: u32) -> MailMessage
     }
 }
 
+/// `References` header value: ancestry plus the direct parent, de-duplicated,
+/// oldest first, each in angle brackets.
+fn thread_references(references: &[String], in_reply_to: Option<&str>) -> String {
+    let mut ids: Vec<String> = Vec::new();
+    for id in references.iter().map(String::as_str).chain(in_reply_to) {
+        let id = clean_message_id(id);
+        if !id.is_empty() && !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
+    ids.iter()
+        .map(|id| format!("<{id}>"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn send_smtp(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
     runtime: &tokio::runtime::Handle,
 ) -> Result<MailSendResult, String> {
-    let message = build_send_message(account, request)?;
+    send_smtp_with(account, request, runtime, &MessageBuildOptions::default())
+}
+
+fn send_smtp_with(
+    account: &ResolvedMailAccount,
+    request: &MailSendRequest,
+    runtime: &tokio::runtime::Handle,
+    options: &MessageBuildOptions,
+) -> Result<MailSendResult, String> {
+    let message = build_send_message_with(account, request, options)?;
     let transport = build_smtp_transport(account, runtime)?;
     let response = transport
         .mailer
@@ -4367,6 +4468,8 @@ fn send_smtp(
     Ok(MailSendResult {
         accepted: true,
         response: format!("{response:?}"),
+        sent_copy_folder: None,
+        sent_copy_error: None,
     })
 }
 
@@ -4426,17 +4529,50 @@ fn build_send_message(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
 ) -> Result<Message, String> {
+    build_send_message_with(account, request, &MessageBuildOptions::default())
+}
+
+/// Knobs for the stored copies of a message (Sent copy, server draft).
+#[derive(Debug, Default)]
+pub(super) struct MessageBuildOptions {
+    /// Explicit `Message-ID` (with brackets) so the SMTP message and its
+    /// stored copy share one id and the copy can be found again.
+    pub message_id: Option<String>,
+    /// Keep the `Bcc` header (Sent copies do, like Thunderbird).
+    pub keep_bcc: bool,
+    /// Drafts may have no recipients: address the envelope to the sender.
+    pub self_envelope: bool,
+}
+
+fn build_send_message_with(
+    account: &ResolvedMailAccount,
+    request: &MailSendRequest,
+    options: &MessageBuildOptions,
+) -> Result<Message, String> {
+    let from_address: lettre::Address = account
+        .config
+        .email_address
+        .parse()
+        .map_err(|e| format!("invalid from address: {e}"))?;
     let from = Mailbox::new(
         account.config.display_name.clone().and_then(non_empty),
-        account
-            .config
-            .email_address
-            .parse()
-            .map_err(|e| format!("invalid from address: {e}"))?,
+        from_address.clone(),
     );
     let mut builder = Message::builder()
         .from(from)
         .subject(request.subject.trim());
+    if let Some(message_id) = &options.message_id {
+        builder = builder.message_id(Some(message_id.clone()));
+    }
+    if options.keep_bcc {
+        builder = builder.keep_bcc();
+    }
+    if options.self_envelope {
+        let envelope =
+            lettre::address::Envelope::new(Some(from_address.clone()), vec![from_address])
+                .map_err(|e| format!("invalid draft envelope: {e}"))?;
+        builder = builder.envelope(envelope);
+    }
     if let Some(reply_to) = account
         .config
         .reply_to
@@ -4454,6 +4590,18 @@ fn build_send_message(
     }
     for bcc in &request.bcc {
         builder = builder.bcc(parse_mailbox(bcc)?);
+    }
+    if let Some(parent) = request
+        .in_reply_to
+        .as_deref()
+        .map(clean_message_id)
+        .filter(|id| !id.is_empty())
+    {
+        builder = builder.in_reply_to(format!("<{parent}>"));
+    }
+    let references = thread_references(&request.references, request.in_reply_to.as_deref());
+    if !references.is_empty() {
+        builder = builder.references(references);
     }
 
     let body = build_send_body_part(request)?;
@@ -4764,9 +4912,9 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
          (account_id, folder, uid, message_id, subject, from_name, from_addr,
           to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
           attachments_json, snippet, body_text, body_html, body_cached_at, raw_size, updated_at,
-          internal_ts)
+          internal_ts, in_reply_to, references_json)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-                 ?15, ?16, ?17, ?18, ?19, ?20, ?21)
+                 ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?23, ?24)
          ON CONFLICT(account_id, folder, uid) DO UPDATE SET
             message_id = COALESCE(excluded.message_id, mail_messages.message_id),
             subject = CASE WHEN excluded.subject != '' THEN excluded.subject ELSE mail_messages.subject END,
@@ -4777,6 +4925,9 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
             date_ts = COALESCE(excluded.date_ts, mail_messages.date_ts),
             flags_json = CASE WHEN ?22 = 1 OR excluded.flags_json != '[]' THEN excluded.flags_json ELSE mail_messages.flags_json END,
             internal_ts = COALESCE(excluded.internal_ts, mail_messages.internal_ts),
+            in_reply_to = COALESCE(excluded.in_reply_to, mail_messages.in_reply_to),
+            references_json = CASE WHEN excluded.references_json != '[]'
+                                   THEN excluded.references_json ELSE mail_messages.references_json END,
             has_attachments = CASE
                 WHEN excluded.attachments_json != '[]' OR excluded.has_attachments = 1
                 THEN excluded.has_attachments
@@ -4817,6 +4968,8 @@ fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<(
             now_ts(),
             message.internal_ts,
             message.flags_authoritative as i64,
+            header.in_reply_to,
+            serde_json::to_string(&header.references).unwrap_or_else(|_| "[]".into()),
         ],
     )?;
     Ok(())
@@ -5294,7 +5447,7 @@ fn list_cached_messages(
     let mut stmt = conn.prepare(
         "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
                 to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
-                attachments_json, snippet, raw_size, body_cached_at
+                attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json
          FROM mail_messages
          WHERE account_id = ?1 AND folder = ?2
          ORDER BY COALESCE(date_ts, 0) DESC, uid DESC
@@ -5473,7 +5626,8 @@ fn get_cached_body(
     conn.query_row(
         "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
                 to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
-                attachments_json, snippet, raw_size, body_cached_at, body_text, body_html
+                attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
+                body_text, body_html
          FROM mail_messages
          WHERE account_id = ?1 AND folder = ?2 AND uid = ?3
            AND body_cached_at IS NOT NULL
@@ -5481,8 +5635,8 @@ fn get_cached_body(
         params![account_id, folder, uid],
         |row| {
             let mut header = row_to_header(row)?;
-            let body_text: Option<String> = row.get(17)?;
-            let body_html: Option<String> = row.get(18)?;
+            let body_text: Option<String> = row.get(19)?;
+            let body_html: Option<String> = row.get(20)?;
             header.body_cached = true;
             Ok(MailMessageBody {
                 account_id: header.account_id,
@@ -5536,6 +5690,11 @@ fn row_to_header(row: &rusqlite::Row<'_>) -> SqlResult<MailMessageHeader> {
         snippet: row.get(14)?,
         raw_size: row.get(15)?,
         body_cached: body_cached_at.is_some(),
+        in_reply_to: row.get(17)?,
+        references: row
+            .get::<_, Option<String>>(18)?
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_default(),
     })
 }
 
@@ -6159,6 +6318,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 sync: MailSyncSettings::default(),
                 cache: MailCacheSettings::default(),
                 ai: MailAiSettings::default(),
+                save_sent_copy: None,
             },
             auth_mode: MailAuthMode::Password,
             network_settings: None,
@@ -6374,6 +6534,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                 sync: MailSyncSettings::default(),
                 cache: MailCacheSettings::default(),
                 ai: MailAiSettings::default(),
+                save_sent_copy: None,
             },
             auth_mode: MailAuthMode::OAuth2,
             network_settings: None,
@@ -6704,6 +6865,9 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
         let conn = Connection::open_in_memory().unwrap();
         init_mail_tables(&conn).unwrap();
         let request = MailSendRequest {
+            in_reply_to: None,
+            references: Vec::new(),
+            draft_id: None,
             to: vec!["Receiver <receiver@example.com>".into()],
             cc: vec![],
             bcc: vec![],
@@ -6722,6 +6886,92 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
     }
 
     #[test]
+    fn build_send_message_threads_replies_and_keeps_bcc_for_copies() {
+        let request = MailSendRequest {
+            to: vec!["Receiver <receiver@example.com>".into()],
+            cc: vec![],
+            bcc: vec!["hidden@example.com".into()],
+            subject: "Re: Plan".into(),
+            text_body: Some("Reply".into()),
+            html_body: None,
+            attachments: vec![],
+            in_reply_to: Some("parent@example.com".into()),
+            references: vec!["<root@example.com>".into(), "parent@example.com".into()],
+            draft_id: None,
+        };
+        let account = sample_resolved_account();
+        let raw =
+            String::from_utf8(build_send_message(&account, &request).unwrap().formatted()).unwrap();
+        assert!(raw.contains("In-Reply-To: <parent@example.com>"), "{raw}");
+        assert!(
+            raw.contains("References: <root@example.com> <parent@example.com>"),
+            "{raw}"
+        );
+        assert!(
+            !raw.contains("hidden@example.com"),
+            "SMTP message omits Bcc"
+        );
+
+        let copy = build_send_message_with(
+            &account,
+            &request,
+            &MessageBuildOptions {
+                message_id: Some("<fixed@example.com>".into()),
+                keep_bcc: true,
+                self_envelope: false,
+            },
+        )
+        .unwrap();
+        let raw = String::from_utf8(copy.formatted()).unwrap();
+        assert!(raw.contains("hidden@example.com"), "Sent copy keeps Bcc");
+        assert!(raw.contains("Message-ID: <fixed@example.com>"), "{raw}");
+    }
+
+    #[test]
+    fn draft_envelope_allows_messages_without_recipients() {
+        let request = MailSendRequest {
+            to: vec![],
+            cc: vec![],
+            bcc: vec![],
+            subject: String::new(),
+            text_body: Some("half written".into()),
+            html_body: None,
+            attachments: vec![],
+            in_reply_to: None,
+            references: vec![],
+            draft_id: None,
+        };
+        let options = MessageBuildOptions {
+            self_envelope: true,
+            ..MessageBuildOptions::default()
+        };
+        let raw = build_send_message_with(&sample_resolved_account(), &request, &options)
+            .unwrap()
+            .formatted();
+        assert!(String::from_utf8(raw).unwrap().contains("half written"));
+    }
+
+    #[test]
+    fn parses_thread_headers_from_fetched_headers() {
+        let raw = b"Subject: Re: x
+Message-ID: <c@x>
+In-Reply-To: <b@x>
+References: <a@x>
+ <b@x>
+
+";
+        let parsed = MessageParser::default().parse(&raw[..]).unwrap();
+        assert_eq!(
+            header_message_ids(parsed.in_reply_to()),
+            vec!["b@x".to_string()]
+        );
+        assert_eq!(
+            header_message_ids(parsed.references()),
+            vec!["a@x".to_string(), "b@x".to_string()]
+        );
+    }
+
+    #[test]
     fn build_send_message_wraps_attachments_in_mixed_mime() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("report.txt");
@@ -6733,6 +6983,9 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             subject: "Hello".into(),
             text_body: Some("Plain body".into()),
             html_body: Some("<p><strong>HTML body</strong></p>".into()),
+            in_reply_to: None,
+            references: Vec::new(),
+            draft_id: None,
             attachments: vec![MailSendAttachment {
                 path: path.to_string_lossy().into_owned(),
                 name: Some("report.txt".into()),
@@ -6756,6 +7009,9 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
         let path = dir.path().join("logo.png");
         std::fs::write(&path, b"png body").unwrap();
         let request = MailSendRequest {
+            in_reply_to: None,
+            references: Vec::new(),
+            draft_id: None,
             to: vec!["Receiver <receiver@example.com>".into()],
             cc: vec![],
             bcc: vec![],
@@ -6788,6 +7044,9 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
         std::fs::write(&image_path, b"png body").unwrap();
         std::fs::write(&report_path, b"report body").unwrap();
         let request = MailSendRequest {
+            in_reply_to: None,
+            references: Vec::new(),
+            draft_id: None,
             to: vec!["Receiver <receiver@example.com>".into()],
             cc: vec![],
             bcc: vec![],
@@ -6851,6 +7110,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
                     uid: Some(42),
                     message_id: Some("msg@example.com".into()),
                     subject: Some("Original".into()),
+                    references: Vec::new(),
                 }),
                 remote_draft_folder: None,
                 remote_draft_uid: None,
