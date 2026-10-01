@@ -34,7 +34,7 @@ pub use handler::{KeyboardEvent, MouseEvent, RdpServerInputHandler};
 pub use helper::TlsIdentityCtx;
 pub use server::{
     ConnectionHandler, CredentialDecision, CredentialValidationError, CredentialValidator, Credentials,
-    ExactMatchCredentialValidator, PostConnectionAction, RdpServer, RdpServerOptions, RdpServerSecurity, ServerEvent,
+    DvcServerFactory, ExactMatchCredentialValidator, PostConnectionAction, RdpServer, RdpServerOptions, RdpServerSecurity, ServerEvent,
     ServerEventSender, TransportTls,
 };
 pub use sound::{RdpsndServerHandler, RdpsndServerMessage, SoundServerFactory};

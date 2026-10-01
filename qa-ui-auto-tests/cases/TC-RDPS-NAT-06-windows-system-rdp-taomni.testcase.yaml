@@ -1,0 +1,250 @@
+id: TC-RDPS-NAT-06-windows-system-rdp-taomni
+title: Windows with system Remote Desktop running - real probe recommends it, Taomni starts only after an explicit choice, then serves NLA, frames and input
+description: |
+  V-03/V-14 on Windows (docs-feature/rdp-server-parity-design.md §4.1,
+  AC-01..AC-03, AC-17). system_rdp_running makes the runner's Remote Desktop
+  host deterministic (connections allowed, TermService running), so the RDP
+  settings card shows the real probe result rather than a stub.
+
+  Start first offers the system Remote Desktop: choosing it leaves Taomni's
+  server stopped and never reaches the vault. Choosing Taomni explicitly
+  starts it on its own loopback port, remembers the choice, and the server
+  then passes the same protocol checks as TC-RDPS-NAT-01 (NLA, painted
+  desktop, clicks injected into a host Tk window, wrong password rejected).
+  A second Start uses the remembered choice without asking again.
+covers:
+- F-RdpServer-1
+- F-Servers-1
+tags:
+- rdp
+- rdp-server
+- servers
+- windows
+- p1
+modes:
+- native
+native_platforms:
+- Windows
+fixtures:
+- reset_db
+- rdp_server_required
+- system_rdp_running
+timeout_sec: 480
+steps:
+- open_route: '?servers=main'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- wait_for:
+    selector: '[data-testid="rdp-system-card"][data-state="use-system"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="rdp-system-message"]'
+    contains: ${env.QA_SYSTEM_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- click: '[data-testid="server-row-rdp-start"]'
+- wait_for:
+    selector: '[data-testid="choice-dialog"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="choice-dialog-message"]'
+    contains: ${env.QA_SYSTEM_RDP_PORT}
+- click: '[data-testid="choice-dialog-primary"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 15
+- assert_not_visible: '[data-testid="vault-setup-dialog"]'
+- click: '[data-testid="server-row-rdp-start"]'
+- wait_for:
+    selector: '[data-testid="choice-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- assert_visible: '[data-testid="rdp-system-choice"]'
+- host_helper:
+    action: start
+    name: target
+    mode: flip
+    geometry: 480x320+40+80
+- rdp_probe:
+    scenario: connect
+    artifact: probe-connect
+    args:
+      seconds: 3
+    expect:
+      negotiated.drdynvc: true
+      graphics_updates:
+        min: 1
+      framebuffer.painted_share:
+        min: 0.95
+- rdp_probe:
+    scenario: latency
+    artifact: probe-latency
+    args:
+      x: 280
+      y: 240
+      samples: 10
+    expect:
+      timeouts:
+        max: 2
+      latency_ms.count:
+        min: 8
+- assert_json_file:
+    path: target-state.json
+    expect:
+      flips:
+        min: 10
+- rdp_probe:
+    scenario: connect
+    artifact: probe-bad-password
+    args:
+      password-env: QA_RDP_BAD_PASSWORD
+    background: bad-password
+- rdp_probe_wait:
+    name: bad-password
+    expect_exit: 3
+    expect:
+      error.kind: auth
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp-start"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- assert_not_visible: '[data-testid="choice-dialog"]'
+- rdp_probe:
+    scenario: connect
+    artifact: probe-restarted
+    args:
+      seconds: 2
+    expect:
+      framebuffer.painted_share:
+        min: 0.95
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+- host_helper:
+    action: stop
+    name: target
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: The settings card reports the runner's running system Remote Desktop from the real probe.
+    actions:
+    - 3
+    checkpoints:
+    - step: 4
+      expectation: rdp-system-card has data-state=use-system.
+    - step: 5
+      expectation: The card message names the system RDP-Tcp port.
+    results:
+    - 5
+  - id: R2
+    requirement: Start recommends the system Remote Desktop and choosing it does not start Taomni's server.
+    actions:
+    - 12
+    - 15
+    checkpoints:
+    - step: 14
+      expectation: The choice dialog names the system port.
+    - step: 16
+      expectation: The RDP row stays stopped.
+    - step: 17
+      expectation: The vault setup dialog never opened.
+    results:
+    - 17
+  - id: R3
+    requirement: An explicit Taomni choice starts the server on its own port and is remembered.
+    actions:
+    - 18
+    - 20
+    - 24
+    checkpoints:
+    - step: 25
+      expectation: The RDP row reports data-status=running.
+    - step: 26
+      expectation: The card shows the remembered Taomni choice.
+    results:
+    - 26
+  - id: R4
+    requirement: The Windows server authenticates NLA, serves a painted desktop and injects clicks; a wrong password is refused.
+    actions:
+    - 28
+    - 29
+    - 31
+    checkpoints:
+    - step: 28
+      expectation: drdynvc negotiated, graphics received and at least 95% of the framebuffer grid painted.
+    - step: 29
+      expectation: At least 8 of 10 clicks produce an observed pixel change.
+    - step: 30
+      expectation: The host Tk target counted at least 10 flips.
+    - step: 32
+      expectation: The wrong password exits 3 with error kind auth.
+    results:
+    - 32
+  - id: R5
+    requirement: A second Start uses the remembered choice without asking again.
+    actions:
+    - 33
+    - 35
+    checkpoints:
+    - step: 36
+      expectation: The RDP row reports data-status=running again.
+    - step: 37
+      expectation: No choice dialog is shown.
+    - step: 38
+      expectation: The restarted server serves a painted desktop.
+    results:
+    - 38
+  - id: R6
+    requirement: Stop closes the listener.
+    actions:
+    - 39
+    checkpoints:
+    - step: 40
+      expectation: The RDP row reports data-status=stopped.
+    results:
+    - 40
+  native:
+  - check: Real Windows Remote Desktop probe (registry, SCM, elevation), Tauri IPC, vault, Windows Graphics Capture and SendInput on the runner desktop.
+    method: automated
+    reason: Only the packaged app on a Windows host can probe TermService, bind the listener, capture and inject input.
+  visual:
+  - check: No visual assertion; the dialog and card are asserted through text and state attributes, pixels through the probe.
+    method: not-applicable
+    reason: The case asserts behaviour and protocol effects, not rendering.

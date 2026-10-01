@@ -49,6 +49,22 @@ def step_goto(ctx: StepContext, args: Any) -> None:
     step_open(ctx, args)
 
 
+@verb("open_route")
+def step_open_route(ctx: StepContext, args: Any) -> None:
+    """Open an app route (``?servers=main``) relative to ``app.base_url``.
+
+    The native runner implements the same verb as a same-origin navigation of
+    the packaged main WebView, so one case can address the route in both modes.
+    """
+    route = args.get("route") if isinstance(args, dict) else args
+    if not isinstance(route, str) or not route.startswith(("?", "/", "#")):
+        raise StepError("open_route: expected a route starting with ?, / or #")
+    base = str((ctx.cfg.get("app") or {}).get("base_url") or "").rstrip("/")
+    if not base:
+        raise StepError("open_route: app.base_url is not configured")
+    step_open(ctx, base + (route if route.startswith("/") else "/" + route))
+
+
 @verb("wait")
 def step_wait(ctx: StepContext, args: Any) -> None:
     seconds = _coerce_seconds(args)

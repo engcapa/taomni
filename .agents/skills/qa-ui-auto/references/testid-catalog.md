@@ -1533,6 +1533,16 @@
 - `[data-testid="rdp-chat-toggle"]` — interactive [optional] — F9.7.chat-toggle
 - `[data-testid="rdp-detach"]` — interactive — F9.7.detach
 - `[data-testid="rdp-view-cycle"]` — interactive — F9.7.view-cycle
+- `[data-testid="rdp-ctrl-alt-del"]` — interactive — F9.7.ctrl-alt-del
+- `[data-testid="rdp-connection-bar"]` — display [optional] — F9.7.connection-bar
+- `[data-testid="rdp-bar-hotzone"]` — display [optional] — F9.7.bar-hotzone
+- `[data-testid="rdp-bar-pin"]` — interactive [optional] — F9.7.bar-pin
+- `[data-testid="rdp-bar-quality"]` — display [optional] — F9.7.bar-quality
+- `[data-testid="rdp-bar-title"]` — display [optional] — F9.7.bar-title
+- `[data-testid="rdp-bar-ctrl-alt-del"]` — interactive [optional] — F9.7.bar-ctrl-alt-del
+- `[data-testid="rdp-bar-minimize"]` — interactive [optional] — F9.7.bar-minimize
+- `[data-testid="rdp-bar-restore"]` — interactive [optional] — F9.7.bar-restore
+- `[data-testid="rdp-bar-disconnect"]` — interactive [optional] — F9.7.bar-disconnect
 
 ## servers (F-Servers-1)
 
@@ -1551,6 +1561,35 @@
 - `[data-testid="server-log"]` — display [optional] — F-Servers-1.server-log
 - `[data-testid="server-log-autoscroll"]` — interactive [optional] — F-Servers-1.server-log-autoscroll
 - `[data-testid="server-log-clear"]` — display [optional] — F-Servers-1.server-log-clear
+
+## servers/rdp (F-RdpServer-1)
+
+- `[data-testid="server-field-port"]` — interactive [optional] — F-RdpServer-1.server-field-port
+- `[data-testid="server-field-bind-address"]` — interactive [optional] — F-RdpServer-1.server-field-bind-address
+- `[data-testid="server-field-auto-stop"]` — interactive [optional] — F-RdpServer-1.server-field-auto-stop
+- `[data-testid="server-field-auto-stop-seconds"]` — interactive [optional] — F-RdpServer-1.server-field-auto-stop-seconds
+- `[data-testid="server-field-start-on-launch"]` — interactive [optional] — F-RdpServer-1.server-field-start-on-launch
+- `[data-testid="server-row-rdp-start"]` — interactive [optional] — F-RdpServer-1.server-row-rdp-start
+- `[data-testid="server-row-rdp-stop"]` — interactive [optional] — F-RdpServer-1.server-row-rdp-stop
+- `[data-testid="rdp-field-username"]` — interactive [optional] — F-RdpServer-1.rdp-field-username
+- `[data-testid="rdp-field-password"]` — interactive [optional] — F-RdpServer-1.rdp-field-password
+- `[data-testid="rdp-field-domain"]` — interactive [optional] — F-RdpServer-1.rdp-field-domain
+- `[data-testid="rdp-field-view-only"]` — interactive [optional] — F-RdpServer-1.rdp-field-view-only
+- `[data-testid="rdp-field-control-approval"]` — interactive [optional] — F-RdpServer-1.rdp-field-control-approval
+- `[data-testid="rdp-field-public-bind"]` — interactive [optional] — F-RdpServer-1.rdp-field-public-bind
+- `[data-testid="rdp-field-display"]` — interactive [optional] — F-RdpServer-1.rdp-field-display
+- `[data-testid="rdp-system-card"]` — display [optional] — F-RdpServer-1.rdp-system-card
+- `[data-testid="rdp-system-message"]` — display [optional] — F-RdpServer-1.rdp-system-message
+- `[data-testid="rdp-system-open-settings"]` — interactive [optional] — F-RdpServer-1.rdp-system-open-settings
+- `[data-testid="rdp-system-refresh"]` — interactive [optional] — F-RdpServer-1.rdp-system-refresh
+- `[data-testid="rdp-system-choice"]` — display [optional] — F-RdpServer-1.rdp-system-choice
+- `[data-testid="rdp-system-choice-reset"]` — interactive [optional] — F-RdpServer-1.rdp-system-choice-reset
+- `[data-testid="rdp-field-clipboard-to-client"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-to-client
+- `[data-testid="rdp-field-clipboard-to-server"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-to-server
+- `[data-testid="rdp-field-clipboard-file-max-mb"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-file-max-mb
+- `[data-testid="rdp-field-audio-playback"]` — interactive [optional] — F-RdpServer-1.rdp-field-audio-playback
+- `[data-testid="rdp-field-microphone"]` — interactive [optional] — F-RdpServer-1.rdp-field-microphone
+- `[data-testid="rdp-field-microphone-device"]` — interactive [optional] — F-RdpServer-1.rdp-field-microphone-device
 
 ## sessions (F6.2)
 

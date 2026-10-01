@@ -2800,6 +2800,45 @@ controls:
   - id: view-cycle
     selector: '[data-testid="rdp-view-cycle"]'
     kind: interactive       # one button cycles normal → maximized → fullscreen
+  - id: ctrl-alt-del
+    selector: '[data-testid="rdp-ctrl-alt-del"]'
+    kind: interactive
+  - id: connection-bar
+    selector: '[data-testid="rdp-connection-bar"]'
+    kind: display
+    optional: true       # only in OS full screen while connected
+  - id: bar-hotzone
+    selector: '[data-testid="rdp-bar-hotzone"]'
+    kind: display
+    optional: true       # only in OS full screen while connected
+  - id: bar-pin
+    selector: '[data-testid="rdp-bar-pin"]'
+    kind: interactive
+    optional: true       # only in OS full screen while connected
+  - id: bar-quality
+    selector: '[data-testid="rdp-bar-quality"]'
+    kind: display
+    optional: true       # only in OS full screen while connected
+  - id: bar-title
+    selector: '[data-testid="rdp-bar-title"]'
+    kind: display
+    optional: true       # only in OS full screen while connected
+  - id: bar-ctrl-alt-del
+    selector: '[data-testid="rdp-bar-ctrl-alt-del"]'
+    kind: interactive
+    optional: true       # only in OS full screen while connected
+  - id: bar-minimize
+    selector: '[data-testid="rdp-bar-minimize"]'
+    kind: interactive
+    optional: true       # only in OS full screen while connected
+  - id: bar-restore
+    selector: '[data-testid="rdp-bar-restore"]'
+    kind: interactive
+    optional: true       # only in OS full screen while connected
+  - id: bar-disconnect
+    selector: '[data-testid="rdp-bar-disconnect"]'
+    kind: interactive
+    optional: true       # only in OS full screen while connected
 -->
 
 - Tauri desktop 模式下通过 IronRDP 0.17 驱动真实 RDP 会话：CredSSP/NLA、active-stage 图像解码、键盘/鼠标/滚轮输入、画布绘制
@@ -2808,6 +2847,7 @@ controls:
 - resize 优先使用 DisplayControl DVC；服务器不开放该通道时保持同一 WS/control session 并按新桌面尺寸重连
 - RDP options 表单已持久化 domain、color depth、NLA/performance、clipboard、audio、drive redirection、RD Gateway 配置
 - 浏览器预览模式只提供 desktop-only stub；真实协议连接和画面验证必须在 Tauri/native 或 Rust live test 环境下执行
+- OS 全屏连接栏（仿 mstsc）：固定、连接质量（服务端 Network Characteristics Result 的 RTT/带宽 → 4 格）、主机名、Ctrl+Alt+Del、最小化、还原、断开；未固定时 2.5 s 后收起，顶部 4 px 热区、Tab 聚焦或 Ctrl+Alt+Home 重新显示；窗口模式工具栏也有 Ctrl+Alt+Del。TC-RDPJ-01 用同一 QA 构建的客户端连接自家服务端联合验证
 
 ### 9.8 WSL 会话类型（WSL session）✅
 
@@ -4370,9 +4410,142 @@ controls:
 - 支持 10 类本地服务器（`SERVER_DEFS` 顺序）：ssh/sftp、ftp、tftp、http、telnet、vnc、nfs、cron、iperf、rdp；每行（`server-row-${type}`）显示运行状态点 + Start/Stop/Settings 按钮
 - 右栏：`CommonSettings`（监听端口 / 绑定地址 / 自动停止 / 开机自启）+ 每类专属设置表单（`settings/<X>Settings.tsx`，复用 `fields.tsx` 受控原语）+ `ServerOutputLog` 实时输出控制台（自动滚动 `server-log-autoscroll` / 清空 `server-log-clear`）
 - 后端 `src-tauri/src/servers/`：`ServerRegistry` 镜像 Tunnel 架构，配置持久化到 SQLite `server_configs` 表并在启动时 `autostart_servers()`；in-process 纯 Rust（ssh/sftp/http/ftp/tftp/telnet/cron）与受监管系统二进制（vnc/nfs/iperf 经 `which` + `spawn_supervised`，缺工具返回明确错误而非假「运行中」）
-- 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送（`app.emit` 全局，detached 窗口可收）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示需重启生效；有未保存修改时 Cancel / 系统关闭按钮会确认丢弃
+- 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送（`app.emit` 全局，detached 窗口可收）；后端 `ServerRegistry` 另按类型保留最近 500 行输出（`list_server_logs`），窗口打开时先显示窗口关闭期间的历史，清空按钮同时清空后端历史（`clear_server_log`）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示需重启生效；有未保存修改时 Cancel / 系统关闭按钮会确认丢弃
 - i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`
 - **e2e 测试限制**：真正 start/stop 一个服务器会绑定真实端口 / 拉起系统二进制，属带副作用操作；浏览器冒烟只验证对话框 chrome（打开 → 选行 → 设置面板/输出控制台挂载 → Cancel 关闭），实际启停留待 native/手动回归
+
+### 22.2 RDP Server（与 Windows 远程桌面对齐）🚧
+
+<!-- feature
+id: F-RdpServer-1
+status: in-progress
+area: servers/rdp
+components: [RdpSettings, CommonSettings, ServerRow, fields, RdpServerApprovalBridge]
+files:
+  - src/components/servers/settings/RdpSettings.tsx
+  - src/components/servers/CommonSettings.tsx
+  - src/components/servers/ServerRow.tsx
+  - src/components/servers/fields.tsx
+  - src/components/servers/RdpServerApprovalBridge.tsx
+  - src-tauri/src/servers/rdp.rs
+  - src-tauri/src/servers/rdp/
+  - src-tauri/src/bin/rdp-probe/
+  - src-tauri/vendor/ironrdp-server/
+controls:
+  - id: server-field-port
+    selector: '[data-testid="server-field-port"]'
+    kind: interactive
+    optional: true
+  - id: server-field-bind-address
+    selector: '[data-testid="server-field-bind-address"]'
+    kind: interactive
+    optional: true
+  - id: server-field-auto-stop
+    selector: '[data-testid="server-field-auto-stop"]'
+    kind: interactive
+    optional: true
+  - id: server-field-auto-stop-seconds
+    selector: '[data-testid="server-field-auto-stop-seconds"]'
+    kind: interactive
+    optional: true
+  - id: server-field-start-on-launch
+    selector: '[data-testid="server-field-start-on-launch"]'
+    kind: interactive
+    optional: true
+  - id: server-row-rdp-start
+    selector: '[data-testid="server-row-rdp-start"]'
+    kind: interactive
+    optional: true
+  - id: server-row-rdp-stop
+    selector: '[data-testid="server-row-rdp-stop"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-username
+    selector: '[data-testid="rdp-field-username"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-password
+    selector: '[data-testid="rdp-field-password"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-domain
+    selector: '[data-testid="rdp-field-domain"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-view-only
+    selector: '[data-testid="rdp-field-view-only"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-control-approval
+    selector: '[data-testid="rdp-field-control-approval"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-public-bind
+    selector: '[data-testid="rdp-field-public-bind"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-display
+    selector: '[data-testid="rdp-field-display"]'
+    kind: interactive
+    optional: true
+  # Windows built-in Remote Desktop card (design §4.1); absent off Windows.
+  - id: rdp-system-card
+    selector: '[data-testid="rdp-system-card"]'
+    kind: display
+    optional: true
+  - id: rdp-system-message
+    selector: '[data-testid="rdp-system-message"]'
+    kind: display
+    optional: true
+  - id: rdp-system-open-settings
+    selector: '[data-testid="rdp-system-open-settings"]'
+    kind: interactive
+    optional: true
+  - id: rdp-system-refresh
+    selector: '[data-testid="rdp-system-refresh"]'
+    kind: interactive
+    optional: true
+  - id: rdp-system-choice
+    selector: '[data-testid="rdp-system-choice"]'
+    kind: display
+    optional: true
+  - id: rdp-system-choice-reset
+    selector: '[data-testid="rdp-system-choice-reset"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-clipboard-to-client
+    selector: '[data-testid="rdp-field-clipboard-to-client"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-clipboard-to-server
+    selector: '[data-testid="rdp-field-clipboard-to-server"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-clipboard-file-max-mb
+    selector: '[data-testid="rdp-field-clipboard-file-max-mb"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-audio-playback
+    selector: '[data-testid="rdp-field-audio-playback"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-microphone
+    selector: '[data-testid="rdp-field-microphone"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-microphone-device
+    selector: '[data-testid="rdp-field-microphone-device"]'
+    kind: interactive
+    optional: true
+-->
+
+- 设计：[`docs-feature/rdp-server-parity-design.md`](../docs-feature/rdp-server-parity-design.md)（AC-01~AC-20、TASK-01~12、V-01~V-21）
+- 本地服务器窗口 RDP 行：通用字段（端口/绑定地址/自动停止/随应用启动）+ RDP 字段（用户名/密码（vault）/域/仅查看/本机确认控制/公网绑定/显示器）；行 `data-status` 反映 stopped/starting/running/error
+- Native 用例经 `open_route: '?servers=main'` 在主窗口打开同一组件树，通过 `rdp-probe`（QA 专用探针客户端，随 QA 构建产出）做协议级判定与性能测量，`rdp_target.py`（Tk）提供宿主可见目标，`host_clipboard` 用系统工具判定宿主剪贴板
+- 剪贴板按方向分级（off/text/rich/all，默认 all）：文本、CF_HTML、CF_DIB/CF_DIBV5 图片、文件（FileGroupDescriptorW + FileContents，暂存目录 + 上限 MB）；两方向都 off 时不提供 CLIPRDR 通道
+- CI：`rdp_server_required` → capability `rdp`；`system_rdp_running`（Windows 系统远程桌面运行中）→ `rdp`；`release_build_required`（性能用例）→ `release`（该条目改用 release QA 构建）；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
+- Windows：NAT-01/PERF-01 三端运行，Windows 上经 `platform_choice` 在系统远程桌面提示中选 Taomni；系统远程桌面分支由 TC-RDPS-NAT-06 覆盖，TermService 基线由 TC-RDPS-PERF-02 测量
+- 声音（RDPSND 播放）：服务器回采本机默认输出（Windows WASAPI loopback、Linux PipeWire sink monitor），按客户端格式重采样为 PCM 下发；macOS 13+ 用 ScreenCaptureKit 系统音频（排除 Taomni 自身声音）；TC-RDPS-NAT-04 在宿主播放单音、由探针经 RDPSND 接收并判定频率。CI `audio`：Linux 为 PipeWire null sink，Windows 为 VB-CABLE，macOS 为 Background Music 虚拟设备
 
 ---
 

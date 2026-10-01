@@ -1,0 +1,191 @@
+id: TC-RDPS-UI-03-rdp-media-clipboard-settings
+title: RDP server clipboard, sound and microphone settings persist through Apply and a reopened window
+description: |
+  V-16 (docs-feature/rdp-server-parity-design.md §4.2-4.4, AC-11, AC-18).
+  Browser preview of Local servers: the RDP settings choose a clipboard
+  level per direction (off / text / text, HTML and images / everything), a
+  clipboard file limit, sound playback and microphone redirection. Apply
+  saves them through save_server_config (the stub keeps them in
+  localStorage); a reloaded window reads them back into the same controls.
+  Defaults are the safe Windows-like ones: both directions "everything",
+  2048 MB, sound and microphone on. The file limit is only shown while a
+  direction allows files, so it is set first and checked again after
+  switching one direction back to "everything".
+
+  Native boundary: whether the server honours the levels is TC-RDPS-NAT-09;
+  sound and microphone are TC-RDPS-NAT-04/05.
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- servers
+- clipboard
+- audio
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}?servers=main
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- wait_for:
+    selector: '[data-testid="rdp-field-clipboard-to-client"] option[value="all"]:checked'
+    state: attached
+- wait_for:
+    selector: '[data-testid="rdp-field-clipboard-to-server"] option[value="all"]:checked'
+    state: attached
+- wait_for: '[data-testid="rdp-field-audio-playback"]:checked'
+- wait_for: '[data-testid="rdp-field-microphone"]:checked'
+- fill:
+    selector: '[data-testid="rdp-field-clipboard-file-max-mb"]'
+    value: '512'
+- select_option:
+    selector: '[data-testid="rdp-field-clipboard-to-client"]'
+    value: text
+- select_option:
+    selector: '[data-testid="rdp-field-clipboard-to-server"]'
+    value: 'off'
+- set_check:
+    selector: '[data-testid="rdp-field-audio-playback"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="rdp-field-microphone"]'
+    checked: false
+- click: '[data-testid="servers-dialog-apply"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-browser-vault-3
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-browser-vault-3
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    state: detached
+- assert_localstorage:
+    key: taomni.stub.serverConfigs.v1
+    contains: '"clipboardServerToClient":"text"'
+- assert_localstorage:
+    key: taomni.stub.serverConfigs.v1
+    contains: '"clipboardClientToServer":"off"'
+- assert_localstorage:
+    key: taomni.stub.serverConfigs.v1
+    contains: '"clipboardFileMaxMb":512'
+- assert_localstorage:
+    key: taomni.stub.serverConfigs.v1
+    contains: '"audioPlayback":false'
+- assert_localstorage:
+    key: taomni.stub.serverConfigs.v1
+    contains: '"microphone":false'
+- reload: null
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- wait_for:
+    selector: '[data-testid="rdp-field-clipboard-to-client"] option[value="text"]:checked'
+    state: attached
+- wait_for:
+    selector: '[data-testid="rdp-field-clipboard-to-server"] option[value="off"]:checked'
+    state: attached
+- wait_for: '[data-testid="rdp-field-audio-playback"]:not(:checked)'
+- wait_for: '[data-testid="rdp-field-microphone"]:not(:checked)'
+- assert_not_visible: '[data-testid="rdp-field-clipboard-file-max-mb"]'
+- select_option:
+    selector: '[data-testid="rdp-field-clipboard-to-server"]'
+    value: all
+- assert_attribute:
+    selector: '[data-testid="rdp-field-clipboard-file-max-mb"]'
+    name: value
+    equals: '512'
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: The RDP settings open with safe defaults for clipboard, sound and microphone.
+    actions:
+    - 3
+    checkpoints:
+    - step: 4
+      expectation: Clipboard to the client defaults to everything, including files.
+    - step: 5
+      expectation: Clipboard from the client defaults to everything, including files.
+    - step: 6
+      expectation: Sound playback is on.
+    - step: 7
+      expectation: Microphone redirection is on.
+    results:
+    - 4
+    - 5
+    - 6
+    - 7
+  - id: R2
+    requirement: Apply (which first creates the credential vault for the RDP password) saves the per-direction clipboard levels, the file limit, sound and microphone choices.
+    actions:
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 17
+    checkpoints:
+    - step: 14
+      expectation: Apply asks for the vault master password before storing the RDP configuration.
+    - step: 19
+      expectation: The saved config holds text only towards the client.
+    - step: 20
+      expectation: The saved config holds off from the client.
+    - step: 21
+      expectation: The saved config holds the 512 MB file limit.
+    - step: 22
+      expectation: The saved config turns sound playback off.
+    - step: 23
+      expectation: The saved config turns microphone redirection off.
+    results:
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+  - id: R3
+    requirement: A reopened window shows the saved choices, and the file limit only while a direction allows files.
+    actions:
+    - 24
+    - 26
+    - 32
+    checkpoints:
+    - step: 27
+      expectation: Clipboard to the client reads text only.
+    - step: 28
+      expectation: Clipboard from the client reads off.
+    - step: 29
+      expectation: Sound playback reads off.
+    - step: 30
+      expectation: Microphone redirection reads off.
+    - step: 31
+      expectation: With no direction allowing files the file limit is hidden.
+    - step: 33
+      expectation: Allowing files again shows the saved 512 MB limit.
+    results:
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 33
+  native:
+  - check: The saved configuration reaching the real server is covered by TC-RDPS-NAT-09 (levels) and TC-RDPS-NAT-04/05 (sound, microphone).
+    method: automated
+    reason: This case checks the renderer state and persistence contract only.
+  visual:
+  - check: Not a visual check.
+    method: not-applicable
+    reason: Control state and saved values are asserted.

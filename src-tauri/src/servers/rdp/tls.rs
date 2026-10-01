@@ -74,7 +74,7 @@ pub(crate) fn identity(app: &AppHandle) -> Result<TlsIdentityCtx> {
 /// dependency tree pulls in *both* `ring` and `aws-lc-rs`, rustls installs no
 /// automatic default, so we install `ring` explicitly. Idempotent: a second call
 /// (or another subsystem having already installed one) is ignored.
-fn ensure_crypto_provider() {
+pub(crate) fn ensure_crypto_provider() {
     use std::sync::Once;
     static INIT: Once = Once::new();
     INIT.call_once(|| {

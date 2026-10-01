@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import {
   SERVER_ORDER,
+  clearServerLog,
   defaultConfig,
   loadServerConfigs,
+  listServerLogs,
   listServerStatuses,
   openServersWindow,
   saveServerConfig,
@@ -14,6 +16,7 @@ import {
   type ServerType,
 } from "../lib/servers";
 import { ensureVaultReady } from "../lib/vaultGate";
+import { decideRdpStart } from "../lib/systemRdpChoice";
 
 const MAX_LOG_LINES = 500;
 
@@ -62,6 +65,17 @@ function initialRuntimes(): Record<ServerType, ServerRuntime> {
     out[t] = { status: "stopped", logLines: [] };
   }
   return out;
+}
+
+/**
+ * Backend history first, then lines this window already holds that the
+ * history does not end with (they arrived while it was fetched, or were
+ * written by this window).
+ */
+export function mergeLogHistory(history: string[], live: string[]): string[] {
+  const tail = new Set(history.slice(-live.length));
+  const fresh = live.filter((line) => !tail.has(line));
+  return [...history, ...fresh].slice(-MAX_LOG_LINES);
 }
 
 function timestampLine(line: string): string {
@@ -123,10 +137,12 @@ export const useServersStore = create<ServersStore>((set, get) => ({
       };
     }),
 
-  clearLog: (t) =>
+  clearLog: (t) => {
+    void clearServerLog(t).catch(() => {});
     set((s) => ({
       runtimes: { ...s.runtimes, [t]: { ...s.runtimes[t], logLines: [] } },
-    })),
+    }));
+  },
 
   markDirty: () => set({ dirty: true }),
   clearDirty: () => set({ dirty: false }),
@@ -161,6 +177,18 @@ export const useServersStore = create<ServersStore>((set, get) => ({
       // Backend not ready — keep stopped defaults.
     }
 
+    // Lines logged while no Local servers window listened.
+    let history: Partial<Record<ServerType, string[]>> = {};
+    try {
+      history = (await listServerLogs()) ?? {};
+    } catch {
+      // Backend not ready — start with the lines this window receives.
+    }
+    const live = get().runtimes;
+    for (const t of SERVER_ORDER) {
+      runtimes[t].logLines = mergeLogHistory(history[t] ?? [], live[t]?.logLines ?? []);
+    }
+
     set({ configs, runtimes, loaded: true, dirty: false });
   },
 
@@ -174,6 +202,22 @@ export const useServersStore = create<ServersStore>((set, get) => ({
       },
     }));
     try {
+      if (t === "rdp") {
+        // Windows: prefer an available system Remote Desktop unless the user
+        // explicitly chooses Taomni (remembered in the config).
+        const decision = await decideRdpStart(cfg);
+        for (const note of decision.notes) get().appendLog(t, timestampLine(note));
+        if (!decision.proceed) {
+          set((s) => ({
+            runtimes: { ...s.runtimes, [t]: { ...s.runtimes[t], status: "stopped", error: undefined } },
+          }));
+          return;
+        }
+        if (decision.patch && Object.keys(decision.patch).length > 0) {
+          cfg = { ...cfg, ...decision.patch };
+          get().setConfig(t, cfg);
+        }
+      }
       if (t === "rdp" && !(await ensureVaultReady("Store the RDP server password securely"))) {
         throw new Error("RDP server start cancelled: credential vault is not ready");
       }

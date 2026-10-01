@@ -1,0 +1,140 @@
+id: TC-RDPS-UI-01-windows-system-rdp-running
+title: Windows system Remote Desktop running - card recommends it, Start asks first, Taomni choice is remembered with a free port
+description: |
+  V-02 (docs-feature/rdp-server-parity-design.md AC-01/AC-18). Browser
+  preview with the stub scenario stubSystemRdp=use-system (system Remote
+  Desktop enabled, TermService running on 3389). The RDP settings card shows
+  the running state; Start opens the recommendation dialog. Keeping the
+  system Remote Desktop leaves the server stopped. Choosing Taomni persists
+  systemRdpChoice=taomni and moves the port off 3389 before the start
+  request (which the browser preview then rejects as desktop-only), and the
+  remembered choice can be reset from the card.
+
+  Native boundary: real registry/SCM detection and the real start are
+  covered by TC-RDPS-NAT-06 on the Windows runner; this case proves the
+  renderer state machine only.
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- servers
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}?servers=main&stubSystemRdp=use-system
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- wait_for: '[data-testid="rdp-system-card"][data-state="use-system"]'
+- assert_text:
+    selector: '[data-testid="rdp-system-message"]'
+    contains: '3389'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: '3389'
+- click: '[data-testid="server-row-rdp-start"]'
+- wait_for: '[data-testid="choice-dialog"]'
+- assert_text:
+    selector: '[data-testid="choice-dialog-message"]'
+    contains: '3389'
+- click: '[data-testid="choice-dialog-primary"]'
+- assert_not_visible: '[data-testid="choice-dialog"]'
+- wait_for: '[data-testid="server-row-rdp"][data-status="stopped"]'
+- assert_not_visible: '[data-testid="vault-setup-dialog"]'
+- click: '[data-testid="server-row-rdp-start"]'
+- wait_for: '[data-testid="choice-dialog"]'
+- click: '[data-testid="choice-dialog-secondary"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-browser-vault-1
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-browser-vault-1
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="server-row-rdp"][data-status="error"]'
+- assert_localstorage:
+    key: taomni.stub.serverConfigs.v1
+    contains: '"systemRdpChoice":"taomni"'
+- assert_localstorage:
+    key: taomni.stub.serverConfigs.v1
+    contains: '"port":3390'
+- assert_visible: '[data-testid="rdp-system-choice"]'
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: '3390'
+- click: '[data-testid="rdp-system-choice-reset"]'
+- assert_not_visible: '[data-testid="rdp-system-choice"]'
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: The card reports the running system Remote Desktop and its port.
+    actions:
+    - 3
+    checkpoints:
+    - step: 4
+      expectation: The card is in the use-system state.
+    - step: 5
+      expectation: The message names port 3389.
+    results:
+    - 5
+  - id: R2
+    requirement: Keeping the system Remote Desktop does not start Taomni.
+    actions:
+    - 7
+    - 10
+    checkpoints:
+    - step: 9
+      expectation: The recommendation dialog names port 3389.
+    - step: 12
+      expectation: The RDP row returns to stopped.
+    - step: 13
+      expectation: No vault prompt appears (the start was abandoned before credentials).
+    results:
+    - 12
+    - 13
+  - id: R3
+    requirement: Choosing Taomni persists the choice and a conflict-free port before starting.
+    actions:
+    - 14
+    - 16
+    - 20
+    checkpoints:
+    - step: 21
+      expectation: The start proceeded to the backend (browser preview rejects it as desktop-only).
+    - step: 22
+      expectation: The saved config records systemRdpChoice=taomni.
+    - step: 23
+      expectation: The saved config moved the port to 3390.
+    - step: 24
+      expectation: The card shows the remembered choice.
+    - step: 25
+      expectation: The server log explains the port move.
+    results:
+    - 22
+    - 23
+    - 25
+  - id: R4
+    requirement: The remembered choice can be reset from the card.
+    actions:
+    - 26
+    checkpoints:
+    - step: 27
+      expectation: The remembered-choice row disappears.
+    results:
+    - 27
+  native:
+  - check: Real registry/SCM detection and starting the server are not exercised here.
+    method: external
+    reason: Covered natively by TC-RDPS-NAT-06 on the Windows runner; browser preview stubs the probe.
+  visual:
+  - check: Dialog and card layout are not compared visually.
+    method: not-applicable
+    reason: Assertions target states, persisted config and messages.

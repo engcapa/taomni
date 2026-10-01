@@ -10,10 +10,21 @@ import {
   CheckboxField,
   FieldNote,
   FormRow,
+  NumberField,
   PasswordField,
   SelectField,
   TextField,
 } from "../fields";
+import { SystemRdpCard } from "./SystemRdpCard";
+
+/** Per-direction clipboard tiers (design DEC-10); the backend defaults to "all". */
+const CLIPBOARD_LEVELS = ["off", "text", "rich", "all"] as const;
+type ClipboardLevel = (typeof CLIPBOARD_LEVELS)[number];
+const DEFAULT_CLIPBOARD_FILE_MAX_MB = 2048;
+
+function clipboardLevel(value: unknown): ClipboardLevel {
+  return CLIPBOARD_LEVELS.includes(value as ClipboardLevel) ? (value as ClipboardLevel) : "all";
+}
 
 interface Props {
   config: ServerConfig;
@@ -36,6 +47,20 @@ export function RdpSettings({ config, onChange }: Props) {
   const allowPublicBind = config.allowPublicBind === true;
   const requireControlApproval = config.requireControlApproval !== false;
   const displayId = typeof config.displayId === "string" ? config.displayId : "";
+  const clipboardToClient = clipboardLevel(config.clipboardServerToClient);
+  const clipboardToServer = clipboardLevel(config.clipboardClientToServer);
+  const clipboardFileMaxMb =
+    typeof config.clipboardFileMaxMb === "number" && config.clipboardFileMaxMb > 0
+      ? config.clipboardFileMaxMb
+      : DEFAULT_CLIPBOARD_FILE_MAX_MB;
+  const audioPlayback = config.audioPlayback !== false;
+  const microphone = config.microphone !== false;
+  const microphoneDevice =
+    typeof config.microphoneDevice === "string" ? config.microphoneDevice : "";
+  const clipboardOptions = CLIPBOARD_LEVELS.map((level) => ({
+    value: level,
+    label: t(`servers.fields.rdpClipboardLevel.${level}`),
+  }));
   const platform = getAppPlatform();
   const supportsDisplaySelection = platform === "macos" || platform === "windows";
   const [captureProbe, setCaptureProbe] = useState<RdpCaptureProbe | null>(null);
@@ -88,10 +113,12 @@ export function RdpSettings({ config, onChange }: Props) {
 
   return (
     <div className="flex flex-col">
+      <SystemRdpCard config={config} onChange={onChange} />
       <FieldNote>{capabilityNote}</FieldNote>
       {supportsDisplaySelection ? (
         <SelectField
           label={t("servers.fields.rdpDisplay")}
+          testId="rdp-field-display"
           value={displayId}
           onChange={(value) => onChange({ displayId: value })}
           options={displayOptions}
@@ -150,17 +177,20 @@ export function RdpSettings({ config, onChange }: Props) {
       ) : null}
       <TextField
         label={t("servers.fields.rdpUsername")}
+        testId="rdp-field-username"
         value={username}
         onChange={(v) => onChange({ username: v })}
       />
       <PasswordField
         label={t("servers.fields.password")}
+        testId="rdp-field-password"
         value={password}
         onChange={(v) => onChange({ password: v })}
         placeholder={passwordStored ? t("servers.fields.rdpPasswordStored") : undefined}
       />
       <TextField
         label={t("servers.fields.rdpDomain")}
+        testId="rdp-field-domain"
         value={domain}
         onChange={(v) => onChange({ domain: v })}
         placeholder={t("servers.fields.optional")}
@@ -168,6 +198,7 @@ export function RdpSettings({ config, onChange }: Props) {
       <FieldNote>{t("servers.notes.rdpHybridOnly")}</FieldNote>
       <CheckboxField
         label={t("servers.fields.viewOnly")}
+        testId="rdp-field-view-only"
         checkboxLabel={t("servers.fields.viewOnly")}
         value={viewOnly}
         onChange={(v) => onChange({ viewOnly: v })}
@@ -175,6 +206,7 @@ export function RdpSettings({ config, onChange }: Props) {
       {!viewOnly ? (
         <CheckboxField
           label={t("servers.fields.rdpControlApproval")}
+          testId="rdp-field-control-approval"
           checkboxLabel={t("servers.fields.rdpControlApproval")}
           value={requireControlApproval}
           onChange={(value) => onChange({ requireControlApproval: value })}
@@ -183,8 +215,63 @@ export function RdpSettings({ config, onChange }: Props) {
       {!viewOnly && !requireControlApproval ? (
         <FieldNote tone="warning">{t("servers.notes.rdpUnattendedControl")}</FieldNote>
       ) : null}
+      <SelectField
+        label={t("servers.fields.rdpClipboardToClient")}
+        testId="rdp-field-clipboard-to-client"
+        value={clipboardToClient}
+        onChange={(value) => onChange({ clipboardServerToClient: value })}
+        options={clipboardOptions}
+        width={220}
+      />
+      <SelectField
+        label={t("servers.fields.rdpClipboardToServer")}
+        testId="rdp-field-clipboard-to-server"
+        value={clipboardToServer}
+        onChange={(value) => onChange({ clipboardClientToServer: value })}
+        options={clipboardOptions}
+        width={220}
+      />
+      {clipboardToClient === "all" || clipboardToServer === "all" ? (
+        <NumberField
+          label={t("servers.fields.rdpClipboardFileMaxMb")}
+          testId="rdp-field-clipboard-file-max-mb"
+          value={clipboardFileMaxMb}
+          min={1}
+          max={1048576}
+          onChange={(value) =>
+            onChange({ clipboardFileMaxMb: Math.max(1, Math.round(value) || 1) })
+          }
+          width={110}
+        />
+      ) : null}
+      <FieldNote>{t("servers.notes.rdpClipboardPolicy")}</FieldNote>
+      <CheckboxField
+        label={t("servers.fields.rdpAudioPlayback")}
+        testId="rdp-field-audio-playback"
+        checkboxLabel={t("servers.fields.rdpAudioPlayback")}
+        value={audioPlayback}
+        onChange={(value) => onChange({ audioPlayback: value })}
+      />
+      <CheckboxField
+        label={t("servers.fields.rdpMicrophone")}
+        testId="rdp-field-microphone"
+        checkboxLabel={t("servers.fields.rdpMicrophone")}
+        value={microphone}
+        onChange={(value) => onChange({ microphone: value })}
+      />
+      {microphone && platform !== "linux" ? (
+        <TextField
+          label={t("servers.fields.rdpMicrophoneDevice")}
+          testId="rdp-field-microphone-device"
+          value={microphoneDevice}
+          onChange={(value) => onChange({ microphoneDevice: value })}
+          placeholder={t("servers.fields.rdpMicrophoneDeviceAuto")}
+        />
+      ) : null}
+      <FieldNote>{t("servers.notes.rdpAudioDevices")}</FieldNote>
       <CheckboxField
         label={t("servers.fields.rdpPublicBind")}
+        testId="rdp-field-public-bind"
         checkboxLabel={t("servers.fields.rdpPublicBind")}
         value={allowPublicBind}
         onChange={(v) => onChange({ allowPublicBind: v })}

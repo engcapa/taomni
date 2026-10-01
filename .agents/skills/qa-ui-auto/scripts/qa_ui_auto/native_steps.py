@@ -2989,3 +2989,8 @@ def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:
             f"native runner does not support verb {verb!r}; supported: {sorted(VERBS)}"
         )
     return fn(ctx, args)
+
+
+# RDP server/client verbs live in their own module; importing it registers
+# them in VERBS (it imports `_verb`/`NativeStepContext` defined above).
+from . import rdp_steps  # noqa: E402,F401

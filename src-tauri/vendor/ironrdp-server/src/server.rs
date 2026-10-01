@@ -493,6 +493,17 @@ pub struct RdpServer {
     /// so display backends can read a fresh, frame-traffic-independent network
     /// RTT for flow control.
     autodetect_rtt: Arc<AtomicU32>,
+
+    /// Application DVCs added to every connection (for example AUDIO_INPUT).
+    dvc_factory: Option<Box<dyn DvcServerFactory>>,
+}
+
+/// Adds application-defined server dynamic virtual channels to the DRDYNVC
+/// channel of each new connection. The server offers every registered DVC
+/// after the DRDYNVC capability exchange; a client without a matching
+/// listener declines it.
+pub trait DvcServerFactory: Send {
+    fn attach(&self, drdynvc: dvc::DrdynvcServer) -> dvc::DrdynvcServer;
 }
 
 #[derive(Debug)]
@@ -580,7 +591,14 @@ impl RdpServer {
                 handle.store(u32::MAX, Ordering::Relaxed);
                 handle
             },
+            dvc_factory: None,
         }
+    }
+
+    /// Set or clear the factory that adds application DVCs to each
+    /// connection's DRDYNVC channel (see [`DvcServerFactory`]).
+    pub fn set_dvc_factory(&mut self, factory: Option<Box<dyn DvcServerFactory>>) {
+        self.dvc_factory = factory;
     }
 
     pub fn builder() -> builder::RdpServerBuilder<builder::WantsAddr> {
@@ -732,6 +750,11 @@ impl RdpServer {
             dvc
         };
 
+        let dvc = match self.dvc_factory.as_deref() {
+            Some(factory) => factory.attach(dvc),
+            None => dvc,
+        };
+
         acceptor.attach_static_channel(dvc);
     }
 
@@ -832,6 +855,11 @@ impl RdpServer {
         // here also covers backends that share an externally-created Arc via
         // `set_display_suppressed_handle()`.
         self.display_suppressed.store(false, Ordering::Relaxed);
+        // RTT samples and the base RTT describe one client's network path.
+        if self.autodetect.is_some() {
+            self.autodetect = Some(AutoDetectManager::new());
+            self.autodetect_rtt.store(u32::MAX, Ordering::Relaxed);
+        }
 
         let framed = TokioFramed::new(stream);
 
@@ -1330,6 +1358,16 @@ impl RdpServer {
                             user_channel_id,
                         )?;
                         writer.write_all(&data).await?;
+                        // Periodically tell the client what was measured, as
+                        // Windows does once its detection settles.
+                        if let Some(result) = ad.network_characteristics() {
+                            let data = encode_autodetect_request(
+                                result,
+                                message_channel_id,
+                                user_channel_id,
+                            )?;
+                            writer.write_all(&data).await?;
+                        }
                     }
                 }
             }
