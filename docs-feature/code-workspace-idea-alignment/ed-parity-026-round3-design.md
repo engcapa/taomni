@@ -60,7 +60,8 @@
 - ED-PARITY-027-A2 Code Workspace 的左工具窗口条在折叠时通过 portal 进入主工具条（`data-embedded`），仅活动工作区占用；右侧条仍在工作区；按钮、右键菜单（Hide/Move/Show Tool Window Names）与拖宽在工具条中照常工作；展开主侧栏后回到工作区。
 - ED-PARITY-027-A3 终端的工具窗口（附加 SFTP、Chat）在折叠时进入主工具条（沿用 `attached-sftp-toggle` / `tab-chat-toggle`），控制栏不再重复显示；分屏模式与独立窗口保持原样。
 - ED-PARITY-027-A4 名称显示与条宽为全局共享设置（`useToolWindowStripeStore`，多个工作区与终端工具条同步）；设置 › 常规 › 全局界面的“单一工具窗口条”可关闭合并与按组记忆。
-- V：单元 `sidebarRailPolicy.test.ts`、`Sidebar.test.tsx`、`ToolWindowRail.test.tsx`、`MainLayout.test.tsx`（ED-PARITY-027 块）、`CodeWorkspaceTab.test.tsx`；`TC-IDE-PARITY-027-01`（browser 三端，工作区 + 设置开关）、`TC-IDE-PARITY-027-02`（browser + native 三端，SSH 终端 SFTP）、`TC-IDE-PARITY-027-03-merged-rail-workspace-native`（native 三端）。
+- ED-PARITY-027-A5 启动状态：合并开启时旧键 `taomni.sidebarCollapsed` 只保存“其它”组（Welcome 等），只有在该组内的手动改动才写它；切换标签应用某组状态不写旧键，`v1` 键只存 Code Workspace/终端两组。主侧栏面板的首次尺寸回报来自恢复的 `main-layout` 布局（可能是上次终端/工作区的 0%），不再回写状态，由状态驱动面板。修复前：在终端或工作区折叠侧栏时退出，下次启动 Welcome 也是折叠的（CI run 36801360767 macOS native 的 TC-145 / 027-02 / 027-03 即因 WKWebView 跨用例保留 localStorage 而复现）。
+- V：单元 `sidebarRailPolicy.test.ts`、`appStore.test.ts`（per tab group 块）、`Sidebar.test.tsx`、`ToolWindowRail.test.tsx`、`MainLayout.test.tsx`（ED-PARITY-027 块，含恢复布局首报不回写）、`CodeWorkspaceTab.test.tsx`；`TC-IDE-PARITY-027-01`（browser 三端，工作区 + 重新加载 + 设置开关）、`TC-IDE-PARITY-027-02`（browser + native 三端，SSH 终端 SFTP）、`TC-IDE-PARITY-027-03-merged-rail-workspace-native`（native 三端，含重新加载后 Welcome 展开）。native 用例开头显式写入三项偏好，避免 macOS WKWebView 跨用例保留的 localStorage 影响结果。
 
 ## 未覆盖与后续
 
