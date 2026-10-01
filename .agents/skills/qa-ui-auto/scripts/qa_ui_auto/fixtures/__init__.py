@@ -32,6 +32,10 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
                     ${fixture.mail_quick_connect}
 * rdp_server_required - native-only: disposable RDP/vault credentials and a
                     free loopback port (QA_RDP_*), plus rdp-probe/Tk checks
+* system_rdp_running - Windows-only: system Remote Desktop host enabled and
+                    TermService running (QA_SYSTEM_RDP_PORT)
+* release_build_required - native performance cases: the app under test is
+                    a verified release QA build (CI capability `release`)
 
 Custom fixtures live here, register in REGISTRY, and declare their name in
 schema/testcase.schema.json. There is no runtime register() API.
@@ -52,6 +56,8 @@ from . import parity007_extract
 from . import editor_save_race
 from . import mail_server
 from . import rdp_server_required
+from . import system_rdp_running
+from . import release_build_required
 
 
 class FixtureContext(Protocol):
@@ -96,6 +102,8 @@ REGISTRY: dict[str, Fixture] = {
     "parity007_extract": Fixture("parity007_extract", parity007_extract.setup, parity007_extract.teardown),
     "mail_server": Fixture("mail_server", mail_server.setup, mail_server.teardown),
     "rdp_server_required": Fixture("rdp_server_required", rdp_server_required.setup),
+    "system_rdp_running": Fixture("system_rdp_running", system_rdp_running.setup),
+    "release_build_required": Fixture("release_build_required", release_build_required.setup),
 }
 
 

@@ -10,11 +10,21 @@ import {
   CheckboxField,
   FieldNote,
   FormRow,
+  NumberField,
   PasswordField,
   SelectField,
   TextField,
 } from "../fields";
 import { SystemRdpCard } from "./SystemRdpCard";
+
+/** Per-direction clipboard tiers (design DEC-10); the backend defaults to "all". */
+const CLIPBOARD_LEVELS = ["off", "text", "rich", "all"] as const;
+type ClipboardLevel = (typeof CLIPBOARD_LEVELS)[number];
+const DEFAULT_CLIPBOARD_FILE_MAX_MB = 2048;
+
+function clipboardLevel(value: unknown): ClipboardLevel {
+  return CLIPBOARD_LEVELS.includes(value as ClipboardLevel) ? (value as ClipboardLevel) : "all";
+}
 
 interface Props {
   config: ServerConfig;
@@ -37,6 +47,16 @@ export function RdpSettings({ config, onChange }: Props) {
   const allowPublicBind = config.allowPublicBind === true;
   const requireControlApproval = config.requireControlApproval !== false;
   const displayId = typeof config.displayId === "string" ? config.displayId : "";
+  const clipboardToClient = clipboardLevel(config.clipboardServerToClient);
+  const clipboardToServer = clipboardLevel(config.clipboardClientToServer);
+  const clipboardFileMaxMb =
+    typeof config.clipboardFileMaxMb === "number" && config.clipboardFileMaxMb > 0
+      ? config.clipboardFileMaxMb
+      : DEFAULT_CLIPBOARD_FILE_MAX_MB;
+  const clipboardOptions = CLIPBOARD_LEVELS.map((level) => ({
+    value: level,
+    label: t(`servers.fields.rdpClipboardLevel.${level}`),
+  }));
   const platform = getAppPlatform();
   const supportsDisplaySelection = platform === "macos" || platform === "windows";
   const [captureProbe, setCaptureProbe] = useState<RdpCaptureProbe | null>(null);
@@ -191,6 +211,36 @@ export function RdpSettings({ config, onChange }: Props) {
       {!viewOnly && !requireControlApproval ? (
         <FieldNote tone="warning">{t("servers.notes.rdpUnattendedControl")}</FieldNote>
       ) : null}
+      <SelectField
+        label={t("servers.fields.rdpClipboardToClient")}
+        testId="rdp-field-clipboard-to-client"
+        value={clipboardToClient}
+        onChange={(value) => onChange({ clipboardServerToClient: value })}
+        options={clipboardOptions}
+        width={220}
+      />
+      <SelectField
+        label={t("servers.fields.rdpClipboardToServer")}
+        testId="rdp-field-clipboard-to-server"
+        value={clipboardToServer}
+        onChange={(value) => onChange({ clipboardClientToServer: value })}
+        options={clipboardOptions}
+        width={220}
+      />
+      {clipboardToClient === "all" || clipboardToServer === "all" ? (
+        <NumberField
+          label={t("servers.fields.rdpClipboardFileMaxMb")}
+          testId="rdp-field-clipboard-file-max-mb"
+          value={clipboardFileMaxMb}
+          min={1}
+          max={1048576}
+          onChange={(value) =>
+            onChange({ clipboardFileMaxMb: Math.max(1, Math.round(value) || 1) })
+          }
+          width={110}
+        />
+      ) : null}
+      <FieldNote>{t("servers.notes.rdpClipboardPolicy")}</FieldNote>
       <CheckboxField
         label={t("servers.fields.rdpPublicBind")}
         testId="rdp-field-public-bind"

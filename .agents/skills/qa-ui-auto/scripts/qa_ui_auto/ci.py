@@ -111,6 +111,12 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.update({"rdp", "rdp-baseline"})
             if "xrdp_server_required" in fixtures:
                 result.update({"rdp", "xrdp"})
+            if "system_rdp_running" in fixtures:
+                result.add("rdp")
+            # Performance budgets are only meaningful on optimised code; the
+            # whole entry then uses the release QA build.
+            if "release_build_required" in fixtures:
+                result.add("release")
     return sorted(result)
 
 

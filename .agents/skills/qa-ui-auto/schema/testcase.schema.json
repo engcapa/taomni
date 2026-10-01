@@ -86,7 +86,9 @@
           "parity009_ssr",
           "parity007_extract",
           "mail_server",
-          "rdp_server_required"
+          "rdp_server_required",
+          "system_rdp_running",
+          "release_build_required"
         ]
       },
       "uniqueItems": true

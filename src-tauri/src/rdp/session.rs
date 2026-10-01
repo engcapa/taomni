@@ -2045,7 +2045,7 @@ fn cleanup_stale_clipboard_staging() {
     });
 }
 
-fn ensure_private_directory(path: &Path) -> Result<(), String> {
+pub(crate) fn ensure_private_directory(path: &Path) -> Result<(), String> {
     fs::create_dir_all(path)
         .map_err(|error| format!("create private directory '{}': {error}", path.display()))?;
     #[cfg(unix)]
@@ -2058,13 +2058,13 @@ fn ensure_private_directory(path: &Path) -> Result<(), String> {
 }
 
 #[cfg(unix)]
-fn process_is_alive(pid: u32) -> bool {
+pub(crate) fn process_is_alive(pid: u32) -> bool {
     let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
     result == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
 }
 
 #[cfg(not(unix))]
-fn process_is_alive(_pid: u32) -> bool {
+pub(crate) fn process_is_alive(_pid: u32) -> bool {
     // Avoid deleting another process's active transfer on platforms where this
     // module has no inexpensive process-existence probe.
     true
@@ -2189,7 +2189,7 @@ fn next_remote_file_request(
     }
 }
 
-fn remote_clipboard_safe_path(root: &Path, remote_name: &str) -> Result<PathBuf, String> {
+pub(crate) fn remote_clipboard_safe_path(root: &Path, remote_name: &str) -> Result<PathBuf, String> {
     let mut path = root.to_path_buf();
     let mut saw_part = false;
     for part in remote_name.split(['\\', '/']) {
@@ -2209,14 +2209,14 @@ fn remote_clipboard_safe_path(root: &Path, remote_name: &str) -> Result<PathBuf,
     Ok(path)
 }
 
-fn remote_top_level_name(remote_name: &str) -> Option<PathBuf> {
+pub(crate) fn remote_top_level_name(remote_name: &str) -> Option<PathBuf> {
     remote_name
         .split(['\\', '/'])
         .find(|part| !part.trim().is_empty() && *part != "." && *part != "..")
         .map(PathBuf::from)
 }
 
-fn write_remote_file_chunk(path: &Path, position: u64, data: &[u8]) -> Result<(), String> {
+pub(crate) fn write_remote_file_chunk(path: &Path, position: u64, data: &[u8]) -> Result<(), String> {
     let mut options = OpenOptions::new();
     options.write(true);
     #[cfg(unix)]
@@ -2316,7 +2316,7 @@ fn collect_clipboard_path(
     Ok(())
 }
 
-fn clipboard_relative_name(root: &Path, path: &Path) -> Result<String, String> {
+pub(crate) fn clipboard_relative_name(root: &Path, path: &Path) -> Result<String, String> {
     let rel = path.strip_prefix(root).unwrap_or(path);
     let name = rel
         .components()
@@ -2338,7 +2338,7 @@ fn clipboard_relative_name(root: &Path, path: &Path) -> Result<String, String> {
     Ok(name)
 }
 
-fn read_clipboard_file_range(
+pub(crate) fn read_clipboard_file_range(
     path: &Path,
     position: u64,
     requested_size: u32,

@@ -14,6 +14,10 @@ description: |
   a wrong password is refused at authentication, and after Stop the port no
   longer accepts connections. Control approval is disabled here; the
   approval gate itself is covered by a dedicated case.
+
+  Linux and macOS only: on Windows a running system Remote Desktop changes
+  the Start flow (explicit choice first), so TC-RDPS-NAT-06 covers the same
+  server contract there together with the Windows branch.
 covers:
 - F-RdpServer-1
 - F-Servers-1
@@ -24,6 +28,9 @@ tags:
 - p1
 modes:
 - native
+native_platforms:
+- Linux
+- macOS
 fixtures:
 - reset_db
 - rdp_server_required

@@ -179,6 +179,12 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     ]
     if not release:
         command.append("--debug")
+    else:
+        # Measurement builds keep release optimisation but also debug
+        # assertions: the app only honours the isolated-profile overrides
+        # (NEWMOB_*) and QA hooks under `cfg!(debug_assertions)`, so a plain
+        # release binary would write into the real QA profile instead.
+        env["CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS"] = "true"
     started = time.monotonic()
     subprocess.run(command, cwd=ROOT, env=env, check=True)
     if inputs != build_inputs(release=release, env=env):

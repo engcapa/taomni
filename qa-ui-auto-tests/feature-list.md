@@ -4392,12 +4392,26 @@ controls:
     selector: '[data-testid="rdp-system-choice-reset"]'
     kind: interactive
     optional: true
+  - id: rdp-field-clipboard-to-client
+    selector: '[data-testid="rdp-field-clipboard-to-client"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-clipboard-to-server
+    selector: '[data-testid="rdp-field-clipboard-to-server"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-clipboard-file-max-mb
+    selector: '[data-testid="rdp-field-clipboard-file-max-mb"]'
+    kind: interactive
+    optional: true
 -->
 
 - 设计：[`docs-feature/rdp-server-parity-design.md`](../docs-feature/rdp-server-parity-design.md)（AC-01~AC-20、TASK-01~12、V-01~V-21）
 - 本地服务器窗口 RDP 行：通用字段（端口/绑定地址/自动停止/随应用启动）+ RDP 字段（用户名/密码（vault）/域/仅查看/本机确认控制/公网绑定/显示器）；行 `data-status` 反映 stopped/starting/running/error
 - Native 用例经 `open_route: '?servers=main'` 在主窗口打开同一组件树，通过 `rdp-probe`（QA 专用探针客户端，随 QA 构建产出）做协议级判定与性能测量，`rdp_target.py`（Tk）提供宿主可见目标，`host_clipboard` 用系统工具判定宿主剪贴板
-- CI：`rdp_server_required` → capability `rdp`；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
+- 剪贴板按方向分级（off/text/rich/all，默认 all）：文本、CF_HTML、CF_DIB/CF_DIBV5 图片、文件（FileGroupDescriptorW + FileContents，暂存目录 + 上限 MB）；两方向都 off 时不提供 CLIPRDR 通道
+- CI：`rdp_server_required` → capability `rdp`；`system_rdp_running`（Windows 系统远程桌面运行中）→ `rdp`；`release_build_required`（性能用例）→ `release`（该条目改用 release QA 构建）；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
+- Windows：NAT-01/PERF-01 仅 Linux/macOS；Windows 上同等协议检查由 TC-RDPS-NAT-06（含系统远程桌面分支）承担，性能由 TC-RDPS-PERF-02（与 TermService 并列）承担
 
 ---
 

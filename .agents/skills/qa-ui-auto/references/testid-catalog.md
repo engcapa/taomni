@@ -1500,6 +1500,9 @@
 - `[data-testid="rdp-system-refresh"]` — interactive [optional] — F-RdpServer-1.rdp-system-refresh
 - `[data-testid="rdp-system-choice"]` — display [optional] — F-RdpServer-1.rdp-system-choice
 - `[data-testid="rdp-system-choice-reset"]` — interactive [optional] — F-RdpServer-1.rdp-system-choice-reset
+- `[data-testid="rdp-field-clipboard-to-client"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-to-client
+- `[data-testid="rdp-field-clipboard-to-server"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-to-server
+- `[data-testid="rdp-field-clipboard-file-max-mb"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-file-max-mb
 
 ## sessions (F6.2)
 

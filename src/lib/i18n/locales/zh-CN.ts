@@ -1768,6 +1768,15 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpGrantControl: "授予权限……",
       rdpRefreshPermission: "刷新状态",
       rdpControlApproval: "要求本机确认远程控制",
+      rdpClipboardToClient: "剪贴板：本机 → 客户端",
+      rdpClipboardToServer: "剪贴板：客户端 → 本机",
+      rdpClipboardFileMaxMb: "剪贴板文件上限（MB）",
+      rdpClipboardLevel: {
+        off: "关闭",
+        text: "仅文本",
+        rich: "文本、HTML 和图片",
+        all: "全部（含文件）",
+      },
       optional: "可选",
     },
     notes: {
@@ -1779,6 +1788,8 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpVaultReason: "请解锁凭据保险库，以保护 RDP Server 密码。",
       rdpVaultCancelled: "凭据保险库未解锁，RDP Server 设置未保存。",
       rdpPublicBind: "这会把 RDP 监听器暴露到本机之外；请使用防火墙限制范围，并仅用于可信网络。",
+      rdpClipboardPolicy:
+        "与 Windows 剪贴板重定向策略相同，两个方向分别限制。从客户端复制的文件会暂存到私有临时目录；两个方向都关闭时不提供剪贴板通道。",
       rdpInsecure:
         "无安全模式意味着流量不加密；若未设置凭据，任何能访问该端口的人都可完全控制本机桌面。请仅在隔离网络中使用。",
       rdpCapLinux:

@@ -57,6 +57,7 @@ mod auth;
 /// native A/V stack can reuse the X11 capturer for screen sharing.
 pub(crate) mod capture;
 mod clipboard;
+mod clipboard_formats;
 mod diff;
 mod display;
 #[cfg(target_os = "macos")]
@@ -72,7 +73,7 @@ pub(crate) mod system_rdp;
 mod tls;
 
 use auth::AuthConfig;
-use clipboard::ClipboardFactory;
+use clipboard::{ClipboardFactory, ClipboardPolicy};
 use display::RdpDisplay;
 use input::RdpInput;
 use metrics::RdpMetrics;
@@ -448,6 +449,17 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     let port = if config.port == 0 { 3389 } else { config.port };
     let bind = config.bind_address.clone();
 
+    // The start dialog already moves Taomni off the system port; this also
+    // covers autostart and configs edited elsewhere.
+    let system = tokio::task::spawn_blocking(system_rdp::probe)
+        .await
+        .map_err(|e| format!("system Remote Desktop probe failed: {e}"))?;
+    if let Some(alternative) = system_rdp::alternative_port(&system, port) {
+        return Err(format!(
+            "Windows Remote Desktop already listens on port {port}; choose another port for Taomni's RDP server (for example {alternative})"
+        ));
+    }
+
     let view_only = config.bool_field("viewOnly", false);
     let require_control_approval = config.bool_field("requireControlApproval", true);
     let display_id = config.str_field("displayId", "").trim().to_string();
@@ -484,6 +496,19 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
             "RDP unattended control is enabled: authenticated clients can control this computer without a local confirmation prompt.",
         );
     }
+
+    let (clipboard, clipboard_warnings) = ClipboardPolicy::from_settings(
+        config.str_field("clipboardServerToClient", ""),
+        config.str_field("clipboardClientToServer", ""),
+        config.u64_field(
+            "clipboardFileMaxMb",
+            ClipboardPolicy::DEFAULT_FILE_MAX_MB,
+        ),
+    );
+    for warning in clipboard_warnings {
+        ctx.log.line(warning);
+    }
+    ctx.log.line(clipboard.summary());
 
     let identity = tls::identity(&ctx.app).map_err(|e| format!("RDP TLS setup failed: {}", e))?;
     ctx.log
@@ -541,6 +566,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
             .rdp_approvals
             .clone(),
         require_control_approval,
+        clipboard,
     };
     let task = spawn_server(params, ctx.cancel.clone(), ctx.log.clone()).await?;
     Ok(ServerStarted { pid: None, task })
@@ -557,6 +583,7 @@ struct ServerParams {
     app: AppHandle,
     approvals: Arc<ApprovalBroker>,
     require_control_approval: bool,
+    clipboard: ClipboardPolicy,
 }
 
 /// Drive `RdpServer::run()` and bridge `cancel` → clean shutdown.
@@ -740,8 +767,13 @@ fn build_server(
         #[cfg(target_os = "macos")]
         input_mapping,
     );
-    let cliprdr: Box<dyn ironrdp::server::CliprdrServerFactory> =
-        Box::new(ClipboardFactory::new(log.clone()));
+    // Both directions off removes the channel itself, as disabling clipboard
+    // redirection does on Windows.
+    let cliprdr: Option<Box<dyn ironrdp::server::CliprdrServerFactory>> =
+        params.clipboard.enabled().then(|| {
+            Box::new(ClipboardFactory::new(log.clone(), params.clipboard))
+                as Box<dyn ironrdp::server::CliprdrServerFactory>
+        });
 
     let base = RdpServer::builder().with_addr(params.addr);
     let connection_handler: Box<dyn ConnectionHandler> = Box::new(ConnectionPolicy {
@@ -760,7 +792,7 @@ fn build_server(
                 .with_hybrid(acceptor, identity.pub_key.clone())
                 .with_input_handler(input)
                 .with_display_handler(display)
-                .with_cliprdr_factory(Some(cliprdr));
+                .with_cliprdr_factory(cliprdr);
             #[cfg(target_os = "macos")]
             let builder = builder.with_honor_client_desktop_size(honor_client_desktop_size);
             #[cfg(target_os = "macos")]

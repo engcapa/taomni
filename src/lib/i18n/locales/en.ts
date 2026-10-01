@@ -1777,6 +1777,15 @@ const dict = {
       rdpGrantControl: "Grant permission…",
       rdpRefreshPermission: "Refresh status",
       rdpControlApproval: "Require local control approval",
+      rdpClipboardToClient: "Clipboard: this computer → client",
+      rdpClipboardToServer: "Clipboard: client → this computer",
+      rdpClipboardFileMaxMb: "Clipboard file limit (MB)",
+      rdpClipboardLevel: {
+        off: "Off",
+        text: "Text only",
+        rich: "Text, HTML and images",
+        all: "Everything, including files",
+      },
       optional: "optional",
     },
     notes: {
@@ -1793,6 +1802,8 @@ const dict = {
       rdpVaultCancelled: "RDP server settings were not saved because the credential vault is locked.",
       rdpPublicBind:
         "This exposes the RDP listener beyond this computer. Restrict it with a firewall and use only trusted networks.",
+      rdpClipboardPolicy:
+        "Like Windows clipboard redirection policy, each direction is limited separately. Files copied from the client are staged in a private temporary folder; turning both directions off removes the clipboard channel.",
       rdpInsecure:
         "No security means traffic is unencrypted and, without credentials, anyone who can reach the port gets full control. Use only on an isolated network.",
       rdpCapLinux:
