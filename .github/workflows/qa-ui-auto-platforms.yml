@@ -156,6 +156,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev libudev-dev nasm xvfb xauth openbox wmctrl xdotool x11-utils x11-xserver-utils libxtst6 dbus-x11 xclip python3-tk python3-gi gir1.2-gtk-3.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons fonts-noto-cjk
+          # RDP audio cases (rdp_audio_required): a per-session PipeWire graph
+          # with a null sink; pipewire-alsa routes cpal/ALSA tones into it.
+          if [[ ",${{ join(matrix.capabilities, ',') }}," == *",audio,"* ]]; then
+            sudo apt-get install -y pipewire wireplumber pipewire-pulse pipewire-alsa pulseaudio-utils
+          fi
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.mode == 'native'
       - uses: arduino/setup-protoc@v3
@@ -189,6 +194,12 @@ jobs:
           Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
           Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
           $driver >> $env:GITHUB_PATH
+      # RDP audio cases (rdp_audio_required): hosted Windows runners have no
+      # audio endpoint. This installs the VB-CABLE virtual device (devcon with
+      # its publisher certificate trusted); the fixture only verifies it.
+      - name: Windows virtual audio output
+        if: runner.os == 'Windows' && contains(matrix.capabilities, 'audio')
+        uses: LABSN/sound-ci-helpers@d08c889a7bba7d9b1b059f8f76dac4672ea3a9cf # v1.0.4
       - name: macOS build dependencies
         if: runner.os == 'macOS' && matrix.mode == 'native'
         run: |

@@ -369,6 +369,7 @@ cases:
 - TC-RDPS-NAT-01-start-connect-display
 - TC-RDPS-NAT-02-clipboard-rich
 - TC-RDPS-NAT-03-clipboard-files
+- TC-RDPS-NAT-04-audio-playback
 - TC-RDPS-NAT-06-windows-system-rdp-taomni
 - TC-RDPS-PERF-01-performance-budget
 - TC-RDPS-PERF-02-windows-termservice-baseline

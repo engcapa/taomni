@@ -38,6 +38,9 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
                     a verified release QA build (CI capability `release`)
 * rdp_baseline_required - Windows-only: TermService reference server with two
                     disposable accounts and in-session Tk targets (QA_RDP_BASELINE_*)
+* rdp_audio_required - native: a default host audio output the RDP server can
+                    loop back (Linux PipeWire null sink, Windows audio device;
+                    macOS skips until output capture exists)
 
 Custom fixtures live here, register in REGISTRY, and declare their name in
 schema/testcase.schema.json. There is no runtime register() API.
@@ -61,6 +64,7 @@ from . import rdp_server_required
 from . import system_rdp_running
 from . import release_build_required
 from . import rdp_baseline_required
+from . import rdp_audio_required
 
 
 class FixtureContext(Protocol):
@@ -108,6 +112,7 @@ REGISTRY: dict[str, Fixture] = {
     "system_rdp_running": Fixture("system_rdp_running", system_rdp_running.setup),
     "release_build_required": Fixture("release_build_required", release_build_required.setup),
     "rdp_baseline_required": Fixture("rdp_baseline_required", rdp_baseline_required.setup, rdp_baseline_required.teardown),
+    "rdp_audio_required": Fixture("rdp_audio_required", rdp_audio_required.setup, rdp_audio_required.teardown),
 }
 
 

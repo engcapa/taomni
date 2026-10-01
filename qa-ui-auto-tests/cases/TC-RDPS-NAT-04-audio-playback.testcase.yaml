@@ -1,0 +1,140 @@
+id: TC-RDPS-NAT-04-audio-playback
+title: RDP server sound - a tone played on this computer reaches the RDP client through RDPSND
+description: |
+  V-07 (docs-feature/rdp-server-parity-design.md §4.3, AC-09). The server runs
+  with audio playback on (the default). rdp_audio_required provides a default
+  host output (Linux: PipeWire null sink; Windows: VB-CABLE installed by the
+  workflow), so the oracle does not depend on sound hardware.
+
+  rdp-probe host-play plays an 880 Hz tone on the host's default output in the
+  background, outside any RDP session. A second probe connects as an RDP
+  client advertising RDPSND, records the waves the server sends for five
+  seconds and analyses them: the dominant frequency must be the played tone
+  (within 2 %), loud enough to rule out silence, and the server log must name
+  the loopback source. macOS has no output capture yet; the fixture skips the
+  case there with that reason. On Windows platform_choice picks Taomni over
+  the runner's system Remote Desktop.
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- audio
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- rdp_server_required
+- system_rdp_running
+- rdp_audio_required
+timeout_sec: 420
+steps:
+- open_route: '?servers=main'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- rdp_probe:
+    scenario: host-play
+    artifact: host-tone
+    background: tone
+    args:
+      freq: 880
+      seconds: 25
+- rdp_probe:
+    scenario: audio-capture
+    artifact: rdpsnd
+    timeout_sec: 120
+    args:
+      freq: 880
+      seconds: 5
+      wav-out: rdpsnd.wav
+    expect:
+      negotiated.rdpsnd: true
+      audio.waves:
+        min: 100
+      audio.rate:
+        min: 22050
+      tone.frequency_matches: true
+      tone.rms_dbfs:
+        min: -30
+- rdp_probe_wait:
+    name: tone
+    timeout_sec: 60
+    expect:
+      freq: 880
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: 'RDP audio: streaming'
+    timeout_sec: 15
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Sound played on this computer is streamed to the RDP client as RDPSND waves with the same tone.
+    actions:
+    - 17
+    - 18
+    checkpoints:
+    - step: 16
+      expectation: The RDP server runs with audio playback on.
+    - step: 18
+      expectation: RDPSND is negotiated, at least 100 wave PDUs arrive in five seconds at 22.05 kHz or more, the dominant frequency is 880 Hz within 2 % and the level is above -30 dBFS.
+    - step: 19
+      expectation: The host tone played on the default output for the whole capture.
+    - step: 20
+      expectation: The server log names the loopback source it streams.
+    results:
+    - 18
+    - 19
+    - 20
+  native:
+  - check: Real host audio output (PipeWire graph on Linux, WASAPI loopback of VB-CABLE on Windows), RDPSND over NLA, tone analysis on received PCM.
+    method: automated
+    reason: Browser stubs have no RDP server or host audio.
+  visual:
+  - check: Not a visual check; audio is compared by frequency analysis.
+    method: not-applicable
+    reason: The case asserts audio fidelity, not rendering.

@@ -89,7 +89,8 @@
           "rdp_server_required",
           "system_rdp_running",
           "release_build_required",
-          "rdp_baseline_required"
+          "rdp_baseline_required",
+          "rdp_audio_required"
         ]
       },
       "uniqueItems": true
