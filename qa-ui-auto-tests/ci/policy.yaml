@@ -376,3 +376,4 @@ cases:
 - TC-RDPS-PERF-02-windows-termservice-baseline
 - TC-RDPS-UI-01-windows-system-rdp-running
 - TC-RDPS-UI-02-windows-system-rdp-states
+- TC-RDPJ-01-client-server-loopback

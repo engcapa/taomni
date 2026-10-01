@@ -27,7 +27,14 @@ pub struct AutoDetectManager {
     next_sequence: u16,
     pending_probes: Vec<(u16, Instant)>,
     rtt_samples: VecDeque<u32>,
+    /// Lowest RTT seen this session ("base RTT", [MS-RDPBCGR] 2.2.14.1.5).
+    base_rtt_ms: Option<u32>,
+    /// RTT requests sent since the last Network Characteristics Result.
+    since_result: u32,
 }
+
+/// A Network Characteristics Result follows every this many RTT requests.
+pub(crate) const NETCHAR_RESULT_EVERY: u32 = 4;
 
 impl AutoDetectManager {
     pub fn new() -> Self {
@@ -35,7 +42,31 @@ impl AutoDetectManager {
             next_sequence: 0,
             pending_probes: Vec::new(),
             rtt_samples: VecDeque::with_capacity(RTT_WINDOW_SIZE),
+            base_rtt_ms: None,
+            since_result: 0,
         }
+    }
+
+    /// The Network Characteristics Result due after the latest RTT request:
+    /// base and average RTT (bandwidth needs client-side byte counting, which
+    /// continuous TCP detection does not provide). `None` until a measurement
+    /// exists and between results.
+    pub fn network_characteristics(&mut self) -> Option<AutoDetectRequest> {
+        self.since_result += 1;
+        if self.since_result < NETCHAR_RESULT_EVERY {
+            return None;
+        }
+        let snapshot = self.snapshot()?;
+        self.since_result = 0;
+        let seq = self.next_sequence;
+        self.next_sequence = seq.wrapping_add(1);
+        Some(AutoDetectRequest::NetworkCharacteristicsResult {
+            sequence_number: seq,
+            request_type: ironrdp_pdu::rdp::autodetect::NETCHAR_RESULT_RTT,
+            base_rtt_ms: Some(self.base_rtt_ms.unwrap_or(snapshot.min_ms)),
+            bandwidth_kbps: None,
+            average_rtt_ms: snapshot.avg_ms,
+        })
     }
 
     /// Generate an RTT Measure Request PDU for continuous detection.
@@ -73,6 +104,7 @@ impl AutoDetectManager {
             self.rtt_samples.pop_front();
         }
         self.rtt_samples.push_back(rtt_ms);
+        self.base_rtt_ms = Some(self.base_rtt_ms.map_or(rtt_ms, |base| base.min(rtt_ms)));
 
         Some(rtt_ms)
     }
@@ -200,6 +232,41 @@ mod tests {
 
         let req2 = mgr.send_rtt_request();
         assert_eq!(req2.sequence_number(), 0, "should wrap around");
+    }
+
+    #[test]
+    fn network_characteristics_follow_measurements_periodically() {
+        let mut mgr = AutoDetectManager::new();
+        // Nothing to report before a measurement exists.
+        for _ in 0..NETCHAR_RESULT_EVERY {
+            let _ = mgr.send_rtt_request();
+            assert!(mgr.network_characteristics().is_none());
+        }
+        let req = mgr.send_rtt_request();
+        let response = AutoDetectResponse::RttResponse {
+            sequence_number: req.sequence_number(),
+        };
+        let rtt = mgr.handle_response(&response).expect("measured");
+        match mgr.network_characteristics().expect("due once data exists") {
+            AutoDetectRequest::NetworkCharacteristicsResult {
+                request_type,
+                base_rtt_ms,
+                bandwidth_kbps,
+                average_rtt_ms,
+                ..
+            } => {
+                assert_eq!(request_type, ironrdp_pdu::rdp::autodetect::NETCHAR_RESULT_RTT);
+                assert_eq!(base_rtt_ms, Some(rtt));
+                assert_eq!(bandwidth_kbps, None);
+                assert_eq!(average_rtt_ms, rtt);
+            }
+            other => panic!("expected a network characteristics result, got {other:?}"),
+        }
+        // The next result waits for another full cadence.
+        for _ in 1..NETCHAR_RESULT_EVERY {
+            assert!(mgr.network_characteristics().is_none());
+        }
+        assert!(mgr.network_characteristics().is_some());
     }
 
     #[test]

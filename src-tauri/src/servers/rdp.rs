@@ -81,6 +81,8 @@ use input::RdpInput;
 use metrics::RdpMetrics;
 
 const CONTROL_APPROVAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+/// Cadence of auto-detect RTT probes during a session.
+const AUTODETECT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(2);
 #[cfg(target_os = "macos")]
 const EXPERIMENTAL_AVC420_ENV: &str = "TAOMNI_RDP_EXPERIMENTAL_AVC420";
 #[cfg(target_os = "macos")]
@@ -643,8 +645,24 @@ async fn spawn_server(
                     }
                 };
                 server.set_credentials(Some(params.credentials.clone()));
+                // Continuous auto-detect, like Windows Remote Desktop: an RTT
+                // probe every 2 s on clients that negotiated the message
+                // channel, plus periodic Network Characteristics Results.
+                // Idle servers drop the events.
+                server.enable_autodetect();
 
                 let ev_sender = server.event_sender().clone();
+                let probes = ev_sender.clone();
+                tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(AUTODETECT_INTERVAL);
+                    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    loop {
+                        interval.tick().await;
+                        if probes.send(ServerEvent::AutoDetectRttRequest).is_err() {
+                            break;
+                        }
+                    }
+                });
                 let (addr_tx, addr_rx) = tokio::sync::oneshot::channel();
                 if ev_sender.send(ServerEvent::GetLocalAddr(addr_tx)).is_err() {
                     let _ = ready_tx.send(Err("RDP listener event channel closed".to_string()));
@@ -739,7 +757,10 @@ fn build_server(
             state: Mutex::new(ControlGateState::default()),
         })
     });
-    let metrics = RdpMetrics::new(log.clone());
+    // Auto-detect RTT (MS-RDPBCGR 2.2.14), written by the server per session
+    // and shown in the periodic latency report.
+    let network_rtt = Arc::new(std::sync::atomic::AtomicU32::new(u32::MAX));
+    let metrics = RdpMetrics::new(log.clone()).with_network_rtt(Arc::clone(&network_rtt));
     #[cfg(target_os = "macos")]
     if !params.view_only && !input::control_permission_granted() {
         anyhow::bail!(
@@ -823,7 +844,8 @@ fn build_server(
                 .with_display_handler(display)
                 .with_cliprdr_factory(cliprdr)
                 .with_sound_factory(sound)
-                .with_dvc_factory(microphone);
+                .with_dvc_factory(microphone)
+                .with_autodetect_rtt_handle(network_rtt);
             #[cfg(target_os = "macos")]
             let builder = builder.with_honor_client_desktop_size(honor_client_desktop_size);
             #[cfg(target_os = "macos")]

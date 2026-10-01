@@ -1776,7 +1776,14 @@ where
                 );
                 return Ok(ActiveOutputFlow::Reactivate);
             }
-            ActiveStageOutput::MultitransportRequest(_) | ActiveStageOutput::AutoDetect(_) => {
+            ActiveStageOutput::AutoDetect(request) => {
+                // RTT probes are answered inside ironrdp-session; the server's
+                // conclusions drive the connection bar's quality indicator.
+                if let Some(text) = network_characteristics_event(&request) {
+                    send_text(out_tx, text);
+                }
+            }
+            ActiveStageOutput::MultitransportRequest(_) => {
                 // Optional RDP transports are not established by this client.
             }
         }
@@ -2681,11 +2688,56 @@ fn send_text(out_tx: &SessionOutputSender, text: String) {
     let _ = out_tx.send(SessionOutput::Text(text));
 }
 
+/// `{"type":"network", ...}` for a server Network Characteristics Result
+/// (MS-RDPBCGR 2.2.14.1.5); other auto-detect requests carry no result.
+fn network_characteristics_event(
+    request: &ironrdp::pdu::rdp::autodetect::AutoDetectRequest,
+) -> Option<String> {
+    use ironrdp::pdu::rdp::autodetect::AutoDetectRequest;
+    let AutoDetectRequest::NetworkCharacteristicsResult {
+        base_rtt_ms,
+        bandwidth_kbps,
+        average_rtt_ms,
+        ..
+    } = request
+    else {
+        return None;
+    };
+    Some(
+        json!({
+            "type": "network",
+            "baseRttMs": base_rtt_ms,
+            "averageRttMs": average_rtt_ms,
+            "bandwidthKbps": bandwidth_kbps,
+        })
+        .to_string(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::time::Duration;
     use tokio::net::TcpStream;
+
+    #[test]
+    fn network_characteristics_become_a_network_event() {
+        use ironrdp::pdu::rdp::autodetect::{AutoDetectRequest, NETCHAR_RESULT_RTT};
+        let result = AutoDetectRequest::NetworkCharacteristicsResult {
+            sequence_number: 7,
+            request_type: NETCHAR_RESULT_RTT,
+            base_rtt_ms: Some(3),
+            bandwidth_kbps: None,
+            average_rtt_ms: 5,
+        };
+        let event: serde_json::Value =
+            serde_json::from_str(&network_characteristics_event(&result).unwrap()).unwrap();
+        assert_eq!(event["type"], "network");
+        assert_eq!(event["baseRttMs"], 3);
+        assert_eq!(event["averageRttMs"], 5);
+        assert!(event["bandwidthKbps"].is_null());
+        assert!(network_characteristics_event(&AutoDetectRequest::rtt_continuous(1)).is_none());
+    }
 
     /// Live RDP fixtures commonly use a self-signed certificate. Keep the
     /// production default fail-closed, while letting an operator explicitly

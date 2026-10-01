@@ -198,13 +198,21 @@ impl CliprdrBackend for ProbeClipboard {
         self.with(|s| s.ready = true);
     }
 
-    /// Monitor Ready: like mstsc, announce the current clipboard once.
+    /// Monitor Ready: like mstsc, announce the current clipboard once. The
+    /// first format list also completes CLIPRDR initialisation, and
+    /// ironrdp-cliprdr only accepts `initiate_file_copy` once Ready, so files
+    /// follow as the next copy (the scenario sends them on `on_ready`).
     fn on_request_format_list(&mut self) {
         self.record("request-format-list");
         self.with(|s| {
-            let advert = s.local.advert();
-            s.actions.push_back(ClipAction::Advertise(advert));
-            s.announced = true;
+            let files = !s.local.files.is_empty();
+            let initial = if files {
+                Advert::Formats(Vec::new())
+            } else {
+                s.local.advert()
+            };
+            s.actions.push_back(ClipAction::Advertise(initial));
+            s.announced = !files;
         });
     }
 

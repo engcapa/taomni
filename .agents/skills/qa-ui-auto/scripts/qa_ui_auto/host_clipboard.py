@@ -79,9 +79,17 @@ def _xclip_set(mime: str, data: bytes) -> None:
     if not shutil.which("xclip"):
         raise RuntimeError("xclip is not installed")
     # xclip forks a background owner that serves the selection until another
-    # client takes ownership; the parent exits once the data is read.
-    subprocess.run(["xclip", "-selection", "clipboard", "-t", mime, "-i"], input=data,
-                   check=True, timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    # client takes ownership; the parent exits once the data is read. The
+    # owner inherits stdout/stderr, so they must not be pipes this process
+    # waits on (a pipe stays open until the owner exits): stderr goes to a
+    # file instead.
+    with tempfile.TemporaryFile() as err:
+        result = subprocess.run(["xclip", "-selection", "clipboard", "-t", mime, "-i"],
+                                input=data, timeout=10, stdout=subprocess.DEVNULL, stderr=err)
+        if result.returncode:
+            err.seek(0)
+            raise RuntimeError(f"xclip failed ({result.returncode}): "
+                               f"{err.read().decode('utf-8', 'replace')[-1500:]}")
 
 
 def _xclip_get(mime: str) -> bytes:

@@ -125,7 +125,48 @@ export type RdpWsText =
   | { type: "status"; stage: string; detail: string }
   | { type: "clipboard"; text: string }
   | { type: "clipboard_files"; paths: string[]; text?: string }
+  | ({ type: "network" } & RdpNetworkInfo)
   | { type: "error"; code: string; message: string; retryable?: boolean };
+
+/** Server-measured network characteristics (MS-RDPBCGR 2.2.14.1.5). */
+export interface RdpNetworkInfo {
+  baseRttMs: number | null;
+  averageRttMs: number;
+  bandwidthKbps: number | null;
+}
+
+export type RdpQualityLevel = 0 | 1 | 2 | 3 | 4;
+
+/**
+ * Connection-bar quality in four bars (0 = not measured), from the average
+ * RTT and, when the server measured it, capped by the bandwidth.
+ */
+export function rdpNetworkQuality(info: RdpNetworkInfo | null): RdpQualityLevel {
+  if (!info || !Number.isFinite(info.averageRttMs)) return 0;
+  const rtt = info.averageRttMs;
+  let level: RdpQualityLevel = rtt <= 30 ? 4 : rtt <= 80 ? 3 : rtt <= 150 ? 2 : 1;
+  if (typeof info.bandwidthKbps === "number") {
+    const kbps = info.bandwidthKbps;
+    const cap: RdpQualityLevel = kbps >= 10_000 ? 4 : kbps >= 2_000 ? 3 : kbps >= 512 ? 2 : 1;
+    level = Math.min(level, cap) as RdpQualityLevel;
+  }
+  return level;
+}
+
+/** Key sequence for Ctrl+Alt+Del as (down, wire scancode) pairs. */
+export function ctrlAltDelSequence(): Array<[boolean, number]> {
+  const ctrl = 0x1d;
+  const alt = 0x38;
+  const del = applyExtended(0x53, true);
+  return [
+    [true, ctrl],
+    [true, alt],
+    [true, del],
+    [false, del],
+    [false, alt],
+    [false, ctrl],
+  ];
+}
 
 export function parseRdpWsText(data: string): RdpWsText | null {
   try {

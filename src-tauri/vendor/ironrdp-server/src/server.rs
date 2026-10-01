@@ -855,6 +855,11 @@ impl RdpServer {
         // here also covers backends that share an externally-created Arc via
         // `set_display_suppressed_handle()`.
         self.display_suppressed.store(false, Ordering::Relaxed);
+        // RTT samples and the base RTT describe one client's network path.
+        if self.autodetect.is_some() {
+            self.autodetect = Some(AutoDetectManager::new());
+            self.autodetect_rtt.store(u32::MAX, Ordering::Relaxed);
+        }
 
         let framed = TokioFramed::new(stream);
 
@@ -1353,6 +1358,16 @@ impl RdpServer {
                             user_channel_id,
                         )?;
                         writer.write_all(&data).await?;
+                        // Periodically tell the client what was measured, as
+                        // Windows does once its detection settles.
+                        if let Some(result) = ad.network_characteristics() {
+                            let data = encode_autodetect_request(
+                                result,
+                                message_channel_id,
+                                user_channel_id,
+                            )?;
+                            writer.write_all(&data).await?;
+                        }
                     }
                 }
             }

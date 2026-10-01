@@ -7,6 +7,7 @@
 //! five seconds, and never contain screen pixels, credentials, or input data.
 
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -23,6 +24,8 @@ pub(crate) struct RdpMetrics {
     /// `None` only in unit tests, which have no Tauri `AppHandle` to emit
     /// through. Recording stays fully active either way.
     log: Option<LogEmitter>,
+    /// Auto-detect RTT shared with the RDP server (see `with_network_rtt`).
+    network_rtt: Option<Arc<AtomicU32>>,
 }
 
 struct MetricsState {
@@ -105,6 +108,7 @@ impl RdpMetrics {
                 input_age_us: SampleWindow::default(),
             })),
             log,
+            network_rtt: None,
         }
     }
 
@@ -241,14 +245,28 @@ impl RdpMetrics {
             age,
             input,
         ) = snapshot;
+        // Network RTT from auto-detect; u32::MAX until the first measurement.
+        let rtt = self
+            .network_rtt
+            .as_ref()
+            .map(|rtt| rtt.load(Ordering::Relaxed))
+            .filter(|rtt| *rtt != u32::MAX)
+            .map(|rtt| format!(" network-rtt={rtt}ms"))
+            .unwrap_or_default();
         log.line(format!(
-            "RDP latency: captured={captured} forwarded={forwarded} duplicate={duplicates} replaced={replaced} input-coalesced={input_coalesced} input-dropped={input_dropped} raw={}MiB{}{}{}{}",
+            "RDP latency: captured={captured} forwarded={forwarded} duplicate={duplicates} replaced={replaced} input-coalesced={input_coalesced} input-dropped={input_dropped} raw={}MiB{}{}{}{}{rtt}",
             bytes / (1024 * 1024),
             fmt(" capture", capture),
             fmt(" hash", hash),
             fmt(" frame-age", age),
             fmt(" input", input),
         ));
+    }
+
+    /// Include the auto-detect network RTT in the periodic report.
+    pub(crate) fn with_network_rtt(mut self, rtt: Arc<AtomicU32>) -> Self {
+        self.network_rtt = Some(rtt);
+        self
     }
 }
 

@@ -2723,6 +2723,45 @@ controls:
   - id: view-cycle
     selector: '[data-testid="rdp-view-cycle"]'
     kind: interactive       # one button cycles normal → maximized → fullscreen
+  - id: ctrl-alt-del
+    selector: '[data-testid="rdp-ctrl-alt-del"]'
+    kind: interactive
+  - id: connection-bar
+    selector: '[data-testid="rdp-connection-bar"]'
+    kind: display
+    optional: true       # only in OS full screen while connected
+  - id: bar-hotzone
+    selector: '[data-testid="rdp-bar-hotzone"]'
+    kind: display
+    optional: true       # only in OS full screen while connected
+  - id: bar-pin
+    selector: '[data-testid="rdp-bar-pin"]'
+    kind: interactive
+    optional: true       # only in OS full screen while connected
+  - id: bar-quality
+    selector: '[data-testid="rdp-bar-quality"]'
+    kind: display
+    optional: true       # only in OS full screen while connected
+  - id: bar-title
+    selector: '[data-testid="rdp-bar-title"]'
+    kind: display
+    optional: true       # only in OS full screen while connected
+  - id: bar-ctrl-alt-del
+    selector: '[data-testid="rdp-bar-ctrl-alt-del"]'
+    kind: interactive
+    optional: true       # only in OS full screen while connected
+  - id: bar-minimize
+    selector: '[data-testid="rdp-bar-minimize"]'
+    kind: interactive
+    optional: true       # only in OS full screen while connected
+  - id: bar-restore
+    selector: '[data-testid="rdp-bar-restore"]'
+    kind: interactive
+    optional: true       # only in OS full screen while connected
+  - id: bar-disconnect
+    selector: '[data-testid="rdp-bar-disconnect"]'
+    kind: interactive
+    optional: true       # only in OS full screen while connected
 -->
 
 - Tauri desktop 模式下通过 IronRDP 0.17 驱动真实 RDP 会话：CredSSP/NLA、active-stage 图像解码、键盘/鼠标/滚轮输入、画布绘制
@@ -2731,6 +2770,7 @@ controls:
 - resize 优先使用 DisplayControl DVC；服务器不开放该通道时保持同一 WS/control session 并按新桌面尺寸重连
 - RDP options 表单已持久化 domain、color depth、NLA/performance、clipboard、audio、drive redirection、RD Gateway 配置
 - 浏览器预览模式只提供 desktop-only stub；真实协议连接和画面验证必须在 Tauri/native 或 Rust live test 环境下执行
+- OS 全屏连接栏（仿 mstsc）：固定、连接质量（服务端 Network Characteristics Result 的 RTT/带宽 → 4 格）、主机名、Ctrl+Alt+Del、最小化、还原、断开；未固定时 2.5 s 后收起，顶部 4 px 热区、Tab 聚焦或 Ctrl+Alt+Home 重新显示；窗口模式工具栏也有 Ctrl+Alt+Del。TC-RDPJ-01 用同一 QA 构建的客户端连接自家服务端联合验证
 
 ### 9.8 WSL 会话类型（WSL session）✅
 

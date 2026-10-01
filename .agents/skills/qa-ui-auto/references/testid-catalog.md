@@ -1459,6 +1459,16 @@
 - `[data-testid="rdp-chat-toggle"]` — interactive [optional] — F9.7.chat-toggle
 - `[data-testid="rdp-detach"]` — interactive — F9.7.detach
 - `[data-testid="rdp-view-cycle"]` — interactive — F9.7.view-cycle
+- `[data-testid="rdp-ctrl-alt-del"]` — interactive — F9.7.ctrl-alt-del
+- `[data-testid="rdp-connection-bar"]` — display [optional] — F9.7.connection-bar
+- `[data-testid="rdp-bar-hotzone"]` — display [optional] — F9.7.bar-hotzone
+- `[data-testid="rdp-bar-pin"]` — interactive [optional] — F9.7.bar-pin
+- `[data-testid="rdp-bar-quality"]` — display [optional] — F9.7.bar-quality
+- `[data-testid="rdp-bar-title"]` — display [optional] — F9.7.bar-title
+- `[data-testid="rdp-bar-ctrl-alt-del"]` — interactive [optional] — F9.7.bar-ctrl-alt-del
+- `[data-testid="rdp-bar-minimize"]` — interactive [optional] — F9.7.bar-minimize
+- `[data-testid="rdp-bar-restore"]` — interactive [optional] — F9.7.bar-restore
+- `[data-testid="rdp-bar-disconnect"]` — interactive [optional] — F9.7.bar-disconnect
 
 ## servers (F-Servers-1)
 
