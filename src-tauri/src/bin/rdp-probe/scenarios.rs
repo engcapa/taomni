@@ -414,11 +414,17 @@ async fn throughput(args: &Args) -> ScenarioResult {
     report["graphics_updates_in_window"] = json!(session.graphics_updates - updates_start);
     report["frame_gap_ms"] = stats::summary(&gaps);
     if marker.is_some() {
+        let observed = marker_frames.saturating_sub(marker_skips);
         report["marker"] = json!({
             "frames": marker_frames,
             "fps": f64::from(marker_frames) / elapsed,
             // Frames the client never saw (level jumped by more than one).
             "skipped": marker_skips,
+            // Distinct animation frames the client displayed (M3): unlike
+            // `fps` above it is not inflated when one frame arrives as
+            // several partial updates.
+            "observed": observed,
+            "observed_fps": f64::from(observed) / elapsed,
         });
     }
     Ok(report)

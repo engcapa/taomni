@@ -11,6 +11,8 @@
 * ``assert_json_file`` assert values in a JSON file inside the report root.
 * ``rdp_canvas_click`` click a remote-desktop coordinate inside the Taomni
                       RDP client canvas with W3C pointer input.
+* ``save_text``       keep an element's text (e.g. the server log) as a
+                      report-root file for diagnostics, pass or fail.
 
 Connection defaults come from the ``rdp_server_required`` fixture through
 ``QA_RDP_PORT`` / ``QA_RDP_USER`` / ``QA_RDP_PASSWORD``; the password is only
@@ -565,3 +567,17 @@ def _do_rdp_canvas_click(ctx: NativeStepContext, args: Any) -> str:
         ]}]})
     ctx.session.request("DELETE", ctx.session.endpoint("/actions"))
     return f"clicked desktop ({args['x']},{args['y']}) at viewport ({vx},{vy}) scale {sx:.3f}x{sy:.3f}"
+
+
+# ------------------------------------------------------------------- save_text
+
+@_verb("save_text")
+def _do_save_text(ctx: NativeStepContext, args: Any) -> str:
+    """Write an element's text into the report root (diagnostics, no assertion)."""
+    if not isinstance(args, dict) or not args.get("selector") or not args.get("path"):
+        raise StepError("save_text: expected {selector, path}")
+    path = _within_report(ctx, str(args["path"]))
+    text = ctx.session.text(str(args["selector"]))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return f"saved {len(text)} characters of {args['selector']} to {path.name}"

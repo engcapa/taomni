@@ -4,13 +4,16 @@ description: |
   V-13 (docs-feature/rdp-server-parity-design.md §4.7, AC-16). Measures the
   Taomni RDP server with rdp-probe over loopback on the runner desktop:
   M1 connect/first-graphics time, M2 input-to-frame latency (40 clicks on a
-  host Tk target that inverts colour per click) and M3/M4 visible-change
-  rate and bandwidth while a 640x360 host animation runs.
+  host Tk target that inverts colour per click) and M3/M4 distinct animation
+  frames per second and bandwidth while a 640x360 host animation runs.
 
-  Round 1 records the baseline: expectations only guard that measurement
-  happened (enough samples, non-zero throughput). The budgets derived from
-  the Windows TermService baseline replace these guards once measured; they
-  may only be tightened afterwards (DEC-04).
+  The measurement steps only guard that measurement happened, so every
+  report is kept; the last steps then hold the reports to the absolute
+  budgets of design §4.7, derived from Windows TermService on the same
+  runner and probe (run 36835206663, TC-RDPS-PERF-02): M1 ≤ 500 ms,
+  M2 p95 ≤ 65 ms, M3 ≥ 25.6 fps, M4 ≤ 4905 kbps. Budgets may only be
+  tightened (DEC-04). The server log is saved as server-log.txt for the
+  capture and encoder timings.
 
   Measured on a release QA build (release_build_required) on all three
   platforms; on Windows platform_choice picks Taomni over the running system
@@ -125,10 +128,30 @@ steps:
 - host_helper:
     action: stop
     name: animation
+- save_text:
+    selector: '[data-testid="server-log"]'
+    path: server-log.txt
 - click: '[data-testid="server-row-rdp-stop"]'
 - wait_for:
     selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
     timeout_sec: 30
+- assert_json_file:
+    path: perf-connect.json
+    expect:
+      first_graphics_ms:
+        max: 500
+- assert_json_file:
+    path: perf-latency.json
+    expect:
+      latency_ms.p95:
+        max: 65
+- assert_json_file:
+    path: perf-throughput.json
+    expect:
+      marker.observed_fps:
+        min: 25.6
+      kbps:
+        max: 4905
 verification:
   review: pending
   requirements:
@@ -148,6 +171,23 @@ verification:
     results:
     - 19
     - 22
+  - id: R2
+    requirement: The measurements meet the absolute budgets of design §4.7, derived from Windows TermService on the same runner and probe (run 36835206663).
+    actions:
+    - 17
+    - 19
+    - 22
+    checkpoints:
+    - step: 27
+      expectation: The first graphics update arrives within 500 ms of activation (M1).
+    - step: 28
+      expectation: Input-to-frame latency p95 is at most 65 ms (M2).
+    - step: 29
+      expectation: At least 25.6 distinct animation frames per second are displayed (M3) using at most 4905 kbps (M4).
+    results:
+    - 27
+    - 28
+    - 29
   native:
   - check: Real capture, encoder, network loopback and input injection timings on the hosted runner.
     method: automated

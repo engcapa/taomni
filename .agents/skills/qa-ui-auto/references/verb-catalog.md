@@ -199,6 +199,7 @@ Native verbs live in `scripts/qa_ui_auto/rdp_steps.py`. Connection defaults come
 | `host_make_tree` | `{root, files: {relative path: text}}` | Native only. Creates a new sample tree (UTF-8 files, nested directories, Unicode names) inside the case directory and writes `<root>-tree.json` with the SHA-256 of every entry. Used as the source and oracle of clipboard file transfers. |
 | `platform_choice` | `{platforms: [Linux\|Windows\|macOS], dialog, click, timeout_sec?=30, absent_sec?=3}` | Native only. For a prompt that exists only on some platforms (e.g. the Windows system Remote Desktop choice): on the listed platforms the `dialog` must appear and `click` answers it; elsewhere it must stay absent for `absent_sec`. Both branches assert. |
 | `assert_json_file` | `{path, expect, timeout_sec?}` | Native only. Polls a JSON file inside the report root (e.g. the helper state) with the `rdp_probe` expectation syntax. |
+| `save_text` | `{selector, path}` | Native only, diagnostics. Writes the element's text (e.g. `server-log`) to a file inside the report root so passing runs keep it too; asserts nothing. |
 | `rdp_canvas_click` | `{x, y, selector?='[data-testid="rdp-canvas"]'}` | Native only. Maps a remote desktop coordinate to the Taomni RDP client canvas (CSS scale from its bounding box and intrinsic size) and clicks with W3C pointer actions; used by joint client↔server cases. |
 
 ## Last-resort escape hatch

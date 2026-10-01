@@ -1319,6 +1319,25 @@
         },
         "rdp_canvas_click": {
           "$ref": "#/$defs/rdp_canvas_click_arg"
+        },
+        "save_text": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selector",
+            "path"
+          ],
+          "description": "Native-only diagnostics: write an element's text to a file inside the report root.",
+          "properties": {
+            "selector": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     },
