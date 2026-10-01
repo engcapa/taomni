@@ -145,6 +145,21 @@ PERF-001 → PERF-002 → INPUT-001 / INPUT-002 / VIEW-001 / SESS-001 / SESS-002
 
 参照：[总体设计](alignment-design.md#vnc-auth-001) / [ARD 设计](vnc-ard-macos-design.md)。
 
+### VNC-AUTH-002 凭据按需询问
+<!-- vnc-task {"id":"VNC-AUTH-002","status":"ready","priority":"P1","size":"M","depends_on":[],"spec":"docs-feature/vnc-realvnc-alignment/alignment-design.md#vnc-auth-002","acceptance":["VNC-AUTH-002-A1","VNC-AUTH-002-A2","VNC-AUTH-002-A3"],"required_evidence":["code-audit","rust","unit","native","live-vnc"],"audit":{"date":"2026-10-01","head":"864fef35","finding":"没保存密码的会话打开前总弹密码框且不能空提交，只提供 None 的服务器要输入占位字符；RealVNC 只在服务器要求时询问"},"prior_completion":{"kind":"new-task","completed":false},"p0":{"audit_id":"LIVE-VMWARE-20261001","planning_required":false},"updated_at":"2026-10-01T08:39:33Z"} -->
+
+目标：没有密码的服务器直接连上，需要密码时才在会话内询问。参照：[总体设计](alignment-design.md#vnc-auth-002) / [VMware 实测](references/vmware-vnc-live-20261001.md)。
+
+### VNC-PERF-006 首选编码被忽略时调整编码顺序
+<!-- vnc-task {"id":"VNC-PERF-006","status":"ready","priority":"P1","size":"S","depends_on":[],"spec":"docs-feature/vnc-realvnc-alignment/alignment-design.md#vnc-perf-006","acceptance":["VNC-PERF-006-A1","VNC-PERF-006-A2"],"required_evidence":["code-audit","rust","live-vnc","performance"],"audit":{"date":"2026-10-01","head":"864fef35","finding":"VMware 内置 VNC 只看客户端列表第一项：High/Automatic 以 ZRLE 为首时回 Raw，整帧 7.45 MB"},"prior_completion":{"kind":"new-task","completed":false},"p0":{"audit_id":"LIVE-VMWARE-20261001","planning_required":false},"updated_at":"2026-10-01T08:39:33Z"} -->
+
+目标：只看第一项的服务器上 High 也拿到压缩编码。参照：[总体设计](alignment-design.md#vnc-perf-006) / [VMware 实测](references/vmware-vnc-live-20261001.md)。
+
+### VNC-CONN-002 会话编辑器 VNC 分区本地化
+<!-- vnc-task {"id":"VNC-CONN-002","status":"done","priority":"P2","size":"S","depends_on":[],"spec":"docs-feature/vnc-realvnc-alignment/alignment-design.md#vnc-conn-002","acceptance":["VNC-CONN-002-A1"],"required_evidence":["code-audit","unit","typecheck"],"audit":{"date":"2026-10-01","head":"864fef35","finding":"会话编辑器 VNC 分区的标签、选项与说明写死英文"},"prior_completion":{"kind":"new-task","completed":false},"p0":{"audit_id":"LIVE-VMWARE-20261001","planning_required":false},"updated_at":"2026-10-01T08:45:26Z","evidence":{"verified_at":"2026-10-01T08:45:00Z","head":"864fef35 + VNC-CONN-002 worktree","checks":[{"kind":"code-audit","result":"passed","command":"review src/components/session/SessionEditor.tsx VNC section against src/components/vnc/VncPropertiesDialog.tsx and src/lib/i18n/locales/{en,zh-CN}.ts","summary":"every label, option and the security note of the Session Editor VNC section now goes through t(); options shared with the in-session Properties dialog (picture quality, scaling, preserve aspect, keys, menu key, clipboard direction, send clipboard on connect, connection checkboxes) use the same vnc.* keys; the security policy label and its five options, Input, the view-only hint, Clipboard on connect and the note use sessionEditor2.* keys added in both locales. English wording is unchanged except the scaling option 'Automatic', which now reads 'Scale Automatically' like Properties","acceptance":["VNC-CONN-002-A1"]},{"kind":"unit","result":"passed","command":"pnpm exec vitest run src/components/session/SessionEditor.test.tsx src/lib/i18n","summary":"62 passed; new cases render the VNC section in English (Security policy, Allow unauthenticated None, Scale Automatically, connection wording, note) and in Chinese (all section labels, the five security-policy options in order, the note, no English leftovers)","acceptance":["VNC-CONN-002-A1"]},{"kind":"typecheck","result":"passed","command":"pnpm exec tsc -b","summary":"exit 0 (translation keys are type-checked)","acceptance":["VNC-CONN-002-A1"]}],"unrun":["No native or browser run: the change is static text in the Session Editor; the existing VNC QA cases select controls by test id"],"notes":[]},"last_attempt":{"owner":"claude-20261001-864fef35","claimed_from":"ready","claimed_at":"2026-10-01T08:40:05Z","baseline":"864fef35","finished_at":"2026-10-01T08:45:26Z","result":"done","note":null}} -->
+
+目标：VNC 分区随界面语言显示。参照：[总体设计](alignment-design.md#vnc-conn-002)。
+
 ## 当前批次边界
 
 不覆盖 RealVNC Server 专属能力（音频、录制、文件传输、聊天、打印、云连接、团队地址簿、SSO/智能卡）、地址簿缩略图与云同步、UDP RFB、会话录制和多窗口拖放。出现具体需求时新增独立卡。
