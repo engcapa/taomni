@@ -26,6 +26,7 @@ steps:
 - wait_for:
     selector: '[data-testid="screenshot-base-image"]'
     timeout_sec: 10
-- click: '[data-testid="screenshot-cancel"]'
+# In select phase there is no cancel button; ESC closes the overlay.
+- press: Escape
 - wait_for:
     selector: '[data-testid="system-screenshot"]'

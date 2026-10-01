@@ -15,6 +15,7 @@ steps:
 - open: ${cfg.app.base_url}
 # Ensure the main window (and Tauri API) is ready before invoking backends.
 - wait_for: '[data-testid="system-screenshot"]'
+- wait: 5
 # Scroll capture drives the OS wheel over the given region and stitches
 # frames; verify the backend resolves with a stitched image file.
 - eval_readonly:
