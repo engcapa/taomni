@@ -246,14 +246,18 @@ export function ScreenshotOverlay() {
     };
   }, []);
 
-  // Escape closes the record dropdown when open.
+  // Escape closes the record dropdown when open (stopImmediatePropagation so
+  // the overlay's own Escape-to-close does not fire).
   useEffect(() => {
     if (!recordOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setRecordOpen(false);
+      if (e.key === "Escape") {
+        e.stopImmediatePropagation();
+        setRecordOpen(false);
+      }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [recordOpen]);
 
   // Init: prefer the pending overlay payload; fall back to a live fullscreen
