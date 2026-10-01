@@ -751,6 +751,8 @@ type LspLocationOpenOptions = {
   onRevealed?: (ref: CodeWorkspaceFileRef, position: LspPosition) => void;
 };
 
+const TREE_DETAILS_STORAGE_KEY = "taomni.codeWorkspace.tree.details";
+
 function semanticLocationsFromResult(result: {
   status: LspDocumentStatus;
   locations: LspLocation[];
@@ -3374,6 +3376,18 @@ export function CodeWorkspaceTab({
     writeCodeWorkspaceTreeViewMode(mode);
     setStatusMessage(`File tree view: ${mode}`);
   }, [patchWorkspaceUi, setStatusMessage, workspaceInstanceId]);
+
+  // IDEA Project view Appearance › Details (file time and size); a per-viewer
+  // preference, so browser storage is enough and failures fall back to off.
+  const [treeShowDetails, setTreeShowDetailsState] = useState(() => {
+    try { return localStorage.getItem(TREE_DETAILS_STORAGE_KEY) === "true"; }
+    catch { return false; }
+  });
+  const setTreeShowDetails = useCallback((value: boolean) => {
+    setTreeShowDetailsState(value);
+    try { localStorage.setItem(TREE_DETAILS_STORAGE_KEY, value ? "true" : "false"); }
+    catch { /* storage unavailable: keep the in-memory choice */ }
+  }, []);
 
   const zoomTargetForNode = useCallback((target: EventTarget | null): "tree" | "editor" => {
     const node = target instanceof Node ? target : null;
@@ -16634,6 +16648,8 @@ export function CodeWorkspaceTab({
     onSelect: setSelected,
     onOpenFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean }) => { void requestTreeOpen(ref, options); },
     onContextMenu: showTreeContextMenu,
+    onAddFolder: () => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" }),
+    onOpenLooseFile: () => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" }),
   });
 
   // ED-PARITY-010 DEC-010-01: IDEA tool window stripes. The bottom-dock tools
@@ -22161,8 +22177,11 @@ export function CodeWorkspaceTab({
         onExpandAll={expandAllProjectTree}
         onCollapseAll={collapseAllProjectTree}
         toolWindowOptions={() => toolWindowOptionsItems("project")}
+        showDetails={treeShowDetails}
+        onShowDetailsChange={setTreeShowDetails}
       >
         <ProjectTree
+          showDetails={treeShowDetails}
           roots={roots}
           looseFiles={looseFiles}
           directories={directories}

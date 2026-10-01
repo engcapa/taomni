@@ -1361,6 +1361,8 @@ describe("CodeWorkspaceTab", () => {
       "var(--taomni-code-tree-font-size)",
     );
 
+    fireEvent.click(screen.getByTestId("code-workspace-tree-toolbar-more"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-menu-appearance"));
     fireEvent.click(screen.getByTestId("code-workspace-tree-zoom-in"));
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
     expect(screen.getByTestId("code-workspace-tree-pane").style.getPropertyValue("--taomni-code-tree-font-size")).toBe("13px");
@@ -1388,6 +1390,8 @@ describe("CodeWorkspaceTab", () => {
     saved = JSON.parse(window.localStorage.getItem(appearanceKey) ?? "{}");
     expect(saved.profile.fontSizePx).toBe(14);
 
+    fireEvent.click(screen.getByTestId("code-workspace-tree-toolbar-more"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-menu-appearance"));
     fireEvent.click(screen.getByTestId("code-workspace-tree-zoom-out"));
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
   });
@@ -1414,7 +1418,8 @@ describe("CodeWorkspaceTab", () => {
     renderWorkspace(workspace);
 
     expect(await screen.findByText("Code · Flat")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("code-workspace-view-flat"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-view-selector"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-view-project-files"));
 
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeViewMode.v1")).toBe("flat");
     expect(await screen.findByText("src")).toBeInTheDocument();
@@ -1498,7 +1503,9 @@ describe("CodeWorkspaceTab", () => {
     renderWorkspace(workspace);
 
     expect(await screen.findByText("Code · Compact")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("code-workspace-view-compact"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-toolbar-more"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-menu-appearance"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-menu-compact"));
 
     const compactDir = await screen.findByText("src/main/java/com/example");
     fireEvent.doubleClick(compactDir);
@@ -6702,8 +6709,8 @@ describe("CodeWorkspaceTab", () => {
     const after = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav");
     expect(after.editorGroups.primary).toEqual(before.editorGroups.primary);
     expect(after.openFiles).toEqual(before.openFiles);
-    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-open-file"), { key: "ArrowDown" });
-    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-filter"), { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-new"), { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-view-selector"), { key: "ArrowDown" });
     expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav").treeSelection).toEqual(after.treeSelection);
   });
 
@@ -7214,6 +7221,7 @@ describe("CodeWorkspaceTab", () => {
     expect(disk.has("src/bookmark.ts")).toBe(false);
 
     vi.mocked(promptAppDialog).mockResolvedValueOnce("src/bookmark.ts");
+    fireEvent.click(screen.getByTestId("code-workspace-tree-new"));
     fireEvent.click(screen.getByTestId("code-workspace-tree-new-file"));
     await waitFor(() => expect(screen.getByTestId("code-workspace-bookmark-item"))
       .toHaveAttribute("data-state", "current"));
@@ -13879,6 +13887,8 @@ end_of_record
       renderWorkspace(workspace);
       await screen.findByTitle("app / src/App.java");
 
+      // IDEA speed search: typing in the tree opens the search field.
+      fireEvent.keyDown(screen.getByTestId("code-workspace-tree-pane"), { key: "a" });
       const filterInput = screen.getByTestId("code-workspace-tree-filter");
       filterInput.focus();
       expect(document.activeElement).toBe(filterInput);
