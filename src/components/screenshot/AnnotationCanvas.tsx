@@ -418,6 +418,10 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       }
     };
 
+    // Debounce rapid number placements (some synthetic clicks fire mousedown
+    // twice in quick succession).
+    const lastNumberTime = useRef(0);
+
     const handleMouseDown = (e: ReactMouseEvent) => {
       if (e.button !== 0 || tool === "select") return;
       // Text tool is handled onClick (below). Number tool places on mousedown
@@ -425,6 +429,9 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       if (tool === "text") return;
       const p = localPos(e);
       if (tool === "number") {
+        const now = Date.now();
+        if (now - lastNumberTime.current < 300) return;
+        lastNumberTime.current = now;
         const num = numberRef.current++;
         addShape({ id: idRef.current++, kind: "number", x: p.x, y: p.y, num, color, lineWidth });
         return;
@@ -498,10 +505,20 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     const handleClick = (e: React.MouseEvent) => {
       // Text tool is handled onClick (not mousedown): a drag's mouseup would
       // blur the freshly opened input via onBlur=commitText before it can be used.
-      if (tool !== "text") return;
+      // Number tool also handles click (with shared debounce) for synthetic
+      // clicks where mousedown may not fire (e.g. macOS).
+      if (tool !== "text" && tool !== "number") return;
       const p = localPos(e);
-      setTextAt(p);
-      setTextValue("");
+      if (tool === "text") {
+        setTextAt(p);
+        setTextValue("");
+      } else {
+        const now = Date.now();
+        if (now - lastNumberTime.current < 300) return;
+        lastNumberTime.current = now;
+        const num = numberRef.current++;
+        addShape({ id: idRef.current++, kind: "number", x: p.x, y: p.y, num, color, lineWidth });
+      }
     };
 
     return (
