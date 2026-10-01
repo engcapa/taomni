@@ -154,7 +154,8 @@ Windows 基线：CI fixture 创建一次性本地账号，临时启用系统远�
 - 运行 36809758793（debug 构建）：Linux/macOS 的 NAT-01、PERF-01 通过。RemoteFX 下 M2 p50 约 130–170 ms、M3 7–12 fps，首帧 0.6–1.4 s；QOIZ 首帧 80–230 ms。CI 默认是 debug 构建，这些数值不能作为预算依据；性能用例改为 `release_build_required`（release + 保留 debug 断言以维持 QA 隔离钩子），TermService 基线由 TC-RDPS-PERF-02 采集。
 - Windows runner 默认启用并运行系统远程桌面（3389），因此 Windows 上的启动流程先弹出选择；跨平台用例以 `platform_choice` 在 Windows 回答“仍使用 Taomni”，其它平台断言不出现。
 - TermService 基线（运行 36835206663）：Server 2025 忽略客户端指定的初始程序，基线目标改由 fixture 写入的 HKLM Run 项在会话登录时启动；首次连接在会话内等待目标就绪（约 105–127 s，含首次登录），测量连接复用已登录会话。
-- 同一运行的 Taomni release 构建（M1 / M2 p50、p95 / M3 / M4）：Windows 33 ms / 22.1、46.2 ms / 33.5 fps / 11520 kbps；Linux 105 ms / 32.4、47.8 ms / 88.6 fps / 9679 kbps；macOS 49 ms / 47.4、67.6 ms / 18.7 fps / 6545 kbps。三端 M4 均超预算（Windows 为 TS 的 3.5 倍），macOS 的 M2 p95 与 M3 也未达标，归 TASK-11。探针报告新增 `rfx` 段（量化表、每帧 tile 数与字节数），用于对比 TermService 与 Taomni 的 RemoteFX 编码差异。
+- 同一运行的 Taomni release 构建（M1 / M2 p50、p95 / M3 / M4）：Windows 33 ms / 22.1、46.2 ms / 33.5 fps / 11520 kbps；Linux 105 ms / 32.4、47.8 ms / 88.6 fps / 9679 kbps；macOS 49 ms / 47.4、67.6 ms / 18.7 fps / 6545 kbps。三端 M4 均超预算（Windows 为 TS 的 3.5 倍），macOS 的 M2 p95 与 M3 也未达标，归 TASK-11。探针报告新增 `rfx` 段（量化表、每帧 tile 数与字节数、各快速路径更新类型的次数与字节），用于对比 TermService 与 Taomni 的编码差异。
+- 编码差异（运行 36841872978，同一 640×360 动画区域）：TermService 虽然收到了探针的 RemoteFX 能力，仍用 bitmap 更新（318 次 / 10 s，平均 11.4 KB）；Taomni 用 RemoteFX image mode，固定默认量化表 `6,6,6,6,7,7,8,8,8,9`，Windows 每帧 63.4 个 tile、42.4 KB（Linux 30.1 个 tile、12.7 KB，但每秒 110 次部分更新）。离线用 ironrdp-graphics 0.9 编码同一画面：RemoteFX 默认量化 24.4 KB/帧，量化整体 +2 为 18.5 KB（-24%），+3 为 15.9 KB（-35%），RDP6 planar 为 22.5 KB（-8%）。单靠调整量化或换 planar 都达不到 M4 预算（需降到约 40%），而且整体加大量化会损害文字清晰度。因此 TASK-11 需要内容自适应编码：静态或平坦区域与运动区域分开编码，或改用 RemoteFX progressive / AVC420 通道，属于编码器层面的改动，不是参数调优。PERF-01 已按预算断言，在完成这项改动前它会如实报告 M4 不达标。
 
 ### 4.8 测试基础设施（TASK-01、TASK-02）
 

@@ -62,7 +62,16 @@ pub(crate) fn dominant_frequency(samples: &[f32], rate: u32) -> Option<f64> {
         return None;
     }
     let fs = f64::from(rate);
-    let coarse = hann(&samples[..samples.len().min(2048)]);
+    // Skip the first 100 ms when enough remains: devices often start with a
+    // transient (a virtual cable replays its buffered audio at double speed),
+    // and a short coarse window placed on it would lock onto the wrong tone.
+    let skip = (rate / 10) as usize;
+    let samples = if samples.len() >= skip + (rate / 2) as usize {
+        &samples[skip..]
+    } else {
+        samples
+    };
+    let coarse = hann(&samples[..samples.len().min((rate / 4) as usize)]);
     let mut best = (0.0, 0.0);
     let mut f = 50.0;
     while f <= 5000.0 {
@@ -176,6 +185,23 @@ mod tests {
             .collect();
         let mono = mono_from_i16(&samples, 2);
         let hz = dominant_frequency(&mono, 48_000).unwrap();
+        assert!((hz - 440.0).abs() <= 2.0, "detected {hz}");
+    }
+
+    /// Shape of a VB-CABLE recording on the Windows runner (run 36850382615):
+    /// 40 ms of the tone replayed at double speed, then the real tone.
+    #[test]
+    fn ignores_a_short_start_transient() {
+        let rate = 44_100u32;
+        let tone = |hz: f64, from: usize, to: usize| {
+            (from..to).map(move |n| {
+                (2.0 * std::f64::consts::PI * hz * n as f64 / f64::from(rate)).sin() as f32 * 0.5
+            })
+        };
+        let transient = (rate as usize) * 40 / 1000;
+        let mut samples: Vec<f32> = tone(880.0, 0, transient).collect();
+        samples.extend(tone(440.0, transient, rate as usize * 4));
+        let hz = dominant_frequency(&samples, rate).unwrap();
         assert!((hz - 440.0).abs() <= 2.0, "detected {hz}");
     }
 }

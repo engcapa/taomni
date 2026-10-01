@@ -32,8 +32,12 @@ steps:
     selector: '[data-testid="servers-dialog"]'
     timeout_sec: 30
 - click: '[data-testid="server-row-rdp"]'
-- wait_for: '[data-testid="rdp-field-clipboard-to-client"] option[value="all"]:checked'
-- wait_for: '[data-testid="rdp-field-clipboard-to-server"] option[value="all"]:checked'
+- wait_for:
+    selector: '[data-testid="rdp-field-clipboard-to-client"] option[value="all"]:checked'
+    state: attached
+- wait_for:
+    selector: '[data-testid="rdp-field-clipboard-to-server"] option[value="all"]:checked'
+    state: attached
 - wait_for: '[data-testid="rdp-field-audio-playback"]:checked'
 - wait_for: '[data-testid="rdp-field-microphone"]:checked'
 - select_option:
@@ -72,8 +76,12 @@ steps:
     selector: '[data-testid="servers-dialog"]'
     timeout_sec: 30
 - click: '[data-testid="server-row-rdp"]'
-- wait_for: '[data-testid="rdp-field-clipboard-to-client"] option[value="text"]:checked'
-- wait_for: '[data-testid="rdp-field-clipboard-to-server"] option[value="off"]:checked'
+- wait_for:
+    selector: '[data-testid="rdp-field-clipboard-to-client"] option[value="text"]:checked'
+    state: attached
+- wait_for:
+    selector: '[data-testid="rdp-field-clipboard-to-server"] option[value="off"]:checked'
+    state: attached
 - wait_for: '[data-testid="rdp-field-audio-playback"]:not(:checked)'
 - wait_for: '[data-testid="rdp-field-microphone"]:not(:checked)'
 - assert_attribute:

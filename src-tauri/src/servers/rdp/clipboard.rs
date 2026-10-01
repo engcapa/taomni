@@ -704,13 +704,23 @@ fn run_worker(shared: Arc<Shared>, commands: Receiver<Command>) {
     loop {
         match commands.recv_timeout(poll) {
             Ok(Command::Advertise) => {
-                last_token = token.current();
-                if let Ok(content) = read_host(&mut clipboard, level) {
-                    known = Some(content.identity());
-                    if !content.is_empty() {
+                let now = token.current();
+                match read_host(&mut clipboard, level) {
+                    Ok(content) if !content.is_empty() => {
+                        last_token = now;
+                        known = Some(content.identity());
                         shared.advertise(&content);
+                        shared.set_snapshot(content);
                     }
-                    shared.set_snapshot(content);
+                    // Busy, or nothing readable yet (another process may be
+                    // mid-write): leave the change token alone so the next
+                    // tick reads the host again instead of treating this
+                    // state as already announced.
+                    Ok(content) => {
+                        known = Some(content.identity());
+                        shared.set_snapshot(content);
+                    }
+                    Err(HostBusy) => {}
                 }
                 continue;
             }
