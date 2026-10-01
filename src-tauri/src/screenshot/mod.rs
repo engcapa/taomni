@@ -241,8 +241,7 @@ pub async fn screenshot_read_file_header(path: String, len: u32) -> Result<Strin
         Ok::<Vec<u8>, String>(buf)
     })
     .await
-    .map_err(|e| format!("read task failed: {e}"))?
-    .map_err(internal_error)?;
+    .map_err(|e| format!("read task failed: {e}"))?;
     Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
 }
 
