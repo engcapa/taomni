@@ -21,6 +21,7 @@ export type AppCommand =
   | "code-workspace"
   | "lan-chat"
   | "mail-unified"
+  | "mfa"
   | "settings"
   | "help"
   | "toggle-xserver"

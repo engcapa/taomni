@@ -10,6 +10,8 @@ export interface BackupCustomOptions {
   includeConfigs?: boolean;
   includeMail?: boolean;
   includeLocalHistory?: boolean;
+  /** MFA accounts (mfa.db); the backend also includes vault.db, which holds their key. */
+  includeMfa?: boolean;
 }
 
 export interface BackupResult {

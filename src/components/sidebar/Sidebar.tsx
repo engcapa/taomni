@@ -15,6 +15,7 @@ import {
   FileText,
   MessageSquare,
   Inbox,
+  KeyRound,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { SessionTree } from "./SessionTree";
@@ -283,6 +284,12 @@ function ToolsPanel({ onCommand }: { onCommand?: (command: AppCommand) => void }
       label: t("tabs.lanChat"),
       icon: <MessageSquare className="w-4 h-4 shrink-0" />,
       testId: "sidebar-tool-lan-chat",
+    },
+    {
+      id: "mfa",
+      label: t("menu.mfa"),
+      icon: <KeyRound className="w-4 h-4 shrink-0" />,
+      testId: "sidebar-tool-mfa",
     },
     {
       id: "tools",

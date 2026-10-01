@@ -9233,6 +9233,441 @@ controls:
 - Workspace Git 的 Changes 按仓库分组；diff 面板显示 `HEAD <oid>` / `Working tree` 两侧标签与 `n/N files` 上一个/下一个文件导航，顺序与平铺列表一致（未跟踪文件内联计入，IDEA 另置 Unversioned 节点）。
 - 快照请求按 repoRoot 分代，diff pair 按 repoRoot+path+状态+快照版本键控：迟到响应不污染新仓库；只读快照使用 `git --no-optional-locks status`，不回写 `.git/index`。
 
+## 27. MFA 验证器（TOTP / HOTP）
+
+### 27.1 MFA 标签、列表组织、编辑与二维码导出 ✅
+
+<!-- feature
+id: F-MFA-1
+status: done
+area: tools/mfa
+components: [MfaTab, MfaPanel, MfaAccountRow, MfaCountdown, MfaEditDialog, MfaQrDialog, VaultGate]
+files:
+  - src-tauri/src/mfa/mod.rs
+  - src-tauri/src/mfa/otp.rs
+  - src-tauri/src/mfa/crypto.rs
+  - src-tauri/src/mfa/store.rs
+  - src-tauri/src/mfa/commands.rs
+  - src/lib/mfa/types.ts
+  - src/lib/mfa/ipc.ts
+  - src/lib/mfa/sort.ts
+  - src/lib/mfa/format.ts
+  - src/lib/mfa/qrSvg.ts
+  - src/stores/mfaStore.ts
+  - src/stubs/mfaStub.ts
+  - src/components/mfa/MfaTab.tsx
+  - src/components/mfa/MfaPanel.tsx
+  - src/components/mfa/MfaAccountRow.tsx
+  - src/components/mfa/MfaCountdown.tsx
+  - src/components/mfa/MfaEditDialog.tsx
+  - src/components/mfa/MfaQrDialog.tsx
+  - src/components/vault/VaultGate.tsx
+controls:
+  - id: open-sidebar
+    selector: '[data-testid="sidebar-tool-mfa"]'
+    kind: interactive
+  - id: open-menu
+    selector: '[data-testid="context-menu-item-mfa"]'
+    kind: interactive
+    optional: true       # app menu (Tools); the macOS desktop app uses the native menu
+  - id: tab
+    selector: '[data-testid="mfa-tab"]'
+    kind: display
+  - id: gate-placeholder
+    selector: '[data-testid="vault-gate-placeholder"]'
+    kind: display
+  - id: gate-action
+    selector: '[data-testid="vault-gate-action"]'
+    kind: interactive
+  - id: panel
+    selector: '[data-testid="mfa-panel"]'
+    kind: display
+  - id: search
+    selector: '[data-testid="mfa-search"]'
+    kind: interactive
+  - id: group-filter
+    selector: '[data-testid="mfa-group-filter"]'
+    kind: interactive
+  - id: sort-mode
+    selector: '[data-testid="mfa-sort-mode"]'
+    kind: interactive
+  - id: add
+    selector: '[data-testid="mfa-add"]'
+    kind: interactive
+  - id: empty
+    selector: '[data-testid="mfa-empty"]'
+    kind: display
+  - id: empty-add-secret
+    selector: '[data-testid="mfa-empty-add-secret"]'
+    kind: interactive
+  - id: empty-add-image
+    selector: '[data-testid="mfa-empty-add-image"]'
+    kind: interactive
+  - id: empty-add-screen
+    selector: '[data-testid="mfa-empty-add-screen"]'
+    kind: interactive
+  - id: empty-add-camera
+    selector: '[data-testid="mfa-empty-add-camera"]'
+    kind: interactive
+  - id: no-results
+    selector: '[data-testid="mfa-no-results"]'
+    kind: display
+  - id: list
+    selector: '[data-testid="mfa-list"]'
+    kind: display
+    optional: true       # container; rows carry the assertions
+  - id: status
+    selector: '[data-testid="mfa-status"]'
+    kind: display
+  - id: row
+    selector: '[data-testid="mfa-account-row"]'
+    kind: interactive    # right-click opens the account menu
+  - id: code
+    selector: '[data-testid="mfa-account-code"]'
+    kind: interactive
+  - id: next-code
+    selector: '[data-testid="mfa-account-next-code"]'
+    kind: interactive
+    optional: true       # only in the last 10 s of a TOTP window
+  - id: countdown
+    selector: '[data-testid="mfa-account-countdown"]'
+    kind: display
+  - id: group-pill
+    selector: '[data-testid="mfa-account-group"]'
+    kind: display
+  - id: issuer-label
+    selector: '[data-testid="mfa-account-issuer"]'
+    kind: display
+    optional: true       # rows are asserted through data-issuer
+  - id: account-label
+    selector: '[data-testid="mfa-account-name"]'
+    kind: display
+    optional: true       # rows are asserted through data-account
+  - id: hotp-next
+    selector: '[data-testid="mfa-account-hotp-next"]'
+    kind: interactive
+  - id: copy
+    selector: '[data-testid="mfa-account-copy"]'
+    kind: interactive
+  - id: pin
+    selector: '[data-testid="mfa-account-pin"]'
+    kind: interactive
+  - id: menu
+    selector: '[data-testid="mfa-account-menu"]'
+    kind: interactive
+  - id: drag
+    selector: '[data-testid="mfa-account-drag"]'
+    kind: interactive
+  - id: menu-edit
+    selector: '[data-testid="mfa-menu-edit"]'
+    kind: interactive
+  - id: menu-qr
+    selector: '[data-testid="mfa-menu-qr"]'
+    kind: interactive
+  - id: menu-pin
+    selector: '[data-testid="mfa-menu-pin"]'
+    kind: interactive
+  - id: menu-move-up
+    selector: '[data-testid="mfa-menu-move-up"]'
+    kind: interactive
+  - id: menu-move-down
+    selector: '[data-testid="mfa-menu-move-down"]'
+    kind: interactive
+  - id: menu-delete
+    selector: '[data-testid="mfa-menu-delete"]'
+    kind: interactive
+  - id: edit-dialog
+    selector: '[data-testid="mfa-edit-dialog"]'
+    kind: display
+  - id: edit-issuer
+    selector: '[data-testid="mfa-edit-issuer"]'
+    kind: interactive
+  - id: edit-account
+    selector: '[data-testid="mfa-edit-account"]'
+    kind: interactive
+  - id: edit-group
+    selector: '[data-testid="mfa-edit-group"]'
+    kind: interactive
+  - id: edit-note
+    selector: '[data-testid="mfa-edit-note"]'
+    kind: interactive
+  - id: edit-error
+    selector: '[data-testid="mfa-edit-error"]'
+    kind: display
+  - id: edit-save
+    selector: '[data-testid="mfa-edit-save"]'
+    kind: interactive
+  - id: edit-cancel
+    selector: '[data-testid="mfa-edit-cancel"]'
+    kind: interactive
+  - id: qr-dialog
+    selector: '[data-testid="mfa-qr-dialog"]'
+    kind: display
+  - id: qr-password
+    selector: '[data-testid="mfa-qr-password"]'
+    kind: interactive
+  - id: qr-reveal
+    selector: '[data-testid="mfa-qr-reveal"]'
+    kind: interactive
+  - id: qr-image
+    selector: '[data-testid="mfa-qr-image"]'
+    kind: display
+  - id: qr-error
+    selector: '[data-testid="mfa-qr-error"]'
+    kind: display
+  - id: qr-close
+    selector: '[data-testid="mfa-qr-close"]'
+    kind: interactive
+  - id: error-banner
+    selector: '[data-testid="mfa-error"]'
+    kind: display
+    optional: true       # transient backend error while the list is shown
+  - id: loading
+    selector: '[data-testid="mfa-loading"]'
+    kind: display
+    optional: true       # first load only
+  - id: load-error
+    selector: '[data-testid="mfa-load-error"]'
+    kind: display
+    optional: true       # unreadable mfa.db
+  - id: retry
+    selector: '[data-testid="mfa-retry"]'
+    kind: interactive
+    optional: true       # unreadable mfa.db
+  - id: key-error
+    selector: '[data-testid="mfa-key-error"]'
+    kind: display
+    optional: true       # vault no longer holds the key of mfa.db (restore mismatch)
+  - id: reset-store
+    selector: '[data-testid="mfa-reset-store"]'
+    kind: interactive
+    optional: true       # destructive recovery from key-error; Rust unit tests cover it
+-->
+
+- Tools 菜单与侧栏 Tools 面板打开唯一的 MFA 标签；保险库未设置/已锁定时由 `VaultGate` 先要求设置或解锁主密码，取消后保留可重试的占位。
+- 账户密钥用保险库中的数据密钥（`mfa.data-key-v1`）以 AES-256-GCM 加密存入独立的 `mfa.db`；验证码在 Rust 后端生成，渲染层不接收已存密钥。
+- 列表显示发行方、账户、分组、验证码（3+3 分组显示，复制为纯数字）、TOTP 倒计时与最后 10 秒的下一个码、HOTP「下一个」；点击验证码或复制按钮写入剪贴板并在状态栏播报。
+- 搜索（发行方/账户/分组/备注，Enter 复制首个结果，方向键在验证码间移动）、分组筛选（含无分组）、6 种排序（自定义/发行方/账户/最近使用/最常用/最近添加）、置顶、菜单上移/下移与拖拽调整自定义顺序；排序与筛选偏好持久化。
+- 右键或 ⋯ 菜单：编辑（发行方、账户、分组、备注）、显示二维码、置顶、上移/下移、删除（确认后执行）。
+- 显示二维码：重新输入主密码后由后端 `mfa_export_uri` 生成 `otpauth://` 链接并在本地渲染为二维码，供其他验证器扫码迁移；关闭即清除，再次打开需重新验证。
+
+### 27.2 添加账户：密钥、截图、屏幕扫描与摄像头 ✅
+
+<!-- feature
+id: F-MFA-2
+status: done
+area: tools/mfa
+components: [MfaAddDialog, MfaSecretForm, MfaImagePane, MfaScreenPane, MfaCameraPane, MfaImportPreview]
+files:
+  - src-tauri/src/mfa/capture.rs
+  - src/lib/mfa/base32.ts
+  - src/lib/mfa/otpauth.ts
+  - src/lib/mfa/migration.ts
+  - src/lib/mfa/qrImage.ts
+  - src/lib/mfa/frames.ts
+  - src/lib/mfa/sources.ts
+  - src/components/mfa/MfaAddDialog.tsx
+  - src/components/mfa/MfaSecretForm.tsx
+  - src/components/mfa/MfaImagePane.tsx
+  - src/components/mfa/MfaScreenPane.tsx
+  - src/components/mfa/MfaCameraPane.tsx
+  - src/components/mfa/MfaImportPreview.tsx
+controls:
+  - id: dialog
+    selector: '[data-testid="mfa-add-dialog"]'
+    kind: display
+  - id: close
+    selector: '[data-testid="mfa-add-close"]'
+    kind: interactive
+  - id: mode-secret
+    selector: '[data-testid="mfa-add-mode-secret"]'
+    kind: interactive
+  - id: mode-image
+    selector: '[data-testid="mfa-add-mode-image"]'
+    kind: interactive
+  - id: mode-screen
+    selector: '[data-testid="mfa-add-mode-screen"]'
+    kind: interactive
+  - id: mode-camera
+    selector: '[data-testid="mfa-add-mode-camera"]'
+    kind: interactive
+  - id: secret-form
+    selector: '[data-testid="mfa-secret-form"]'
+    kind: display
+    optional: true       # fields carry the assertions
+  - id: uri
+    selector: '[data-testid="mfa-add-uri"]'
+    kind: interactive
+  - id: issuer
+    selector: '[data-testid="mfa-add-issuer"]'
+    kind: interactive
+  - id: account
+    selector: '[data-testid="mfa-add-account"]'
+    kind: interactive
+  - id: secret
+    selector: '[data-testid="mfa-add-secret"]'
+    kind: interactive
+  - id: group
+    selector: '[data-testid="mfa-add-group"]'
+    kind: interactive
+  - id: advanced
+    selector: '[data-testid="mfa-add-advanced"]'
+    kind: interactive
+  - id: advanced-panel
+    selector: '[data-testid="mfa-add-advanced-panel"]'
+    kind: display
+  - id: kind
+    selector: '[data-testid="mfa-add-kind"]'
+    kind: interactive
+  - id: counter
+    selector: '[data-testid="mfa-add-counter"]'
+    kind: interactive
+  - id: algorithm
+    selector: '[data-testid="mfa-add-algorithm"]'
+    kind: interactive
+    optional: true       # set through otpauth links in the cases
+  - id: digits
+    selector: '[data-testid="mfa-add-digits"]'
+    kind: interactive
+    optional: true       # set through otpauth links in the cases
+  - id: period
+    selector: '[data-testid="mfa-add-period"]'
+    kind: interactive
+    optional: true       # set through otpauth links in the cases
+  - id: notice
+    selector: '[data-testid="mfa-add-notice"]'
+    kind: display
+  - id: error
+    selector: '[data-testid="mfa-add-error"]'
+    kind: display
+  - id: cancel
+    selector: '[data-testid="mfa-add-cancel"]'
+    kind: interactive
+  - id: submit
+    selector: '[data-testid="mfa-add-submit"]'
+    kind: interactive
+  - id: image-dropzone
+    selector: '[data-testid="mfa-image-dropzone"]'
+    kind: interactive    # paste/drop target
+  - id: image-paste
+    selector: '[data-testid="mfa-image-paste"]'
+    kind: interactive
+  - id: image-choose
+    selector: '[data-testid="mfa-image-choose"]'
+    kind: interactive
+    optional: true       # opens the OS file chooser; cases drive the hidden input
+  - id: image-file
+    selector: '[data-testid="mfa-image-file"]'
+    kind: interactive
+  - id: image-status
+    selector: '[data-testid="mfa-image-status"]'
+    kind: display
+  - id: screen-scan
+    selector: '[data-testid="mfa-screen-scan"]'
+    kind: interactive
+  - id: screen-status
+    selector: '[data-testid="mfa-screen-status"]'
+    kind: display
+  - id: camera-state
+    selector: '[data-testid="mfa-camera-state"]'
+    kind: display
+  - id: camera-video
+    selector: '[data-testid="mfa-camera-video"]'
+    kind: display
+  - id: camera-retry
+    selector: '[data-testid="mfa-camera-retry"]'
+    kind: interactive
+  - id: camera-device
+    selector: '[data-testid="mfa-camera-device"]'
+    kind: interactive
+    optional: true       # only with more than one camera
+  - id: import-preview
+    selector: '[data-testid="mfa-import-preview"]'
+    kind: display
+  - id: import-item
+    selector: '[data-testid="mfa-import-item"]'
+    kind: display
+  - id: import-item-check
+    selector: '[data-testid="mfa-import-item-check"]'
+    kind: interactive
+  - id: import-item-label
+    selector: '[data-testid="mfa-import-item-label"]'
+    kind: display
+  - id: import-issuer
+    selector: '[data-testid="mfa-import-issuer"]'
+    kind: interactive
+  - id: import-account
+    selector: '[data-testid="mfa-import-account"]'
+    kind: interactive
+  - id: import-group
+    selector: '[data-testid="mfa-import-group"]'
+    kind: interactive
+  - id: import-duplicate
+    selector: '[data-testid="mfa-import-duplicate"]'
+    kind: display
+  - id: import-all-duplicates
+    selector: '[data-testid="mfa-import-all-duplicates"]'
+    kind: display
+  - id: import-invalid
+    selector: '[data-testid="mfa-import-invalid"]'
+    kind: display
+    optional: true       # migration entry with an unsupported algorithm/type (Vitest)
+  - id: import-error
+    selector: '[data-testid="mfa-import-error"]'
+    kind: display
+    optional: true       # backend refusal while importing
+  - id: import-back
+    selector: '[data-testid="mfa-import-back"]'
+    kind: interactive
+  - id: import-confirm
+    selector: '[data-testid="mfa-import-confirm"]'
+    kind: interactive
+-->
+
+- 密钥模式：发行方/账户/Base32 密钥（允许小写、空格分组）/分组，高级项可选 TOTP/HOTP、SHA1/256/512、6～8 位、周期或初始计数；粘贴 `otpauth://` 链接自动填表；逐项校验并拒绝重复密钥。
+- 截图模式：粘贴截图（按钮或 Ctrl/⌘+V，桌面版经 Rust arboard 读取系统剪贴板图片）、拖入或选择图片文件；在 MFA 标签上直接粘贴截图会跳到导入预览。
+- 屏幕扫描（桌面版）：临时隐藏 Taomni，截取所有显示器后恢复窗口；macOS 需屏幕录制权限。摄像头：设备选择、无设备/拒绝授权状态与重试，识别后立即停止视频流。
+- 二维码由渲染层 `qr` 解码；支持 Google Authenticator `otpauth-migration` 批量导出码。导入前预览每个账户（可取消勾选、改名、统一分组），已存在的账户标记为“已添加”。
+
+### 27.3 备份与恢复中的 MFA 数据 ✅
+
+<!-- feature
+id: F-MFA-3
+status: done
+area: settings/backup
+components: [BackupSettingsPanel]
+files:
+  - src-tauri/src/backup/engine.rs
+  - src-tauri/src/backup/restore.rs
+  - src/components/settings/BackupSettingsPanel.tsx
+  - src/lib/backup.ts
+controls:
+  - id: group-toggle-backup
+    selector: '[data-testid="settings-group-toggle-backup"]'
+    kind: interactive
+  - id: create-now
+    selector: '[data-testid="backup-create-now"]'
+    kind: interactive
+  - id: action-success
+    selector: '[data-testid="backup-action-success"]'
+    kind: display
+  - id: history-row
+    selector: '[data-testid="backup-history-row"]'
+    kind: display
+  - id: history-restore
+    selector: '[data-testid="backup-history-restore"]'
+    kind: interactive
+  - id: restore-files
+    selector: '[data-testid="backup-restore-files"]'
+    kind: display
+  - id: restore-cancel
+    selector: '[data-testid="backup-restore-cancel"]'
+    kind: interactive
+-->
+
+- 轻量核心与完整备份都包含 `databases/mfa.db`；自定义范围勾选 MFA 时强制同时包含 `vault.db`（数据密钥在保险库中）。从未使用 MFA 的配置不生成 `mfa.db`。
+- 恢复时替换 `mfa.db` 并为原文件保留安全副本；恢复后若保险库与 `mfa.db` 不匹配，MFA 标签提示并提供清空重建入口。
+
 ---
 
 

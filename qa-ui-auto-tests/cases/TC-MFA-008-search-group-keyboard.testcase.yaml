@@ -1,0 +1,111 @@
+id: TC-MFA-008
+title: Many MFA accounts are found by search, group filter and keyboard, and copied without the mouse
+description: >-
+  V-17a (AC-10, AC-11, AC-17). Browser stub. Four exported accounts are
+  imported into group Work and one is moved to Personal. Search matches
+  issuer and account case-insensitively, Enter copies the first match, and an
+  unmatched query shows the empty-result state. The group filter narrows to a
+  group or to ungrouped accounts. ArrowDown from search walks the codes,
+  ArrowUp goes back, and Enter on a focused code copies it.
+covers: [F-MFA-1, F-MFA-2]
+tags: [mfa, keyboard, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-008}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-008}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="mfa-empty"]'
+- click: '[data-testid="mfa-empty-add-image"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
+- upload_file: {selector: '[data-testid="mfa-image-file"]', path: qa-ui-auto-tests/synthetic-fixtures/mfa/migration-four.png}
+- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 20}
+- fill: {selector: '[data-testid="mfa-import-group"]', value: Work}
+- click: '[data-testid="mfa-import-confirm"]'
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Zeta Cloud, Alpha Mail, Mid Bank, Beta Git]}
+- click: '[data-testid="mfa-account-menu"]:is([data-issuer="Beta Git"] *)'
+- click: '[data-testid="mfa-menu-edit"]'
+- wait_for: '[data-testid="mfa-edit-dialog"]'
+- fill: {selector: '[data-testid="mfa-edit-group"]', value: Personal}
+- click: '[data-testid="mfa-edit-save"]'
+- assert_not_visible: '[data-testid="mfa-edit-dialog"]'
+- fill: {selector: '[data-testid="mfa-search"]', value: MAIL}
+- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Alpha Mail]}
+- press: {key: Enter, selector: '[data-testid="mfa-search"]'}
+- eval_readonly: {expression: navigator.clipboard.readText(), contains: '436092'}
+- assert_text: {selector: '[data-testid="mfa-status"]', contains: Copied Alpha Mail}
+- fill: {selector: '[data-testid="mfa-search"]', value: kim@}
+- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Mid Bank]}
+- fill: {selector: '[data-testid="mfa-search"]', value: nomatch-xyz}
+- assert_visible: '[data-testid="mfa-no-results"]'
+- fill: {selector: '[data-testid="mfa-search"]', value: ''}
+- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 4}
+- select_option: {selector: '[data-testid="mfa-group-filter"]', value: Personal}
+- assert_items: {selector: '[data-testid="mfa-account-row"]', attribute: data-issuer, equals: [Beta Git]}
+- select_option: {selector: '[data-testid="mfa-group-filter"]', value: __ungrouped__}
+- assert_visible: '[data-testid="mfa-no-results"]'
+- select_option: {selector: '[data-testid="mfa-group-filter"]', value: ''}
+- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 4}
+- press: {key: ArrowDown, selector: '[data-testid="mfa-search"]'}
+- eval_readonly: {expression: "document.activeElement.dataset.testid + '|' + document.activeElement.closest('li').dataset.issuer", contains: mfa-account-code|Zeta Cloud}
+- press: ArrowDown
+- eval_readonly: {expression: "document.activeElement.dataset.testid + '|' + document.activeElement.closest('li').dataset.issuer", contains: mfa-account-code|Alpha Mail}
+- press: ArrowDown
+- eval_readonly: {expression: "document.activeElement.dataset.testid + '|' + document.activeElement.closest('li').dataset.issuer", contains: mfa-account-code|Mid Bank}
+- press: Enter
+- eval_readonly: {expression: navigator.clipboard.readText(), contains: '885398'}
+- assert_text: {selector: '[data-testid="mfa-status"]', contains: Copied Mid Bank}
+- press: ArrowUp
+- eval_readonly: {expression: "document.activeElement.dataset.testid + '|' + document.activeElement.closest('li').dataset.issuer", contains: mfa-account-code|Alpha Mail}
+- screenshot: mfa-008-search-groups.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Search matches issuer or account case-insensitively, Enter copies the first match, and no match shows the empty-result state (AC-10, AC-11).
+    actions: [11, 13, 15, 16, 19, 20, 22, 23, 25, 27, 30, 32, 34]
+    checkpoints:
+    - {step: 18, expectation: four imported accounts in export order}
+    - {step: 24, expectation: edit dialog closed after saving the group}
+    - {step: 26, expectation: MAIL finds Alpha Mail}
+    - {step: 28, expectation: Enter copied Alpha Mail's code}
+    - {step: 29, expectation: copy announced}
+    - {step: 31, expectation: account-name search finds Mid Bank}
+    - {step: 33, expectation: unmatched query shows no results}
+    - {step: 35, expectation: clearing search shows all four}
+    results: [35]
+  - id: R2
+    requirement: The group filter shows one group, ungrouped accounts, or all accounts (AC-11).
+    actions: [36, 38, 40]
+    checkpoints:
+    - {step: 37, expectation: Personal holds Beta Git only}
+    - {step: 39, expectation: no ungrouped accounts}
+    - {step: 41, expectation: all groups restored}
+    results: [41]
+  - id: R3
+    requirement: Arrow keys move focus between codes and Enter on a focused code copies it (AC-17, AC-10).
+    actions: [42, 44, 46, 48, 51]
+    checkpoints:
+    - {step: 43, expectation: first code focused from search}
+    - {step: 45, expectation: second code focused}
+    - {step: 47, expectation: third code focused}
+    - {step: 49, expectation: Enter copied Mid Bank's code}
+    - {step: 50, expectation: copy announced}
+    - {step: 52, expectation: ArrowUp returned to Alpha Mail}
+    results: [52]
+  visual:
+  - check: Search, group filter and focus ring on the focused code are visible.
+    method: manual
+    reason: Focus visibility needs human review of the screenshot.
+  native:
+  - check: Screen-reader announcements of the status line are not automated.
+    method: manual
+    reason: Requires assistive technology on each platform.

@@ -260,7 +260,7 @@ export function BackupSettingsPanel() {
       )}
 
       {actionSuccess && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded text-sm text-emerald-500 flex items-center gap-2">
+        <div data-testid="backup-action-success" className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded text-sm text-emerald-500 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
           <span>{actionSuccess}</span>
         </div>
@@ -393,6 +393,7 @@ export function BackupSettingsPanel() {
           </button>
           <button
             type="button"
+            data-testid="backup-create-now"
             disabled={creating}
             onClick={handleBackupNow}
             className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-accent text-accent-text rounded hover:opacity-90 disabled:opacity-50 transition-opacity"
@@ -574,7 +575,7 @@ export function BackupSettingsPanel() {
                   </thead>
                   <tbody className="divide-y divide-theme-border/40">
                     {safeHistory.map((item) => (
-                      <tr key={item.filePath} className="hover:bg-theme-bg/40">
+                      <tr key={item.filePath} data-testid="backup-history-row" data-file-name={item.fileName} className="hover:bg-theme-bg/40">
                         <td className="py-2 px-2 font-mono text-theme-text max-w-xs truncate" title={item.fileName}>
                           {item.fileName}
                         </td>
@@ -600,6 +601,7 @@ export function BackupSettingsPanel() {
                         <td className="py-2 px-2 text-right space-x-2">
                           <button
                             type="button"
+                            data-testid="backup-history-restore"
                             onClick={() => openRestoreModal(item.filePath)}
                             className="text-xs text-accent hover:underline font-medium"
                           >
@@ -699,6 +701,7 @@ export function BackupSettingsPanel() {
                 </div>
 
                 <div
+                  data-testid="backup-restore-files"
                   className="max-h-36 overflow-y-auto space-y-1 rounded border p-2 font-mono text-[11px] text-[var(--taomni-text-muted)]"
                   style={{
                     background: "var(--taomni-panel-bg)",
@@ -814,6 +817,7 @@ export function BackupSettingsPanel() {
             >
               <button
                 type="button"
+                data-testid="backup-restore-cancel"
                 disabled={restoring}
                 onClick={() => setRestoreModalOpen(false)}
                 className="rounded border px-3 py-1.5 text-xs text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"

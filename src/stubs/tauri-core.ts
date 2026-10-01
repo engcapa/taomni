@@ -27,6 +27,7 @@ import {
 } from "./mailContactsStub";
 import type { MailAddressBookEntry } from "../lib/mailContacts";
 import { stubAddInviteToCalendar, stubCalDavSync, stubListAgenda } from "./mailCalendarStub";
+import { stubMfaInvoke } from "./mfaStub";
 import type { MailFilter } from "../lib/mailFilters";
 import type { SessionConfig, SessionGroup, LocalShellOption, LocalDirectoryShortcut, IpcRunSnapshotRecord, IpcSnapshotEntry } from "../lib/ipc";
 import {
@@ -1655,6 +1656,11 @@ async function readStubWorkspaceEncodedFile(
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
   // ED-PARITY-008 isolated two-repository Git fixture (opt-in via localStorage).
   if (parity008Handles(cmd, args)) return await parity008Invoke(cmd, args) as T;
+  // MFA authenticator: localStorage mirror of mfa.db gated by the stub vault.
+  if (cmd.startsWith("mfa_")) {
+    const vault = loadStubVault();
+    return await stubMfaInvoke(cmd, args, vault.state === "unlocked", vault.masterPassword) as T;
+  }
   switch (cmd) {
     case "structural_search_capabilities":
       return parity009Capabilities() as T;

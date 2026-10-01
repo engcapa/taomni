@@ -1,0 +1,103 @@
+id: TC-MFA-004
+title: Choosing a QR image previews, edits and imports the account; bad images explain why
+description: >-
+  V-13 (AC-05, AC-08). Browser stub with the app's real `qr` decoder. An image
+  without a QR code and a QR that is not an MFA link each report their own
+  status. The RFC 4226 fixture opens the review step; Back returns to the
+  image pane; the issuer, account name and group are edited before import and
+  the row shows 755 224. Importing the same image again marks it as already added and
+  disables Import.
+covers: [F-MFA-1, F-MFA-2]
+tags: [mfa, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-master-004}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-master-004}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="mfa-empty"]'
+- click: '[data-testid="mfa-empty-add-image"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
+- upload_file: {selector: '[data-testid="mfa-image-file"]', path: qa-ui-auto-tests/synthetic-fixtures/mfa/no-qr.png}
+- assert_text: {selector: '[data-testid="mfa-image-status"]', contains: No QR code found, timeout_sec: 20}
+- upload_file: {selector: '[data-testid="mfa-image-file"]', path: qa-ui-auto-tests/synthetic-fixtures/mfa/not-otp.png}
+- assert_text: {selector: '[data-testid="mfa-image-status"]', contains: not an MFA QR code, timeout_sec: 20}
+- upload_file: {selector: '[data-testid="mfa-image-file"]', path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png}
+- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 20}
+- assert_items: {selector: '[data-testid="mfa-import-item"]', attribute: data-issuer, equals: [QA Bank]}
+- click: '[data-testid="mfa-import-back"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
+- upload_file: {selector: '[data-testid="mfa-image-file"]', path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png}
+- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 20}
+- assert_attribute: {selector: '[data-testid="mfa-import-issuer"]', name: value, equals: QA Bank}
+- fill: {selector: '[data-testid="mfa-import-issuer"]', value: QA Bank Imported}
+- fill: {selector: '[data-testid="mfa-import-account"]', value: qa.bank@example.com}
+- fill: {selector: '[data-testid="mfa-import-group"]', value: Imported}
+- click: '[data-testid="mfa-import-confirm"]'
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank Imported"] *)', equals: 755 224}
+- assert_attribute: {selector: '[data-testid="mfa-account-row"][data-issuer="QA Bank Imported"]', name: data-account, equals: qa.bank@example.com}
+- assert_text_equals: {selector: '[data-testid="mfa-account-group"]', equals: Imported}
+- assert_text: {selector: '[data-testid="mfa-status"]', contains: Added 1 account}
+- click: '[data-testid="mfa-add"]'
+- click: '[data-testid="mfa-add-mode-image"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="image"]'
+- upload_file: {selector: '[data-testid="mfa-image-file"]', path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png}
+- wait_for: {selector: '[data-testid="mfa-import-duplicate"]', timeout_sec: 20}
+- assert_attribute: {selector: '[data-testid="mfa-import-item"]', name: data-duplicate, equals: 'true'}
+- assert_visible: '[data-testid="mfa-import-all-duplicates"]'
+- assert_disabled: '[data-testid="mfa-import-confirm"]'
+- click: '[data-testid="mfa-add-close"]'
+- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 1}
+- screenshot: mfa-004-image-import.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Images without a QR code or with a non-MFA QR code are rejected with distinct messages (AC-05).
+    actions: [11, 13, 15]
+    checkpoints:
+    - {step: 12, expectation: image pane open}
+    - {step: 14, expectation: no QR code found}
+    - {step: 16, expectation: QR is not an MFA code}
+    results: [14, 16]
+  - id: R2
+    requirement: An MFA QR image opens the review step; Back returns to the image pane; the edited issuer, name and group are imported with the RFC 4226 code (AC-05, AC-08).
+    actions: [17, 20, 22, 25, 26, 27, 28]
+    checkpoints:
+    - {step: 18, expectation: review step shown}
+    - {step: 19, expectation: one decoded account QA Bank}
+    - {step: 21, expectation: Back returned to the image pane}
+    - {step: 24, expectation: issuer prefilled from the QR}
+    - {step: 29, expectation: dialog closed after import}
+    - {step: 30, expectation: edited issuer shows code 755 224}
+    - {step: 31, expectation: edited account name kept}
+    - {step: 32, expectation: group from the review step}
+    - {step: 33, expectation: status announces the import}
+    results: [30, 31, 32, 33]
+  - id: R3
+    requirement: Importing an existing account again is flagged as already added and cannot be imported (AC-08).
+    actions: [34, 35, 37, 42]
+    checkpoints:
+    - {step: 36, expectation: image pane via the mode tab}
+    - {step: 38, expectation: duplicate badge}
+    - {step: 39, expectation: item marked duplicate}
+    - {step: 40, expectation: all-duplicates notice}
+    - {step: 41, expectation: Import disabled}
+    - {step: 43, expectation: still one account after closing}
+    results: [43]
+  visual:
+  - check: Review step layout and status colours are legible in the screenshot.
+    method: manual
+    reason: Screenshot needs human review.
+  native:
+  - check: Native drag-and-drop of image files and the native file chooser are not automated; the decoder path is shared.
+    method: manual
+    reason: The runner has no native file chooser or OS drag source.

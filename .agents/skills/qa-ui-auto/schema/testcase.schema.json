@@ -1231,6 +1231,21 @@
               "minimum": 1
             }
           }
+        },
+        "seed_clipboard_image": {
+          "$ref": "#/$defs/seed_clipboard_image_arg"
+        },
+        "browser_fake_camera": {
+          "$ref": "#/$defs/browser_fake_camera_arg"
+        },
+        "assert_totp_code": {
+          "$ref": "#/$defs/assert_totp_code_arg"
+        },
+        "native_clipboard_image": {
+          "$ref": "#/$defs/mfa_png_arg"
+        },
+        "native_show_image_window": {
+          "$ref": "#/$defs/native_show_image_window_arg"
         }
       }
     },
@@ -2453,6 +2468,172 @@
           "minLength": 1
         }
       }
+    },
+    "mfa_png_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "description": "MFA image fixture (qa-ui-auto-tests/synthetic-fixtures/mfa/*.png).",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\.png$",
+          "description": "PNG fixture; relative paths resolve from the repository root."
+        }
+      }
+    },
+    "browser_fake_camera_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "description": "Browser-only: replace navigator.mediaDevices with one fake camera. qr streams `image` from a canvas, none reports no camera, denied rejects getUserMedia with NotAllowedError. Not camera hardware or permission evidence.",
+      "properties": {
+        "mode": {
+          "enum": [
+            "qr",
+            "none",
+            "denied"
+          ]
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\.png$",
+          "description": "PNG fixture; relative paths resolve from the repository root."
+        }
+      },
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "qr"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "image"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "image"
+          ]
+        }
+      }
+    },
+    "assert_totp_code_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "secret"
+      ],
+      "description": "Exactly one element's code attribute must equal an independent Python RFC 6238 code for the current (or just-rolled-over) time step.",
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "secret": {
+          "type": "string",
+          "pattern": "^[A-Za-z2-7 =-]{16,}$"
+        },
+        "period": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 300
+        },
+        "digits": {
+          "type": "integer",
+          "minimum": 6,
+          "maximum": 8
+        },
+        "algorithm": {
+          "enum": [
+            "SHA1",
+            "SHA256",
+            "SHA512"
+          ]
+        },
+        "attribute": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "native_show_image_window_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Native Linux/X11 and Windows: show (default) a topmost Tk window with a PNG fixture for a real screen capture, or close it. Closed automatically after the case.",
+      "properties": {
+        "action": {
+          "enum": [
+            "show",
+            "close"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\.png$",
+          "description": "PNG fixture; relative paths resolve from the repository root."
+        },
+        "x": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "if": {
+        "properties": {
+          "action": {
+            "const": "close"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "maxProperties": 1
+      },
+      "else": {
+        "required": [
+          "path"
+        ]
+      }
+    },
+    "seed_clipboard_image_arg": {
+      "description": "Browser-only: put a PNG fixture ({path}) or a screenshot of one element ({selector}) on Chromium's clipboard as image/png.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/mfa_png_arg"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selector"
+          ],
+          "properties": {
+            "selector": {
+              "$ref": "#/$defs/selector"
+            }
+          }
+        }
+      ]
     }
   }
 }

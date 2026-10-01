@@ -27,6 +27,60 @@ pub struct BackupCustomOptions {
     pub include_mail: bool,
     #[serde(default)]
     pub include_local_history: bool,
+    #[serde(default)]
+    pub include_mfa: bool,
+}
+
+/// What a backup scope stages. MFA secrets are sealed with a data key held in
+/// the vault, so including `mfa.db` always includes `vault.db` as well.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BackupScopeFlags {
+    pub sessions: bool,
+    pub notes: bool,
+    pub vault: bool,
+    pub lanchat: bool,
+    pub configs: bool,
+    pub mail: bool,
+    pub local_history: bool,
+    pub mfa: bool,
+}
+
+pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> BackupScopeFlags {
+    let core = BackupScopeFlags {
+        sessions: true,
+        notes: true,
+        vault: true,
+        lanchat: false,
+        configs: true,
+        mail: false,
+        local_history: false,
+        mfa: true,
+    };
+    let mut flags = match scope {
+        "full" => BackupScopeFlags {
+            lanchat: true,
+            mail: true,
+            ..core
+        },
+        "custom" => match custom {
+            Some(opts) => BackupScopeFlags {
+                sessions: opts.include_sessions,
+                notes: opts.include_notes,
+                vault: opts.include_vault,
+                lanchat: opts.include_lanchat,
+                configs: opts.include_configs,
+                mail: opts.include_mail,
+                local_history: opts.include_local_history,
+                mfa: opts.include_mfa,
+            },
+            None => core,
+        },
+        _ => core,
+    };
+    if flags.mfa {
+        flags.vault = true;
+    }
+    flags
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,35 +166,10 @@ pub fn create_backup(
     let mut staged_files: Vec<StagedFile> = Vec::new();
 
     // Determine what to include based on scope
-    let (inc_sessions, inc_notes, inc_vault, inc_lanchat, inc_configs, inc_mail, inc_local_history) =
-        match scope {
-            "core" => (true, true, true, false, true, false, false),
-            "full" => (true, true, true, true, true, true, false),
-            "custom" => {
-                let opts = custom_options.unwrap_or(BackupCustomOptions {
-                    include_sessions: true,
-                    include_notes: true,
-                    include_vault: true,
-                    include_lanchat: false,
-                    include_configs: true,
-                    include_mail: false,
-                    include_local_history: false,
-                });
-                (
-                    opts.include_sessions,
-                    opts.include_notes,
-                    opts.include_vault,
-                    opts.include_lanchat,
-                    opts.include_configs,
-                    opts.include_mail,
-                    opts.include_local_history,
-                )
-            }
-            _ => (true, true, true, false, true, false, false),
-        };
+    let flags = resolve_scope_flags(scope, custom_options);
 
     // 1. taomni.db
-    if inc_sessions {
+    if flags.sessions {
         let snap_dest = temp_staging_dir.join("taomni.db");
         let conn = state.db.lock().map_err(|e| e.to_string())?;
         hot_backup_conn(&conn, &snap_dest)?;
@@ -151,7 +180,7 @@ pub fn create_backup(
     }
 
     // 2. notes.db
-    if inc_notes {
+    if flags.notes {
         let snap_dest = temp_staging_dir.join("notes.db");
         let conn = state.notes_db.lock().map_err(|e| e.to_string())?;
         hot_backup_conn(&conn, &snap_dest)?;
@@ -162,7 +191,7 @@ pub fn create_backup(
     }
 
     // 3. vault.db
-    if inc_vault {
+    if flags.vault {
         let snap_dest = temp_staging_dir.join("vault.db");
         state.vault.backup_to(&snap_dest)?;
         staged_files.push(StagedFile {
@@ -171,8 +200,19 @@ pub fn create_backup(
         });
     }
 
+    // 3b. mfa.db (skipped when MFA was never used on this profile)
+    if flags.mfa {
+        let snap_dest = temp_staging_dir.join("mfa.db");
+        if state.mfa.backup_to(&snap_dest)? {
+            staged_files.push(StagedFile {
+                archive_path: "databases/mfa.db".into(),
+                disk_path: snap_dest,
+            });
+        }
+    }
+
     // 4. lanchat.sqlite
-    if inc_lanchat {
+    if flags.lanchat {
         let snap_dest = temp_staging_dir.join("lanchat.sqlite");
         state.lanchat.backup_to(&snap_dest)?;
         staged_files.push(StagedFile {
@@ -182,7 +222,7 @@ pub fn create_backup(
     }
 
     // 5. Config files
-    if inc_configs {
+    if flags.configs {
         if let Some(cfg_base) = dirs::config_dir() {
             let taomni_cfg_dir = cfg_base.join("taomni");
             for cfg_name in &["ai.json", "proxy.json", "mirror.json", "sdk.json"] {
@@ -205,7 +245,7 @@ pub fn create_backup(
     }
 
     // 6. Mail cache databases
-    if inc_mail {
+    if flags.mail {
         let mail_dir = app_data.join("mail-cache");
         if mail_dir.is_dir() {
             if let Ok(entries) = std::fs::read_dir(&mail_dir) {
@@ -225,7 +265,7 @@ pub fn create_backup(
     }
 
     // 7. Local history snapshots
-    if inc_local_history {
+    if flags.local_history {
         let history_db = app_data.join("local-history").join("history.db");
         if history_db.is_file() {
             staged_files.push(StagedFile {

@@ -209,7 +209,13 @@ pub fn apply_pending_restore(app_data: &Path) {
     // 1. Make a safety rollback copy of existing database files
     let safety_dir = app_data.join("backups").join("pre_restore_safety_copy");
     let _ = std::fs::create_dir_all(&safety_dir);
-    for db_name in &["taomni.db", "notes.db", "vault.db", "lanchat.sqlite"] {
+    for db_name in &[
+        "taomni.db",
+        "notes.db",
+        "vault.db",
+        "lanchat.sqlite",
+        "mfa.db",
+    ] {
         let curr = app_data.join(db_name);
         if curr.is_file() {
             let _ = std::fs::copy(&curr, safety_dir.join(db_name));
@@ -243,6 +249,13 @@ pub fn apply_pending_restore(app_data: &Path) {
         let dest = app_data.join("lanchat.sqlite");
         remove_wal_shm(&dest);
         let _ = replace_file(&staged_lanchat, &dest);
+    }
+
+    let staged_mfa = pending_dir.join("databases").join("mfa.db");
+    if staged_mfa.is_file() {
+        let dest = app_data.join("mfa.db");
+        remove_wal_shm(&dest);
+        let _ = replace_file(&staged_mfa, &dest);
     }
 
     // 3. Overwrite config files

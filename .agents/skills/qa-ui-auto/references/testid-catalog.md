@@ -1720,6 +1720,16 @@
 - `[data-testid="sql-completion-accept-enter"]` — interactive — F11.1.sql-completion-accept-enter
 - `[data-testid="sql-completion-reset"]` — interactive — F11.1.sql-completion-reset
 
+## settings/backup (F-MFA-3)
+
+- `[data-testid="settings-group-toggle-backup"]` — interactive — F-MFA-3.group-toggle-backup
+- `[data-testid="backup-create-now"]` — interactive — F-MFA-3.create-now
+- `[data-testid="backup-action-success"]` — display — F-MFA-3.action-success
+- `[data-testid="backup-history-row"]` — display — F-MFA-3.history-row
+- `[data-testid="backup-history-restore"]` — interactive — F-MFA-3.history-restore
+- `[data-testid="backup-restore-files"]` — display — F-MFA-3.restore-files
+- `[data-testid="backup-restore-cancel"]` — interactive — F-MFA-3.restore-cancel
+
 ## settings/code-workspace (F11.2)
 
 - `[data-testid="sdk-settings"]` — display — F11.2.sdk-settings
@@ -2021,6 +2031,115 @@
 - `[data-testid="welcome-wsl-card"]` — display [optional] — F9.8.welcome-wsl-card
 - `[data-testid="welcome-wsl-distro"]` — interactive [optional] — F9.8.welcome-wsl-distro
 - `[data-testid="welcome-wsl-open"]` — interactive [optional] — F9.8.welcome-wsl-open
+
+## tools/mfa (F-MFA-1)
+
+- `[data-testid="sidebar-tool-mfa"]` — interactive — F-MFA-1.open-sidebar
+- `[data-testid="context-menu-item-mfa"]` — interactive [optional] — F-MFA-1.open-menu
+- `[data-testid="mfa-tab"]` — display — F-MFA-1.tab
+- `[data-testid="vault-gate-placeholder"]` — display — F-MFA-1.gate-placeholder
+- `[data-testid="vault-gate-action"]` — interactive — F-MFA-1.gate-action
+- `[data-testid="mfa-panel"]` — display — F-MFA-1.panel
+- `[data-testid="mfa-search"]` — interactive — F-MFA-1.search
+- `[data-testid="mfa-group-filter"]` — interactive — F-MFA-1.group-filter
+- `[data-testid="mfa-sort-mode"]` — interactive — F-MFA-1.sort-mode
+- `[data-testid="mfa-add"]` — interactive — F-MFA-1.add
+- `[data-testid="mfa-empty"]` — display — F-MFA-1.empty
+- `[data-testid="mfa-empty-add-secret"]` — interactive — F-MFA-1.empty-add-secret
+- `[data-testid="mfa-empty-add-image"]` — interactive — F-MFA-1.empty-add-image
+- `[data-testid="mfa-empty-add-screen"]` — interactive — F-MFA-1.empty-add-screen
+- `[data-testid="mfa-empty-add-camera"]` — interactive — F-MFA-1.empty-add-camera
+- `[data-testid="mfa-no-results"]` — display — F-MFA-1.no-results
+- `[data-testid="mfa-list"]` — display [optional] — F-MFA-1.list
+- `[data-testid="mfa-status"]` — display — F-MFA-1.status
+- `[data-testid="mfa-account-row"]` — interactive — F-MFA-1.row
+- `[data-testid="mfa-account-code"]` — interactive — F-MFA-1.code
+- `[data-testid="mfa-account-next-code"]` — interactive [optional] — F-MFA-1.next-code
+- `[data-testid="mfa-account-countdown"]` — display — F-MFA-1.countdown
+- `[data-testid="mfa-account-group"]` — display — F-MFA-1.group-pill
+- `[data-testid="mfa-account-issuer"]` — display [optional] — F-MFA-1.issuer-label
+- `[data-testid="mfa-account-name"]` — display [optional] — F-MFA-1.account-label
+- `[data-testid="mfa-account-hotp-next"]` — interactive — F-MFA-1.hotp-next
+- `[data-testid="mfa-account-copy"]` — interactive — F-MFA-1.copy
+- `[data-testid="mfa-account-pin"]` — interactive — F-MFA-1.pin
+- `[data-testid="mfa-account-menu"]` — interactive — F-MFA-1.menu
+- `[data-testid="mfa-account-drag"]` — interactive — F-MFA-1.drag
+- `[data-testid="mfa-menu-edit"]` — interactive — F-MFA-1.menu-edit
+- `[data-testid="mfa-menu-qr"]` — interactive — F-MFA-1.menu-qr
+- `[data-testid="mfa-menu-pin"]` — interactive — F-MFA-1.menu-pin
+- `[data-testid="mfa-menu-move-up"]` — interactive — F-MFA-1.menu-move-up
+- `[data-testid="mfa-menu-move-down"]` — interactive — F-MFA-1.menu-move-down
+- `[data-testid="mfa-menu-delete"]` — interactive — F-MFA-1.menu-delete
+- `[data-testid="mfa-edit-dialog"]` — display — F-MFA-1.edit-dialog
+- `[data-testid="mfa-edit-issuer"]` — interactive — F-MFA-1.edit-issuer
+- `[data-testid="mfa-edit-account"]` — interactive — F-MFA-1.edit-account
+- `[data-testid="mfa-edit-group"]` — interactive — F-MFA-1.edit-group
+- `[data-testid="mfa-edit-note"]` — interactive — F-MFA-1.edit-note
+- `[data-testid="mfa-edit-error"]` — display — F-MFA-1.edit-error
+- `[data-testid="mfa-edit-save"]` — interactive — F-MFA-1.edit-save
+- `[data-testid="mfa-edit-cancel"]` — interactive — F-MFA-1.edit-cancel
+- `[data-testid="mfa-qr-dialog"]` — display — F-MFA-1.qr-dialog
+- `[data-testid="mfa-qr-password"]` — interactive — F-MFA-1.qr-password
+- `[data-testid="mfa-qr-reveal"]` — interactive — F-MFA-1.qr-reveal
+- `[data-testid="mfa-qr-image"]` — display — F-MFA-1.qr-image
+- `[data-testid="mfa-qr-error"]` — display — F-MFA-1.qr-error
+- `[data-testid="mfa-qr-close"]` — interactive — F-MFA-1.qr-close
+- `[data-testid="mfa-error"]` — display [optional] — F-MFA-1.error-banner
+- `[data-testid="mfa-loading"]` — display [optional] — F-MFA-1.loading
+- `[data-testid="mfa-load-error"]` — display [optional] — F-MFA-1.load-error
+- `[data-testid="mfa-retry"]` — interactive [optional] — F-MFA-1.retry
+- `[data-testid="mfa-key-error"]` — display [optional] — F-MFA-1.key-error
+- `[data-testid="mfa-reset-store"]` — interactive [optional] — F-MFA-1.reset-store
+
+## tools/mfa (F-MFA-2)
+
+- `[data-testid="mfa-add-dialog"]` — display — F-MFA-2.dialog
+- `[data-testid="mfa-add-close"]` — interactive — F-MFA-2.close
+- `[data-testid="mfa-add-mode-secret"]` — interactive — F-MFA-2.mode-secret
+- `[data-testid="mfa-add-mode-image"]` — interactive — F-MFA-2.mode-image
+- `[data-testid="mfa-add-mode-screen"]` — interactive — F-MFA-2.mode-screen
+- `[data-testid="mfa-add-mode-camera"]` — interactive — F-MFA-2.mode-camera
+- `[data-testid="mfa-secret-form"]` — display [optional] — F-MFA-2.secret-form
+- `[data-testid="mfa-add-uri"]` — interactive — F-MFA-2.uri
+- `[data-testid="mfa-add-issuer"]` — interactive — F-MFA-2.issuer
+- `[data-testid="mfa-add-account"]` — interactive — F-MFA-2.account
+- `[data-testid="mfa-add-secret"]` — interactive — F-MFA-2.secret
+- `[data-testid="mfa-add-group"]` — interactive — F-MFA-2.group
+- `[data-testid="mfa-add-advanced"]` — interactive — F-MFA-2.advanced
+- `[data-testid="mfa-add-advanced-panel"]` — display — F-MFA-2.advanced-panel
+- `[data-testid="mfa-add-kind"]` — interactive — F-MFA-2.kind
+- `[data-testid="mfa-add-counter"]` — interactive — F-MFA-2.counter
+- `[data-testid="mfa-add-algorithm"]` — interactive [optional] — F-MFA-2.algorithm
+- `[data-testid="mfa-add-digits"]` — interactive [optional] — F-MFA-2.digits
+- `[data-testid="mfa-add-period"]` — interactive [optional] — F-MFA-2.period
+- `[data-testid="mfa-add-notice"]` — display — F-MFA-2.notice
+- `[data-testid="mfa-add-error"]` — display — F-MFA-2.error
+- `[data-testid="mfa-add-cancel"]` — interactive — F-MFA-2.cancel
+- `[data-testid="mfa-add-submit"]` — interactive — F-MFA-2.submit
+- `[data-testid="mfa-image-dropzone"]` — interactive — F-MFA-2.image-dropzone
+- `[data-testid="mfa-image-paste"]` — interactive — F-MFA-2.image-paste
+- `[data-testid="mfa-image-choose"]` — interactive [optional] — F-MFA-2.image-choose
+- `[data-testid="mfa-image-file"]` — interactive — F-MFA-2.image-file
+- `[data-testid="mfa-image-status"]` — display — F-MFA-2.image-status
+- `[data-testid="mfa-screen-scan"]` — interactive — F-MFA-2.screen-scan
+- `[data-testid="mfa-screen-status"]` — display — F-MFA-2.screen-status
+- `[data-testid="mfa-camera-state"]` — display — F-MFA-2.camera-state
+- `[data-testid="mfa-camera-video"]` — display — F-MFA-2.camera-video
+- `[data-testid="mfa-camera-retry"]` — interactive — F-MFA-2.camera-retry
+- `[data-testid="mfa-camera-device"]` — interactive [optional] — F-MFA-2.camera-device
+- `[data-testid="mfa-import-preview"]` — display — F-MFA-2.import-preview
+- `[data-testid="mfa-import-item"]` — display — F-MFA-2.import-item
+- `[data-testid="mfa-import-item-check"]` — interactive — F-MFA-2.import-item-check
+- `[data-testid="mfa-import-item-label"]` — display — F-MFA-2.import-item-label
+- `[data-testid="mfa-import-issuer"]` — interactive — F-MFA-2.import-issuer
+- `[data-testid="mfa-import-account"]` — interactive — F-MFA-2.import-account
+- `[data-testid="mfa-import-group"]` — interactive — F-MFA-2.import-group
+- `[data-testid="mfa-import-duplicate"]` — display — F-MFA-2.import-duplicate
+- `[data-testid="mfa-import-all-duplicates"]` — display — F-MFA-2.import-all-duplicates
+- `[data-testid="mfa-import-invalid"]` — display [optional] — F-MFA-2.import-invalid
+- `[data-testid="mfa-import-error"]` — display [optional] — F-MFA-2.import-error
+- `[data-testid="mfa-import-back"]` — interactive — F-MFA-2.import-back
+- `[data-testid="mfa-import-confirm"]` — interactive — F-MFA-2.import-confirm
 
 ## tunnel (F8.2)
 
