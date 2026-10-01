@@ -7140,7 +7140,11 @@ export function CodeWorkspaceTab({
     if (normalizedPath.endsWith(".editorconfig")) {
       workspaceStyleControllerRef.current.invalidate(normalizedPath);
     }
-    semanticIndex.invalidate("external-file-change", [normalizedPath]);
+    // The semantic revision only moves for a real content change: the watcher
+    // echo of our own save (or of a restore) re-delivers what the open buffer
+    // already holds, and must not cancel a rename whose dialog is open
+    // (Extract Method's naming prompt, ED-AUDIT-008 freshness contract).
+    const invalidateSemantics = () => semanticIndex.invalidate("external-file-change", [normalizedPath]);
     const file = Object.values(openFilesRef.current).find((candidate) => {
       const absolute = absolutePathForOpenFile(candidate);
       return absolute !== null && fsPathEquals(absolute, normalizedPath);
@@ -7151,13 +7155,19 @@ export function CodeWorkspaceTab({
     // before either the open- or closed-file status path handles it.
     if (restoreEchoSuppressorRef.current.shouldSuppress(fsPathComparisonKey(normalizedPath))) return;
     if (!file) {
+      invalidateSemantics();
       setStatusMessage(`File changed on disk: ${change.path}`);
       return;
     }
-    if (file.library || file.saving) {
+    if (file.library) {
+      invalidateSemantics();
+      return;
+    }
+    if (file.saving) {
       return;
     }
     if (change.type === 3) {
+      invalidateSemantics();
       if (file.dirty) {
         enqueueExternalFileConflict(file, null);
         setStatusMessage(`${file.subtitle} was deleted on disk; choose how to recover the local buffer`);
@@ -7178,10 +7188,12 @@ export function CodeWorkspaceTab({
     try {
       disk = await readDiskSnapshot(file);
     } catch (error) {
+      invalidateSemantics();
       setStatusMessage(`Cannot read external change for ${file.subtitle}: ${errorMessage(error)}`);
       return;
     }
     const latest = openFilesRef.current[file.key] ?? file;
+    if (disk.text !== latest.text && disk.text !== latest.savedText) invalidateSemantics();
     if (disk.text === latest.text) {
       // Another process wrote exactly the buffer we already have. Accept the
       // new hash and clear dirty without repainting the editor document.

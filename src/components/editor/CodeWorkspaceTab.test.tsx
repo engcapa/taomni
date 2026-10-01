@@ -14403,6 +14403,26 @@ end_of_record
         view.state.doc.lineAt(view.state.selection.main.head).text,
       ).toBe("        int sum = sumOf(values);"));
 
+      // Fresh setup: the watcher echo of the extract's own save, delivered while
+      // the naming prompt is open, is not a workspace change (no stale cancel).
+      await cleanup();
+      runtimeState.tauri = true;
+      const echoed = setupExtract("instance-extract-echo");
+      const echo = await mountExtract(echoed);
+      selectExtractRange(echo.content);
+      pressExtractChord(echo.pane);
+      const echoInput = await screen.findByTestId("text-input-dialog-input");
+      await waitFor(() => expect(echoed.disk[EXTRACT_PATH]).toBe(B1));
+      await act(async () => {
+        await emit("lsp://external-file-change", { workspaceId: "instance-extract-echo", path: EXTRACT_ABS, type: 2 });
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
+      fireEvent.change(echoInput, { target: { value: "sumOf" } });
+      fireEvent.keyDown(echoInput, { key: "Enter" });
+      await waitFor(() => expect(echoed.text()).toBe(B2));
+      expect(useAppStore.getState().statusMessage).not.toContain("workspace changed");
+      runtimeState.tauri = false;
+
       // Fresh setup: Escape keeps the provider default name and adds no history.
       await cleanup();
       const escaped = setupExtract("instance-extract-escape");
