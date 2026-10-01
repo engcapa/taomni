@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Loader2, Search } from "lucide-react";
 import { useFocusReturn } from "./useFocusReturn";
+import { detectKeymapPlatform, type KeymapPlatform } from "./workspaceKeymapPlatform";
 
 interface QuickPickOverlayProps<T> {
   open: boolean;
@@ -31,10 +32,15 @@ interface QuickPickOverlayProps<T> {
   /** Enter on a keyboard-selected aside row. */
   onAsideActivate?: (index: number) => void;
   /**
-   * IDEA Search Everywhere: Tab / Shift+Tab switch the category tab
-   * (SearchEverywhere.NextTab / PrevTab) instead of moving DOM focus.
+   * IDEA Search Everywhere switches the category tab with every chord its UI
+   * registers (see `searchEverywhereTabDirection`) instead of moving DOM focus.
    */
   onTabNavigate?: (direction: 1 | -1) => void;
+  /**
+   * IDEA SearchEverywhere.NavigateToNextGroup / PrevGroup: PageDown or
+   * Ctrl+Down selects the last result, PageUp or Ctrl+Up the first.
+   */
+  groupNavigation?: boolean;
   onClose: () => void;
   onPick: (item: T, options?: { split: boolean }) => void;
   /** Called when Enter is pressed with no selectable results (e.g. Text search). */
@@ -43,6 +49,31 @@ interface QuickPickOverlayProps<T> {
   onQueryChange?: (query: string) => void;
   /** Alt+Enter on the selected item (e.g. Find Action → Assign Shortcut). */
   onAltEnter?: (item: T) => void;
+}
+
+type TabKeyEvent = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "altKey" | "shiftKey" | "metaKey">;
+
+/**
+ * Tab-switch direction of one key event in IDEA Search Everywhere, or null.
+ * SearchEverywhereUI registers SearchEverywhere.NextTab/PrevTab (Tab /
+ * Shift+Tab), the platform NextTab/PreviousTab actions (XWin Alt+Right /
+ * Alt+Left; macOS Ctrl+Right / Ctrl+Left and Cmd+Shift+] / [) and Switcher
+ * (Ctrl+Tab, with Shift = previous).
+ */
+export function searchEverywhereTabDirection(event: TabKeyEvent, platform: KeymapPlatform = detectKeymapPlatform()): 1 | -1 | null {
+  const { key, code, ctrlKey: ctrl, altKey: alt, shiftKey: shift, metaKey: meta } = event;
+  if (key === "Tab" && !alt && !meta) return shift ? -1 : 1;
+  const arrow = key === "ArrowRight" ? 1 : key === "ArrowLeft" ? -1 : null;
+  if (platform === "mac") {
+    if (arrow && ctrl && !alt && !shift && !meta) return arrow;
+    if (meta && shift && !ctrl && !alt) {
+      if (code === "BracketRight") return 1;
+      if (code === "BracketLeft") return -1;
+    }
+    return null;
+  }
+  if (arrow && alt && !ctrl && !shift && !meta) return arrow;
+  return null;
 }
 
 /**
@@ -69,6 +100,7 @@ export function QuickPickOverlay<T>({
   asideItemCount = 0,
   onAsideActivate,
   onTabNavigate,
+  groupNavigation = false,
   onClose,
   onPick,
   onEnterEmpty,
@@ -87,6 +119,19 @@ export function QuickPickOverlay<T>({
   initialIndexRef.current = initialIndex;
   const onQueryChangeRef = useRef(onQueryChange);
   onQueryChangeRef.current = onQueryChange;
+
+  // Reopening starts from an empty query in the SAME render that shows the
+  // popup: the overlay stays mounted while closed, and a slow runner could
+  // otherwise paint (and type into) the previous query before the effect runs.
+  const [openSeen, setOpenSeen] = useState(open);
+  if (open !== openSeen) {
+    setOpenSeen(open);
+    if (open) {
+      setQuery("");
+      setSelectedIndex(initialIndex);
+      setAsideIndex(null);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -145,10 +190,23 @@ export function QuickPickOverlay<T>({
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.nativeEvent.isComposing) return;
     const input = inputRef.current;
-    if (event.key === "Tab" && onTabNavigate && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    const tabDirection = onTabNavigate ? searchEverywhereTabDirection(event) : null;
+    if (onTabNavigate && tabDirection) {
       event.preventDefault();
-      onTabNavigate(event.shiftKey ? -1 : 1);
+      event.stopPropagation();
+      onTabNavigate(tabDirection);
       return;
+    }
+    if (groupNavigation && !event.altKey && !event.metaKey && !event.shiftKey) {
+      const plain = !event.ctrlKey;
+      const toLast = (plain && event.key === "PageDown") || (event.ctrlKey && event.key === "ArrowDown");
+      const toFirst = (plain && event.key === "PageUp") || (event.ctrlKey && event.key === "ArrowUp");
+      if (toLast || toFirst) {
+        event.preventDefault();
+        setAsideIndex(null);
+        setSelectedIndex(toLast ? Math.max(0, results.length - 1) : 0);
+        return;
+      }
     }
     if (asideActive) {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {

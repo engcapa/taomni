@@ -441,6 +441,7 @@ export function SearchEverywhere({
         );
       }}
       onClose={onClose}
+      groupNavigation
       onTabNavigate={(direction) => {
         const index = visibleTabs.findIndex((tab) => tab.id === mode);
         const next = visibleTabs[(index + direction + visibleTabs.length) % visibleTabs.length];

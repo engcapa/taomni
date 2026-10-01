@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SearchEverywhere, actionMatchesQuery, rankAllModeItems, type GoToFileItem } from "./SearchEverywhere";
+import { searchEverywhereTabDirection } from "./QuickPickOverlay";
+import { setKeymapPlatformOverride } from "./workspaceKeymapPlatform";
 import type { ActionSnapshotItem, PreparedActionEvaluation } from "./workspaceActionHost";
 import { createWorkspaceSemanticIndexSnapshot } from "./workspaceSemanticIndex";
 
@@ -61,9 +63,80 @@ describe("SearchEverywhere", () => {
     fireEvent.keyDown(screen.getByLabelText("Go to symbol"), { key: "Tab", shiftKey: true });
     fireEvent.keyDown(screen.getByLabelText("Go to file"), { key: "Tab", shiftKey: true });
     expect(screen.getByTestId("search-everywhere-tab-classes")).toHaveAttribute("aria-selected", "true");
-    // Left/Right keep moving the caret in the query (IDEA does not switch tabs on arrows).
+    // Plain Left/Right keep moving the caret in the query.
     fireEvent.keyDown(screen.getByLabelText("Go to class"), { key: "ArrowRight" });
     expect(screen.getByTestId("search-everywhere-tab-classes")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("switches tabs with Alt+Left/Right and Ctrl+Tab like IDEA (NextTab / PreviousTab / Switcher)", () => {
+    setKeymapPlatformOverride("linux");
+    try {
+      renderPopup({ initialMode: "classes" });
+      fireEvent.keyDown(screen.getByLabelText("Go to class"), { key: "ArrowRight", altKey: true });
+      expect(screen.getByTestId("search-everywhere-tab-files")).toHaveAttribute("aria-selected", "true");
+      fireEvent.keyDown(screen.getByLabelText("Go to file"), { key: "ArrowRight", altKey: true });
+      expect(screen.getByTestId("search-everywhere-tab-symbols")).toHaveAttribute("aria-selected", "true");
+      fireEvent.keyDown(screen.getByLabelText("Go to symbol"), { key: "ArrowLeft", altKey: true });
+      expect(screen.getByTestId("search-everywhere-tab-files")).toHaveAttribute("aria-selected", "true");
+      fireEvent.keyDown(screen.getByLabelText("Go to file"), { key: "Tab", ctrlKey: true });
+      expect(screen.getByTestId("search-everywhere-tab-symbols")).toHaveAttribute("aria-selected", "true");
+      fireEvent.keyDown(screen.getByLabelText("Go to symbol"), { key: "Tab", ctrlKey: true, shiftKey: true });
+      expect(screen.getByTestId("search-everywhere-tab-files")).toHaveAttribute("aria-selected", "true");
+      // Wraps from the first tab to the last.
+      fireEvent.keyDown(screen.getByLabelText("Go to file"), { key: "ArrowLeft", altKey: true });
+      fireEvent.keyDown(screen.getByLabelText("Go to class"), { key: "ArrowLeft", altKey: true });
+      fireEvent.keyDown(screen.getByLabelText("Search everywhere"), { key: "ArrowLeft", altKey: true });
+      expect(screen.getByTestId("search-everywhere-tab-text")).toHaveAttribute("aria-selected", "true");
+    } finally {
+      setKeymapPlatformOverride(null);
+    }
+  });
+
+  it("maps the macOS NextTab chords (Ctrl+Right, Cmd+Shift+]) and keeps Option+arrows for the caret", () => {
+    expect(searchEverywhereTabDirection({ key: "ArrowRight", code: "ArrowRight", ctrlKey: true, altKey: false, shiftKey: false, metaKey: false }, "mac")).toBe(1);
+    expect(searchEverywhereTabDirection({ key: "ArrowLeft", code: "ArrowLeft", ctrlKey: true, altKey: false, shiftKey: false, metaKey: false }, "mac")).toBe(-1);
+    expect(searchEverywhereTabDirection({ key: "}", code: "BracketRight", ctrlKey: false, altKey: false, shiftKey: true, metaKey: true }, "mac")).toBe(1);
+    expect(searchEverywhereTabDirection({ key: "{", code: "BracketLeft", ctrlKey: false, altKey: false, shiftKey: true, metaKey: true }, "mac")).toBe(-1);
+    expect(searchEverywhereTabDirection({ key: "ArrowRight", code: "ArrowRight", ctrlKey: false, altKey: true, shiftKey: false, metaKey: false }, "mac")).toBeNull();
+    expect(searchEverywhereTabDirection({ key: "ArrowRight", code: "ArrowRight", ctrlKey: true, altKey: false, shiftKey: false, metaKey: false }, "windows")).toBeNull();
+    expect(searchEverywhereTabDirection({ key: "ArrowRight", code: "ArrowRight", ctrlKey: false, altKey: true, shiftKey: false, metaKey: false }, "windows")).toBe(1);
+    expect(searchEverywhereTabDirection({ key: "ArrowRight", code: "ArrowRight", ctrlKey: false, altKey: false, shiftKey: false, metaKey: false }, "linux")).toBeNull();
+  });
+
+  it("jumps to the last/first result with PageDown/PageUp and Ctrl+Down/Up (NavigateToNextGroup)", () => {
+    renderPopup({ initialMode: "files" });
+    const input = screen.getByLabelText("Go to file");
+    const rows = () => Array.from(document.querySelectorAll("[data-testid='code-workspace-search-everywhere'] [data-index]"));
+    const selectedIndex = () => rows().findIndex((row) => row.getAttribute("data-selected") === "true");
+    expect(rows()).toHaveLength(3);
+    expect(selectedIndex()).toBe(0);
+    fireEvent.keyDown(input, { key: "PageDown" });
+    expect(selectedIndex()).toBe(2);
+    fireEvent.keyDown(input, { key: "PageUp" });
+    expect(selectedIndex()).toBe(0);
+    fireEvent.keyDown(input, { key: "ArrowDown", ctrlKey: true });
+    expect(selectedIndex()).toBe(2);
+    fireEvent.keyDown(input, { key: "ArrowUp", ctrlKey: true });
+    expect(selectedIndex()).toBe(0);
+  });
+
+  it("reopens with an empty query even when the previous query was typed", () => {
+    const props = {
+      items,
+      loading: false,
+      actionSnapshots,
+      onClose: vi.fn(),
+      onOpenFile: vi.fn(),
+      onRunCommand: vi.fn(),
+      initialMode: "actions" as const,
+    };
+    const { rerender } = render(<SearchEverywhere open {...props} />);
+    fireEvent.change(screen.getByLabelText("Search actions"), { target: { value: "Find in" } });
+    expect(screen.getByLabelText("Search actions")).toHaveValue("Find in");
+    rerender(<SearchEverywhere open={false} {...props} />);
+    rerender(<SearchEverywhere open {...props} />);
+    expect(screen.getByLabelText("Search actions")).toHaveValue("");
+    expect(screen.getByText("Find in Files")).toBeInTheDocument();
   });
 
   it("renders nothing while closed", () => {
