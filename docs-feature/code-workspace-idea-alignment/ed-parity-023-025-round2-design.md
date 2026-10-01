@@ -17,7 +17,7 @@
 
 ## ED-PARITY-024 工具窗口条、锚点与弹窗按键
 
-**IDEA 事实**：新 UI 工具窗口条可显示名称（默认 59 px，40–100 px 可拖），条按钮右键菜单为 Hide / Move to（六个锚点）/ Remove from Sidebar / Show Tool Window Names；窗口 ⋮ Options 为 View Mode / Move to / Resize / Remove from Sidebar / Hide；Structure 默认 Left Bottom。Project 窗口头部有 Select Opened File、Expand All、Collapse All。弹窗按键（实测 + 字节码）：IDEA 的 Ctrl+Alt+N 是 Inline 重构而非弹窗；Search Everywhere 只用 Tab/Shift+Tab 切换分类，方向键不切换；Recent Files 与 Switcher 用 Left/Right 在工具窗口列与文件列之间移动。
+**IDEA 事实**：新 UI 工具窗口条可显示名称（默认 59 px，40–100 px 可拖），条按钮右键菜单为 Hide / Move to（六个锚点）/ Remove from Sidebar / Show Tool Window Names；窗口 ⋮ Options 为 View Mode / Move to / Resize / Remove from Sidebar / Hide；Structure 默认 Left Bottom。Project 窗口头部有 Select Opened File、Expand All、Collapse All。弹窗按键（实测 + 字节码）：IDEA 的 Ctrl+Alt+N 是 Inline 重构而非弹窗；Search Everywhere 用 Tab/Shift+Tab 切换分类，不带修饰键的方向键不切换（第三轮更正：Alt+Left/Right、Ctrl+Tab 等平台 NextTab/PreviousTab/Switcher 也会切换，见 [ED-PARITY-026](ed-parity-026-round3-design.md#ed-parity-026)）；Recent Files 与 Switcher 用 Left/Right 在工具窗口列与文件列之间移动。
 
 - ED-PARITY-024-A1 工具窗口条显示名称、可拖宽、可切换仅图标。
 - ED-PARITY-024-A2 任一工具窗口可移到六个锚点，内容经 portal 重新挂载而保留状态（终端会话、搜索结果）。

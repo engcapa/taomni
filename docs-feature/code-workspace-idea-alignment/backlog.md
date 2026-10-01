@@ -125,6 +125,13 @@
 
 参照：[第二轮设计](ed-parity-023-025-round2-design.md#ed-parity-025-调试器断点与暂停态)。
 
+### ED-PARITY-026 Search Everywhere 切换键、悬停文档停留与 Project 头部
+<!-- ide-task {"id": "ED-PARITY-026", "status": "implemented", "priority": "P1", "size": "M", "depends_on": ["ED-PARITY-024"], "spec": "docs-feature/code-workspace-idea-alignment/ed-parity-026-round3-design.md#ed-parity-026", "acceptance": ["ED-PARITY-026-A1", "ED-PARITY-026-A2", "ED-PARITY-026-A3"], "required_evidence": ["code-audit", "unit", "typecheck", "browser", "native", "idea-comparison"], "audit": {"date": "2026-10-01", "head": "25221869", "finding": "Ctrl+N/Ctrl+Shift+N 弹窗不支持 IDEA 的 Alt+Left/Right 等切页签键；悬停文档在指针移向它时立即消失；Project 树头部为两行 Taomni 工具条而非 IDEA 单行标题栏。"}, "prior_completion": {"kind": "new-task", "completed": false}, "p0": {"audit_id": "LIVE-IDEA-20261001-ROUND3", "requirements": [], "scenarios": [], "planning_required": false}, "updated_at": "2026-10-01T00:00:00Z", "evidence": {"verified_at": "2026-10-01T00:00:00Z", "head": "25221869", "checks": [{"kind": "unit", "result": "passed", "command": "pnpm test src/components/editor src/stubs", "summary": "246 files / 2719 tests passed locally on Linux", "acceptance": ["ED-PARITY-026-A1", "ED-PARITY-026-A2", "ED-PARITY-026-A3"]}, {"kind": "typecheck", "result": "passed", "command": "pnpm exec tsc -b && pnpm build", "summary": "clean", "acceptance": ["ED-PARITY-026-A1", "ED-PARITY-026-A2", "ED-PARITY-026-A3"]}], "unrun": ["browser", "native", "idea-comparison"], "notes": ["GitHub workflow qa-ui-auto-platforms run pending for TC-IDE-PARITY-026-01..06 and the 22 re-pointed tree cases."]}} -->
+
+目标：Search Everywhere 支持 IDEA 注册的全部切页签/分组键并在重开时清空查询；悬停文档在指针移向或停在其上时保留；Project 工具窗口改为 IDEA 单行标题栏与速搜。
+
+参照：[第三轮设计](ed-parity-026-round3-design.md#ed-parity-026)；左侧条与主侧栏融合方案见 [PROP-026-01](ed-parity-026-round3-design.md#prop-026-01)（待评审）。
+
 ## 当前批次边界
 
 本板不覆盖完整插件生态、所有语言、远端开发、全部 Git 发布动作、所有 IDEA 主题/DPI 组合、Code Vision（usages/作者 inlay）、Scratch、Injected Language、Coverage 高级功能、Services/Database/AI Chat 等 IDEA 右侧工具窗内容和多窗口拖拽。发现这些范围存在具体用户需求时新增独立卡并扩充分母。
