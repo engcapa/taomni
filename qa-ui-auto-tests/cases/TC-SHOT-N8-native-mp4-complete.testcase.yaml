@@ -1,0 +1,25 @@
+id: TC-SHOT-N8
+title: Native MP4 recording has correct duration, codec and dimensions
+covers:
+- F27.2
+tags:
+- screenshot
+- recording
+- native
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- wait: 5
+# Record 3s at 5fps, probe with ffprobe, verify duration ~3s, h264 codec,
+# and 200x200 dimensions. Requires ffmpeg/ffprobe on PATH.
+- eval_readonly:
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_mp4_complete", {secs: 3, fps: 5}).then(JSON.stringify)'
+    contains: 'OK duration='

@@ -1,0 +1,25 @@
+id: TC-SHOT-N7
+title: Native GIF recording has complete frames matching duration and fps
+covers:
+- F27.2
+tags:
+- screenshot
+- recording
+- native
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- wait: 5
+# Record 3s at 5fps, decode the GIF, verify frame count is within 20% of
+# expected (15) and dimensions are 200x200.
+- eval_readonly:
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_gif_complete", {secs: 3, fps: 5}).then(JSON.stringify)'
+    contains: 'OK frames='

@@ -1,0 +1,24 @@
+id: TC-SHOT-N10
+title: Native screen capture is deterministic across rapid captures
+covers:
+- F27.1
+tags:
+- screenshot
+- native
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- wait: 5
+# Capture the screen twice in quick succession; the captures must be
+# nearly identical (<5% differing pixels), proving faithful capture.
+- eval_readonly:
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_capture_fidelity").then(JSON.stringify)'
+    contains: 'OK diff_pct='

@@ -300,6 +300,226 @@ pub async fn screenshot_test_recording(
     Ok(format!("OK path={} header={}", file.path, header))
 }
 
+/// Test-only: record a GIF and verify frame completeness by decoding it.
+/// Checks frame count is within 20% of expected (secs * fps) and dimensions
+/// match. Returns "OK frames=N width=W height=H".
+#[tauri::command]
+pub async fn screenshot_test_gif_complete(
+    app: AppHandle,
+    secs: u64,
+    fps: u32,
+) -> Result<String, String> {
+    let recording_id = {
+        let app_clone = app.clone();
+        tokio::task::spawn_blocking(move || {
+            record::start_recording(&app_clone, None, Some((0, 0, 200, 200)), "gif", Some(fps))
+        })
+        .await
+        .map_err(|e| format!("start task failed: {e}"))?
+        .map_err(internal_error)?
+    };
+    tokio::time::sleep(std::time::Duration::from_secs(secs.min(10))).await;
+    let file = tokio::task::spawn_blocking(move || record::stop_recording(&recording_id))
+        .await
+        .map_err(|e| format!("stop task failed: {e}"))?
+        .map_err(internal_error)?;
+    let path = file.path.clone();
+    let (frames, width, height) = tokio::task::spawn_blocking(move || {
+        let f = std::fs::File::open(&path).map_err(|e| format!("open failed: {e}"))?;
+        let mut decoder = gif::DecodeOptions::new()
+            .read_info(f)
+            .map_err(|e| format!("gif decode failed: {e}"))?;
+        let (w, h) = (decoder.width() as u32, decoder.height() as u32);
+        let mut count = 0u32;
+        while decoder
+            .read_next_frame()
+            .map_err(|e| format!("frame read failed: {e}"))?
+            .is_some()
+        {
+            count += 1;
+        }
+        Ok::<(u32, u32, u32), String>((count, w, h))
+    })
+    .await
+    .map_err(|e| format!("decode task failed: {e}"))??;
+    let expected = secs as u32 * fps;
+    let ok = frames >= expected * 8 / 10 && frames <= expected * 12 / 10 && width == 200 && height == 200;
+    Ok(format!(
+        "{} frames={} width={} height={} expected={}",
+        if ok { "OK" } else { "FAIL" },
+        frames,
+        width,
+        height,
+        expected
+    ))
+}
+
+/// Test-only: record MP4 and verify via ffprobe (duration, codec, dims).
+/// Returns "OK duration=D codec=C width=W height=H".
+#[tauri::command]
+pub async fn screenshot_test_mp4_complete(
+    app: AppHandle,
+    secs: u64,
+    fps: u32,
+) -> Result<String, String> {
+    let recording_id = {
+        let app_clone = app.clone();
+        tokio::task::spawn_blocking(move || {
+            record::start_recording(&app_clone, None, Some((0, 0, 200, 200)), "mp4", Some(fps))
+        })
+        .await
+        .map_err(|e| format!("start task failed: {e}"))?
+        .map_err(internal_error)?
+    };
+    tokio::time::sleep(std::time::Duration::from_secs(secs.min(10))).await;
+    let file = tokio::task::spawn_blocking(move || record::stop_recording(&recording_id))
+        .await
+        .map_err(|e| format!("stop task failed: {e}"))?
+        .map_err(internal_error)?;
+    let path = file.path.clone();
+    let info = tokio::task::spawn_blocking(move || {
+        let out = std::process::Command::new("ffprobe")
+            .args([
+                "-v", "quiet",
+                "-print_format", "json",
+                "-show_format", "-show_streams",
+                &path,
+            ])
+            .output()
+            .map_err(|e| format!("ffprobe failed: {e}"))?;
+        let json: serde_json::Value =
+            serde_json::from_slice(&out.stdout).map_err(|e| format!("json parse failed: {e}"))?;
+        let stream = json["streams"]
+            .as_array()
+            .and_then(|s| s.iter().find(|v| v["codec_type"] == "video"))
+            .ok_or_else(|| "no video stream".to_string())?;
+        let duration: f64 = json["format"]["duration"]
+            .as_str()
+            .and_then(|d| d.parse().ok())
+            .unwrap_or(0.0);
+        let codec = stream["codec_name"].as_str().unwrap_or("?").to_string();
+        let w = stream["width"].as_u64().unwrap_or(0);
+        let h = stream["height"].as_u64().unwrap_or(0);
+        Ok::<(f64, String, u64, u64), String>((duration, codec, w, h))
+    })
+    .await
+    .map_err(|e| format!("probe task failed: {e}"))??;
+    let (duration, codec, w, h) = info;
+    let ok = duration >= secs as f64 - 0.5
+        && duration <= secs as f64 + 1.5
+        && codec == "h264"
+        && w == 200
+        && h == 200;
+    Ok(format!(
+        "{} duration={:.2} codec={} width={} height={}",
+        if ok { "OK" } else { "FAIL" },
+        duration,
+        codec,
+        w,
+        h
+    ))
+}
+
+/// Test-only: verify scroll-stitch content is real (not duplicated frames).
+/// Divides the stitched image into 3 vertical thirds and checks at least 2
+/// have different average colors, proving the wheel actually scrolled.
+#[tauri::command]
+pub async fn screenshot_test_scroll_content(
+    app: AppHandle,
+    width: u32,
+    height: u32,
+) -> Result<String, String> {
+    let r = screenshot_scroll_capture(app, None, 0, 0, width, height).await?;
+    let path = r.path.clone();
+    let differ = tokio::task::spawn_blocking(move || {
+        let img = image::open(&path).map_err(|e| format!("open failed: {e}"))?.to_rgba8();
+        let (w, h) = img.dimensions();
+        let third = h / 3;
+        let mut avgs = Vec::new();
+        for i in 0..3 {
+            let y0 = i * third;
+            let y1 = if i == 2 { h } else { (i + 1) * third };
+            let mut sr: u64 = 0;
+            let mut sg: u64 = 0;
+            let mut sb: u64 = 0;
+            let mut n: u64 = 0;
+            // Sample every 7th pixel for speed.
+            for y in (y0..y1).step_by(7) {
+                for x in (0..w).step_by(7) {
+                    let p = img.get_pixel(x, y);
+                    sr += p[0] as u64;
+                    sg += p[1] as u64;
+                    sb += p[2] as u64;
+                    n += 1;
+                }
+            }
+            avgs.push((sr / n, sg / n, sb / n));
+        }
+        let mut differ = 0;
+        for a in 0..3 {
+            for b in (a + 1)..3 {
+                let dr = (avgs[a].0 as i64 - avgs[b].0 as i64).abs();
+                let dg = (avgs[a].1 as i64 - avgs[b].1 as i64).abs();
+                let db = (avgs[a].2 as i64 - avgs[b].2 as i64).abs();
+                if dr + dg + db > 30 {
+                    differ += 1;
+                }
+            }
+        }
+        Ok::<u32, String>(differ)
+    })
+    .await
+    .map_err(|e| format!("content task failed: {e}"))??;
+    Ok(format!(
+        "{} differing_thirds={}",
+        if differ >= 1 { "OK" } else { "FAIL" },
+        differ
+    ))
+}
+
+/// Test-only: capture the screen twice and verify the captures are nearly
+/// identical (proving deterministic, faithful capture).
+#[tauri::command]
+pub async fn screenshot_test_capture_fidelity(app: AppHandle) -> Result<String, String> {
+    let cap = |app: &AppHandle| {
+        let app_clone = app.clone();
+        capture::capture_display_png(&app_clone, None).map_err(|e| format!("capture failed: {e}"))
+    };
+    let (p1, _, _) = cap(&app)?;
+    let (p2, _, _) = cap(&app)?;
+    let diff_pct = tokio::task::spawn_blocking(move || {
+        let a = image::open(&p1).map_err(|e| format!("open1 failed: {e}"))?.to_rgba8();
+        let b = image::open(&p2).map_err(|e| format!("open2 failed: {e}"))?.to_rgba8();
+        let (w, h) = a.dimensions();
+        if b.dimensions() != (w, h) {
+            return Ok::<f64, String>(100.0);
+        }
+        let mut diff: u64 = 0;
+        let mut total: u64 = 0;
+        for y in (0..h).step_by(3) {
+            for x in (0..w).step_by(3) {
+                let pa = a.get_pixel(x, y);
+                let pb = b.get_pixel(x, y);
+                let d = (pa[0] as i32 - pb[0] as i32).abs()
+                    + (pa[1] as i32 - pb[1] as i32).abs()
+                    + (pa[2] as i32 - pb[2] as i32).abs();
+                if d > 30 {
+                    diff += 1;
+                }
+                total += 1;
+            }
+        }
+        Ok::<f64, String>(diff as f64 * 100.0 / total as f64)
+    })
+    .await
+    .map_err(|e| format!("diff task failed: {e}"))??;
+    Ok(format!(
+        "{} diff_pct={:.2}",
+        if diff_pct < 5.0 { "OK" } else { "FAIL" },
+        diff_pct
+    ))
+}
+
 // ---------------------------------------------------------------------------
 // Overlay window
 // ---------------------------------------------------------------------------
