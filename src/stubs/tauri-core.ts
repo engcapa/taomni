@@ -41,6 +41,7 @@ import {
   VFS_ROOT,
 } from "./localVfs";
 import { emit } from "./tauri-event";
+import { vncBridgeCancel, vncBridgeConnect, vncBridgeDisconnect, vncBridgeTest } from "./vncClient";
 import { promptAppDialog } from "../lib/appDialogs";
 import {
   parity005Completion,
@@ -3108,6 +3109,16 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         onOutput: args?.onOutput as SshConnectArgs["onOutput"],
       })) as T;
     }
+    case "vnc_connect":
+      // Proxy / jump-host rows are ignored here, as for SSH in the preview.
+      return await vncBridgeConnect<T>(args);
+    case "vnc_test_connection":
+      return await vncBridgeTest<T>(args);
+    case "vnc_disconnect":
+      await vncBridgeDisconnect(args?.sessionId);
+      return undefined as T;
+    case "vnc_cancel_connect":
+      return (await vncBridgeCancel(args?.attemptId)) as T;
     case "submit_ssh_auth_response": {
       // Keyboard-interactive (MFA) auth is driven by the real Rust backend.
       // The browser preview's WS SSH proxy doesn't surface interactive

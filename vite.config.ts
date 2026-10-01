@@ -7,6 +7,7 @@ import { readFileSync } from "fs";
 import { sshProxyPlugin } from "./vite-plugins/sshProxy";
 import { sftpProxyPlugin } from "./vite-plugins/sftpProxy";
 import { rdpProxyPlugin } from "./vite-plugins/rdpProxy";
+import { vncProxyPlugin } from "./vite-plugins/vncProxy";
 
 const isTauriBuild = !!process.env.TAURI_ENV_PLATFORM;
 
@@ -17,7 +18,7 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8")
 };
 
 export default defineConfig(({ mode }) => ({
-  plugins: [tailwindcss(), react(), ...(isTauriBuild ? [] : [sshProxyPlugin(), sftpProxyPlugin(), rdpProxyPlugin()])],
+  plugins: [tailwindcss(), react(), ...(isTauriBuild ? [] : [sshProxyPlugin(), sftpProxyPlugin(), rdpProxyPlugin(), vncProxyPlugin()])],
   clearScreen: false,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
