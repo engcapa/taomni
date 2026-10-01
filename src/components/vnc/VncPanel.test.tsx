@@ -484,6 +484,80 @@ describe("VncPanel viewer options (VNC-CLIP-001, VNC-PERF-004, VNC-INPUT-003)", 
     expect(texts.filter((text) => String(text).includes("ext_clipboard"))).toEqual([]);
   });
 
+  describe("VNC-CLIP-001 clipboard timing", () => {
+    let local = "baseline";
+    beforeEach(() => {
+      local = "baseline";
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          readText: vi.fn(async () => local),
+          writeText: vi.fn(async (text: string) => {
+            local = text;
+          }),
+        },
+      });
+    });
+    afterEach(() => {
+      delete (navigator as unknown as Record<string, unknown>).clipboard;
+    });
+
+    const clipboardTexts = (socket: MockWebSocket) =>
+      sentText(socket).filter((message) => message.type === "ext_clipboard").map((message) => message.text);
+
+    it("sends a local change once when the pointer comes back to the desktop", async () => {
+      const { socket, canvas } = await renderConnected();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      local = "copied elsewhere";
+      await act(async () => {
+        fireEvent.pointerEnter(canvas, { buttons: 0, clientX: 10, clientY: 10, pointerId: 1 });
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      await act(async () => {
+        fireEvent.pointerLeave(canvas, { pointerId: 1 });
+        await vi.advanceTimersByTimeAsync(300);
+        fireEvent.pointerEnter(canvas, { buttons: 0, clientX: 10, clientY: 10, pointerId: 1 });
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      expect(clipboardTexts(socket)).toEqual(["copied elsewhere"]);
+    });
+
+    it("does not echo the server's clipboard back", async () => {
+      const { socket, canvas } = await renderConnected();
+      await act(async () => {
+        socket.onmessage?.({ data: '{"type":"clipboard","text":"from the server"}' } as MessageEvent);
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      // The local clipboard now holds the server's text.
+      local = "from the server";
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+        fireEvent.pointerEnter(canvas, { buttons: 0, clientX: 10, clientY: 10, pointerId: 1 });
+        window.dispatchEvent(new Event("focus"));
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      expect(clipboardTexts(socket)).toEqual([]);
+    });
+
+    it("types the clipboard as keystrokes from the session menu", async () => {
+      const { socket, canvas } = await renderConnected();
+      local = "Ab1\n";
+      act(() => {
+        fireEvent.keyDown(canvas, { key: "F8", code: "F8" });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("vnc-menu-send-clipboard-keys"));
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      const presses = sentMessages(socket)
+        .filter((message) => message.kind === "key" && message.down)
+        .map((message) => message.kind === "key" && message.keysym);
+      expect(presses).toEqual([0x41, 0x62, 0x31, 0xff0d]);
+    });
+  });
+
   it("sends the picture quality chosen in the session menu", async () => {
     const { socket, canvas } = await renderConnected();
     act(() => {
