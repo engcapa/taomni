@@ -322,12 +322,24 @@ async fn element_click<R: Runtime>(
         Err(message) => return error(message),
     };
     let mut script = element_lookup(&reference);
+    // W3C Element Click presses the mouse at the element's in-view center,
+    // so the page sees pointer events with coordinates before the mouse
+    // events. Pointer-only surfaces (the VNC and RDP canvases) ignore mouse
+    // events, and a cancelled pointerdown suppresses the compatibility
+    // mousedown/mouseup like a real driver.
     script.push_str(concat!(
-        "if (!el) throw new Error('stale element'); el.focus?.(); ",
-        "el.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0})); ",
-        "el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true,button:0})); ",
+        "if (!el) throw new Error('stale element'); ",
+        "const r = el.getBoundingClientRect(); ",
+        "const at = {bubbles:true,cancelable:true,composed:true,view:window,button:0,",
+        "clientX:r.left + r.width / 2,clientY:r.top + r.height / 2}; ",
+        "const pointer = {...at,pointerId:1,pointerType:'mouse',isPrimary:true}; ",
+        "const compat = el.dispatchEvent(new PointerEvent('pointerdown',{...pointer,buttons:1})); ",
+        "el.focus?.(); ",
+        "if (compat) el.dispatchEvent(new MouseEvent('mousedown',{...at,buttons:1})); ",
+        "el.dispatchEvent(new PointerEvent('pointerup',{...pointer,buttons:0})); ",
+        "if (compat) el.dispatchEvent(new MouseEvent('mouseup',{...at,buttons:0})); ",
         "if (typeof el.click === 'function') el.click(); ",
-        "else el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,button:0})); ",
+        "else el.dispatchEvent(new MouseEvent('click',{...at,buttons:0})); ",
         "return true;",
     ));
     match eval_js(&state, script).await {

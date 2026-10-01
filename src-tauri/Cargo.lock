@@ -4302,6 +4302,8 @@ dependencies = [
  "num-traits",
  "png 0.18.1",
  "tiff",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -10381,7 +10383,7 @@ dependencies = [
  "llama-cpp-2",
  "log",
  "mail-parser",
- "md-5 0.10.6",
+ "md-5 0.11.0",
  "mdns-sd",
  "native-tls",
  "nokhwa",
@@ -10474,7 +10476,10 @@ dependencies = [
  "xcap",
  "zeroize",
  "zip",
+ "zlib-rs",
  "zookeeper-client",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]

@@ -86,6 +86,13 @@ import {
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { redactVncHandoff, vncConsumeDetachClaim, vncCreateDetachClaim } from "../lib/vnc";
+import {
+  deserializeVncViewerOptions,
+  parseVncViewerOptions,
+  serializeVncViewerOptions,
+  writeVncViewerOptions,
+} from "../lib/vncOptions";
+import type { VncSessionProperties } from "../components/vnc/VncPropertiesDialog";
 import { Bot, Columns2, FolderOpen, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { ToolWindowRail, type ToolWindowRailItem } from "../components/editor/workspace/panels/ToolWindowRail";
@@ -1311,6 +1318,7 @@ export function MainLayout() {
         security_policy: info.securityPolicy ?? "prefer-encryption",
         view_only: info.viewOnly ?? false,
         clipboard_policy: info.clipboardPolicy ?? "bidirectional",
+        viewer_options_json: info.viewerOptions ? serializeVncViewerOptions(info.viewerOptions) : null,
       }).then((claimId) => {
         // The browser-persisted handoff contains only an opaque one-time id;
         // password/proxy secrets stay in backend memory.
@@ -1514,6 +1522,7 @@ export function MainLayout() {
               securityPolicy: claim.security_policy,
               viewOnly: claim.view_only,
               clipboardPolicy: claim.clipboard_policy as DetachedVncParams["clipboardPolicy"],
+              viewerOptions: deserializeVncViewerOptions(claim.viewer_options_json),
             };
           }
           if (!p?.host) return;
@@ -1533,6 +1542,7 @@ export function MainLayout() {
               securityPolicy: p.securityPolicy,
               viewOnly: p.viewOnly,
               clipboardPolicy: p.clipboardPolicy,
+              viewerOptions: p.viewerOptions,
             },
           });
           setStatusMessage(tr("status.reattached"));
@@ -1860,6 +1870,7 @@ export function MainLayout() {
     const options = parseSessionOptions(session.options_json);
     const rawPolicy = typeof options.vncSecurityPolicy === "string" ? options.vncSecurityPolicy : "prefer-encryption";
     const securityPolicy = rawPolicy === "require-encryption" || rawPolicy === "legacy-compatible" || rawPolicy === "allow-none"
+      || rawPolicy === "prefer-off"
       ? rawPolicy
       : "prefer-encryption";
     const ns = toNetworkSettingsPayload(getSessionNetworkSettings(session.options_json));
@@ -1882,9 +1893,48 @@ export function MainLayout() {
           options.vncClipboardPolicy === "disabled" || options.vncClipboardPolicy === "client-to-server" || options.vncClipboardPolicy === "server-to-client"
             ? options.vncClipboardPolicy
             : "bidirectional",
+        viewerOptions: parseVncViewerOptions(options),
       },
     });
   }, [addTab]);
+
+  // VNC-CONN-001: Properties changed in a VNC session persist to the saved
+  // session (like RealVNC's address-book entry) and to the tab.
+  const persistVncProperties = useCallback(async (tabId: string, sessionId: string, properties: VncSessionProperties) => {
+    useAppStore.getState().updateTabVnc(tabId, {
+      viewOnly: properties.viewOnly,
+      clipboardPolicy: properties.clipboardPolicy,
+      viewerOptions: properties.viewer,
+    });
+    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    if (!session) return;
+    const options = writeVncViewerOptions(parseSessionOptions(session.options_json), properties.viewer);
+    options.vncViewOnly = properties.viewOnly;
+    options.vncClipboardPolicy = properties.clipboardPolicy;
+    try {
+      await updateSession({ ...session, options_json: JSON.stringify(options) });
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : String(error));
+    }
+  }, [setStatusMessage, updateSession]);
+
+  // "Remember password" in the in-session authentication form stores the
+  // password in the vault and references it from the session.
+  const rememberVncCredentials = useCallback(async (tabId: string, sessionId: string, password: string) => {
+    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    if (!session) return;
+    const ready = await ensureVaultReady(tr(SAVED_PASSWORD_VAULT_REASON_KEY));
+    if (!ready) return;
+    try {
+      const label = `${session.username || "user"}@${session.host || "?"}:${session.port}`;
+      const result = await vaultPut("vnc-password", label, password);
+      const opts = parseSessionOptions(session.options_json);
+      await updateSession({ ...session, options_json: JSON.stringify({ ...opts, passwordRef: result.reference }) });
+      useAppStore.getState().updateTabVnc(tabId, { password: result.reference });
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : String(error));
+    }
+  }, [setStatusMessage, updateSession]);
 
   const openRdpTab = useCallback((session: SessionConfig, password?: string) => {
     const id = `rdp-${session.id}-${Date.now()}`;
@@ -2550,14 +2600,10 @@ export function MainLayout() {
           if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
           openVncTab(session, ref);
         } else {
-          awaitingManualAuthRef.current = true;
-          setPendingAuth({
-            kind: "session",
-            session,
-            resumeRequestId: resume?.requestId,
-            restoreOperationId: resume?.operationId,
-          });
-          return "awaiting-auth";
+          // DEC-VNC-21: connect first; the session's own authentication form
+          // asks only when the server requires a password (RealVNC), so a
+          // None-only server needs no input at all.
+          openVncTab(session);
         }
       } else {
         openVncTab(session, data ?? undefined);
@@ -3200,7 +3246,11 @@ export function MainLayout() {
         || session.session_type === "RDP"
         || session.session_type === "VNC"
       ) {
-        if (session.auth_method === "Password") {
+        if (session.session_type === "VNC" && session.auth_method === "Password") {
+          // DEC-VNC-21: like saved sessions, ask in the session only when the
+          // server requires a password.
+          openVncTab(session);
+        } else if (session.auth_method === "Password") {
           awaitingManualAuthRef.current = true;
           setPendingAuth({ kind: "session", session });
         } else {
@@ -4723,6 +4773,13 @@ export function MainLayout() {
                           securityPolicy={vnc.securityPolicy}
                           viewOnly={vnc.viewOnly}
                           clipboardPolicy={vnc.clipboardPolicy}
+                          viewerOptions={vnc.viewerOptions}
+                          onSessionPropertiesChange={(properties) => {
+                            void persistVncProperties(tab.id, vnc.sessionId, properties);
+                          }}
+                          onCredentialsChange={({ password: typed }) => {
+                            void rememberVncCredentials(tab.id, vnc.sessionId, typed);
+                          }}
                           visible={isActive}
                           onDetach={() => openDetachedVnc(tab.id, vnc, tab.title)}
                         />

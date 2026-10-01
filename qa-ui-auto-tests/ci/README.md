@@ -96,6 +96,17 @@ probes before the cases. Secrets are masked and referenced by environment name
 in config artifacts. No external server, repository secret or private network
 is required. Account/package mutations are limited to CI.
 
+`vnc_required` selects the `vnc` capability: on every platform the job starts
+the skill's scriptable RFB server (`vnc-realvnc-task/scripts/vnc_fixture_server.py`,
+VNCAuth with a disposable `QA_VNC_PASSWORD`, ExtendedClipboard text+HTML) on
+free loopback ports, and authenticates a real VNCAuth handshake before the
+cases. Its pinned NumPy/Pillow wheels are installed only for that capability.
+Each case resets the fixture and gets its own event log and command file (see
+`qa_ui_auto/fixtures/vnc_required.py`); VNC jobs run cases serially. Browser
+mode reaches it through the dev-server VNC bridge (`vite-plugins/vncProxy.ts`:
+None/VNCAuth, Raw, DesktopSize, clipboard), which proves the panel workflow but
+not the native relay, encodings, OS input or the system clipboard.
+
 The Windows SSH fixture uses Git Bash paths (`/c/...`), while OpenSSH SFTP
 reports `/C:/...`. Manual Sync verifies the translated path. The hosted Windows
 OpenSSH fixture acknowledges `chmod 600` without applying POSIX bits; `TC-010`

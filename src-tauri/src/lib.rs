@@ -44,6 +44,11 @@ mod tunnel;
 mod update;
 pub mod vault;
 mod vnc;
+/// The VNC special-key hook helper process (`taomni --vnc-special-key-hook <pid>`).
+#[cfg(windows)]
+pub use vnc::keyboard_hook::{
+    HOOK_PROCESS_ARG as VNC_SPECIAL_KEY_HOOK_ARG, run_hook_process as run_vnc_special_key_hook,
+};
 mod voice;
 mod windowing;
 mod workspace;
@@ -800,6 +805,9 @@ pub fn run() {
             vnc::vnc_test_connection,
             vnc::vnc_create_detach_claim,
             vnc::vnc_consume_detach_claim,
+            vnc::vnc_cancel_connect,
+            vnc::keyboard_hook::vnc_set_special_key_capture,
+            vnc::keyboard_hook::vnc_special_key_capture_status,
             rdp::rdp_connect,
             rdp::rdp_disconnect,
             rdp::rdp_test_connection,

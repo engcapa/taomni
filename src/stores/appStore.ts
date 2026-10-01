@@ -246,6 +246,8 @@ interface AppState {
   removeTab: (id: string) => void;
   removeTabs: (ids: string[]) => void;
   updateTabTitle: (id: string, title: string) => void;
+  /** Patch a VNC tab's connection info (Properties / remembered credentials). */
+  updateTabVnc: (id: string, patch: Partial<NonNullable<Tab["vnc"]>>) => void;
   /** Resolve or refresh an automatic terminal title from a valid cwd report. */
   assignTerminalAutoTitle: (tabId: string, cwd: string) => void;
   updateGitTabInfo: (id: string, git: GitTabInfo, title?: string) => void;
@@ -1123,6 +1125,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         statusMessage: tr("status.closedTabs"),
       };
     }),
+
+  updateTabVnc: (id, patch) =>
+    set((s) => ({
+      tabs: s.tabs.map((tab) => (tab.id === id && tab.vnc ? { ...tab, vnc: { ...tab.vnc, ...patch } } : tab)),
+    })),
 
   updateTabTitle: (id, title) =>
     set((s) => ({

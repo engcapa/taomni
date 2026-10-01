@@ -2603,23 +2603,26 @@ files:
 controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas surface is owned by F9.6
 -->
 
-- Rust 端 VNC 模块：`src-tauri/src/vnc/{mod,rfb,tls,ws,encodings,clipboard,error,limits,policy,queue}.rs`
-- Tauri 命令：`vnc_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim`
+- Rust 端 VNC 模块：`src-tauri/src/vnc/{mod,rfb,tls,ws,encodings,tight,pixel,quality,framebuffer,clipboard,error,limits,policy,queue,keyboard_hook,native_pointer}.rs`
+- Tauri 命令：`vnc_connect / vnc_cancel_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim / vnc_set_special_key_capture / vnc_special_key_capture_status`
 - 本地动态端口 WebSocket relay：VNC server ↔ 前端 Canvas（前端不再直接持有 TCP 套接字）
 
 ### 9.2 RFB 握手与认证 ✅
-- 安全类型：None（仅显式 `allow-none`）、VNC password、RFB 18 anonymous TLS + 内层安全协商、RealVNC RA2 / RA2ne（128 / 256 位 AES）
+- 安全类型：None（仅显式 `allow-none`）、VNC password、RFB 18 anonymous TLS + 内层安全协商、RealVNC RA2 / RA2ne（128 / 256 位 AES）、Apple Remote Desktop（RFB 30，macOS 屏幕共享：会话填写 macOS 账户名时用 DH + AES-128 发送账户密码；未填用户名时有 VNCAuth 则用 VNCAuth；会话本身不加密，同样先弹未加密警告；TC-152 在 macOS runner 上连真实屏幕共享）
+- macOS 屏幕共享宣告 `RFB 003.889`，按 3.8 协商
+- 凭据按需询问：没有密码时不回应 VNCAuth、RA2/RA2ne、ARD 的挑战，以 `credentials-required`（认证阶段、不重试）结束这次尝试，由会话内认证表单询问；None 不需要任何输入（VNC-AUTH-002，DEC-VNC-21）
 - RA2 子模式：USER_PASS、PASS-only；公钥位长度合法性校验（1024–8192 bit）
 - TCP 建连使用独立 15 秒 deadline；RFB 安全协商和认证使用 45 秒 timeout，支持服务端认证限速/延迟，并将超时标记为可重试的 authentication/security 阶段错误
 - Tokio socket 交给同步 RFB 解码器前恢复 blocking mode，避免 `WouldBlock` 被误报为认证超时
 - RFB 18 TLS 使用匿名密码套件，能够加密传输但不验证服务器身份；`RequireEncryption` 继续 fail closed，VeNCrypt/X509 TLS 和证书校验仍未实现
 
 ### 9.3 编码与画面 ✅
-- 解码器：Raw（0）、CopyRect（1）、Hextile（5）、ZRLE（16，单一持久 zlib 流）
+- 解码器：Raw（0）、CopyRect（1）、Hextile（5）、ZRLE（16，单一持久 zlib 流）；运行期读缓冲，整矩形解码进后端权威帧缓冲，relay 按 damage 合并（≤16 矩形/帧），WebView 绘制完成即发送最新像素，解码完成立即请求下一增量更新（VNC-PERF-001/002）
 - 伪编码：DesktopSize（-223）接收；窗口变化仅调整本地 fit，不宣称或发送 SetDesktopSize；丢帧恢复时才请求全量刷新
 - ZRLE 单 zlib 状态贯穿整个 session，已修复历史的 "zrle: eof cpixel" 间歇性断连
-- 像素格式 `set_pixel_format_rgba()` 协商成 little-endian RGBA，前端按位图直接渲染
-- Tight 编码暂未启用（解码器尚未 RFC-conformant，避免 stream 失步）
+- 像素格式 `set_pixel_format_rgba()` 协商成 little-endian RGBA，前端按位图直接渲染；服务器静止时不调度绘制（VNC-PERF-003）
+- Tight（7，含 JPEG 质量与 zlib 级别伪编码）与画质 Automatic / High / Medium / Low：Medium/Low 优先 Tight + JPEG，服务器不支持 Tight 时改用降色深像素格式；Automatic 按线路速度升降档；切换像素格式前等待在途更新（VNC-PERF-004，TC-153 native 验证 Low 的编码请求与之后的绘制）
+- 首选编码自适应：只认客户端第一个编码的服务器（如 VMware 内置 VNC）用 Raw 回应大块更新时，High/Automatic 依次把 Tight（JPEG 质量 9）、Hextile 移到首位，降色深档改用 Hextile；服务器已按首选编码压缩时不再试探（VNC-PERF-006，DEC-VNC-22）
 
 ### 9.4 ExtendedClipboard 互通 ✅
 - 实现 ExtendedClipboard 伪编码（`0xC0A1E5CE` + 旧 draft 值 `-1063` 双广告兼容）
@@ -2629,9 +2632,9 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 - 前端 ↔ 后端剪贴板桥：`vncStore` 协调，文本/HTML/RTF 选择性传输
 
 ### 9.5 输入处理 ✅
-- 鼠标：左/中/右键、滚轮、拖拽（pointer capture）
-- 键盘：包含 RealVNC 输入修复，组合键正确转发
-- 剪贴板：双向同步，自动切换 Extended / Legacy
+- 鼠标：左/中/右键、滚轮、拖拽（pointer capture）；Windows 上画布无按键时 relay 直接采样系统光标位置，绕开 WebView 按刷新对齐的 pointermove（VNC-PERF-005，`TAOMNI_VNC_NATIVE_POINTER=0` 关闭）
+- 键盘：包含 RealVNC 输入修复，组合键正确转发；菜单键（默认 F8，可改或关闭）打开会话菜单而不发往远端；Windows 低级键盘钩子把 Win、Alt+Tab、Alt+Esc、Ctrl+Esc、PrtScn 直通远端（可关闭），AltGr 发送 ISO_Level3_Shift（VNC-INPUT-002/003）
+- 剪贴板：双向同步，自动切换 Extended / Legacy；连接时不推送本地剪贴板，指针进入画布、窗口重新获得焦点或本地复制时发送变化，远端写入本机后不回送（VNC-CLIP-001）
 
 ### 9.6 前端 `VncPanel` ✅
 
@@ -2642,7 +2645,21 @@ area: vnc
 components: [VncPanel, FloatingToolbar, CaptureToolbar, SessionEditor]
 files:
   - src/components/vnc/VncPanel.tsx
+  - src/components/vnc/vncSessionMenu.ts
+  - src/components/vnc/VncConnectionOverlay.tsx
+  - src/components/vnc/VncPropertiesDialog.tsx
+  - src/components/vnc/VncSessionInfoDialog.tsx
+  - src/components/vnc/VncFullScreenToolbar.tsx
+  - src/lib/vnc.ts
+  - src/lib/vncFramePainter.ts
+  - src/lib/vncOptions.ts
   - src/components/session/SessionEditor.tsx
+  # Browser-preview VNC bridge and the scriptable RFB fixture behind vnc_required.
+  - vite-plugins/vncProxy.ts
+  - vite-plugins/vncBridge.ts
+  - vite-plugins/vncDes.ts
+  - src/stubs/vncClient.ts
+  - .agents/skills/vnc-realvnc-task/scripts/vnc_fixture_server.py
 controls:
   # Detach/reattach/fullscreen controls rendered by VncPanel are owned by
   # F-Detach-1 to avoid duplicate selector ownership.
@@ -2652,16 +2669,59 @@ controls:
   - id: canvas
     selector: '[data-testid="vnc-canvas"]'
     kind: display       # pointer / wheel / context-menu handlers fire only after a live RFB session;
-                        # without a configured VNC fixture we can only verify the canvas is attached.
-                        # Driving it is left to feature-flagged conformance tests.
+                        # TC-151 (both modes) and TC-153 (native) drive it against the hosted vnc_required fixture.
   - id: scale-toggle
     selector: '[data-testid="vnc-scale-toggle"]'
     kind: interactive
-    optional: true          # inside the floating toolbar
+    optional: true          # inside the floating toolbar; Scale to 100% / Scale Automatically
+  - id: send-ctrl-alt-del
+    selector: '[data-testid="vnc-send-cad"]'
+    kind: interactive
+    optional: true          # connected, not view-only (VNC-INPUT-002)
+  - id: fullscreen
+    selector: '[data-testid="vnc-fullscreen"]'
+    kind: interactive
+    optional: true          # connected tab sessions (VNC-SESS-001 / DEC-VNC-10)
+  - id: session-menu
+    selector: '[data-testid="vnc-session-menu"]'
+    kind: interactive
+    optional: true          # connected; same menu as F8 (VNC-SESS-001)
+  - id: menu-info
+    selector: '[data-testid="vnc-menu-info"]'
+    kind: interactive
+    optional: true          # session menu → Information; TC-152 reads the negotiated ARD security type
+  - id: menu-quality
+    selector: '[data-testid="vnc-menu-quality"]'
+    kind: interactive
+    optional: true          # session menu → Picture quality submenu (VNC-PERF-004)
+  - id: quality-low
+    selector: '[data-testid="vnc-quality-low"]'
+    kind: interactive
+    optional: true          # Picture quality → Low; TC-153 checks the Tight/JPEG SetEncodings
+  - id: menu-send-f8
+    selector: '[data-testid="vnc-menu-send-f8"]'
+    kind: interactive
+    optional: true          # session menu → Send F8 (VNC-INPUT-002)
+  - id: session-info
+    selector: '[data-testid="vnc-session-info"]'
+    kind: display
+    optional: true          # Session Information dialog (VNC-SESS-002)
   - id: reconnect
     selector: '[data-testid="vnc-reconnect"]'
     kind: interactive
     optional: true          # only on disconnected/error state
+  - id: unencrypted-continue
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    kind: interactive
+    optional: true          # per-attempt unencrypted-connection warning (VNC-SESS-003, DEC-VNC-19)
+  - id: vnc-auth-password
+    selector: '[data-testid="vnc-auth-password"]'
+    kind: interactive
+    optional: true          # in-session authentication form, shown only when the server asks for a password (VNC-AUTH-002, DEC-VNC-21)
+  - id: vnc-auth-ok
+    selector: '[data-testid="vnc-auth-ok"]'
+    kind: interactive
+    optional: true          # submits the in-session form; the retry keeps the confirmed unencrypted warning
   - id: policy-settings
     selector: '[data-testid="session-vnc-policies"]'
     kind: display
@@ -2680,15 +2740,22 @@ controls:
     optional: true
 -->
 
-- Canvas 画面渲染 + fit / 1:1 缩放
+- Canvas 画面渲染；RealVNC 对齐缩放：自动（只缩小）/ 适应窗口 / 适应宽度 / 适应高度 / 25–400%，100% 为一个远端像素对应一个设备像素，可保持宽高比（VNC-VIEW-001）
+- F8 会话菜单与工具栏菜单按钮：关闭连接、全屏、发送 F8、发送 Ctrl+Alt+Del、以按键发送剪贴板、Ctrl/Alt 锁定、缩放、画质、刷新屏幕、会话信息、属性（VNC-SESS-001、VNC-INPUT-002、VNC-PERF-004；TC-153 native 用 F8 打开菜单、切到 Low 并发送 F8）
+- 屏幕级全屏：Esc 发往远端，顶端热区滑出工具栏、离开即收起，退出恢复原窗口状态（VNC-VIEW-002）
+- 连接生命周期浮层：每次连接前的未加密警告（可选不再提示）、认证表单（只在服务器要求密码时出现，提交后的重连沿用已确认的未加密警告，VNC-AUTH-002）、Stop、断线后自动重连倒计时、KeepAlive 探测（VNC-SESS-003）
+- 会话内 Properties：画质、view-only、缩放、菜单键、特殊键直通、剪贴板方向与连接时推送、共享会话、未加密警告、自动重连、响铃，写回会话，需要时提示重连生效（VNC-CONN-001）
+- 会话信息：桌面名、尺寸、像素格式、请求/最近编码、线路速度、更新/帧速率、协议、安全、连接类型（VNC-SESS-002）
+- 鼠标：右键即时发送；滚轮按刻度累积、Shift+滚轮水平；后退键映射按键 8；失焦不再把远端指针移到 (0,0)（VNC-INPUT-001）
 - 浮动 `FloatingToolbar`：可拖拽 / 折叠 / 位置持久化
 - 内嵌 `CaptureToolbar`：可见区域 PNG / 全帧 PNG / GIF 录制（与终端共用截图链路）
 - 断开提示 + Reconnect、错误分类（区分用户主动断开 / 服务端断开 / 网络异常）
-- 保存的 VNC 会话可从会话树双击连接，密码场景复用 `AuthPrompt`
+- 保存的 VNC 会话可从会话树双击连接；没保存密码时直接连接，不弹连接前的密码框，服务器要求密码时由会话内认证表单询问，`vnc://` 快速连接相同（VNC-AUTH-002；TC-151/TC-152/TC-153 经会话内表单登录，TC-107 确认不弹连接前密码框）
+- 浏览器预览（`pnpm dev`）经 dev server VNC bridge 连接真实 RFB 服务器：None/VNCAuth、Raw、DesktopSize、Bell、legacy 与 ExtendedClipboard；不含原生 relay 的编码、OS 输入和系统剪贴板（TC-151 双模式）
 - VNC tab 常驻挂载，切换标签时连接不主动销毁
 - 已修复 VNC 剪贴板与输入延迟、Windows 11 上的 client→server 文本粘贴
 - view-only 与剪贴板方向（disabled / client→server / server→client / bidirectional）由前后端同时执行；None 默认拒绝
-- 当前不启用 Tight/JPEG、VeNCrypt/X509 TLS，也不发送 RFB SetDesktopSize；RFB 18 anonymous TLS 已支持，但不提供服务器身份验证；窗口变化只调整本地显示
+- 当前不支持 VeNCrypt/X509 TLS，也不发送 RFB SetDesktopSize；RFB 18 anonymous TLS 已支持，但不提供服务器身份验证；窗口变化只调整本地显示
 
 ### 9.7 RDP client（IronRDP 0.17）🟡
 

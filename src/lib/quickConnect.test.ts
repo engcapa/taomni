@@ -25,7 +25,7 @@ describe("parseQuickConnectInput", () => {
     });
   });
 
-  it("parses VNC URLs through the password prompt path", () => {
+  it("parses VNC URLs as password sessions without a password", () => {
     const parsed = parseQuickConnectInput("vnc://alice@desktop.example.test:5901");
 
     expect(parsed.config).toMatchObject({

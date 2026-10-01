@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { writeDetachedHandoff } from "../../lib/detachedSession";
 import type { VncDetachClaim } from "../../lib/vnc";
+import { DEFAULT_VNC_VIEWER_OPTIONS, serializeVncViewerOptions } from "../../lib/vncOptions";
 import DetachedSessionWindow, { type DetachedVncParams } from "./DetachedSessionWindow";
 
 const vncMocks = vi.hoisted(() => ({
@@ -11,7 +12,8 @@ const vncMocks = vi.hoisted(() => ({
   createDetachClaim: vi.fn(),
 }));
 
-vi.mock("../../lib/vnc", () => ({
+vi.mock("../../lib/vnc", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/vnc")>()),
   vncConsumeDetachClaim: vncMocks.consumeDetachClaim,
   vncCreateDetachClaim: vncMocks.createDetachClaim,
   redactVncHandoff: (params: unknown) => params,
@@ -65,8 +67,13 @@ vi.mock("../chat/ChatDrawer", () => ({ ChatDrawer: () => null }));
 vi.mock("../tao/TaoRibbon", () => ({ TaoRibbon: () => null }));
 vi.mock("../agent/CcAgentBridge", () => ({ CcAgentBridge: () => null }));
 vi.mock("../vnc/VncPanel", () => ({
-  default: ({ host, port }: { host: string; port: number }) => (
-    <div data-vnc-panel-stub data-host={host} data-port={port} />
+  default: ({ host, port, viewerOptions }: { host: string; port: number; viewerOptions?: unknown }) => (
+    <div
+      data-vnc-panel-stub
+      data-host={host}
+      data-port={port}
+      data-viewer-options={viewerOptions ? JSON.stringify(viewerOptions) : ""}
+    />
   ),
 }));
 
@@ -132,6 +139,35 @@ describe("DetachedSessionWindow VNC handoff", () => {
     });
     const panel = document.querySelector("[data-vnc-panel-stub]");
     expect(panel).toHaveAttribute("data-port", "5900");
+  });
+
+  it("keeps the session's viewer options in the detached window (VNC-CONN-001)", async () => {
+    const options = {
+      ...DEFAULT_VNC_VIEWER_OPTIONS,
+      pictureQuality: "low" as const,
+      menuKey: "F9" as const,
+      autoReconnect: false,
+    };
+    vncMocks.consumeDetachClaim.mockResolvedValue({
+      host: "vnc.internal",
+      port: 5900,
+      username: null,
+      password: null,
+      network_settings_json: null,
+      security_policy: "prefer-off",
+      view_only: false,
+      clipboard_policy: "bidirectional",
+      viewer_options_json: serializeVncViewerOptions(options),
+    });
+    seedVncHandoff();
+
+    render(<DetachedSessionWindow kind="vnc" id={DETACHED_ID} />);
+
+    await waitFor(() => {
+      expect(document.querySelector("[data-vnc-panel-stub]")).toHaveAttribute("data-host", "vnc.internal");
+    });
+    const passed = JSON.parse(document.querySelector("[data-vnc-panel-stub]")!.getAttribute("data-viewer-options")!);
+    expect(passed).toEqual(options);
   });
 
   it("shows a handoff error instead of loading forever when claim consumption fails", async () => {

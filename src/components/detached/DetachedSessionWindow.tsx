@@ -36,7 +36,7 @@ import {
 } from "../../lib/detachedSession";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import type { RdpOptions } from "../../types/rdp";
-import type { DbConnectInfo, Tab, TabKind } from "../../types";
+import type { DbConnectInfo, Tab, TabKind, VncConnectInfo } from "../../types";
 import type { TerminalProfile } from "../../lib/terminalProfile";
 import type { CommandTerminalConnectInfo, SshConnectInfo } from "../terminal/TerminalPanel";
 import type { LocalShellSelection } from "../../types";
@@ -44,6 +44,8 @@ import { useT, t as tr } from "../../lib/i18n";
 import { useAppTheme } from "../../lib/appTheme";
 import { isTauriRuntime } from "../../lib/runtime";
 import { redactVncHandoff, vncConsumeDetachClaim, vncCreateDetachClaim } from "../../lib/vnc";
+import { deserializeVncViewerOptions, serializeVncViewerOptions, type VncViewerOptions } from "../../lib/vncOptions";
+import type { VncSessionProperties } from "../vnc/VncPropertiesDialog";
 import {
   TerminalPanel,
   type TerminalReattachState,
@@ -82,9 +84,10 @@ export interface DetachedVncParams {
   username?: string | null;
   password?: string;
   networkSettingsJson?: string | null;
-  securityPolicy?: "require-encryption" | "prefer-encryption" | "legacy-compatible" | "allow-none";
+  securityPolicy?: VncConnectInfo["securityPolicy"];
   viewOnly?: boolean;
   clipboardPolicy?: "disabled" | "client-to-server" | "server-to-client" | "bidirectional";
+  viewerOptions?: VncViewerOptions;
   title?: string;
   claimId?: string;
 }
@@ -175,6 +178,7 @@ export default function DetachedSessionWindow({
           securityPolicy: claim.security_policy,
           viewOnly: claim.view_only,
           clipboardPolicy: claim.clipboard_policy as DetachedVncParams["clipboardPolicy"],
+          viewerOptions: deserializeVncViewerOptions(claim.viewer_options_json),
         } satisfies DetachedVncParams);
       })
       .catch(() => {
@@ -316,8 +320,9 @@ export default function DetachedSessionWindow({
         security_policy: current.securityPolicy ?? "prefer-encryption",
         view_only: current.viewOnly ?? false,
         clipboard_policy: current.clipboardPolicy ?? "bidirectional",
+        viewer_options_json: current.viewerOptions ? serializeVncViewerOptions(current.viewerOptions) : null,
       });
-      payload = redactVncHandoff(current, claimId);
+      payload = redactVncHandoff({ ...current, viewerOptions: undefined }, claimId);
     }
     broadcastReattach(kind, id, payload);
     clearDetachedHandoff(kind, id);
@@ -481,6 +486,17 @@ export default function DetachedSessionWindow({
         ...state,
       };
     },
+    // Properties changed in the detached viewer travel back on reattach.
+    (properties) => {
+      setParams((prev: unknown) => prev
+        ? {
+          ...(prev as DetachedVncParams),
+          viewOnly: properties.viewOnly,
+          clipboardPolicy: properties.clipboardPolicy,
+          viewerOptions: properties.viewer,
+        }
+        : prev);
+    },
   );
   const chatDrawerInline =
     !!detachedChatTab &&
@@ -567,6 +583,7 @@ function renderInner(
     osFullscreen: boolean;
   },
   onTerminalStateChange: (state: TerminalReattachState) => void,
+  onVncPropertiesChange: (properties: VncSessionProperties) => void,
 ): ReactElement | null {
   switch (kind) {
     case "rdp": {
@@ -602,6 +619,8 @@ function renderInner(
             securityPolicy={p.securityPolicy}
             viewOnly={p.viewOnly}
             clipboardPolicy={p.clipboardPolicy}
+            viewerOptions={p.viewerOptions}
+            onSessionPropertiesChange={onVncPropertiesChange}
             visible
             detachedWindowControls={detachedWindowControls}
           />

@@ -18,17 +18,17 @@ use uuid::Uuid;
 
 use crate::terminal::network::NetworkSettings;
 use crate::vnc::clipboard::{
-    ACTION_NOTIFY, ACTION_PROVIDE, ACTION_REQUEST, ClipboardFormats, ENCODING_EXTENDED_CLIPBOARD,
-    ENCODING_EXTENDED_CLIPBOARD_LEGACY, ExtendedClipboardMsg, FORMAT_HTML, FORMAT_RTF, FORMAT_TEXT,
+    ACTION_NOTIFY, ACTION_PROVIDE, ACTION_REQUEST, ClipboardFormats, ExtendedClipboardMsg,
+    FORMAT_HTML, FORMAT_RTF, FORMAT_TEXT,
     SUPPORTED_ACTIONS, build_caps_body, build_notify_body, build_provide_body, build_request_body,
 };
-use crate::vnc::encodings::{
-    DecodedCursor, DecodedRect, ENCODING_DESKTOP_SIZE, ENCODING_POINTER_POS, ENCODING_RICH_CURSOR,
-    ENCODING_X_CURSOR,
-};
+use crate::vnc::encodings::DecodedCursor;
+use crate::vnc::framebuffer::{Damage, FbRect, SharedFramebuffer};
+use crate::vnc::native_pointer::{NativePointerSampler, NativePointerTarget};
 use crate::vnc::policy::{VncClipboardPolicy, VncSecurityPolicy};
+use crate::vnc::quality::{QualityController, UpdateSummary, VncPictureQuality};
 use crate::vnc::queue::{FrameQueueReceiver, FrameQueueSender, QueuedWsOutgoing};
-use crate::vnc::rfb::{RfbConnection, RfbWriter, ServerMessage};
+use crate::vnc::rfb::{RfbConnection, RfbWriter, RuntimeStats, ServerMessage, encoding_name};
 
 /// Deadline for the frontend to complete its WebSocket upgrade after we bind.
 const WS_ACCEPT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -42,6 +42,9 @@ const WS_IDLE_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 const VNC_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 pub(crate) const VNC_AUTH_TIMEOUT: Duration = Duration::from_secs(45);
 const VNC_WS_PATH: &str = "/vnc";
+/// The WebView's plain moves trail the native sampler by one or two vsync
+/// periods; within this window after a sample they carry no newer position.
+const SAMPLED_POINTER_FRESH: Duration = Duration::from_millis(50);
 
 // ── Messages for internal channels ──────────────────────────────────
 
@@ -64,6 +67,18 @@ pub enum VncControl {
     ExtendedClipboard(ClipboardFormats),
     Refresh,
     Ack,
+    /// Picture quality chosen in the session menu (VNC-PERF-004).
+    SetQuality(VncPictureQuality),
+    /// Start (`Some`) or stop native pointer sampling over the canvas
+    /// (VNC-PERF-005).
+    NativePointer(Option<NativePointerTarget>),
+    /// A cursor position read by the native sampler (no buttons). Applied
+    /// only while no button is held; the WebView's later copies of the same
+    /// moves are then dropped.
+    SampledPointer {
+        x: u16,
+        y: u16,
+    },
     Disconnect,
 }
 
@@ -98,6 +113,26 @@ enum WsIncoming {
     },
     #[serde(rename = "refresh")]
     Refresh,
+    /// `on` with the canvas geometry starts native pointer sampling; `on:
+    /// false` (or incomplete geometry) stops it.
+    #[serde(rename = "native_pointer")]
+    NativePointer {
+        on: bool,
+        #[serde(default)]
+        left: Option<f64>,
+        #[serde(default)]
+        top: Option<f64>,
+        #[serde(default)]
+        width: Option<f64>,
+        #[serde(default)]
+        height: Option<f64>,
+        #[serde(default)]
+        dpr: Option<f64>,
+        #[serde(default)]
+        fb_width: Option<u16>,
+        #[serde(default)]
+        fb_height: Option<u16>,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -111,6 +146,9 @@ enum WsOutgoingText {
         protocol: String,
         security: String,
         encrypted: bool,
+        /// The relay samples the cursor natively while it rests over the
+        /// canvas (Windows, VNC-PERF-005).
+        native_pointer: bool,
     },
     #[serde(rename = "desktop_size")]
     DesktopSize {
@@ -157,6 +195,60 @@ enum WsOutgoingText {
     },
     #[serde(rename = "pointer_pos")]
     PointerPos { x: u16, y: u16 },
+    /// Once-per-second counters for the Session Information view.
+    #[serde(rename = "stats")]
+    Stats {
+        requested_encoding: &'static str,
+        last_encoding: &'static str,
+        pixel_format: String,
+        quality: &'static str,
+        quality_level: &'static str,
+        wire_kbps: u64,
+        line_kbps: Option<u64>,
+        updates_per_sec: f32,
+        frames_per_sec: f32,
+        update_ms: f32,
+    },
+}
+
+const STATS_INTERVAL: Duration = Duration::from_secs(1);
+/// RealVNC `KeepAliveInterval` / `KeepAliveResponseTimeout` (VNC-SESS-003):
+/// after this much server silence send a 1x1 probe; after as much again
+/// without any answer the connection is considered lost.
+pub(crate) const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
+pub(crate) const KEEPALIVE_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
+const RELAY_TICK: Duration = Duration::from_millis(250);
+
+/// Options the viewer negotiates with the server (VNC-CONN-001).
+#[derive(Debug, Clone, Copy)]
+pub struct VncRelayOptions {
+    pub picture_quality: VncPictureQuality,
+    /// ClientInit shared flag (RealVNC `Shared=True`).
+    pub shared: bool,
+    /// Proceed when only an unencrypted security type is available; false
+    /// stops before authentication so the viewer can warn (VNC-SESS-003).
+    pub allow_unencrypted: bool,
+    pub keepalive_interval: Duration,
+    pub keepalive_timeout: Duration,
+}
+
+impl Default for VncRelayOptions {
+    fn default() -> Self {
+        Self {
+            picture_quality: VncPictureQuality::default(),
+            shared: true,
+            allow_unencrypted: true,
+            keepalive_interval: KEEPALIVE_INTERVAL,
+            keepalive_timeout: KEEPALIVE_RESPONSE_TIMEOUT,
+        }
+    }
+}
+
+/// Labels of the current encoding profile for Session Information.
+struct StatsLabels {
+    requested: &'static str,
+    quality: &'static str,
+    level: &'static str,
 }
 
 // ── Public session handle ───────────────────────────────────────────
@@ -234,6 +326,281 @@ struct ServerClipboardCaps {
     actions: u32,
 }
 
+/// How long after the last frontend ACK the relay keeps pipelining update
+/// requests. A hidden or stalled WebView stops acknowledging, so the server
+/// goes quiet instead of the relay decoding updates nobody will paint.
+const FRAME_STREAM_GRACE: Duration = Duration::from_secs(1);
+
+/// Update pacing between the RFB server, the authoritative framebuffer and
+/// the WebView. The relay requests the next incremental update as soon as one
+/// is decoded (like RealVNC Viewer) and, independently, sends the WebView the
+/// newest pixels of all accumulated damage whenever it has painted the
+/// previous frame. Slow painting therefore never drops pixels or triggers a
+/// full-refresh storm; it only coalesces more damage into the next frame.
+struct FrameFlow {
+    damage: Damage,
+    frontend_ready: bool,
+    last_ack: Instant,
+    request_deferred: bool,
+    frames_sent: u64,
+    /// FramebufferUpdateRequests not yet answered by an update. Pixel-format
+    /// switches wait for zero (DEC-VNC-15).
+    outstanding: u32,
+    last_update_at: Instant,
+    /// Last byte-level sign of life from the server (any message).
+    last_server_at: Instant,
+    probe_sent_at: Option<Instant>,
+}
+
+impl FrameFlow {
+    fn new() -> Self {
+        Self {
+            damage: Damage::default(),
+            frontend_ready: true,
+            last_ack: Instant::now(),
+            request_deferred: false,
+            frames_sent: 0,
+            // The handshake already sent the first full request.
+            outstanding: 1,
+            last_update_at: Instant::now(),
+            last_server_at: Instant::now(),
+            probe_sent_at: None,
+        }
+    }
+
+    fn streaming(&self) -> bool {
+        self.frontend_ready || self.last_ack.elapsed() < FRAME_STREAM_GRACE
+    }
+}
+
+type SharedFrameFlow = Arc<std::sync::Mutex<FrameFlow>>;
+
+/// Rolling one-second window over the reader's runtime counters.
+struct StatsWindow {
+    started: Instant,
+    wire_bytes: u64,
+    updates: u64,
+    frames: u64,
+    update_micros: u64,
+    line_kbps: Option<u64>,
+    initialized: bool,
+    /// Back-to-back updates (gap below `BURST_GAP`) merged into one transfer.
+    burst: Option<(Instant, Instant, u64)>,
+}
+
+/// Updates separated by less than this are one server transfer for the
+/// line-speed estimate; a single pipelined update can start with bytes the
+/// kernel already buffered, which overstates the speed of short samples.
+const BURST_GAP: Duration = Duration::from_millis(30);
+const LINE_SPEED_MIN_BYTES: u64 = 256 * 1024;
+
+impl StatsWindow {
+    fn new() -> Self {
+        Self {
+            started: Instant::now(),
+            wire_bytes: 0,
+            updates: 0,
+            frames: 0,
+            update_micros: 0,
+            line_kbps: None,
+            initialized: false,
+            burst: None,
+        }
+    }
+
+    fn close_burst(&mut self) {
+        if let Some((start, end, bytes)) = self.burst.take() {
+            let micros = end.duration_since(start).as_micros() as u64;
+            if bytes >= LINE_SPEED_MIN_BYTES && micros > 0 {
+                let sample = bytes * 8 * 1000 / micros;
+                self.line_kbps = Some(match self.line_kbps {
+                    Some(previous) => (previous * 3 + sample) / 4,
+                    None => sample,
+                });
+            }
+        }
+    }
+
+    fn observe(
+        &mut self,
+        stats: RuntimeStats,
+        frames_sent: u64,
+        labels: &StatsLabels,
+    ) -> Option<String> {
+        if !self.initialized {
+            self.initialized = true;
+            self.wire_bytes = stats.wire_bytes;
+            self.updates = stats.updates.saturating_sub(1);
+            self.frames = frames_sent.saturating_sub(1);
+        }
+        self.update_micros += stats.last_update_micros;
+        if let (Some(start), Some(end)) =
+            (stats.last_update_started_at, stats.last_update_finished_at)
+        {
+            match self.burst {
+                Some((burst_start, burst_end, bytes))
+                    if start.saturating_duration_since(burst_end) < BURST_GAP =>
+                {
+                    self.burst = Some((burst_start, end, bytes + stats.last_update_wire_bytes));
+                }
+                _ => {
+                    self.close_burst();
+                    self.burst = Some((start, end, stats.last_update_wire_bytes));
+                }
+            }
+        }
+        let elapsed = self.started.elapsed();
+        if elapsed < STATS_INTERVAL {
+            return None;
+        }
+        let seconds = elapsed.as_secs_f32();
+        let updates = stats.updates.saturating_sub(self.updates);
+        let frames = frames_sent.saturating_sub(self.frames);
+        let message = WsOutgoingText::Stats {
+            requested_encoding: labels.requested,
+            last_encoding: stats.last_encoding.map(encoding_name).unwrap_or("-"),
+            pixel_format: stats.pixel_format.label(),
+            quality: labels.quality,
+            quality_level: labels.level,
+            wire_kbps: (stats.wire_bytes.saturating_sub(self.wire_bytes) as f32 * 8.0
+                / 1000.0
+                / seconds) as u64,
+            line_kbps: self.line_kbps,
+            updates_per_sec: updates as f32 / seconds,
+            frames_per_sec: frames as f32 / seconds,
+            update_ms: if updates > 0 {
+                self.update_micros as f32 / 1000.0 / updates as f32
+            } else {
+                0.0
+            },
+        };
+        self.started = Instant::now();
+        self.wire_bytes = stats.wire_bytes;
+        self.updates = stats.updates;
+        self.frames = frames_sent;
+        self.update_micros = 0;
+        serde_json::to_string(&message).ok()
+    }
+}
+
+/// Serialize the pending damage as one relay frame if the WebView is ready.
+/// Returns true when a frame boundary was queued.
+fn flush_frame(
+    flow: &SharedFrameFlow,
+    framebuffer: &SharedFramebuffer,
+    ws_out: &FrameQueueSender,
+) -> bool {
+    let rects = {
+        let Ok(mut flow) = flow.lock() else {
+            return false;
+        };
+        if !flow.frontend_ready || flow.damage.is_empty() {
+            return false;
+        }
+        flow.frontend_ready = false;
+        flow.frames_sent += 1;
+        flow.damage.take()
+    };
+    let frames: Vec<Vec<u8>> = match framebuffer.lock() {
+        Ok(fb) => rects
+            .into_iter()
+            .filter_map(|rect| fb.relay_frame(rect))
+            .collect(),
+        Err(_) => return false,
+    };
+    for frame in frames {
+        let _ = ws_out.push_rect(frame);
+    }
+    if ws_out.finish_frame().unwrap_or(false) {
+        // Either an undelivered older frame was replaced (after a Refresh or
+        // resize marked the WebView ready early) or this frame exceeded the
+        // queue budget. The pixels of the lost frame are unknown here, so
+        // repaint the whole surface with the next frame.
+        damage_full_framebuffer(flow, framebuffer);
+        if !ws_out.has_pending_frame()
+            && let Ok(mut flow) = flow.lock()
+        {
+            // Nothing is in flight, so no ACK will arrive to release the
+            // next frame.
+            flow.frontend_ready = true;
+        }
+    }
+    true
+}
+
+type SharedQuality = Arc<std::sync::Mutex<QualityController>>;
+
+fn stats_labels(quality: &SharedQuality) -> StatsLabels {
+    match quality.lock() {
+        Ok(quality) => StatsLabels {
+            requested: quality.applied().requested_label(),
+            quality: quality.preset().label(),
+            level: quality.level().label(),
+        },
+        Err(_) => StatsLabels {
+            requested: "-",
+            quality: "-",
+            level: "-",
+        },
+    }
+}
+
+/// Send the pending encoding profile: SetEncodings, SetPixelFormat when it
+/// changed, and a full update request so the new quality shows at once.
+/// Callers make sure no update is outstanding when the format changes.
+fn apply_pending_quality(
+    writer: &mut RfbWriter,
+    quality: &SharedQuality,
+    flow: &SharedFrameFlow,
+) -> Result<bool, String> {
+    let Some((profile, format_changed)) = quality
+        .lock()
+        .map_err(|_| "VNC quality lock poisoned".to_string())?
+        .take_pending()
+    else {
+        return Ok(false);
+    };
+    writer.set_encodings(&profile.encodings)?;
+    if format_changed {
+        writer.set_pixel_format(profile.pixel_format)?;
+    }
+    writer.request_update(false)?;
+    if let Ok(mut flow) = flow.lock() {
+        flow.outstanding = flow.outstanding.saturating_add(1);
+    }
+    Ok(true)
+}
+
+/// Whether the pending quality change can be sent now.
+fn quality_ready(quality: &SharedQuality, flow: &SharedFrameFlow) -> bool {
+    let Ok(quality) = quality.lock() else {
+        return false;
+    };
+    if !quality.has_pending() {
+        return false;
+    }
+    if !quality.pending_needs_sync() {
+        return true;
+    }
+    flow.lock().map(|flow| flow.outstanding == 0).unwrap_or(false)
+}
+
+fn note_request(flow: &SharedFrameFlow) {
+    if let Ok(mut flow) = flow.lock() {
+        flow.outstanding = flow.outstanding.saturating_add(1);
+    }
+}
+
+fn damage_full_framebuffer(flow: &SharedFrameFlow, framebuffer: &SharedFramebuffer) {
+    let size = framebuffer
+        .lock()
+        .map(|fb| (fb.width(), fb.height()))
+        .unwrap_or((0, 0));
+    if let Ok(mut flow) = flow.lock() {
+        flow.damage.add(FbRect::new(0, 0, size.0, size.1));
+    }
+}
+
 // ── Main entry point ────────────────────────────────────────────────
 
 /// Connect to a VNC server and spawn the relay. Returns a session handle.
@@ -246,9 +613,43 @@ pub async fn spawn_vnc_relay(
     security_policy: VncSecurityPolicy,
     view_only: bool,
     clipboard_policy: VncClipboardPolicy,
+    options: VncRelayOptions,
+    attempt: CancellationToken,
+) -> Result<VncSession, String> {
+    tokio::select! {
+        result = spawn_vnc_relay_inner(
+            host,
+            port,
+            username,
+            password,
+            network,
+            security_policy,
+            view_only,
+            clipboard_policy,
+            options,
+            attempt.clone(),
+        ) => result,
+        _ = attempt.cancelled() => Err("VNC connection attempt stopped by the user".into()),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn spawn_vnc_relay_inner(
+    host: String,
+    port: u16,
+    username: Option<String>,
+    password: Option<String>,
+    network: Option<NetworkSettings>,
+    security_policy: VncSecurityPolicy,
+    view_only: bool,
+    clipboard_policy: VncClipboardPolicy,
+    options: VncRelayOptions,
+    attempt: CancellationToken,
 ) -> Result<VncSession, String> {
     let cancel = CancellationToken::new();
     let ws_token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+    let quality = QualityController::new(options.picture_quality);
+    let initial_profile = quality.applied().clone();
 
     // 1. Connect + handshake + auth. Route proxy and SSH-jump connections
     // through the shared loopback forwarder, allowing the synchronous RA2
@@ -261,10 +662,27 @@ pub async fn spawn_vnc_relay(
         &host,
         security_policy,
         VNC_AUTH_TIMEOUT,
+        options.allow_unencrypted,
+        username
+            .as_deref()
+            .is_some_and(|name| !name.trim().is_empty()),
     )
     .await?;
     let mut tls_guard = ForwardTaskGuard(prepared.tls_task);
-    let (rfb, writer, server_init) = tokio::task::spawn_blocking(move || {
+    // Stop closes the socket so the blocking authentication read returns
+    // instead of waiting for a slow server (VNC-SESS-003).
+    let stop_handle = prepared
+        .stream
+        .try_clone()
+        .map_err(|e| format!("clone VNC stream for stop: {e}"))?;
+    let stop_watch = {
+        let attempt = attempt.clone();
+        tokio::spawn(async move {
+            attempt.cancelled().await;
+            let _ = stop_handle.shutdown(std::net::Shutdown::Both);
+        })
+    };
+    let handshake = tokio::task::spawn_blocking(move || {
         let mut rfb = RfbConnection::from_negotiated_stream(
             prepared.stream,
             VNC_AUTH_TIMEOUT,
@@ -274,39 +692,31 @@ pub async fn spawn_vnc_relay(
             prepared.pending_security,
             prepared.outer_security_type,
         )?;
+        rfb.set_shared(options.shared);
         let server_init = rfb.authenticate_with_policy(
             username.as_deref(),
             password.as_deref(),
             security_policy,
         )?;
-        rfb.set_pixel_format_rgba()?;
-        rfb.set_encodings(&[
-            16,
-            5,
-            1,
-            0,
-            ENCODING_DESKTOP_SIZE,
-            ENCODING_POINTER_POS,
-            ENCODING_X_CURSOR,
-            ENCODING_RICH_CURSOR,
-            ENCODING_EXTENDED_CLIPBOARD,
-            ENCODING_EXTENDED_CLIPBOARD_LEGACY,
-        ])?;
+        // Encodings and pixel format come from the picture-quality profile
+        // (quality.rs): ZRLE > Hextile > Tight > CopyRect > Raw for High,
+        // Tight + JPEG first for Medium/Low. DesktopSize keeps server-driven
+        // resolution changes working; ExtendedClipboard advertises
+        // multi-format clipboard exchange.
+        rfb.set_pixel_format(initial_profile.pixel_format)?;
+        rfb.set_encodings(&initial_profile.encodings)?;
         rfb.request_update(false)?;
         rfb.enter_runtime_mode()?;
         let writer = rfb.take_writer()?;
         Ok::<_, String>((rfb, writer, server_init))
-    })
-    .await
-    .map_err(|e| format!("VNC handshake worker failed: {e}"))??;
-
-    // Encoding preference: ZRLE (bandwidth) > Hextile (tile cache) > CopyRect
-    // (scroll) > Raw (fallback). DesktopSize must be listed so server-driven
-    // resolution changes keep working. Tight is intentionally omitted — the
-    // decoder in encodings.rs is not RFC-compliant and would desync the stream.
-    // ExtendedClipboard is a pseudo-encoding advertising support for
-    // multi-format clipboard exchange (HTML/RTF/UTF-8); the server only sends
-    // extended ClientCutText when both sides have advertised it.
+    });
+    let handshake = handshake.await;
+    stop_watch.abort();
+    if attempt.is_cancelled() {
+        return Err("VNC connection attempt stopped by the user".into());
+    }
+    let (rfb, writer, server_init) =
+        handshake.map_err(|e| format!("VNC handshake worker failed: {e}"))??;
     // 2. Bind WS listener on dynamic port
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -329,6 +739,7 @@ pub async fn spawn_vnc_relay(
         protocol: rfb.protocol_version(),
         security: rfb.security_label(),
         encrypted: rfb.encrypted(),
+        native_pointer: crate::vnc::native_pointer::supported() && !view_only,
     })
     .unwrap();
     let _ = ws_out_tx.send_critical_control(connected);
@@ -354,6 +765,8 @@ pub async fn spawn_vnc_relay(
             shutdown_stream,
             view_only,
             clipboard_policy,
+            Arc::new(std::sync::Mutex::new(quality)),
+            options,
         )
         .await
         {
@@ -387,6 +800,8 @@ async fn run_relay(
     shutdown_stream: std::net::TcpStream,
     view_only: bool,
     clipboard_policy: VncClipboardPolicy,
+    quality: SharedQuality,
+    options: VncRelayOptions,
 ) -> Result<(), String> {
     let ws_stream = accept_authorized_ws(listener, &ws_token, &cancel).await?;
 
@@ -495,6 +910,18 @@ async fn run_relay(
                                 }))
                             }
                             WsIncoming::Refresh => Some(VncControl::Refresh),
+                            WsIncoming::NativePointer {
+                                on,
+                                left,
+                                top,
+                                width,
+                                height,
+                                dpr,
+                                fb_width,
+                                fb_height,
+                            } => Some(VncControl::NativePointer(native_pointer_target(
+                                on, left, top, width, height, dpr, fb_width, fb_height,
+                            ))),
                         };
                         if let Some(m) = ctrl_msg
                             && control_allowed(&m, view_only, clipboard_policy, &control_limits)
@@ -525,14 +952,16 @@ async fn run_relay(
     // dedicated blocking worker and bridge decoded messages through a bounded
     // channel so no Tokio executor thread is stalled by a slow server.
     let initial_framebuffer_size = (rfb.width, rfb.height);
+    let framebuffer = rfb.framebuffer();
+    let flow: SharedFrameFlow = Arc::new(std::sync::Mutex::new(FrameFlow::new()));
     let (server_message_tx, mut server_message_rx) =
-        mpsc::channel::<Result<(ServerMessage, u16, u16), String>>(2);
+        mpsc::channel::<Result<(ServerMessage, u16, u16, RuntimeStats), String>>(2);
     let cancel_reader = cancel.clone();
     let rfb_reader = tokio::task::spawn_blocking(move || {
         while !cancel_reader.is_cancelled() {
             let result = rfb
                 .read_server_message()
-                .map(|message| (message, rfb.width, rfb.height));
+                .map(|message| (message, rfb.width, rfb.height, rfb.runtime_stats()));
             let should_stop = result.is_err();
             if server_message_tx.blocking_send(result).is_err() || should_stop {
                 break;
@@ -546,11 +975,19 @@ async fn run_relay(
     let server_caps_read = server_clip_caps.clone();
     let latest_clipboard_read = latest_local_clipboard.clone();
     let writer_for_caps = writer.clone();
+    let flow_read = flow.clone();
+    let framebuffer_read = framebuffer.clone();
+    let quality_read = quality.clone();
     let mut vnc_read = tokio::spawn(async move {
         let mut published_framebuffer_size = initial_framebuffer_size;
         let mut framebuffer_generation = 0u64;
+        let mut window = StatsWindow::new();
         while let Some(result) = server_message_rx.recv().await {
-            let (msg, fb_width, fb_height) = match result {
+            if let Ok(mut flow) = flow_read.lock() {
+                flow.last_server_at = Instant::now();
+                flow.probe_sent_at = None;
+            }
+            let (msg, fb_width, fb_height, stats) = match result {
                 Ok(value) => value,
                 Err(message) => {
                     let error = crate::vnc::error::VncError::classify(message);
@@ -574,6 +1011,14 @@ async fn run_relay(
                     if (fb_width, fb_height) != published_framebuffer_size {
                         framebuffer_generation = framebuffer_generation.saturating_add(1);
                         published_framebuffer_size = (fb_width, fb_height);
+                        // Frames of the old geometry are obsolete; the WebView
+                        // also drops whatever it had queued on desktop_size.
+                        ws_out.clear_frames();
+                        if let Ok(mut flow) = flow_read.lock() {
+                            flow.damage.clear();
+                            flow.frontend_ready = true;
+                            flow.last_ack = Instant::now();
+                        }
                         let json = serde_json::to_string(&WsOutgoingText::DesktopSize {
                             width: fb_width,
                             height: fb_height,
@@ -582,16 +1027,56 @@ async fn run_relay(
                         .unwrap();
                         let _ = ws_out.send_critical_control(json);
                     }
+                    if let Ok(mut quality) = quality_read.lock() {
+                        quality.observe_update(UpdateSummary {
+                            pixel_rects: stats.last_update_pixel_rects,
+                            tight_rects: stats.last_update_tight_rects,
+                            compressed_rects: stats.last_update_compressed_rects,
+                            raw_pixels: stats.last_update_raw_pixels,
+                        });
+                    }
+                    let request_now = {
+                        match flow_read.lock() {
+                            Ok(mut flow) => {
+                                flow.outstanding = flow.outstanding.saturating_sub(1);
+                                flow.last_update_at = Instant::now();
+                                for rect in rects {
+                                    flow.damage.add(rect);
+                                }
+                                let streaming = flow.streaming();
+                                flow.request_deferred = !streaming;
+                                streaming
+                            }
+                            Err(_) => true,
+                        }
+                    };
                     {
                         let mut writer = rfb_writer_for_read.lock().await;
                         writer.set_framebuffer_size(fb_width, fb_height);
-                    }
-                    for rect in rects {
-                        let DecodedRect::Pixels { x, y, w, h, rgba } = rect;
-                        let mut frame = Vec::with_capacity(12 + rgba.len());
-                        frame.extend_from_slice(&make_frame_header(x, y, w, h));
-                        frame.extend_from_slice(&rgba);
-                        let _ = ws_out.push_rect(frame);
+                        let pending_quality = quality_read
+                            .lock()
+                            .map(|quality| quality.has_pending())
+                            .unwrap_or(false);
+                        if pending_quality && quality_ready(&quality_read, &flow_read) {
+                            // The switch includes its own full update request.
+                            if let Err(error) =
+                                apply_pending_quality(&mut writer, &quality_read, &flow_read)
+                            {
+                                tracing::warn!(%error, "VNC picture quality switch failed");
+                            }
+                        } else if request_now && !pending_quality {
+                            // Pipeline the next incremental request immediately so
+                            // server encoding overlaps relay and WebView painting.
+                            if writer.request_update(true).is_ok() {
+                                note_request(&flow_read);
+                            }
+                        } else if request_now {
+                            // A pixel-format switch waits for the outstanding
+                            // update; no new request until it has been sent.
+                            if let Ok(mut flow) = flow_read.lock() {
+                                flow.request_deferred = false;
+                            }
+                        }
                     }
                     if let Some(cursor) = cursor {
                         match serialize_cursor(cursor) {
@@ -611,8 +1096,14 @@ async fn run_relay(
                         .unwrap();
                         let _ = ws_out.send_control(json);
                     }
-                    if ws_out.finish_frame().unwrap_or(false) {
-                        let _ = rfb_writer_for_read.lock().await.request_update(false);
+                    flush_frame(&flow_read, &framebuffer_read, &ws_out);
+                    let frames_sent = flow_read.lock().map(|flow| flow.frames_sent).unwrap_or(0);
+                    let labels = stats_labels(&quality_read);
+                    if let Some(json) = window.observe(stats, frames_sent, &labels) {
+                        if let Ok(mut quality) = quality_read.lock() {
+                            quality.observe_line_speed(window.line_kbps);
+                        }
+                        let _ = ws_out.send_control(json);
                     }
                 }
                 ServerMessage::Bell => {
@@ -652,9 +1143,17 @@ async fn run_relay(
     let server_caps_ctrl = server_clip_caps.clone();
     let latest_clipboard_ctrl = latest_local_clipboard.clone();
     let dispatch_limits = crate::vnc::limits::DecodeLimits::default();
+    let flow_ctrl = flow.clone();
+    let framebuffer_ctrl = framebuffer.clone();
+    let ws_out_ctrl = ws_out_tx.clone();
+    let quality_ctrl = quality.clone();
+    let native_pointer_tx = control_tx.clone();
     let mut vnc_ctrl = tokio::spawn(async move {
         let mut deferred_ctrl: Option<VncControl> = None;
         let mut last_pointer_buttons = 0u8;
+        // Dropped with this task, which stops its sampling thread.
+        let mut native_pointer = NativePointerSampler::new();
+        let mut pointer_arbiter = PointerArbiter::default();
         loop {
             let ctrl = match deferred_ctrl.take() {
                 Some(ctrl) => ctrl,
@@ -674,12 +1173,45 @@ async fn run_relay(
             );
             if let VncControl::Pointer { buttons, .. } = &ctrl {
                 last_pointer_buttons = *buttons;
+                native_pointer.set_buttons_held(*buttons != 0);
             }
             if !control_allowed(&ctrl, view_only, clipboard_policy, &dispatch_limits) {
                 continue;
             }
+            if let VncControl::Pointer { x, y, buttons } = &ctrl
+                && !pointer_arbiter.web(*x, *y, *buttons, Instant::now())
+            {
+                continue;
+            }
             let result = match ctrl {
-                VncControl::Ack => rfb_ctrl.lock().await.request_update(true),
+                VncControl::Ack => {
+                    // The WebView painted the previous frame: hand it the
+                    // accumulated damage and resume the request pipeline if a
+                    // hidden period paused it.
+                    let deferred = match flow_ctrl.lock() {
+                        Ok(mut flow) => {
+                            flow.frontend_ready = true;
+                            flow.last_ack = Instant::now();
+                            std::mem::take(&mut flow.request_deferred)
+                        }
+                        Err(_) => false,
+                    };
+                    flush_frame(&flow_ctrl, &framebuffer_ctrl, &ws_out_ctrl);
+                    if deferred {
+                        let mut writer = rfb_ctrl.lock().await;
+                        if quality_ready(&quality_ctrl, &flow_ctrl) {
+                            apply_pending_quality(&mut writer, &quality_ctrl, &flow_ctrl).map(|_| ())
+                        } else {
+                            let result = writer.request_update(true);
+                            if result.is_ok() {
+                                note_request(&flow_ctrl);
+                            }
+                            result
+                        }
+                    } else {
+                        Ok(())
+                    }
+                }
                 VncControl::Key { down, keysym } => {
                     rfb_ctrl.lock().await.send_key_event(down, keysym)
                 }
@@ -755,7 +1287,46 @@ async fn run_relay(
                         }
                     }
                 }
-                VncControl::Refresh => rfb_ctrl.lock().await.request_update(false),
+                VncControl::Refresh => {
+                    // The WebView lost pixels (or the user asked to refresh):
+                    // repaint from the authoritative framebuffer right away and
+                    // also ask the server for a full update.
+                    if let Ok(mut flow) = flow_ctrl.lock() {
+                        flow.frontend_ready = true;
+                        flow.last_ack = Instant::now();
+                        flow.request_deferred = false;
+                    }
+                    damage_full_framebuffer(&flow_ctrl, &framebuffer_ctrl);
+                    flush_frame(&flow_ctrl, &framebuffer_ctrl, &ws_out_ctrl);
+                    let result = rfb_ctrl.lock().await.request_update(false);
+                    if result.is_ok() {
+                        note_request(&flow_ctrl);
+                    }
+                    result
+                }
+                VncControl::SetQuality(preset) => {
+                    if let Ok(mut quality) = quality_ctrl.lock() {
+                        quality.set_preset(preset);
+                    }
+                    if quality_ready(&quality_ctrl, &flow_ctrl) {
+                        let mut writer = rfb_ctrl.lock().await;
+                        apply_pending_quality(&mut writer, &quality_ctrl, &flow_ctrl).map(|_| ())
+                    } else {
+                        Ok(())
+                    }
+                }
+                VncControl::NativePointer(target) => {
+                    pointer_arbiter.set_native(target.is_some());
+                    native_pointer.set(target, &native_pointer_tx);
+                    Ok(())
+                }
+                VncControl::SampledPointer { x, y } => {
+                    if pointer_arbiter.sample(x, y, Instant::now()) {
+                        rfb_ctrl.lock().await.send_pointer_event(x, y, 0)
+                    } else {
+                        Ok(())
+                    }
+                }
                 VncControl::Disconnect => {
                     cl_cancel.cancel();
                     Ok(())
@@ -763,6 +1334,71 @@ async fn run_relay(
             };
             if let Err(e) = result {
                 tracing::error!("VNC control error: {}", e);
+            }
+        }
+    });
+
+    // Task: relay tick — force an overdue pixel-format switch (the server
+    // merged our requests) and run the KeepAlive probe (VNC-SESS-003).
+    let tick_flow = flow.clone();
+    let tick_quality = quality.clone();
+    let tick_writer = writer.clone();
+    let tick_out = ws_out_tx.clone();
+    let tick_cancel = cancel.clone();
+    let mut relay_tick = tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(RELAY_TICK);
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            tokio::select! {
+                _ = ticker.tick() => {}
+                _ = tick_cancel.cancelled() => break,
+            }
+            let (last_update, last_server, probe_sent) = match tick_flow.lock() {
+                Ok(flow) => (flow.last_update_at, flow.last_server_at, flow.probe_sent_at),
+                Err(_) => break,
+            };
+            let overdue = tick_quality
+                .lock()
+                .map(|quality| quality.pending_overdue(last_update))
+                .unwrap_or(false);
+            if overdue {
+                if let Ok(mut flow) = tick_flow.lock() {
+                    flow.outstanding = 0;
+                }
+                let mut writer = tick_writer.lock().await;
+                if let Err(error) = apply_pending_quality(&mut writer, &tick_quality, &tick_flow) {
+                    tracing::warn!(%error, "VNC picture quality switch failed");
+                }
+            }
+            match probe_sent {
+                Some(sent) if sent.elapsed() >= options.keepalive_timeout => {
+                    let error = crate::vnc::error::VncError::classify(format!(
+                        "VNC keepalive: no response from the server for {} s",
+                        (last_server.elapsed().as_secs())
+                    ));
+                    let json = serde_json::to_string(&WsOutgoingText::Disconnected {
+                        code: error.code,
+                        stage: error.stage,
+                        retryable: error.retryable,
+                        reason: error.message,
+                    })
+                    .unwrap();
+                    let _ = tick_out.send_critical_control(json);
+                    // Give the writer a moment to deliver the reason.
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    tick_cancel.cancel();
+                    break;
+                }
+                None if last_server.elapsed() >= options.keepalive_interval => {
+                    let sent = tick_writer.lock().await.request_probe();
+                    if sent.is_ok() {
+                        if let Ok(mut flow) = tick_flow.lock() {
+                            flow.outstanding = flow.outstanding.saturating_add(1);
+                            flow.probe_sent_at = Some(Instant::now());
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     });
@@ -812,6 +1448,9 @@ async fn run_relay(
         r = &mut idle_watch => {
             if let Err(e) = r { tracing::error!("idle_watch: {}", e); }
         }
+        r = &mut relay_tick => {
+            if let Err(e) = r { tracing::error!("relay_tick: {}", e); }
+        }
     }
 
     cancel.cancel();
@@ -823,6 +1462,7 @@ async fn run_relay(
     vnc_read.abort();
     vnc_ctrl.abort();
     idle_watch.abort();
+    relay_tick.abort();
     Ok(())
 }
 
@@ -1015,6 +1655,7 @@ fn parse_binary_control(bytes: &[u8]) -> Option<VncControl> {
             Some(VncControl::Pointer { x, y, buttons })
         }
         4 if bytes.len() == 1 => Some(VncControl::Refresh),
+        5 if bytes.len() == 2 => VncPictureQuality::from_wire(bytes[1]).map(VncControl::SetQuality),
         _ => None,
     }
 }
@@ -1059,6 +1700,87 @@ fn coalesce_pointer_control(
     VncControl::Pointer { x, y, buttons }
 }
 
+/// Merges the WebView's pointer events with native cursor samples
+/// (VNC-PERF-005, DEC-VNC-20). The WebView owns the pointer while one of its
+/// buttons is down; otherwise the sampler's moves win and the WebView's later
+/// copies of them are dropped.
+#[derive(Debug, Default)]
+struct PointerArbiter {
+    native_on: bool,
+    buttons: u8,
+    sampled_at: Option<Instant>,
+    last_wire: Option<(u16, u16, u8)>,
+}
+
+impl PointerArbiter {
+    fn set_native(&mut self, on: bool) {
+        self.native_on = on;
+        if !on {
+            self.sampled_at = None;
+        }
+    }
+
+    /// Whether a WebView pointer event is sent to the server.
+    fn web(&mut self, x: u16, y: u16, buttons: u8, now: Instant) -> bool {
+        let previous = self.buttons;
+        self.buttons = buttons;
+        if buttons != 0 {
+            // After the release the WebView's moves count again until the
+            // sampler has resumed.
+            self.sampled_at = None;
+        }
+        let late_copy = buttons == 0
+            && previous == 0
+            && self.native_on
+            && self
+                .sampled_at
+                .is_some_and(|at| now.saturating_duration_since(at) < SAMPLED_POINTER_FRESH);
+        if late_copy {
+            return false;
+        }
+        self.last_wire = Some((x, y, buttons));
+        true
+    }
+
+    /// Whether a native sample is sent to the server; a sample of the
+    /// position just sent (such as the release point) is no move.
+    fn sample(&mut self, x: u16, y: u16, now: Instant) -> bool {
+        if !self.native_on || self.buttons != 0 || self.last_wire == Some((x, y, 0)) {
+            return false;
+        }
+        self.sampled_at = Some(now);
+        self.last_wire = Some((x, y, 0));
+        true
+    }
+}
+
+/// Geometry of a `native_pointer` message; `None` stops sampling.
+#[allow(clippy::too_many_arguments)]
+fn native_pointer_target(
+    on: bool,
+    left: Option<f64>,
+    top: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
+    dpr: Option<f64>,
+    fb_width: Option<u16>,
+    fb_height: Option<u16>,
+) -> Option<NativePointerTarget> {
+    if !on {
+        return None;
+    }
+    Some(NativePointerTarget {
+        left: left?,
+        top: top?,
+        width: width?,
+        height: height?,
+        dpr: dpr?,
+        fb_width: fb_width?,
+        fb_height: fb_height?,
+    })
+    .filter(NativePointerTarget::valid)
+}
+
 fn control_allowed(
     control: &VncControl,
     view_only: bool,
@@ -1066,7 +1788,10 @@ fn control_allowed(
     limits: &crate::vnc::limits::DecodeLimits,
 ) -> bool {
     match control {
-        VncControl::Key { .. } | VncControl::Pointer { .. } => !view_only,
+        VncControl::Key { .. }
+        | VncControl::Pointer { .. }
+        | VncControl::NativePointer(_)
+        | VncControl::SampledPointer { .. } => !view_only,
         VncControl::Clipboard(text) => {
             clipboard_policy.allows_client_to_server() && limits.clipboard_bytes(text.len()).is_ok()
         }
@@ -1085,7 +1810,10 @@ fn control_allowed(
                 })
                 .is_some_and(|total| total <= limits.max_clipboard_decompressed_bytes)
         }
-        VncControl::Refresh | VncControl::Ack | VncControl::Disconnect => true,
+        VncControl::Refresh
+        | VncControl::Ack
+        | VncControl::SetQuality(_)
+        | VncControl::Disconnect => true,
     }
 }
 
@@ -1167,6 +1895,7 @@ async fn accept_authorized_ws(
 
 #[cfg(test)]
 mod tests {
+    use crate::vnc::encodings::ENCODING_DESKTOP_SIZE;
     use super::*;
     use tokio::sync::oneshot;
     use tokio_tungstenite::connect_async;
@@ -1257,6 +1986,119 @@ mod tests {
     }
 
     #[test]
+    fn native_pointer_messages_carry_the_canvas_geometry() {
+        let on: WsIncoming = serde_json::from_str(
+            r#"{"type":"native_pointer","on":true,"left":10,"top":20,"width":800,"height":450,"dpr":1.5,"fb_width":1600,"fb_height":900}"#,
+        )
+        .unwrap();
+        let WsIncoming::NativePointer {
+            on,
+            left,
+            top,
+            width,
+            height,
+            dpr,
+            fb_width,
+            fb_height,
+        } = on
+        else {
+            panic!("expected native_pointer");
+        };
+        let target =
+            native_pointer_target(on, left, top, width, height, dpr, fb_width, fb_height).unwrap();
+        // Physical (615, 367.5) is CSS (410, 245): the middle of the canvas.
+        assert_eq!(target.framebuffer_point(615.0, 367.5), Some((800, 450)));
+
+        let off: WsIncoming =
+            serde_json::from_str(r#"{"type":"native_pointer","on":false}"#).unwrap();
+        assert!(matches!(off, WsIncoming::NativePointer { on: false, .. }));
+        assert_eq!(
+            native_pointer_target(false, left, top, width, height, dpr, fb_width, fb_height),
+            None
+        );
+        // Incomplete or degenerate geometry stops sampling instead of guessing.
+        assert_eq!(
+            native_pointer_target(true, left, None, width, height, dpr, fb_width, fb_height),
+            None
+        );
+        assert_eq!(
+            native_pointer_target(true, left, top, Some(0.0), height, dpr, fb_width, fb_height),
+            None
+        );
+
+        let limits = crate::vnc::limits::DecodeLimits::default();
+        let start = VncControl::NativePointer(Some(target));
+        assert!(control_allowed(
+            &start,
+            false,
+            VncClipboardPolicy::Disabled,
+            &limits
+        ));
+        assert!(!control_allowed(
+            &start,
+            true,
+            VncClipboardPolicy::Disabled,
+            &limits
+        ));
+    }
+
+    #[test]
+    fn native_samples_lead_and_the_webview_owns_presses() {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut arbiter = PointerArbiter::default();
+        // Without sampling every WebView event goes out; samples do not.
+        assert!(arbiter.web(10, 10, 0, at(0)));
+        assert!(!arbiter.sample(11, 11, at(1)));
+
+        arbiter.set_native(true);
+        assert!(arbiter.sample(12, 12, at(2)));
+        // The WebView's copy of that move (and a stale one) is dropped...
+        assert!(!arbiter.web(12, 12, 0, at(12)));
+        assert!(!arbiter.web(11, 11, 0, at(20)));
+        // ...a repeated sample of the same position is no move...
+        assert!(!arbiter.sample(12, 12, at(21)));
+        // ...and once samples stop, the WebView's moves count again.
+        assert!(arbiter.web(13, 13, 0, at(80)));
+
+        // A press goes out and pauses samples until the release.
+        assert!(arbiter.sample(14, 14, at(81)));
+        assert!(arbiter.web(14, 14, 1, at(82)));
+        assert!(!arbiter.sample(20, 20, at(83)));
+        assert!(arbiter.web(20, 20, 1, at(84)));
+        assert!(
+            arbiter.web(20, 20, 0, at(85)),
+            "the release is never dropped"
+        );
+        // The sampler's first position after the release equals it.
+        assert!(!arbiter.sample(20, 20, at(86)));
+        assert!(arbiter.sample(21, 20, at(87)));
+
+        // A wheel notch (press/release pair) keeps its release.
+        assert!(arbiter.web(21, 20, 0x10, at(88)));
+        assert!(arbiter.web(21, 20, 0, at(89)));
+
+        arbiter.set_native(false);
+        assert!(arbiter.web(22, 22, 0, at(90)));
+        assert!(!arbiter.sample(23, 23, at(91)));
+    }
+
+    #[test]
+    fn connected_message_offers_native_pointer_sampling() {
+        let json = serde_json::to_value(&WsOutgoingText::Connected {
+            width: 1024,
+            height: 768,
+            name: "desk".into(),
+            protocol: "3.8".into(),
+            security: "VNC password".into(),
+            encrypted: false,
+            native_pointer: true,
+        })
+        .unwrap();
+        assert_eq!(json["native_pointer"], serde_json::json!(true));
+    }
+
+    #[test]
     fn backend_enforces_view_only_and_clipboard_direction() {
         let limits = crate::vnc::limits::DecodeLimits::default();
         let key = VncControl::Key {
@@ -1335,6 +2177,37 @@ mod tests {
     fn relay_origin_allowlist_rejects_untrusted_pages() {
         assert!(is_authorized_origin("tauri://localhost"));
         assert!(!is_authorized_origin("https://attacker.example"));
+    }
+
+    #[test]
+    fn stats_window_merges_back_to_back_updates_into_one_line_speed_sample() {
+        let mut window = StatsWindow::new();
+        let labels = StatsLabels {
+            requested: "ZRLE",
+            quality: "automatic",
+            level: "high",
+        };
+        let t0 = Instant::now();
+        let update = |start_ms: u64, end_ms: u64, bytes: u64, updates: u64| RuntimeStats {
+            wire_bytes: 0,
+            updates,
+            last_encoding: Some(16),
+            last_update_wire_bytes: bytes,
+            last_update_micros: (end_ms - start_ms) * 1000,
+            last_update_started_at: Some(t0 + Duration::from_millis(start_ms)),
+            last_update_finished_at: Some(t0 + Duration::from_millis(end_ms)),
+            ..RuntimeStats::default()
+        };
+        // Two halves of one 1 MB transfer 10 ms apart, then a later small update.
+        window.observe(update(0, 40, 500_000, 1), 1, &labels);
+        window.observe(update(50, 100, 500_000, 2), 1, &labels);
+        assert!(window.line_kbps.is_none(), "burst still open");
+        window.observe(update(600, 601, 1_000, 3), 2, &labels);
+        // 1_000_000 bytes over 100 ms = 80_000 kbit/s.
+        assert_eq!(window.line_kbps, Some(80_000));
+        // A lone small transfer never produces a sample.
+        window.observe(update(2_000, 2_001, 1_000, 4), 3, &labels);
+        assert_eq!(window.line_kbps, Some(80_000));
     }
 
     #[test]
@@ -1432,6 +2305,170 @@ mod tests {
         let _ = release_tx.send(());
         server.await.unwrap();
     }
+
+    /// Minimal RFB 3.8 server for relay tests: None security, 4x2 desktop.
+    /// Sends one Raw update, then waits for the client's *next* update request
+    /// (proving the relay pipelines requests without a WebView ACK), then —
+    /// once the test has received the first frame (`delivered`) — resizes to
+    /// 2x2 with a DesktopSize rect followed by a Raw rect. Without that wait
+    /// the resize can arrive while the first frame is still queued, and the
+    /// relay rightly drops frames of the old geometry.
+    fn start_pipeline_fixture() -> (
+        u16,
+        std::thread::JoinHandle<Vec<u8>>,
+        std::sync::mpsc::Sender<()>,
+    ) {
+        use std::io::{Read as _, Write as _};
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (delivered, first_frame_delivered) = std::sync::mpsc::channel::<()>();
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+                .unwrap();
+            stream.write_all(b"RFB 003.008\n").unwrap();
+            let mut banner = [0u8; 12];
+            stream.read_exact(&mut banner).unwrap();
+            stream.write_all(&[1, 1]).unwrap();
+            let mut chosen = [0u8; 1];
+            stream.read_exact(&mut chosen).unwrap();
+            stream.write_all(&0u32.to_be_bytes()).unwrap();
+            let mut shared = [0u8; 1];
+            stream.read_exact(&mut shared).unwrap();
+            let mut init = Vec::new();
+            init.extend_from_slice(&4u16.to_be_bytes());
+            init.extend_from_slice(&2u16.to_be_bytes());
+            init.extend_from_slice(&[32, 24, 0, 1, 0, 255, 0, 255, 0, 255, 0, 8, 16, 0, 0, 0]);
+            init.extend_from_slice(&4u32.to_be_bytes());
+            init.extend_from_slice(b"test");
+            stream.write_all(&init).unwrap();
+
+            // Client setup: SetPixelFormat, SetEncodings, first (full) request.
+            let mut pixel_format = [0u8; 20];
+            stream.read_exact(&mut pixel_format).unwrap();
+            let mut encodings = [0u8; 4];
+            stream.read_exact(&mut encodings).unwrap();
+            let count = u16::from_be_bytes([encodings[2], encodings[3]]) as usize;
+            let mut list = vec![0u8; count * 4];
+            stream.read_exact(&mut list).unwrap();
+            let mut first_request = [0u8; 10];
+            stream.read_exact(&mut first_request).unwrap();
+
+            let raw_rect = |x: u16, y: u16, w: u16, h: u16, value: u8| {
+                let mut rect = Vec::new();
+                for field in [x, y, w, h] {
+                    rect.extend_from_slice(&field.to_be_bytes());
+                }
+                rect.extend_from_slice(&0i32.to_be_bytes());
+                for _ in 0..(w as usize * h as usize) {
+                    rect.extend_from_slice(&[value, value, value, 0]);
+                }
+                rect
+            };
+            let mut first = vec![0, 0, 0, 1];
+            first.extend_from_slice(&raw_rect(0, 0, 4, 2, 7));
+            stream.write_all(&first).unwrap();
+
+            // The relay must ask for the next incremental update on its own.
+            let mut next_request = [0u8; 10];
+            stream.read_exact(&mut next_request).unwrap();
+            first_frame_delivered
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("first frame delivered to the WebSocket");
+
+            let mut resized = vec![0, 0, 0, 2];
+            for field in [0u16, 0, 2, 2] {
+                resized.extend_from_slice(&field.to_be_bytes());
+            }
+            resized.extend_from_slice(&ENCODING_DESKTOP_SIZE.to_be_bytes());
+            resized.extend_from_slice(&raw_rect(0, 0, 2, 2, 9));
+            stream.write_all(&resized).unwrap();
+
+            let mut rest = Vec::new();
+            let _ = stream.read_to_end(&mut rest);
+            next_request.to_vec()
+        });
+        (port, handle, delivered)
+    }
+
+    #[tokio::test]
+    async fn relay_pipelines_requests_and_repaints_after_desktop_size() {
+        let (port, server, delivered) = start_pipeline_fixture();
+        let session = spawn_vnc_relay(
+            "127.0.0.1".into(),
+            port,
+            None,
+            None,
+            None,
+            VncSecurityPolicy::AllowNone,
+            false,
+            VncClipboardPolicy::Disabled,
+            VncRelayOptions::default(),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+        let (mut client, _) = connect_async(ws_request(
+            session.ws_port,
+            "/vnc",
+            &format!("taomni-vnc.{}", session.ws_token),
+            "tauri://localhost",
+        ))
+        .await
+        .unwrap();
+
+        let mut texts = Vec::new();
+        let mut frames: Vec<Vec<Vec<u8>>> = vec![Vec::new()];
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+        while frames.iter().filter(|frame| !frame.is_empty()).count() < 2 {
+            let message = tokio::time::timeout_at(deadline, client.next())
+                .await
+                .expect("relay frames before timeout")
+                .expect("socket open")
+                .expect("valid message");
+            match message {
+                Message::Text(text) => texts.push(text.to_string()),
+                Message::Binary(bytes) if bytes.is_empty() => {
+                    if !frames.last().unwrap().is_empty() {
+                        let _ = delivered.send(());
+                    }
+                    frames.push(Vec::new());
+                }
+                Message::Binary(bytes) => frames.last_mut().unwrap().push(bytes.to_vec()),
+                _ => {}
+            }
+        }
+        // No ACK was sent, yet the server saw an incremental request.
+        let _ = client.close(None).await;
+        drop(session);
+        let next_request = tokio::task::spawn_blocking(move || server.join().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(next_request[0], 3, "FramebufferUpdateRequest");
+        assert_eq!(next_request[1], 1, "incremental");
+
+        assert!(
+            texts
+                .iter()
+                .any(|text| text.contains("\"type\":\"connected\""))
+        );
+        assert!(
+            texts
+                .iter()
+                .any(|text| text.contains("\"type\":\"desktop_size\"")
+                    && text.contains("\"width\":2")),
+            "desktop_size notification: {texts:?}"
+        );
+        let painted: Vec<&Vec<Vec<u8>>> = frames.iter().filter(|frame| !frame.is_empty()).collect();
+        // First frame: one 4x2 rect of value 7.
+        assert_eq!(painted[0].len(), 1);
+        assert_eq!(&painted[0][0][..8], &[0, 0, 0, 0, 0, 4, 0, 2]);
+        assert!(painted[0][0][12..].chunks(4).all(|px| px == [7, 7, 7, 255]));
+        // After the resize the whole new 2x2 surface is repainted.
+        assert_eq!(&painted[1][0][..8], &[0, 0, 0, 0, 0, 2, 0, 2]);
+        assert!(painted[1][0][12..].chunks(4).all(|px| px == [9, 9, 9, 255]));
+    }
 }
 
 fn is_authorized_origin(origin: &str) -> bool {
@@ -1451,14 +2488,4 @@ fn is_authorized_origin(origin: &str) -> bool {
         );
     }
     false
-}
-
-fn make_frame_header(x: u16, y: u16, w: u16, h: u16) -> [u8; 12] {
-    let mut hdr = [0u8; 12];
-    hdr[0..2].copy_from_slice(&x.to_be_bytes());
-    hdr[2..4].copy_from_slice(&y.to_be_bytes());
-    hdr[4..6].copy_from_slice(&w.to_be_bytes());
-    hdr[6..8].copy_from_slice(&h.to_be_bytes());
-    // bytes 8-11 reserved (zero)
-    hdr
 }

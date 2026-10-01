@@ -85,7 +85,7 @@ Major modules:
 
 ### Dev-mode Stubs
 
-When running `pnpm dev` (no Tauri), `vite.config.ts` aliases `@tauri-apps/api/*` and the dialog/shell/notification plugins to stub implementations in `src/stubs/` (tauri-core, tauri-event, tauri-window, tauri-shell, etc., plus sshClient/sftpClient/localVfs). Custom Vite plugins in `vite-plugins/` provide SSH, SFTP, and RDP proxy servers (Node ssh2/ws) so the frontend can be developed without the Rust backend. These plugins are only loaded when `TAURI_ENV_PLATFORM` is unset.
+When running `pnpm dev` (no Tauri), `vite.config.ts` aliases `@tauri-apps/api/*` and the dialog/shell/notification plugins to stub implementations in `src/stubs/` (tauri-core, tauri-event, tauri-window, tauri-shell, etc., plus sshClient/sftpClient/vncClient/localVfs). Custom Vite plugins in `vite-plugins/` provide SSH, SFTP, RDP and VNC proxy servers (Node ssh2/ws; the VNC bridge speaks None/VNCAuth, Raw, DesktopSize and clipboard RFB) so the frontend can be developed without the Rust backend. These plugins are only loaded when `TAURI_ENV_PLATFORM` is unset.
 
 ### Communication Pattern
 

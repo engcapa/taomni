@@ -5,7 +5,9 @@ implemented in scripts/tauri_webdriver.py. Verbs that cannot be expressed
 through WebDriver (or that would lie about what was exercised) raise
 StepError instead of silently passing — a native gate must fail loudly.
 
-Native-only verbs:
+Native-only verbs (assert_file_contains / host_write_file also exist in
+browser mode, confined to the report root for runner-host fixtures such as
+the VNC event log; see steps/host_files.py):
 * assert_file_contains  - host-side disk re-read of a saved workspace file
                           (the G0 disk-effect proof; impossible from browser).
 * assert_file_exists    - host-side existence check.

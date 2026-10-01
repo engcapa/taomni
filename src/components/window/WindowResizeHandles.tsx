@@ -1,5 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { isTauriRuntime } from "../../lib/runtime";
 
 type ResizeDirection =
@@ -75,7 +75,35 @@ export function WindowResizeHandles({
   edgeSize = EDGE_SIZE,
   cornerSize = CORNER_SIZE,
 }: WindowResizeHandlesProps = {}) {
-  if (!isTauriRuntime()) return null;
+  const tauri = isTauriRuntime();
+  // A full-screen or maximized window has no resizable edges; leaving the
+  // handles in place would also swallow pointer input at the screen edges
+  // (e.g. the VNC full-screen toolbar hot zone).
+  const [edgesLocked, setEdgesLocked] = useState(false);
+  useEffect(() => {
+    if (!tauri) return;
+    const win = getCurrentWindow();
+    let disposed = false;
+    const refresh = () => {
+      void Promise.all([win.isFullscreen(), win.isMaximized()])
+        .then(([fullscreen, maximized]) => {
+          if (!disposed) setEdgesLocked(fullscreen || maximized);
+        })
+        .catch(() => {});
+    };
+    refresh();
+    let unlisten: (() => void) | undefined;
+    void win.onResized(refresh).then((stop) => {
+      if (disposed) stop();
+      else unlisten = stop;
+    }).catch(() => {});
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [tauri]);
+
+  if (!tauri || edgesLocked) return null;
 
   const startResize = (direction: ResizeDirection) => (event: ReactMouseEvent) => {
     if (event.button !== 0) return;

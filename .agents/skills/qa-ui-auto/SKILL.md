@@ -215,6 +215,33 @@ python .agents/skills/qa-ui-auto/scripts/fixtures.py stop
 The manual command's credentials are disposable test values only; prefer
 environment variables or workspace secrets and never commit them.
 
+### Local VNC fixture
+
+Cases that declare `vnc_required` connect to the scriptable RFB server of the
+VNC skill. Start it (Python with NumPy; Pillow for JPEG) and point the local
+config at it; hosted CI does both automatically:
+
+```bash
+QA_VNC_PASSWORD=<8 chars> python .agents/skills/vnc-realvnc-task/scripts/vnc_fixture_server.py \
+  --port 5988 --control-port 5989 --security vncauth --password-env QA_VNC_PASSWORD \
+  --ext-clipboard --clip-formats text,html
+```
+
+```yaml
+vnc:
+  host: 127.0.0.1
+  port: 5988
+  control_port: 5989
+  password: ${env.QA_VNC_PASSWORD}
+```
+
+Each case resets the fixture and gets `${fixture.vnc_events}` (one JSON line per
+client message) and `${fixture.vnc_control}` (overwrite with control lines such
+as `resize 1024 768`) inside the report root; `host_write_file` and
+`assert_file_contains` reach them in both modes. Browser mode connects through
+the dev-server VNC bridge, which proves the panel workflow, not the native
+relay, encodings, OS input or the system clipboard.
+
 ## GitHub Hosted Execution
 
 For manual/nightly/reusable three-platform browser/native jobs, use the independent
