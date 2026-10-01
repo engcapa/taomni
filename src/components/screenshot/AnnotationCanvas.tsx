@@ -430,9 +430,6 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       const p = localPos(e);
       if (tool === "number") {
         const now = Date.now();
-        // TEMP-DEBUG-009: remove after diagnosing event sequence
-        // eslint-disable-next-line no-console
-        console.log(`[009dbg] mousedown x=${Math.round(p.x)} y=${Math.round(p.y)} t=${now} last=${lastNumberTime.current}`);
         if (now - lastNumberTime.current < 300) return;
         lastNumberTime.current = now;
         const num = numberRef.current++;
@@ -517,9 +514,6 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         setTextValue("");
       } else {
         const now = Date.now();
-        // TEMP-DEBUG-009: remove after diagnosing event sequence
-        // eslint-disable-next-line no-console
-        console.log(`[009dbg] click x=${Math.round(p.x)} y=${Math.round(p.y)} t=${now} last=${lastNumberTime.current}`);
         if (now - lastNumberTime.current < 300) return;
         lastNumberTime.current = now;
         const num = numberRef.current++;
