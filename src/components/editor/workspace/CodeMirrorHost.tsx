@@ -27,9 +27,9 @@ import {
   type DocumentTransaction,
   type WorkspaceDocumentTransactionOwner,
 } from "./workspaceDocumentTransactionOwner";
+import { hoverDocTooltip } from "./hoverDocTooltip";
 import {
   EditorView,
-  closeHoverTooltip,
   crosshairCursor,
   drawSelection,
   highlightActiveLine,
@@ -2052,34 +2052,39 @@ function lspHoverExtension(
   hoverTime: number,
 ): Extension {
   if (!enabled) return [];
-  const extension = hoverTooltip((view, pos): Promise<Tooltip | null> => {
-    const position = lspPositionFromOffset(view.state.doc, pos);
-    return hoverRef.current(position).then((content) => {
-      if (!content) return null;
-      const title = extractIdentifierAtPos(view.state.doc, pos);
-      const displayContent = content.title ? content : { ...content, title };
-      return {
-        pos,
-        above: true,
-        create() {
-          const dom = createHoverDocDom({
-            content: displayContent,
-            onPin: onPinHoverDocRef.current,
-            onClose: () => view.dispatch({ effects: closeHoverTooltip(extension) }),
-            activeResizeSessionRef,
-          });
-          return {
-            dom,
-            destroy: () => cancelActiveHoverResize(activeResizeSessionRef),
-          };
-        },
-      };
-    });
-  }, {
-    hideOnChange: true,
+  // IDEA keeps the hover popup while the pointer moves towards it or rests in
+  // it (hoverDocTooltip); CodeMirror's hoverTooltip closed it on the first
+  // pointer move off the hovered character.
+  return hoverDocTooltip({
     hoverTime,
+    isBusy: () => !!activeResizeSessionRef.current,
+    source: (view, pos) => {
+      const position = lspPositionFromOffset(view.state.doc, pos);
+      return hoverRef.current(position).then((content) => {
+        if (!content) return null;
+        const title = extractIdentifierAtPos(view.state.doc, pos);
+        const displayContent = content.title ? content : { ...content, title };
+        return {
+          create: (close) => {
+            // Same structure as before: the .cm-tooltip-hover wrapper stays
+            // transparent and the container draws the popup chrome.
+            const wrapper = document.createElement("div");
+            wrapper.className = "cm-tooltip-hover";
+            wrapper.appendChild(createHoverDocDom({
+              content: displayContent,
+              onPin: onPinHoverDocRef.current,
+              onClose: close,
+              activeResizeSessionRef,
+            }));
+            return {
+              dom: wrapper,
+              destroy: () => cancelActiveHoverResize(activeResizeSessionRef),
+            };
+          },
+        };
+      });
+    },
   });
-  return extension;
 }
 
 function foldHoverProvenanceTooltip(resolvePath: () => string | null | undefined): Extension {
