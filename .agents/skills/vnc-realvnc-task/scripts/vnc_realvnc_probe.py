@@ -74,34 +74,45 @@ def keys_of(found: list[dict]) -> list[list]:
     return [[e["down"], e["keysym_hex"]] for e in found if e["type"] == "key"]
 
 
-def viewer_window(proc: subprocess.Popen) -> int:
-    """The RealVNC session window ("<address> (<desktop>) - RealVNC Viewer"); the
-    launched executable may hand off to another process, so match by title."""
+def session_windows() -> list[tuple[int, str]]:
+    """Visible RealVNC session windows: "<address> (<desktop>) - RealVNC Viewer"
+    (7.15) or "... - VNC Viewer" (7.0); the address book window has no address."""
     import ctypes
     from ctypes import wintypes
 
     from vnc_native import user32
 
-    end = time.time() + 10
+    found: list[tuple[int, str]] = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def callback(hwnd, _):
+        buf = ctypes.create_unicode_buffer(256)
+        user32.GetWindowTextW(hwnd, buf, 256)
+        if user32.IsWindowVisible(hwnd) and buf.value.endswith("VNC Viewer") and "127.0.0.1" in buf.value:
+            found.append((hwnd, buf.value))
+        return True
+
+    user32.EnumWindows(callback, 0)
+    return found
+
+
+def viewer_window(proc: subprocess.Popen, timeout: float = 10.0, connected: bool = False) -> int:
+    """The session window; the launched executable may hand off to another
+    process, so match by title. `connected` waits for the desktop name."""
+    import vnc_native
+
+    end = time.time() + timeout
     while time.time() < end:
-        found: list[int] = []
-
-        @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-        def callback(hwnd, _):
-            buf = ctypes.create_unicode_buffer(256)
-            user32.GetWindowTextW(hwnd, buf, 256)
-            if user32.IsWindowVisible(hwnd) and buf.value.endswith("RealVNC Viewer") and "127.0.0.1" in buf.value:
-                found.append(hwnd)
-            return True
-
-        user32.EnumWindows(callback, 0)
+        found = [(hwnd, title) for hwnd, title in session_windows() if not connected or " (" in title]
         if found:
-            return found[0]
+            hwnd = found[0][0]
+            vnc_native.TARGET_PIDS.add(vnc_native._window_pid(hwnd))
+            return hwnd
         time.sleep(0.3)
     return 0
 
 
-def activate_viewer(hwnd: int) -> tuple[int, int, int, int]:
+def activate_viewer(hwnd: int, click: bool = True) -> tuple[int, int, int, int]:
     import ctypes
     from ctypes import wintypes
 
@@ -111,41 +122,81 @@ def activate_viewer(hwnd: int) -> tuple[int, int, int, int]:
     user32.GetWindowRect(hwnd, ctypes.byref(rect))
     bring_to_front(hwnd)
     cx, cy = (rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2
-    # RealVNC takes keyboard focus for the desktop on a click; against the
-    # fixture server a left click is harmless.
-    from vnc_native import mouse_click
+    if click:
+        # RealVNC takes keyboard focus for the desktop on a click; against the
+        # fixture server a left click is harmless (never used on a live server).
+        from vnc_native import mouse_click
 
-    mouse_click(cx, cy)
+        mouse_click(cx, cy)
+    else:
+        user32.SetCursorPos(cx, cy)
     time.sleep(0.3)
     return rect.left, rect.top, rect.right, rect.bottom
 
 
+def probe_pointer_latency(proc, args, log, ctl, report, since) -> None:
+    """VNC-PERF-005-A1: the same vnc_pointer_latency.py method as the Taomni
+    scenario; moves only (no click, no key), so it is safe on a live server."""
+    import sys
+
+    hwnd = viewer_window(proc, timeout=90, connected=True)
+    if not hwnd:
+        record(report, "pointer-latency", "connect", False, reason="session window with a desktop name not found")
+        return
+    time.sleep(3)
+    script = Path(__file__).with_name("vnc_pointer_latency.py")
+    for run in range(args.latency_runs):
+        left, top, right, bottom = activate_viewer(hwnd, click=False)
+        import ctypes
+
+        front = ctypes.windll.user32.GetForegroundWindow() == hwnd
+        # A third into the client area, clear of the title bar.
+        x, y = left + (right - left) // 3, top + 60 + (bottom - top - 60) // 3
+        result = subprocess.run(
+            [sys.executable, str(script), "--up-log", args.up_log, "--x", str(x), "--y", str(y), "--moves", "40",
+             "--interval-ms", "200", "--size", str(args.pointer_size), "--label", f"realvnc-{run}",
+             "--dump", str(Path(args.report) / "pointer-latency.jsonl")],
+            capture_output=True, text=True, timeout=120,
+        )
+        line = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else result.stderr[-300:]
+        record(report, "pointer-latency", f"run-{run}", "median_ms" in line, line=line, foreground_viewer=front)
+        time.sleep(1.0)
+
+
 def probe_special_keys(proc, args, log, ctl, report, since) -> None:
-    from vnc_native import chord, tap
+    """Same keys, same order and timing as vnc_native_scenarios.SPECIAL_KEY_PROBES."""
+    import ctypes
+
+    from vnc_native import dismiss_shell_surface, foreground_image
+    from vnc_native_scenarios import SPECIAL_KEY_PROBES
 
     hwnd = viewer_window(proc)
-    activate_viewer(hwnd)
-    for label, action in (("win", lambda: tap(0x5B)), ("alt-tab", lambda: chord(0x12, 0x09)),
-                          ("prtscn", lambda: tap(0x2C))):
+    for label, action, want in SPECIAL_KEY_PROBES:
+        activate_viewer(hwnd)
+        if ctypes.windll.user32.GetForegroundWindow() != hwnd:
+            record(report, "special-keys", label, False, reason="viewer not in front; key not sent")
+            continue
         start = time.perf_counter()
         action()
         time.sleep(1.0)
-        import ctypes
+        got = keys_of(events(log, start, ("key",)))
         front = ctypes.windll.user32.GetForegroundWindow() == hwnd
-        record(report, "special-keys", label, True, got=keys_of(events(log, start, ("key",))), foreground_viewer=front)
+        record(report, "special-keys", label, True, got=got, foreground_viewer=front,
+               local_surface=None if front else foreground_image(),
+               remote_matches=got == [[d, hex(k)] for d, k in want])
         if not front:
-            tap(0x1B)
-            activate_viewer(hwnd)
+            dismiss_shell_surface()
         time.sleep(0.3)
 
 
 def probe_layouts(proc, args, log, ctl, report, since) -> None:
-    from vnc_layouts import PROBES, layout_for
+    from vnc_layouts import PROBES, layout_for, warm_up
 
     hwnd = viewer_window(proc)
     for label, klid, action, want in PROBES:
         activate_viewer(hwnd)
         with layout_for(hwnd, klid) as layout:
+            warm_up()
             start = time.perf_counter()
             action()
             time.sleep(1.0)
@@ -174,55 +225,70 @@ def probe_clipboard_timing(proc, args, log, ctl, report, since) -> None:
             start = time.perf_counter()
             user32.SetCursorPos((left + right) // 2, (top + bottom) // 2)
         else:
-            shell = user32.FindWindowW("Shell_TrayWnd", None)
-            user32.SetForegroundWindow(shell)
+            # The cursor stays inside the viewer, so only the focus changes.
+            from vnc_native import bring_to_front
+
+            bring_to_front(user32.FindWindowW("Shell_TrayWnd", None))
             time.sleep(0.5)
+            away = user32.GetForegroundWindow() != hwnd
             set_clipboard(text)
             start = time.perf_counter()
-            activate_viewer(hwnd)
+            bring_to_front(hwnd)
         found = wait_for(log, start, lambda ev: any(text in (e.get("text") or "") for e in ev), 6)
         hit = next((e for e in found if text in (e.get("text") or "")), None)
         record(report, "clipboard-timing", label, True, sent=hit is not None,
-               after_ms=round((hit["t"] - start) * 1000) if hit else None)
+               after_ms=round((hit["t"] - start) * 1000) if hit else None,
+               left_window=away if label == "focus-return" else None)
+
+
+def probe_unicode_clipboard(proc, args, log, ctl, report, since) -> None:
+    """VNC-CLIP-001-A2 reference: Chinese text both ways (legacy or Extended clipboard)."""
+    from vnc_native import user32
+
+    hwnd = viewer_window(proc)
+    left, top, right, bottom = activate_viewer(hwnd)
+    text = "中文剪贴板 ✓"
+    user32.SetCursorPos(right + 60, (top + bottom) // 2)
+    time.sleep(0.3)
+    set_clipboard(text)
+    start = time.perf_counter()
+    user32.SetCursorPos((left + right) // 2, (top + bottom) // 2)
+    found = wait_for(log, start, lambda ev: any(e["type"] in ("cut_text", "ext_clipboard") for e in ev), 6)
+    sent = [{k: e.get(k) for k in ("type", "action", "formats", "text")} for e in found
+            if e["type"] in ("cut_text", "ext_clipboard")]
+    record(report, "unicode-clipboard", "client-to-server", any(e.get("text") == text for e in sent), sent=sent[:4])
+    remote = "服务器文本 ok"
+    control(ctl, f"extclip {remote}")
+    time.sleep(2.5)
+    local = subprocess.run(["powershell.exe", "-NoProfile", "-Command",
+                            "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard -Raw"],
+                           capture_output=True, timeout=30).stdout.decode("utf-8", "replace").strip()
+    record(report, "unicode-clipboard", "server-to-client", local == remote, local=local[:40])
 
 
 def probe_fullscreen_toolbar(proc, args, log, ctl, report, since) -> None:
-    """RealVNC full-screen toolbar show/hide timing from screen pixels at the top centre."""
-    from PIL import ImageChops, ImageGrab
+    """RealVNC full-screen toolbar show/hide timing from screen pixels at the top
+    centre (vnc_native.toolbar_timing, the method the Taomni scenario uses too)."""
+    from PIL import ImageGrab
 
-    from vnc_native import user32
+    from vnc_native import toolbar_timing, user32
 
     hwnd = viewer_window(proc)
     activate_viewer(hwnd)
     width = user32.GetSystemMetrics(0)
     box = (width // 2 - 200, 0, width // 2 + 200, 50)
-    user32.SetCursorPos(width // 2, 400)
-    time.sleep(2.5)
-    baseline = ImageGrab.grab(bbox=box)
+    for attempt in range(3):
+        timing = toolbar_timing(box, enter=(width // 2, 0), leave=(width // 2, 400))
+        record(report, "fullscreen-toolbar", f"timing-{attempt}", timing["show_start_s"] is not None, **timing)
+    from vnc_native import toolbar_zones
 
-    def changed() -> bool:
-        diff = ImageChops.difference(ImageGrab.grab(bbox=box).convert("L"), baseline.convert("L"))
-        return sum(1 for v in diff.getdata() if v > 40) > 800
-
-    user32.SetCursorPos(width // 2, 1)
-    start = time.time()
-    shown = None
-    while time.time() - start < 3:
-        if changed():
-            shown = time.time() - start
-            break
-        time.sleep(0.03)
-    ImageGrab.grab(bbox=box).save(Path(args.report) / "rv-toolbar-shown.png")
+    zones = toolbar_zones(box, width // 2)
+    record(report, "fullscreen-toolbar", "zones", zones["starts_hiding_at_y"] is not None, **zones)
+    # The toolbar itself (pointer resting on it).
+    user32.SetCursorPos(width // 2, 0)
+    time.sleep(1.0)
+    ImageGrab.grab(bbox=(width // 2 - 300, 0, width // 2 + 300, 80)).save(Path(args.report) / "rv-toolbar-shown.png")
     user32.SetCursorPos(width // 2, 400)
-    left_at = time.time()
-    hidden = None
-    while time.time() - left_at < 6:
-        if not changed():
-            hidden = time.time() - left_at
-            break
-        time.sleep(0.03)
-    record(report, "fullscreen-toolbar", "timing", shown is not None, show_after_s=round(shown, 2) if shown else None,
-           hide_after_s=round(hidden, 2) if hidden else None)
 
 
 OS_PROBES = {
@@ -230,6 +296,8 @@ OS_PROBES = {
     "layouts": probe_layouts,
     "clipboard-timing": probe_clipboard_timing,
     "fullscreen-toolbar": probe_fullscreen_toolbar,
+    "pointer-latency": probe_pointer_latency,
+    "unicode-clipboard": probe_unicode_clipboard,
 }
 
 
@@ -244,19 +312,30 @@ def main() -> None:
     parser.add_argument("--viewer", required=True)
     parser.add_argument("--port", type=int, default=5988)
     parser.add_argument("--password-env", required=True)
-    parser.add_argument("--fixture-log", required=True)
-    parser.add_argument("--fixture-control", type=int, required=True)
+    parser.add_argument("--fixture-log", help="omit for a live server behind vnc_burst_proxy.py (pointer-latency only)")
+    parser.add_argument("--fixture-control", type=int)
     parser.add_argument("--report", required=True)
     parser.add_argument("--probe", action="append", required=True)
     parser.add_argument("--viewer-arg", action="append", default=[], help="extra RealVNC parameter, e.g. -Quality=Low")
+    parser.add_argument("--up-log", help="vnc_burst_proxy.py --up-log file (pointer-latency)")
+    parser.add_argument("--pointer-size", type=int, default=6)
+    parser.add_argument("--latency-runs", type=int, default=3)
     args = parser.parse_args()
     report = Path(args.report)
     report.mkdir(parents=True, exist_ok=True)
     log = args.fixture_log
     ctl = args.fixture_control
     marker = time.perf_counter()
+    before = {hwnd for hwnd, _ in session_windows()}
     proc = launch(args, args.viewer_arg)
     try:
+        if not log:
+            for probe in args.probe:
+                if probe != "pointer-latency":
+                    record(report, probe, "unsupported-without-fixture", False)
+                    continue
+                probe_pointer_latency(proc, args, log, ctl, report, time.perf_counter())
+            return
         found = wait_for(log, marker, lambda ev: any(e["type"] == "fbur" for e in ev), 60)
         init = next((e for e in found if e["type"] == "client_init"), None)
         encodings = next((e["encodings"] for e in found if e["type"] == "set_encodings"), [])
@@ -308,9 +387,25 @@ def main() -> None:
             proc.wait(10)
         except subprocess.TimeoutExpired:
             proc.kill()
+        close_new_sessions(before)
         pwd = Path(args.report) / "realvnc.pwd"
         if pwd.exists():
             pwd.unlink()
+
+
+def close_new_sessions(before: set[int]) -> None:
+    """Close session windows this run opened. A viewer that was already running
+    (the user's own) may host them, so windows get WM_CLOSE, never a kill."""
+    import ctypes
+
+    WM_CLOSE = 0x0010
+    for _ in range(20):
+        mine = [hwnd for hwnd, _ in session_windows() if hwnd not in before]
+        if not mine:
+            return
+        for hwnd in mine:
+            ctypes.windll.user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+        time.sleep(0.5)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 
     python vnc_fixture_server.py --port 5988 --log events.jsonl --control-port 5989 \
         [--security none|vncauth] [--password-env VAR] [--auth-delay-ms N] \
-        [--width 1280 --height 720] [--animate-fps 10] [--ext-clipboard]
+        [--width 1280 --height 720] [--animate-fps 10] [--ext-clipboard [--clip-formats text,html]]
 
 Every client message (keys, pointer, cut text, encodings, pixel format, update
 requests) is appended to --log as one JSON line with a time.perf_counter()
@@ -19,6 +19,11 @@ commands on the control port (one per connection or newline separated):
     reject-auth on|off   answer the next VNCAuth attempts with failure
     auth-delay MS   delay the VNCAuth result (a slow server; 0 restores)
     stats           reply with per-client counters
+    reset           drop every client and restore the start-up state
+    log PATH        also append every later event to PATH (replaces the
+                    previous per-case log)
+    watch PATH      run PATH's lines (not '#' comments) as commands each time
+                    its content changes (replaces the previous watched file)
 
 Pixel encodings: Tight (7; fill, palette, copy/gradient filters, JPEG when a
 quality level is requested and Pillow is available), ZRLE is not implemented,
@@ -54,7 +59,7 @@ ENC_TIGHT = 7
 ENC_DESKTOP_SIZE = -223
 ENC_EXT_CLIPBOARD = 0xC0A1E5CE - (1 << 32)
 CLIP_CAPS, CLIP_REQUEST, CLIP_PEEK, CLIP_NOTIFY, CLIP_PROVIDE = (1 << 24, 1 << 25, 1 << 26, 1 << 27, 1 << 28)
-CLIP_TEXT = 1
+CLIP_TEXT, CLIP_RTF, CLIP_HTML = 1, 2, 4
 JPEG_QUALITY = [5, 10, 15, 25, 37, 50, 60, 70, 75, 80]
 TIGHT_MAX_WIDTH = 2048
 TIGHT_BAND_ROWS = 128
@@ -63,15 +68,25 @@ TIGHT_BAND_ROWS = 128
 class EventLog:
     def __init__(self, path: str | None) -> None:
         self.lock = threading.Lock()
-        self.handle = open(path, "a", encoding="utf-8") if path else None
+        self.base = open(path, "a", encoding="utf-8") if path else None
+        self.case = None
+
+    def tee(self, path: str) -> None:
+        """Also append every later event to `path`, replacing the previous
+        per-case log (one log per test case)."""
+        with self.lock:
+            if self.case:
+                self.case.close()
+            self.case = open(path, "a", encoding="utf-8")
 
     def write(self, conn: int, kind: str, **fields) -> None:
         record = {"t": round(time.perf_counter(), 6), "conn": conn, "type": kind, **fields}
         line = json.dumps(record, ensure_ascii=False)
         with self.lock:
-            if self.handle:
-                self.handle.write(line + "\n")
-                self.handle.flush()
+            for handle in (self.base, self.case):
+                if handle:
+                    handle.write(line + "\n")
+                    handle.flush()
         if kind not in ("pointer", "fbur"):
             print(line, flush=True)
 
@@ -255,7 +270,12 @@ class Server:
         self.frozen = threading.Event()
         self.reject_auth = args.reject_auth
         self.auth_delay_ms = args.auth_delay_ms
+        self.watch_path: str | None = None
         self.password = os.environ.get(args.password_env, "") if args.password_env else ""
+        names = {"text": CLIP_TEXT, "rtf": CLIP_RTF, "html": CLIP_HTML}
+        self.clip_formats = 0
+        for name in args.clip_formats.split(","):
+            self.clip_formats |= names[name.strip()]
         self.counter = 0
         self.counter_lock = threading.Lock()
 
@@ -390,8 +410,10 @@ class Client:
                 self.tight.set_level(level[0] if level else 6)
                 self.log.write(self.id, "set_encodings", encodings=self.encodings)
                 if ENC_EXT_CLIPBOARD in self.encodings and self.server.args.ext_clipboard:
-                    body = struct.pack(">II", CLIP_CAPS | CLIP_REQUEST | CLIP_NOTIFY | CLIP_PROVIDE | CLIP_TEXT,
-                                       16 * 1024 * 1024)
+                    formats = self.server.clip_formats
+                    sizes = [16 * 1024 * 1024] * bin(formats).count("1")
+                    body = struct.pack(f">I{len(sizes)}I", CLIP_CAPS | CLIP_REQUEST | CLIP_NOTIFY | CLIP_PROVIDE | formats,
+                                       *sizes)
                     self.queue(b"\x03\0\0\0" + struct.pack(">i", -len(body)) + body)
             elif kind == 3:
                 incremental, x, y, w, h = struct.unpack(">BHHHH", self.recv_exact(9))
@@ -422,14 +444,21 @@ class Client:
             self.log.write(self.id, "ext_clipboard", action="caps", flags=f"0x{flags:08x}")
         elif action == CLIP_NOTIFY:
             self.log.write(self.id, "ext_clipboard", action="notify", formats=flags & 0xFFFF)
-            if flags & CLIP_TEXT:
-                request = struct.pack(">I", CLIP_REQUEST | CLIP_TEXT)
+            wanted = flags & self.server.clip_formats
+            if wanted:
+                request = struct.pack(">I", CLIP_REQUEST | wanted)
                 self.queue(b"\x03\0\0\0" + struct.pack(">i", -len(request)) + request)
         elif action == CLIP_PROVIDE:
+            # One u32 size + data per format bit, in bit order (text, rtf, html).
             data = zlib.decompress(body[4:])
-            size = struct.unpack(">I", data[:4])[0]
-            text = data[4:4 + size].rstrip(b"\0").decode("utf-8", "replace")
-            self.log.write(self.id, "ext_clipboard", action="provide", formats=flags & 0xFFFF, text=text)
+            values, offset = {}, 0
+            for bit, name in ((CLIP_TEXT, "text"), (CLIP_RTF, "rtf"), (CLIP_HTML, "html")):
+                if flags & bit and offset + 4 <= len(data):
+                    size = struct.unpack(">I", data[offset:offset + 4])[0]
+                    values[name] = data[offset + 4:offset + 4 + size].rstrip(b"\0").decode("utf-8", "replace")
+                    offset += 4 + size
+            self.log.write(self.id, "ext_clipboard", action="provide", formats=flags & 0xFFFF,
+                           text=values.get("text"), html=values.get("html"), rtf=values.get("rtf"))
         elif action == CLIP_REQUEST:
             text = getattr(self, "server_clipboard", "")
             payload = text.replace("\n", "\r\n").encode() + b"\0"
@@ -546,10 +575,9 @@ def control_loop(server: Server, port: int) -> None:
             data = b""
             conn.settimeout(2)
             try:
-                while not data.endswith(b"\n"):
-                    chunk = conn.recv(65536)
-                    if not chunk:
-                        break
+                # Until the sender half-closes (or 2 s pass), so several
+                # commands can share one connection.
+                while chunk := conn.recv(65536):
                     data += chunk
             except socket.timeout:
                 pass
@@ -557,11 +585,55 @@ def control_loop(server: Server, port: int) -> None:
             conn.sendall(("\n".join(replies) + "\n").encode())
 
 
+def watch_commands(server: Server) -> None:
+    """Run the lines of the watched file as control commands whenever its
+    content changes (test runners that can only write files drive the fixture
+    so). `watch PATH` retargets this single watcher."""
+    path, seen = None, None
+    while True:
+        if server.watch_path != path:
+            path, seen = server.watch_path, None
+        try:
+            with open(path, encoding="utf-8") as handle:
+                content = handle.read()
+        except OSError:
+            content = None
+        if content is not None and content != seen:
+            for line in content.splitlines():
+                if line.strip() and not line.startswith("#"):
+                    handle_command(server, line.strip())
+            seen = content
+        time.sleep(0.1)
+
+
+def drop_clients(clients: list["Client"]) -> None:
+    for client in clients:
+        try:
+            client.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        client.sock.close()
+
+
 def handle_command(server: Server, line: str) -> str:
     verb, _, rest = line.partition(" ")
     clients = list(server.scene.clients)
     server.log.write(0, "control", command=verb, arg=rest[:64])
-    if verb == "resize":
+    if verb == "log":
+        server.log.tee(rest.strip())
+    elif verb == "watch":
+        first = server.watch_path is None
+        server.watch_path = rest.strip()
+        if first:
+            threading.Thread(target=watch_commands, args=(server,), daemon=True).start()
+    elif verb == "reset":
+        # A fresh fixture for the next test case: no clients, default state.
+        drop_clients(clients)
+        server.frozen.clear()
+        server.reject_auth = server.args.reject_auth
+        server.auth_delay_ms = server.args.auth_delay_ms
+        server.scene.resize(server.args.width, server.args.height, notify=False)
+    elif verb == "resize":
         width, height = (int(v) for v in rest.split())
         server.scene.resize(width, height)
     elif verb == "cuttext":
@@ -577,12 +649,7 @@ def handle_command(server: Server, line: str) -> str:
         for client in clients:
             client.queue(b"\x02")
     elif verb == "drop":
-        for client in clients:
-            try:
-                client.sock.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
-            client.sock.close()
+        drop_clients(clients)
     elif verb == "freeze":
         server.frozen.set()
     elif verb == "thaw":
@@ -616,6 +683,8 @@ def main() -> None:
     parser.add_argument("--reject-auth", action="store_true")
     parser.add_argument("--animate-fps", type=float, default=0.0)
     parser.add_argument("--ext-clipboard", action="store_true")
+    parser.add_argument("--clip-formats", default="text",
+                        help="ExtendedClipboard formats the fixture accepts: text,rtf,html")
     parser.add_argument("--no-tight", action="store_true", help="behave like a server without Tight")
     parser.add_argument("--name", default="taomni-vnc-fixture")
     args = parser.parse_args()

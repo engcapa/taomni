@@ -11,9 +11,20 @@ import socket
 import subprocess
 import time
 
-from vnc_native import App, chord, mouse_click, mouse_wheel, tap, user32
+from vnc_native import App, chord, dismiss_shell_surface, foreground_image, mouse_click, mouse_wheel, tap, user32
 
 VK_F8, VK_ESCAPE, VK_TAB, VK_MENU, VK_LWIN, VK_SNAPSHOT = 0x77, 0x1B, 0x09, 0x12, 0x5B, 0x2C
+
+
+def press(app: App, vk: int, combo: str) -> str:
+    """A real key press when an interactive desktop exists (the WebView sees
+    it through the OS keyboard path), otherwise the WebDriver equivalent."""
+    if app.os_input:
+        app.activate()
+        tap(vk)
+        return "os-sendinput"
+    app.key(combo)
+    return "webdriver-actions"
 
 
 # ── fixture helpers ───────────────────────────────────────────────────
@@ -202,19 +213,47 @@ def scenario_mouse(app: App, args) -> None:
         masks = [e["mask"] for e in events_since(args, since, ("pointer",))]
         presses = sum(1 for i, m in enumerate(masks) if m & mask and (i == 0 or not masks[i - 1] & mask))
         app.run.record("mouse", label, presses == 1 and bool(masks) and (masks[-1] & mask) == 0, masks=masks)
+    if app.os_input:
+        # VNC-PERF-005-A2: a left-button drag keeps the button bit on every
+        # move, ends with one release and sends no duplicate events.
+        from vnc_native import INPUT, INPUT_MOUSE, MOUSEINPUT, _INPUTUNION, send_inputs
+
+        def button(flag: int) -> None:
+            send_inputs(INPUT(INPUT_MOUSE, _INPUTUNION(mi=MOUSEINPUT(0, 0, 0, flag, 0, 0))))
+
+        user32.SetCursorPos(x, y)
+        time.sleep(0.2)
+        since = now()
+        button(0x2)
+        for step in range(1, 11):
+            time.sleep(0.03)
+            user32.SetCursorPos(x + step * 6, y + step * 3)
+        time.sleep(0.05)
+        button(0x4)
+        time.sleep(0.5)
+        drag = [(e["x"], e["y"], e["mask"]) for e in events_since(args, since, ("pointer",))]
+        duplicates = sum(1 for a, b in zip(drag, drag[1:]) if a == b)
+        held = [m for _, _, m in drag[1:-1]]
+        app.run.record("mouse", "left-drag", bool(drag) and drag[0][2] == 1 and drag[-1][2] == 0
+                       and all(m == 1 for m in held) and duplicates == 0 and len(drag) >= 6,
+                       events=len(drag), duplicates=duplicates, first=drag[:1], last=drag[-1:])
 
 
-def reenter_pointer(app: App) -> None:
-    """Leave the remote desktop and come back (the RealVNC clipboard sync point)."""
+def reenter_pointer(app: App) -> float:
+    """Leave the remote desktop and come back (the RealVNC clipboard sync point).
+    Returns the perf_counter stamp of the move back in (what RealVNC is timed from)."""
     if app.os_input:
         x, y, w, h = app.canvas_rect_screen()
         user32.SetCursorPos(x + w + 40, y + h // 2)
         time.sleep(0.3)
+        entered = now()
         user32.SetCursorPos(x + w // 2, y + h // 2)
-        return
+        return entered
     app.move_viewport(2, 2)
     time.sleep(0.3)
+    entered = now()
     app.move_canvas(0, 0)
+    return entered
 
 
 def scenario_menu_key(app: App, args) -> None:
@@ -268,6 +307,8 @@ def session_info(app: App) -> dict:
 
 def scenario_clipboard(app: App, args) -> None:
     """VNC-CLIP-001-A1: connect / focus / copy / remote-copy timing."""
+    # The QA window must be in front, or the cursor re-enters whatever covers it.
+    app.focus_canvas()
     conn = current_conn(args)
     events = [e for e in events_since(args, 0, ("cut_text", "ext_clipboard")) if e["conn"] == conn]
     provided = [e for e in events if e["type"] == "cut_text" or e.get("action") == "provide"]
@@ -275,12 +316,26 @@ def scenario_clipboard(app: App, args) -> None:
     # A local change reaches the server when the pointer re-enters the desktop.
     text = f"local-{int(time.time())}"
     set_local_clipboard(text)
-    since = now()
-    reenter_pointer(app)
+    since = reenter_pointer(app)
     events = wait_events(args, since, lambda ev: any(text in (e.get("text") or "") for e in ev), 5)
     hit = next((e for e in events if text in (e.get("text") or "")), None)
     app.run.record("clipboard", "pointer-enter-sends-local-change", hit is not None,
                    after_ms=round((hit["t"] - since) * 1000) if hit else None, via=hit and hit["type"])
+    # ... and when the window gets focus back (RealVNC: sent on focus return).
+    if app.os_input:
+        from vnc_native import bring_to_front
+
+        bring_to_front(user32.FindWindowW("Shell_TrayWnd", None))
+        time.sleep(0.5)
+        away = not app.ours_in_front()
+        text = f"focus-{int(time.time())}"
+        set_local_clipboard(text)
+        since = now()
+        app.activate()
+        events = wait_events(args, since, lambda ev: any(text in (e.get("text") or "") for e in ev), 5)
+        hit = next((e for e in events if text in (e.get("text") or "")), None)
+        app.run.record("clipboard", "focus-return-sends-local-change", away and hit is not None, left_window=away,
+                       after_ms=round((hit["t"] - since) * 1000) if hit else None, via=hit and hit["type"])
     # Server clipboard lands locally and is not echoed back (grace time).
     remote = f"remote-{int(time.time())}"
     since = now()
@@ -313,10 +368,11 @@ def scenario_ext_clipboard(app: App, args) -> None:
     """VNC-CLIP-001-A2: ExtendedClipboard with Chinese text both ways."""
     text = "中文剪贴板 ✓"
     app.session.install_console_hook()
+    # The QA window must be in front, or the cursor re-enters whatever covers it.
+    app.focus_canvas()
     set_local_clipboard(text)
     readback = get_local_clipboard()
-    since = now()
-    reenter_pointer(app)
+    since = reenter_pointer(app)
     events = wait_events(args, since, lambda ev: any(e.get("action") == "provide" for e in ev), 6)
     provided = next((e for e in events if e.get("action") == "provide"), None)
     notify = [e for e in events if e.get("action") == "notify"]
@@ -333,6 +389,22 @@ def scenario_ext_clipboard(app: App, args) -> None:
             break
         time.sleep(0.3)
     app.run.record("ext-clipboard", "server-to-client", got == remote, local=got)
+    if app.os_input:
+        # Rich text: Ctrl+V on the desktop provides HTML next to the text.
+        subprocess.run(["powershell.exe", "-NoProfile", "-Command", "Set-Clipboard -Value $env:QA_CLIP -AsHtml"],
+                       env={**__import__("os").environ, "QA_CLIP": "<b>粗体</b> 富文本"}, check=True, timeout=30)
+        time.sleep(1.2)  # past the server clipboard grace time
+        app.focus_canvas()
+        since = now()
+        chord(0x11, 0x56)
+        # The remote V follows the provide after PASTE_KEY_DELAY_MS.
+        events = wait_events(args, since, lambda ev: any(e.get("action") == "provide" for e in ev)
+                             and (True, 0x76) in keys(ev), 6)
+        provided = next((e for e in events if e.get("action") == "provide"), None)
+        typed = [k for k in keys(events_since(args, since, ("key",)))]
+        app.run.record("ext-clipboard", "rich-text-paste", bool(provided) and bool(provided["formats"] & 0x4)
+                       and (True, 0x76) in typed, formats=provided and provided["formats"],
+                       text=provided and provided.get("text"), keys=[[d, hex(k)] for d, k in typed])
 
 
 def wait_connected(app: App, timeout: float) -> tuple[bool, int]:
@@ -448,29 +520,59 @@ def scenario_stop(app: App, args) -> None:
     wait_connected(app, 20)
 
 
+def native_window_at(x: int, y: int) -> str:
+    import ctypes
+    from ctypes import wintypes
+
+    user32.WindowFromPoint.restype = wintypes.HWND
+    user32.WindowFromPoint.argtypes = [wintypes.POINT]
+    buf = ctypes.create_unicode_buffer(128)
+    user32.GetClassNameW(user32.WindowFromPoint(wintypes.POINT(x, y)), buf, 128)
+    return buf.value
+
+
 def scenario_fullscreen(app: App, args) -> None:
     """VNC-VIEW-002-A1/A2: screen-level full screen, Esc to the remote, toolbar."""
+    from vnc_native import window_of_pid
+
+    hwnd = window_of_pid(app.pid)
+    # Start from a maximized window: leaving full screen must bring it back.
+    if not user32.IsZoomed(hwnd):
+        app.click_testid("window-max")
+        time.sleep(1.0)
+    was_maximized = bool(user32.IsZoomed(hwnd))
     app.click_testid("vnc-fullscreen")
     app.wait_js("document.querySelector('[data-testid=\"vnc-panel\"]').dataset.vncFullscreen === 'true'", timeout=5)
     time.sleep(1.5)
     screen_w = user32.GetSystemMetrics(0)
     size = app.js("return [window.innerWidth * devicePixelRatio, window.innerHeight * devicePixelRatio];")
     app.screenshot("fullscreen")
-    app.run.record("fullscreen", "covers-screen", abs(size[0] - screen_w) <= 2, viewport=size, screen_width=screen_w)
+    app.run.record("fullscreen", "covers-screen", abs(size[0] - screen_w) <= 2, viewport=size, screen_width=screen_w,
+                   started_maximized=was_maximized)
+    # Nothing native may sit over the WebView at the top edge (Tauri's resize
+    # border window would take the pointer there).
+    edge = {y: native_window_at(screen_w // 2, y) for y in (0, 1, 2, 3, 6)}
+    app.run.record("fullscreen", "top-edge-reaches-webview",
+                   all(name == "Chrome_RenderWidgetHostHWND" for name in edge.values()), windows=edge)
     app.focus_canvas()
     since = now()
-    app.key("Escape")
+    via = press(app, VK_ESCAPE, "Escape")
     time.sleep(0.6)
     still = app.dataset("vncFullscreen") == "true"
     got = keys(events_since(args, since, ("key",)))
-    app.run.record("fullscreen", "esc-goes-to-remote", still and (True, 0xff1b) in got, keys=[[d, hex(k)] for d, k in got])
+    app.run.record("fullscreen", "esc-goes-to-remote", still and got == [(True, 0xff1b), (False, 0xff1b)],
+                   keys=[[d, hex(k)] for d, k in got], input=via)
     since = now()
-    app.key("F8")
+    press(app, VK_F8, "F8")
     menu = wait_overlay(app, "vnc-menu-send-cad", 3)
-    app.key("Escape")
+    press(app, VK_ESCAPE, "Escape")
     time.sleep(0.4)
-    f8_remote = [k for k in keys(events_since(args, since, ("key",))) if k[1] == 0xffc5]
-    app.run.record("fullscreen", "f8-menu", menu and not f8_remote)
+    closed = not app.exists("vnc-menu-send-cad")
+    focus = app.js("return document.activeElement?.dataset?.testid ?? document.activeElement?.tagName;")
+    remote = keys(events_since(args, since, ("key",)))
+    app.run.record("fullscreen", "f8-menu", menu and closed and not remote and focus == "vnc-canvas",
+                   menu_opened=menu, esc_closed=closed, focus_after=focus, remote_keys=[[d, hex(k)] for d, k in remote],
+                   input=via)
     # Toolbar: top edge shows it, leaving hides it after ~1.5 s.
     view_w = app.js("return window.innerWidth;")
     top_chain = app.js(
@@ -507,36 +609,105 @@ def scenario_fullscreen(app: App, args) -> None:
     app.run.record("fullscreen", "toolbar-autohide", shown is not None and hidden_after is not None,
                    show_after_s=round(shown, 2) if shown is not None else None, top_edge_element=top_chain,
                    hide_after_s=round(hidden_after, 2) if hidden_after else None)
+    if app.os_input:
+        # Same screen-pixel method as vnc_realvnc_probe.py fullscreen-toolbar.
+        from vnc_native import toolbar_timing, toolbar_zones
+
+        box = (screen_w // 2 - 200, 0, screen_w // 2 + 200, 50)
+        for attempt in range(3):
+            timing = toolbar_timing(box, enter=(screen_w // 2, 0), leave=(screen_w // 2, 400))
+            app.run.record("fullscreen", f"toolbar-pixels-{attempt}", timing["show_start_s"] is not None,
+                           **{k: v for k, v in timing.items() if not k.endswith("_samples")})
+        zones = toolbar_zones(box, screen_w // 2)
+        app.run.record("fullscreen", "toolbar-zones", zones["starts_hiding_at_y"] is not None, **zones)
     app.click_testid("vnc-fs-exit")
     app.wait_js("document.querySelector('[data-testid=\"vnc-panel\"]').dataset.vncFullscreen === 'false'", timeout=5)
     time.sleep(1.0)
     size = app.js("return [window.innerWidth * devicePixelRatio, window.innerHeight * devicePixelRatio];")
-    app.run.record("fullscreen", "exit-restores-window", True, viewport=size)
+    maximized = bool(user32.IsZoomed(hwnd))
+    resizable = bool(user32.GetWindowLongW(hwnd, -16) & 0x00040000)  # WS_THICKFRAME
+    app.run.record("fullscreen", "exit-restores-window", maximized == was_maximized and resizable, viewport=size,
+                   maximized=maximized, resizable=resizable)
+    if maximized:
+        app.click_testid("window-max")
+        time.sleep(0.8)
+
+
+SPECIAL_KEY_PROBES = (
+    ("win", lambda: tap(VK_LWIN), [(True, 0xffeb), (False, 0xffeb)]),
+    ("alt-tab", lambda: chord(VK_MENU, VK_TAB), [(True, 0xffe9), (True, 0xff09), (False, 0xff09), (False, 0xffe9)]),
+    ("alt-esc", lambda: chord(VK_MENU, VK_ESCAPE), [(True, 0xffe9), (True, 0xff1b), (False, 0xff1b), (False, 0xffe9)]),
+    ("ctrl-esc", lambda: chord(0x11, VK_ESCAPE), [(True, 0xffe3), (True, 0xff1b), (False, 0xff1b), (False, 0xffe3)]),
+    ("prtscn", lambda: tap(VK_SNAPSHOT), [(True, 0xff61), (False, 0xff61)]),
+)
+
+
+def hook_status(app: App) -> dict:
+    """Panel capture state plus the backend hook counters (vnc_special_key_capture_status)."""
+    app.js("window.__qaHook = null; window.__TAURI_INTERNALS__.invoke('vnc_special_key_capture_status')"
+           ".then(s => { window.__qaHook = s; }, e => { window.__qaHook = {error: String(e)}; }); return true;")
+    time.sleep(0.2)
+    status = app.js("return window.__qaHook;") or {}
+    status["panel"] = app.dataset("vncSpecialKeys")
+    return status
+
+
+def _special_keys(app: App, args, scenario: str, expect_remote: bool) -> None:
+    for label, action, want in SPECIAL_KEY_PROBES:
+        app.focus_canvas()
+        time.sleep(0.4)
+        if not app.ours_in_front():
+            app.run.record(scenario, label, False, reason="QA window not in front; key not sent")
+            continue
+        before = hook_status(app)
+        since = now()
+        action()
+        wait_events(args, since, lambda ev: len(keys(ev)) >= len(want), 2)
+        time.sleep(0.8)
+        got = keys(events_since(args, since, ("key",)))
+        front = app.ours_in_front()
+        local = "" if front else foreground_image()
+        after = hook_status(app) if front else {}
+        ok = (got == want and front) if expect_remote else True
+        app.run.record(scenario, label, ok, got=[[d, hex(k)] for d, k in got], foreground_ours=front,
+                       local_surface=local or None, remote_matches=got == want, hook_before=before,
+                       intercepted=(after.get("intercepted", 0) - before.get("intercepted", 0)) if after else None)
+        if not front:
+            dismiss_shell_surface()
+            time.sleep(0.3)
+            app.activate()
+        time.sleep(0.4)
 
 
 def scenario_special_keys(app: App, args) -> None:
-    """VNC-INPUT-003-A1: Win, Alt+Tab and PrtScn go to the remote (Windows hook)."""
+    """VNC-INPUT-003-A1: Win, Alt+Tab, Alt+Esc, Ctrl+Esc and PrtScn go to the remote (Windows hook on)."""
     if not app.os_input:
         app.run.record("special-keys", "unrun", False, reason="no interactive desktop: the WH_KEYBOARD_LL hook needs real OS input")
         return
-    app.focus_canvas()
+    _special_keys(app, args, "special-keys", expect_remote=True)
+
+
+def set_pass_special_keys(app: App, enabled: bool) -> None:
+    open_menu(app)
+    menu_pick(app, None, "vnc-menu-properties")
+    app.wait_js("!!document.querySelector('[data-testid=\"vnc-properties\"]')", timeout=5)
+    app.set_value("vnc-prop-special-keys", enabled)
+    app.click_testid("vnc-prop-ok")
+    app.wait_js("!document.querySelector('[data-testid=\"vnc-properties\"]')", timeout=5)
     time.sleep(0.5)
-    for label, action, want in (
-        ("win", lambda: tap(VK_LWIN), [(True, 0xffeb), (False, 0xffeb)]),
-        ("alt-tab", lambda: chord(VK_MENU, VK_TAB), [(True, 0xffe9), (True, 0xff09), (False, 0xff09), (False, 0xffe9)]),
-        ("prtscn", lambda: tap(VK_SNAPSHOT), [(True, 0xff61), (False, 0xff61)]),
-    ):
-        since = now()
-        action()
-        events = wait_events(args, since, lambda ev: len(keys(ev)) >= len(want), 3)
-        got = keys(events)
-        front = app.ours_in_front()
-        app.run.record("special-keys", label, got == want and front, got=[[d, hex(k)] for d, k in got], foreground_ours=front)
-        if not front:
-            app.key("Escape")
-            app.activate()
-            app.focus_canvas()
-        time.sleep(0.4)
+
+
+def scenario_special_keys_off(app: App, args) -> None:
+    """VNC-INPUT-003-A1: with "Pass special keys" off the same keys stay local; records where each went."""
+    if not app.os_input:
+        app.run.record("special-keys-off", "unrun", False, reason="no interactive desktop")
+        return
+    set_pass_special_keys(app, False)
+    try:
+        _special_keys(app, args, "special-keys-off", expect_remote=False)
+    finally:
+        app.activate()
+        set_pass_special_keys(app, True)
 
 
 def scenario_pointer_latency(app: App, args) -> None:
@@ -554,7 +725,8 @@ def scenario_pointer_latency(app: App, args) -> None:
         x, y, w, h = app.canvas_rect_screen()
         result = subprocess.run(
             [sys.executable, str(script), "--up-log", args.up_log, "--x", str(x + w // 3), "--y", str(y + h // 3),
-             "--moves", "40", "--interval-ms", "200", "--size", str(args.pointer_size), "--label", f"taomni-{run}"],
+             "--moves", "40", "--interval-ms", "200", "--size", str(args.pointer_size), "--label", f"taomni-{run}",
+             "--dump", str(app.run.report / "pointer-latency.jsonl")],
             capture_output=True, text=True, timeout=120,
         )
         line = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else result.stderr[-300:]
@@ -620,10 +792,13 @@ def scenario_layouts(app: App, args) -> None:
     from vnc_layouts import PROBES, layout_for
     from vnc_native import window_of_pid
 
+    from vnc_layouts import warm_up
+
     for label, klid, action, want in PROBES:
         app.focus_canvas()
         time.sleep(0.3)
         with layout_for(window_of_pid(app.pid), klid) as layout:
+            warm_up()
             since = now()
             action()
             events = wait_events(args, since, lambda ev: len(keys(ev)) >= len(want), 3)

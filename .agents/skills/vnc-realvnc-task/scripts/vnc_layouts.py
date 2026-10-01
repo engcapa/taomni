@@ -25,7 +25,7 @@ user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, w
 
 WM_INPUTLANGCHANGEREQUEST = 0x0050
 KLF_NOTELLSHELL = 0x00000080
-VK_RMENU, VK_OEM_5, VK_Q, VK_E, VK_A = 0xA5, 0xDC, 0x51, 0x45, 0x41
+VK_RMENU, VK_OEM_5, VK_Q, VK_E, VK_A, VK_LSHIFT = 0xA5, 0xDC, 0x51, 0x45, 0x41, 0xA0
 
 GERMAN = "00000407"
 CHINESE_PINYIN = "00000804"
@@ -90,6 +90,15 @@ def dead_circumflex_e() -> None:
 
 def plain_a() -> None:
     send_inputs(key_input(VK_A), key_input(VK_A, up=True))
+
+
+def warm_up() -> None:
+    """One Shift tap after switching layouts. Chromium rebuilds its key map on
+    the first key in a new layout and drops a dead key pressed in that same
+    event (measured: the first ^+e after a switch gives "e", every later one
+    "ê"); a user who switched layouts has always typed something since."""
+    send_inputs(key_input(VK_LSHIFT), key_input(VK_LSHIFT, up=True))
+    time.sleep(0.3)
 
 
 PROBES = [

@@ -60,25 +60,226 @@ class INPUT(ctypes.Structure):
     _fields_ = [("type", wintypes.DWORD), ("u", _INPUTUNION)]
 
 
-def send_inputs(*inputs: INPUT) -> None:
+class ForegroundGuardError(RuntimeError):
+    """Synthetic OS input refused: it would land outside the windows under test."""
+
+
+# Processes allowed to receive synthetic OS input (the QA app, the RealVNC
+# session). SendInput goes to whatever window is in front, and the user's own
+# Taomni may be there; with a non-empty set every key and button is checked.
+TARGET_PIDS: set[int] = set()
+GA_ROOT = 2
+
+
+def _window_pid(hwnd: int) -> int:
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return pid.value
+
+
+def guard_keyboard() -> None:
+    if TARGET_PIDS and _window_pid(user32.GetForegroundWindow()) not in TARGET_PIDS:
+        raise ForegroundGuardError(f"foreground pid {_window_pid(user32.GetForegroundWindow())} is not a test target")
+
+
+def guard_pointer() -> None:
+    """The window under the cursor (its top-level root) must be a test target."""
+    if not TARGET_PIDS:
+        return
+    point = wintypes.POINT()
+    user32.GetCursorPos(ctypes.byref(point))
+    user32.WindowFromPoint.restype = wintypes.HWND
+    user32.WindowFromPoint.argtypes = [wintypes.POINT]
+    user32.GetAncestor.restype = wintypes.HWND
+    user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+    root = user32.GetAncestor(user32.WindowFromPoint(point), GA_ROOT) or 0
+    if _window_pid(root) not in TARGET_PIDS:
+        raise ForegroundGuardError(f"window under ({point.x},{point.y}) belongs to pid {_window_pid(root)}")
+
+
+def send_inputs(*inputs: INPUT, unguarded: bool = False) -> None:
+    if not unguarded:
+        if any(item.type == INPUT_KEYBOARD for item in inputs):
+            guard_keyboard()
+        if any(item.type == INPUT_MOUSE for item in inputs):
+            guard_pointer()
     array = (INPUT * len(inputs))(*inputs)
     user32.SendInput(len(inputs), array, ctypes.sizeof(INPUT))
 
 
+# A real keyboard always reports a scan code; WebViews derive
+# KeyboardEvent.code from it. Keys whose MapVirtualKey answer is not the
+# physical key are fixed here (set 1 codes, 0xE0 = extended).
+SCAN_OVERRIDES = {0x2C: 0xE037, 0x5B: 0xE05B, 0x5C: 0xE05C, 0xA5: 0xE038, 0xA3: 0xE01D}
+MAPVK_VK_TO_VSC_EX = 4
+
+
+def keyboard_layout_in_front() -> int:
+    """HKL of the thread owning keyboard focus in the foreground window."""
+    class GUITHREADINFO(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.DWORD), ("flags", wintypes.DWORD), ("hwndActive", wintypes.HWND),
+                    ("hwndFocus", wintypes.HWND), ("hwndCapture", wintypes.HWND), ("hwndMenuOwner", wintypes.HWND),
+                    ("hwndMoveSize", wintypes.HWND), ("hwndCaret", wintypes.HWND), ("rcCaret", wintypes.RECT)]
+
+    info = GUITHREADINFO(cbSize=ctypes.sizeof(GUITHREADINFO))
+    user32.GetGUIThreadInfo(0, ctypes.byref(info))
+    hwnd = info.hwndFocus or user32.GetForegroundWindow()
+    user32.GetKeyboardLayout.restype = wintypes.HANDLE
+    return user32.GetKeyboardLayout(user32.GetWindowThreadProcessId(hwnd, None)) or 0
+
+
+def physical_scan(vk: int) -> int:
+    if vk in SCAN_OVERRIDES:
+        return SCAN_OVERRIDES[vk]
+    user32.MapVirtualKeyExW.restype = wintypes.UINT
+    user32.MapVirtualKeyExW.argtypes = [wintypes.UINT, wintypes.UINT, wintypes.HANDLE]
+    return user32.MapVirtualKeyExW(vk, MAPVK_VK_TO_VSC_EX, keyboard_layout_in_front())
+
+
 def key_input(vk: int = 0, scan: int = 0, up: bool = False, extended: bool = False) -> INPUT:
+    if vk and not scan:
+        full = physical_scan(vk)
+        scan, extended = full & 0xFF, extended or (full >> 8) == 0xE0
     flags = (KEYEVENTF_KEYUP if up else 0) | (KEYEVENTF_EXTENDEDKEY if extended else 0)
     if scan and not vk:
         flags |= KEYEVENTF_SCANCODE
     return INPUT(INPUT_KEYBOARD, _INPUTUNION(ki=KEYBDINPUT(vk, scan, flags, 0, 0)))
 
 
-def tap(vk: int, extended: bool = False) -> None:
-    send_inputs(key_input(vk, extended=extended), key_input(vk, up=True, extended=extended))
+def tap(vk: int, extended: bool = False, unguarded: bool = False) -> None:
+    send_inputs(key_input(vk, extended=extended), unguarded=unguarded)
+    time.sleep(0.03)
+    send_inputs(key_input(vk, up=True, extended=extended), unguarded=unguarded)
 
 
-def chord(*vks: int) -> None:
-    """Press the keys in order and release them in reverse."""
-    send_inputs(*[key_input(vk) for vk in vks], *[key_input(vk, up=True) for vk in reversed(vks)])
+def chord(*vks: int, gap: float = 0.04) -> None:
+    """Press the keys in order and release them in reverse, `gap` seconds apart
+    (a quick human chord; one batched SendInput is not a realistic keyboard)."""
+    for vk in vks:
+        send_inputs(key_input(vk))
+        time.sleep(gap)
+    for vk in reversed(vks):
+        send_inputs(key_input(vk, up=True))
+        time.sleep(gap)
+
+
+# Shell surfaces a system key can open when it is not passed through; Esc
+# dismisses them. Anything else in front is left alone.
+SHELL_IMAGES = {"startmenuexperiencehost.exe", "searchhost.exe", "shellexperiencehost.exe", "searchapp.exe",
+                "screenclippinghost.exe", "snippingtool.exe", "explorer.exe", "shellhost.exe"}
+
+
+def foreground_image() -> str:
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(0x1000, False, _window_pid(user32.GetForegroundWindow()))
+    if not handle:
+        return ""
+    try:
+        buf = ctypes.create_unicode_buffer(1024)
+        size = wintypes.DWORD(1024)
+        kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size))
+        return buf.value.rsplit("\\", 1)[-1].lower()
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def changed_pixels(image, baseline) -> int:
+    """Pixels whose largest RGB channel moved by more than 24 (a dark toolbar on
+    a dark background differs in its icons only, so luminance is not enough)."""
+    from PIL import ImageChops
+
+    red, green, blue = ImageChops.difference(image.convert("RGB"), baseline).split()
+    peak = ImageChops.lighter(red, ImageChops.lighter(green, blue))
+    return peak.point(lambda v: 255 if v > 24 else 0).histogram()[255]
+
+
+def region_changes(box: tuple[int, int, int, int], baseline, seconds: float, interval: float = 0.015) -> list[tuple[float, int]]:
+    """(seconds, changed pixels vs baseline) samples of a screen region, used to
+    time toolbars of both viewers with one pixel method."""
+    from PIL import ImageGrab
+
+    samples = []
+    start = time.perf_counter()
+    while (elapsed := time.perf_counter() - start) < seconds:
+        samples.append((round(elapsed, 3), changed_pixels(ImageGrab.grab(bbox=box), baseline)))
+        time.sleep(interval)
+    return samples
+
+
+def toolbar_timing(box: tuple[int, int, int, int], enter: tuple[int, int], leave: tuple[int, int],
+                   show_s: float = 2.5, hide_s: float = 5.0, floor: int = 100) -> dict:
+    """Cursor to `enter` (top edge) and later to `leave`; returns when the region
+    started / finished changing (show) and started / finished restoring (hide).
+    Thresholds are relative to the fully shown toolbar (10 % / 90 %)."""
+    from PIL import ImageGrab
+
+    user32.SetCursorPos(*leave)
+    time.sleep(2.0)
+    baseline = ImageGrab.grab(bbox=box).convert("RGB")
+    user32.SetCursorPos(*enter)
+    shown = region_changes(box, baseline, show_s)
+    full = max((count for _, count in shown), default=0)
+    user32.SetCursorPos(*leave)
+    hidden = region_changes(box, baseline, hide_s)
+    visible = full > floor
+    low, high = max(floor, 0.1 * full), 0.9 * full
+
+    def first(samples, predicate):
+        return next((t for t, count in samples if predicate(count)), None)
+
+    return {
+        "changed_px_max": full,
+        "show_start_s": first(shown, lambda c: c > low) if visible else None,
+        "show_done_s": first(shown, lambda c: c >= high) if visible else None,
+        "hide_start_s": first(hidden, lambda c: c < high) if visible else None,
+        "hide_done_s": first(hidden, lambda c: c <= low) if visible else None,
+        "show_samples": shown[::4][:40],
+        "hide_samples": hidden[::6][:60],
+    }
+
+
+def toolbar_zones(box: tuple[int, int, int, int], x: int, rest_y: int = 400, floor: int = 100) -> dict:
+    """Which cursor heights reveal the toolbar, and how far below the top the
+    cursor gets before it starts to hide when moving down 1 px per 25 ms."""
+    from PIL import ImageGrab
+
+    def changed(baseline) -> int:
+        return changed_pixels(ImageGrab.grab(bbox=box), baseline)
+
+    user32.SetCursorPos(x, rest_y)
+    time.sleep(1.5)
+    baseline = ImageGrab.grab(bbox=box).convert("RGB")
+    user32.SetCursorPos(x, 0)
+    time.sleep(0.8)
+    full = changed(baseline)
+    threshold = max(floor, 0.5 * full)
+    reveals = {}
+    for y in (0, 1, 2, 3, 4, 6, 10):
+        user32.SetCursorPos(x, rest_y)
+        time.sleep(0.8)
+        user32.SetCursorPos(x, y)
+        time.sleep(0.7)
+        reveals[y] = changed(baseline) > threshold
+    user32.SetCursorPos(x, 0)
+    time.sleep(0.8)
+    hide_at_y = None
+    for y in range(0, 160):
+        user32.SetCursorPos(x, y)
+        time.sleep(0.025)
+        if full > floor and changed(baseline) < 0.9 * full:
+            hide_at_y = y
+            break
+    user32.SetCursorPos(x, rest_y)
+    return {"reveals_at_y": reveals, "changed_px_full": full, "starts_hiding_at_y": hide_at_y}
+
+
+def dismiss_shell_surface() -> str:
+    """Press Esc only when a shell surface (Start, task view, snipping) is in front."""
+    image = foreground_image()
+    if image in SHELL_IMAGES:
+        tap(0x1B, unguarded=True)
+        time.sleep(0.4)
+    return image
 
 
 def mouse_click(x: int, y: int, button: str = "left") -> None:
@@ -116,7 +317,11 @@ def bring_to_front(hwnd: int) -> bool:
         if attempt == 1:
             rect = wintypes.RECT()
             user32.GetWindowRect(hwnd, ctypes.byref(rect))
-            mouse_click(rect.left + (rect.right - rect.left) // 2, rect.top + 12)
+            try:
+                # Only when that title bar point really is this window.
+                mouse_click(rect.left + (rect.right - rect.left) // 2, rect.top + 12)
+            except ForegroundGuardError:
+                pass
             time.sleep(0.3)
     return user32.GetForegroundWindow() == hwnd
 
@@ -203,6 +408,9 @@ class App:
         self.session = session
         self.run = run
         self.pid = find_process(RELEASE_BINARY)
+        if not self.pid:
+            raise RuntimeError(f"QA app {RELEASE_BINARY} is not running")
+        TARGET_PIDS.add(self.pid)
 
     # ── page probes ───────────────────────────────────────────────────
     def js(self, body: str):
