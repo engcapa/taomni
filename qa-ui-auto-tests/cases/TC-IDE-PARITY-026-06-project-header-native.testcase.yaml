@@ -103,10 +103,10 @@ steps:
     selector: '[data-testid="code-workspace-tree-filter"]'
     value: notes
 - wait_for:
-    selector: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-    state: detached
+    selector: '[data-testid="code-workspace-flat-file"][data-path="notes.txt"]'
     timeout_sec: 15
-- assert_visible: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
+- assert_not_visible: '[data-testid="code-workspace-flat-file"][data-path="README.md"]'
+- assert_not_visible: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
 - press:
     key: Escape
     selector: '[data-testid="code-workspace-tree-filter"]'
@@ -196,24 +196,27 @@ verification:
     actions:
     - 37
     - 39
-    - 42
+    - 43
     checkpoints:
     - step: 38
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-speed-search\"]"}'
     - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]", "state": "detached", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-flat-file\"][data-path=\"notes.txt\"]", "timeout_sec": 15}}'
     - step: 41
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"notes.txt\"]"}'
-    - step: 43
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-speed-search\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-flat-file\"][data-path=\"README.md\"]"}'
+    - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
     - step: 44
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-speed-search\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 45
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]", "timeout_sec": 15}}'
     results:
     - 38
     - 40
     - 41
-    - 43
+    - 42
     - 44
+    - 45
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

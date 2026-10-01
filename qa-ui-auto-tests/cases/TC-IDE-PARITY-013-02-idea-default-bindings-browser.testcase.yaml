@@ -70,9 +70,9 @@ steps:
     expression: document.activeElement?.classList?.contains("cm-content") === true
     expect_truthy: true
 - press: Control+Shift+F12
-- assert_not_visible: '[data-testid="code-workspace-tree-add-folder"]'
+- assert_not_visible: '[data-testid="code-workspace-tree-new"]'
 - press: Control+Shift+F12
-- assert_visible: '[data-testid="code-workspace-tree-add-folder"]'
+- assert_visible: '[data-testid="code-workspace-tree-new"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Alt+7
 - assert_visible: '[data-testid="code-workspace-tool-window-structure"]'
@@ -131,9 +131,9 @@ verification:
     - 35
     checkpoints:
     - step: 31
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-add-folder\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-new\"]"}'
     - step: 33
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-add-folder\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-new\"]"}'
     - step: 36
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-window-structure\"]"}'
     results:

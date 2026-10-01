@@ -70,6 +70,7 @@ steps:
     timeout_sec: 5
 - press: Control+e
 - wait_for: '[data-testid="code-workspace-recent-files"]'
+- wait_for: '[data-testid="code-workspace-recent-files"] input[aria-label="Recent files"]:focus'
 - press: ArrowLeft
 - assert_attribute:
     selector: '[data-testid="code-workspace-recent-files-tool-window-project"]'
@@ -137,32 +138,35 @@ verification:
     requirement: A4：Recent Files 中 Left 进入工具窗列、Down 在列内移动、Right 返回文件列，Enter 激活所选工具窗。
     actions:
     - 29
+    - 32
+    - 34
+    - 36
+    - 38
+    - 39
+    - 40
+    checkpoints:
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-recent-files\"] input[aria-label=\"Recent files\"]:focus"}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-recent-files-tool-window-project\"]", "name": "data-selected", "equals": "true"}}'
+    - step: 35
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-recent-files-tool-window-problems\"]", "name": "data-selected", "equals": "true"}}'
+    - step: 37
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-recent-files-tool-windows\"] [data-selected=\"true\"]", "equal": 0}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Problems"}}'
+    results:
     - 31
     - 33
     - 35
     - 37
-    - 38
-    - 39
-    checkpoints:
-    - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-recent-files-tool-window-project\"]", "name": "data-selected", "equals": "true"}}'
-    - step: 34
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-recent-files-tool-window-problems\"]", "name": "data-selected", "equals": "true"}}'
-    - step: 36
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-recent-files-tool-windows\"] [data-selected=\"true\"]", "equal": 0}}'
-    - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 41
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
-    - step: 42
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Problems"}}'
-    results:
-    - 32
-    - 34
-    - 36
-    - 40
     - 41
     - 42
+    - 43
   visual:
   - check: 弹层键盘选中态颜色与 IDEA 对照。
     method: manual

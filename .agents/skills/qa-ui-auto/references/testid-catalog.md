@@ -409,6 +409,7 @@
 - `[data-testid="search-everywhere-tab-files"]` — interactive [optional] — F25.5.search-everywhere-tab
   ↳ `[data-testid="search-everywhere-tab-classes"]` — alias
   ↳ `[data-testid="search-everywhere-tab-symbols"]` — alias
+  ↳ `[data-testid="search-everywhere-tab-actions"]` — alias
 - `[data-testid="code-workspace-tool-window-header"]` — display [optional] — F25.5.tool-window-header
 - `[data-testid="code-workspace-tool-window-title"]` — display [optional] — F25.5.tool-window-title
 - `[data-testid="code-workspace-tool-window-hide"]` — interactive [optional] — F25.5.tool-window-hide

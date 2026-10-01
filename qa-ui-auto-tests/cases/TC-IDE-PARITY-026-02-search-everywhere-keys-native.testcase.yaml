@@ -1,6 +1,6 @@
 id: TC-IDE-PARITY-026-02-search-everywhere-keys-native
 title: Native Search Everywhere tab and group keys match IDEA and reopen empty
-description: 'ED-PARITY-026 A1 native case in the isolated QA app: Search Everywhere opened with Ctrl+Shift+N switches tabs with the platform NextTab/PreviousTab chords (Alt+Right/Alt+Left; macOS Ctrl+Right/Ctrl+Left), Ctrl+Tab / Ctrl+Shift+Tab and Tab / Shift+Tab, jumps to the last/first file result with PageDown/PageUp and Ctrl+Down/Ctrl+Up, and reopens with an empty query.
+description: 'ED-PARITY-026 A1 native case in the isolated QA app: Search Everywhere opened with Ctrl+Shift+N switches tabs with the platform NextTab/PreviousTab chords (Alt+Right/Alt+Left; macOS Ctrl+Right/Ctrl+Left), Ctrl+Tab / Ctrl+Shift+Tab and Tab / Shift+Tab, jumps to the last/first result on the Actions tab with PageDown/PageUp and Ctrl+Down/Ctrl+Up, and reopens with an empty query.
 
   '
 covers:
@@ -78,6 +78,17 @@ steps:
     name: aria-selected
     equals: 'true'
 - screenshot: tc-ide-parity-026-02-files-tab.png
+- press: Tab
+- assert_attribute:
+    selector: '[data-testid="search-everywhere-tab-symbols"]'
+    name: aria-selected
+    equals: 'true'
+- press: Tab
+- assert_attribute:
+    selector: '[data-testid="search-everywhere-tab-actions"]'
+    name: aria-selected
+    equals: 'true'
+- wait_for: '[data-testid="code-workspace-search-everywhere"] [data-index="1"]'
 - eval_readonly:
     expression: document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] [data-index]').length > 1
     expect_truthy: true
@@ -98,10 +109,10 @@ steps:
     expression: document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] [data-index]')[0].getAttribute('data-selected') === 'true'
     expect_truthy: true
 - type:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
     text: zzqq
 - assert_attribute:
-    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
     name: value
     equals: zzqq
 - press: Escape
@@ -111,6 +122,10 @@ steps:
     timeout_sec: 5
 - press: Control+Shift+N
 - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+- assert_attribute:
+    selector: '[data-testid="search-everywhere-tab-files"]'
+    name: aria-selected
+    equals: 'true'
 - eval_readonly:
     expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] input').value === ''
     expect_truthy: true
@@ -155,44 +170,58 @@ verification:
     - 23
     - 25
   - id: R2
-    requirement: A1：PageDown/Ctrl+Down 选中最后一个文件结果、PageUp/Ctrl+Up 回到第一个；输入查询后 Esc 关闭，再次打开时查询为空。
+    requirement: A1：Tab 切到 Actions 后 PageDown/Ctrl+Down 选中最后一个结果、PageUp/Ctrl+Up 回到第一个；输入查询后 Esc 关闭，再次 Ctrl+Shift+N 打开时回到 Files 页签且查询为空。
     actions:
-    - 28
-    - 30
-    - 32
-    - 34
-    - 36
-    - 38
-    - 40
-    checkpoints:
-    - step: 27
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length > 1", "expect_truthy": true}}'
-    - step: 29
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length - 1].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
-    - step: 31
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[0].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
-    - step: 33
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length - 1].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
-    - step: 35
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[0].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
-    - step: 37
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Go to file\"]", "name": "value", "equals": "zzqq"}}'
-    - step: 39
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 41
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
-    - step: 42
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] input'').value === ''''", "expect_truthy": true}}'
-    results:
     - 27
     - 29
-    - 31
     - 33
     - 35
     - 37
     - 39
     - 41
+    - 43
+    - 45
+    checkpoints:
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-actions\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"] [data-index=\"1\"]"}'
+    - step: 32
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length > 1", "expect_truthy": true}}'
+    - step: 34
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length - 1].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+    - step: 36
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[0].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+    - step: 38
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length - 1].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+    - step: 40
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[0].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+    - step: 42
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Search actions\"]", "name": "value", "equals": "zzqq"}}'
+    - step: 44
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 48
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] input'').value === ''''", "expect_truthy": true}}'
+    results:
+    - 28
+    - 30
+    - 31
+    - 32
+    - 34
+    - 36
+    - 38
+    - 40
     - 42
+    - 44
+    - 46
+    - 47
+    - 48
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

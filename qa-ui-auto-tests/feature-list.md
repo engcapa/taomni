@@ -8300,6 +8300,7 @@ controls:
     aliases:
       - '[data-testid="search-everywhere-tab-classes"]'
       - '[data-testid="search-everywhere-tab-symbols"]'
+      - '[data-testid="search-everywhere-tab-actions"]'
   - id: tool-window-header
     selector: '[data-testid="code-workspace-tool-window-header"]'
     kind: display

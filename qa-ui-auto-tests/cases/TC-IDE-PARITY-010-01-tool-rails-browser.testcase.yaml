@@ -97,7 +97,7 @@ steps:
     name: aria-pressed
     equals: 'false'
 - click: '[data-testid="code-workspace-tool-rail-project"]'
-- assert_visible: '[data-testid="code-workspace-tree-add-folder"]'
+- assert_visible: '[data-testid="code-workspace-tree-new"]'
 - click: '[data-testid="code-workspace-bottom-tab-overflow"]'
 - assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-problems"]'
 - click: '[data-testid="code-workspace-bottom-tab-overflow-problems"]'
@@ -188,7 +188,7 @@ verification:
     - step: 39
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "false"}}'
     - step: 41
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-add-folder\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-new\"]"}'
     - step: 43
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-problems\"]"}'
     - step: 46

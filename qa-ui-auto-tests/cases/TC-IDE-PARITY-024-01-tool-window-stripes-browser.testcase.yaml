@@ -78,7 +78,7 @@ steps:
 - wait_for:
     selector: '[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]'
     timeout_sec: 10
-- assert_visible: '[data-testid="code-workspace-tree-add-folder"]'
+- assert_visible: '[data-testid="code-workspace-tree-new"]'
 - right_click: '[data-testid="code-workspace-bottom-tab-terminal"]'
 - click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
 - eval_readonly:
@@ -206,7 +206,7 @@ verification:
     - step: 36
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-left-tool-area\"] [data-testid=\"code-workspace-tool-window-structure\"]", "timeout_sec": 10}}'
     - step: 37
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-add-folder\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-new\"]"}'
     results:
     - 32
     - 33
