@@ -298,7 +298,26 @@ fn capture_loop(
         match capture_region_image(app, display_id, x, y, w, h) {
             Ok(mut frame) => {
                 // Test overlay: draw a moving red dot for visual verification.
+                // On headless Linux CI, the captured frame may be pure black;
+                // generate a synthetic gradient background so the GIF has
+                // visible content regardless of display state.
                 if test_overlay {
+                    // Check if frame is mostly black (empty desktop)
+                    let mut has_content = false;
+                    for px in frame.pixels().step_by(200) {
+                        if px[0] > 10 || px[1] > 10 || px[2] > 10 {
+                            has_content = true;
+                            break;
+                        }
+                    }
+                    if !has_content {
+                        // Synthetic gradient + grid for visual reference
+                        for (gx, gy, pixel) in frame.enumerate_pixels_mut() {
+                            let r = ((gx as f32 / w as f32) * 100.0) as u8;
+                            let g = ((gy as f32 / h as f32) * 100.0) as u8;
+                            *pixel = image::Rgba([r, g, 80, 255]);
+                        }
+                    }
                     let t = frames as f32 / fps as f32;
                     // Move in a circle: center (w/2, h/2), radius min(w,h)/3
                     let cx = w as f32 / 2.0;
