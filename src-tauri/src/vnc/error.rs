@@ -37,6 +37,10 @@ impl VncError {
         let (code, stage, retryable) = if lower.contains("unencrypted connection requires confirmation")
         {
             ("unencrypted-confirmation-required", VncStage::Security, false)
+        } else if lower.starts_with("credentials required:") {
+            // Only the client's own stop (rfb::CREDENTIALS_REQUIRED), never a
+            // server's failure reason.
+            ("credentials-required", VncStage::Authentication, false)
         } else if lower.contains("attempt stopped by the user") {
             ("connection-stopped", VncStage::Runtime, false)
         } else if lower.contains("keepalive") {
@@ -134,6 +138,16 @@ mod tests {
             assert_eq!(error.code, "authentication-failed", "{message}");
             assert!(!error.retryable, "{message}");
         }
+    }
+
+    #[test]
+    fn missing_credentials_ask_without_counting_as_a_failure() {
+        let error = VncError::classify(crate::vnc::rfb::CREDENTIALS_REQUIRED);
+        assert_eq!(error.code, "credentials-required");
+        assert_eq!(error.stage, VncStage::Authentication);
+        assert!(!error.retryable);
+        let reason = VncError::classify("authentication failed: credentials required: retry");
+        assert_eq!(reason.code, "authentication-failed");
     }
 
     #[test]

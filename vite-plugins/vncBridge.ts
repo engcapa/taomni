@@ -192,6 +192,12 @@ export async function connectRfb(
       fail("unencrypted-confirmation-required", "security", false,
         "unencrypted connection requires confirmation");
     }
+    // DEC-VNC-21: without a password, stop before answering the challenge so
+    // the panel can ask for one (RealVNC asks only when the server requires it).
+    if (chosen === 2 && !request.password) {
+      fail("credentials-required", "authentication", false,
+        "credentials required: the server asks for a VNC password");
+    }
     if (minor !== 3) socket.write(Buffer.from([chosen]));
     if (chosen === 2) {
       const challenge = await reader.read(16);

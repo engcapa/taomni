@@ -61,7 +61,7 @@
 ## 5. VNC-SESS-003 连接生命周期
 
 - DEC-VNC-19：未加密警告在认证之前出现（与 RealVNC 一致）：`vnc_connect(allow_unencrypted=false)` 在选定安全类型为未加密（VNCAuth/None/RA2ne）时、发送选择之前返回 `unencrypted-confirmation-required`；前端弹出 “未加密连接” 对话框（继续 / 取消，“不再提示” 写回会话选项 `vncWarnUnencrypted=false`），继续后以 `allow_unencrypted=true` 重连。
-- 认证：保留连接前的 `AuthPrompt`（含保存到 vault）；认证失败时在会话内显示凭据表单（用户名、密码、记住密码、错误原因），提交后重连；取消留在断开状态。
+- 认证：保留连接前的 `AuthPrompt`（含保存到 vault）；认证失败时在会话内显示凭据表单（用户名、密码、记住密码、错误原因），提交后重连；取消留在断开状态。（连接前的 `AuthPrompt` 后由 [DEC-VNC-21](alignment-design.md#vnc-auth-002) 取消：没保存密码时先连接，服务器要求密码时才在会话内询问。）
 - 连接中：遮罩显示阶段与 Stop；`vnc_cancel_connect(attempt_id)` 取消后台握手并关闭套接字。
 - 自动重连（RealVNC `AutoReconnect=True`）：非用户发起、可重试的断线自动重连，退避 1/2/4/8/15 s 持续尝试，遮罩显示 “连接已断开，正在重连（第 n 次）” 与 Stop / 立即重连；认证失败、用户关闭、未加密取消不自动重连。会话选项 `vncAutoReconnect` 可关闭。
 - KeepAlive（RealVNC 30/30 s）：30 s 未收到任何服务器消息发送 1×1 非增量请求；再 30 s 无响应判定断线（`keepalive-timeout`，可重试）。

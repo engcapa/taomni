@@ -181,6 +181,14 @@ describe("connectRfb", () => {
     expect(server.chosen).toBeNull();
   });
 
+  it("asks for credentials without answering the challenge when no password is given", async () => {
+    const server = await serve([2]);
+    const detail = await failure(connectRfb({ host: "127.0.0.1", port: server.port }));
+    expect(detail).toMatchObject({ code: "credentials-required", stage: "authentication", retryable: false });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(server.chosen).toBeNull();
+  });
+
   it("refuses an unauthenticated server unless allow-none is chosen", async () => {
     const server = await serve([1]);
     expect((await failure(connectRfb({ host: "127.0.0.1", port: server.port, securityPolicy: "prefer-encryption" }))).code)

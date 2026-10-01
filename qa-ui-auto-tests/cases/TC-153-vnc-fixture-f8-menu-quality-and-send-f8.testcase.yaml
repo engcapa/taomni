@@ -39,15 +39,17 @@ steps:
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-menu"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-menu"]'
-- wait_for: '[data-testid="auth-prompt"]'
-- fill:
-    selector: '[data-testid="auth-password"]'
-    value: ${env.QA_VNC_PASSWORD}
-- click: '[data-testid="auth-submit"]'
 - wait_for:
     selector: '[data-testid="vnc-unencrypted-continue"]'
     timeout_sec: 20
 - click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-auth-password"]'
+    timeout_sec: 20
+- fill:
+    selector: '[data-testid="vnc-auth-password"]'
+    value: ${env.QA_VNC_PASSWORD}
+- click: '[data-testid="vnc-auth-ok"]'
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
     timeout_sec: 20
@@ -92,7 +94,7 @@ verification:
     - 10
     - 12
     - 14
-    - 15
+    - 16
     - 17
     - 19
     - 20
@@ -104,11 +106,11 @@ verification:
     - step: 11
       expectation: The saved VNC session appears in the session tree.
     - step: 13
-      expectation: Opening the session without a stored password asks for it.
-    - step: 16
-      expectation: The connection stops for the unencrypted-connection warning before any credential is sent.
+      expectation: Opening the session connects without a password prompt and stops for the unencrypted-connection warning.
+    - step: 15
+      expectation: The fixture requires VNCAuth, so the session's authentication form asks for the password.
     - step: 18
-      expectation: The session paints the fixture's 1280x720 framebuffer.
+      expectation: The session paints the fixture's 1280x720 framebuffer without warning again.
     - step: 21
       expectation: F8 on the canvas opens the session menu with the Picture quality entry.
     results:

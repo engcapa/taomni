@@ -3,7 +3,8 @@ title: VNC session logs in to macOS Screen Sharing with ARD and reports it in Se
 description: 'Native macOS check for F9.2 against the real Screen Sharing server of the
   runner (ard_required): a saved VNC session with the macOS account name uses Apple
   Remote Desktop authentication (RFB security type 30), passes the per-attempt
-  unencrypted-connection warning, connects, and Session Information reports ARD
+  unencrypted-connection warning, asks for the password in the session only because
+  ARD needs one (DEC-VNC-21), connects, and Session Information reports ARD
   and the desktop size the Mac announced. The ARD login of a second account makes
   macOS switch the console to that account, so the app''s own (now background)
   session stops painting frames; frame pixels are covered by TC-151. The
@@ -53,15 +54,17 @@ steps:
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-mac-ard"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-mac-ard"]'
-- wait_for: '[data-testid="auth-prompt"]'
-- fill:
-    selector: '[data-testid="auth-password"]'
-    value: ${env.QA_ARD_PASSWORD}
-- click: '[data-testid="auth-submit"]'
 - wait_for:
     selector: '[data-testid="vnc-unencrypted-continue"]'
     timeout_sec: 30
 - click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-auth-password"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vnc-auth-password"]'
+    value: ${env.QA_ARD_PASSWORD}
+- click: '[data-testid="vnc-auth-ok"]'
 - wait_for:
     selector: '[data-testid="vnc-session-menu"]'
     timeout_sec: 120
@@ -81,7 +84,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A VNC session with the macOS account name logs in to Screen Sharing with ARD after the unencrypted-connection confirmation and connects.
+    requirement: A VNC session with the macOS account name and no stored password reaches Screen Sharing, stops for the unencrypted-connection confirmation, asks for the password in the session because ARD needs one, and logs in with ARD.
     actions:
     - 1
     - 2
@@ -95,7 +98,7 @@ verification:
     - 12
     - 14
     - 16
-    - 17
+    - 18
     - 19
     checkpoints:
     - step: 3
@@ -105,13 +108,14 @@ verification:
     - step: 13
       expectation: The saved session appears in the session tree.
     - step: 15
-      expectation: Opening the session asks for the password.
-    - step: 18
-      expectation: Screen Sharing is reached and the connection stops for the unencrypted-connection warning.
+      expectation: Opening the session connects without a password prompt; Screen Sharing is reached and the connection stops for the unencrypted-connection warning.
+    - step: 17
+      expectation: ARD needs a password, so the session's authentication form asks for it.
     - step: 20
-      expectation: The ARD login succeeds and the in-session toolbar of a connected session appears.
+      expectation: The ARD login succeeds without warning again and the in-session toolbar of a connected session appears.
     results:
-    - 18
+    - 15
+    - 17
     - 20
   - id: R2
     requirement: Session Information names the ARD security method and the desktop size from the Mac's ServerInit.

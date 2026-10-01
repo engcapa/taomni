@@ -2600,6 +2600,7 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 ### 9.2 RFB 握手与认证 ✅
 - 安全类型：None（仅显式 `allow-none`）、VNC password、RFB 18 anonymous TLS + 内层安全协商、RealVNC RA2 / RA2ne（128 / 256 位 AES）、Apple Remote Desktop（RFB 30，macOS 屏幕共享：会话填写 macOS 账户名时用 DH + AES-128 发送账户密码；未填用户名时有 VNCAuth 则用 VNCAuth；会话本身不加密，同样先弹未加密警告；TC-152 在 macOS runner 上连真实屏幕共享）
 - macOS 屏幕共享宣告 `RFB 003.889`，按 3.8 协商
+- 凭据按需询问：没有密码时不回应 VNCAuth、RA2/RA2ne、ARD 的挑战，以 `credentials-required`（认证阶段、不重试）结束这次尝试，由会话内认证表单询问；None 不需要任何输入（VNC-AUTH-002，DEC-VNC-21）
 - RA2 子模式：USER_PASS、PASS-only；公钥位长度合法性校验（1024–8192 bit）
 - TCP 建连使用独立 15 秒 deadline；RFB 安全协商和认证使用 45 秒 timeout，支持服务端认证限速/延迟，并将超时标记为可重试的 authentication/security 阶段错误
 - Tokio socket 交给同步 RFB 解码器前恢复 blocking mode，避免 `WouldBlock` 被误报为认证超时
@@ -2703,6 +2704,14 @@ controls:
     selector: '[data-testid="vnc-unencrypted-continue"]'
     kind: interactive
     optional: true          # per-attempt unencrypted-connection warning (VNC-SESS-003, DEC-VNC-19)
+  - id: vnc-auth-password
+    selector: '[data-testid="vnc-auth-password"]'
+    kind: interactive
+    optional: true          # in-session authentication form, shown only when the server asks for a password (VNC-AUTH-002, DEC-VNC-21)
+  - id: vnc-auth-ok
+    selector: '[data-testid="vnc-auth-ok"]'
+    kind: interactive
+    optional: true          # submits the in-session form; the retry keeps the confirmed unencrypted warning
   - id: policy-settings
     selector: '[data-testid="session-vnc-policies"]'
     kind: display
@@ -2724,14 +2733,14 @@ controls:
 - Canvas 画面渲染；RealVNC 对齐缩放：自动（只缩小）/ 适应窗口 / 适应宽度 / 适应高度 / 25–400%，100% 为一个远端像素对应一个设备像素，可保持宽高比（VNC-VIEW-001）
 - F8 会话菜单与工具栏菜单按钮：关闭连接、全屏、发送 F8、发送 Ctrl+Alt+Del、以按键发送剪贴板、Ctrl/Alt 锁定、缩放、画质、刷新屏幕、会话信息、属性（VNC-SESS-001、VNC-INPUT-002、VNC-PERF-004；TC-153 native 用 F8 打开菜单、切到 Low 并发送 F8）
 - 屏幕级全屏：Esc 发往远端，顶端热区滑出工具栏、离开即收起，退出恢复原窗口状态（VNC-VIEW-002）
-- 连接生命周期浮层：每次连接前的未加密警告（可选不再提示）、认证表单、Stop、断线后自动重连倒计时、KeepAlive 探测（VNC-SESS-003）
+- 连接生命周期浮层：每次连接前的未加密警告（可选不再提示）、认证表单（只在服务器要求密码时出现，提交后的重连沿用已确认的未加密警告，VNC-AUTH-002）、Stop、断线后自动重连倒计时、KeepAlive 探测（VNC-SESS-003）
 - 会话内 Properties：画质、view-only、缩放、菜单键、特殊键直通、剪贴板方向与连接时推送、共享会话、未加密警告、自动重连、响铃，写回会话，需要时提示重连生效（VNC-CONN-001）
 - 会话信息：桌面名、尺寸、像素格式、请求/最近编码、线路速度、更新/帧速率、协议、安全、连接类型（VNC-SESS-002）
 - 鼠标：右键即时发送；滚轮按刻度累积、Shift+滚轮水平；后退键映射按键 8；失焦不再把远端指针移到 (0,0)（VNC-INPUT-001）
 - 浮动 `FloatingToolbar`：可拖拽 / 折叠 / 位置持久化
 - 内嵌 `CaptureToolbar`：可见区域 PNG / 全帧 PNG / GIF 录制（与终端共用截图链路）
 - 断开提示 + Reconnect、错误分类（区分用户主动断开 / 服务端断开 / 网络异常）
-- 保存的 VNC 会话可从会话树双击连接，密码场景复用 `AuthPrompt`
+- 保存的 VNC 会话可从会话树双击连接；没保存密码时直接连接，不弹连接前的密码框，服务器要求密码时由会话内认证表单询问，`vnc://` 快速连接相同（VNC-AUTH-002；TC-151/TC-152/TC-153 经会话内表单登录，TC-107 确认不弹连接前密码框）
 - 浏览器预览（`pnpm dev`）经 dev server VNC bridge 连接真实 RFB 服务器：None/VNCAuth、Raw、DesktopSize、Bell、legacy 与 ExtendedClipboard；不含原生 relay 的编码、OS 输入和系统剪贴板（TC-151 双模式）
 - VNC tab 常驻挂载，切换标签时连接不主动销毁
 - 已修复 VNC 剪贴板与输入延迟、Windows 11 上的 client→server 文本粘贴

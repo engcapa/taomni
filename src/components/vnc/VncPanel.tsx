@@ -261,6 +261,9 @@ export default function VncPanel({
   const credentialOverrideRef = useRef<{ username: string; password: string } | null>(null);
   // The user accepted the unencrypted-connection warning for the next attempt.
   const unencryptedConfirmedRef = useRef(false);
+  // DEC-VNC-21: the attempt that stopped to ask for credentials had already
+  // passed the unencrypted warning, so the retry with them does not ask again.
+  const credentialsRetryConfirmedRef = useRef(false);
   const attemptIdRef = useRef<string | null>(null);
   const [lifecycle, setLifecycle] = useState<
     | { kind: "unencrypted" }
@@ -873,8 +876,14 @@ export default function VncPanel({
           if (structured.code === "unencrypted-confirmation-required") {
             // RealVNC asks before any credential is exchanged.
             setLifecycle({ kind: "unencrypted" });
+          } else if (structured.code === "credentials-required") {
+            // The server wants a password the session does not have; nothing
+            // was sent, so ask without an error (RealVNC asks only now).
+            credentialsRetryConfirmedRef.current = allowUnencrypted;
+            setLifecycle({ kind: "auth", error: null });
           } else if (structured.code === "authentication-failed") {
             credentialOverrideRef.current = null;
+            credentialsRetryConfirmedRef.current = false;
             setLifecycle({ kind: "auth", error: structured.message });
           } else if (structured.code === "connection-stopped") {
             // The user pressed Stop; stay disconnected.
@@ -1942,9 +1951,12 @@ export default function VncPanel({
             submitCredentials: ({ username: user, password: pass, remember }) => {
               credentialOverrideRef.current = { username: user, password: pass };
               if (remember) onCredentialsChange?.({ username: user, password: pass });
+              if (credentialsRetryConfirmedRef.current) unencryptedConfirmedRef.current = true;
+              credentialsRetryConfirmedRef.current = false;
               reconnectNow();
             },
             cancelAuth: () => {
+              credentialsRetryConfirmedRef.current = false;
               setLifecycle(null);
               store.setDisconnected(tabId, tr("vnc.authCancelled"));
             },

@@ -1926,6 +1926,8 @@
 - `[data-testid="vnc-session-info"]` — display [optional] — F9.6.session-info
 - `[data-testid="vnc-reconnect"]` — interactive [optional] — F9.6.reconnect
 - `[data-testid="vnc-unencrypted-continue"]` — interactive [optional] — F9.6.unencrypted-continue
+- `[data-testid="vnc-auth-password"]` — interactive [optional] — F9.6.vnc-auth-password
+- `[data-testid="vnc-auth-ok"]` — interactive [optional] — F9.6.vnc-auth-ok
 - `[data-testid="session-vnc-policies"]` — display [optional] — F9.6.policy-settings
 - `[data-testid="session-vnc-security-policy"]` — interactive [optional] — F9.6.security-policy
 - `[data-testid="session-vnc-clipboard-policy"]` — interactive [optional] — F9.6.clipboard-policy

@@ -595,7 +595,10 @@ def open_vnc(app: App, *, name: str, host: str, port: int, password: str | None,
              policy: str = "prefer-encryption", editor: dict | None = None,
              confirm_unencrypted: bool = True, wait_connected: float = 60.0) -> float:
     """Create a VNC session in the Session Editor and open it. Returns the
-    seconds from submitting the password to the first painted frame."""
+    seconds from opening the session to the first painted frame, including the
+    unencrypted warning and the in-session password form (DEC-VNC-21: the
+    session connects first and the form asks only when the server needs a
+    password, so `password=None` suits None-only servers)."""
     session = app.session
     vault_first_run(session)
     session.click('text="New session…"')
@@ -612,17 +615,19 @@ def open_vnc(app: App, *, name: str, host: str, port: int, password: str | None,
     session.click("[data-testid='session-save']")
     session.find(f"[data-testid='session-tree-item'][data-session-name='{name}']", timeout=10)
     session.dblclick(f"[data-testid='session-tree-item'][data-session-name='{name}']")
-    if password is not None:
-        session.find("[data-testid='auth-prompt']", timeout=15)
-        session.fill("[data-testid='auth-password']", password)
-        if app.js("return !!document.querySelector('[data-testid=\"auth-save-to-vault\"]')?.checked;"):
-            app.click_testid("auth-save-to-vault")
-        session.click("[data-testid='auth-submit']")
     started = time.time()
     end = started + wait_connected
     while time.time() < end:
         if confirm_unencrypted and app.exists("vnc-unencrypted-continue"):
             app.click_testid("vnc-unencrypted-continue")
+        if app.exists("vnc-auth-password"):
+            if app.exists("vnc-auth-error"):
+                raise RuntimeError("VNC authentication failed")
+            if not password:
+                raise RuntimeError("the server asks for a password but none was given")
+            session.fill("[data-testid='vnc-auth-password']", password)
+            session.click("[data-testid='vnc-auth-ok']")
+            session.wait_absent("[data-testid='vnc-auth-password']", timeout=10)
         if app.connected():
             painted = app.js("return Number(document.querySelector('[data-testid=\"vnc-panel\"]').dataset.vncFramesPainted || 0);")
             if painted or time.time() - started > 3:

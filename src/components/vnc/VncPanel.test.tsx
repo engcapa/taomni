@@ -407,6 +407,67 @@ describe("VncPanel connection lifecycle (VNC-SESS-003)", () => {
     expect(onCredentialsChange).toHaveBeenCalledWith({ username: "", password: "new-secret" });
   });
 
+  it("asks for missing credentials in the session without an error and keeps the warning confirmation", async () => {
+    let calls = 0;
+    mocks.invoke.mockImplementation((command: string) => {
+      if (command === "vnc_connect") {
+        calls += 1;
+        if (calls === 1) {
+          return Promise.reject(structured("unencrypted-confirmation-required", "security", false, "unencrypted connection requires confirmation"));
+        }
+        if (calls === 2) {
+          return Promise.reject(structured("credentials-required", "authentication", false, "credentials required: the server asks for a password"));
+        }
+        return Promise.resolve({ session_id: "s", ws_port: 41000, ws_token: "t", width: 0, height: 0, name: "" });
+      }
+      return Promise.resolve("");
+    });
+    // A saved session without a password: the panel connects first (DEC-VNC-21).
+    render(<VncPanel tabId="vnc-tab" host="h.test" port={5900} username="ops" visible />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(connectCalls()[0][1]).toMatchObject({ password: null });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("vnc-unencrypted-continue"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByTestId("vnc-auth-password")).toBeInTheDocument();
+    expect(screen.queryByTestId("vnc-auth-error")).toBeNull();
+    expect(screen.getByTestId("vnc-auth-username")).toHaveValue("ops");
+    fireEvent.change(screen.getByTestId("vnc-auth-password"), { target: { value: "secret12" } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("vnc-auth-ok"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    // The retry carries the password and does not ask the warning again.
+    expect(connectCalls()).toHaveLength(3);
+    expect(connectCalls()[2][1]).toMatchObject({ password: "secret12", allowUnencrypted: true });
+    expect(screen.queryByTestId("vnc-overlay-unencrypted")).toBeNull();
+  });
+
+  it("asks the warning again after a wrong password", async () => {
+    let calls = 0;
+    mocks.invoke.mockImplementation((command: string) => {
+      if (command === "vnc_connect") {
+        calls += 1;
+        if (calls === 1) return Promise.reject(structured("authentication-failed", "authentication", false, "authentication failed (result=1)"));
+        return Promise.reject(structured("unencrypted-confirmation-required", "security", false, "unencrypted connection requires confirmation"));
+      }
+      return Promise.resolve("");
+    });
+    render(<VncPanel tabId="vnc-tab" host="h.test" port={5900} password="wrong" visible />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.change(screen.getByTestId("vnc-auth-password"), { target: { value: "secret12" } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("vnc-auth-ok"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(connectCalls()[1][1]).toMatchObject({ allowUnencrypted: false });
+  });
+
   it("Stop cancels the attempt in flight", async () => {
     mocks.invoke.mockImplementation((command: string) => {
       if (command === "vnc_connect") return new Promise(() => {});

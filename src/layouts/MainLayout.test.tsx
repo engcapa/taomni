@@ -302,6 +302,28 @@ vi.mock("../components/rdp/RdpPanel", () => ({
   ),
 }));
 
+vi.mock("../components/vnc/VncPanel", () => ({
+  default: ({
+    host,
+    port,
+    username,
+    password,
+  }: {
+    host: string;
+    port: number;
+    username?: string | null;
+    password?: string;
+  }) => (
+    <div
+      data-testid="vnc-panel"
+      data-host={host}
+      data-port={port}
+      data-username={username ?? ""}
+      data-password={password ?? ""}
+    />
+  ),
+}));
+
 vi.mock("../components/filebrowser/SftpSidebar", () => ({
   SftpSidebar: (props: any) => {
     sftpSidebarMock.props.push(props);
@@ -1560,6 +1582,46 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(rdpPanel).toHaveAttribute("data-host", "win.example.test");
     expect(rdpPanel).toHaveAttribute("data-port", "3390");
     expect(rdpPanel).toHaveAttribute("data-username", "alice");
+  });
+
+  it("opens saved VNC sessions without a stored password straight into the VNC panel", async () => {
+    render(<MainLayout />);
+
+    const session: SessionConfig = {
+      ...makePasswordSession("vnc-1", "desktop.example.test"),
+      name: "Desktop",
+      session_type: "VNC",
+      port: 5901,
+      username: null,
+    };
+    useSessionStore.setState({ sessions: [session], groups: [] });
+
+    await act(async () => {
+      sidebarMock.props.at(-1)?.onConnectSession?.(session);
+    });
+
+    // DEC-VNC-21: the panel asks only when the server requires a password.
+    const vncPanel = await screen.findByTestId("vnc-panel");
+    expect(screen.queryByTestId("auth-prompt")).not.toBeInTheDocument();
+    expect(vncPanel).toHaveAttribute("data-host", "desktop.example.test");
+    expect(vncPanel).toHaveAttribute("data-port", "5901");
+    expect(vncPanel).toHaveAttribute("data-password", "");
+  });
+
+  it("opens VNC quick-connect URLs straight into the VNC panel", async () => {
+    window.localStorage.setItem("taomni.quickConnectVisible", "true");
+    render(<MainLayout />);
+
+    act(() => {
+      latestQuickConnectProps().onConnectInput?.("vnc://alice@desktop.example.test:5902");
+    });
+
+    const vncPanel = await screen.findByTestId("vnc-panel");
+    expect(screen.queryByTestId("auth-prompt")).not.toBeInTheDocument();
+    expect(vncPanel).toHaveAttribute("data-host", "desktop.example.test");
+    expect(vncPanel).toHaveAttribute("data-port", "5902");
+    expect(vncPanel).toHaveAttribute("data-username", "alice");
+    expect(vncPanel).toHaveAttribute("data-password", "");
   });
 
   it("opens saved Presto sessions as database tabs with catalog context", async () => {

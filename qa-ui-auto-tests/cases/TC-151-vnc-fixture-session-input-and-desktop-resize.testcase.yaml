@@ -1,8 +1,9 @@
 id: TC-151
 title: VNC session reaches the hosted RFB fixture, relays input and follows a remote resize
 description: 'Real RFB session for F9.6 against the scriptable VNC fixture (vnc_required):
-  VNCAuth after the per-attempt unencrypted-connection warning, first frame at the
-  framebuffer size, pointer/key/Ctrl+Alt+Del arrival in the fixture''s event log,
+  the per-attempt unencrypted-connection warning, then VNCAuth through the session''s
+  own authentication form (asked only because the server requires a password, DEC-VNC-21),
+  first frame at the framebuffer size, pointer/key/Ctrl+Alt+Del arrival in the fixture''s event log,
   and a server DesktopSize change. Native mode exercises the Rust RFB client and
   relay; browser mode exercises the same panel through the dev-server VNC bridge.
 
@@ -39,15 +40,17 @@ steps:
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-fixture"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-fixture"]'
-- wait_for: '[data-testid="auth-prompt"]'
-- fill:
-    selector: '[data-testid="auth-password"]'
-    value: ${env.QA_VNC_PASSWORD}
-- click: '[data-testid="auth-submit"]'
 - wait_for:
     selector: '[data-testid="vnc-unencrypted-continue"]'
     timeout_sec: 20
 - click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-auth-password"]'
+    timeout_sec: 20
+- fill:
+    selector: '[data-testid="vnc-auth-password"]'
+    value: ${env.QA_VNC_PASSWORD}
+- click: '[data-testid="vnc-auth-ok"]'
 - wait_for:
     selector: '[data-testid="vnc-canvas"][width="1280"][height="720"]'
     timeout_sec: 20
@@ -82,7 +85,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A saved VNC session authenticates to the RFB fixture with VNCAuth after the per-attempt unencrypted-connection confirmation and paints the remote desktop at its framebuffer size.
+    requirement: A saved VNC session without a stored password connects first, stops for the per-attempt unencrypted-connection confirmation, asks for the password only because the fixture requires VNCAuth, and then paints the remote desktop at its framebuffer size without warning again.
     actions:
     - 1
     - 2
@@ -94,7 +97,7 @@ verification:
     - 10
     - 12
     - 14
-    - 15
+    - 16
     - 17
     checkpoints:
     - step: 3
@@ -104,11 +107,11 @@ verification:
     - step: 11
       expectation: The saved VNC session appears in the session tree.
     - step: 13
-      expectation: Opening the session without a stored password asks for it.
-    - step: 16
-      expectation: The connection stops for the unencrypted-connection warning before any credential is sent.
+      expectation: Opening the session connects without a password prompt and stops for the unencrypted-connection warning before any credential is sent.
+    - step: 15
+      expectation: The fixture asks for VNCAuth, so the session's own authentication form asks for the password.
     - step: 18
-      expectation: The frame painter sizes the canvas to the fixture's 1280x720 framebuffer when it paints the first frame.
+      expectation: The retry with the password does not warn again; the frame painter sizes the canvas to the fixture's 1280x720 framebuffer when it paints the first frame.
     - step: 19
       expectation: The fixture logs a successful VNCAuth handshake.
     results:

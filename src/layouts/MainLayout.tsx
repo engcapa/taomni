@@ -2543,14 +2543,10 @@ export function MainLayout() {
           if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
           openVncTab(session, ref);
         } else {
-          awaitingManualAuthRef.current = true;
-          setPendingAuth({
-            kind: "session",
-            session,
-            resumeRequestId: resume?.requestId,
-            restoreOperationId: resume?.operationId,
-          });
-          return "awaiting-auth";
+          // DEC-VNC-21: connect first; the session's own authentication form
+          // asks only when the server requires a password (RealVNC), so a
+          // None-only server needs no input at all.
+          openVncTab(session);
         }
       } else {
         openVncTab(session, data ?? undefined);
@@ -3193,7 +3189,11 @@ export function MainLayout() {
         || session.session_type === "RDP"
         || session.session_type === "VNC"
       ) {
-        if (session.auth_method === "Password") {
+        if (session.session_type === "VNC" && session.auth_method === "Password") {
+          // DEC-VNC-21: like saved sessions, ask in the session only when the
+          // server requires a password.
+          openVncTab(session);
+        } else if (session.auth_method === "Password") {
           awaitingManualAuthRef.current = true;
           setPendingAuth({ kind: "session", session });
         } else {

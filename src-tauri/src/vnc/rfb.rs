@@ -33,6 +33,29 @@ const ARD_MAX_KEY_BYTES: usize = 1024;
 /// Username and password are NUL-terminated in 64-byte fields.
 const ARD_FIELD_BYTES: usize = 64;
 
+/// The chosen security type needs a password the caller did not supply; the
+/// attempt stops before any challenge is answered so the viewer can ask
+/// (DEC-VNC-21). `VncError::classify` maps it to `credentials-required`.
+pub(crate) const CREDENTIALS_REQUIRED: &str =
+    "credentials required: the server asks for a password to log in";
+
+/// Security types that authenticate with a password.
+fn needs_password(sec_type: u8) -> bool {
+    matches!(
+        sec_type,
+        SEC_TYPE_VNC_AUTH
+            | SEC_TYPE_RA2_128
+            | SEC_TYPE_RA2NE_128
+            | SEC_TYPE_RA2_256
+            | SEC_TYPE_RA2NE_256
+            | SEC_TYPE_ARD
+    )
+}
+
+fn missing_password(password: Option<&str>) -> bool {
+    password.is_none_or(str::is_empty)
+}
+
 const RA2_SUBTYPE_USER_PASS: u8 = 1;
 const RA2_SUBTYPE_PASS: u8 = 2;
 const RA2_MIN_KEY_BITS: usize = 1024;
@@ -334,6 +357,9 @@ impl RfbConnection {
             None => (self.read_and_choose_security_type(has_username)?, true),
         };
         self.security_type = Some(chosen);
+        if needs_password(chosen) && missing_password(password) {
+            return Err(CREDENTIALS_REQUIRED.into());
+        }
 
         if write_selection {
             self.write_all(&[chosen])
@@ -464,6 +490,9 @@ impl RfbConnection {
             }
             2 => {
                 // VNC Authentication
+                if missing_password(password) {
+                    return Err(CREDENTIALS_REQUIRED.into());
+                }
                 let pwd = password.unwrap_or("");
                 self.vnc_auth_des(pwd)?;
 
@@ -2332,6 +2361,62 @@ mod tests {
         // the VNCAuth challenge, which is all this test needs.
         let _ = connect_ard(port, None, "Qa1-secret");
         assert_eq!(server.join().unwrap(), 2);
+    }
+
+    /// A VNCAuth server that reports whether the client answered its
+    /// challenge: `Some(true)` response sent, `Some(false)` the client hung up
+    /// first, `None` it never got as far as the challenge (3.8 selection).
+    fn start_vncauth_probe(minor: u16) -> (u16, thread::JoinHandle<Option<bool>>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            stream
+                .write_all(format!("RFB 003.{minor:03}\n").as_bytes())
+                .unwrap();
+            let mut client_banner = [0u8; 12];
+            stream.read_exact(&mut client_banner).unwrap();
+            if minor <= 3 {
+                stream.write_all(&2u32.to_be_bytes()).unwrap();
+            } else {
+                stream.write_all(&[1, 2]).unwrap();
+                let mut chosen = [0u8; 1];
+                if stream.read_exact(&mut chosen).is_err() {
+                    return None;
+                }
+            }
+            stream.write_all(&[0x5au8; 16]).unwrap();
+            let mut response = [0u8; 16];
+            Some(stream.read_exact(&mut response).is_ok())
+        });
+        (port, handle)
+    }
+
+    #[test]
+    fn vncauth_without_a_password_asks_instead_of_answering_the_challenge() {
+        for minor in [3, 8] {
+            let (port, server) = start_vncauth_probe(minor);
+            let stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            let mut connection = RfbConnection::from_stream(
+                stream,
+                Duration::from_secs(2),
+                VncSecurityPolicy::PreferEncryption,
+                DecodeLimits::default(),
+            )
+            .unwrap();
+            let error = connection.authenticate(None, None).unwrap_err();
+            assert_eq!(error, CREDENTIALS_REQUIRED, "RFB 3.{minor}");
+            drop(connection);
+            let answered = server.join().unwrap();
+            assert_ne!(answered, Some(true), "RFB 3.{minor}: no challenge response");
+        }
+        assert!(missing_password(Some("")));
+        assert!(!missing_password(Some("secret12")));
+        assert!(needs_password(SEC_TYPE_ARD) && needs_password(SEC_TYPE_RA2_256));
+        assert!(!needs_password(SEC_TYPE_NONE));
     }
 
     #[test]
