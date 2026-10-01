@@ -91,7 +91,7 @@ fn qa_artifact_dir() -> std::path::PathBuf {
     base.join("taomni-qa-artifacts")
 }
 
-fn save_qa_artifact(src_path: &str, name: &str) {
+pub(crate) fn save_qa_artifact(src_path: &str, name: &str) {
     let dir = qa_artifact_dir();
     if std::fs::create_dir_all(&dir).is_err() {
         return;

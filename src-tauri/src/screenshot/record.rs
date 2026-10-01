@@ -316,6 +316,18 @@ fn capture_loop(
                             }
                         }
                     }
+                    // Diagnostic: save first frame as PNG to verify overlay works
+                    if frames == 0 {
+                        if let Ok(diag_path) =
+                            crate::screenshot::capture::temp_artifact_path("overlay-diag", "png")
+                        {
+                            let _ = frame.save(&diag_path);
+                            crate::screenshot::save_qa_artifact(
+                                &diag_path.to_string_lossy(),
+                                "n7-overlay-diag.png",
+                            );
+                        }
+                    }
                 }
                 let (fw, fh) = sink.push(frame)?;
                 out_w = fw;
