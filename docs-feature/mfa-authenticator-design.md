@@ -77,6 +77,7 @@
 | DEC-08 HOTP 语义 | 显示当前计数码 + “下一个”递增；或点击才生成 | 前者（与 Aegis 一致），计数立即持久化 | agent 自决 | RFC 4226 计数语义 | AC-09 |
 | DEC-09 剪贴板自动清除 | 默认清除 / 不做 | 不做，列为后续设置项 | agent 自决 | 需求未提，自动清除会覆盖用户之后复制的内容 | — |
 | DEC-10 测试设施 | 只写 Vitest；或补 runner 动词让 browser/native 用例观察真实路径 | 新增 `seed_clipboard_image`（夹具或元素截图）、`browser_fake_camera`、`native_clipboard_image`、`native_show_image_window`、`assert_totp_code` | agent 自决 | 用户要求 browser/native 全部用例；native 不支持 `upload_file` | TASK-08；V-10～V-29 |
+| DEC-12 Linux 截屏后端 | A xcap（三端统一，但 Linux Wayland 后端链接 libgbm/EGL，首轮 GitHub Linux native 构建因缺 `-lgbm` 失败，发布构建同样受影响）；B x11rb（已依赖）+ 门户 Screenshot（ashpd 已依赖） | B：不新增系统依赖，Windows/macOS 仍用 xcap | agent 自决 | GitHub run 36822701149 linux-native `build.log`：`rust-lld: error: unable to find library -lgbm` | AC-06；TASK-02；V-24/V-27 |
 | DEC-11 二维码导出的保护与渲染 | A 保险库已解锁即可显示；B 每次显示前重新输入主密码；渲染：后端出图 vs 渲染层用 `qr` 编码器出 SVG | B：唯一把已存密钥交给渲染层的命令 `mfa_export_uri` 先 `verify_master_password`，防止已解锁机器被他人导出；`qr` 编码器（已依赖、按需加载）在本地生成内联 SVG（不用 innerHTML），关闭即丢弃；HOTP 导出当前计数 | agent 自决（可按用户意见改为 A） | 导出的是长期凭据，风险高于查看一次性验证码；与备份恢复需主密码一致 | AC-18；TASK-10；V-28/V-29/V-30 |
 
 ### 用户流程与交互
@@ -115,7 +116,7 @@ MFA 标签布局（DEC-02 已确认线框）：
 - 表结构（`PRAGMA user_version=1`）：`mfa_accounts(id TEXT PK, issuer, account_name, group_name, note, kind 'totp'|'hotp', algorithm 'SHA1'|'SHA256'|'SHA512', digits, period, counter, secret_ct BLOB, secret_nonce BLOB, fingerprint TEXT, pinned, sort_order, use_count, last_used_at, created_at, updated_at)`；`mfa_meta(key PK, value BLOB)` 存 `key_check`（数据密钥校验密文）；`mfa_prefs(key PK, value TEXT)` 存 `sort_mode`、`group_filter`。时间戳统一为 Unix 毫秒。
 - 数据密钥：32 字节随机，Base64 存保险库固定条目 `mfa.data-key-v1`（kind `mfa_secret`，label `MFA Data Key`），首次在保险库解锁且 `mfa.db` 无密文时创建；`key_check` 为 AES-GCM 加密的常量串。每条密钥 `AES-256-GCM(key, nonce, secret, aad="taomni-mfa:"+id)`；`fingerprint=HMAC-SHA256(key, kind|alg|digits|period|secret)` 用于去重。每次命令从保险库取密钥，保险库锁定即返回 `VAULT_LOCKED`，解密后 `Zeroizing` 清理。锁顺序固定为“MFA 连接 → 保险库”，保险库从不回调 MFA。
 - 验证码：后端 `SystemTime::now()` 计算 `step=floor(unix/period)`，返回当前码、下一码与 `validFromMs/validUntilMs`；前端 1 秒节拍刷新倒计时，任一码到期触发一次 `mfa_codes`（至少间隔 1 秒，防抖）。
-- 截屏：`mfa_capture_screens` 在 `spawn_blocking` 内隐藏调用窗口→等待 350 ms→`xcap::Monitor::all()` 逐屏 `capture_image`→转 luma（按 alpha 叠白）→`scopeguard` 保证 `show()+set_focus()`→二进制返回。
+- 截屏：`mfa_capture_screens` 在 `spawn_blocking` 内隐藏调用窗口→等待 350 ms→逐屏截取→转 luma→`scopeguard` 保证 `show()+set_focus()`→二进制返回。Windows/macOS 用 `xcap::Monitor::all()` + `capture_image`（RGBA 按 alpha 叠白）；Linux 不用 xcap（其 Wayland 后端在链接期依赖 libgbm/EGL，CI 与发布构建均未安装）：X11 会话用 x11rb 按 RandR 监视器对根窗口 `GetImage`（ZPixmap 32 bpp），Wayland 会话（`WAYLAND_DISPLAY` 或 `XDG_SESSION_TYPE=wayland`）用 xdg-desktop-portal Screenshot（ashpd，非交互）取 PNG 后解码，并只删除位于临时目录的截图文件（DEC-12）。
 - 帧格式（剪贴板与截屏共用）：`"TQF1"` + `u32 count` + 每帧 `u32 width, u32 height, width*height luma`，小端；前端 `decodeQRBatch(frames, {format:"I420"})`。
 - 摄像头：`getUserMedia` → `<video>` → 画到 ≤1280 宽画布 → `decodeQR`；组件卸载、切换方式、关闭对话框、识别成功都停止全部 track 并清定时器。
 
@@ -145,7 +146,7 @@ MFA 标签布局（DEC-02 已确认线框）：
 
 - Windows：WebView2 支持 `<input type=file>`、async clipboard、`getUserMedia`（WebView2 权限提示）；xcap GDI/WGC 截屏；arboard 读位图。hosted runner 有交互桌面，可自动化屏幕扫描。
 - macOS：WKWebView 文件输入由 wry `runOpenPanelWithParameters` 支持；摄像头依赖已有 `NSCameraUsageDescription` 与 camera entitlement（文案补 MFA）；屏幕扫描先 `CGPreflightScreenCaptureAccess`，无权限时 `CGRequestScreenCaptureAccess` 并返回 `MFA_SCREEN_PERMISSION`（提示“系统设置 → 隐私与安全性 → 屏幕录制”）；hosted runner 无授权，屏幕扫描用例不选 macOS，记为未验证。
-- Linux：WebKitGTK 粘贴事件常缺图片，“粘贴截图”优先走 arboard；X11 下 xcap 读根窗口（Xvfb 可用）；Wayland 由 xcap 走门户并弹授权；摄像头复用 `with_webview` 已开启的 media-stream。
+- Linux：WebKitGTK 粘贴事件常缺图片，“粘贴截图”优先走 arboard；X11 下 x11rb 读根窗口（Xvfb 可用）；Wayland 走 xdg-desktop-portal Screenshot 并由桌面弹授权；摄像头复用 `with_webview` 已开启的 media-stream。
 - 浏览器 stub：`src/stubs/mfaStub.ts` 以 localStorage `taomni.stub.mfa.v1` 模拟存储、以 WebCrypto 生成码、校验 stub 保险库解锁；截屏/原生剪贴板返回 `MFA_DESKTOP_ONLY`。只证明渲染层编排，不证明 Rust/真实系统。
 - 故障：`mfa.db` 打开失败只影响 MFA 命令（懒打开），不阻断启动；恢复时 `apply_pending_restore` 先于打开数据库运行；回退为删除 `mfa` 模块与入口，`mfa.db` 文件留在磁盘不影响其他功能。
 

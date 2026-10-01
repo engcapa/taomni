@@ -105,6 +105,22 @@ fn ensure_screen_permission() -> Result<(), String> {
     Ok(())
 }
 
+/// Linux avoids xcap: its Wayland backend links libgbm/EGL, which the app does
+/// not otherwise need. X11 sessions read the root window per RandR monitor via
+/// x11rb (already used by the RDP server); Wayland sessions use the
+/// xdg-desktop-portal Screenshot request, which shows the desktop's own prompt.
+#[cfg(target_os = "linux")]
+fn capture_all_monitors() -> Result<Vec<LumaFrame>, String> {
+    let wayland = std::env::var_os("WAYLAND_DISPLAY").is_some()
+        || std::env::var("XDG_SESSION_TYPE").is_ok_and(|kind| kind.eq_ignore_ascii_case("wayland"));
+    if wayland {
+        linux::capture_portal()
+    } else {
+        linux::capture_x11()
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
 fn capture_all_monitors() -> Result<Vec<LumaFrame>, String> {
     let monitors = xcap::Monitor::all().map_err(|e| format!("{ERR_NO_DISPLAY}: {e}"))?;
     if monitors.is_empty() {
@@ -150,4 +166,136 @@ pub fn capture_screens_hiding<R: tauri::Runtime>(
     let frames = capture_all_monitors();
     drop(restore);
     Ok(encode_frames(&frames?))
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) mod linux {
+    use super::{ERR_CAPTURE_FAILED, ERR_NO_DISPLAY, LumaFrame, rgba_to_luma};
+    use x11rb::connection::Connection as _;
+    use x11rb::protocol::randr::ConnectionExt as _;
+    use x11rb::protocol::xproto::{ConnectionExt as _, ImageFormat, ImageOrder};
+
+    /// Luma of a 32-bpp ZPixmap (BGRX for LSB-first servers, XRGB otherwise).
+    pub(crate) fn zpixmap_to_luma(
+        data: &[u8],
+        width: u32,
+        height: u32,
+        lsb_first: bool,
+    ) -> Result<Vec<u8>, String> {
+        let pixels = width as usize * height as usize;
+        if pixels == 0 || data.len() < pixels * 4 {
+            return Err(format!(
+                "{ERR_CAPTURE_FAILED}: X11 image does not match {width}x{height}"
+            ));
+        }
+        let (r, g, b) = if lsb_first { (2, 1, 0) } else { (1, 2, 3) };
+        Ok(data
+            .chunks_exact(4)
+            .take(pixels)
+            .map(|px| {
+                ((u32::from(px[r]) * 77 + u32::from(px[g]) * 150 + u32::from(px[b]) * 29) >> 8)
+                    as u8
+            })
+            .collect())
+    }
+
+    pub(super) fn capture_x11() -> Result<Vec<LumaFrame>, String> {
+        let (conn, screen_num) =
+            x11rb::connect(None).map_err(|e| format!("{ERR_NO_DISPLAY}: {e}"))?;
+        let setup = conn.setup();
+        let screen = setup
+            .roots
+            .get(screen_num)
+            .ok_or_else(|| ERR_NO_DISPLAY.to_string())?;
+        let bits = setup
+            .pixmap_formats
+            .iter()
+            .find(|f| f.depth == screen.root_depth)
+            .map(|f| f.bits_per_pixel);
+        if bits != Some(32) {
+            return Err(format!(
+                "{ERR_CAPTURE_FAILED}: unsupported X11 root depth {}",
+                screen.root_depth
+            ));
+        }
+        let lsb_first = setup.image_byte_order == ImageOrder::LSB_FIRST;
+        let mut rects: Vec<(i16, i16, u16, u16)> = conn
+            .randr_get_monitors(screen.root, true)
+            .ok()
+            .and_then(|cookie| cookie.reply().ok())
+            .map(|reply| {
+                reply
+                    .monitors
+                    .iter()
+                    .map(|m| (m.x, m.y, m.width, m.height))
+                    .collect()
+            })
+            .unwrap_or_default();
+        rects.retain(|&(_, _, w, h)| w > 0 && h > 0);
+        if rects.is_empty() {
+            rects.push((0, 0, screen.width_in_pixels, screen.height_in_pixels));
+        }
+        let mut frames = Vec::with_capacity(rects.len());
+        let mut failures = Vec::new();
+        for (x, y, w, h) in rects {
+            let reply = conn
+                .get_image(ImageFormat::Z_PIXMAP, screen.root, x, y, w, h, !0)
+                .map_err(|e| e.to_string())
+                .and_then(|cookie| cookie.reply().map_err(|e| e.to_string()));
+            match reply.and_then(|image| {
+                zpixmap_to_luma(&image.data, u32::from(w), u32::from(h), lsb_first)
+            }) {
+                Ok(luma) => frames.push(LumaFrame {
+                    width: u32::from(w),
+                    height: u32::from(h),
+                    luma,
+                }),
+                Err(error) => failures.push(error),
+            }
+        }
+        if frames.is_empty() {
+            return Err(format!("{ERR_CAPTURE_FAILED}: {}", failures.join("; ")));
+        }
+        Ok(frames)
+    }
+
+    pub(super) fn capture_portal() -> Result<Vec<LumaFrame>, String> {
+        let uri = tauri::async_runtime::block_on(async {
+            let request = ashpd::desktop::screenshot::Screenshot::request()
+                .interactive(false)
+                .modal(true)
+                .send()
+                .await
+                .map_err(|e| format!("{ERR_CAPTURE_FAILED}: screenshot portal: {e}"))?;
+            let response = request
+                .response()
+                .map_err(|e| format!("{ERR_CAPTURE_FAILED}: screenshot portal: {e}"))?;
+            Ok::<_, String>(response.uri().clone())
+        })?;
+        let path = uri
+            .to_file_path()
+            .map_err(|_| format!("{ERR_CAPTURE_FAILED}: portal returned {uri}"))?;
+        let decoded =
+            image::open(&path).map_err(|e| format!("{ERR_CAPTURE_FAILED}: portal screenshot: {e}"));
+        // Portals write the capture to a temporary file; never touch user folders.
+        let temporary = [
+            std::env::temp_dir(),
+            std::env::var_os("XDG_RUNTIME_DIR")
+                .map(Into::into)
+                .unwrap_or_default(),
+        ];
+        if temporary
+            .iter()
+            .any(|dir| !dir.as_os_str().is_empty() && path.starts_with(dir))
+        {
+            let _ = std::fs::remove_file(&path);
+        }
+        let rgba = decoded?.to_rgba8();
+        let (width, height) = rgba.dimensions();
+        Ok(vec![LumaFrame {
+            width,
+            height,
+            luma: rgba_to_luma(rgba.as_raw(), width, height)?,
+        }])
+    }
 }
