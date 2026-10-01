@@ -1096,6 +1096,7 @@ pub fn run() {
             screenshot::screenshot_test_mp4_complete,
             screenshot::screenshot_test_scroll_content,
             screenshot::screenshot_test_capture_fidelity,
+            screenshot::screenshot_test_capture_full,
             screenshot::screenshot_open_overlay,
             screenshot::screenshot_overlay_init,
             screenshot::screenshot_close_overlay,

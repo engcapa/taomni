@@ -80,6 +80,26 @@ fn pin_counter() -> &'static std::sync::atomic::AtomicU64 {
     PIN_COUNTER.get_or_init(|| std::sync::atomic::AtomicU64::new(1))
 }
 
+/// Directory where test-only commands stash visual artifacts (captured PNGs,
+/// recorded GIFs/MP4s) for CI upload. Best-effort: failures are ignored so
+/// tests never fail because artifact saving failed.
+/// Prefers RUNNER_TEMP (GitHub Actions) so the workflow can upload it.
+fn qa_artifact_dir() -> std::path::PathBuf {
+    let base = std::env::var("RUNNER_TEMP")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir());
+    base.join("taomni-qa-artifacts")
+}
+
+fn save_qa_artifact(src_path: &str, name: &str) {
+    let dir = qa_artifact_dir();
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let dest = dir.join(name);
+    let _ = std::fs::copy(src_path, &dest);
+}
+
 fn hidden_windows_slot() -> &'static Mutex<Vec<String>> {
     HIDDEN_WINDOWS.get_or_init(|| Mutex::new(Vec::new()))
 }
@@ -265,6 +285,18 @@ pub async fn screenshot_read_file_header(path: String, len: u32) -> Result<Strin
     Ok(bytes.iter().map(|b| format!("{:02x}", *b)).collect())
 }
 
+/// Test-only: capture full screen and stash the PNG for CI artifact upload.
+/// Returns the same ScreenshotFile as screenshot_capture_full.
+#[tauri::command]
+pub async fn screenshot_test_capture_full(
+    app: AppHandle,
+    display_id: Option<String>,
+) -> Result<ScreenshotFile, String> {
+    let file = screenshot_capture_full(app, display_id).await?;
+    save_qa_artifact(&file.path, "n1-screen-capture.png");
+    Ok(file)
+}
+
 /// Test-only: run scroll capture and verify multi-frame stitching in one call.
 /// Returns "OK frames=N height=H" where N>1 and H>requested height prove
 /// the wheel scrolled and frames were stitched.
@@ -275,6 +307,7 @@ pub async fn screenshot_test_scroll_capture(
     height: u32,
 ) -> Result<String, String> {
     let r = screenshot_scroll_capture(app, None, 0, 0, width, height).await?;
+    save_qa_artifact(&r.path, "n2-scroll-stitch.png");
     let ok = r.frames > 1 && r.height > height;
     Ok(format!(
         "{} frames={} height={}",
@@ -317,6 +350,10 @@ pub async fn screenshot_test_recording(
         .map_err(|e| format!("stop recording task failed: {e}"))?
         .map_err(internal_error)?;
     let header = screenshot_read_file_header(file.path.clone(), 12).await?;
+    // Save the recording for CI artifact upload (visual inspection).
+    // N5 passes format="gif", N6 passes format="mp4".
+    let artifact_name = format!("n56-recording-{}.{}", format, format);
+    save_qa_artifact(&file.path, &artifact_name);
     Ok(format!("OK path={} header={}", file.path, header))
 }
 
@@ -364,6 +401,7 @@ pub async fn screenshot_test_gif_complete(
     .map_err(|e| format!("decode task failed: {e}"))??;
     let expected = secs as u32 * fps;
     let ok = frames >= expected * 8 / 10 && frames <= expected * 12 / 10 && width == 200 && height == 200;
+    save_qa_artifact(&path, "n7-gif-complete.gif");
     Ok(format!(
         "{} frames={} width={} height={} expected={}",
         if ok { "OK" } else { "FAIL" },
@@ -397,6 +435,7 @@ pub async fn screenshot_test_mp4_complete(
         .map_err(|e| format!("stop task failed: {e}"))?
         .map_err(internal_error)?;
     let path = file.path.clone();
+    save_qa_artifact(&path, "n8-mp4-complete.mp4");
     let info = tokio::task::spawn_blocking(move || {
         let out = std::process::Command::new("ffprobe")
             .args([
@@ -451,6 +490,7 @@ pub async fn screenshot_test_scroll_content(
 ) -> Result<String, String> {
     let r = screenshot_scroll_capture(app, None, 0, 0, width, height).await?;
     let path = r.path.clone();
+    save_qa_artifact(&path, "n9-scroll-content.png");
     let differ = tokio::task::spawn_blocking(move || {
         let img = image::open(&path).map_err(|e| format!("open failed: {e}"))?.to_rgba8();
         let (w, h) = img.dimensions();
@@ -507,6 +547,8 @@ pub async fn screenshot_test_capture_fidelity(app: AppHandle) -> Result<String, 
     };
     let (p1, _, _) = cap(&app)?;
     let (p2, _, _) = cap(&app)?;
+    save_qa_artifact(&p1.to_string_lossy(), "n10-capture-1.png");
+    save_qa_artifact(&p2.to_string_lossy(), "n10-capture-2.png");
     let diff_pct = tokio::task::spawn_blocking(move || {
         let a = image::open(&p1).map_err(|e| format!("open1 failed: {e}"))?.to_rgba8();
         let b = image::open(&p2).map_err(|e| format!("open2 failed: {e}"))?.to_rgba8();

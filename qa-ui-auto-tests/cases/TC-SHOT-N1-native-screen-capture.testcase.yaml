@@ -26,7 +26,7 @@ steps:
     expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_list_displays").then(JSON.stringify)'
     contains: '"width"'
 - eval_readonly:
-    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_capture_full", {displayId: null}).then(JSON.stringify)'
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_capture_full", {displayId: null}).then(JSON.stringify)'
     contains: '"path"'
 - eval_readonly:
     expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_probe").then(JSON.stringify)'
