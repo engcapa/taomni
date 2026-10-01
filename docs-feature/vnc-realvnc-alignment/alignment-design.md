@@ -40,7 +40,7 @@
 | 剪贴板 | 连接时强制同步本地剪贴板（RealVNC `SendInitialClipboard=False`），每 750 ms 轮询；无 “剪贴板作为按键发送”。 | VNC-CLIP-001 |
 | 三端收口 | 仅本机 Windows 实测。 | VNC-QA-001 |
 | 凭据询问（2026-10-01 VMware 实测） | 没保存密码的会话打开前总弹密码框且不能空提交；只提供 None 的服务器要随便输入一个字符。RealVNC 只在服务器要求时询问。 | VNC-AUTH-002 |
-| 首选编码被忽略（同上） | VMware 内置 VNC 只看列表第一项：High/Automatic 以 ZRLE 为首时回 Raw，整帧 7.45 MB；Tight 为首时用 Tight。 | VNC-PERF-006 |
+| 首选编码被忽略（同上） | VMware 内置 VNC 只看列表第一项，而且只实现 Raw 与 JPEG Tight：High/Automatic 以 ZRLE 为首时回 Raw，整帧 7.45 MB；Tight 带 JPEG 质量为首时用 Tight。 | VNC-PERF-006 |
 | 会话编辑器文案（同上） | VNC 分区的标签、选项与说明写死英文，中文界面不翻译。 | VNC-CONN-002 |
 
 <a id="decisions"></a>
@@ -69,7 +69,7 @@
 | DEC-VNC-19 | 未加密警告在认证前出现；自动重连持续退避；KeepAlive 30/30 s。 | agent 自决 | RealVNC `WarnUnencrypted` / `AutoReconnect` / `KeepAlive*` 默认值。 |
 | DEC-VNC-20 | Windows 上指针停在已连接画布上且无按键时，relay 线程每 1–4 ms 读光标位置直接发 PointerEvent；WebView 照常发自己的事件，relay 丢弃采样后 50 ms 内的无按键移动副本；按键、滚轮、拖拽仍走 WebView；macOS/Linux 不启用；`TAOMNI_VNC_NATIVE_POINTER=0` 关闭。 | agent 自决（[PERF-005 §指针](references/realvnc-fixture-comparison-20261001.md#pointer-latency)） | 逐段测量表明 WebView/JS/relay 合计 < 1 ms，延迟与尾部来自 Windows 按显示刷新投递 `WM_MOUSEMOVE`（裸 Win32 窗口同样 p95 ≈ 31 ms）；RealVNC 走同一机制，只有读光标才能稳定低于它。 |
 | DEC-VNC-21 | 凭据按需询问：会话没有密码时直接连接；服务器选定的安全类型需要密码时，客户端不回应挑战，以 `credentials-required` 结束这次尝试，由会话内认证表单询问；表单提交的重连沿用这次已确认的未加密警告。 | agent 自决（[VMware 实测 §3](references/vmware-vnc-live-20261001.md)） | RealVNC 只在服务器要求时询问；连接前弹框挡住了只提供 None 的服务器。现有架构每次认证都是新的 TCP 连接，所以“询问后重连”与未加密警告的处理方式一致。 |
-| DEC-VNC-22 | 首选的压缩编码被服务器用大块 Raw 回应（≥ 64×64 像素且本次更新没有压缩矩形）时，把下一个候选提到第一位：High 为 ZRLE → Tight（无损，不带 JPEG 质量）→ Hextile，降色深档为 ZRLE → Hextile；候选用尽则保持。 | agent 自决 | 符合规范的服务器按客户端顺序选第一个支持的编码，不会对大块区域回 Raw；只看第一项的服务器（VMware 内置 VNC）只有这样才拿得到压缩编码。 |
+| DEC-VNC-22 | 首选的压缩编码被服务器用大块 Raw 回应（≥ 64×64 像素且本次更新没有压缩矩形）时，把下一个候选提到第一位：High 为 ZRLE → Tight（JPEG 质量 9，服务器默认 zlib 级别）→ Hextile，降色深档为 ZRLE → Hextile；候选用尽则保持。Tight 为首仍收到大块 Raw 才认定服务器没有 Tight。 | agent 自决；用户确认可用 Tight + JPEG（2026-10-01） | 符合规范的服务器按客户端顺序选第一个支持的编码，不会对大块区域回 Raw；只看第一项的服务器（VMware 内置 VNC）只有这样才拿得到压缩编码。探针显示 VMware 对不带 JPEG 质量的 Tight 也回 Raw，最初的无损 Tight 候选因此误判“没有 Tight”，Low 随后改用 8 色像素格式，VMware 收到 RGB111 即重置连接；带 JPEG 质量的 Tight 在完整实现的服务器上仍对不适合 JPEG 的区域发无损子矩形。 |
 
 ## 5. 交互与 UI 总体合同
 
@@ -274,10 +274,10 @@
 <a id="vnc-perf-006"></a>
 ### VNC-PERF-006 首选编码被忽略时调整编码顺序
 
-- 交付（DEC-VNC-22）：读线程统计每次更新的 Raw 像素与压缩矩形；首选的压缩编码被大块 Raw 回应时，画质控制器把下一个候选提到第一位并按画质切换的路径重发 SetEncodings 与整帧请求；会话信息的“请求的编码”随之变化。
+- 交付（DEC-VNC-22）：读线程统计每次更新的 Raw 像素与压缩矩形；首选的压缩编码被大块 Raw 回应时，画质控制器把下一个候选提到第一位并按画质切换的路径重发 SetEncodings 与整帧请求；High 的 Tight 候选带 JPEG 质量 9；会话信息的“请求的编码”随之变化。
 - 验收：
-  - **VNC-PERF-006-A1**：单测：ZRLE 首选收到大块 Raw → Tight 首选（不带 JPEG 质量伪编码，像素格式不变）；再收到 Raw → Hextile 首选；候选用尽后不再切换；小块 Raw、混有压缩矩形的更新不触发；降色深档同理。
-  - **VNC-PERF-006-A2**：实测：VMware 内置 VNC 上 High 与 Automatic 在首个整帧后改用 Tight，会话信息的请求与实际编码为 Tight，整帧字节低于 Raw；fixture 上 TC-151/TC-153 不回退。
+  - **VNC-PERF-006-A1**：单测：ZRLE 首选收到大块 Raw → Tight 首选（带 JPEG 质量 9、不带 zlib 级别，像素格式不变）；再收到 Raw → Hextile 首选；候选用尽后不再切换；小块 Raw、混有压缩矩形的更新不触发；降色深档同理；High 学到 Tight 后 Low/Medium 仍用 Tight + JPEG 与 32 bpp（VMware 断线回归）。
+  - **VNC-PERF-006-A2**：实测：VMware 内置 VNC 上 High 与 Automatic 在首个整帧后改用 Tight，会话信息的请求与实际编码为 Tight，整帧字节低于 Raw，各档画质切换不断线；fixture 上 TC-151/TC-153 不回退。
 
 <a id="vnc-conn-002"></a>
 ### VNC-CONN-002 会话编辑器 VNC 分区本地化

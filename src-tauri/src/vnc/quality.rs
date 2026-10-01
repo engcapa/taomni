@@ -120,10 +120,14 @@ pub const LOW_COLOUR: PixelFormat = PixelFormat::RGB111;
 
 const ENCODING_ZRLE: i32 = 16;
 const ENCODING_HEXTILE: i32 = 5;
-/// Lossless encodings High may list first, tried in this order when the
-/// server ignores the current first choice (DEC-VNC-22). Tight without JPEG
-/// quality pseudo-encodings is lossless.
+/// Encodings High may list first, tried in this order when the server ignores
+/// the current first choice (DEC-VNC-22). Tight comes with the best JPEG
+/// quality: VMware's built-in server answers Tight without a JPEG quality
+/// level, Hextile and ZRLE with Raw, and implements only JPEG Tight; servers
+/// with a full Tight encoder still send lossless subrectangles where JPEG does
+/// not pay off.
 const HIGH_FIRST: [i32; 3] = [ENCODING_ZRLE, ENCODING_TIGHT, ENCODING_HEXTILE];
+const HIGH_TIGHT_JPEG_QUALITY: i32 = 9;
 /// The same for the reduced-colour tiers of a server without Tight.
 const PLAIN_FIRST: [i32; 2] = [ENCODING_ZRLE, ENCODING_HEXTILE];
 /// A Raw-only update at least this large while a compressed encoding is listed
@@ -178,19 +182,31 @@ pub fn profile_for(level: QualityLevel, tight: Option<bool>, ignored: &[i32]) ->
         encodings
     };
     match (level, tight) {
-        (QualityLevel::High, _) => {
+        (QualityLevel::High, _) => match first_choice(&HIGH_FIRST, ignored, tight) {
+            // The server ignored ZRLE: Tight with the best JPEG quality.
+            ENCODING_TIGHT => EncodingProfile {
+                encodings: with_pseudo(vec![
+                    ENCODING_TIGHT,
+                    ENCODING_ZRLE,
+                    ENCODING_HEXTILE,
+                    1,
+                    0,
+                    ENCODING_JPEG_QUALITY_0 + HIGH_TIGHT_JPEG_QUALITY,
+                ]),
+                pixel_format: PixelFormat::RGB888,
+                tight_first: true,
+            },
             // ZRLE (bandwidth) > Hextile > Tight (lossless) > CopyRect > Raw,
-            // with the first choice moved up when the server ignored ZRLE.
-            let first = first_choice(&HIGH_FIRST, ignored, tight);
-            EncodingProfile {
+            // or Hextile first once ZRLE and Tight were ignored.
+            first => EncodingProfile {
                 encodings: with_pseudo(with_first(
                     first,
                     &[ENCODING_ZRLE, ENCODING_HEXTILE, ENCODING_TIGHT, 1, 0],
                 )),
                 pixel_format: PixelFormat::RGB888,
-                tight_first: first == ENCODING_TIGHT,
-            }
-        }
+                tight_first: false,
+            },
+        },
         (level, Some(false)) => EncodingProfile {
             encodings: with_pseudo(with_first(
                 first_choice(&PLAIN_FIRST, ignored, tight),
@@ -480,7 +496,7 @@ mod tests {
     }
 
     #[test]
-    fn high_moves_tight_first_when_the_server_answers_zrle_with_raw() {
+    fn high_moves_jpeg_tight_first_when_the_server_answers_zrle_with_raw() {
         let mut quality = QualityController::new(VncPictureQuality::High);
         // VMware's built-in VNC: the first full update comes back as Raw.
         quality.observe_update(update(0, 0, FULL_FRAME));
@@ -495,10 +511,14 @@ mod tests {
         assert_eq!(profile.requested_label(), "Tight");
         assert!(profile.tight_first);
         assert_eq!(profile.pixel_format, PixelFormat::RGB888);
-        // Lossless: no JPEG quality or compression level pseudo-encodings.
+        // VMware answers Tight with Raw unless JPEG is allowed: best JPEG
+        // quality, the server's own zlib level.
+        assert_eq!(
+            profile.encodings[..6],
+            [7, 16, 5, 1, 0, ENCODING_JPEG_QUALITY_0 + 9]
+        );
         assert!(!profile.encodings.iter().any(|encoding| {
-            (ENCODING_JPEG_QUALITY_0..ENCODING_JPEG_QUALITY_0 + 10).contains(encoding)
-                || (ENCODING_COMPRESS_LEVEL_0..ENCODING_COMPRESS_LEVEL_0 + 10).contains(encoding)
+            (ENCODING_COMPRESS_LEVEL_0..ENCODING_COMPRESS_LEVEL_0 + 10).contains(encoding)
         }));
         // A small update requested before the switch is inconclusive...
         quality.observe_update(update(0, 0, 1548));
@@ -526,6 +546,29 @@ mod tests {
         quality.observe_update(update(0, 0, FULL_FRAME));
         assert!(!quality.has_pending());
         assert_eq!(quality.applied().first_pixel_encoding(), Some(5));
+    }
+
+    #[test]
+    fn tight_learned_on_high_keeps_jpeg_tight_for_the_lower_tiers() {
+        // 2026-10-01 VMware regression: High learned "no Tight" from lossless
+        // Tight answered with Raw, so Low switched to the 8-colour pixel format,
+        // which makes that server reset the connection.
+        let mut quality = QualityController::new(VncPictureQuality::Automatic);
+        quality.observe_update(update(0, 0, FULL_FRAME));
+        quality.take_pending();
+        quality.observe_update(update(0, 8, 0));
+        assert!(!quality.has_pending());
+        for preset in [VncPictureQuality::Low, VncPictureQuality::Medium] {
+            quality.set_preset(preset);
+            let (profile, changed) = quality.take_pending().unwrap();
+            assert!(!changed, "{preset:?} keeps the pixel format");
+            assert_eq!(profile.pixel_format, PixelFormat::RGB888);
+            assert_eq!(profile.first_pixel_encoding(), Some(ENCODING_TIGHT));
+        }
+        quality.set_preset(VncPictureQuality::High);
+        let (profile, _) = quality.take_pending().unwrap();
+        assert_eq!(profile.first_pixel_encoding(), Some(ENCODING_TIGHT));
+        assert!(profile.encodings.contains(&(ENCODING_JPEG_QUALITY_0 + 9)));
     }
 
     #[test]
