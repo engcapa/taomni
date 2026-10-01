@@ -132,6 +132,13 @@
 
 参照：[第三轮设计](ed-parity-026-round3-design.md#ed-parity-026)；左侧条与主侧栏融合方案见 [PROP-026-01](ed-parity-026-round3-design.md#prop-026-01)（待评审）。
 
+### ED-PARITY-027 单一工具窗口条（主侧栏工具条合并，含终端）
+<!-- ide-task {"id": "ED-PARITY-027", "status": "implemented", "priority": "P1", "size": "M", "depends_on": ["ED-PARITY-024", "ED-PARITY-026"], "spec": "docs-feature/code-workspace-idea-alignment/ed-parity-026-round3-design.md#ed-parity-027", "acceptance": ["ED-PARITY-027-A1", "ED-PARITY-027-A2", "ED-PARITY-027-A3", "ED-PARITY-027-A4"], "required_evidence": ["code-audit", "unit", "typecheck", "browser", "native"], "audit": {"date": "2026-10-01", "head": "0d62b964", "finding": "Code Workspace 内的左工具窗口条与 Taomni 主侧栏工具条并列，两列竖条占用横向空间；终端的工具窗口开关在控制栏，与工作区不一致。"}, "prior_completion": {"kind": "new-task", "completed": false}, "p0": {"audit_id": "LIVE-IDEA-20261001-ROUND3", "requirements": [], "scenarios": [], "planning_required": false}, "updated_at": "2026-10-01T02:00:00Z", "evidence": {"verified_at": "2026-10-01T02:00:00Z", "head": "0d62b964", "checks": [{"kind": "unit", "result": "passed", "command": "pnpm test", "summary": "471 files / 4750 tests; 1 known load-only timeout (CodeWorkspaceTab sync barrier) passes in isolation", "acceptance": ["ED-PARITY-027-A1", "ED-PARITY-027-A2", "ED-PARITY-027-A3", "ED-PARITY-027-A4"]}, {"kind": "typecheck", "result": "passed", "command": "pnpm build", "summary": "tsc -b + vite build clean", "acceptance": ["ED-PARITY-027-A1", "ED-PARITY-027-A2", "ED-PARITY-027-A3", "ED-PARITY-027-A4"]}], "unrun": ["browser", "native"], "notes": ["GitHub workflow qa-ui-auto-platforms run pending for TC-IDE-PARITY-027-01..03 and the affected terminal/workspace regressions."]}} -->
+
+目标：Code Workspace 与终端标签把工具窗口按钮放进折叠后的主侧栏工具条，侧栏状态按标签组记忆，窗口里只剩一列工具条。
+
+参照：[第三轮设计](ed-parity-026-round3-design.md#ed-parity-027)。
+
 ## 当前批次边界
 
 本板不覆盖完整插件生态、所有语言、远端开发、全部 Git 发布动作、所有 IDEA 主题/DPI 组合、Code Vision（usages/作者 inlay）、Scratch、Injected Language、Coverage 高级功能、Services/Database/AI Chat 等 IDEA 右侧工具窗内容和多窗口拖拽。发现这些范围存在具体用户需求时新增独立卡并扩充分母。

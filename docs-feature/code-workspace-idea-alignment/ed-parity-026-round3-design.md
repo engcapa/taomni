@@ -46,9 +46,24 @@
 | B 合并为一条（推荐，与 A 组合） | 主侧栏处于轨道态且活动标签是 Code Workspace 时，工作区把自己的左工具窗口条通过 portal 挂进主轨道（分隔线以下，上组 Project/Structure…，下组 Terminal/Problems/Git…），工作区内不再渲染左条；主侧栏展开时自动还原到工作区内 | 只剩一列竖条，与 IDEA 一致；复用 ED-PARITY-024 的可重挂载宿主 | 需要 MainLayout 提供轨道宿主注册；多工作区标签切换时只挂活动实例；拖放与右键菜单（Move to/Show names）需在轨道内同样可用；轨道宽度需随“显示名称”变化 |
 | C 完全隐藏 + 边缘唤出 | 工作区标签下主侧栏宽度为 0，左边缘 4 px 热区或快捷键临时以浮层展开（不挤压编辑区） | 编辑区最大 | 会话/工具入口不可见，可发现性差；浮层与工具窗口的焦点与 Esc 交互需额外设计 |
 
-建议：B + A。默认开启“Code Workspace 中折叠主侧栏并合并工具窗口条”，设置里可关闭（关闭后回到现状）。实现顺序：① MainLayout 轨道宿主 + 活动标签类型订阅（A）；② 工作区左条 portal 到宿主并处理多实例/展开还原（B）；③ 右键菜单、拖放、显示名称宽度；④ 用例：browser + native 三端验证切换标签时宽度恢复、条按钮激活/移动工具窗口、展开主侧栏后条回到工作区。**需用户确认方案后再实施。**
+建议：B + A。默认开启“Code Workspace 中折叠主侧栏并合并工具窗口条”，设置里可关闭（关闭后回到现状）。
+
+**用户决定（2026-10-01）**：执行 B + A，并扩展到终端等其它标签类型以保持整体一致 → 见 [ED-PARITY-027](#ed-parity-027)。
+
+<a id="ed-parity-027"></a>
+
+## ED-PARITY-027 单一工具窗口条（PROP-026-01 B + A，扩展到终端）
+
+规则：拥有工具窗口的标签类型（Code Workspace、终端）各自记住主侧栏展开/折叠状态，默认折叠为工具条；其它标签类型共用一组状态（保持原有行为）。主侧栏折叠时，活动标签把自己的工具窗口按钮渲染进该工具条（Sessions/Tools 竖排页签之下、Git/Settings 之上）；主侧栏展开时按钮回到标签内原位置。动作类按钮（Capture、Detach、Reconnect…）仍在控制栏的标签操作区——与 IDEA“条上是工具窗口、工具栏上是动作”一致。
+
+- ED-PARITY-027-A1 侧栏状态按标签组记忆（`taomni.sidebarCollapsedByGroup.v1`）：进入 Code Workspace/终端默认折叠，离开时恢复下一组的状态；在某组内手动展开/折叠（侧栏页签、拖动分隔条、菜单）只改该组。
+- ED-PARITY-027-A2 Code Workspace 的左工具窗口条在折叠时通过 portal 进入主工具条（`data-embedded`），仅活动工作区占用；右侧条仍在工作区；按钮、右键菜单（Hide/Move/Show Tool Window Names）与拖宽在工具条中照常工作；展开主侧栏后回到工作区。
+- ED-PARITY-027-A3 终端的工具窗口（附加 SFTP、Chat）在折叠时进入主工具条（沿用 `attached-sftp-toggle` / `tab-chat-toggle`），控制栏不再重复显示；分屏模式与独立窗口保持原样。
+- ED-PARITY-027-A4 名称显示与条宽为全局共享设置（`useToolWindowStripeStore`，多个工作区与终端工具条同步）；设置 › 常规 › 全局界面的“单一工具窗口条”可关闭合并与按组记忆。
+- V：单元 `sidebarRailPolicy.test.ts`、`Sidebar.test.tsx`、`ToolWindowRail.test.tsx`、`MainLayout.test.tsx`（ED-PARITY-027 块）、`CodeWorkspaceTab.test.tsx`；`TC-IDE-PARITY-027-01`（browser 三端，工作区 + 设置开关）、`TC-IDE-PARITY-027-02`（browser + native 三端，SSH 终端 SFTP）、`TC-IDE-PARITY-027-03-merged-rail-workspace-native`（native 三端）。
 
 ## 未覆盖与后续
 
 - IDEA Project 视图的 Packages / Open Files / Scratches 等其它视图、Behavior 与 Sort 子菜单、文件类型图标与源根着色未做。
 - 悬停弹窗的“朝向判断”不含 IDEA 的时间衰减；调试值悬停（debugEditorChrome）仍用 CodeMirror 默认行为。
+- ED-PARITY-027 只给 Code Workspace 与终端接入工具条；SFTP、数据库、邮件等标签类型暂无工具窗口，沿用“其它”组；后续接入时只需按同一宿主渲染按钮并加入分组。
