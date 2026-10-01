@@ -4,7 +4,7 @@
 
 - 类型：新功能
 - 文档位置：`docs-feature/mfa-authenticator-design.md`
-- 设计状态：可实施（DEC-01～DEC-03 用户已定，其余 agent 自决并记录依据）
+- 设计状态：已实施，GitHub 三端 browser/native 自动化全部通过（§9）；V-25～V-27、V-29 人工项待执行（DEC-01～DEC-03 用户已定，其余 agent 自决并记录依据）
 - 来源：2026-10-01 会话需求——MFA 放到 Tools 菜单；先本地存储到独立 SQLite 库，备份包含该库；支持密钥导入、截图二维码、摄像头扫码（有摄像头时）；验证码方便复制；多账户方便查找、排序；编写 browser/native 全部 qa-ui-auto 用例，在 GitHub 用 `.github/workflows/qa-ui-auto-platforms.yml` 执行，不在本地跑。同日追加：“在 MFA 管理列表中增加显示二维码的功能，将保存的 MFA 渲染为二维码，供其它 app 扫码”（AC-18、DEC-11、TASK-10）。
 - 调研基线：`origin/main` `23882563`（2026-10-01），实现分支 `feat/mfa-authenticator`。
 - 平台与运行方式：Windows、macOS、Linux 三端 Tauri 桌面应用，代码必须兼容三端构建与运行。
@@ -263,24 +263,24 @@ MFA 标签布局（DEC-02 已确认线框）：
 | V-07 | AC-15 | Rust `backup` 范围解析单测 | — | core/full 含 MFA；custom `includeMfa` 强制 vault | 同上 | 本地 Linux 通过（2026-10-01，`cargo test --lib -- mfa:: backup:: vault::` 42 passed） |
 | V-08 | AC-01/03～08/11/12 | Vitest `src/lib/mfa/*.test.ts`、`nativeAppMenu.test.ts` | `qr` 编码生成测试图 | 解析、迁移、解码 luma/RGBA、排序筛选、格式化、菜单 spec 含 `mfa` | 根目录 `pnpm test src/lib/mfa src/lib/nativeAppMenu.test.ts` | 本地通过（2026-10-01，Vitest 10 files / 55 tests） |
 | V-09 | AC-02/09～13/17 | Vitest `src/stores/mfaStore.test.ts`、`src/components/mfa/*.test.tsx`、`src/stubs/mfaStub.test.ts` | mock IPC / stub | 加载/刷新/复制/错误态、对话框与键盘、stub HOTP 755224 | `pnpm test src/stores/mfaStore.test.ts src/components/mfa src/stubs/mfaStub.test.ts` | 本地通过（2026-10-01，Vitest 10 files / 55 tests） |
-| V-10 | AC-01/02 | browser `TC-MFA-001-tools-entry-vault-gate` | 新上下文 | 应用菜单 Tools 打开、门禁取消/设置、侧栏入口不重复开标签、空状态 | GitHub browser ×3 | 待执行 |
-| V-11 | AC-03/09/10 | browser `TC-MFA-002-secret-key-hotp-copy` | RFC 4226 密钥 | `755 224`；复制→粘贴到搜索框为 `755224`；下一个 `287 082`；重载保持 | 同上 | 待执行 |
-| V-12 | AC-03/04/09 | browser `TC-MFA-003-otpauth-uri-validation` | `JBSWY3DPEHPK3PXP` | 非法密钥报错；otpauth 预填；`assert_totp_code` 与 Python RFC 6238 一致；倒计时；重复提示 | 同上 | 待执行 |
-| V-13 | AC-05/08 | browser `TC-MFA-004-image-file-qr-import` | 夹具 PNG | 导入预览→`755 224`；非 OTP 码、无码图片各自提示 | 同上 | 待执行 |
-| V-14 | AC-05 | browser `TC-MFA-005-paste-screenshot` | `seed_clipboard_image` | 按钮粘贴与 Ctrl+V 粘贴各导入一个账户 | 同上 | 待执行 |
-| V-15 | AC-05/08 | browser `TC-MFA-006-google-migration-batch` | 迁移码夹具 | 预览两项、导入两项、再次导入全部“已存在” | 同上 | 待执行 |
-| V-16 | AC-06/07 | browser `TC-MFA-007-camera-and-screen-modes` | `browser_fake_camera` | 无摄像头状态；合成摄像头识别→导入→视频移除；屏幕扫描提示仅桌面版 | 同上 | 待执行 |
-| V-17a | AC-10/11/17 | browser `TC-MFA-008-search-group-keyboard` | 四账户迁移码，编辑一个到 Personal | 大小写不敏感搜索、Enter 复制首条、无结果、分组/未分组筛选、↓/↑ 在验证码间移动、Enter 复制焦点码 | 同上 | 待执行 |
-| V-17b | AC-12 | browser `TC-MFA-010-sort-pin-reorder` | 四账户迁移码，按固定模式复制 | 六种排序各自 `assert_items`、非自定义下无拖拽且上移禁用、置顶、菜单上/下移、拖拽、重载后排序/置顶/顺序保持、取消置顶回位 | 同上 | 待执行 |
-| V-18 | AC-13 | browser `TC-MFA-009-edit-delete` | — | 编辑后行更新；删除取消保留、确认删除 | 同上 | 待执行 |
-| V-19 | AC-02/03/09/14 | native `TC-MFA-101-native-hotp-totp-persist` | 隔离 profile | Rust 码 `755 224`→`287 082`；重载后计数保持；TOTP 与 Python 一致 | GitHub native ×3 | 待执行 |
-| V-20 | AC-02/14 | native `TC-MFA-102-native-vault-lock-gate` | — | 设置中锁定→MFA 解锁对话框→解锁后码恢复 | GitHub native ×3 | 待执行 |
-| V-21 | AC-15 | native `TC-MFA-103-native-backup-includes-mfa` | — | 立即备份→历史行→恢复清单含 `databases/mfa.db`、`databases/vault.db` | GitHub native ×3 | 待执行 |
-| V-22 | AC-10 | native `TC-MFA-104-native-copy-system-clipboard` | Linux/X11 | `assert_system_clipboard equals 755224` | GitHub native Linux | 待执行 |
-| V-23 | AC-05 | native `TC-MFA-105-native-paste-screenshot-clipboard` | `native_clipboard_image`（xclip） | arboard 读图→导入→`755 224` | GitHub native Linux | 待执行 |
-| V-24 | AC-06 | native `TC-MFA-106-native-screen-scan` | `native_show_image_window` | 隐藏窗口截屏识别→导入→`755 224`；窗口恢复 | GitHub native Linux、Windows | 待执行 |
-| V-28 | AC-18 | browser `TC-MFA-011-show-qr-export` | HOTP 账户计数推进到 1 | 空/错密码拒绝且无图；Enter 提交正确密码出图；`seed_clipboard_image {selector}` 截取 QR 再经应用自身导入解码→同一账户“已添加”、`counter 1`、账户名一致；再开需重新输入；Esc 关闭 | GitHub browser ×3 | 待执行 |
-| V-29 | AC-18 | native `TC-MFA-107-native-qr-export` + 人工手机扫码 | 隔离 profile | Rust `VAULT_BAD_PASSWORD` 拒绝错密码且无图；正确密码渲染 QR（模块数合理）；人工：用 Google Authenticator/Aegis 扫截图，码与 Taomni 一致 | GitHub native ×3；人工待执行 | 待执行 |
+| V-10 | AC-01/02 | browser `TC-MFA-001-tools-entry-vault-gate` | 新上下文 | 应用菜单 Tools 打开、门禁取消/设置、侧栏入口不重复开标签、空状态 | GitHub browser ×3 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-11 | AC-03/09/10 | browser `TC-MFA-002-secret-key-hotp-copy` | RFC 4226 密钥 | `755 224`；复制→粘贴到搜索框为 `755224`；下一个 `287 082`；重载保持 | 同上 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-12 | AC-03/04/09 | browser `TC-MFA-003-otpauth-uri-validation` | `JBSWY3DPEHPK3PXP` | 非法密钥报错；otpauth 预填；`assert_totp_code` 与 Python RFC 6238 一致；倒计时；重复提示 | 同上 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-13 | AC-05/08 | browser `TC-MFA-004-image-file-qr-import` | 夹具 PNG | 导入预览→`755 224`；非 OTP 码、无码图片各自提示 | 同上 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-14 | AC-05 | browser `TC-MFA-005-paste-screenshot` | `seed_clipboard_image` | 按钮粘贴与 Ctrl+V 粘贴各导入一个账户 | 同上 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-15 | AC-05/08 | browser `TC-MFA-006-google-migration-batch` | 迁移码夹具 | 预览两项、导入两项、再次导入全部“已存在” | 同上 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-16 | AC-06/07 | browser `TC-MFA-007-camera-and-screen-modes` | `browser_fake_camera` | 无摄像头状态；合成摄像头识别→导入→视频移除；屏幕扫描提示仅桌面版 | 同上 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-17a | AC-10/11/17 | browser `TC-MFA-008-search-group-keyboard` | 四账户迁移码，编辑一个到 Personal | 大小写不敏感搜索、Enter 复制首条、无结果、分组/未分组筛选、↓/↑ 在验证码间移动、Enter 复制焦点码 | 同上 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-17b | AC-12 | browser `TC-MFA-010-sort-pin-reorder` | 四账户迁移码，按固定模式复制 | 六种排序各自 `assert_items`、非自定义下无拖拽且上移禁用、置顶、菜单上/下移、拖拽、重载后排序/置顶/顺序保持、取消置顶回位 | 同上 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-18 | AC-13 | browser `TC-MFA-009-edit-delete` | — | 编辑后行更新；删除取消保留、确认删除 | 同上 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-19 | AC-02/03/09/14 | native `TC-MFA-101-native-hotp-totp-persist` | 隔离 profile | Rust 码 `755 224`→`287 082`；重载后计数保持；TOTP 与 Python 一致 | GitHub native ×3 | native Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-20 | AC-02/14 | native `TC-MFA-102-native-vault-lock-gate` | — | 设置中锁定→MFA 解锁对话框→解锁后码恢复 | GitHub native ×3 | native Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-21 | AC-15 | native `TC-MFA-103-native-backup-includes-mfa` | — | 立即备份→历史行→恢复清单含 `databases/mfa.db`、`databases/vault.db` | GitHub native ×3 | native Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-22 | AC-10 | native `TC-MFA-104-native-copy-system-clipboard` | Linux/X11 | `assert_system_clipboard equals 755224` | GitHub native Linux | native Linux 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-23 | AC-05 | native `TC-MFA-105-native-paste-screenshot-clipboard` | `native_clipboard_image`（xclip） | arboard 读图→导入→`755 224` | GitHub native Linux | native Linux 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-24 | AC-06 | native `TC-MFA-106-native-screen-scan` | `native_show_image_window` | 隐藏窗口截屏识别→导入→`755 224`；窗口恢复 | GitHub native Linux、Windows | native Linux/Windows 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`）；macOS 不适用（需屏幕录制授权） |
+| V-28 | AC-18 | browser `TC-MFA-011-show-qr-export` | HOTP 账户计数推进到 1 | 空/错密码拒绝且无图；Enter 提交正确密码出图；`seed_clipboard_image {selector}` 截取 QR 再经应用自身导入解码→同一账户“已添加”、`counter 1`、账户名一致；再开需重新输入；Esc 关闭 | GitHub browser ×3 | browser Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） |
+| V-29 | AC-18 | native `TC-MFA-107-native-qr-export` + 人工手机扫码 | 隔离 profile | Rust `VAULT_BAD_PASSWORD` 拒绝错密码且无图；正确密码渲染 QR（模块数合理）；人工：用 Google Authenticator/Aegis 扫截图，码与 Taomni 一致 | GitHub native ×3；人工待执行 | 自动部分 native Linux/Windows/macOS 通过，[run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`）；手机扫码人工待执行 |
 | V-30 | AC-18 | Rust `mfa::tests::{base32_encoding_*, export_uri_*}`；Vitest `src/lib/mfa/qrSvg.test.ts`、`MfaQrDialog.test.tsx`、`mfaStub.test.ts` | 临时 Vault / stub | RFC 4648 编码向量；错/空密码错误码；导出 URI 精确字符串（含 `&`、空格、`@` 编码与 HOTP 计数）；TS 与 Rust 同格式；SVG path 栅格化后 `qr` 解码回原 URI 且解析出同参数 | `cargo test --lib mfa::`；`pnpm test src/lib/mfa src/components/mfa src/stubs/mfaStub.test.ts` | 本地通过（2026-10-01） |
 
 用例与控件映射：`F-MFA-1`（标签、门禁、列表、复制、搜索/分组/排序/置顶、编辑/删除、二维码导出 `mfa-menu-qr`、`mfa-qr-{dialog,password,reveal,image,error,close}`）、`F-MFA-2`（添加对话框与四种导入、预览）、`F-MFA-3`（备份面板 testid 与 MFA 备份）。主要 testid：`context-menu-item-mfa`、`sidebar-tool-mfa`、`mfa-tab`、`mfa-search`、`mfa-group-filter`、`mfa-sort-mode`、`mfa-add`、`mfa-list`、`mfa-empty`、`mfa-status`、`mfa-account-row`（`data-issuer`、`data-account`、`data-pinned`、`data-kind`）、`mfa-account-code`、`mfa-account-countdown`、`mfa-account-next-code`、`mfa-account-copy`、`mfa-account-hotp-next`、`mfa-account-pin`、`mfa-account-menu`、`mfa-account-drag`、`mfa-add-dialog`、`mfa-add-mode-{secret,image,screen,camera}`、`mfa-add-{issuer,account,secret,group,advanced,kind,algorithm,digits,period,counter,uri,error,submit,cancel}`、`mfa-image-{dropzone,file,choose,paste,status}`、`mfa-camera-{state,video,device,retry}`、`mfa-screen-{scan,status}`、`mfa-import-{preview,item,item-check,issuer,account,group,duplicate,confirm,back}`、`mfa-edit-{dialog,issuer,account,group,note,save,cancel}`、`mfa-key-error`、`mfa-reset-store`、`vault-gate-placeholder`、`backup-create-now`、`backup-history-row`、`backup-history-restore`、`backup-restore-files`、`backup-restore-cancel`、`backup-action-success`。
@@ -324,21 +324,23 @@ MFA 标签布局（DEC-02 已确认线框）：
 
 | AC | 方案位置 | 开发任务 | 验证项与平台 | 所需证据 / 实际证据链接 | 当前缺口 |
 |---|---|---|---|---|---|
-| AC-01 | §4 流程 | TASK-06 | V-08、V-10（browser×3）、V-19（native×3 侧栏入口） | GitHub run 报告 | 待执行 |
-| AC-02 | §4 门禁 | TASK-05/06 | V-09、V-10、V-20 | 同上 | 待执行 |
-| AC-03/04 | §4 添加 | TASK-04/05 | V-08、V-11、V-12、V-19 | 同上 | 待执行 |
-| AC-05 | §4 图片 | TASK-04/05 | V-08、V-13、V-14、V-15、V-23 | 同上 | 待执行 |
-| AC-06 | §4 屏幕 | TASK-02/05 | V-04、V-16、V-24；V-26/V-27 人工 | 同上 | macOS/Wayland 人工待执行 |
-| AC-07 | §4 摄像头 | TASK-05 | V-09、V-16；V-25 人工 | 同上 | 真实摄像头人工待执行 |
-| AC-08 | §4 预览 | TASK-04/05 | V-13、V-15 | 同上 | 待执行 |
-| AC-09/10 | §4 列表 | TASK-01/05 | V-01、V-11、V-12、V-19、V-22 | 同上 | 待执行 |
-| AC-11/12/13 | §4 组织 | TASK-05 | V-08、V-09、V-17a、V-17b、V-18 | 同上 | 待执行 |
-| AC-14/16 | §4 数据 | TASK-01/02 | V-02、V-03、V-05、V-19、V-20 | 同上 | 待执行 |
-| AC-15 | §4 备份 | TASK-03 | V-06、V-07、V-21 | 同上 | 待执行 |
+| AC-01 | §4 流程 | TASK-06 | V-08、V-10（browser×3）、V-19（native×3 侧栏入口） | [run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） | 无（自动化已通过） |
+| AC-02 | §4 门禁 | TASK-05/06 | V-09、V-10、V-20 | 同上 | 无（自动化已通过） |
+| AC-03/04 | §4 添加 | TASK-04/05 | V-08、V-11、V-12、V-19 | 同上 | 无（自动化已通过） |
+| AC-05 | §4 图片 | TASK-04/05 | V-08、V-13、V-14、V-15、V-23 | 同上 | 无（自动化已通过） |
+| AC-06 | §4 屏幕 | TASK-02/05 | V-04、V-16、V-24；V-26/V-27 人工 | 同上 | Linux X11 与 Windows 自动化通过；macOS 屏幕录制与 Wayland 门户人工待执行（V-26/V-27） |
+| AC-07 | §4 摄像头 | TASK-05 | V-09、V-16；V-25 人工 | 同上 | 合成摄像头 browser×3 通过；真实摄像头人工待执行（V-25） |
+| AC-08 | §4 预览 | TASK-04/05 | V-13、V-15 | 同上 | 无（自动化已通过） |
+| AC-09/10 | §4 列表 | TASK-01/05 | V-01、V-11、V-12、V-19、V-22 | 同上 | 无（自动化已通过） |
+| AC-11/12/13 | §4 组织 | TASK-05 | V-08、V-09、V-17a、V-17b、V-18 | 同上 | 无（自动化已通过） |
+| AC-14/16 | §4 数据 | TASK-01/02 | V-02、V-03、V-05、V-19、V-20 | 同上 | 无（自动化已通过） |
+| AC-15 | §4 备份 | TASK-03 | V-06、V-07、V-21 | 同上 | 无（自动化已通过） |
 | AC-17 | §4 键盘 | TASK-05/06 | V-09、V-17a | 同上 | 屏幕阅读器人工未验证 |
-| AC-18 | §4 二维码导出、DEC-11 | TASK-10 | V-28（browser×3）、V-29（native×3 + 人工手机扫码）、V-30（本地已通过） | 同上 | GitHub 执行与手机扫码待执行 |
+| AC-18 | §4 二维码导出、DEC-11 | TASK-10 | V-28（browser×3）、V-29（native×3 + 人工手机扫码）、V-30（本地已通过） | 同上 | GitHub 自动化通过；第三方 App 手机扫码人工待执行（V-29） |
 
 三端代码兼容检查：本地 Linux 编译与单测；Windows/macOS 编译由 GitHub native 构建证明。只有三端 native 均有通过证据才可报告“三端真机通过”。
+
+执行记录：首轮 [run 36822701149](https://github.com/engcapa/taomni/actions/runs/36822701149)（`93bef67d`）browser 30/33（TC-MFA-010 拖拽在三端均未生效）、Windows native 5/5、macOS native 4/4、Linux native 构建失败（xcap Wayland 后端缺 `-lgbm`）；修复后（DEC-12、拖拽手柄 `preventDefault`）第二轮 [run 36832092843](https://github.com/engcapa/taomni/actions/runs/36832092843)（`37f018cf`） 全部 49 次执行通过：browser 11×3、native Linux 7、Windows 5、macOS 4；不适用组合为 TC-MFA-104/105 仅 Linux、TC-MFA-106 不含 macOS。
 
 ## 10. 风险、未决项与回退
 
