@@ -2,8 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Maximize, Menu as MenuIcon, Minimize, Minimize2, Pin, PinOff, Power, ShieldAlert } from "lucide-react";
 import { useT } from "../../lib/i18n";
 
-/** Delay before an unpinned toolbar slides away once the pointer leaves it. */
-export const VNC_TOOLBAR_HIDE_MS = 1500;
+/**
+ * Delay before an unpinned toolbar slides away once the pointer is off both
+ * the top edge and the toolbar. RealVNC Viewer starts hiding as soon as the
+ * pointer leaves (measured 2026-10-01); the few milliseconds only bridge the
+ * hand-over from the edge strip to the toolbar sliding in under the pointer.
+ */
+export const VNC_TOOLBAR_HIDE_MS = 50;
+/** Slide in/out duration (RealVNC Viewer: ~0.25 s each way). */
+const VNC_TOOLBAR_SLIDE_MS = 250;
+/** Height of the top-edge strip that reveals the toolbar, in device pixels (RealVNC: rows 0-2). */
+const VNC_TOOLBAR_EDGE_DEVICE_PX = 3;
 
 export interface VncFullScreenToolbarProps {
   scaledTo100: boolean;
@@ -74,7 +83,14 @@ export function VncFullScreenToolbar(props: VncFullScreenToolbarProps) {
       {/* Hot zone along the top edge; the toolbar itself sits above it. */}
       <div
         data-testid="vnc-fullscreen-hotzone"
-        style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, zIndex: 8 }}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: VNC_TOOLBAR_EDGE_DEVICE_PX / (window.devicePixelRatio || 1),
+          zIndex: 8,
+        }}
         onPointerEnter={() => {
           cancelHide();
           setShown(true);
@@ -99,7 +115,7 @@ export function VncFullScreenToolbar(props: VncFullScreenToolbarProps) {
           top: 0,
           left: "50%",
           transform: `translate(-50%, ${visible ? "0" : "-100%"})`,
-          transition: "transform 150ms ease-out",
+          transition: `transform ${VNC_TOOLBAR_SLIDE_MS}ms ease-out`,
           zIndex: 9,
           display: "flex",
           gap: 4,

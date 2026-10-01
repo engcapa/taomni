@@ -1,9 +1,27 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ invoke: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  invoke: vi.fn(),
+  listeners: new Map<string, (event: { payload: unknown }) => void>(),
+  window: { current: null as Record<string, unknown> | null },
+}));
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => {
+    if (!mocks.window.current) throw new Error("no Tauri window in this test");
+    return mocks.window.current;
+  },
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn((name: string, handler: (event: { payload: unknown }) => void) => {
+    mocks.listeners.set(name, handler);
+    return Promise.resolve(() => {
+      if (mocks.listeners.get(name) === handler) mocks.listeners.delete(name);
+    });
+  }),
+}));
 
 import { useVncStore, type VncConnectionState } from "../../stores/vncStore";
 import VncPanel from "./VncPanel";
@@ -483,6 +501,119 @@ describe("VncPanel viewer options (VNC-CLIP-001, VNC-PERF-004, VNC-INPUT-003)", 
       ]);
     } finally {
       platform.mockRestore();
+    }
+  });
+
+  it("sends Ctrl before a key passed through by the special-key hook (Ctrl+Esc)", async () => {
+    const platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+    const tauri = window as unknown as { __TAURI_INTERNALS__?: unknown };
+    tauri.__TAURI_INTERNALS__ = {};
+    try {
+      const { socket, canvas } = await renderConnected();
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+        fireEvent.focus(canvas);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(mocks.invoke).toHaveBeenCalledWith("vnc_set_special_key_capture", { enabled: true });
+      const special = mocks.listeners.get("vnc-special-key");
+      expect(special).toBeDefined();
+      act(() => {
+        canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "Control", code: "ControlLeft", ctrlKey: true, bubbles: true, cancelable: true }));
+        // Esc arrives from the hook 40 ms later, inside the AltGr pairing wait.
+        vi.advanceTimersByTime(40);
+        special?.({ payload: { code: "Escape", down: true } });
+        special?.({ payload: { code: "Escape", down: false } });
+        canvas.dispatchEvent(new KeyboardEvent("keyup", { key: "Control", code: "ControlLeft", bubbles: true, cancelable: true }));
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      expect(sentMessages(socket).filter((message) => message.kind === "key")).toEqual([
+        { kind: "key", down: true, keysym: 0xffe3 },
+        { kind: "key", down: true, keysym: 0xff1b },
+        { kind: "key", down: false, keysym: 0xff1b },
+        { kind: "key", down: false, keysym: 0xffe3 },
+      ]);
+    } finally {
+      delete tauri.__TAURI_INTERNALS__;
+      mocks.listeners.clear();
+      platform.mockRestore();
+    }
+  });
+
+  it("sends the character a dead key composes, not the bare letter", async () => {
+    const { socket, canvas } = await renderConnected();
+    const key = (type: string, init: KeyboardEventInit) => {
+      const event = new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init });
+      canvas.dispatchEvent(event);
+      return event;
+    };
+    let deadDown: KeyboardEvent | null = null;
+    let letterDown: KeyboardEvent | null = null;
+    act(() => {
+      // German ^ then e: the OS composes and reports "ê" only as keypress.
+      deadDown = key("keydown", { key: "Dead", code: "Backquote" });
+      key("keyup", { key: "Dead", code: "Backquote" });
+      letterDown = key("keydown", { key: "e", code: "KeyE" });
+      key("keypress", { key: "ê", code: "KeyE", charCode: 0xea });
+      key("keyup", { key: "e", code: "KeyE" });
+      // Ctrl+C right after a dead key is still a shortcut.
+      key("keydown", { key: "Dead", code: "Backquote" });
+      key("keydown", { key: "Control", code: "ControlRight", ctrlKey: true });
+      key("keydown", { key: "c", code: "KeyC", ctrlKey: true });
+      key("keyup", { key: "c", code: "KeyC", ctrlKey: true });
+      key("keyup", { key: "Control", code: "ControlRight" });
+    });
+    // The OS needs both keydowns to compose: neither may be default-prevented.
+    expect(deadDown!.defaultPrevented).toBe(false);
+    expect(letterDown!.defaultPrevented).toBe(false);
+    expect(sentMessages(socket).filter((message) => message.kind === "key")).toEqual([
+      { kind: "key", down: true, keysym: 0xea },
+      { kind: "key", down: false, keysym: 0xea },
+      { kind: "key", down: true, keysym: 0xffe3 },
+      { kind: "key", down: true, keysym: 0x63 },
+      { kind: "key", down: false, keysym: 0x63 },
+      { kind: "key", down: false, keysym: 0xffe3 },
+    ]);
+  });
+
+  it("enters screen full screen without Tauri's resize-border window and restores the window", async () => {
+    const tauri = window as unknown as { __TAURI_INTERNALS__?: unknown };
+    tauri.__TAURI_INTERNALS__ = {};
+    const calls: string[] = [];
+    const state = { maximized: true, fullscreen: false, resizable: true };
+    mocks.window.current = {
+      isMaximized: async () => state.maximized,
+      isFullscreen: async () => state.fullscreen,
+      isResizable: async () => state.resizable,
+      unmaximize: async () => { calls.push("unmaximize"); state.maximized = false; },
+      maximize: async () => { calls.push("maximize"); state.maximized = true; },
+      setResizable: async (value: boolean) => { calls.push(`setResizable(${value})`); state.resizable = value; },
+      setFullscreen: async (value: boolean) => { calls.push(`setFullscreen(${value})`); state.fullscreen = value; },
+    };
+    try {
+      const { canvas } = await renderConnected();
+      act(() => {
+        fireEvent.keyDown(canvas, { key: "F8", code: "F8" });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("vnc-menu-fullscreen"));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByTestId("vnc-panel").dataset.vncFullscreen).toBe("true");
+      expect(calls).toEqual(["unmaximize", "setResizable(false)", "setFullscreen(true)"]);
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("vnc-fs-exit"));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByTestId("vnc-panel").dataset.vncFullscreen).toBe("false");
+      expect(calls.slice(3)).toEqual(["setFullscreen(false)", "setResizable(true)", "maximize"]);
+    } finally {
+      delete tauri.__TAURI_INTERNALS__;
+      mocks.window.current = null;
     }
   });
 

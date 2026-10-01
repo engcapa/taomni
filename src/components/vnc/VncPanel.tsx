@@ -158,6 +158,18 @@ function newAttemptId(): string {
 }
 
 /** Keysyms for keys the Windows keyboard hook passes through (VNC-INPUT-003). */
+/** Window state screen-level full screen changed, restored on exit. */
+type FullScreenRestore = { maximized: boolean; osFullscreen: boolean; resizable: boolean };
+
+async function restoreWindowAfterFullScreen(
+  w: ReturnType<typeof getCurrentWindow>,
+  restore: FullScreenRestore | null,
+): Promise<void> {
+  if (!restore?.osFullscreen) await w.setFullscreen(false);
+  if (restore?.resizable) await w.setResizable(true);
+  if (restore?.maximized) await w.maximize();
+}
+
 const SPECIAL_KEY_KEYSYMS: Record<string, number> = {
   MetaLeft: 0xffeb,
   MetaRight: 0xffec,
@@ -281,10 +293,12 @@ export default function VncPanel({
   const serverClipboardGraceUntilRef = useRef(0);
   const altGrArmedRef = useRef<{ timeStamp: number; timer: number } | null>(null);
   const altGrSuppressedCtrlRef = useRef(false);
+  // Sends a Ctrl press still held back by the AltGr check (set by the key handler).
+  const flushAltGrRef = useRef<() => void>(() => {});
   const canvasFocusedRef = useRef(false);
   const [canvasFocused, setCanvasFocused] = useState(false);
   const [screenFullScreen, setScreenFullScreen] = useState(false);
-  const fullScreenRestoreRef = useRef<{ maximized: boolean; osFullscreen: boolean } | null>(null);
+  const fullScreenRestoreRef = useRef<FullScreenRestore | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [devicePixelRatio, setDevicePixelRatio] = useState(() => window.devicePixelRatio || 1);
   const [ctrlLatched, setCtrlLatched] = useState(false);
@@ -379,17 +393,24 @@ export default function VncPanel({
     try {
       const w = getCurrentWindow();
       if (next) {
-        const restore = { maximized: await w.isMaximized(), osFullscreen: await w.isFullscreen() };
+        const restore = {
+          maximized: await w.isMaximized(),
+          osFullscreen: await w.isFullscreen(),
+          resizable: await w.isResizable(),
+        };
         fullScreenRestoreRef.current = restore;
         // A maximized borderless window keeps a work-area-sized surface on
         // Windows unless it leaves the maximized state first.
         if (restore.maximized) await w.unmaximize();
+        // Tauri resizes undecorated windows through a child window over the
+        // window edges; in full screen it would take the pointer at the top
+        // edge (the toolbar hot zone). A non-resizable window has none.
+        if (restore.resizable) await w.setResizable(false);
         if (!restore.osFullscreen) await w.setFullscreen(true);
       } else {
         const restore = fullScreenRestoreRef.current;
         fullScreenRestoreRef.current = null;
-        if (!restore?.osFullscreen) await w.setFullscreen(false);
-        if (restore?.maximized) await w.maximize();
+        await restoreWindowAfterFullScreen(w, restore);
       }
     } catch {
       // Window API unavailable: the in-WebView cover still applies.
@@ -415,15 +436,7 @@ export default function VncPanel({
   useEffect(() => () => {
     if (fullScreenRestoreRef.current && isTauriRuntime()) {
       const restore = fullScreenRestoreRef.current;
-      void (async () => {
-        try {
-          const w = getCurrentWindow();
-          if (!restore.osFullscreen) await w.setFullscreen(false);
-          if (restore.maximized) await w.maximize();
-        } catch {
-          // ignore
-        }
-      })();
+      void restoreWindowAfterFullScreen(getCurrentWindow(), restore).catch(() => {});
     }
   }, []);
 
@@ -1152,7 +1165,13 @@ export default function VncPanel({
       })();
     };
 
+    // Dead-key composition state (see handleKey / handleKeyPress).
+    let deadKeyPending = false;
+    let composingCode: string | null = null;
+
     const releaseAllInput = () => {
+      deadKeyPending = false;
+      composingCode = null;
       pressedKeysymsRef.current.forEach((keysym) => {
         // Keys latched from the session menu stay down until toggled off.
         if (!latchedKeysymsRef.current.has(keysym)) sendWsBinary(encodeWsKey(false, keysym));
@@ -1188,6 +1207,7 @@ export default function VncPanel({
       keyCodeKeysymsRef.current.set("ControlLeft", 0xffe3);
       sendKey(true, 0xffe3);
     };
+    flushAltGrRef.current = flushAltGr;
 
     const handleKey = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
@@ -1262,6 +1282,31 @@ export default function VncPanel({
         return;
       }
 
+      // VNC-INPUT-003 / DEC-VNC-17: the OS composes a dead key with the next
+      // key and reports the result only as keypress (the keydowns say "Dead"
+      // and then the bare letter). Neither keydown is sent and neither is
+      // default-prevented; the composed character goes out on keypress, the
+      // way RealVNC Viewer sends it.
+      if (e.type === "keydown" && e.key === "Dead") {
+        // A second dead key makes the OS type the accent itself.
+        if (deadKeyPending) composingCode = e.code;
+        deadKeyPending = !deadKeyPending;
+        return;
+      }
+      if (e.type === "keydown" && deadKeyPending && !modifierKeysymFromKey(e.key)) {
+        deadKeyPending = false;
+        const plain = (!e.ctrlKey && !e.altKey && !e.metaKey) || e.getModifierState?.("AltGraph");
+        if (plain && [...e.key].length === 1) {
+          composingCode = e.code;
+          return;
+        }
+      }
+      if (e.type === "keyup" && composingCode !== null && e.code === composingCode) {
+        composingCode = null;
+        e.preventDefault();
+        return;
+      }
+
       if (e.type === "keyup" && e.code) {
         // Release exactly what this physical key pressed; a key-up whose
         // key-down went elsewhere (e.g. Esc closing the session menu) is not
@@ -1287,8 +1332,21 @@ export default function VncPanel({
       sendKey(true, keysym);
     };
 
+    // The character a dead-key sequence produced (see handleKey).
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (composingCode === null || viewOnly) return;
+      const activeEl = document.activeElement;
+      if (isEditableTarget(e.target, activeEl) || !isTerminalFocused(containerRef.current, activeEl)) return;
+      const keysym = keyEventToKeysym(e);
+      if (keysym === 0) return;
+      e.preventDefault();
+      sendWsBinary(encodeWsKey(true, keysym));
+      sendWsBinary(encodeWsKey(false, keysym));
+    };
+
     window.addEventListener("keydown", handleKey);
     window.addEventListener("keyup", handleKey);
+    window.addEventListener("keypress", handleKeyPress);
 
     // Keep the paste listener as a secondary path — useful when the OS
     // dispatches a paste event directly to the WebView.
@@ -1314,6 +1372,7 @@ export default function VncPanel({
     return () => {
       window.removeEventListener("keydown", handleKey);
       window.removeEventListener("keyup", handleKey);
+      window.removeEventListener("keypress", handleKeyPress);
       window.removeEventListener("paste", handlePaste);
       window.removeEventListener("blur", releaseAllInput);
       document.removeEventListener("visibilitychange", releaseAllInput);
@@ -1321,6 +1380,7 @@ export default function VncPanel({
         window.clearTimeout(altGrArmedRef.current.timer);
         altGrArmedRef.current = null;
       }
+      flushAltGrRef.current = () => {};
     };
   }, [visible, conn?.status, viewOnly, allowClipboardSend, sendWs, sendWsBinary]);
 
@@ -1356,6 +1416,9 @@ export default function VncPanel({
     void listen<{ code: string; down: boolean }>("vnc-special-key", (event) => {
       const keysym = SPECIAL_KEY_KEYSYMS[event.payload.code];
       if (!keysym || !canvasFocusedRef.current) return;
+      // Ctrl+Esc: the Ctrl held back by the AltGr check must reach the
+      // remote before the intercepted key, or the remote sees a plain Esc.
+      if (event.payload.down) flushAltGrRef.current();
       sendWsBinary(encodeWsKey(event.payload.down, keysym));
       if (event.payload.down) pressedKeysymsRef.current.add(keysym);
       else pressedKeysymsRef.current.delete(keysym);
@@ -1674,6 +1737,7 @@ export default function VncPanel({
         ? `${paintStats.fullFrame.receiveMs.toFixed(2)}+${paintStats.fullFrame.paintMs.toFixed(2)}`
         : undefined}
       data-vnc-fullscreen={fullScreen ? "true" : "false"}
+      data-vnc-special-keys={captureSpecialKeys ? "captured" : "off"}
       style={{
         width: "100%",
         height: "100%",
