@@ -13,6 +13,14 @@ import { detectXServer, type XServerStatus } from "../lib/ipc";
 import type { TabFilter } from "../lib/tabFilter";
 import { terminalCwdTitlePrefix } from "../lib/terminalCwd";
 import { getQueryTab } from "../lib/queryRegistry";
+import {
+  readMergeToolWindowRail,
+  readSidebarCollapsedByGroup,
+  sidebarRailGroup,
+  writeMergeToolWindowRail,
+  writeSidebarCollapsedByGroup,
+  type SidebarCollapsedByGroup,
+} from "./sidebarRailPolicy";
 
 export type SideTab = "sessions" | "tools";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
@@ -141,6 +149,13 @@ interface AppState {
   tabs: Tab[];
   activeTabId: string | null;
   sidebarCollapsed: boolean;
+  /**
+   * ED-PARITY-027: merge the active tab's tool window bar into the sidebar
+   * rail and remember the sidebar state per tab group (default on).
+   */
+  mergeToolWindowRail: boolean;
+  /** Sidebar collapsed state remembered per tab group (see sidebarRailPolicy). */
+  sidebarCollapsedByGroup: SidebarCollapsedByGroup;
   activeSideTab: SideTab;
   /**
    * Whether a usable local X server is reachable (Xorg / XQuartz / VcXsrv /
@@ -242,6 +257,9 @@ interface AppState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveSideTab: (tab: SideTab) => void;
+  setMergeToolWindowRail: (value: boolean) => void;
+  /** Apply the remembered sidebar state of the active tab's group (ED-PARITY-027). */
+  applySidebarForActiveTab: () => void;
   /** Re-probe the local X server and update {@link xServerStatus}. */
   refreshXServer: () => Promise<void>;
   /** @deprecated X server availability is detected, not toggled. Kept as a
@@ -871,7 +889,30 @@ function terminalAutoTitleBase(tab: Tab, cwdPrefix: string): string {
   return sessionName ? `${sessionName} · ${cwdPrefix}` : cwdPrefix;
 }
 
-export const useAppStore = create<AppState>((set) => ({
+/**
+ * ED-PARITY-027 A: a manual sidebar change is remembered for the active tab's
+ * group, so returning to that kind of tab restores it. With the merged rail the
+ * legacy key keeps only the "other" group's state, which is what a new launch
+ * (Welcome) starts from.
+ */
+function rememberSidebarForActiveGroup(
+  s: Pick<AppState, "mergeToolWindowRail" | "sidebarCollapsedByGroup" | "tabs" | "activeTabId">,
+  collapsed: boolean,
+): Partial<Pick<AppState, "sidebarCollapsedByGroup">> {
+  if (!s.mergeToolWindowRail) {
+    writeSidebarCollapsed(collapsed);
+    return {};
+  }
+  const active = s.tabs.find((tab) => tab.id === s.activeTabId);
+  const group = sidebarRailGroup(active?.type);
+  if (group === "other") writeSidebarCollapsed(collapsed);
+  if (s.sidebarCollapsedByGroup[group] === collapsed) return {};
+  const sidebarCollapsedByGroup = { ...s.sidebarCollapsedByGroup, [group]: collapsed };
+  if (group !== "other") writeSidebarCollapsedByGroup(sidebarCollapsedByGroup);
+  return { sidebarCollapsedByGroup };
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
   tabs: [
     {
       id: "welcome",
@@ -882,6 +923,8 @@ export const useAppStore = create<AppState>((set) => ({
   ],
   activeTabId: "welcome",
   sidebarCollapsed: readSidebarCollapsed(),
+  mergeToolWindowRail: readMergeToolWindowRail(),
+  sidebarCollapsedByGroup: readSidebarCollapsedByGroup(readSidebarCollapsed()),
   activeSideTab: "sessions",
   cwdByTab: {},
   terminalRuntimeByTab: {},
@@ -1201,16 +1244,27 @@ export const useAppStore = create<AppState>((set) => ({
   toggleSidebar: () =>
     set((s) => {
       const sidebarCollapsed = !s.sidebarCollapsed;
-      writeSidebarCollapsed(sidebarCollapsed);
-      return { sidebarCollapsed };
+      return { sidebarCollapsed, ...rememberSidebarForActiveGroup(s, sidebarCollapsed) };
     }),
   setSidebarCollapsed: (collapsed) => {
-    writeSidebarCollapsed(collapsed);
-    set({ sidebarCollapsed: collapsed });
+    set((s) => ({ sidebarCollapsed: collapsed, ...rememberSidebarForActiveGroup(s, collapsed) }));
   },
   setActiveSideTab: (tab) => {
-    writeSidebarCollapsed(false);
-    set({ activeSideTab: tab, sidebarCollapsed: false });
+    set((s) => ({ activeSideTab: tab, sidebarCollapsed: false, ...rememberSidebarForActiveGroup(s, false) }));
+  },
+  setMergeToolWindowRail: (value) => {
+    writeMergeToolWindowRail(value);
+    set({ mergeToolWindowRail: value });
+  },
+  applySidebarForActiveTab: () => {
+    const s = get();
+    if (!s.mergeToolWindowRail) return;
+    const active = s.tabs.find((tab) => tab.id === s.activeTabId);
+    const collapsed = s.sidebarCollapsedByGroup[sidebarRailGroup(active?.type)];
+    if (collapsed === s.sidebarCollapsed) return;
+    // Applying a group's state is not a manual change: the legacy key keeps
+    // the "other" group's state for the next launch.
+    set({ sidebarCollapsed: collapsed });
   },
 
   refreshXServer: async () => {

@@ -14,12 +14,15 @@ import {
   Shield,
   FileText,
   MessageSquare,
+  Inbox,
+  KeyRound,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { SessionTree } from "./SessionTree";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useAppStore, type SideTab } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
+import { useMainRailHostStore } from "../../stores/mainRailHostStore";
 import type { SessionConfig } from "../../lib/ipc";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import type { AppCommand } from "../menubar/commands";
@@ -65,6 +68,7 @@ export function Sidebar({
     moveSessionsToGroup,
   } = useSessionStore();
   const t = useT();
+  const setRailHost = useMainRailHostStore((state) => state.setHost);
   const selectedSessions = sessions.filter((session) => selectedSessionIds.includes(session.id));
   const selectionCount = selectedSessions.length;
   const [deleteConfirm, setDeleteConfirm] = useState<SessionConfig[] | null>(null);
@@ -107,7 +111,8 @@ export function Sidebar({
     <>
     <div data-testid="sidebar" className="h-full flex">
       <div
-        className="w-[30px] flex flex-col shrink-0"
+        data-testid="sidebar-rail"
+        className={`${compact ? "min-w-[30px]" : "w-[30px]"} flex flex-col shrink-0`}
         style={{ background: "var(--taomni-tab-inactive)", borderRight: "1px solid var(--taomni-sidebar-border)" }}
       >
         {(["sessions", "tools"] as const).map((tab) => {
@@ -127,7 +132,16 @@ export function Sidebar({
             </div>
           );
         })}
-        <div className="flex-1" />
+        {compact ? (
+          // ED-PARITY-027 B: the active tab's tool window buttons render here.
+          <div
+            ref={setRailHost}
+            data-testid="sidebar-tool-window-rail"
+            className="flex min-h-0 flex-1 flex-col"
+          />
+        ) : (
+          <div className="flex-1" />
+        )}
         {gitAction && (
           <button
             data-testid="ribbon-git"
@@ -272,10 +286,22 @@ function ToolsPanel({ onCommand }: { onCommand?: (command: AppCommand) => void }
       testId: "sidebar-tool-code-workspace",
     },
     {
+      id: "mail-unified",
+      label: t("tabs.mailUnified"),
+      icon: <Inbox className="w-4 h-4 shrink-0" />,
+      testId: "sidebar-tool-mail-unified",
+    },
+    {
       id: "lan-chat",
       label: t("tabs.lanChat"),
       icon: <MessageSquare className="w-4 h-4 shrink-0" />,
       testId: "sidebar-tool-lan-chat",
+    },
+    {
+      id: "mfa",
+      label: t("menu.mfa"),
+      icon: <KeyRound className="w-4 h-4 shrink-0" />,
+      testId: "sidebar-tool-mfa",
     },
     {
       id: "tools",

@@ -488,7 +488,22 @@ export function Breadcrumbs({
   onCloseNavigationBar,
   variant = "bar",
 }: BreadcrumbsProps) {
-  const symbolChain = symbolChainAtPosition(symbols, position);
+  const computedSymbolChain = useMemo(
+    () => symbolChainAtPosition(symbols, position),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- position fields, not identity
+    [symbols, position.line, position.character],
+  );
+  // Caret moves inside the same member keep the same chain identity, so the
+  // width measurement below does not force a layout on every keystroke.
+  const symbolChainRef = useRef(computedSymbolChain);
+  if (
+    symbolChainRef.current !== computedSymbolChain
+    && (symbolChainRef.current.length !== computedSymbolChain.length
+      || symbolChainRef.current.some((symbol, index) => symbol !== computedSymbolChain[index]))
+  ) {
+    symbolChainRef.current = computedSymbolChain;
+  }
+  const symbolChain = symbolChainRef.current;
   const navRef = useRef<HTMLElement | null>(null);
   const fullPathMeasureRef = useRef<HTMLDivElement | null>(null);
   const [collapsed, setCollapsed] = useState(false);

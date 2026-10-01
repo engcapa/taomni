@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DebugFramesPane } from "./DebugFramesPane";
 import type { CodeDebugSession } from "../../useCodeDebugSession";
@@ -37,6 +37,8 @@ function makeSession(overrides: Partial<CodeDebugSession> = {}): CodeDebugSessio
     restart: vi.fn(),
     canRestart: false,
     toggleBreakpoint: vi.fn(),
+    addBreakpoint: vi.fn(),
+    toggleBreakpointEnabled: vi.fn(),
     setBreakpointOptions: vi.fn(),
     setBreakpointMode: vi.fn(),
     removeBreakpoint: vi.fn(),
@@ -59,6 +61,7 @@ function makeSession(overrides: Partial<CodeDebugSession> = {}): CodeDebugSessio
     runToCursor: vi.fn(),
     selectThread: vi.fn(),
     selectFrame: vi.fn(),
+    loadMoreFrames: vi.fn(async () => {}),
     restartFrame: vi.fn(),
     hotReload: vi.fn(),
     evaluate: vi.fn().mockResolvedValue({ value: "", variablesReference: 0, type: null }),
@@ -84,11 +87,10 @@ function makeSession(overrides: Partial<CodeDebugSession> = {}): CodeDebugSessio
 describe("DebugFramesPane", () => {
   afterEach(cleanup);
 
-  it("renders threads and frames tree and allows selection and step actions", async () => {
+  it("shows IDEA's thread combo and frame labels, and selects frames by mouse and keyboard", () => {
     const selectThread = vi.fn();
     const selectFrame = vi.fn();
     const onOpenFrame = vi.fn();
-    const step = vi.fn().mockResolvedValue(undefined);
 
     const state = {
       ...initialDebugState("s1"),
@@ -99,14 +101,14 @@ describe("DebugFramesPane", () => {
         { id: 2, name: "worker" },
       ],
       frames: [
-        { id: 101, name: "Main.main", path: "/src/Main.java", line: 15, column: 1, sourceReference: 0, sourceName: null },
-        { id: 102, name: "App.run", path: "/src/App.java", line: 42, column: 1, sourceReference: 0, sourceName: null },
+        { id: 101, name: "com.acme.Main.main(String[])", path: "/src/main/java/com/acme/Main.java", line: 15, column: 1, sourceReference: 0, sourceName: null },
+        { id: 102, name: "com.acme.App.run()", path: "/src/main/java/com/acme/App.java", line: 42, column: 1, sourceReference: 0, sourceName: null },
       ],
       selectedThreadId: 1,
       selectedFrameId: 101,
     };
 
-    const debug = makeSession({ state, selectThread, selectFrame, step });
+    const debug = makeSession({ state, selectThread, selectFrame });
 
     render(
       <DebugFramesPane
@@ -117,40 +119,57 @@ describe("DebugFramesPane", () => {
       />,
     );
 
-    expect(screen.getByTestId("debug-thread-1")).toBeInTheDocument();
-    expect(screen.getByTestId("debug-thread-2")).toBeInTheDocument();
-    expect(screen.getByTestId("debug-frame-101")).toBeInTheDocument();
-    expect(screen.getByTestId("debug-frame-102")).toBeInTheDocument();
+    expect(screen.getByTestId("debug-thread-select")).toHaveTextContent('"main"@1: SUSPENDED');
+    expect(screen.getByTestId("debug-frame-101")).toHaveTextContent("main:15, Main (com.acme)");
+    expect(screen.getByTestId("debug-frame-102")).toHaveTextContent("run:42, App (com.acme)");
 
-    // Click frame to select and open
-    fireEvent.click(screen.getByTestId("debug-frame-101"));
-    expect(selectFrame).toHaveBeenCalledWith(101);
-    expect(onOpenFrame).toHaveBeenCalledWith(expect.objectContaining({ id: 101 }));
+    // Click a frame to select and reveal it.
+    fireEvent.click(screen.getByTestId("debug-frame-102"));
+    expect(selectFrame).toHaveBeenCalledWith(102);
+    expect(onOpenFrame).toHaveBeenCalledWith(expect.objectContaining({ id: 102 }));
 
-    // Click thread 2
+    // The list follows the arrows like IDEA's frames list.
+    fireEvent.keyDown(screen.getByTestId("debug-frames-list"), { key: "ArrowDown" });
+    expect(selectFrame).toHaveBeenLastCalledWith(102);
+
+    // Pick another thread from the combo.
+    fireEvent.click(screen.getByTestId("debug-thread-select"));
+    expect(screen.getByTestId("debug-thread-2")).toHaveTextContent('"worker"@2: RUNNING');
     fireEvent.click(screen.getByTestId("debug-thread-2"));
     expect(selectThread).toHaveBeenCalledWith(2);
+  });
 
-    // Step controls
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("debug-step-over"));
-    });
-    expect(step).toHaveBeenCalledWith("stepOver");
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("debug-step-in"));
-    });
-    expect(step).toHaveBeenCalledWith("stepIn");
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("debug-step-out"));
-    });
-    expect(step).toHaveBeenCalledWith("stepOut");
-
-    // Session controls
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("debug-continue"));
-    });
-    expect(step).toHaveBeenCalledWith("continue");
+  it("folds library frames and loads more frames on demand", () => {
+    const loadMoreFrames = vi.fn(async () => {});
+    const state = {
+      ...initialDebugState("s1"),
+      status: "stopped" as const,
+      stoppedThreadId: 1,
+      threads: [{ id: 1, name: "main" }],
+      frames: [
+        { id: 1, name: "App.run()", path: "/repo/App.java", line: 3, column: 1, sourceReference: 0, sourceName: null },
+        { id: 2, name: "java.lang.reflect.Method.invoke(Object)", path: null, line: 580, column: 1, sourceReference: 9, sourceName: "Method.java" },
+        { id: 3, name: "java.lang.Thread.run()", path: null, line: 1583, column: 1, sourceReference: 9, sourceName: "Thread.java" },
+      ],
+      framesTotal: 12,
+      selectedThreadId: 1,
+      selectedFrameId: 1,
+    };
+    render(
+      <DebugFramesPane
+        debug={makeSession({ state, loadMoreFrames })}
+        activeRunning={true}
+        stopped={true}
+        onOpenFrame={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("debug-frame-2")).toHaveAttribute("data-library-frame", "true");
+    fireEvent.click(screen.getByTestId("debug-frames-hide-library"));
+    expect(screen.queryByTestId("debug-frame-2")).toBeNull();
+    expect(screen.getByTestId("debug-frames-folded-2")).toHaveTextContent("2 hidden frames");
+    fireEvent.click(screen.getByTestId("debug-frames-load-more"));
+    expect(loadMoreFrames).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId("debug-frames-folded-2"));
+    expect(screen.getByTestId("debug-frame-2")).toBeInTheDocument();
   });
 });

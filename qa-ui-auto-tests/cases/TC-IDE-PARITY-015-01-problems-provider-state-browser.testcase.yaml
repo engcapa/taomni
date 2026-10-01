@@ -31,6 +31,7 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tree-new"]'
 - click: '[data-testid="code-workspace-tree-new-file"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
@@ -70,33 +71,33 @@ verification:
   - id: R1
     requirement: A1/DEC-015-01：状态胶囊与 Problems 对同一不可用状态给出同一原因。
     actions:
-    - 17
-    - 21
+    - 18
+    - 22
     checkpoints:
-    - step: 20
+    - step: 21
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains": "not available", "timeout_sec": 30}}'
-    - step: 23
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"][data-state=\"failed\"]", "timeout_sec": 10}}'
     - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"][data-state=\"failed\"]", "timeout_sec": 10}}'
+    - step: 25
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"]", "contains": "not available"}}'
     results:
-    - 20
-    - 24
+    - 21
+    - 25
   - id: R2
     requirement: A3/A4/DEC-015-02：语言服务不可用时 Problems 不显示 “No problems”，而显示 typed 状态与 Configure；Configure 打开 Language Servers 设置。
     actions:
-    - 21
-    - 27
+    - 22
+    - 28
     checkpoints:
-    - step: 23
+    - step: 24
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-problems-provider-state\"][data-state=\"failed\"]", "timeout_sec": 10}}'
-    - step: 25
+    - step: 26
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-problems-panel\"]", "regex": "(?s)\\A(?!.*No problems)"}}'
-    - step: 28
+    - step: 29
       expectation: '{"wait_for": {"selector": "[data-testid=\"language-servers-settings\"]", "timeout_sec": 15}}'
     results:
-    - 25
-    - 28
+    - 26
+    - 29
   visual:
   - check: 对照 IDEA Problems 空态与 Taomni typed 状态行的文案与按钮位置。
     method: manual

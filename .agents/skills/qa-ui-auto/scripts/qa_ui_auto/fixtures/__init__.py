@@ -31,6 +31,9 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
                     journal shapes for rename-delete recovery
 * view_state_fixtures - native-only 60-line Long.java for per-leaf caret,
                     scroll and fold restore across reload_window
+* mail_server     - native: in-process fake IMAP/SMTP on 127.0.0.1 (seeded
+                    INBOX); browser: stub server model. Exposes
+                    ${fixture.mail_quick_connect}
 
 Custom fixtures live here, register in REGISTRY, and declare their name in
 schema/testcase.schema.json. There is no runtime register() API.
@@ -49,6 +52,7 @@ from . import parity008_git
 from . import parity009_ssr
 from . import parity007_extract
 from . import editor_save_race
+from . import mail_server
 
 
 class FixtureContext(Protocol):
@@ -93,6 +97,7 @@ REGISTRY: dict[str, Fixture] = {
     "parity008_git": Fixture("parity008_git", parity008_git.setup, parity008_git.teardown),
     "parity009_ssr": Fixture("parity009_ssr", parity009_ssr.setup, parity009_ssr.teardown),
     "parity007_extract": Fixture("parity007_extract", parity007_extract.setup, parity007_extract.teardown),
+    "mail_server": Fixture("mail_server", mail_server.setup, mail_server.teardown),
 }
 
 

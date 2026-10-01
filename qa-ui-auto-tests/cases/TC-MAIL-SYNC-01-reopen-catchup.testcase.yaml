@@ -1,0 +1,102 @@
+id: TC-MAIL-SYNC-01
+title: Mail catches up every message delivered while the tab was closed
+description: 'Regression for the "mail missing after the session was closed" issue
+
+  (docs-feature/mail-thunderbird-parity-design.md R1/AC-01). Opens a mail
+
+  account through Quick Connect, closes the tab, delivers 450 messages to the
+
+  server (more than two catch-up batches of 200), reopens the same account and
+
+  requires the fully loaded list to equal the server''s message count.
+
+  Browser mode drives the stub server model (renderer orchestration only);
+
+  native mode runs the real Tauri backend against the in-process fake IMAP
+
+  server started by the mail_server fixture.
+
+  '
+covers:
+- F-MAIL-5
+tags:
+- mail
+- p0
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="mail-client-tab"]'
+    state: detached
+- mail_server_deliver:
+    count: 450
+    prefix: Closed-tab
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 120
+- assert_count:
+    selector: '[data-testid="mail-message-row"]'
+    min: 450
+- screenshot: mail-sync-01-reopen-catchup.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 标签关闭期间到达的 450 封邮件在重开后全部出现在列表中，列表数量与服务器完全一致且无更多待加载项（AC-01/AC-02）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
+    - step: 9
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
+    - step: 16
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 120}}'
+    - step: 17
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-message-row\"]", "min": 450}}'
+    results:
+    - 16
+    - 17
+  visual:
+  - check: 截图中邮件列表、文件夹与计数显示完整，无同步进度残留或遮挡。
+    method: manual
+    reason: 像素与布局需人工评审，不能由 DOM 断言代替。
+  native:
+  - check: native 模式验证真实 Tauri 后端对本地假 IMAP 服务器的多批次 catch-up；browser 仅验证渲染层编排；各平台分别记录，不互相外推。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

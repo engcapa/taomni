@@ -37,6 +37,40 @@ describe("RecentFilesPopup", () => {
     expect(onPick).toHaveBeenCalledWith(entries[1]);
   });
 
+  it("moves between the tool window column and the files with Left/Right (IDEA Switcher)", () => {
+    const onPick = vi.fn();
+    const onActivateToolWindow = vi.fn();
+    const onOpenRecentLocations = vi.fn();
+    render(
+      <RecentFilesPopup
+        open
+        entries={entries}
+        onClose={vi.fn()}
+        onPick={onPick}
+        toolWindows={[{ id: "project", label: "Project" }, { id: "problems", label: "Problems" }]}
+        onActivateToolWindow={onActivateToolWindow}
+        onOpenRecentLocations={onOpenRecentLocations}
+      />,
+    );
+    const input = screen.getByLabelText("Recent files");
+    fireEvent.keyDown(input, { key: "ArrowLeft" });
+    // Selection enters the tool-window column at the same row (previous file = row 1).
+    expect(screen.getByTestId("code-workspace-recent-files-tool-window-problems")).toHaveAttribute("data-selected", "true");
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(screen.getByTestId("code-workspace-recent-files-tool-window-project")).toHaveAttribute("data-selected", "true");
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onActivateToolWindow).toHaveBeenCalledWith("project");
+    expect(onPick).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onOpenRecentLocations).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(input, { key: "ArrowRight" });
+    expect(screen.getByTestId("code-workspace-recent-files-recent-locations")).not.toHaveAttribute("data-selected");
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onPick).toHaveBeenCalledWith(entries[1]);
+  });
+
   it("advances the selection when the advance nonce bumps", () => {
     const onPick = vi.fn();
     const { rerender } = render(

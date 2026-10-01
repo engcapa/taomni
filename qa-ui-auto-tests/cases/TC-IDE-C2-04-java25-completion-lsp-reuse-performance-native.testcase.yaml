@@ -86,8 +86,7 @@ steps:
     timeout_sec: 10
 - wait: 1
 - eval_readonly:
-    expression: document.querySelector(".cm-tooltip-autocomplete")?.textContent?.includes("Prints current method
-      name to System.out") !== true && document.querySelector(".cm-tooltip-autocomplete") !== null
+    expression: document.querySelector(".cm-tooltip-autocomplete")?.textContent?.includes("Prints current method name to System.out") !== true && document.querySelector(".cm-tooltip-autocomplete") !== null
     expect_truthy: true
 - press: Tab
 - assert_text:
@@ -105,6 +104,9 @@ steps:
     contains: System.out.println();
     timeout_sec: 15
 - press: Escape
+- press:
+    key: s
+    selector: '[data-testid="code-workspace-tree-pane"]'
 - fill:
     selector: '[data-testid="code-workspace-tree-filter"]'
     value: Helper
@@ -183,57 +185,44 @@ verification:
     - 25
     - 26
     - 28
-    - 29
-    - 31
-    - 35
+    - 30
+    - 32
     - 36
+    - 37
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 8
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 9
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "completionTargets",
-        "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "completionTargets", "timeout_sec": 60}}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
-        "Java", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains": "Java", "timeout_sec": 60}}'
     - step: 15
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 10}}'
     - step: 16
-      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "print current method to
-        standard out", "timeout_sec": 10}}'
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "print current method to standard out", "timeout_sec": 10}}'
     - step: 18
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\")?.textContent?.includes(\"Prints
-        current method name to System.out\") !== true && document.querySelector(\".cm-tooltip-autocomplete\") !==
-        null", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-tooltip-autocomplete\")?.textContent?.includes(\"Prints current method name to System.out\") !== true && document.querySelector(\".cm-tooltip-autocomplete\") !== null", "expect_truthy": true}}'
     - step: 20
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println(\"App.completionTargets()\");",
-        "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println(\"App.completionTargets()\");", "timeout_sec": 30}}'
     - step: 27
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println();",
-        "timeout_sec": 15}}'
-    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println();", "timeout_sec": 15}}'
+    - step: 31
       expectation: '{"wait_for": "[data-testid=\"code-workspace-flat-file\"][data-path=\"src/main/java/com/example/other/Helper.java\"]"}'
-    - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "// PERF:",
-        "timeout_sec": 30}}'
     - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
-        "Java", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "// PERF:", "timeout_sec": 30}}'
     - step: 34
-      expectation: '{"assert_native_process_delta": {"pattern": "org.eclipse.jdt.ls.core.id1", "baseline": "${fixture.jdtls_process_count_before}",
-        "max_delta": 1, "timeout_sec": 10}}'
-    - step: 37
-      expectation: '{"native_editor_performance": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content",
-        "keys": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s",
-        "t"], "max_p95_ms": 50}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains": "Java", "timeout_sec": 60}}'
+    - step: 35
+      expectation: '{"assert_native_process_delta": {"pattern": "org.eclipse.jdt.ls.core.id1", "baseline": "${fixture.jdtls_process_count_before}", "max_delta": 1, "timeout_sec": 10}}'
     - step: 38
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "abcdefghijklmnopqrst",
-        "timeout_sec": 15}}'
+      expectation: '{"native_editor_performance": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "keys": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t"], "max_p95_ms": 50}}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "abcdefghijklmnopqrst", "timeout_sec": 15}}'
     results:
-    - 37
     - 38
+    - 39
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

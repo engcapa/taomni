@@ -109,6 +109,8 @@ pub struct AppState {
     /// Dedicated connection to the standalone Tao Notes database (`notes.db`),
     /// kept separate from `taomni.db` so note storage can evolve independently.
     pub notes_db: Mutex<rusqlite::Connection>,
+    /// MFA authenticator store (`mfa.db`, opened lazily on first MFA use).
+    pub mfa: Arc<crate::mfa::store::MfaStore>,
     /// Directory containing one SQLite cache database per saved or transient mail
     /// session. Mail caches are intentionally isolated from `taomni.db`, and
     /// from each other, so mailbox refresh writes cannot block session CRUD.
@@ -196,6 +198,7 @@ impl AppState {
     pub fn new(
         db: rusqlite::Connection,
         notes_db: rusqlite::Connection,
+        mfa: Arc<crate::mfa::store::MfaStore>,
         mail_db_dir: PathBuf,
         vault: Arc<Vault>,
         ai_ctx: AppAiCtx,
@@ -227,6 +230,7 @@ impl AppState {
             db: Mutex::new(db),
             local_directory_runtime: Arc::new(Mutex::new(HashMap::new())),
             notes_db: Mutex::new(notes_db),
+            mfa,
             mail_db_dir,
             mail_dbs: Arc::new(Mutex::new(HashMap::new())),
             mail_imap_pool: Arc::new(MailImapPool::new()),
@@ -255,6 +259,11 @@ impl AppState {
         }
     }
 
+    /// Root of the per-account mail caches (`<app_data>/mail-cache`).
+    pub fn mail_cache_root(&self) -> &std::path::Path {
+        &self.mail_db_dir
+    }
+
     pub fn mail_db(&self, account_id: &str) -> Result<MailDbHandle, String> {
         let stem = mail_db_file_stem(account_id);
         let mut dbs = self.mail_dbs.lock().map_err(|e| e.to_string())?;
@@ -273,7 +282,7 @@ impl AppState {
     }
 }
 
-fn mail_db_file_stem(account_id: &str) -> String {
+pub(crate) fn mail_db_file_stem(account_id: &str) -> String {
     use sha2::{Digest, Sha256};
 
     let mut cleaned = account_id

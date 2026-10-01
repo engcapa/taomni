@@ -35,6 +35,8 @@ const PROTOCOL_ALIASES: Record<string, string> = {
   http: "Browser",
   https: "Browser",
   mail: "Mail",
+  pop3: "Mail",
+  pop3s: "Mail",
   imap: "Mail",
   shell: "LocalShell",
   local: "LocalShell",
@@ -124,6 +126,8 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
     };
   }
 
+  if (sessionType === "Mail") return mailQuickConnect(target, now);
+
   const parsed = parseTarget(target);
   if (!parsed.host) {
     throw new Error(sessionType === "Serial" ? "Serial device path is required." : "Remote host is required.");
@@ -147,8 +151,8 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
         mailSmtpUseImapAuth: true,
         mailCacheEnabled: true,
         mailSaveDirectory: "",
-        mailHeaderRetentionDays: "30",
-        mailHeaderLimitPerFolder: "2000",
+        mailHeaderRetentionDays: "0",
+        mailHeaderLimitPerFolder: "0",
         mailBodyRecentLimit: "200",
         mailBodyMaxBytes: "262144",
         mailAttachmentCache: false,
@@ -179,6 +183,86 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
       sort_order: 0,
     },
   };
+}
+
+/**
+ * `mail://user[:password]@imap-host[:port][?security=tls|starttls|none&smtp=host[:port]&smtpSecurity=...&carddav=url&caldav=url]`
+ *
+ * The session id is derived from account + server so reopening the same
+ * target reuses its local mail cache (gap-free catch-up instead of a fresh
+ * download). The SMTP host defaults to the IMAP host with `imap.` → `smtp.`.
+ * A URL password is handed over as `authData` and never stored.
+ */
+function mailQuickConnect(target: string, now: number): ParsedQuickConnect {
+  const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(target) ? target : `mail://${target}`);
+  // `pop3://` / `pop3s://`: POP3 account with local folders (TASK-21).
+  const pop3 = /^pop3s?:$/i.test(url.protocol);
+  const host = url.hostname.replace(/^\[|\]$/g, "");
+  if (!host) throw new Error("Remote host is required.");
+  const username = url.username ? decodeURIComponent(url.username) : null;
+  const password = url.password ? decodeURIComponent(url.password) : null;
+  const params = url.searchParams;
+  const security = mailSecurityParam(params.get("security"), "TLS");
+  const defaultPort = pop3 ? (security === "TLS" ? 995 : 110) : security === "TLS" ? 993 : 143;
+  const port = url.port ? parseNumber(url.port, defaultPort) : defaultPort;
+  const smtpRaw = params.get("smtp")?.trim() ?? "";
+  const smtpMatch = smtpRaw.match(/^(.*?)(?::(\d+))?$/);
+  const smtpHost = (smtpMatch?.[1] || "").trim() || host.replace(/^(imap|pop3?)\./i, "smtp.");
+  const smtpSecurity = mailSecurityParam(params.get("smtpSecurity"), security);
+  const smtpPort = smtpMatch?.[2]
+    ? parseNumber(smtpMatch[2], 465)
+    : smtpSecurity === "TLS" ? 465 : smtpSecurity === "STARTTLS" ? 587 : 25;
+  const titlePrefix = username ? `${username}@` : "";
+  const slug = `${username ?? ""}@${host}:${port}`.toLowerCase().replace(/[^a-z0-9@._-]+/g, "_");
+  return {
+    transient: true,
+    authData: password,
+    config: {
+      id: `quick-${pop3 ? "pop3" : "mail"}-${slug}`,
+      name: `${pop3 ? "pop3" : "mail"}://${titlePrefix}${host}:${port}`,
+      session_type: "Mail",
+      group_path: null,
+      host,
+      port,
+      username,
+      auth_method: "Password",
+      options_json: JSON.stringify({
+        mailSignature: "",
+        ...(pop3 ? { mailIncoming: "pop3" } : {}),
+        ...(params.get("carddav")?.trim() ? { mailCardDavUrl: params.get("carddav")!.trim() } : {}),
+        ...(params.get("caldav")?.trim() ? { mailCalDavUrl: params.get("caldav")!.trim() } : {}),
+        mailImapSecurity: security,
+        mailSmtpHost: smtpHost,
+        mailSmtpPort: String(smtpPort),
+        mailSmtpSecurity: smtpSecurity,
+        mailSmtpUseImapAuth: true,
+        mailCacheEnabled: true,
+        mailSaveDirectory: "",
+        mailHeaderRetentionDays: "0",
+        mailHeaderLimitPerFolder: "0",
+        mailBodyRecentLimit: "200",
+        mailBodyMaxBytes: "262144",
+        mailAttachmentCache: false,
+        mailSyncOnOpen: true,
+        mailSyncIntervalMinutes: "5",
+        mailMaxFetchPerSync: "200",
+        mailAiEnabled: true,
+        mailAiSkipBodyConfirm: false,
+      }),
+      created_at: now,
+      updated_at: now,
+      last_connected_at: null,
+      sort_order: 0,
+    },
+  };
+}
+
+function mailSecurityParam(value: string | null, fallback: "TLS" | "STARTTLS" | "None"): "TLS" | "STARTTLS" | "None" {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "tls" || normalized === "ssl") return "TLS";
+  if (normalized === "starttls") return "STARTTLS";
+  if (normalized === "none" || normalized === "plain") return "None";
+  return fallback;
 }
 
 export function parseSshConnectionCommand(command: string): ParsedSshConnectionCommand | null {

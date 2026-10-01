@@ -14,6 +14,8 @@ interface MailMessageBodyViewProps {
   fontSize?: number;
   title?: string;
   loading?: boolean;
+  /** Open `mailto:` links in the in-app composer. */
+  onMailtoLink?: (href: string) => void;
 }
 
 const BODY_ZOOM_MIN = 0.75;
@@ -32,6 +34,7 @@ export function MailMessageBodyView({
   fontSize = 14,
   title = "Message body",
   loading = false,
+  onMailtoLink,
 }: MailMessageBodyViewProps) {
   const hasHtml = !!html?.trim();
   const hasText = !!text?.trim();
@@ -110,7 +113,19 @@ export function MailMessageBodyView({
   }
 
   return (
-    <div className="flex flex-col gap-2" data-testid="mail-message-body-view">
+    <div
+      className="flex flex-col gap-2"
+      data-testid="mail-message-body-view"
+      onClickCapture={(event) => {
+        // Plain-text links live in this DOM (HTML mail is handled in its iframe).
+        const anchor = (event.target as Element | null)?.closest?.("a[href]");
+        const href = anchor?.getAttribute("href") ?? "";
+        if (!onMailtoLink || !/^mailto:/i.test(href)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onMailtoLink(href);
+      }}
+    >
       <div className="flex flex-wrap items-center gap-1.5">
         {showToggle && (
           <div
@@ -284,6 +299,7 @@ export function MailMessageBodyView({
       {activeMode === "html" && hasHtml ? (
         <MailHtmlReader
           ref={htmlReaderRef}
+          onMailtoLink={onMailtoLink}
           html={html!}
           allowRemoteImages={allowRemoteImages}
           preferDark={preferDark}

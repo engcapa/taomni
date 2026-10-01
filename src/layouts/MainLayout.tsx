@@ -23,6 +23,13 @@ import {
 import { useSessionImportExport } from "../components/menubar/useSessionImportExport";
 import type { AppCommand } from "../components/menubar/commands";
 import { buildAppMenuSpec, installAppMenu, type MenuActionId } from "../lib/nativeAppMenu";
+import {
+  LEGACY_MAIL_HEADER_LIMIT_PER_FOLDER,
+  LEGACY_MAIL_HEADER_RETENTION_DAYS,
+  mailHeaderLimitOption,
+} from "../lib/mailSync";
+import { parseMailIdentities } from "../lib/mailIdentities";
+import { parseSpecialFolders } from "../lib/mailFolders";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
@@ -48,10 +55,12 @@ import { CallOverlay } from "../components/lanchat/CallOverlay";
 import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";
 import { TunnelManager } from "../components/tunnel/TunnelManager";
 import { SocksCapPanel } from "../components/sockscap/SocksCapPanel";
+import { MfaTab } from "../components/mfa/MfaTab";
 import { FileBrowser, type SftpPendingUploadRequest } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
 import { MailClientTab } from "../components/mail/MailClientTab";
+import { MailUnifiedTab } from "../components/mail/MailUnifiedTab";
 import { sessionToObjectStorageConfig, objectStorageHasVaultSecret } from "../lib/objectStorage";
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { useSftpStore } from "../stores/sftpStore";
@@ -84,7 +93,13 @@ import {
   writeVncViewerOptions,
 } from "../lib/vncOptions";
 import type { VncSessionProperties } from "../components/vnc/VncPropertiesDialog";
-import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
+import { Bot, Columns2, FolderOpen, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ToolWindowRail, type ToolWindowRailItem } from "../components/editor/workspace/panels/ToolWindowRail";
+import { effectiveStripeWidth } from "../components/editor/workspace/toolWindowLayout";
+import { useToolWindowStripeStore } from "../components/editor/workspace/toolWindowStripeStore";
+import { useMainRailHostStore } from "../stores/mainRailHostStore";
+import { sidebarRailGroup } from "../stores/sidebarRailPolicy";
 import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, MailAuthMode, MailProvider, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
 import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { normalizeLocalStartCwd, terminalCwdTitlePrefix } from "../lib/terminalCwd";
@@ -539,6 +554,7 @@ function sessionToMailTabInfo(
       username: session.username || emailAddress || null,
       password,
       security: mailSecurityFromOptions(opts.mailImapSecurity, "tls"),
+      trustedCert: str("mailImapTrustedCert") || null,
     },
     smtp: {
       host: str("mailSmtpHost"),
@@ -547,6 +563,7 @@ function sessionToMailTabInfo(
       password: smtpUseImapAuth ? password : smtpPassword,
       security: mailSecurityFromOptions(opts.mailSmtpSecurity, "tls"),
       useImapAuth: smtpUseImapAuth,
+      trustedCert: str("mailSmtpTrustedCert") || null,
     },
     oauth: {
       clientId: str("mailOauthClientId") || null,
@@ -561,11 +578,38 @@ function sessionToMailTabInfo(
       onOpen: opts.mailSyncOnOpen !== false,
       intervalMinutes: mailNumberOption(opts, "mailSyncIntervalMinutes", 5, 1),
       maxFetchPerSync: mailNumberOption(opts, "mailMaxFetchPerSync", 200, 1),
+      idle: opts.mailIdlePush !== false,
+      desktopNotify: opts.mailDesktopNotify === true,
+      subscribedOnly: opts.mailSubscribedOnly === true,
     },
+    specialFolders: parseSpecialFolders(opts.mailSpecialFolders),
+    undoSendSeconds: mailNumberOption(opts, "mailUndoSendSeconds", 0, 0),
+    carddav: typeof opts.mailCardDavUrl === "string" && opts.mailCardDavUrl.trim()
+      ? {
+        url: opts.mailCardDavUrl.trim(),
+        username: typeof opts.mailCardDavUsername === "string" && opts.mailCardDavUsername.trim()
+          ? opts.mailCardDavUsername.trim()
+          : null,
+      }
+      : null,
+    caldav: typeof opts.mailCalDavUrl === "string" && opts.mailCalDavUrl.trim()
+      ? {
+        url: opts.mailCalDavUrl.trim(),
+        username: typeof opts.mailCalDavUsername === "string" && opts.mailCalDavUsername.trim()
+          ? opts.mailCalDavUsername.trim()
+          : null,
+      }
+      : null,
+    receiptPolicy: opts.mailReceiptPolicy === "always" || opts.mailReceiptPolicy === "never" ? opts.mailReceiptPolicy : "ask",
+    incoming: opts.mailIncoming === "pop3" ? "pop3" : "imap",
+    pop3LeaveDays: opts.mailPop3LeaveDays === undefined || opts.mailPop3LeaveDays === null || String(opts.mailPop3LeaveDays).trim() === ""
+      ? null
+      : mailNumberOption(opts, "mailPop3LeaveDays", 0, 0),
     cache: {
-      enabled: opts.mailCacheEnabled !== false,
-      headerRetentionDays: mailNumberOption(opts, "mailHeaderRetentionDays", 30, 1),
-      headerLimitPerFolder: mailNumberOption(opts, "mailHeaderLimitPerFolder", 2000, 1),
+      // POP3 mail lives only in the local store, so its cache is always on.
+      enabled: opts.mailCacheEnabled !== false || opts.mailIncoming === "pop3",
+      headerRetentionDays: mailHeaderLimitOption(opts, "mailHeaderRetentionDays", LEGACY_MAIL_HEADER_RETENTION_DAYS),
+      headerLimitPerFolder: mailHeaderLimitOption(opts, "mailHeaderLimitPerFolder", LEGACY_MAIL_HEADER_LIMIT_PER_FOLDER),
       bodyRecentLimit: mailNumberOption(opts, "mailBodyRecentLimit", 200, 0),
       bodyMaxBytes: mailNumberOption(opts, "mailBodyMaxBytes", 262144, 1024),
       attachmentCache: opts.mailAttachmentCache === true,
@@ -575,6 +619,8 @@ function sessionToMailTabInfo(
       enabled: opts.mailAiEnabled !== false,
       skipBodyConfirm: opts.mailAiSkipBodyConfirm === true,
     },
+    saveSentCopy: opts.mailSaveSentCopy === "on" ? true : opts.mailSaveSentCopy === "off" ? false : null,
+    identities: parseMailIdentities(opts.mailIdentities),
   };
 }
 
@@ -689,6 +735,7 @@ export function MainLayout() {
     tabs,
     activeTabId,
     sidebarCollapsed,
+    mergeToolWindowRail,
     xServerEnabled,
     refreshXServer,
     addTab,
@@ -726,6 +773,12 @@ export function MainLayout() {
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  // ED-PARITY-027 A: every tab group restores its own sidebar state (tool
+  // window tabs start collapsed to the rail).
+  const activeRailGroup = sidebarRailGroup(activeTab?.type);
+  useEffect(() => {
+    useAppStore.getState().applySidebarForActiveTab();
+  }, [activeRailGroup, mergeToolWindowRail]);
   const terminalProfilesBySessionId = useMemo(() => {
     const profiles = new Map<string, TerminalProfile | undefined>();
     for (const session of sessions) {
@@ -889,6 +942,10 @@ export function MainLayout() {
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
+  const mainRailHost = useMainRailHostStore((s) => s.host);
+  const stripeSettings = useToolWindowStripeStore((s) => s.settings);
+  const toggleStripeNames = useToolWindowStripeStore((s) => s.toggleShowNames);
+  const setStripeWidth = useToolWindowStripeStore((s) => s.setWidth);
   const toggleTabChat = useChatStore((s) => s.toggleTabChat);
   const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
@@ -3180,7 +3237,7 @@ export function MainLayout() {
       } else if (session.session_type === "Browser") {
         openBrowserSession(session);
       } else if (session.session_type === "Mail") {
-        openMailTab(session);
+        openMailTab(session, parsed.authData ?? undefined);
       } else if (COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) {
         openCommandTerminalTab(session);
       } else if (
@@ -3525,6 +3582,59 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
+  /** MFA authenticator: one tab per window (docs-feature/mfa-authenticator-design.md). */
+  const openMfaTab = useCallback(() => {
+    const existing = tabsRef.current.find((tab) => tab.type === "mfa");
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    addTab({
+      id: "mfa",
+      type: "mfa",
+      title: t("tabs.mfa"),
+      closable: true,
+    });
+  }, [addTab, setActiveTab]);
+
+  /** Unified mail across every saved mail account (TASK-16, DEC-12). */
+  const openUnifiedMailTab = useCallback(() => {
+    const existing = tabsRef.current.find((tab) => tab.type === "mail-unified");
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    addTab({
+      id: "mail-unified",
+      type: "mail-unified",
+      title: t("tabs.mailUnified"),
+      closable: true,
+    });
+  }, [addTab, setActiveTab]);
+
+  // Saved mail sessions plus every open mail tab (quick-connect accounts are
+  // not saved); an open tab's info wins because it carries its credentials.
+  const unifiedMailAccounts = useMemo(() => {
+    const byId = new Map<string, MailTabInfo>();
+    for (const session of sessions) {
+      if (session.session_type !== "Mail") continue;
+      byId.set(session.id, sessionToMailTabInfo(
+        session,
+        passwordRefFromOptions(session) ?? undefined,
+        mailSmtpPasswordRefFromOptions(session) ?? undefined,
+      ));
+    }
+    for (const tab of tabs) {
+      if (tab.type === "mail" && tab.mail) byId.set(tab.mail.sessionId, tab.mail);
+    }
+    return [...byId.values()];
+  }, [sessions, tabs]);
+
+  const openMailAccountById = useCallback((sessionId: string) => {
+    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    if (session) openQueuedSession(session);
+  }, [openQueuedSession]);
+
   // Initialize LanChat at app startup (not only when the tab opens) so roster,
   // unread, and desktop notifications work even while the tab is closed.
   useEffect(() => {
@@ -3655,6 +3765,12 @@ export function MainLayout() {
       case "lan-chat":
         openLanChatTab();
         break;
+      case "mail-unified":
+        openUnifiedMailTab();
+        break;
+      case "mfa":
+        openMfaTab();
+        break;
       case "help":
         setShowAbout(true);
         break;
@@ -3672,6 +3788,7 @@ export function MainLayout() {
     openPlaceholderTab,
     openSettingsTab,
     openLanChatTab,
+    openMfaTab,
     removeTab,
     requestAppExit,
     setActiveTab,
@@ -3826,6 +3943,56 @@ export function MainLayout() {
   const mailTabs = tabs.filter((t) => t.type === "mail" && t.mail);
   const terminalSplitVisible =
     terminalSplitActive && terminalTabs.length > 0 && activeTab?.type === "terminal";
+  // ED-PARITY-027 B: a terminal's tool windows (attached SFTP, Chat) move from
+  // its floating actions into the collapsed sidebar rail.
+  const terminalRailMerged = mergeToolWindowRail && sidebarCollapsed && !!mainRailHost
+    && activeTab?.type === "terminal" && !terminalSplitVisible;
+  const toggleTerminalSftp = (tab: Tab) => {
+    if (sftpDetachedTabs[tab.id] && tab.ssh) {
+      openDetachedSftp(
+        {
+          sessionId: `attached-${tab.id}`,
+          host: tab.ssh.host,
+          port: tab.ssh.port,
+          username: tab.ssh.username,
+          authMethod: tab.ssh.authMethod,
+          authData: tab.ssh.authData,
+          networkSettingsJson: JSON.stringify(
+            toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
+          ),
+          initialPath: terminalCwds[tab.id],
+          attachedToTerminal: true,
+        },
+        `${tab.title} — SFTP`,
+      );
+    } else {
+      toggleAttachedSidebar(tab.id);
+    }
+  };
+  const terminalRailItems: ToolWindowRailItem[] = [];
+  if (terminalRailMerged && activeTab) {
+    const railTab = activeTab;
+    if (railTab.ssh) {
+      terminalRailItems.push({
+        id: "sftp",
+        label: t("terminal.sftpFloatingButtonLabel"),
+        icon: <FolderOpen />,
+        active: !!attachedSidebars[railTab.id],
+        testId: "attached-sftp-toggle",
+        onSelect: () => toggleTerminalSftp(railTab),
+      });
+    }
+    if (!aiFullyDisabled) {
+      terminalRailItems.push({
+        id: "chat",
+        label: t("terminal.chatFloatingButtonLabel"),
+        icon: <Bot />,
+        active: chatDrawerOpen && activeTabId === railTab.id,
+        testId: "tab-chat-toggle",
+        onSelect: () => void toggleTabChat(railTab.id),
+      });
+    }
+  }
   const effectiveMultiExecSelectedCount = terminalSplitActive
     ? [...multiExecSelectedTabIds].filter((id) => !terminalSplitInputLockedTabIds.has(id)).length
     : multiExecSelectedTabIds.size;
@@ -4013,8 +4180,21 @@ export function MainLayout() {
       {chatDrawerTopPinned && <ChatDrawer />}
 
       <div className="flex-1 flex min-h-0">
+        {terminalRailMerged && mainRailHost && terminalRailItems.length > 0 && createPortal(
+          <ToolWindowRail
+            side="left"
+            embedded
+            top={terminalRailItems}
+            width={effectiveStripeWidth(stripeSettings, "left")}
+            showNames={stripeSettings.showNames}
+            onToggleShowNames={toggleStripeNames}
+            onResize={(width) => setStripeWidth("left", width)}
+            onHide={(id) => terminalRailItems.find((item) => item.id === id)?.onSelect()}
+          />,
+          mainRailHost,
+        )}
         {sidebarCollapsed && (
-          <div data-testid="collapsed-sidebar-rail" className="h-full w-[30px] shrink-0 overflow-visible">
+          <div data-testid="collapsed-sidebar-rail" className="h-full min-w-[30px] shrink-0 overflow-visible">
             <Sidebar
               compact
               onNewSession={handleNewSession}
@@ -4045,11 +4225,15 @@ export function MainLayout() {
             maxSize="40%"
             collapsible
             collapsedSize={0}
-            onResize={(size: PanelSize) => {
+            onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
               const percentage = size.asPercentage;
               if (percentage > 2) {
                 lastSidebarSizeRef.current = percentage;
               }
+              // The first report is the restored layout, which may carry another
+              // tab group's collapsed sidebar (ED-PARITY-027); the store's state
+              // wins and the sync effect resizes the panel to it.
+              if (!prevSize) return;
               setSidebarCollapsed(percentage <= 2);
             }}
           >
@@ -4219,34 +4403,13 @@ export function MainLayout() {
                             detachToggle={!terminalSplitVisible ? {
                               onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
                             } : undefined}
-                            chatToggle={!aiFullyDisabled ? {
+                            chatToggle={!aiFullyDisabled && !(terminalRailMerged && isActive) ? {
                               open: chatDrawerOpen && activeTabId === tab.id,
                               onToggle: () => void toggleTabChat(tab.id),
                             } : undefined}
-                            sftpToggle={!terminalSplitVisible && tab.ssh ? {
+                            sftpToggle={!terminalSplitVisible && tab.ssh && !(terminalRailMerged && isActive) ? {
                               open: sidebarOpen,
-                              onToggle: () => {
-                                if (sftpDetachedTabs[tab.id] && tab.ssh) {
-                                  openDetachedSftp(
-                                    {
-                                      sessionId: `attached-${tab.id}`,
-                                      host: tab.ssh.host,
-                                      port: tab.ssh.port,
-                                      username: tab.ssh.username,
-                                      authMethod: tab.ssh.authMethod,
-                                      authData: tab.ssh.authData,
-                                      networkSettingsJson: JSON.stringify(
-                                        toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
-                                      ),
-                                      initialPath: terminalCwds[tab.id],
-                                      attachedToTerminal: true,
-                                    },
-                                    `${tab.title} — SFTP`,
-                                  );
-                                } else {
-                                  toggleAttachedSidebar(tab.id);
-                                }
-                              }
+                              onToggle: () => toggleTerminalSftp(tab),
                             } : undefined}
                             gitToggle={!tab.ssh && !tab.commandTerminal ? {
                               cwd: terminalCwds[tab.id] ?? null,
@@ -4578,6 +4741,16 @@ export function MainLayout() {
 
                 {activeTab?.type === "lan-chat" && <LanChatGate />}
 
+                {tabs.some((tab) => tab.type === "mail-unified") && (
+                  <div className="absolute inset-0" style={{ display: activeTab?.type === "mail-unified" ? "block" : "none" }}>
+                    <MailUnifiedTab
+                      accounts={unifiedMailAccounts}
+                      visible={activeTab?.type === "mail-unified"}
+                      onOpenAccount={openMailAccountById}
+                    />
+                  </div>
+                )}
+
                 {/* VNC tabs — always mounted so connection survives tab switches */}
                 {vncTabs.map((tab) => {
                   const vnc = tab.vnc;
@@ -4775,6 +4948,8 @@ export function MainLayout() {
                   />
                 )}
 
+                {activeTab?.type === "mfa" && <MfaTab onStatusMessage={setStatusMessage} />}
+
                 {activeTab?.type === "proxy-test" && activeTab.proxyTest && (
                   <Suspense fallback={null}>
                     <ProxyTestTab info={activeTab.proxyTest} />
@@ -4793,11 +4968,13 @@ export function MainLayout() {
                   activeTab.type !== "redis" &&
                   activeTab.type !== "hbase-shell" &&
                   activeTab.type !== "mail" &&
+                  activeTab.type !== "mail-unified" &&
                   activeTab.type !== "settings" &&
                   activeTab.type !== "git" &&
                   activeTab.type !== "nettools" &&
                   activeTab.type !== "sockscap" &&
                   activeTab.type !== "lan-chat" &&
+                  activeTab.type !== "mfa" &&
                   activeTab.type !== "proxy-test" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}

@@ -129,10 +129,9 @@ def setup(ctx: Any) -> None:
         # suffix there ends at col 1 + len(typed_suffix) on the same line.
         cm_lines = len(text.splitlines()) + 1
         values[f"editor_perf_{stem}_cm_lines"] = str(cm_lines)
-        values[f"editor_perf_{stem}_cursor_at_end"] = f"Ln {cm_lines}, Col 1"
-        values[f"editor_perf_{stem}_cursor_after_append"] = (
-            f"Ln {cm_lines}, Col {1 + len(typed_suffix)}"
-        )
+        # The status bar prints IDEA's `line:column` (ED-PARITY-010).
+        values[f"editor_perf_{stem}_cursor_at_end"] = f"{cm_lines}:1"
+        values[f"editor_perf_{stem}_cursor_after_append"] = f"{cm_lines}:{1 + len(typed_suffix)}"
     # The typed key payloads are exposed as values so the consuming case
     # references ${fixture.*} instead of duplicating the literals; the
     # after-hashes above are computed from exactly these strings.

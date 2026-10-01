@@ -1,0 +1,111 @@
+id: TC-MAIL-RECEIPT-01
+title: Mail asks before answering a read receipt request and sends an RFC 8098 notification
+description: 'TASK-17 (docs-feature/mail-thunderbird-parity-design.md, read receipt responses).
+
+  Delivers a message carrying Disposition-Notification-To, syncs, opens it and
+
+  requires the reader to ask (default "ask" policy); Send receipt must send a
+
+  multipart/report disposition notification that the server side receives,
+
+  and the banner must not come back. The "always"/"never" policies and the
+
+  MDN format are covered by Vitest and the Rust test (mail::receipts).
+
+  Browser mode drives the stub server model (renderer orchestration only);
+
+  native mode parses the real header from the fake IMAP server and sends
+
+  through the fake SMTP server started by the mail_server fixture.
+
+  '
+covers:
+- F-MAIL-13
+tags:
+- mail
+- p2
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- mail_server_deliver:
+    count: 1
+    prefix: Receipt
+    read_receipt: true
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-search-input"]'
+    value: Receipt 0001
+- click: '[data-testid="mail-message-row"]'
+- wait_for:
+    selector: '[data-testid="mail-receipt-banner"]'
+    timeout_sec: 20
+- click: '[data-testid="mail-receipt-send"]'
+- mail_server_assert_smtp_contains:
+    text: report-type=disposition-notification
+    timeout_sec: 20
+- assert_not_visible: '[data-testid="mail-receipt-banner"]'
+- screenshot: mail-receipt-01.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 带 Disposition-Notification-To 的邮件打开后按默认“询问”策略显示回执提示（TASK-17）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 10
+    - 12
+    - 13
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-receipt-banner\"]", "timeout_sec": 20}}'
+    results:
+    - 14
+  - id: R2
+    requirement: 点击 Send receipt 后发出 RFC 8098 回执（multipart/report; report-type=disposition-notification），提示不再出现（邮件标记 $MDNSent）。
+    actions:
+    - 15
+    checkpoints:
+    - step: 16
+      expectation: '{"mail_server_assert_smtp_contains": {"text": "report-type=disposition-notification", "timeout_sec": 20}}'
+    - step: 17
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-receipt-banner\"]"}'
+    results:
+    - 16
+    - 17
+  visual:
+  - check: 截图中阅读区不再显示回执提示，状态栏显示回执已发送。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证后端解析回执请求头并经假 SMTP 发出 MDN；browser 仅验证渲染层；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

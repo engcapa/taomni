@@ -10367,6 +10367,7 @@ dependencies = [
  "ignore",
  "image",
  "imap",
+ "imap-proto",
  "ironrdp",
  "ironrdp-egfx",
  "ironrdp-server",

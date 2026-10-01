@@ -113,6 +113,8 @@ zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2
 tungstenite = "0.29"
 tokio-tungstenite = "0.29"
 imap = "2.4.1"
+# BODYSTRUCTURE / section types; same version `imap` already uses.
+imap-proto = "=0.10.2"
 lettre = "0.11.22"
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }
 native-tls = "0.2"
@@ -150,7 +152,8 @@ generic-array = "1"
 rsa = "0.9"
 sha2 = "0.11"
 sha1 = "0.11"
-# VNC Apple Remote Desktop authentication (MD5 of the DH secret is the AES key).
+# VNC Apple Remote Desktop authentication (MD5 of the DH secret is the AES key)
+# and POP3 APOP digest.
 md-5 = "0.11"
 rand = "0.10"
 pbkdf2 = "0.13"

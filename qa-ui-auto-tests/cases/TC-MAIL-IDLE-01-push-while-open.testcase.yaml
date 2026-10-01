@@ -1,0 +1,114 @@
+id: TC-MAIL-IDLE-01
+title: Mail picks up pushed mail through IMAP IDLE while open and drops IDLE on close
+description: 'TASK-12 (docs-feature/mail-thunderbird-parity-design.md AC-36/AC-37).
+
+  Opens a mail account through Quick Connect, waits for the IDLE watcher to be
+
+  ready, delivers mail "from another client" without clicking Sync and requires
+
+  the list to match the server within 15 seconds (push, not the 5-minute poll).
+
+  Closing the tab must release the IDLE connection.
+
+  Browser mode drives the stub server model (renderer orchestration only);
+
+  native mode runs the real Tauri backend IDLE watcher against the in-process
+
+  fake IMAP server started by the mail_server fixture.
+
+  '
+covers:
+- F-MAIL-10
+- F-MAIL-5
+tags:
+- mail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="mail-idle-status"][data-active="true"]'
+    timeout_sec: 30
+- mail_server_assert_idle_clients:
+    equals: 1
+    timeout_sec: 20
+- mail_server_deliver:
+    count: 3
+    prefix: Pushed
+- mail_server_assert_list_matches:
+    timeout_sec: 15
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Pushed 0003
+    timeout_sec: 10
+- screenshot: mail-idle-01-pushed.png
+- click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="mail-client-tab"]'
+    state: detached
+- mail_server_assert_idle_clients:
+    equals: 0
+    timeout_sec: 10
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 标签打开时，其他客户端投递的新邮件无需点击 Sync，15 秒内经 IDLE 推送出现在列表中，数量与服务器一致（AC-36）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 12
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-idle-status\"][data-active=\"true\"]", "timeout_sec": 30}}'
+    - step: 10
+      expectation: '{"mail_server_assert_idle_clients": {"equals": 1, "timeout_sec": 20}}'
+    - step: 12
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 15}}'
+    - step: 13
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Pushed 0003", "timeout_sec": 10}}'
+    results:
+    - 12
+    - 13
+  - id: R2
+    requirement: 关闭标签后 IDLE 连接在 10 秒内释放（AC-37，DEC-01 不做后台收信）。
+    actions:
+    - 15
+    checkpoints:
+    - step: 16
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
+    - step: 17
+      expectation: '{"mail_server_assert_idle_clients": {"equals": 0, "timeout_sec": 10}}'
+    results:
+    - 17
+  visual:
+  - check: 截图中 Sync 旁显示 Push 状态，推送的邮件出现在列表顶部。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实后端的 IDLE 线程、推送后的补齐以及关闭时断开连接；browser 仅验证渲染层编排；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

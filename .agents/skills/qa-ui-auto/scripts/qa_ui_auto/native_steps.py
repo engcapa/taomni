@@ -67,6 +67,22 @@ class NativeStepContext:
         self._clipboard_owner_text: str | None = None
         self._host_clipboard_before: str | None = None
         self._host_clipboard_captured = False
+        # MFA fixtures: xclip serving an image/png CLIPBOARD and the Tk window
+        # showing a QR code for the screen scan, keyed by helper role.
+        self._mfa_helpers: dict[str, subprocess.Popen[str]] = {}
+
+    def stop_mfa_helper(self, role: str) -> bool:
+        proc = self._mfa_helpers.pop(role, None)
+        if proc is None:
+            return False
+        with suppress(OSError, subprocess.TimeoutExpired):
+            proc.kill()
+            proc.wait(timeout=5)
+        for stream in (proc.stdout, proc.stderr):
+            with suppress(Exception):
+                if stream is not None:
+                    stream.close()
+        return True
 
     def restore_host_permissions(self) -> None:
         """Best-effort rollback for report-scoped fault injection.
@@ -81,6 +97,8 @@ class NativeStepContext:
             except OSError:
                 pass
         self._permission_restores.clear()
+        for role in list(self._mfa_helpers):
+            self.stop_mfa_helper(role)
         self._release_clipboard_owner()
         self._restore_host_clipboard()
 
@@ -306,6 +324,41 @@ def _hover(ctx: NativeStepContext, args: Any) -> str:
     # Allow React submenu state to mount before the next native step queries it.
     time.sleep(0.35)
     return f"hovered {selector}"
+
+
+def _mouse_path(ctx: NativeStepContext, args: Any) -> str:
+    """Move the pointer through element-relative points (see steps.mouse)."""
+    from .steps.mouse import mouse_path_points
+
+    points = mouse_path_points(args)
+    for point in points:
+        element = ctx.session.find(point["selector"], interactive=False)
+        # W3C element origin: integer offsets from the element's in-view
+        # centre, the same convention as the browser runner. A duration lets
+        # the driver interpolate intermediate moves like `steps` does.
+        ctx.session.request(
+            "POST",
+            ctx.session.endpoint("/actions"),
+            {
+                "actions": [
+                    {
+                        "type": "pointer",
+                        "id": "mouse",
+                        "parameters": {"pointerType": "mouse"},
+                        "actions": [{
+                            "type": "pointerMove",
+                            "duration": 16 * point["steps"],
+                            "x": int(round(point["dx"])),
+                            "y": int(round(point["dy"])),
+                            "origin": {"element-6066-11e4-a52e-4f735466cecf": element},
+                        }],
+                    }
+                ]
+            },
+        )
+        if point["pause_ms"]:
+            time.sleep(point["pause_ms"] / 1000)
+    return f"moved through {len(points)} point(s)"
 
 
 def _select_option(ctx: NativeStepContext, args: Any) -> str:
@@ -1530,6 +1583,11 @@ def _do_hover(ctx: NativeStepContext, args: Any) -> str:
     return _hover(ctx, args)
 
 
+@_verb("mouse_path")
+def _do_mouse_path(ctx: NativeStepContext, args: Any) -> str:
+    return _mouse_path(ctx, args)
+
+
 @_verb("select_option")
 def _do_select_option(ctx: NativeStepContext, args: Any) -> str:
     return _select_option(ctx, args)
@@ -2646,6 +2704,282 @@ def _find_quiet(ctx: NativeStepContext, selector: str) -> bool:
         return True
     except Exception:  # noqa: BLE001
         return False
+
+
+def _mail_server() -> Any:
+    from . import mail_fake_server
+
+    server = mail_fake_server.ACTIVE
+    if server is None:
+        raise StepError("mail_server_*: the mail_server fixture is not active")
+    return server
+
+
+def _mail_args(args: Any, name: str, *, need_count: bool = True) -> tuple[str, int]:
+    args = args if isinstance(args, dict) else {}
+    count = args.get("count", 0)
+    if need_count and (not isinstance(count, int) or count < 1):
+        raise StepError(f"{name}: expected {{count: positive int, folder?}}")
+    return str(args.get("folder") or "INBOX"), int(count or 0)
+
+
+@_verb("mail_server_deliver")
+def _do_mail_server_deliver(ctx: NativeStepContext, args: Any) -> str:
+    folder, count = _mail_args(args, "mail_server_deliver")
+    uids = _mail_server().state.deliver(folder, count, prefix=str(args.get("prefix") or "QA"),
+                                        thread=bool(args.get("thread")),
+                                        list_unsubscribe=args.get("list_unsubscribe") or None,
+                                        invite=args.get("invite") or None,
+                                        read_receipt=bool(args.get("read_receipt")))
+    return f"delivered {len(uids)} to {folder} (uids {uids[0]}..{uids[-1]})"
+
+
+@_verb("mail_server_expunge_newest")
+def _do_mail_server_expunge_newest(ctx: NativeStepContext, args: Any) -> str:
+    folder, count = _mail_args(args, "mail_server_expunge_newest")
+    state = _mail_server().state
+    uids = state.newest_uids(folder, count)
+    state.expunge(folder, uids)
+    return f"expunged {uids} from {folder}"
+
+
+@_verb("mail_server_set_flags_newest")
+def _do_mail_server_set_flags_newest(ctx: NativeStepContext, args: Any) -> str:
+    folder, count = _mail_args(args, "mail_server_set_flags_newest")
+    flags = args.get("flags")
+    if not isinstance(flags, list):
+        raise StepError("mail_server_set_flags_newest: flags must be a list")
+    state = _mail_server().state
+    uids = state.newest_uids(folder, count)
+    state.set_flags(folder, uids, [str(flag) for flag in flags])
+    return f"set {flags} on {uids} in {folder}"
+
+
+@_verb("mail_server_assert_folder_count")
+def _do_mail_server_assert_folder_count(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    folder = str(args.get("folder") or "INBOX")
+    minimum = int(args.get("min", 0))
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 20))
+    count = -1
+    while time.time() < deadline:
+        count = state.count(folder)
+        subjects = state.subjects(folder)
+        if (
+            count >= minimum
+            and ("equals" not in args or count == int(args["equals"]))
+            and ("has_subject" not in args or args["has_subject"] in subjects)
+            and ("lacks_subject" not in args or args["lacks_subject"] not in subjects)
+        ):
+            return f"{folder} has {count} messages on the server"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_folder_count: {folder} has {count}, expected {args!r}")
+
+
+@_verb("mail_server_assert_idle_clients")
+def _do_mail_server_assert_idle_clients(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    if not isinstance(args.get("equals"), int):
+        raise StepError("mail_server_assert_idle_clients: expected {equals: int, timeout_sec?}")
+    expected = int(args["equals"])
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 10))
+    count = -1
+    while time.time() < deadline:
+        count = state.idle_clients()
+        if count == expected:
+            return f"{count} IDLE connection(s) on the fake server"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_idle_clients: {count} IDLE clients, expected {expected}")
+
+
+@_verb("mail_server_assert_caldav_contains")
+def _do_mail_server_assert_caldav_contains(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    text = args.get("text")
+    if not isinstance(text, str) or not text:
+        raise StepError("mail_server_assert_caldav_contains: expected {text: str, timeout_sec?}")
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 20))
+    while time.time() < deadline:
+        if state.caldav_contains(text):
+            return f"fake CalDAV holds a resource containing {text!r}"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_caldav_contains: no CalDAV resource contains {text!r} "
+                    f"({len(state.caldav)} stored)")
+
+
+@_verb("mail_server_assert_smtp_contains")
+def _do_mail_server_assert_smtp_contains(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    text = args.get("text")
+    if not isinstance(text, str) or not text:
+        raise StepError("mail_server_assert_smtp_contains: expected {text: str, timeout_sec?}")
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 20))
+    while time.time() < deadline:
+        if state.smtp_contains(text):
+            return f"fake SMTP received a message containing {text!r}"
+        time.sleep(0.25)
+    raise StepError(f"mail_server_assert_smtp_contains: no SMTP message contains {text!r} "
+                    f"({len(state.smtp_messages)} received)")
+
+
+@_verb("mail_server_assert_list_matches")
+def _do_mail_server_assert_list_matches(ctx: NativeStepContext, args: Any) -> str:
+    args = args if isinstance(args, dict) else {}
+    folder = str(args.get("folder") or "INBOX")
+    state = _mail_server().state
+    deadline = time.time() + float(args.get("timeout_sec", 30))
+    observed: Any = None
+    while time.time() < deadline:
+        with state.lock:
+            messages = state.folders[folder].messages
+            server = len(messages)
+            server_unread = sum(1 for m in messages.values() if "\\Seen" not in m.flags)
+        observed = ctx.session.execute(
+            "const el = document.querySelector('[data-testid=\"mail-message-count\"]');"
+            "return {shown: el ? Number(el.getAttribute('data-count')) : -1,"
+            " hasMore: el ? el.getAttribute('data-has-more') : null,"
+            " unreadRows: document.querySelectorAll('[data-testid=\"mail-message-row\"][data-unread=\"true\"]').length};"
+        )
+        if (
+            isinstance(observed, dict)
+            and observed.get("shown") == server
+            and observed.get("hasMore") == "false"
+            and (not args.get("unread") or observed.get("unreadRows") == server_unread)
+        ):
+            return f"list matches server: {server} messages, {server_unread} unread"
+        if isinstance(observed, dict) and observed.get("hasMore") == "true":
+            # Like a user scrolling to the end: load the next cached page.
+            ctx.session.execute(
+                "document.querySelector('[data-testid=\"mail-load-more\"]:not([disabled])')?.click(); return true;"
+            )
+        time.sleep(0.5)
+    raise StepError(
+        f"mail_server_assert_list_matches: server={server} unread={server_unread} ui={observed!r}"
+    )
+
+
+# -- MFA authenticator fixtures (docs-feature/mfa-authenticator-design.md) ----
+
+@_verb("assert_totp_code")
+def _do_assert_totp_code(ctx: NativeStepContext, args: Any) -> str:
+    from .mfa_support import assert_totp_code
+
+    return assert_totp_code(lambda expression: ctx.session.execute(f"return ({expression});"), args)
+
+
+def _mfa_helper_line(proc: subprocess.Popen[str], timeout: float) -> str:
+    """First stdout line of a helper, or "" if it exits or stays silent (pipes cannot select() on Windows)."""
+    import threading
+
+    lines: list[str] = []
+    reader = threading.Thread(target=lambda: lines.append(proc.stdout.readline() if proc.stdout else ""), daemon=True)
+    reader.start()
+    reader.join(timeout)
+    return lines[0] if lines else ""
+
+
+# Topmost Tk window showing the fixture image, so a real screen capture of the
+# desktop (with Taomni hidden) contains a QR code. Prints its geometry once mapped.
+_MFA_IMAGE_WINDOW_SOURCE = r'''
+import sys
+import tkinter as tk
+
+path, x, y = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+root = tk.Tk()
+root.title("Taomni QA MFA QR")
+root.configure(background="white")
+image = tk.PhotoImage(file=path)
+tk.Label(root, image=image, background="white", borderwidth=0).pack(padx=24, pady=24)
+root.geometry(f"+{x}+{y}")
+root.attributes("-topmost", True)
+
+def ready():
+    root.update_idletasks()
+    print("WINDOW-READY", root.winfo_rootx(), root.winfo_rooty(), root.winfo_width(), root.winfo_height(), flush=True)
+
+root.after(300, ready)
+root.mainloop()
+'''
+
+
+@_verb("native_show_image_window")
+def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
+    from .mfa_support import png_fixture
+
+    args = args if isinstance(args, dict) else {"path": args}
+    if args.get("action", "show") == "close":
+        return "image window closed" if ctx.stop_mfa_helper("image-window") else "no image window was open"
+    if platform.system() not in {"Linux", "Windows"} or (platform.system() == "Linux" and not os.environ.get("DISPLAY")):
+        raise StepError("native_show_image_window: requires a Linux X11 display or a Windows desktop")
+    target, data = png_fixture(args.get("path"), "native_show_image_window")
+    ctx.stop_mfa_helper("image-window")
+    proc = subprocess.Popen(
+        [sys.executable, "-c", _MFA_IMAGE_WINDOW_SOURCE, str(target), str(int(args.get("x", 40))), str(int(args.get("y", 40)))],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    ctx._mfa_helpers["image-window"] = proc
+    line = _mfa_helper_line(proc, timeout=20)
+    if not line.startswith("WINDOW-READY"):
+        exited = proc.poll() is not None
+        err = ""
+        if exited and proc.stderr is not None:
+            with suppress(Exception):
+                err = proc.stderr.read().strip()
+        ctx.stop_mfa_helper("image-window")
+        detail = line.strip() or err or (f"exit {proc.returncode}" if exited else "no ready signal within 20s")
+        raise StepError(f"native_show_image_window: window did not appear: {detail}")
+    x, y, width, height = (int(v) for v in line.split()[1:5])
+    observation = {"path": str(target), "sha256": hashlib.sha256(data).hexdigest(), "pid": proc.pid,
+                   "geometry": {"x": x, "y": y, "width": width, "height": height}, "platform": platform.system()}
+    (ctx.case_dir / "native-image-window.json").write_text(json.dumps(observation, indent=1), encoding="utf-8")
+    return f"image window mapped at {x},{y} {width}x{height}"
+
+
+@_verb("native_clipboard_image")
+def _do_native_clipboard_image(ctx: NativeStepContext, args: Any) -> str:
+    """Make an external xclip process own the X11 CLIPBOARD as image/png.
+
+    The app must then read the image through its own OS clipboard path
+    (arboard); a separate TARGETS read proves the selection really changed.
+    """
+    import shutil
+
+    from .mfa_support import png_fixture
+
+    target, data = png_fixture(args.get("path") if isinstance(args, dict) else args, "native_clipboard_image")
+    if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
+        raise StepError("native_clipboard_image: requires a Linux X11 display")
+    xclip = shutil.which("xclip")
+    if xclip is None:
+        raise StepError("native_clipboard_image: xclip is not installed")
+    ctx.stop_mfa_helper("clipboard-image")
+    proc = subprocess.Popen(
+        [xclip, "-quiet", "-selection", "clipboard", "-t", "image/png", "-i", str(target)],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True,
+    )
+    ctx._mfa_helpers["clipboard-image"] = proc
+    targets = ""
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            raise StepError(f"native_clipboard_image: xclip exited with {proc.returncode}")
+        with suppress(subprocess.TimeoutExpired):
+            targets = subprocess.run([xclip, "-selection", "clipboard", "-t", "TARGETS", "-o"],
+                                     capture_output=True, text=True, timeout=5, check=False).stdout
+        if "image/png" in targets.split():
+            break
+        time.sleep(0.2)
+    else:
+        raise StepError(f"native_clipboard_image: CLIPBOARD never advertised image/png (targets {targets.split()})")
+    observation = {"path": str(target), "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data),
+                   "owner": "xclip", "pid": proc.pid, "targets": targets.split(),
+                   "display": os.environ.get("DISPLAY"), "hostSelectionReplaced": True}
+    (ctx.case_dir / "native-clipboard-image.json").write_text(json.dumps(observation, indent=1), encoding="utf-8")
+    return f"X11 CLIPBOARD owns image/png from {target.name}"
 
 
 def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:

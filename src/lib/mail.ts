@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { MailTabInfo } from "../types";
 import type { NetworkSettingsPayload } from "./networkSettings";
 import { withVaultLockedNotice } from "./ipc";
+import type { MailOutboxState } from "./mailOutbox";
 
 export interface MailAddress {
   name?: string | null;
@@ -12,6 +13,8 @@ export interface MailAttachmentInfo {
   name?: string | null;
   contentType?: string | null;
   size?: number | null;
+  /** IMAP section when listed from BODYSTRUCTURE (large messages). */
+  section?: string | null;
 }
 
 export interface MailFolder {
@@ -25,6 +28,14 @@ export interface MailFolder {
   total?: number | null;
   unread?: number | null;
   updatedAt: number;
+  /** Contiguous cached UID span (gap-free sync watermark). */
+  syncLowUid?: number | null;
+  syncHighUid?: number | null;
+  /** True when no older history remains to backfill. */
+  syncComplete?: boolean;
+  cachedCount?: number | null;
+  /** Last sync error for this folder; cleared by the next successful sync. */
+  lastError?: string | null;
 }
 
 export interface MailMessageHeader {
@@ -44,6 +55,14 @@ export interface MailMessageHeader {
   snippet?: string | null;
   rawSize?: number | null;
   bodyCached: boolean;
+  /** Parent message id (no angle brackets). */
+  inReplyTo?: string | null;
+  /** Thread ancestry, oldest first (no angle brackets). */
+  references?: string[];
+  /** The sender asked for a read receipt at this address (TASK-17). */
+  receiptTo?: string | null;
+  /** Mailing-list unsubscribe options (TASK-18). */
+  listUnsubscribe?: MailListUnsubscribe | null;
 }
 
 export interface MailMessageBody {
@@ -74,13 +93,162 @@ export interface MailSyncResult {
   hasMore: boolean;
 }
 
+export interface MailFolderError {
+  name: string;
+  error: string;
+}
+
 export interface MailSyncAllResult {
   accountId: string;
   folders: MailFolder[];
   fetchedMessages: number;
+  /** New unseen mail across folders (never initial sync, repair or backfill). */
   newMessages?: number;
+  newUnseenByFolder?: Record<string, number>;
+  failedFolders?: MailFolderError[];
+  /** Folders whose catch-up needs more steps (call mailSyncFolder). */
+  pendingFolders?: string[];
+  /** Folders a STATUS check proved unchanged (periodic scans only). */
+  unchangedFolders?: string[];
   cachedBodies: number;
   syncedAt: number;
+}
+
+export type MailSyncRequestMode = "auto" | "catchup" | "backfill" | "reconcile" | "reconcileFull";
+export type MailSyncMode =
+  | "initial"
+  | "repair"
+  | "catchup"
+  | "backfill"
+  | "reconcile"
+  | "reconcileFull"
+  | "uncached";
+
+export interface MailFolderSyncResult {
+  accountId: string;
+  folder: MailFolder;
+  mode: MailSyncMode;
+  messages: MailMessageHeader[];
+  fetched: number;
+  newUnseen: number;
+  vanished: number;
+  flagsUpdated: number;
+  remainingNew: number;
+  /** Call again to finish the requested work. */
+  more: boolean;
+  syncComplete: boolean;
+  uidValidityReset: boolean;
+  syncedAt: number;
+}
+
+export type MailSearchField = "all" | "subject" | "sender" | "recipients" | "body";
+
+export interface MailSearchQuery {
+  text: string;
+  /** null searches every cached folder. */
+  folder?: string | null;
+  field?: MailSearchField;
+  unreadOnly?: boolean;
+  flaggedOnly?: boolean;
+  withAttachments?: boolean;
+  keyword?: string | null;
+  limit?: number;
+}
+
+/** Search the local full-text index (all cached headers, cached bodies). */
+export function mailSearchMessages(accountId: string, query: MailSearchQuery): Promise<MailMessageHeader[]> {
+  return invoke<MailMessageHeader[]>("mail_search_messages", { accountId, query });
+}
+
+/** IMAP SEARCH in one server folder (mail whose body is not cached). */
+export function mailSearchServer(config: MailTabInfo, folder: string, query: MailSearchQuery): Promise<MailMessageHeader[]> {
+  return withVaultLockedNotice(() =>
+    invoke<MailMessageHeader[]>("mail_search_server", { config, folder, query }),
+  );
+}
+
+export interface MailServerGuess {
+  host: string;
+  port: number;
+  security: "TLS" | "STARTTLS" | "None";
+}
+
+export interface MailAutoconfig {
+  source: "builtin" | "ispdb" | "provider" | "well-known" | "guess";
+  provider: "gmail" | "outlook" | "custom";
+  imap: MailServerGuess;
+  smtp: MailServerGuess;
+}
+
+/** Discover IMAP/SMTP settings; `allowOnline` sends the domain to ISPDB. */
+export function mailAutoconfig(email: string, allowOnline: boolean): Promise<MailAutoconfig | null> {
+  return invoke<MailAutoconfig | null>("mail_autoconfig", { email, allowOnline });
+}
+
+export interface MailCertificateInfo {
+  host: string;
+  port: number;
+  sha256: string;
+  subject: string;
+  issuer: string;
+  notBefore: string;
+  notAfter: string;
+  derBase64: string;
+  trustedBySystem: boolean;
+  verifyError?: string | null;
+}
+
+/** Fetch the IMAP or SMTP server certificate for review (AC-44). */
+export function mailProbeCertificate(config: MailTabInfo, protocol: "imap" | "smtp"): Promise<MailCertificateInfo> {
+  return withVaultLockedNotice(() => invoke<MailCertificateInfo>("mail_probe_certificate", { config, protocol }));
+}
+
+/** Handshake errors the backend tagged as certificate problems. */
+export function isMailCertificateError(message: string | null | undefined): boolean {
+  return /untrusted server certificate|no longer matches the one you trusted/i.test(message ?? "");
+}
+
+/** LIST the remote folder tree (no message sync); resolves to cached folders. */
+export function mailListFolders(config: MailTabInfo): Promise<MailFolder[]> {
+  return withVaultLockedNotice(() => invoke<MailFolder[]>("mail_list_folders", { config }));
+}
+
+/** SUBSCRIBE/UNSUBSCRIBE a folder; resolves to the refreshed folder list. */
+export function mailSetFolderSubscription(
+  config: MailTabInfo,
+  folder: string,
+  subscribed: boolean,
+): Promise<MailFolder[]> {
+  return withVaultLockedNotice(() =>
+    invoke<MailFolder[]>("mail_set_folder_subscription", { config, folder, subscribed }),
+  );
+}
+
+/** Tauri event emitted by an open tab's IMAP IDLE watcher (TASK-12). */
+export const MAIL_IDLE_EVENT = "mail://idle";
+
+export interface MailIdleEvent {
+  accountId: string;
+  folder: string;
+  /** "ready" | "changed" | "unsupported" | "error" | "stopped" */
+  kind: string;
+  error?: string;
+}
+
+/** Start the account's IDLE watcher while its mail tab is open. */
+export function mailIdleStart(config: MailTabInfo, folder = "INBOX"): Promise<boolean> {
+  return withVaultLockedNotice(() => invoke<boolean>("mail_idle_start", { config, folder }));
+}
+
+/** Stop the account's IDLE watcher (tab closed; DEC-01). */
+export function mailIdleStop(accountId: string): Promise<boolean> {
+  return invoke<boolean>("mail_idle_stop", { accountId });
+}
+
+export interface MailSyncFolderOptions {
+  mode?: MailSyncRequestMode;
+  limit?: number;
+  includeBodies?: boolean;
 }
 
 export interface MailSyncOptions {
@@ -174,6 +342,48 @@ export interface MailSendRequest {
   textBody?: string | null;
   htmlBody?: string | null;
   attachments?: MailSendAttachment[];
+  inReplyTo?: string | null;
+  references?: string[];
+  /** Local draft whose server copy is removed after sending. */
+  draftId?: string | null;
+  /** `From:` of a non-default identity ("Name <addr>"); null = account address. */
+  from?: string | null;
+  replyTo?: string | null;
+  /** Ask for a read receipt (Disposition-Notification-To). */
+  requestReadReceipt?: boolean;
+}
+
+export interface MailListUnsubscribe {
+  /** https/http/mailto URIs from `List-Unsubscribe`, in header order. */
+  uris: string[];
+  /** RFC 8058 one-click POST is offered. */
+  oneClick: boolean;
+}
+
+export interface MailExportResult {
+  path: string;
+  count: number;
+}
+
+export interface MailImportResult {
+  imported: number;
+  failed: number;
+  firstError?: string | null;
+}
+
+/** Export a folder to an mbox file (mboxrd, Thunderbird-compatible). */
+export function mailExportMbox(config: MailTabInfo, folder: string, path: string): Promise<MailExportResult> {
+  return withVaultLockedNotice(() => invoke<MailExportResult>("mail_export_mbox", { config, folder, path }));
+}
+
+/** Import an mbox or .eml file into a folder (IMAP APPEND). */
+export function mailImportMessages(config: MailTabInfo, folder: string, path: string): Promise<MailImportResult> {
+  return withVaultLockedNotice(() => invoke<MailImportResult>("mail_import_messages", { config, folder, path }));
+}
+
+/** RFC 8058 one-click unsubscribe POST (https only). */
+export function mailUnsubscribeOneClick(url: string): Promise<number> {
+  return invoke<number>("mail_unsubscribe_one_click", { url });
 }
 
 export interface MailSendAttachment {
@@ -187,6 +397,9 @@ export interface MailSendAttachment {
 export interface MailSendResult {
   accepted: boolean;
   response: string;
+  /** Folder that received the stored copy (IMAP APPEND). */
+  sentCopyFolder?: string | null;
+  sentCopyError?: string | null;
 }
 
 export interface MailContactSuggestion {
@@ -220,6 +433,12 @@ export interface MailDraftContext {
   uid?: number | null;
   messageId?: string | null;
   subject?: string | null;
+  /** Thread ancestry of the replied-to message, oldest first. */
+  references?: string[];
+  /** Sending identity chosen in the composer. */
+  identityId?: string | null;
+  /** Present while the message waits in the local Outbox (TASK-17). */
+  outbox?: MailOutboxState | null;
 }
 
 export interface MailDraft {
@@ -290,11 +509,29 @@ export function mailSyncHeaders(
 
 export function mailSyncAllFolders(
   config: MailTabInfo,
-  options: Pick<MailSyncOptions, "limit" | "includeBodies"> = {},
+  options: Pick<MailSyncOptions, "limit" | "includeBodies"> & { fullReconcile?: boolean } = {},
 ): Promise<MailSyncAllResult> {
   return withVaultLockedNotice(() =>
     invoke<MailSyncAllResult>("mail_sync_all_folders", {
       config,
+      limit: options.limit ?? null,
+      includeBodies: options.includeBodies ?? null,
+      fullReconcile: options.fullReconcile ?? null,
+    }),
+  );
+}
+
+/** One gap-free sync step for a folder; repeat while `result.more`. */
+export function mailSyncFolder(
+  config: MailTabInfo,
+  folder: string,
+  options: MailSyncFolderOptions = {},
+): Promise<MailFolderSyncResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailFolderSyncResult>("mail_sync_folder", {
+      config,
+      folder,
+      mode: options.mode ?? null,
       limit: options.limit ?? null,
       includeBodies: options.includeBodies ?? null,
     }),
@@ -333,6 +570,8 @@ export function mailDownloadAttachment(
   uid: number,
   attachmentIndex: number,
   targetPath: string,
+  /** IMAP section of a large message's attachment (fetches only that part). */
+  section?: string | null,
 ): Promise<MailDownloadAttachmentResult> {
   return withVaultLockedNotice(() =>
     invoke<MailDownloadAttachmentResult>("mail_download_attachment", {
@@ -341,6 +580,7 @@ export function mailDownloadAttachment(
       uid,
       attachmentIndex,
       targetPath,
+      section: section ?? null,
     }),
   );
 }
@@ -367,6 +607,20 @@ export function mailSaveDraft(
 
 export function mailDeleteDraft(accountId: string, draftId: string): Promise<void> {
   return invoke("mail_delete_draft", { accountId, draftId });
+}
+
+/** Store (or replace) the draft's copy in the server Drafts folder. */
+export function mailStoreRemoteDraft(config: MailTabInfo, draftId: string): Promise<MailDraft> {
+  return withVaultLockedNotice(() =>
+    invoke<MailDraft>("mail_store_remote_draft", { config, draftId }),
+  );
+}
+
+/** Remove the draft's server copy; resolves false when it had none. */
+export function mailDiscardRemoteDraft(config: MailTabInfo, draftId: string): Promise<boolean> {
+  return withVaultLockedNotice(() =>
+    invoke<boolean>("mail_discard_remote_draft", { config, draftId }),
+  );
 }
 
 export function mailIndexCachedContacts(accountId: string): Promise<number> {
@@ -467,6 +721,79 @@ export function mailFetchRaw(
 ): Promise<string> {
   return withVaultLockedNotice(() =>
     invoke<string>("mail_fetch_raw", { config, folder, uid }),
+  );
+}
+
+export interface MailInviteTime {
+  /** Epoch seconds for UTC and all-day values; null for zoned wall-clock times. */
+  epoch?: number | null;
+  /** `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM` in the sender's zone. */
+  local: string;
+  tzid?: string | null;
+  allDay: boolean;
+}
+
+export interface MailInviteAttendee {
+  email: string;
+  name?: string | null;
+  partstat: string;
+}
+
+/** iTIP/iMIP calendar invitation carried by a message (TASK-20). */
+export interface MailInvite {
+  method: string;
+  uid: string;
+  sequence: number;
+  summary: string;
+  location?: string | null;
+  description?: string | null;
+  start?: MailInviteTime | null;
+  end?: MailInviteTime | null;
+  organizer?: MailInviteAttendee | null;
+  attendees: MailInviteAttendee[];
+  status?: string | null;
+  ics: string;
+}
+
+export type MailInviteReply = "accept" | "tentative" | "decline";
+
+export interface MailInviteResponse {
+  partstat: string;
+  sentTo: string;
+}
+
+export function mailGetInvite(
+  config: MailTabInfo,
+  folder: string,
+  uid: number,
+): Promise<MailInvite | null> {
+  return withVaultLockedNotice(() =>
+    invoke<MailInvite | null>("mail_get_invite", { config, folder, uid }),
+  );
+}
+
+export function mailRespondInvite(
+  config: MailTabInfo,
+  folder: string,
+  uid: number,
+  response: MailInviteReply,
+): Promise<MailInviteResponse> {
+  return withVaultLockedNotice(() =>
+    invoke<MailInviteResponse>("mail_respond_invite", { config, folder, uid, response }),
+  );
+}
+
+/** RFC 3503 keyword: the read receipt request was answered or declined. */
+export const MAIL_MDN_SENT = "$MDNSent";
+
+export function mailSendReceipt(
+  config: MailTabInfo,
+  folder: string,
+  uid: number,
+  automatic = false,
+): Promise<{ sentTo: string }> {
+  return withVaultLockedNotice(() =>
+    invoke<{ sentTo: string }>("mail_send_receipt", { config, folder, uid, automatic }),
   );
 }
 

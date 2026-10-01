@@ -53,6 +53,7 @@
     "marked": "18.0.13",
     "mermaid": "^11.17.2",
     "perfect-freehand": "^1.2.3",
+    "qr": "0.7.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-konva": "^19.2.7",

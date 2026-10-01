@@ -1,0 +1,129 @@
+id: TC-MAIL-SEND-01
+title: Mail stores server drafts and a Sent copy through IMAP APPEND
+description: 'TASK-06 (docs-feature/mail-thunderbird-parity-design.md AC-20/AC-21):
+
+  composing a message and saving it stores a copy in the server Drafts
+
+  folder; sending it removes that server draft and appends the sent message
+
+  to the Sent folder so other clients see both. Browser mode drives the stub
+
+  server model; native mode uses the fake IMAP/SMTP server and the real
+
+  lettre + IMAP APPEND path.
+
+  '
+covers:
+- F-MAIL-6
+- F-MAIL-2
+tags:
+- mail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- click: '[data-testid="mail-compose-open"]'
+- wait_for: '[data-testid="mail-compose-dialog"]'
+- fill:
+    selector: '[data-testid="mail-recipient-to"] input'
+    value: receiver@example.com
+- press: Enter
+- fill:
+    selector: '[data-testid="mail-compose-subject"]'
+    value: Server draft and sent copy
+- type:
+    selector: '[data-testid="mail-compose-editor"]'
+    text: Stored on the server for other clients
+- click: '[data-testid="mail-compose-save-draft"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Draft saved to Drafts
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Drafts
+    equals: 1
+- click: '[data-testid="mail-compose-send"]'
+- wait_for:
+    selector: '[data-testid="mail-compose-dialog"]'
+    state: detached
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: copy saved to Sent
+    timeout_sec: 30
+- mail_server_assert_folder_count:
+    folder: Sent
+    min: 1
+- mail_server_assert_folder_count:
+    folder: Drafts
+    equals: 0
+- screenshot: mail-send-01-sent-copy.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 手工保存草稿后服务器 Drafts 出现一份副本（AC-21）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 8
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"mail-compose-dialog\"]"}'
+    - step: 15
+      expectation: '{"assert_text": {"contains": "Draft saved to Drafts"}}'
+    - step: 16
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Drafts", "equals": 1}}'
+    results:
+    - 15
+    - 16
+  - id: R2
+    requirement: 发送后服务器 Sent 收到副本、服务器草稿被移除（AC-20/AC-21）。
+    actions:
+    - 17
+    checkpoints:
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-compose-dialog\"]", "state": "detached"}}'
+    - step: 19
+      expectation: '{"assert_text": {"contains": "copy saved to Sent"}}'
+    - step: 20
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Sent", "min": 1}}'
+    - step: 21
+      expectation: '{"mail_server_assert_folder_count": {"folder": "Drafts", "equals": 0}}'
+    results:
+    - 19
+    - 20
+    - 21
+  visual:
+  - check: 截图中状态栏显示已保存 Sent 副本，写信窗口已关闭。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实 SMTP 发送与 IMAP APPEND；browser 仅验证渲染层与桩模型；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

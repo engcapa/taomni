@@ -94,6 +94,7 @@ function Placeholder({
 }) {
   return (
     <div
+      data-testid="vault-gate-placeholder"
       className="grid h-full w-full place-items-center"
       style={{ background: "var(--taomni-bg)", color: "var(--taomni-text-muted)" }}
     >
@@ -106,6 +107,7 @@ function Placeholder({
         {actionLabel && onAction ? (
           <button
             type="button"
+            data-testid="vault-gate-action"
             onClick={onAction}
             className="rounded-lg px-4 py-2 text-[12px] font-semibold text-white"
             style={{ background: "var(--taomni-accent)" }}

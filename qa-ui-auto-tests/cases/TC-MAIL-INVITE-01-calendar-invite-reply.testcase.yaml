@@ -1,0 +1,121 @@
+id: TC-MAIL-INVITE-01
+title: Mail shows a calendar invitation card and Accept sends an iTIP REPLY to the organizer
+description: 'TASK-20 phase 1 (docs-feature/mail-thunderbird-parity-design.md AC-62/AC-63).
+
+  Delivers an iMIP invitation (multipart/alternative with text/calendar
+
+  METHOD:REQUEST), syncs, opens it and requires the reader''s invite card with
+
+  the event summary; Accept must send a METHOD:REPLY with PARTSTAT=ACCEPTED
+
+  that the server side receives. Time-zone formatting, CANCEL and the ICS
+
+  parser are covered by Rust and Vitest tests.
+
+  Browser mode drives the stub server model (renderer orchestration only);
+
+  native mode parses the real message fetched from the in-process fake IMAP
+
+  server and sends the reply through the fake SMTP server started by the
+
+  mail_server fixture.
+
+  '
+covers:
+- F-MAIL-18
+tags:
+- mail
+- p2
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- mail_server
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- mail_server_deliver:
+    count: 1
+    prefix: Invite
+    invite: QA standup
+- click: '[data-testid="mail-sync-button"]'
+- mail_server_assert_list_matches:
+    timeout_sec: 60
+- fill:
+    selector: '[data-testid="mail-search-input"]'
+    value: Invite 0001
+- click: '[data-testid="mail-message-row"]'
+- wait_for:
+    selector: '[data-testid="mail-invite-card"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="mail-invite-summary"]'
+    contains: QA standup
+- click: '[data-testid="mail-invite-accept"]'
+- wait_for:
+    selector: '[data-testid="mail-invite-responded"]'
+    timeout_sec: 30
+- mail_server_assert_smtp_contains:
+    text: PARTSTAT=ACCEPTED
+    timeout_sec: 20
+- screenshot: mail-invite-01-accepted.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 含 text/calendar METHOD:REQUEST 的邮件在阅读区显示邀请卡片及事件标题（AC-62）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 9
+    - 10
+    - 12
+    - 13
+    checkpoints:
+    - step: 8
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 11
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 14
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-invite-card\"]", "timeout_sec": 30}}'
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-invite-summary\"]", "contains": "QA standup"}}'
+    results:
+    - 14
+    - 15
+  - id: R2
+    requirement: 点击 Accept 后向组织者发送 iTIP METHOD:REPLY（PARTSTAT=ACCEPTED），服务端收到该回复且卡片显示已回复（AC-62）。
+    actions:
+    - 16
+    checkpoints:
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-invite-responded\"]", "timeout_sec": 30}}'
+    - step: 18
+      expectation: '{"mail_server_assert_smtp_contains": {"text": "PARTSTAT=ACCEPTED", "timeout_sec": 20}}'
+    results:
+    - 17
+    - 18
+  visual:
+  - check: 截图中邀请卡片显示标题、时间、地点、组织者，Accept 高亮并显示 “Reply sent (accepted)”。
+    method: manual
+    reason: 像素与布局需人工评审。
+  native:
+  - check: native 模式验证真实后端解析 text/calendar 并经 SMTP 发出 iTIP REPLY；browser 仅验证渲染层；平台结果分别记录。
+    method: automated
+    reason: 按实际执行模式与平台解释证据。

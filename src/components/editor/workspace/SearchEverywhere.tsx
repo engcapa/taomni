@@ -386,8 +386,11 @@ export function SearchEverywhere({
               key={tab.id}
               type="button"
               role="tab"
+              tabIndex={-1}
               aria-selected={mode === tab.id}
               data-active={mode === tab.id || undefined}
+              data-testid={`search-everywhere-tab-${tab.id}`}
+              onMouseDown={(event) => event.preventDefault()}
               className="h-7 shrink-0 rounded-t px-2.5 text-[11px] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
               onClick={() => setMode(tab.id)}
             >
@@ -438,6 +441,12 @@ export function SearchEverywhere({
         );
       }}
       onClose={onClose}
+      groupNavigation
+      onTabNavigate={(direction) => {
+        const index = visibleTabs.findIndex((tab) => tab.id === mode);
+        const next = visibleTabs[(index + direction + visibleTabs.length) % visibleTabs.length];
+        if (next) setMode(next.id);
+      }}
       onPick={(item, options) => {
         if (item.kind === "file") {
           if (options) onOpenFile(item.value, options);

@@ -1,0 +1,73 @@
+id: TC-MFA-107
+title: Native QR export is gated by the real master-password check
+description: >-
+  V-29 (AC-18). Isolated native profile on each desktop platform. Show QR code
+  calls the Rust export command: a wrong master password is refused by the
+  vault (VAULT_BAD_PASSWORD) with nothing rendered; the right one returns the
+  otpauth link, which the packaged WebView renders as a QR code. Decoding of
+  the rendered QR is proven by TC-MFA-011; scanning with a phone app is the
+  manual part of V-29.
+covers: [F-MFA-1]
+tags: [mfa, export, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-native-107}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-native-107}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: QA Native Export}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: JBSWY3DPEHPK3PXP}
+- click: '[data-testid="mfa-add-submit"]'
+- wait_for: '[data-testid="mfa-account-row"][data-issuer="QA Native Export"]'
+- click: '[data-testid="mfa-account-menu"]:is([data-issuer="QA Native Export"] *)'
+- click: '[data-testid="mfa-menu-qr"]'
+- wait_for: '[data-testid="mfa-qr-dialog"][data-state="locked"]'
+- fill: {selector: '[data-testid="mfa-qr-password"]', value: wrong-master-password}
+- click: '[data-testid="mfa-qr-reveal"]'
+- assert_text: {selector: '[data-testid="mfa-qr-error"]', contains: Incorrect master password, timeout_sec: 30}
+- assert_count: {selector: '[data-testid="mfa-qr-image"]', equal: 0}
+- fill: {selector: '[data-testid="mfa-qr-password"]', value: qa-mfa-native-107}
+- click: '[data-testid="mfa-qr-reveal"]'
+- wait_for: {selector: '[data-testid="mfa-qr-image"]', timeout_sec: 30}
+- assert_attribute: {selector: '[data-testid="mfa-qr-image"]', name: data-modules, matches: '[3-9][0-9]|1[0-7][0-9]'}
+- click: '[data-testid="mfa-qr-close"]'
+- assert_not_visible: '[data-testid="mfa-qr-dialog"]'
+- screenshot: mfa-107-native-qr.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The native export refuses a wrong master password and renders nothing (AC-18).
+    actions: [11, 13, 14, 15, 17, 18, 20, 21]
+    checkpoints:
+    - {step: 16, expectation: account stored}
+    - {step: 19, expectation: QR dialog asks for the password}
+    - {step: 22, expectation: vault refused the wrong password}
+    - {step: 23, expectation: no QR rendered}
+    results: [22, 23]
+  - id: R2
+    requirement: The right master password renders the exported account as a QR code and Close removes it (AC-18).
+    actions: [24, 25, 28]
+    checkpoints:
+    - {step: 26, expectation: QR rendered}
+    - {step: 27, expectation: QR has a plausible module count}
+    - {step: 29, expectation: dialog closed}
+    results: [29]
+  visual:
+  - check: Scan the QR in the screenshot with Google Authenticator or Aegis on a phone and compare its code with Taomni.
+    method: manual
+    reason: Third-party app compatibility cannot be automated on hosted runners (V-29).
+  native:
+  - check: Real vault verification and Rust otpauth export run in the packaged app on Linux, Windows and macOS.
+    method: automated
+    reason: Native mode drives the isolated QA build.

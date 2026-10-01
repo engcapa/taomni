@@ -10,7 +10,9 @@ import {
   AlertTriangle,
   Archive,
   Ban,
+  BookUser,
   Bot,
+  CalendarDays,
   CheckCircle2,
   ChevronDown,
   Code,
@@ -18,6 +20,7 @@ import {
   Download,
   ExternalLink,
   FileText,
+  Filter as FilterIcon,
   Folder,
   FolderInput,
   FolderPlus,
@@ -28,6 +31,7 @@ import {
   ImageOff,
   Inbox,
   Link as LinkIcon,
+  ListChecks,
   Loader2,
   Mail as MailIcon,
   MailOpen,
@@ -42,12 +46,13 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  Tag,
   Trash2,
   X,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import type { MailTabInfo } from "../../types";
+import type { MailIdentity, MailTabInfo } from "../../types";
 import {
   mailClearCache,
   mailCopyMessages,
@@ -55,11 +60,24 @@ import {
   mailDeleteFolder,
   mailDeleteMessages,
   mailDownloadAttachment,
+  mailExportMbox,
+  isMailCertificateError,
+  mailProbeCertificate,
+  mailImportMessages,
   mailFetchRaw,
+  mailSendReceipt,
+  MAIL_MDN_SENT,
+  mailGetInvite,
+  mailRespondInvite,
   mailGetMessageBody,
+  mailIdleStart,
+  mailIdleStop,
   mailIndexCachedContacts,
   mailDeleteDraft,
+  mailDiscardRemoteDraft,
+  mailStoreRemoteDraft,
   mailListDrafts,
+  mailListFolders,
   mailListCachedFolders,
   mailListCachedMessages,
   mailSaveDraft,
@@ -69,10 +87,16 @@ import {
   mailSaveRaw,
   mailSendMessage,
   mailSetFlags,
+  mailSetFolderSubscription,
   mailSearchContacts,
+  mailSearchMessages,
+  mailSearchServer,
   mailSyncAllFolders,
+  mailSyncFolder,
   mailSyncHeaders,
   mailTestConnection,
+  mailUnsubscribeOneClick,
+  MAIL_IDLE_EVENT,
   type MailAddress,
   type MailAttachmentInfo,
   type MailContactSuggestion,
@@ -80,9 +104,81 @@ import {
   type MailDraftAttachment,
   type MailDraftContext,
   type MailFolder,
+  type MailCertificateInfo,
+  type MailFolderSyncResult,
+  type MailIdleEvent,
+  type MailInvite,
+  type MailInviteReply,
   type MailMessageBody,
   type MailMessageHeader,
+  type MailSearchField,
+  type MailSendRequest,
+  type MailSendResult,
+  type MailSyncRequestMode,
 } from "../../lib/mail";
+import { listen } from "@tauri-apps/api/event";
+import { notifyDesktop } from "../../lib/lanNotify";
+import { formatInviteRange, hasCalendarPart, myPartstat } from "../../lib/mailInvite";
+import { filterFromMessage, mailApplyFilters, type MailFilter } from "../../lib/mailFilters";
+import { MailFiltersPanel } from "./MailFiltersPanel";
+import { MailAddressBookPanel } from "./MailAddressBookPanel";
+import { MailAgendaPanel } from "./MailAgendaPanel";
+import {
+  agendaKey,
+  agendaTimeLabel,
+  dueReminders,
+  mailAddInviteToCalendar,
+  mailCalDavSync,
+  mailListAgenda,
+  type MailAgendaEvent,
+} from "../../lib/mailCalendar";
+import { emptyAddressBookEntry, type MailAddressBookEntry } from "../../lib/mailContacts";
+import {
+  isSelectable,
+  isSubscribed,
+  loadSubscribedOnly,
+  saveSubscribedOnly,
+  visibleFolders,
+} from "../../lib/mailFolders";
+import {
+  fromDateTimeLocal,
+  isOutbox,
+  isTransientSendError,
+  outboxNextAttemptAt,
+  outboxState,
+  toDateTimeLocal,
+  type MailOutboxState,
+} from "../../lib/mailOutbox";
+import { parseMailto } from "../../lib/mailto";
+import { useAppStore } from "../../stores/appStore";
+import { useSessionStore } from "../../stores/sessionStore";
+import { mentionsAttachment } from "../../lib/mailAttachReminder";
+import { isEditableTarget, mailShortcutAction, type MailShortcutAction } from "../../lib/mailShortcuts";
+import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
+import {
+  DEFAULT_IDENTITY_ID,
+  identityFromHeader,
+  identityLabel,
+  mailIdentities,
+  ownIdentityAddresses,
+  pickReplyIdentity,
+  swapSignature,
+} from "../../lib/mailIdentities";
+import {
+  JUNK_KEYWORD,
+  MAIL_TAGS,
+  NOT_JUNK_KEYWORD,
+  isJunk,
+  messageTags,
+  toggleKeywordPlan,
+} from "../../lib/mailTags";
+import {
+  countNewMail,
+  folderHasMoreToLoad,
+  mergeFolderMeta,
+  mergeSyncedMessages,
+  runFolderSyncLoop,
+} from "../../lib/mailSync";
 import { RecipientField } from "./RecipientField";
 import { RichMailEditor } from "./RichMailEditor";
 import { MailMessageBodyView } from "./MailMessageBodyView";
@@ -162,6 +258,10 @@ interface ComposeDraft {
   attachments: MailDraftAttachment[];
   replyContext?: MailDraftContext | null;
   richFormatUsed: boolean;
+  /** Sending identity (DEFAULT_IDENTITY_ID = account address). */
+  identityId?: string | null;
+  /** Ask for a read receipt (RFC 8098). */
+  readReceipt?: boolean;
 }
 
 type RecipientFieldKey = "to" | "cc" | "bcc";
@@ -194,6 +294,7 @@ interface MailDraggableDialogProps {
   className: string;
   children: ReactNode;
   headerActions?: ReactNode;
+  closeTestId?: string;
   onClose: () => void;
 }
 
@@ -400,6 +501,7 @@ function MailDraggableDialog({
   className,
   children,
   headerActions,
+  closeTestId,
   onClose,
 }: MailDraggableDialogProps) {
   const { containerRef, handleRef } = useModalDraggableAndResizable({ minWidth, minHeight });
@@ -432,6 +534,7 @@ function MailDraggableDialog({
           onClick={onClose}
           aria-label="Close dialog"
           title="Close"
+          data-testid={closeTestId}
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -526,6 +629,12 @@ function withSeenFlag(message: MailMessageHeader): MailMessageHeader {
 
 type SpecialFolderKind = "trash" | "junk" | "archive" | "sent";
 
+/** Drag payload marker for messages dragged onto the folder tree. */
+const MAIL_DRAG_TYPE = "application/x-taomni-mail";
+
+/** Folders whose new arrivals never raise a new-mail alert. */
+const NEW_MAIL_EXCLUDED_KINDS: SpecialFolderKind[] = ["sent", "trash", "junk"];
+
 const SPECIAL_FOLDER_MATCHERS: Record<SpecialFolderKind, { flag: string; names: string[] }> = {
   trash: { flag: "trash", names: ["trash", "deleted", "已删除", "已刪除", "垃圾桶", "废件箱", "廢件匣"] },
   junk: { flag: "junk", names: ["junk", "spam", "bulk", "垃圾邮件", "垃圾郵件"] },
@@ -533,7 +642,14 @@ const SPECIAL_FOLDER_MATCHERS: Record<SpecialFolderKind, { flag: string; names: 
   sent: { flag: "sent", names: ["sent", "已发送", "已傳送", "寄件"] },
 };
 
-function folderMatchesSpecial(folder: MailFolder, kind: SpecialFolderKind): boolean {
+function folderMatchesSpecial(
+  folder: MailFolder,
+  kind: SpecialFolderKind,
+  overrides?: MailTabInfo["specialFolders"],
+): boolean {
+  // A manual choice in the account settings beats attributes and names.
+  const manual = overrides?.[kind];
+  if (manual) return folder.name === manual || folderLabel(folder) === manual;
   const matcher = SPECIAL_FOLDER_MATCHERS[kind];
   if (folder.flags.some((flag) => flag.toLowerCase().includes(matcher.flag))) return true;
   const haystack = `${folder.name} ${folderLabel(folder)}`.toLowerCase();
@@ -612,40 +728,59 @@ function mergeMessagePages(current: MailMessageHeader[], next: MailMessageHeader
   return sortMessages(Array.from(byKey.values()));
 }
 
-function folderHasMoreMessages(folders: readonly MailFolder[], folderName: string, loadedCount: number): boolean {
-  const total = folders.find((folder) => folder.name === folderName)?.total;
-  return typeof total === "number" && total > loadedCount;
+const MAIL_THREAD_VIEW_STORAGE_KEY = "taomni.mail.threadView";
+
+/** Headers per gap-free catch-up step (the loop repeats until caught up). */
+function catchupStepSize(info: MailTabInfo): number {
+  return Math.max(20, Math.min(500, info.sync.maxFetchPerSync || 200));
 }
 
-/**
- * Decide whether a quiet-poll header result should rewrite the visible message
- * list, and compute hasMore from the post-merge loaded count (not just the
- * poll page size). Exported for unit tests of the shipped quiet-poll path.
- */
-export function applyQuietPollMessages(
-  selectedFolderNow: string,
-  polledFolder: string,
-  currentMessages: readonly MailMessageHeader[],
-  polledMessages: readonly MailMessageHeader[],
-  folders: readonly MailFolder[],
-  hasMoreFromServer: boolean,
-): { applyMessages: boolean; messages: MailMessageHeader[]; hasMore: boolean } {
-  if (selectedFolderNow !== polledFolder) {
-    return {
-      applyMessages: false,
-      messages: currentMessages.slice() as MailMessageHeader[],
-      hasMore: false,
-    };
-  }
-  const previousForFolder = currentMessages.filter((message) => message.folder === polledFolder);
-  const messages = mergeMessagePages(previousForFolder, polledMessages.slice());
-  // Quiet poll always uses offset=0, so server hasMore is true whenever the
-  // mailbox is larger than the batch — even if the UI already paged to the end.
-  // Prefer post-merge loaded count (+ folder total). Only trust server hasMore
-  // when the merge did not already exceed the quiet page (fresh/short lists).
-  const hasMore = folderHasMoreMessages(folders, polledFolder, messages.length)
-    || (hasMoreFromServer && messages.length <= polledMessages.length);
-  return { applyMessages: true, messages, hasMore };
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function replyContextFor(
+  kind: "reply" | "replyAll" | "forward",
+  target: MailMessageHeader,
+): MailDraftContext {
+  const references = [...(target.references ?? [])];
+  if (target.inReplyTo && !references.includes(target.inReplyTo)) references.push(target.inReplyTo);
+  return {
+    kind,
+    folder: target.folder,
+    uid: target.uid,
+    messageId: target.messageId,
+    subject: target.subject,
+    references,
+  };
+}
+
+/** In-Reply-To / References for a reply; forwards start a new thread. */
+function threadHeadersFor(context: MailDraftContext | null | undefined): { inReplyTo: string | null; references: string[] } {
+  if (!context || context.kind === "forward" || !context.messageId) return { inReplyTo: null, references: [] };
+  return { inReplyTo: context.messageId, references: context.references ?? [] };
+}
+
+function decodeFolderLabel(name: string, folders: readonly MailFolder[]): string {
+  const folder = folders.find((entry) => entry.name === name);
+  return folder ? folderLabel(folder) : name;
+}
+
+const TEMPLATE_KIND = "template";
+
+function isTemplate(saved: MailDraft): boolean {
+  return saved.replyContext?.kind === TEMPLATE_KIND;
+}
+
+function draftContextWithIdentity(draft: ComposeDraft): MailDraftContext | null {
+  const identityId = draft.identityId && draft.identityId !== DEFAULT_IDENTITY_ID ? draft.identityId : null;
+  if (!draft.replyContext && !identityId) return null;
+  return { ...(draft.replyContext ?? {}), identityId };
+}
+
+function identitySendFields(identity: MailIdentity): { from: string | null; replyTo: string | null } {
+  if (identity.id === DEFAULT_IDENTITY_ID) return { from: null, replyTo: null };
+  return { from: identityFromHeader(identity), replyTo: identity.replyTo ?? null };
 }
 
 function draftWithSignature(draft: Partial<ComposeDraft>, signature: string | null | undefined): ComposeDraft {
@@ -685,8 +820,16 @@ function serializeDraftContent(draft: ComposeDraft): string {
   });
 }
 
+/** Reply context without the Outbox queue state (editing leaves the Outbox). */
+function withoutOutbox(context: MailDraftContext | null | undefined): MailDraftContext | null {
+  if (!context) return null;
+  const { outbox: _outbox, ...rest } = context;
+  return rest;
+}
+
 function draftFromSaved(saved: MailDraft): ComposeDraft {
   return {
+    readReceipt: outboxState(saved)?.readReceipt ?? false,
     id: saved.id,
     to: parseRecipientsText(saved.to.join(", ")),
     cc: parseRecipientsText(saved.cc.join(", ")),
@@ -695,8 +838,9 @@ function draftFromSaved(saved: MailDraft): ComposeDraft {
     htmlBody: saved.htmlBody || plainTextToMailHtml(saved.textBody),
     textBody: saved.textBody,
     attachments: saved.attachments ?? [],
-    replyContext: saved.replyContext ?? null,
+    replyContext: withoutOutbox(saved.replyContext),
     richFormatUsed: hasRichMailFormatting(saved.htmlBody),
+    identityId: saved.replyContext?.identityId ?? null,
   };
 }
 
@@ -951,6 +1095,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [checkedMessageKeys, setCheckedMessageKeys] = useState<Set<string>>(() => new Set());
   const [body, setBody] = useState<MailMessageBody | null>(null);
   const [query, setQuery] = useState("");
+  const [searchScope, setSearchScope] = useState<"folder" | "all">("folder");
+  const [searchField, setSearchField] = useState<MailSearchField>("all");
+  const [quickFilters, setQuickFilters] = useState<{ unread: boolean; flagged: boolean; attachments: boolean }>({
+    unread: false,
+    flagged: false,
+    attachments: false,
+  });
+  const [tagFilter, setTagFilter] = useState<string>("");
+  const [searchResults, setSearchResults] = useState<MailMessageHeader[] | null>(null);
+  const [serverSearching, setServerSearching] = useState(false);
+  const searchSeqRef = useRef(0);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingFolders, setLoadingFolders] = useState(false);
@@ -959,6 +1114,16 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [bodyCache, setBodyCache] = useState<Map<string, MailMessageBody>>(() => new Map());
   const [bodyLoadingKey, setBodyLoadingKey] = useState<string | null>(null);
   const [bodyWarming, setBodyWarming] = useState<BodyWarmState>({ active: false, done: 0, total: 0 });
+  const [threadView, setThreadView] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(MAIL_THREAD_VIEW_STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(() => new Set());
+  const [syncProgress, setSyncProgress] = useState<{ folder: string; fetched: number; remaining: number } | null>(null);
+  const [backfillProgress, setBackfillProgress] = useState<{ folder: string; cached: number; total: number } | null>(null);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -968,6 +1133,23 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [draft, setDraft] = useState<ComposeDraft>(EMPTY_DRAFT);
   const [drafts, setDrafts] = useState<MailDraft[]>([]);
   const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftsTab, setDraftsTab] = useState<"drafts" | "templates" | "outbox">("drafts");
+  const visibleDrafts = useMemo(
+    () => drafts.filter((saved) => {
+      if (draftsTab === "outbox") return isOutbox(saved);
+      if (isOutbox(saved)) return false;
+      return isTemplate(saved) === (draftsTab === "templates");
+    }),
+    [drafts, draftsTab],
+  );
+  const outboxCount = useMemo(() => drafts.filter(isOutbox).length, [drafts]);
+  const [sendLaterOpen, setSendLaterOpen] = useState(false);
+  const [attachReminder, setAttachReminder] = useState(false);
+  const [sendLaterAt, setSendLaterAt] = useState("");
+  const [undoSend, setUndoSend] = useState<{ draftId: string; until: number } | null>(null);
+  const [undoNow, setUndoNow] = useState(() => Date.now());
+  const undoTimerRef = useRef<number | null>(null);
+  const outboxBusyIdsRef = useRef(new Set<string>());
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState<RecipientSearchState>({
@@ -987,6 +1169,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const visibleRef = useRef(visible);
   const pendingCacheRefreshRef = useRef(false);
   const initialSyncDoneRef = useRef(false);
+  /** Bumped by user-driven syncs; stale catch-up loops stop at their next step. */
+  const syncGenerationRef = useRef(0);
+  const backfillSeqRef = useRef(0);
   const contactIndexAccountRef = useRef<string | null>(null);
   const contactSearchSeqRef = useRef(0);
   const bodyCacheRef = useRef<Map<string, MailMessageBody>>(new Map());
@@ -1020,9 +1205,63 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const pushMailNew = useTaoAlertStore((s) => s.pushMailNew);
 
   const displayFolders = folders.length > 0 ? folders : [{ ...DEFAULT_FOLDER, accountId: info.sessionId }];
+  // TASK-10: "show only subscribed folders" (per account, this browser).
+  const [subscribedOnly, setSubscribedOnlyState] = useState(
+    () => loadSubscribedOnly(info.sessionId, info.sync.subscribedOnly ?? false),
+  );
+  const subscribedOnlyRef = useRef(subscribedOnly);
+  subscribedOnlyRef.current = subscribedOnly;
+  const treeFolders = useMemo(() => visibleFolders(displayFolders, subscribedOnly), [displayFolders, subscribedOnly]);
+  const [subscriptionsOpen, setSubscriptionsOpen] = useState(false);
+  const draggedMessagesRef = useRef<MailMessageHeader[]>([]);
+  const [dropFolder, setDropFolder] = useState<string | null>(null);
+  const [unsubscribeArmed, setUnsubscribeArmed] = useState<string | null>(null);
+  /** Message filters dialog (TASK-13); the draft pre-fills "Create filter from message". */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterDraft, setFilterDraft] = useState<MailFilter | null>(null);
+  /** Failed actions of the last incoming filter run (AC-42), kept until the dialog is opened. */
+  const [filterErrors, setFilterErrors] = useState<string[]>([]);
+  const incomingFiltersRef = useRef<(() => Promise<void>) | null>(null);
+  /** Address book dialog (TASK-19); the draft pre-fills "Add sender to address book". */
+  const [addressBookOpen, setAddressBookOpen] = useState(false);
+  const [contactDraft, setContactDraft] = useState<MailAddressBookEntry | null>(null);
+  /** CalDAV agenda (DEC-14): dialog, cache revision and reminder bookkeeping. */
+  const [agendaOpen, setAgendaOpen] = useState(false);
+  const [agendaRevision, setAgendaRevision] = useState(0);
+  const agendaEventsRef = useRef<MailAgendaEvent[]>([]);
+  const remindedRef = useRef<Set<string>>(new Set());
+  /** Read receipt answered for these messages in this session (TASK-17). */
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const autoReceiptRef = useRef<Set<string>>(new Set());
+  /** Calendar invitation of the open message (TASK-20), keyed by message. */
+  const [inviteView, setInviteView] = useState<{
+    key: string;
+    invite: MailInvite | null;
+    loading: boolean;
+    responding?: MailInviteReply;
+    responded?: string;
+    error?: string;
+    /** CalDAV write of the invitation (TASK-20 phase 2). */
+    calendar?: "adding" | "added";
+    calendarError?: string;
+  } | null>(null);
+  const [certReview, setCertReview] = useState<{
+    protocol: "imap" | "smtp";
+    loading: boolean;
+    info?: MailCertificateInfo;
+    error?: string;
+  } | null>(null);
+  const retryAfterTrustRef = useRef(false);
+  const [subscriptionBusy, setSubscriptionBusy] = useState<string | null>(null);
   const oauthReauthRequired = isOAuthReauthRequired(error);
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
   const batchSize = useMemo(() => refreshBatchSize(info), [info.sync.maxFetchPerSync]);
+  const catchupBatchSize = useMemo(() => catchupStepSize(info), [info.sync.maxFetchPerSync]);
+  const identities = useMemo(() => mailIdentities(info), [info]);
+  const identityById = useCallback(
+    (id: string | null | undefined) => identities.find((identity) => identity.id === id) ?? identities[0],
+    [identities],
+  );
   const defaultMailDomain = useMemo(
     () => extractDefaultMailDomain([info.emailAddress, info.imap.username, info.smtp.username]),
     [info.emailAddress, info.imap.username, info.smtp.username],
@@ -1136,19 +1375,118 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     ));
   }, [visible]);
 
+  const quickFilterActive = quickFilters.unread || quickFilters.flagged || quickFilters.attachments || Boolean(tagFilter);
+  const searchActive = query.trim().length > 0;
+
+  // Local full-text search over the whole cached index (not just loaded rows).
+  useEffect(() => {
+    const text = query.trim();
+    const seq = searchSeqRef.current + 1;
+    searchSeqRef.current = seq;
+    if (!text || !info.cache.enabled) {
+      setSearchResults(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void mailSearchMessages(info.sessionId, {
+        text,
+        folder: searchScope === "folder" ? selectedFolder : null,
+        field: searchField,
+        unreadOnly: quickFilters.unread,
+        flaggedOnly: quickFilters.flagged,
+        withAttachments: quickFilters.attachments,
+        keyword: tagFilter || null,
+        limit: 1000,
+      })
+        .then((results) => {
+          if (searchSeqRef.current === seq) setSearchResults(results);
+        })
+        .catch((e) => {
+          if (searchSeqRef.current === seq) {
+            setSearchResults(null);
+            console.debug("mail local search failed", e);
+          }
+        });
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [info.cache.enabled, info.sessionId, query, quickFilters, searchField, searchScope, selectedFolder, tagFilter]);
+
+  const runServerSearch = useCallback(async () => {
+    const text = query.trim();
+    if (!text) return;
+    const folder = selectedFolderRef.current;
+    const seq = searchSeqRef.current;
+    setServerSearching(true);
+    setError(null);
+    try {
+      const results = await mailSearchServer(info, folder, {
+        text,
+        field: searchField,
+        unreadOnly: quickFilters.unread,
+        flaggedOnly: quickFilters.flagged,
+        limit: 200,
+      });
+      if (searchSeqRef.current !== seq) return;
+      setSearchResults((current) => {
+        const byKey = new Map<string, MailMessageHeader>();
+        for (const message of current ?? []) byKey.set(messageKey(message), message);
+        for (const message of results) byKey.set(messageKey(message), message);
+        return sortMessages(Array.from(byKey.values()));
+      });
+      setStatus(`Server search found ${results.length} message${results.length === 1 ? "" : "s"} in ${folder}`);
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+    } finally {
+      setServerSearching(false);
+    }
+  }, [info, query, quickFilters.flagged, quickFilters.unread, searchField]);
+
   const filteredMessages = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return messages;
-    return messages.filter((message) => {
-      const haystack = [
-        message.subject,
-        addressLabel(message.from),
-        message.snippet ?? "",
-        ...message.to.map(addressLabel),
-      ].join(" ").toLowerCase();
-      return haystack.includes(q);
+    let base: MailMessageHeader[];
+    if (q && searchResults) {
+      base = searchResults;
+    } else if (q) {
+      // Cache disabled (or index not ready): filter the loaded rows.
+      base = messages.filter((message) => {
+        const haystack = [
+          message.subject,
+          addressLabel(message.from),
+          message.snippet ?? "",
+          ...message.to.map(addressLabel),
+        ].join(" ").toLowerCase();
+        return haystack.includes(q);
+      });
+    } else {
+      base = messages;
+    }
+    if (!quickFilterActive) return base;
+    return base.filter((message) =>
+      (!quickFilters.unread || isUnread(message))
+      && (!quickFilters.flagged || isFlagged(message))
+      && (!quickFilters.attachments || message.hasAttachments)
+      && (!tagFilter || message.flags.some((flag) => flag.toLowerCase() === tagFilter.toLowerCase())));
+  }, [messages, query, quickFilterActive, quickFilters, searchResults, tagFilter]);
+  const listRows = useMemo<MailThreadRow[]>(() => {
+    if (threadView) return flattenMailThreads(buildMailThreads(filteredMessages), expandedThreads);
+    return filteredMessages.map((message) => ({
+      message,
+      threadKey: messageKey(message),
+      depth: 0,
+      isRoot: true,
+      threadSize: 1,
+      threadUnread: isUnread(message) ? 1 : 0,
+      expanded: false,
+    }));
+  }, [expandedThreads, filteredMessages, threadView]);
+  const toggleThreadExpanded = useCallback((key: string) => {
+    setExpandedThreads((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
-  }, [messages, query]);
+  }, []);
   const allFilteredMessagesChecked = filteredMessages.length > 0
     && filteredMessages.every((message) => checkedMessageKeys.has(messageKey(message)));
   const selectedBody = useMemo(() => {
@@ -1169,6 +1507,91 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     () => (selectedBody?.attachments.length ? selectedBody.attachments : selectedMessage?.attachments ?? []),
     [selectedBody?.attachments, selectedMessage?.attachments],
   );
+  // AC-62: parse the invitation once the body shows a calendar part.
+  const inviteInfoRef = useRef(info);
+  inviteInfoRef.current = info;
+  const selectedInviteKey = selectedMessage && hasCalendarPart(visibleAttachments)
+    ? messageKey(selectedMessage)
+    : null;
+  useEffect(() => {
+    if (!selectedInviteKey || !selectedMessage) {
+      setInviteView(null);
+      return;
+    }
+    let cancelled = false;
+    const { folder, uid } = selectedMessage;
+    setInviteView({ key: selectedInviteKey, invite: null, loading: true });
+    mailGetInvite(inviteInfoRef.current, folder, uid)
+      .then((invite) => {
+        if (!cancelled) setInviteView({ key: selectedInviteKey, invite, loading: false });
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setInviteView({ key: selectedInviteKey, invite: null, loading: false, error: mailClientErrorMessage(e) });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // selectedMessage is identified by selectedInviteKey.
+  }, [selectedInviteKey]);
+
+  // TASK-17: "always" answers a read receipt request when the message is shown.
+  const selectedReceiptKey = selectedMessage?.receiptTo ? messageKey(selectedMessage) : null;
+  useEffect(() => {
+    if (!selectedReceiptKey || !selectedMessage || (info.receiptPolicy ?? "ask") !== "always") return;
+    if (autoReceiptRef.current.has(selectedReceiptKey) || !receiptRequest(selectedMessage)) return;
+    autoReceiptRef.current.add(selectedReceiptKey);
+    void answerReceipt(selectedMessage, true, true);
+    // selectedMessage is identified by selectedReceiptKey.
+  }, [selectedReceiptKey, info.receiptPolicy]);
+
+  // DEC-14: reminders for CalDAV events while this tab is open (DEC-01).
+  const caldavUrl = info.caldav?.url ?? "";
+  const onAgendaChanged = useCallback((events: MailAgendaEvent[]) => {
+    agendaEventsRef.current = events;
+  }, []);
+  useEffect(() => {
+    if (!caldavUrl) return;
+    let cancelled = false;
+    const refresh = async (sync: boolean) => {
+      try {
+        if (sync) await mailCalDavSync(inviteInfoRef.current);
+        const events = await mailListAgenda(inviteInfoRef.current.sessionId, 2);
+        if (!cancelled) agendaEventsRef.current = events;
+      } catch (e) {
+        console.debug("mail agenda refresh failed", e);
+      }
+    };
+    void refresh(false);
+    const firstSync = window.setTimeout(() => void refresh(true), 5_000);
+    const syncTimer = window.setInterval(() => void refresh(true), 15 * 60_000);
+    const reminderTimer = window.setInterval(() => {
+      for (const event of dueReminders(agendaEventsRef.current, Date.now(), remindedRef.current)) {
+        remindedRef.current.add(agendaKey(event));
+        const when = agendaTimeLabel(event);
+        setStatus(`Reminder: ${event.summary || "event"} at ${when}`);
+        void notifyDesktop(
+          `Reminder: ${event.summary || "Event"}`,
+          event.location ? `${when} · ${event.location}` : when,
+        );
+      }
+    }, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(firstSync);
+      window.clearInterval(syncTimer);
+      window.clearInterval(reminderTimer);
+    };
+  }, [caldavUrl]);
+  useEffect(() => {
+    if (!caldavUrl || agendaRevision === 0) return;
+    void mailListAgenda(inviteInfoRef.current.sessionId, 2)
+      .then((events) => {
+        agendaEventsRef.current = events;
+      })
+      .catch(() => undefined);
+  }, [agendaRevision, caldavUrl]);
   const activeRecipientSuggestions = useMemo<RecipientSuggestion[]>(() => {
     const { field, query: recipientQuery, suggestions } = recipientSearch;
     if (!field || !recipientQuery.trim()) return [];
@@ -1285,6 +1708,27 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [decreaseFontSize, increaseFontSize, resetFontSize, visible]);
 
+  // Thunderbird-style list shortcuts (TASK-22); never inside inputs/editors.
+  const shortcutRef = useRef<(action: MailShortcutAction) => boolean>(() => false);
+  useEffect(() => {
+    if (!visible) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) return;
+      const action = mailShortcutAction(event);
+      if (!action) return;
+      const root = rootRef.current;
+      const target = event.target as Node | null;
+      const inTab = !target || target === document.body || Boolean(root?.contains(target));
+      if (!inTab || isEditableTarget(event.target)) return;
+      if (shortcutRef.current(action)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [visible]);
+
   useEffect(() => {
     if (!visible) return;
     const root = rootRef.current;
@@ -1352,7 +1796,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   }, [info.sessionId, updateSelectedFolder]);
 
-  const loadCachedMessages = useCallback(async (folder: string, offset = 0, append = false, quiet = false) => {
+  const loadCachedMessages = useCallback(async (
+    folder: string,
+    offset = 0,
+    append = false,
+    quiet = false,
+    limitOverride?: number,
+  ) => {
     if (!visibleRef.current) {
       pendingCacheRefreshRef.current = true;
       return { page: [] as MailMessageHeader[], hasMore: false };
@@ -1365,16 +1815,24 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
     setError(null);
     try {
-      const cached = await mailListCachedMessages(info.sessionId, folder, pageSize + 1, offset);
+      const limit = Math.max(pageSize, limitOverride ?? pageSize);
+      const cached = await mailListCachedMessages(info.sessionId, folder, limit + 1, offset);
       if (!visibleRef.current) {
         pendingCacheRefreshRef.current = true;
         return { page: [] as MailMessageHeader[], hasMore: false };
       }
-      const page = cached.slice(0, pageSize);
+      const page = cached.slice(0, limit);
       const loadedCount = offset + page.length;
-      const hasMore = cached.length > pageSize || folderHasMoreMessages(foldersRef.current, folder, loadedCount);
+      const hasMore = folderHasMoreToLoad(
+        foldersRef.current.find((entry) => entry.name === folder),
+        loadedCount,
+        cached.length > limit,
+      );
       setHasMoreMessages(hasMore);
-      setMessages((current) => append ? mergeMessagePages(current, page) : sortMessages(page));
+      // Update the ref synchronously: concurrent sync steps merge against it.
+      const next = append ? mergeMessagePages(messagesRef.current, page) : sortMessages(page);
+      messagesRef.current = next;
+      setMessages(next);
       if (!quiet) {
         setStatus(
           append
@@ -1522,140 +1980,270 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   }, [fetchBodyForMessage, info.cache.bodyRecentLimit, info.cache.enabled, info.sessionId]);
 
-  const syncFolder = useCallback(async (
-    folder = selectedFolder,
-    quiet = false,
-    options: SyncFolderOptions = {},
-  ) => {
-    const indicator = options.indicator ?? "sync";
-    const append = options.append ?? false;
-    const offset = Math.max(0, options.offset ?? 0);
-    const limit = Math.max(1, options.limit ?? (offset > 0 ? pageSize : batchSize));
-    const includeBodies = options.includeBodies ?? false;
-    const refreshFolders = options.refreshFolders ?? true;
+  const isNewMailExcludedFolder = useCallback((folder: MailFolder) =>
+    NEW_MAIL_EXCLUDED_KINDS.some((kind) => folderMatchesSpecial(folder, kind, info.specialFolders))
+    || /draft|草稿/i.test(`${folder.name} ${folderLabel(folder)}`), [info.specialFolders]);
 
-    if (syncInFlightRef.current) {
-      if (indicator !== "none" && visibleRef.current) {
-        setStatus("Mail sync already running");
+  const isNewMailExcludedName = useCallback((name: string) => {
+    const folder = foldersRef.current.find((entry) => entry.name === name);
+    return folder ? isNewMailExcludedFolder(folder) : false;
+  }, [isNewMailExcludedFolder]);
+
+  const notifyNewMail = useCallback((count: number) => {
+    if (count <= 0) return;
+    const title = info.displayName?.trim() || info.emailAddress || info.sessionId;
+    pushMailNew(tabId, info.sessionId, title, count);
+    // Only while the tab is open (DEC-01); opt-in per account.
+    if (info.sync.desktopNotify) {
+      void notifyDesktop(title, count === 1 ? "1 new message" : `${count} new messages`);
+    }
+  }, [info.displayName, info.emailAddress, info.sessionId, info.sync.desktopNotify, pushMailNew, tabId]);
+
+  const applySyncedFolder = useCallback((folder: MailFolder) => {
+    const next = mergeFolderMeta(foldersRef.current, folder);
+    foldersRef.current = next;
+    if (visibleRef.current) setFolders(next);
+  }, []);
+
+  /** Remote LIST on open so a new account shows every folder at once. */
+  const refreshFolderTree = useCallback(async () => {
+    try {
+      const listed = await mailListFolders(info);
+      if (listed.length === 0) return;
+      // Keep counts/watermarks a concurrent sync may have just updated.
+      const byName = new Map(foldersRef.current.map((entry) => [entry.name, entry]));
+      const next = listed.map((entry) => {
+        const known = byName.get(entry.name);
+        return known ? { ...entry, ...known, flags: entry.flags } : entry;
+      });
+      foldersRef.current = next;
+      if (visibleRef.current) setFolders(next);
+    } catch (e) {
+      console.debug("mail folder LIST failed", e);
+    }
+  }, [info]);
+
+  const setSubscribedOnly = useCallback((value: boolean) => {
+    setSubscribedOnlyState(value);
+    saveSubscribedOnly(info.sessionId, value);
+  }, [info.sessionId]);
+
+  const toggleSubscription = useCallback(async (folder: MailFolder, subscribed: boolean) => {
+    setSubscriptionBusy(folder.name);
+    setError(null);
+    try {
+      const listed = await mailSetFolderSubscription(info, folder.name, subscribed);
+      // Only the attributes change; keep cached counts and watermarks.
+      const merged = foldersRef.current.map((entry) => {
+        const remote = listed.find((candidate) => candidate.name === entry.name);
+        return remote ? { ...entry, flags: remote.flags } : entry;
+      });
+      foldersRef.current = merged;
+      setFolders(merged);
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+    } finally {
+      setSubscriptionBusy(null);
+    }
+  }, [info]);
+
+  /** Reload the visible list from the cache, keeping the loaded depth. */
+  const reloadVisibleFromCache = useCallback(async (folder: string) => {
+    if (!visibleRef.current) {
+      pendingCacheRefreshRef.current = true;
+      return;
+    }
+    if (selectedFolderRef.current !== folder) return;
+    const loaded = messagesRef.current.filter((message) => message.folder === folder).length;
+    await loadCachedMessages(folder, 0, false, true, Math.max(pageSize, loaded));
+  }, [loadCachedMessages, pageSize]);
+
+  /**
+   * Run gap-free sync steps for one folder until the backend reports no more
+   * work (bounded by maxSteps). New headers appear as each step lands; the
+   * visible list is then reloaded from the cache so deletions and flag
+   * changes from other clients show up too.
+   */
+  const runFolderSync = useCallback(async (folder: string, options: {
+    mode?: MailSyncRequestMode;
+    indicator?: SyncIndicator;
+    maxSteps?: number;
+  } = {}) => {
+    const generation = syncGenerationRef.current;
+    const indicator = options.indicator ?? "none";
+    let changed = false;
+    try {
+      const loop = await runFolderSyncLoop({
+        mode: options.mode ?? "auto",
+        maxSteps: options.maxSteps ?? 40,
+        isCancelled: () => syncGenerationRef.current !== generation,
+        step: (mode) => mailSyncFolder(info, folder, { mode, limit: catchupBatchSize, includeBodies: false }),
+        onStep: (result, progress) => {
+          if (result.fetched > 0 || result.vanished > 0 || result.flagsUpdated > 0) changed = true;
+          applySyncedFolder(result.folder);
+          if (!visibleRef.current) {
+            pendingCacheRefreshRef.current = true;
+            return;
+          }
+          const merged = mergeSyncedMessages(
+            selectedFolderRef.current,
+            folder,
+            messagesRef.current,
+            result.messages,
+            sortMessages,
+          );
+          if (merged) {
+            messagesRef.current = merged;
+            setMessages(merged);
+          }
+          if (result.uidValidityReset) {
+            setStatus(`${folderLabel(result.folder)} was rebuilt on the server; resynced`);
+          }
+          if (indicator !== "none" && result.more) {
+            setSyncProgress({ folder, fetched: progress.fetched, remaining: progress.remaining });
+          }
+        },
+      });
+      if (changed && info.cache.enabled) await reloadVisibleFromCache(folder);
+      if (loop.fetched > 0 && folder.trim().toUpperCase() === "INBOX") {
+        await incomingFiltersRef.current?.();
       }
+      return loop;
+    } finally {
+      if (indicator !== "none" && visibleRef.current) setSyncProgress(null);
+    }
+  }, [applySyncedFolder, catchupBatchSize, info, reloadVisibleFromCache]);
+
+  /**
+   * Fetch older history for the selected folder in the background (full
+   * header index). Yields to user-triggered syncs and stops on folder switch,
+   * tab hide or unmount; the next open resumes from the stored watermark.
+   */
+  const startBackfill = useCallback((folder: string) => {
+    const meta = foldersRef.current.find((entry) => entry.name === folder);
+    if (!info.cache.enabled || !meta || meta.syncComplete || meta.syncHighUid == null) return;
+    const seq = backfillSeqRef.current + 1;
+    backfillSeqRef.current = seq;
+    const active = () =>
+      backfillSeqRef.current === seq && visibleRef.current && selectedFolderRef.current === folder;
+    void (async () => {
+      try {
+        for (let round = 0; round < 1000; round += 1) {
+          if (!active()) return;
+          if (syncInFlightRef.current) {
+            await delay(800);
+            continue;
+          }
+          syncInFlightRef.current = true;
+          let result: MailFolderSyncResult;
+          try {
+            result = await mailSyncFolder(info, folder, { mode: "backfill", limit: catchupBatchSize });
+          } finally {
+            syncInFlightRef.current = false;
+          }
+          applySyncedFolder(result.folder);
+          if (!active()) return;
+          const cached = result.folder.cachedCount ?? 0;
+          const total = result.folder.total ?? cached;
+          if (!result.more) {
+            setBackfillProgress(null);
+            setHasMoreMessages(folderHasMoreToLoad(
+              result.folder,
+              messagesRef.current.filter((message) => message.folder === folder).length,
+              false,
+            ));
+            return;
+          }
+          setBackfillProgress({ folder, cached, total });
+          setHasMoreMessages(true);
+          await delay(200);
+        }
+      } catch (e) {
+        console.debug("mail history backfill paused", e);
+      } finally {
+        if (backfillSeqRef.current === seq && visibleRef.current) setBackfillProgress(null);
+      }
+    })();
+  }, [applySyncedFolder, catchupBatchSize, info]);
+
+  /**
+   * Open / folder-select sync: catch the folder (and INBOX) up completely,
+   * however long the tab was closed.
+   */
+  const syncFolderNow = useCallback(async (
+    folder: string,
+    indicator: SyncIndicator = "sync",
+    notify = false,
+  ) => {
+    if (syncInFlightRef.current) {
+      if (indicator !== "none" && visibleRef.current) setStatus("Mail sync already running");
       return null;
     }
     syncInFlightRef.current = true;
-
-    if (indicator === "more") {
-      setLoadingMoreMessages(true);
-    } else if (indicator === "sync") {
-      setSyncing(true);
-    }
-    if (!quiet && indicator !== "none") setStatus(null);
+    syncGenerationRef.current += 1;
+    if (indicator === "sync") setSyncing(true);
     if (indicator !== "none") setError(null);
-
     try {
-      const result = await mailSyncHeaders(info, folder, {
-        limit,
-        offset,
-        includeBodies,
-        refreshFolders,
-      });
-      if (!visibleRef.current) {
-        pendingCacheRefreshRef.current = true;
-        return result;
+      const primary = await runFolderSync(folder, { indicator });
+      let fetched = primary.fetched;
+      let newUnseen = isNewMailExcludedName(folder) ? 0 : primary.newUnseen;
+      if (folder.trim().toUpperCase() !== "INBOX") {
+        try {
+          const inbox = await runFolderSync("INBOX");
+          fetched += inbox.fetched;
+          newUnseen += inbox.newUnseen;
+        } catch (e) {
+          console.debug("mail INBOX catch-up failed", e);
+        }
       }
-      foldersRef.current = result.folders;
-      setFolders(result.folders);
-      updateSelectedFolder(result.folder);
-      setMessages((current) => mergeMessagePages(
-        current.filter((message) => message.folder === result.folder),
-        result.messages,
-      ));
-      setHasMoreMessages(
-        result.hasMore
-        || folderHasMoreMessages(result.folders, result.folder, offset + result.messages.length),
-      );
-      if (indicator !== "none") {
-        setStatus(
-          append
-            ? result.fetchedMessages > 0 ? `Loaded ${result.fetchedMessages} older messages` : "No more messages"
-            : `Synced ${result.fetchedMessages} headers`,
-        );
+      if (notify) notifyNewMail(newUnseen);
+      if (indicator !== "none" && visibleRef.current) {
+        setStatus(fetched > 0 ? `Synced ${fetched} headers` : "Mailbox up to date");
       }
-      return result;
+      return primary;
     } catch (e) {
-      if (indicator !== "none") setError(mailClientErrorMessage(e));
+      if (visibleRef.current) {
+        if (indicator !== "none") setError(mailClientErrorMessage(e));
+        // Surface the folder failure recorded by the backend.
+        void loadCachedFolders();
+      }
       return null;
     } finally {
       syncInFlightRef.current = false;
-      if (indicator === "more") {
-        if (visibleRef.current) setLoadingMoreMessages(false);
-      } else if (indicator === "sync") {
-        if (visibleRef.current) setSyncing(false);
-      }
+      if (indicator === "sync" && visibleRef.current) setSyncing(false);
     }
-  }, [batchSize, info, pageSize, selectedFolder, updateSelectedFolder]);
+  }, [isNewMailExcludedName, loadCachedFolders, notifyNewMail, runFolderSync]);
 
-  /** Quiet background poll: selected folder (+ INBOX when different), no LIST. */
+  /** Quiet background poll: catch up the selected folder and INBOX, reconcile flags. */
   const quietPollSelectedAndInbox = useCallback(async () => {
     if (syncInFlightRef.current) return;
     syncInFlightRef.current = true;
-    // Snapshot at start; folder switches can happen during awaits (loadCachedMessages
-    // does not take syncInFlightRef).
     const activeFolder = selectedFolderRef.current;
-    const alsoInbox = activeFolder.trim().toUpperCase() !== "INBOX";
     try {
-      const selectedResult = await mailSyncHeaders(info, activeFolder, {
-        limit: batchSize,
-        includeBodies: false,
-        refreshFolders: false,
-      });
-      let folders = selectedResult.folders;
-      if (alsoInbox) {
+      const selected = await runFolderSync(activeFolder, { maxSteps: 10 });
+      let newUnseen = isNewMailExcludedName(activeFolder) ? 0 : selected.newUnseen;
+      if (activeFolder.trim().toUpperCase() !== "INBOX") {
         try {
-          const inboxResult = await mailSyncHeaders(info, "INBOX", {
-            limit: batchSize,
-            includeBodies: false,
-            refreshFolders: false,
-          });
-          // Merge INBOX metadata into the folder tree without switching the UI
-          // selection away from the active folder.
-          const byName = new Map(folders.map((f) => [f.name, f]));
-          for (const f of inboxResult.folders) {
-            byName.set(f.name, f);
-          }
-          folders = Array.from(byName.values());
+          newUnseen += (await runFolderSync("INBOX", { maxSteps: 10 })).newUnseen;
         } catch (e) {
           // Selected-folder refresh already succeeded; inbox is best-effort.
           console.debug("quiet INBOX poll failed", e);
         }
       }
-      if (!visibleRef.current) {
-        pendingCacheRefreshRef.current = true;
-        return;
+      if (info.cache.enabled) {
+        try {
+          await runFolderSync(activeFolder, { mode: "reconcile", maxSteps: 3 });
+        } catch (e) {
+          console.debug("quiet mail reconcile failed", e);
+        }
       }
-      // Always refresh folder badges/metadata from the poll.
-      foldersRef.current = folders;
-      setFolders(folders);
-
-      // Only rewrite the message list if the user is still on the folder we polled.
-      const applied = applyQuietPollMessages(
-        selectedFolderRef.current,
-        selectedResult.folder,
-        messagesRef.current,
-        selectedResult.messages,
-        folders,
-        selectedResult.hasMore,
-      );
-      if (!applied.applyMessages) {
-        return;
-      }
-      messagesRef.current = applied.messages;
-      setMessages(applied.messages);
-      setHasMoreMessages(applied.hasMore);
+      notifyNewMail(newUnseen);
     } catch (e) {
       console.debug("quiet mail poll failed", e);
     } finally {
       syncInFlightRef.current = false;
     }
-  }, [batchSize, info]);
+  }, [info.cache.enabled, isNewMailExcludedName, notifyNewMail, runFolderSync]);
 
   const syncAllFolders = useCallback(async (
     quiet = false,
@@ -1664,13 +2252,24 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const indicator = options.indicator ?? "sync";
     const limit = Math.max(1, options.limit ?? batchSize);
     const includeBodies = options.includeBodies ?? false;
-    const activeBeforeSync = selectedFolder;
+    const activeBeforeSync = selectedFolderRef.current;
 
     if (syncInFlightRef.current) {
-      if (indicator !== "none" && visibleRef.current) {
-        setStatus("Mail sync already running");
+      // Background work (open catch-up, backfill, quiet poll) holds the lock.
+      // Periodic scans just skip; a manual sync waits its turn instead of
+      // being dropped, so a click always ends with fresh server state.
+      if (quiet || indicator === "none") return null;
+      if (indicator === "sync") setSyncing(true);
+      if (visibleRef.current) setStatus("Waiting for current mail sync…");
+      const deadline = Date.now() + 120_000;
+      while (syncInFlightRef.current && Date.now() < deadline) {
+        await delay(150);
       }
-      return null;
+      if (syncInFlightRef.current) {
+        if (indicator === "sync" && visibleRef.current) setSyncing(false);
+        if (visibleRef.current) setStatus("Mail sync already running");
+        return null;
+      }
     }
     syncInFlightRef.current = true;
 
@@ -1681,35 +2280,51 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     if (indicator !== "none") setError(null);
 
     try {
-      const result = await mailSyncAllFolders(info, { limit, includeBodies });
-      const newMessages = result.newMessages ?? 0;
-      if (indicator === "none" && newMessages > 0) {
-        pushMailNew(
-          tabId,
-          info.sessionId,
-          info.displayName?.trim() || info.emailAddress || info.sessionId,
-          newMessages,
-        );
+      // Manual sync reconciles every cached message; periodic scans only the newest window.
+      const result = await mailSyncAllFolders(
+        { ...info, sync: { ...info.sync, subscribedOnly: subscribedOnlyRef.current } },
+        { limit, includeBodies, fullReconcile: !quiet },
+      );
+      foldersRef.current = result.folders;
+      let newMessages = countNewMail(result.newUnseenByFolder, result.folders, isNewMailExcludedFolder);
+      const pending = (result.pendingFolders ?? [])
+        .slice()
+        .sort((a, b) => Number(b === activeBeforeSync) - Number(a === activeBeforeSync))
+        .slice(0, 6);
+      for (const name of pending) {
+        try {
+          const loop = await runFolderSync(name, { maxSteps: 20 });
+          if (!isNewMailExcludedName(name)) newMessages += loop.newUnseen;
+        } catch (e) {
+          console.debug(`mail catch-up for ${name} failed`, e);
+        }
       }
+      if (indicator === "none") notifyNewMail(newMessages);
+      // New INBOX mail from the full scan goes through the incoming filters
+      // (a cheap cache query when nothing is new or no filter is enabled).
+      if (result.fetchedMessages > 0) await incomingFiltersRef.current?.();
       if (!visibleRef.current) {
         pendingCacheRefreshRef.current = true;
         return result;
       }
-      foldersRef.current = result.folders;
-      setFolders(result.folders);
-      const nextFolder = result.folders.some((folder) => folder.name === activeBeforeSync)
+      setFolders(foldersRef.current);
+      const nextFolder = foldersRef.current.some((folder) => folder.name === activeBeforeSync)
         ? activeBeforeSync
-        : result.folders[0]?.name ?? activeBeforeSync;
+        : foldersRef.current[0]?.name ?? activeBeforeSync;
       if (nextFolder !== activeBeforeSync) {
         updateSelectedFolder(nextFolder);
       }
-      await loadCachedMessages(nextFolder, 0, false, quiet || indicator === "none");
+      const loaded = messagesRef.current.filter((message) => message.folder === nextFolder).length;
+      await loadCachedMessages(nextFolder, 0, false, quiet || indicator === "none", Math.max(pageSize, loaded));
+      const failed = result.failedFolders ?? [];
       if (indicator !== "none") {
         setStatus(
-          `Synced ${result.fetchedMessages} new headers across ${result.folders.length} folders`,
+          `Synced ${result.fetchedMessages} new headers across ${result.folders.length} folders`
+          + (failed.length > 0 ? `; ${failed.length} folder${failed.length === 1 ? "" : "s"} failed` : ""),
         );
       }
-      void warmRecentBodies(result.folders, nextFolder);
+      void warmRecentBodies(foldersRef.current, nextFolder);
+      startBackfill(nextFolder);
       return result;
     } catch (e) {
       if (indicator !== "none") setError(mailClientErrorMessage(e));
@@ -1720,7 +2335,19 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         if (visibleRef.current) setSyncing(false);
       }
     }
-  }, [batchSize, info, loadCachedMessages, pushMailNew, selectedFolder, tabId, updateSelectedFolder, warmRecentBodies]);
+  }, [
+    batchSize,
+    info,
+    isNewMailExcludedFolder,
+    isNewMailExcludedName,
+    loadCachedMessages,
+    notifyNewMail,
+    pageSize,
+    runFolderSync,
+    startBackfill,
+    updateSelectedFolder,
+    warmRecentBodies,
+  ]);
 
   const loadBody = useCallback(async (message: MailMessageHeader) => {
     const key = messageKey(message);
@@ -1944,12 +2571,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   useEffect(() => {
     if (!visible || !info.sync.onOpen || initialSyncDoneRef.current) return;
     initialSyncDoneRef.current = true;
-    void syncFolder(selectedFolder, true, {
-      limit: batchSize,
-      includeBodies: false,
-      indicator: "sync",
-    });
-  }, [batchSize, info.sync.onOpen, selectedFolder, syncFolder, visible]);
+    const folder = selectedFolder;
+    // Catch up everything that arrived while the tab was closed, then keep
+    // backfilling older history for the full local header index.
+    void syncFolderNow(folder, "sync", true)
+      .then(() => refreshFolderTree())
+      .then(() => startBackfill(folder));
+  }, [info.sync.onOpen, refreshFolderTree, selectedFolder, startBackfill, syncFolderNow, visible]);
 
   // Quiet background poll: most ticks refresh selected folder (+ INBOX when
   // different) without remote LIST. Every 6th tick does a full-folder scan for
@@ -1974,6 +2602,58 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }, intervalMs);
     return () => window.clearInterval(id);
   }, [batchSize, info.sync.intervalMinutes, quietPollSelectedAndInbox, syncAllFolders]);
+
+  // IMAP IDLE push (TASK-12): while the tab is open a dedicated connection
+  // waits on INBOX; each change runs the normal gap-free quiet catch-up, so a
+  // lost push only delays mail until the next poll. Stopped on close (DEC-01).
+  const quietPollRef = useRef(quietPollSelectedAndInbox);
+  quietPollRef.current = quietPollSelectedAndInbox;
+  const idleConfigRef = useRef(info);
+  idleConfigRef.current = info;
+  const [idleState, setIdleState] = useState<string | null>(null);
+  const idleEnabled = info.sync.idle !== false;
+  useEffect(() => {
+    if (!idleEnabled) return;
+    const accountId = info.sessionId;
+    let disposed = false;
+    let debounce: number | null = null;
+    let unlisten: (() => void) | null = null;
+    const schedulePoll = (waitMs = 400) => {
+      if (debounce != null) window.clearTimeout(debounce);
+      debounce = window.setTimeout(() => {
+        debounce = null;
+        if (disposed) return;
+        // The quiet poll skips while another sync (open catch-up, backfill)
+        // holds the lock; keep the push pending instead of dropping it.
+        if (syncInFlightRef.current) {
+          schedulePoll(500);
+          return;
+        }
+        void quietPollRef.current();
+      }, waitMs);
+    };
+    void listen<MailIdleEvent>(MAIL_IDLE_EVENT, (event) => {
+      const payload = event.payload;
+      if (disposed || payload?.accountId !== accountId) return;
+      // "stopped" may come from a previous watcher replaced by this tab's.
+      if (payload.kind === "stopped") return;
+      setIdleState(payload.kind);
+      if (payload.kind === "changed") schedulePoll();
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    }).catch(() => {});
+    void mailIdleStart(idleConfigRef.current, "INBOX").catch((e) => {
+      console.debug("mail IDLE unavailable; polling only", e);
+      if (!disposed) setIdleState("unsupported");
+    });
+    return () => {
+      disposed = true;
+      if (debounce != null) window.clearTimeout(debounce);
+      unlisten?.();
+      void mailIdleStop(accountId).catch(() => {});
+    };
+  }, [idleEnabled, info.sessionId]);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -2041,7 +2721,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   }, [messages]);
 
   const handleFolderSelect = (folder: MailFolder) => {
+    const changed = folder.name !== selectedFolderRef.current;
     updateSelectedFolder(folder.name);
+    if (changed) {
+      backfillSeqRef.current += 1;
+      setBackfillProgress(null);
+      void syncFolderNow(folder.name, "none").then(() => startBackfill(folder.name));
+    }
     setSelectedMessageKey(null);
     setCheckedMessageKeys(new Set());
     setBody(null);
@@ -2055,7 +2741,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setError(null);
     try {
       const result = await mailTestConnection(info);
-      setStatus(`IMAP ${result.imapOk ? "ok" : "failed"}, SMTP ${result.smtpOk ? "ok" : "failed"}, ${result.folderCount} folders`);
+      setStatus(`${info.incoming === "pop3" ? "POP3" : "IMAP"} ${result.imapOk ? "ok" : "failed"}, SMTP ${result.smtpOk ? "ok" : "failed"}, ${result.folderCount} folders`);
     } catch (e) {
       setError(mailClientErrorMessage(e));
     } finally {
@@ -2095,18 +2781,51 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const loadMoreMessages = useCallback(async () => {
     if (query.trim() || loadingMessages || loadingMoreMessages || !hasMoreMessages) return;
-    const result = await syncFolder(selectedFolder, true, {
-      limit: pageSize,
-      offset: messages.length,
-      includeBodies: false,
-      append: true,
-      indicator: "more",
-    });
-    if (!result) {
-      await loadCachedMessages(selectedFolder, messages.length, true);
+    const folder = selectedFolder;
+    const loaded = messages.length;
+    if (!info.cache.enabled) {
+      // No cache to page: fall back to server offset paging.
+      setLoadingMoreMessages(true);
+      try {
+        const result = await mailSyncHeaders(info, folder, { limit: pageSize, offset: loaded, refreshFolders: false });
+        const merged = mergeSyncedMessages(selectedFolderRef.current, folder, messagesRef.current, result.messages, sortMessages);
+        if (merged) {
+          messagesRef.current = merged;
+          setMessages(merged);
+        }
+        setHasMoreMessages(result.hasMore);
+      } catch (e) {
+        setError(mailClientErrorMessage(e));
+      } finally {
+        setLoadingMoreMessages(false);
+      }
+      return;
+    }
+    // Cache first; only when the cache is exhausted backfill older history.
+    const { page } = await loadCachedMessages(folder, loaded, true);
+    if (page.length > 0) return;
+    const meta = foldersRef.current.find((entry) => entry.name === folder);
+    if (!meta || meta.syncComplete || syncInFlightRef.current) {
+      if (meta?.syncComplete) setHasMoreMessages(false);
+      return;
+    }
+    syncInFlightRef.current = true;
+    setLoadingMoreMessages(true);
+    try {
+      const result = await mailSyncFolder(info, folder, { mode: "backfill", limit: pageSize });
+      applySyncedFolder(result.folder);
+      await loadCachedMessages(folder, loaded, true);
+      if (!result.more && result.fetched === 0) setStatus("No more messages");
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+    } finally {
+      syncInFlightRef.current = false;
+      setLoadingMoreMessages(false);
     }
   }, [
+    applySyncedFolder,
     hasMoreMessages,
+    info,
     loadCachedMessages,
     loadingMessages,
     loadingMoreMessages,
@@ -2114,7 +2833,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     pageSize,
     query,
     selectedFolder,
-    syncFolder,
   ]);
 
   const handleMessageListScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
@@ -2136,7 +2854,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   };
 
   const openCompose = (nextDraft: Partial<ComposeDraft> = {}, includeSignature = true) => {
-    const next = includeSignature ? draftWithSignature(nextDraft, info.signature) : { ...emptyComposeDraft(), ...nextDraft };
+    const identity = identityById(nextDraft.identityId);
+    const withIdentity = { ...nextDraft, identityId: identity.id };
+    const next = includeSignature ? draftWithSignature(withIdentity, identity.signature) : { ...emptyComposeDraft(), ...withIdentity };
     setDraft(next);
     lastSavedDraftJsonRef.current = serializeDraftContent(next);
     setRecipientSearch({ field: null, query: "", suggestions: [], loading: false });
@@ -2158,12 +2878,21 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         textBody: draft.textBody || mailHtmlToPlainText(draft.htmlBody),
         htmlBody: sanitizeMailComposeHtml(draft.htmlBody),
         attachments: draft.attachments,
-        replyContext: draft.replyContext ?? null,
+        replyContext: draftContextWithIdentity(draft),
       });
       lastSavedDraftJsonRef.current = serialized;
       setDraft((current) => ({ ...current, id: saved.id }));
       setDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-      if (mode === "manual") setStatus("Draft saved");
+      if (mode === "manual") {
+        setStatus("Draft saved");
+        // Mirror explicit saves to the server Drafts folder (autosave stays local).
+        void mailStoreRemoteDraft(info, saved.id)
+          .then((stored) => {
+            setDrafts((current) => current.map((item) => (item.id === stored.id ? stored : item)));
+            if (stored.remoteDraftFolder) setStatus(`Draft saved to ${stored.remoteDraftFolder}`);
+          })
+          .catch((e) => setStatus(`Draft saved locally; server copy failed: ${mailClientErrorMessage(e)}`));
+      }
       return saved;
     } catch (e) {
       if (mode === "manual") setError(mailClientErrorMessage(e));
@@ -2173,8 +2902,59 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   };
 
+  /** Templates are local drafts tagged kind "template"; each save adds one. */
+  const saveCurrentAsTemplate = async () => {
+    if (!draftHasContent(draft)) return;
+    setSavingDraft(true);
+    try {
+      const saved = await mailSaveDraft(info.sessionId, {
+        id: null,
+        to: draft.to.map(formatRecipientForSend),
+        cc: draft.cc.map(formatRecipientForSend),
+        bcc: draft.bcc.map(formatRecipientForSend),
+        subject: draft.subject,
+        textBody: draft.textBody || mailHtmlToPlainText(draft.htmlBody),
+        htmlBody: sanitizeMailComposeHtml(draft.htmlBody),
+        attachments: draft.attachments,
+        replyContext: { kind: TEMPLATE_KIND, identityId: draftContextWithIdentity(draft)?.identityId ?? null },
+      });
+      setDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      setStatus("Template saved");
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const openFromTemplate = (template: MailDraft) => {
+    const next = draftFromSaved(template);
+    openCompose({
+      ...next,
+      id: null,
+      replyContext: null,
+      identityId: template.replyContext?.identityId ?? null,
+    }, false);
+    setDraftsOpen(false);
+  };
+
   const openSavedDraft = (saved: MailDraft) => {
     const next = draftFromSaved(saved);
+    if (isOutbox(saved)) {
+      // Editing a queued message takes it out of the Outbox (Thunderbird).
+      void mailSaveDraft(info.sessionId, {
+        id: saved.id,
+        to: saved.to,
+        cc: saved.cc,
+        bcc: saved.bcc,
+        subject: saved.subject,
+        textBody: saved.textBody,
+        htmlBody: saved.htmlBody,
+        attachments: saved.attachments,
+        replyContext: withoutOutbox(saved.replyContext),
+      }).then((plain) => setDrafts((current) => current.map((item) => (item.id === plain.id ? plain : item))))
+        .catch((e) => console.debug("mail: could not move draft out of the Outbox", e));
+    }
     setDraft(next);
     lastSavedDraftJsonRef.current = serializeDraftContent(next);
     setRecipientSearch({ field: null, query: "", suggestions: [], loading: false });
@@ -2184,6 +2964,11 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const deleteSavedDraft = async (saved: MailDraft) => {
     try {
+      if (saved.remoteDraftUid) {
+        await mailDiscardRemoteDraft(info, saved.id).catch((e) => {
+          console.debug("mail: discarding server draft failed", e);
+        });
+      }
       await mailDeleteDraft(info.sessionId, saved.id);
       setDrafts((current) => current.filter((item) => item.id !== saved.id));
       if (draft.id === saved.id) setDraft(emptyComposeDraft());
@@ -2208,12 +2993,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     source: "header",
   });
 
-  const replyDraftBody = (target: MailMessageHeader, currentBody: MailMessageBody) => {
+  const replyDraftBody = (target: MailMessageHeader, currentBody: MailMessageBody, signature: string | null | undefined) => {
     const intro = `On ${formatFullDate(target.dateTs) || "an unknown date"}, ${addressLabel(target.from) || "(unknown sender)"} wrote:`;
     const originalText = currentBody.text?.trim() || currentBody.snippet || "";
     return {
-      htmlBody: buildReplyHtml(intro, { html: currentBody.html, text: originalText }, info.signature),
-      textBody: `\n\n${info.signature?.trim() ? `-- \n${info.signature.trimEnd()}\n\n` : ""}${intro}\n${quotePlainText(originalText)}`,
+      htmlBody: buildReplyHtml(intro, { html: currentBody.html, text: originalText }, signature),
+      textBody: `\n\n${signature?.trim() ? `-- \n${signature.trimEnd()}\n\n` : ""}${intro}\n${quotePlainText(originalText)}`,
     };
   };
 
@@ -2223,15 +3008,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const replyBody = bodyMatchesMessage(body, target)
       ? body
       : fallbackBodyFor(target);
-    const replyBodyDraft = replyDraftBody(target, replyBody);
+    const identity = pickReplyIdentity(identities, target);
+    const replyBodyDraft = replyDraftBody(target, replyBody, identity.signature);
     openCompose({
+      identityId: identity.id,
       to: parseRecipientsText(from),
       subject: target.subject.toLowerCase().startsWith("re:")
         ? target.subject
         : `Re: ${target.subject || "(no subject)"}`,
       htmlBody: replyBodyDraft.htmlBody,
       textBody: replyBodyDraft.textBody,
-      replyContext: { kind: "reply", folder: target.folder, uid: target.uid, messageId: target.messageId, subject: target.subject },
+      replyContext: replyContextFor("reply", target),
       richFormatUsed: true,
     }, false);
   };
@@ -2242,6 +3029,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       normalizedMailAddress(info.emailAddress),
       normalizedMailAddress(info.imap.username),
       normalizedMailAddress(info.smtp.username),
+      ...ownIdentityAddresses(identities),
     ].filter(Boolean));
     const to: string[] = [];
     const cc: string[] = [];
@@ -2257,8 +3045,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const replyBody = bodyMatchesMessage(body, target)
       ? body
       : fallbackBodyFor(target);
-    const replyBodyDraft = replyDraftBody(target, replyBody);
+    const identity = pickReplyIdentity(identities, target);
+    const replyBodyDraft = replyDraftBody(target, replyBody, identity.signature);
     openCompose({
+      identityId: identity.id,
       to: parseRecipientsText(to.join(", ")),
       cc: parseRecipientsText(cc.join(", ")),
       subject: target.subject.toLowerCase().startsWith("re:")
@@ -2266,57 +3056,299 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         : `Re: ${target.subject || "(no subject)"}`,
       htmlBody: replyBodyDraft.htmlBody,
       textBody: replyBodyDraft.textBody,
-      replyContext: { kind: "replyAll", folder: target.folder, uid: target.uid, messageId: target.messageId, subject: target.subject },
+      replyContext: replyContextFor("replyAll", target),
       richFormatUsed: true,
     }, false);
   };
 
-  const handleSendDraft = async () => {
+  /** MIME request for a composer draft, or an error to show. */
+  const buildSendRequest = (source: ComposeDraft): MailSendRequest | string => {
     // Convert compose-time data-URL previews (data-taomni-cid) to cid: for MIME.
-    const htmlBody = prepareMailHtmlForSend(draft.htmlBody);
-    const textBody = draft.textBody.trim() || mailHtmlToPlainText(htmlBody);
-    const sendHtml = draft.richFormatUsed || hasRichMailFormatting(htmlBody);
-    const request = {
-      to: draft.to.map(formatRecipientForSend),
-      cc: draft.cc.map(formatRecipientForSend),
-      bcc: draft.bcc.map(formatRecipientForSend),
-      subject: draft.subject.trim(),
+    const htmlBody = prepareMailHtmlForSend(source.htmlBody);
+    const textBody = source.textBody.trim() || mailHtmlToPlainText(htmlBody);
+    const sendHtml = source.richFormatUsed || hasRichMailFormatting(htmlBody);
+    const recipients = [...source.to, ...source.cc, ...source.bcc];
+    if (recipients.length === 0) return "At least one recipient is required.";
+    const invalidRecipient = recipients.find((recipient) => !isValidEmailAddress(recipient.email));
+    if (invalidRecipient) return `Invalid recipient: ${recipientLabel(invalidRecipient)}`;
+    return {
+      to: source.to.map(formatRecipientForSend),
+      cc: source.cc.map(formatRecipientForSend),
+      bcc: source.bcc.map(formatRecipientForSend),
+      subject: source.subject.trim(),
       textBody,
       htmlBody: sendHtml ? htmlBody : null,
-      attachments: draft.attachments.map((attachment) => ({
+      attachments: source.attachments.map((attachment) => ({
         path: attachment.path,
         name: attachment.name ?? null,
         contentType: attachment.contentType ?? null,
         inline: attachment.inline ?? false,
         contentId: attachment.contentId ?? null,
       })),
+      ...threadHeadersFor(source.replyContext),
+      draftId: source.id ?? null,
+      ...identitySendFields(identityById(source.identityId)),
+      requestReadReceipt: source.readReceipt === true,
     };
-    const recipients = [...draft.to, ...draft.cc, ...draft.bcc];
-    if (recipients.length === 0) {
-      setError("At least one recipient is required.");
+  };
+
+  const sentStatus = (result: MailSendResult) => {
+    if (!result.accepted) {
+      setStatus(result.response || "SMTP send returned no acceptance");
+    } else if (result.sentCopyError) {
+      setStatus("Message sent");
+      setError(`Message sent, but saving the Sent copy failed: ${result.sentCopyError}`);
+    } else {
+      setStatus(result.sentCopyFolder ? `Message sent; copy saved to ${result.sentCopyFolder}` : "Message sent");
+    }
+  };
+
+  /** Save a composer draft into the local Outbox (TASK-17). */
+  const queueToOutbox = async (
+    source: ComposeDraft,
+    queue: Pick<MailOutboxState, "sendAt"> & Partial<MailOutboxState>,
+  ): Promise<MailDraft | null> => {
+    const outbox: MailOutboxState = {
+      queuedAt: Math.floor(Date.now() / 1000),
+      attempts: 0,
+      lastError: null,
+      readReceipt: source.readReceipt === true,
+      ...queue,
+    };
+    try {
+      const saved = await mailSaveDraft(info.sessionId, {
+        id: source.id ?? null,
+        to: source.to.map(formatRecipientForSend),
+        cc: source.cc.map(formatRecipientForSend),
+        bcc: source.bcc.map(formatRecipientForSend),
+        subject: source.subject,
+        textBody: source.textBody || mailHtmlToPlainText(source.htmlBody),
+        htmlBody: sanitizeMailComposeHtml(source.htmlBody),
+        attachments: source.attachments,
+        replyContext: { ...(draftContextWithIdentity(source) ?? {}), outbox },
+      });
+      setDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      return saved;
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+      return null;
+    }
+  };
+
+  const closeComposer = () => {
+    setComposeOpen(false);
+    setSendLaterOpen(false);
+    setAttachReminder(false);
+    setDraft(emptyComposeDraft());
+  };
+
+  /** Send one queued message; failures stay queued with a retry backoff. */
+  const sendOutboxItem = async (saved: MailDraft, manual = false): Promise<boolean> => {
+    const state = outboxState(saved);
+    if (!state || outboxBusyIdsRef.current.has(saved.id)) return false;
+    const built = buildSendRequest(draftFromSaved(saved));
+    if (typeof built === "string") {
+      if (manual) setError(built);
+      return false;
+    }
+    outboxBusyIdsRef.current.add(saved.id);
+    try {
+      const result = await mailSendMessage(info, { ...built, draftId: saved.id });
+      await mailDeleteDraft(info.sessionId, saved.id).catch(() => undefined);
+      setDrafts((current) => current.filter((item) => item.id !== saved.id));
+      sentStatus(result);
+      return true;
+    } catch (e) {
+      const message = mailClientErrorMessage(e);
+      const next: MailOutboxState = { ...state, attempts: state.attempts + 1, lastError: message };
+      try {
+        const updated = await mailSaveDraft(info.sessionId, {
+          id: saved.id,
+          to: saved.to,
+          cc: saved.cc,
+          bcc: saved.bcc,
+          subject: saved.subject,
+          textBody: saved.textBody,
+          htmlBody: saved.htmlBody,
+          attachments: saved.attachments,
+          replyContext: { ...(saved.replyContext ?? {}), outbox: next },
+        });
+        setDrafts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      } catch (saveError) {
+        console.debug("mail: outbox retry state not saved", saveError);
+      }
+      if (manual) setError(`Sending "${saved.subject || "(no subject)"}" failed: ${message}`);
+      return false;
+    } finally {
+      outboxBusyIdsRef.current.delete(saved.id);
+    }
+  };
+
+  /** Send every due (or, when `all`, every) queued message. */
+  const processOutbox = async (all = false) => {
+    let list: MailDraft[];
+    try {
+      list = await mailListDrafts(info.sessionId);
+    } catch (e) {
+      console.debug("mail: outbox list failed", e);
       return;
     }
-    const invalidRecipient = recipients.find((recipient) => !isValidEmailAddress(recipient.email));
-    if (invalidRecipient) {
-      setError(`Invalid recipient: ${recipientLabel(invalidRecipient)}`);
+    setDrafts(list);
+    const now = Math.floor(Date.now() / 1000);
+    const pendingUndo = undoSendRef.current?.draftId;
+    const editing = composeDraftIdRef.current;
+    const due = list.filter((saved) => {
+      const state = outboxState(saved);
+      // Skip the undo-window message and one reopened in the composer.
+      if (!state || saved.id === pendingUndo || saved.id === editing) return false;
+      if (all) return true;
+      const at = outboxNextAttemptAt(state);
+      return at != null && at <= now;
+    });
+    let sent = 0;
+    for (const saved of due) {
+      if (await sendOutboxItem(saved, all)) sent += 1;
+    }
+    if (all && due.length > 0) {
+      setStatus(sent === due.length ? `Sent ${sent} queued message${sent === 1 ? "" : "s"}` : `Sent ${sent} of ${due.length} queued messages`);
+    }
+  };
+  const processOutboxRef = useRef(processOutbox);
+  processOutboxRef.current = processOutbox;
+  const undoSendRef = useRef(undoSend);
+  undoSendRef.current = undoSend;
+  const composeDraftIdRef = useRef<string | null>(null);
+  composeDraftIdRef.current = composeOpen ? draft.id ?? null : null;
+
+  useEffect(() => {
+    if (!retryAfterTrustRef.current) return;
+    retryAfterTrustRef.current = false;
+    void syncFolderNow(selectedFolderRef.current, "sync", true);
+  }, [info.imap.trustedCert, info.smtp.trustedCert]);
+
+  // Outbox: send due messages only while the tab is open (DEC-01).
+  useEffect(() => {
+    const first = window.setTimeout(() => void processOutboxRef.current(), 3000);
+    const id = window.setInterval(() => void processOutboxRef.current(), 30_000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(id);
+    };
+  }, [info.sessionId]);
+
+  useEffect(() => {
+    if (!undoSend) return;
+    const id = window.setInterval(() => setUndoNow(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [undoSend]);
+
+  // A pending undo survives unmount in the Outbox and goes out on next open.
+  useEffect(() => () => {
+    if (undoTimerRef.current != null) window.clearTimeout(undoTimerRef.current);
+  }, []);
+
+  const handleSendDraft = async (skipAttachReminder = false) => {
+    const built = buildSendRequest(draft);
+    if (typeof built === "string") {
+      setError(built);
+      return;
+    }
+    // Thunderbird's attachment reminder: text mentions one, none attached.
+    if (!skipAttachReminder && draft.attachments.length === 0
+      && mentionsAttachment(draft.subject, draft.textBody, draft.htmlBody)) {
+      setAttachReminder(true);
+      return;
+    }
+    setAttachReminder(false);
+    setError(null);
+    const undoSeconds = Math.max(0, Math.floor(info.undoSendSeconds ?? 0));
+    if (undoSeconds > 0) {
+      // Undo window: the message waits in the Outbox until the timer fires.
+      const until = Math.floor(Date.now() / 1000) + undoSeconds;
+      const queued = await queueToOutbox(draft, { sendAt: until });
+      if (!queued) return;
+      closeComposer();
+      setUndoSend({ draftId: queued.id, until });
+      setUndoNow(Date.now());
+      if (undoTimerRef.current != null) window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = window.setTimeout(() => {
+        undoTimerRef.current = null;
+        setUndoSend(null);
+        void sendOutboxItem(queued, true);
+      }, undoSeconds * 1000);
       return;
     }
     setSending(true);
-    setError(null);
     try {
-      const result = await mailSendMessage(info, request);
+      const result = await mailSendMessage(info, built);
       if (draft.id) {
         await mailDeleteDraft(info.sessionId, draft.id).catch(() => undefined);
         setDrafts((current) => current.filter((item) => item.id !== draft.id));
       }
-      setStatus(result.accepted ? "Message sent" : result.response || "SMTP send returned no acceptance");
-      setComposeOpen(false);
-      setDraft(emptyComposeDraft());
+      sentStatus(result);
+      closeComposer();
     } catch (e) {
-      setError(mailClientErrorMessage(e));
+      const message = mailClientErrorMessage(e);
+      // Offline / unreachable server: keep the message in the Outbox (AC-49).
+      if (isTransientSendError(message)) {
+        const now = Math.floor(Date.now() / 1000);
+        const queued = await queueToOutbox(draft, { sendAt: now, attempts: 1, lastError: message });
+        if (queued) {
+          closeComposer();
+          setStatus("Could not reach the mail server; the message is in the Outbox and retries while this tab is open");
+          return;
+        }
+      }
+      setError(message);
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSendLater = async () => {
+    const built = buildSendRequest(draft);
+    if (typeof built === "string") {
+      setError(built);
+      return;
+    }
+    const at = fromDateTimeLocal(sendLaterAt);
+    const queued = await queueToOutbox(draft, { sendAt: at });
+    if (!queued) return;
+    closeComposer();
+    setStatus(at
+      ? `Scheduled for ${new Date(at * 1000).toLocaleString()} (sends while this tab is open)`
+      : "Saved to Outbox; use Send now in Drafts > Outbox");
+  };
+
+  const handleUndoSend = async () => {
+    const pending = undoSend;
+    if (!pending) return;
+    if (undoTimerRef.current != null) {
+      window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    setUndoSend(null);
+    const saved = drafts.find((item) => item.id === pending.draftId)
+      ?? (await mailListDrafts(info.sessionId).catch(() => [] as MailDraft[])).find((item) => item.id === pending.draftId);
+    if (!saved) return;
+    const restored = draftFromSaved(saved);
+    // Back to a plain draft, then reopen it for editing.
+    await mailSaveDraft(info.sessionId, {
+      id: saved.id,
+      to: saved.to,
+      cc: saved.cc,
+      bcc: saved.bcc,
+      subject: saved.subject,
+      textBody: saved.textBody,
+      htmlBody: saved.htmlBody,
+      attachments: saved.attachments,
+      replyContext: withoutOutbox(saved.replyContext),
+    }).then((plain) => setDrafts((current) => current.map((item) => (item.id === plain.id ? plain : item))))
+      .catch((e) => console.debug("mail: undo could not clear outbox state", e));
+    setDraft(restored);
+    lastSavedDraftJsonRef.current = serializeDraftContent(restored);
+    setComposeOpen(true);
+    setStatus("Sending cancelled");
   };
 
   const addDraftAttachmentPaths = useCallback(async (paths: string[]) => {
@@ -2623,7 +3655,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         setStatus("Attachment save cancelled");
         return;
       }
-      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath);
+      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath, attachment.section);
       setStatus(`Saved attachment to ${result.path}`);
     } catch (e) {
       setError(mailClientErrorMessage(e));
@@ -2638,7 +3670,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     try {
       const defaultPath = suggestedAttachmentName(attachment, index, message.subject);
       const targetPath = await temporaryFilePath(defaultPath);
-      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath);
+      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath, attachment.section);
       await openLocalPath(result.path);
       setStatus(`Opened attachment ${result.name || defaultPath}`);
     } catch (e) {
@@ -2670,7 +3702,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           suggestedAttachmentName(attachment, index, message.subject),
           usedNames,
         );
-        await mailDownloadAttachment(info, message.folder, message.uid, index, joinLocalPath(targetDir, fileName));
+        await mailDownloadAttachment(info, message.folder, message.uid, index, joinLocalPath(targetDir, fileName), attachment.section);
         saved += 1;
       }
       setStatus(`Saved ${saved} attachment${saved === 1 ? "" : "s"} to ${targetDir}`);
@@ -2781,12 +3813,58 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   };
 
   const resolveSpecialFolder = (kind: SpecialFolderKind): string | null =>
-    displayFolders.find((folder) => folderMatchesSpecial(folder, kind))?.name ?? null;
+    displayFolders.find((folder) => folderMatchesSpecial(folder, kind, info.specialFolders))?.name ?? null;
 
   const resolveInboxFolder = (): string =>
     displayFolders.find((folder) => folder.name.toUpperCase() === "INBOX")?.name
     ?? displayFolders.find((folder) => `${folder.name} ${folderLabel(folder)}`.toLowerCase().includes("inbox"))?.name
     ?? "INBOX";
+
+  /** AC-40: run the incoming filters on new INBOX mail (tab open only, DEC-01). */
+  incomingFiltersRef.current = async () => {
+    try {
+      const result = await mailApplyFilters(info, resolveInboxFolder(), "incoming", {
+        trashFolder: resolveSpecialFolder("trash"),
+      });
+      if (result.errors.length > 0) {
+        setFilterErrors(result.errors);
+        setError(`Mail filter actions failed: ${result.errors.join("; ")}`);
+      }
+      if (result.matched > 0) {
+        setStatus(`Filters handled ${result.matched} new message${result.matched === 1 ? "" : "s"}`);
+        await reloadVisibleFromCache(selectedFolderRef.current);
+        void loadCachedFolders();
+      }
+    } catch (e) {
+      console.debug("incoming mail filters failed", e);
+    }
+  };
+
+  /** AC-41: run filters by hand on the selected folder. */
+  const runFiltersOnFolder = async (filterIds: string[] | undefined) => {
+    const folder = selectedFolderRef.current;
+    const result = await mailApplyFilters(info, folder, "manual", {
+      filterIds,
+      trashFolder: resolveSpecialFolder("trash"),
+    });
+    await reloadVisibleFromCache(folder);
+    void loadCachedFolders();
+    return result;
+  };
+
+  const openContactFromMessage = (message: MailMessageHeader) => {
+    const address = message.from?.address?.trim() ?? "";
+    setContactDraft(emptyAddressBookEntry({
+      displayName: message.from?.name?.trim() || "",
+      emails: [address],
+    }));
+    setAddressBookOpen(true);
+  };
+
+  const openFilterFromMessage = (message: MailMessageHeader) => {
+    setFilterDraft(filterFromMessage(message));
+    setFiltersOpen(true);
+  };
 
   const handleToggleFlagged = (targets: MailMessageHeader[]) => runMailAction(async () => {
     const unique = dedupeMessages(targets);
@@ -2801,6 +3879,44 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
     setStatus(allFlagged ? "Removed star" : `Starred ${unique.length} message${unique.length === 1 ? "" : "s"}`);
   });
+
+  const handleToggleKeyword = (targets: MailMessageHeader[], keyword: string, label: string) => runMailAction(async () => {
+    const unique = dedupeMessages(targets);
+    if (unique.length === 0) return;
+    const plan = toggleKeywordPlan(unique, keyword);
+    for (const [folder, group] of groupMessagesByFolder(unique)) {
+      const uids = group.map((message) => message.uid);
+      await mailSetFlags(info, folder, uids, plan.add, plan.remove);
+      applyFlagsLocally(folder, uids, plan.add, plan.remove, 0);
+    }
+    setStatus(plan.enable ? `Tagged ${unique.length} as ${label}` : `Removed tag ${label}`);
+  });
+
+  const handleClearTags = (targets: MailMessageHeader[]) => runMailAction(async () => {
+    const unique = dedupeMessages(targets).filter((message) => messageTags(message).length > 0);
+    const remove = MAIL_TAGS.map((tag) => tag.keyword);
+    for (const [folder, group] of groupMessagesByFolder(unique)) {
+      const uids = group.map((message) => message.uid);
+      await mailSetFlags(info, folder, uids, [], remove);
+      applyFlagsLocally(folder, uids, [], remove, 0);
+    }
+    setStatus("Removed tags");
+  });
+
+  /** Train the server's junk filter via $Junk/$NotJunk; unsupported keywords are not fatal. */
+  const setJunkKeywords = async (targets: MailMessageHeader[], junk: boolean) => {
+    const add = [junk ? JUNK_KEYWORD : NOT_JUNK_KEYWORD];
+    const remove = [junk ? NOT_JUNK_KEYWORD : JUNK_KEYWORD];
+    for (const [folder, group] of groupMessagesByFolder(dedupeMessages(targets))) {
+      const uids = group.map((message) => message.uid);
+      try {
+        await mailSetFlags(info, folder, uids, add, remove);
+        applyFlagsLocally(folder, uids, add, remove, 0);
+      } catch (e) {
+        console.debug("mail: junk keyword not accepted by the server", e);
+      }
+    }
+  };
 
   const handleMarkUnread = (targets: MailMessageHeader[]) => runMailAction(async () => {
     const unique = dedupeMessages(targets).filter((message) => !isUnread(message));
@@ -2859,12 +3975,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       setError("No Junk folder found for this account.");
       return;
     }
+    await setJunkKeywords(targets, true);
     const moved = await moveTargetsTo(targets, target);
     setStatus(moved > 0 ? `Moved ${moved} message${moved === 1 ? "" : "s"} to Junk` : "Already in Junk");
   });
 
   const handleNotJunkMessages = (targets: MailMessageHeader[]) => runMailAction(async () => {
     const target = resolveInboxFolder();
+    await setJunkKeywords(targets, false);
     const moved = await moveTargetsTo(targets, target);
     setStatus(moved > 0 ? `Moved ${moved} message${moved === 1 ? "" : "s"} to Inbox` : "Already in Inbox");
   });
@@ -2894,7 +4012,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setStatus(`Moved ${moved} message${moved === 1 ? "" : "s"} to Trash`);
   });
 
-  const buildForwardBody = (target: MailMessageHeader): { htmlBody: string; textBody: string } => {
+  const buildForwardBody = (
+    target: MailMessageHeader,
+    signature: string | null | undefined = info.signature,
+  ): { htmlBody: string; textBody: string } => {
     const currentBody = bodyMatchesMessage(body, target)
       ? body
       : fallbackBodyFor(target);
@@ -2906,19 +4027,21 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     ].filter(Boolean);
     const originalText = currentBody.text?.trim() || currentBody.snippet || "";
     return {
-      htmlBody: buildForwardHtml(headerLines, { html: currentBody.html, text: originalText }, info.signature),
-      textBody: `\n\n${info.signature?.trim() ? `-- \n${info.signature.trimEnd()}\n\n` : ""}---------- Forwarded message ----------\n${headerLines.join("\n")}\n\n${originalText}`,
+      htmlBody: buildForwardHtml(headerLines, { html: currentBody.html, text: originalText }, signature),
+      textBody: `\n\n${signature?.trim() ? `-- \n${signature.trimEnd()}\n\n` : ""}---------- Forwarded message ----------\n${headerLines.join("\n")}\n\n${originalText}`,
     };
   };
 
   const openForward = (target = selectedMessage) => {
     if (!target) return;
-    const forwardBody = buildForwardBody(target);
+    const identity = pickReplyIdentity(identities, target);
+    const forwardBody = buildForwardBody(target, identity.signature);
     openCompose({
+      identityId: identity.id,
       subject: forwardSubject(target.subject),
       htmlBody: forwardBody.htmlBody,
       textBody: forwardBody.textBody,
-      replyContext: { kind: "forward", folder: target.folder, uid: target.uid, messageId: target.messageId, subject: target.subject },
+      replyContext: replyContextFor("forward", target),
       richFormatUsed: true,
     }, false);
   };
@@ -3077,6 +4200,358 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setStatus(`Emptied ${result.deleted} message${result.deleted === 1 ? "" : "s"} from ${folderLabel(folder)}`);
   });
 
+  /** A pending read receipt request of `message` (not yet answered, not mine). */
+  const receiptRequest = (message: MailMessageHeader | null | undefined): string | null => {
+    if (!message?.receiptTo) return null;
+    if (message.flags.some((flag) => flag.toLowerCase() === MAIL_MDN_SENT.toLowerCase())) return null;
+    const own = [info.emailAddress, ...(info.identities ?? []).map((identity) => identity.email)]
+      .map((address) => address?.trim().toLowerCase())
+      .filter(Boolean);
+    if (own.includes(message.from?.address?.trim().toLowerCase() ?? "")) return null;
+    if (resolveSpecialFolder("sent") === message.folder) return null;
+    return message.receiptTo;
+  };
+
+  const answerReceipt = async (message: MailMessageHeader, send: boolean, automatic = false) => {
+    setReceiptBusy(true);
+    try {
+      if (send) {
+        const result = await mailSendReceipt(info, message.folder, message.uid, automatic);
+        setStatus(`Read receipt sent to ${result.sentTo}`);
+      } else {
+        await mailSetFlags(info, message.folder, [message.uid], [MAIL_MDN_SENT], []);
+        setStatus("Read receipt declined");
+      }
+      applyFlagsLocally(message.folder, [message.uid], [MAIL_MDN_SENT], [], 0);
+    } catch (e) {
+      setError(mailClientErrorMessage(e));
+    } finally {
+      setReceiptBusy(false);
+    }
+  };
+
+  const renderReceiptBanner = (message: MailMessageHeader) => {
+    const address = receiptRequest(message);
+    if (!address || (info.receiptPolicy ?? "ask") !== "ask") return null;
+    return (
+      <div
+        className="mx-4 mt-3 px-3 py-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] flex flex-wrap items-center gap-2 text-[12px]"
+        data-testid="mail-receipt-banner"
+      >
+        <span className="min-w-0 flex-1">The sender asked for a read receipt to {address}.</span>
+        <button type="button" className="taomni-btn h-6 px-2 text-[11px]" data-testid="mail-receipt-send" disabled={receiptBusy} onClick={() => void answerReceipt(message, true)}>
+          Send receipt
+        </button>
+        <button type="button" className="taomni-btn h-6 px-2 text-[11px]" data-testid="mail-receipt-ignore" disabled={receiptBusy} onClick={() => void answerReceipt(message, false)}>
+          Ignore
+        </button>
+      </div>
+    );
+  };
+
+  /** In-app composer for `mailto:` links (reader links, List-Unsubscribe). */
+  const openComposeFromMailto = (href: string) => {
+    const fields = parseMailto(href);
+    if (!fields) return;
+    const body = fields.body.trim();
+    openCompose({
+      to: parseRecipientsText(fields.to.join(", ")),
+      cc: parseRecipientsText(fields.cc.join(", ")),
+      bcc: parseRecipientsText(fields.bcc.join(", ")),
+      subject: fields.subject,
+      ...(body ? { textBody: fields.body, htmlBody: plainTextToMailHtml(fields.body) } : {}),
+    }, !body);
+  };
+
+  const handleUnsubscribe = async (message: MailMessageHeader) => {
+    const list = message.listUnsubscribe;
+    if (!list) return;
+    const key = messageKey(message);
+    const https = list.uris.find((uri) => /^https:/i.test(uri));
+    const mailto = list.uris.find((uri) => /^mailto:/i.test(uri));
+    if (list.oneClick && https) {
+      // RFC 8058: confirm first, then POST without opening a browser.
+      if (unsubscribeArmed !== key) {
+        setUnsubscribeArmed(key);
+        return;
+      }
+      setUnsubscribeArmed(null);
+      try {
+        await mailUnsubscribeOneClick(https);
+        setStatus("Unsubscribe request sent");
+      } catch (e) {
+        setError(mailClientErrorMessage(e));
+      }
+      return;
+    }
+    if (mailto) {
+      openComposeFromMailto(mailto);
+      return;
+    }
+    const web = list.uris.find((uri) => /^https?:/i.test(uri));
+    if (web) void openExternalUrl(web);
+  };
+
+  const renderUnsubscribe = (message: MailMessageHeader) => {
+    if (!message.listUnsubscribe || message.listUnsubscribe.uris.length === 0) return null;
+    const armed = unsubscribeArmed === messageKey(message);
+    return (
+      <button
+        type="button"
+        className="taomni-btn h-5 px-2 text-[10px]"
+        data-testid="mail-unsubscribe"
+        data-armed={armed ? "true" : undefined}
+        title={message.listUnsubscribe.uris.join("\n")}
+        onClick={() => void handleUnsubscribe(message)}
+      >
+        {armed ? "Confirm unsubscribe" : "Unsubscribe"}
+      </button>
+    );
+  };
+
+  /** DEC-14: put the invitation (with my reply) into the CalDAV calendar. */
+  const addInviteToCalendar = async (message: MailMessageHeader, partstat?: string) => {
+    const key = messageKey(message);
+    setInviteView((current) => (current?.key === key ? { ...current, calendar: "adding", calendarError: undefined } : current));
+    try {
+      const written = await mailAddInviteToCalendar(info, message.folder, message.uid, partstat);
+      setInviteView((current) => (current?.key === key ? { ...current, calendar: "added" } : current));
+      setAgendaRevision((value) => value + 1);
+      setStatus(written.created ? "Added to your calendar" : "Updated in your calendar");
+    } catch (e) {
+      const calendarError = mailClientErrorMessage(e);
+      setInviteView((current) => (current?.key === key ? { ...current, calendar: undefined, calendarError } : current));
+    }
+  };
+
+  /** AC-62: Accept / Tentative / Decline sends an iTIP REPLY to the organizer. */
+  const handleRespondInvite = async (message: MailMessageHeader, response: MailInviteReply) => {
+    const key = messageKey(message);
+    setInviteView((current) => (current?.key === key ? { ...current, responding: response, error: undefined } : current));
+    try {
+      const result = await mailRespondInvite(info, message.folder, message.uid, response);
+      setInviteView((current) => (current?.key === key ? { ...current, responding: undefined, responded: result.partstat } : current));
+      setStatus(`Invitation reply (${result.partstat.toLowerCase()}) sent to ${result.sentTo}`);
+      if (info.caldav && response !== "decline") await addInviteToCalendar(message, result.partstat);
+    } catch (e) {
+      const error = mailClientErrorMessage(e);
+      setInviteView((current) => (current?.key === key ? { ...current, responding: undefined, error } : current));
+    }
+  };
+
+  const renderInviteCard = (message: MailMessageHeader) => {
+    const view = inviteView;
+    if (!view || view.key !== messageKey(message)) return null;
+    if (view.loading) {
+      return (
+        <div className="mx-4 mt-3 flex items-center gap-2 text-[12px] text-[var(--taomni-text-muted)]" data-testid="mail-invite-loading">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading calendar invitation…
+        </div>
+      );
+    }
+    const invite = view.invite;
+    if (!invite) {
+      return view.error ? (
+        <div className="mx-4 mt-3 text-[12px] text-red-500" data-testid="mail-invite-error">{view.error}</div>
+      ) : null;
+    }
+    const cancelled = invite.method === "CANCEL" || invite.status === "CANCELLED";
+    const canRespond = invite.method === "REQUEST" && !cancelled && !!invite.organizer;
+    const current = view.responded ?? myPartstat(invite, info.emailAddress);
+    const calendarIndex = visibleAttachments.findIndex((attachment) => hasCalendarPart([attachment]));
+    const replies: Array<{ response: MailInviteReply; label: string; partstat: string }> = [
+      { response: "accept", label: "Accept", partstat: "ACCEPTED" },
+      { response: "tentative", label: "Tentative", partstat: "TENTATIVE" },
+      { response: "decline", label: "Decline", partstat: "DECLINED" },
+    ];
+    return (
+      <div
+        className="mx-4 mt-3 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] p-3 text-[12px]"
+        data-testid="mail-invite-card"
+        data-method={invite.method}
+        data-partstat={current ?? undefined}
+      >
+        <div className="flex items-start gap-2">
+          <CalendarDays className="w-4 h-4 mt-0.5 text-[var(--taomni-accent)]" />
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold break-words" data-testid="mail-invite-summary">
+              {cancelled ? "Cancelled: " : invite.method === "REPLY" ? "Reply: " : ""}{invite.summary || "(untitled event)"}
+            </div>
+            <div className="mt-1 grid grid-cols-[72px_1fr] gap-x-2 gap-y-0.5">
+              <span className="text-[var(--taomni-text-muted)]">When</span>
+              <span data-testid="mail-invite-when">{formatInviteRange(invite) || "(not specified)"}</span>
+              {invite.location && (
+                <>
+                  <span className="text-[var(--taomni-text-muted)]">Where</span>
+                  <span className="break-words">{invite.location}</span>
+                </>
+              )}
+              {invite.organizer && (
+                <>
+                  <span className="text-[var(--taomni-text-muted)]">Organizer</span>
+                  <span className="truncate">{invite.organizer.name ? `${invite.organizer.name} <${invite.organizer.email}>` : invite.organizer.email}</span>
+                </>
+              )}
+              {invite.attendees.length > 0 && (
+                <>
+                  <span className="text-[var(--taomni-text-muted)]">Attendees</span>
+                  <span className="break-words">
+                    {invite.attendees.map((attendee) => `${attendee.name || attendee.email} (${attendee.partstat.toLowerCase()})`).join(", ")}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {canRespond && replies.map((reply) => (
+            <button
+              key={reply.response}
+              type="button"
+              className={`taomni-btn h-6 px-2 text-[11px] ${current === reply.partstat ? "text-[var(--taomni-accent)] border-[var(--taomni-accent)]" : ""}`}
+              data-testid={`mail-invite-${reply.response}`}
+              aria-pressed={current === reply.partstat}
+              disabled={!!view.responding}
+              onClick={() => void handleRespondInvite(message, reply.response)}
+            >
+              {view.responding === reply.response ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              {reply.label}
+            </button>
+          ))}
+          {calendarIndex >= 0 && (
+            <button
+              type="button"
+              className="taomni-btn h-6 px-2 text-[11px]"
+              data-testid="mail-invite-export"
+              title="Save the event as an .ics file"
+              onClick={() => void handleDownloadAttachment(message, visibleAttachments[calendarIndex], calendarIndex)}
+            >
+              <Download className="w-3 h-3" /> Export .ics
+            </button>
+          )}
+          {calendarIndex >= 0 && (
+            <button
+              type="button"
+              className="taomni-btn h-6 px-2 text-[11px]"
+              data-testid="mail-invite-open"
+              title="Open in the system calendar app"
+              onClick={() => void handleOpenAttachment(message, visibleAttachments[calendarIndex], calendarIndex)}
+            >
+              <ExternalLink className="w-3 h-3" /> Open in calendar
+            </button>
+          )}
+          {info.caldav && invite.method === "REQUEST" && !cancelled && view.calendar !== "added" && (
+            <button
+              type="button"
+              className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
+              data-testid="mail-invite-add-calendar"
+              disabled={view.calendar === "adding"}
+              onClick={() => void addInviteToCalendar(message, view.responded)}
+            >
+              {view.calendar === "adding" ? <Loader2 className="w-3 h-3 animate-spin" /> : <CalendarDays className="w-3 h-3" />} Add to calendar
+            </button>
+          )}
+          {view.responded && (
+            <span className="text-[var(--taomni-text-muted)]" data-testid="mail-invite-responded">
+              Reply sent ({view.responded.toLowerCase()})
+            </span>
+          )}
+          {view.calendar === "added" && (
+            <span className="text-[var(--taomni-text-muted)]" data-testid="mail-invite-in-calendar">In your calendar</span>
+          )}
+        </div>
+        {view.error && <div className="mt-1 text-red-500" data-testid="mail-invite-error">{view.error}</div>}
+        {view.calendarError && <div className="mt-1 text-red-500" data-testid="mail-invite-calendar-error">{view.calendarError}</div>}
+      </div>
+    );
+  };
+
+  const handleExportMbox = (folder: MailFolder) => runMailAction(async () => {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const safe = folderLabel(folder).replace(/[\\/:*?"<>|]+/g, "_") || "folder";
+    const targetPath = await save({ title: `Export ${folderLabel(folder)} as mbox`, defaultPath: `${safe}.mbox` });
+    if (typeof targetPath !== "string" || !targetPath.trim()) {
+      setStatus("Export cancelled");
+      return;
+    }
+    setStatus(`Exporting ${folderLabel(folder)}…`);
+    const result = await mailExportMbox(info, folder.name, targetPath);
+    setStatus(`Exported ${result.count} message${result.count === 1 ? "" : "s"} to ${result.path}`);
+  });
+
+  const handleImportMessages = (folder: MailFolder) => runMailAction(async () => {
+    const paths = await selectUploadFile();
+    if (!paths.length) {
+      setStatus("Import cancelled");
+      return;
+    }
+    let imported = 0;
+    let failed = 0;
+    let firstError: string | null = null;
+    for (const path of paths) {
+      const result = await mailImportMessages(info, folder.name, path);
+      imported += result.imported;
+      failed += result.failed;
+      firstError = firstError ?? result.firstError ?? null;
+    }
+    setStatus(`Imported ${imported} message${imported === 1 ? "" : "s"} into ${folderLabel(folder)}${failed ? `; ${failed} failed` : ""}`);
+    if (firstError) setError(`Import failed for some messages: ${firstError}`);
+    // Pull the appended mail into the cache and list.
+    await runFolderSync(folder.name, { maxSteps: 20 }).catch(() => undefined);
+    await reloadVisibleFromCache(folder.name);
+  });
+
+  /** AC-44: show the server certificate so the user can add an exception. */
+  const openCertReview = async (protocol: "imap" | "smtp") => {
+    setCertReview({ protocol, loading: true });
+    try {
+      const cert = await mailProbeCertificate(info, protocol);
+      setCertReview({ protocol, loading: false, info: cert });
+    } catch (e) {
+      setCertReview({ protocol, loading: false, error: mailClientErrorMessage(e) });
+    }
+  };
+
+  const trustReviewedCertificate = async () => {
+    const review = certReview;
+    if (!review?.info) return;
+    const der = review.info.derBase64;
+    const key = review.protocol === "smtp" ? "mailSmtpTrustedCert" : "mailImapTrustedCert";
+    // Persist on the saved session (quick-connect tabs keep it in memory).
+    const store = useSessionStore.getState();
+    const session = store.sessions.find((entry) => entry.id === info.sessionId);
+    if (session) {
+      let options: Record<string, unknown> = {};
+      try {
+        options = JSON.parse(session.options_json || "{}") as Record<string, unknown>;
+      } catch {
+        options = {};
+      }
+      options[key] = der;
+      try {
+        await store.updateSession({ ...session, options_json: JSON.stringify(options) });
+      } catch (e) {
+        setError(mailClientErrorMessage(e));
+        return;
+      }
+    }
+    useAppStore.setState((state) => ({
+      tabs: state.tabs.map((tab) => {
+        if (tab.id !== tabId || !tab.mail) return tab;
+        const mail = review.protocol === "smtp"
+          ? { ...tab.mail, smtp: { ...tab.mail.smtp, trustedCert: der } }
+          : { ...tab.mail, imap: { ...tab.mail.imap, trustedCert: der } };
+        return { ...tab, mail };
+      }),
+    }));
+    setCertReview(null);
+    setError(null);
+    setStatus(session
+      ? "Certificate trusted for this account; reconnecting…"
+      : "Certificate trusted until this tab closes (save the account to keep it); reconnecting…");
+    retryAfterTrustRef.current = true;
+  };
+
   const openExternalUrl = async (url: string) => {
     try {
       const { open } = await import("@tauri-apps/plugin-shell");
@@ -3139,6 +4614,24 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         disabled: busyAction,
         onClick: () => void handleToggleFlagged(targets),
       },
+      {
+        label: `Tag${suffix}`,
+        icon: <Tag className="w-3.5 h-3.5" />,
+        testId: "mail-menu-tag",
+        openOnClick: true,
+        children: [
+          ...MAIL_TAGS.map((tag) => ({
+            label: tag.label,
+            testId: `mail-menu-tag-${tag.keyword.replace("$", "")}`,
+            checked: targets.every((target) => messageTags(target).some((entry) => entry.keyword === tag.keyword)),
+            icon: <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: tag.color }} />,
+            disabled: busyAction,
+            onClick: () => void handleToggleKeyword(targets, tag.keyword, tag.label),
+          })),
+          { label: "", separator: true },
+          { label: "Remove all tags", disabled: busyAction, onClick: () => void handleClearTags(targets) },
+        ],
+      },
       { label: "Mark folder read", icon: <MailOpen className="w-3.5 h-3.5" />, disabled: markingRead, onClick: () => void handleMarkFolderRead(message.folder) },
       { label: "", separator: true },
       { label: `Archive${suffix}`, icon: <Archive className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleArchiveMessages(targets) },
@@ -3148,6 +4641,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       { label: `Not junk${suffix}`, icon: <Inbox className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleNotJunkMessages(targets) },
       { label: `Delete${suffix}`, icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, disabled: busyAction, onClick: () => void handleDeleteMessages(targets) },
       { label: "", separator: true },
+      { label: "Create filter from message…", icon: <FilterIcon className="w-3.5 h-3.5" />, testId: "mail-menu-create-filter", onClick: () => openFilterFromMessage(message) },
+      { label: "Add sender to address book…", icon: <BookUser className="w-3.5 h-3.5" />, testId: "mail-menu-add-contact", disabled: !message.from?.address, onClick: () => openContactFromMessage(message) },
       { label: "Save as .eml", icon: <Save className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleSaveEml(message) },
       { label: "View source", icon: <Code className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleViewSource(message) },
       { label: "Print", icon: <Printer className="w-3.5 h-3.5" />, onClick: () => handlePrintMessage(message) },
@@ -3159,8 +4654,79 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   };
 
 
+  shortcutRef.current = (action: MailShortcutAction): boolean => {
+    // Dialogs and the composer own the keyboard.
+    if (composeOpen || draftsOpen || subscriptionsOpen) return false;
+    const rows = listRows.map((row) => row.message);
+    const current = selectedMessage;
+    const index = current ? rows.findIndex((message) => messageKey(message) === messageKey(current)) : -1;
+    const go = (message: MailMessageHeader | undefined) => {
+      if (!message) return false;
+      selectMessage(message, "mailbox");
+      document.querySelector<HTMLElement>(
+        `[data-testid="mail-message-row"][data-uid="${message.uid}"]`,
+      )?.scrollIntoView?.({ block: "nearest" });
+      return true;
+    };
+    switch (action) {
+      case "next":
+        return go(index < 0 ? rows[0] : rows[index + 1]);
+      case "prev":
+        return go(index < 0 ? rows[0] : rows[index - 1]);
+      case "nextUnread":
+        return go(rows.slice(index + 1).find(isUnread) ?? rows.slice(0, Math.max(index, 0)).find(isUnread));
+      case "focusSearch":
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return true;
+      default:
+        break;
+    }
+    const targets = checkedMessages.length > 0 ? checkedMessages : current ? [current] : [];
+    if (targets.length === 0 || busyAction) return false;
+    switch (action) {
+      case "reply":
+        openReply(targets[0]);
+        return true;
+      case "replyAll":
+        openReplyAll(targets[0]);
+        return true;
+      case "forward":
+        openForward(targets[0]);
+        return true;
+      case "toggleRead":
+        if (targets.some(isUnread)) {
+          void (checkedMessages.length > 0 ? handleMarkSelectedRead() : handleMarkSingleRead(targets[0]));
+        } else {
+          void handleMarkUnread(targets);
+        }
+        return true;
+      case "star":
+        void handleToggleFlagged(targets);
+        return true;
+      case "archive":
+        void handleArchiveMessages(targets);
+        return true;
+      case "junk":
+        void handleJunkMessages(targets);
+        return true;
+      case "notJunk":
+        void handleNotJunkMessages(targets);
+        return true;
+      case "delete":
+        void handleDeleteMessages(targets);
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  const dragTargetsFor = (message: MailMessageHeader): MailMessageHeader[] =>
+    checkedMessageKeys.has(messageKey(message)) && checkedMessages.length > 0 ? checkedMessages : [message];
+
   const folderMenuItems = (folder: MailFolder): MenuItem[] => {
-    const isTrashLike = folderMatchesSpecial(folder, "trash") || folderMatchesSpecial(folder, "junk");
+    const isTrashLike = folderMatchesSpecial(folder, "trash", info.specialFolders)
+      || folderMatchesSpecial(folder, "junk", info.specialFolders);
     return [
       { label: "Open folder", icon: folderIcon(folder), onClick: () => handleFolderSelect(folder) },
       { label: "Search in this folder", icon: <Search className="w-3.5 h-3.5" />, onClick: () => handleSearchInFolder(folder) },
@@ -3179,6 +4745,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       { label: "", separator: true },
       { label: "New subfolder…", icon: <FolderPlus className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleCreateFolder(folder) },
       { label: "Rename folder…", icon: <PenLine className="w-3.5 h-3.5" />, disabled: busyAction, onClick: () => void handleRenameFolder(folder) },
+      { label: "Export as mbox…", icon: <Download className="w-3.5 h-3.5" />, disabled: busyAction || !isSelectable(folder), onClick: () => void handleExportMbox(folder) },
+      { label: "Import messages (mbox/.eml)…", icon: <FolderInput className="w-3.5 h-3.5" />, disabled: busyAction || !isSelectable(folder), onClick: () => void handleImportMessages(folder) },
       {
         label: isTrashLike ? "Empty folder" : "Delete folder",
         icon: isTrashLike ? <Trash2 className="w-3.5 h-3.5" /> : <FolderX className="w-3.5 h-3.5" />,
@@ -3250,7 +4818,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const activeFolder = displayFolders.find((folder) => folder.name === selectedFolder) ?? displayFolders[0];
   const cacheLine = info.cache.enabled
-    ? `${info.cache.headerRetentionDays}d headers, ${info.cache.bodyRecentLimit} recent bodies`
+    ? `${info.cache.headerRetentionDays > 0 ? `${info.cache.headerRetentionDays}d` : "all"} headers, ${info.cache.bodyRecentLimit} recent bodies`
     : "cache off";
   const renderReaderSurface = (message: MailMessageHeader | null, popup = false) => {
     const currentBody = message
@@ -3349,6 +4917,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                     {currentAllowsRemote ? "Block remote images" : "Load remote images"}
                   </button>
                 )}
+                {renderUnsubscribe(message)}
               </div>
               {currentAttachments.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -3411,6 +4980,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 fontSize={mailFontSize}
                 title={message.subject || "Message body"}
                 loading={loadingThisBody && !currentBody}
+                onMailtoLink={openComposeFromMailto}
               />
             </div>
           </div>
@@ -3443,6 +5013,16 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         >
           <FileText className="w-3.5 h-3.5" />
           Drafts
+          {outboxCount > 0 && (
+            <span
+              className="ml-0.5 rounded px-1 text-[10px] leading-4 bg-[var(--taomni-accent)] text-white"
+              data-testid="mail-outbox-count"
+              data-count={outboxCount}
+              title={`${outboxCount} message${outboxCount === 1 ? "" : "s"} in the Outbox`}
+            >
+              {outboxCount}
+            </span>
+          )}
         </button>
         <button
           type="button"
@@ -3458,6 +5038,48 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           Sync
         </button>
+        {idleEnabled && idleState && (
+          <span
+            className="h-7 px-1.5 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]"
+            data-testid="mail-idle-status"
+            data-state={idleState}
+            data-active={idleState === "ready" || idleState === "changed" ? "true" : "false"}
+            title={idleState === "ready" || idleState === "changed"
+              ? "Instant push (IMAP IDLE) active"
+              : "Instant push unavailable; polling"}
+          >
+            <span
+              aria-hidden="true"
+              className={`w-1.5 h-1.5 rounded-full ${idleState === "ready" || idleState === "changed"
+                ? "bg-[var(--taomni-success,#22c55e)]"
+                : "bg-[var(--taomni-text-muted)]"}`}
+            />
+            {idleState === "ready" || idleState === "changed" ? "Push" : "Poll"}
+          </span>
+        )}
+        {syncProgress && (
+          <span
+            className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+            data-testid="mail-sync-progress"
+            data-folder={syncProgress.folder}
+            title={`Catching up ${syncProgress.folder}`}
+          >
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Catching up {syncProgress.fetched}
+            {syncProgress.remaining > 0 ? ` / ${syncProgress.fetched + syncProgress.remaining}` : ""}
+          </span>
+        )}
+        {backfillProgress && (
+          <span
+            className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
+            data-testid="mail-backfill-progress"
+            data-folder={backfillProgress.folder}
+            title={`Downloading older headers of ${backfillProgress.folder}`}
+          >
+            <Loader2 className="w-3 h-3 animate-spin" />
+            History {backfillProgress.cached}/{backfillProgress.total}
+          </span>
+        )}
         {bodyWarming.active && (
           <span
             className="h-7 px-2 inline-flex items-center gap-1.5 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-text-muted)]"
@@ -3499,16 +5121,91 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           Test
         </button>
         <div className="relative w-[320px] max-w-[40vw]">
-          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
+          <Search className="pointer-events-none w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
             ref={searchInputRef}
             type="search"
             className="taomni-input h-7 w-full pl-7 text-[12px]"
-            placeholder="Search cached headers"
-            aria-label="Search cached mail headers"
+            placeholder={searchScope === "all" ? "Search all folders" : "Search this folder"}
+            aria-label="Search mail"
+            data-testid="mail-search-input"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && event.shiftKey) {
+                event.preventDefault();
+                void runServerSearch();
+              }
+            }}
           />
+        </div>
+        <select
+          className="taomni-input h-7 text-[12px] w-[92px]"
+          value={searchField}
+          aria-label="Search field"
+          data-testid="mail-search-field"
+          onChange={(event) => setSearchField(event.target.value as MailSearchField)}
+        >
+          <option value="all">All text</option>
+          <option value="subject">Subject</option>
+          <option value="sender">From</option>
+          <option value="recipients">To/Cc</option>
+          <option value="body">Body</option>
+        </select>
+        <select
+          className="taomni-input h-7 text-[12px] w-[96px]"
+          value={searchScope}
+          aria-label="Search scope"
+          data-testid="mail-search-scope"
+          onChange={(event) => setSearchScope(event.target.value === "all" ? "all" : "folder")}
+        >
+          <option value="folder">This folder</option>
+          <option value="all">All folders</option>
+        </select>
+        {searchActive && (
+          <button
+            type="button"
+            className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5 text-[12px]"
+            data-testid="mail-search-server"
+            onClick={() => void runServerSearch()}
+            disabled={serverSearching}
+            title="Search the current folder on the server (Shift+Enter)"
+          >
+            {serverSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+            Server
+          </button>
+        )}
+        <div className="flex items-center gap-0.5" role="group" aria-label="Quick filter" data-testid="mail-quick-filter">
+          {([
+            ["unread", "Unread", MailOpen],
+            ["flagged", "Starred", Star],
+            ["attachments", "Attachments", Paperclip],
+          ] as const).map(([key, label, Icon]) => (
+            <button
+              key={key}
+              type="button"
+              className={`taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center ${quickFilters[key] ? "text-[var(--taomni-accent)]" : ""}`}
+              aria-pressed={quickFilters[key]}
+              aria-label={`Show only ${label.toLowerCase()}`}
+              title={`Show only ${label.toLowerCase()}`}
+              data-testid={`mail-quick-filter-${key}`}
+              onClick={() => setQuickFilters((current) => ({ ...current, [key]: !current[key] }))}
+            >
+              <Icon className="w-3.5 h-3.5" />
+            </button>
+          ))}
+          <select
+            className="taomni-input h-7 text-[12px] w-[92px] ml-0.5"
+            value={tagFilter}
+            aria-label="Filter by tag"
+            data-testid="mail-quick-filter-tag"
+            onChange={(event) => setTagFilter(event.target.value)}
+          >
+            <option value="">Any tag</option>
+            {MAIL_TAGS.map((tag) => (
+              <option key={tag.keyword} value={tag.keyword}>{tag.label}</option>
+            ))}
+          </select>
         </div>
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -3593,6 +5290,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           >
             {error ?? status}
           </span>
+          {error && isMailCertificateError(error) && (
+            <button
+              type="button"
+              className="ml-auto h-5 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
+              data-testid="mail-cert-review"
+              onClick={() => void openCertReview(/smtp/i.test(error) ? "smtp" : "imap")}
+            >
+              <ShieldCheck className="w-3 h-3" />
+              Review certificate
+            </button>
+          )}
           {error && oauthReauthRequired && onEditSession && (
             <button
               type="button"
@@ -3654,23 +5362,111 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 <div className="h-8 shrink-0 flex items-center px-3 text-[12px] font-semibold border-b border-[var(--taomni-divider)]">
                   Mailbox
                   {loadingFolders && <Loader2 className="w-3.5 h-3.5 ml-auto animate-spin text-[var(--taomni-text-muted)]" />}
+                  <button
+                    type="button"
+                    className={`${loadingFolders ? "ml-1" : "ml-auto"} h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]`}
+                    title="Manage folder subscriptions"
+                    aria-label="Manage folder subscriptions"
+                    data-testid="mail-subscriptions-open"
+                    onClick={() => setSubscriptionsOpen(true)}
+                  >
+                    <ListChecks className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="ml-1 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
+                    title="Address book"
+                    aria-label="Address book"
+                    data-testid="mail-address-book-open"
+                    onClick={() => {
+                      setContactDraft(null);
+                      setAddressBookOpen(true);
+                    }}
+                  >
+                    <BookUser className="w-3.5 h-3.5" />
+                  </button>
+                  {info.caldav && (
+                    <button
+                      type="button"
+                      className="ml-1 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
+                      title="Agenda"
+                      aria-label="Agenda"
+                      data-testid="mail-agenda-open"
+                      onClick={() => setAgendaOpen(true)}
+                    >
+                      <CalendarDays className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="ml-1 h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
+                    title="Message filters"
+                    aria-label="Message filters"
+                    data-testid="mail-filters-open"
+                    data-errors={filterErrors.length || undefined}
+                    onClick={() => {
+                      setFilterDraft(null);
+                      setFiltersOpen(true);
+                    }}
+                  >
+                    <FilterIcon className="w-3.5 h-3.5" />
+                    {filterErrors.length > 0 && (
+                      <AlertTriangle className="w-2.5 h-2.5 -ml-1 -mt-2 text-amber-500" data-testid="mail-filters-error-badge" />
+                    )}
+                  </button>
                 </div>
                 <div className="flex-1 min-h-0 py-1 overflow-auto">
-                  {displayFolders.map((folder) => {
+                  {treeFolders.map((folder) => {
                     const active = folder.name === selectedFolder;
                     const label = folderLabel(folder);
                     return (
                       <button
                         key={folder.name}
                         type="button"
-                        className={`w-full h-7 pr-3 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""}`}
+                        className={`w-full h-7 pr-3 flex items-center gap-2 text-left text-[12px] hover:bg-[var(--taomni-hover)] ${active ? "bg-[var(--taomni-selected)] font-semibold" : ""} ${dropFolder === folder.name ? "outline outline-1 outline-[var(--taomni-accent)] -outline-offset-1" : ""}`}
                         style={{ paddingLeft: `${12 + Math.min(folderDepth(folder), 6) * 14}px` }}
                         data-active={active || undefined}
+                        data-testid="mail-folder-row"
+                        data-folder-name={folder.name}
+                        data-unread={folder.unread ?? 0}
+                        data-sync-error={folder.lastError ? "true" : undefined}
+                        data-drop-target={dropFolder === folder.name ? "true" : undefined}
+                        onDragOver={(event) => {
+                          if (!event.dataTransfer.types.includes(MAIL_DRAG_TYPE) || !isSelectable(folder)) return;
+                          const dragged = draggedMessagesRef.current;
+                          if (dragged.length === 0 || dragged.every((m) => m.folder === folder.name)) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = event.ctrlKey || event.altKey ? "copy" : "move";
+                          if (dropFolder !== folder.name) setDropFolder(folder.name);
+                        }}
+                        onDragLeave={() => {
+                          if (dropFolder === folder.name) setDropFolder(null);
+                        }}
+                        onDrop={(event) => {
+                          const dragged = draggedMessagesRef.current;
+                          if (!event.dataTransfer.types.includes(MAIL_DRAG_TYPE) || dragged.length === 0) return;
+                          event.preventDefault();
+                          setDropFolder(null);
+                          draggedMessagesRef.current = [];
+                          // Move by default; Ctrl (Option on macOS) copies, like Thunderbird.
+                          if (event.ctrlKey || event.altKey) void handleCopyMessages(dragged, folder.name);
+                          else void handleMoveMessages(dragged, folder.name);
+                        }}
                         onClick={() => handleFolderSelect(folder)}
                         onContextMenu={(event) => mailMenu.show(event, folderMenuItems(folder))}
                       >
                         <span className="text-[var(--taomni-text-muted)]">{folderIcon(folder)}</span>
                         <span className="min-w-0 flex-1 truncate" title={label === folder.name ? folder.name : `${label} (${folder.name})`}>{label}</span>
+                        {folder.lastError && (
+                          <span
+                            className="text-[var(--taomni-warning,#d97706)]"
+                            data-testid="mail-folder-sync-error"
+                            title={`Sync failed: ${folder.lastError}`}
+                            aria-label={`Sync failed: ${folder.lastError}`}
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                          </span>
+                        )}
                         {folder.unread !== null && folder.unread !== undefined && folder.unread > 0 && (
                           <span className="text-[11px] text-[var(--taomni-accent)]">{folder.unread}</span>
                         )}
@@ -3683,7 +5479,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 </div>
                 <div className="shrink-0 border-t border-[var(--taomni-divider)] px-3 py-2 text-[11px] text-[var(--taomni-text-muted)] leading-5">
                   <div className="truncate" title={`${info.imap.host}:${info.imap.port}`}>
-                    IMAP {info.imap.host}:{info.imap.port}
+                    {info.incoming === "pop3" ? "POP3" : "IMAP"} {info.imap.host}:{info.imap.port}
                   </div>
                   <div className="truncate" title={`${info.smtp.host}:${info.smtp.port}`}>
                     SMTP {info.smtp.host}:{info.smtp.port}
@@ -3709,8 +5505,32 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                     onChange={(event) => toggleFilteredMessagesChecked(event.target.checked)}
                   />
                   <span className="text-[12px] font-semibold truncate" title={activeFolder?.name}>{folderLabel(activeFolder)}</span>
+                  <button
+                    type="button"
+                    className={`taomni-btn h-6 px-1.5 text-[11px] inline-flex items-center gap-1 ${threadView ? "text-[var(--taomni-accent)]" : ""}`}
+                    data-testid="mail-thread-view-toggle"
+                    aria-pressed={threadView}
+                    title={threadView ? "Show messages unthreaded" : "Group messages into conversations"}
+                    onClick={() => {
+                      const next = !threadView;
+                      setThreadView(next);
+                      try {
+                        window.localStorage.setItem(MAIL_THREAD_VIEW_STORAGE_KEY, String(next));
+                      } catch {
+                        // Per-viewer convenience only.
+                      }
+                    }}
+                  >
+                    <MessageSquareReply className="w-3 h-3" />
+                    Threads
+                  </button>
                 </div>
-                <span className="text-[11px] text-[var(--taomni-text-muted)]">
+                <span
+                  className="text-[11px] text-[var(--taomni-text-muted)]"
+                  data-testid="mail-message-count"
+                  data-count={messages.length}
+                  data-has-more={hasMoreMessages ? "true" : "false"}
+                >
                   {loadingMessages ? "Loading" : `${filteredMessages.length}/${messages.length}${!query.trim() && hasMoreMessages ? "+" : ""}`}
                 </span>
               </div>
@@ -3726,19 +5546,43 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                   </div>
                 ) : filteredMessages.length === 0 ? (
                   <div className="h-28 flex items-center justify-center px-4 text-center text-[12px] text-[var(--taomni-text-muted)]">
-                    {query ? "No cached messages match the search." : "No cached messages. Run Sync to refresh all folders."}
+                    {query || quickFilterActive ? "No messages match the search or filter." : "No cached messages. Run Sync to refresh all folders."}
                   </div>
                 ) : (
                   <>
-                    {filteredMessages.map((message) => {
+                    {listRows.map((row) => {
+                      const { message } = row;
                       const active = messageKey(message) === selectedMessageKey;
                       const unread = isUnread(message);
                       return (
                         <div
                           key={messageKey(message)}
+                          data-thread-key={threadView ? row.threadKey : undefined}
+                          data-thread-depth={threadView ? row.depth : undefined}
+                          style={{
+                            // Offscreen rows skip layout/paint (TASK-22) while
+                            // staying in the DOM for find, a11y and selection.
+                            contentVisibility: "auto",
+                            containIntrinsicSize: "auto 82px",
+                            ...(threadView && row.depth > 0 ? { paddingLeft: `${12 + row.depth * 16}px` } : {}),
+                          }}
+                          draggable
+                          onDragStart={(event) => {
+                            draggedMessagesRef.current = dragTargetsFor(message);
+                            event.dataTransfer.effectAllowed = "copyMove";
+                            event.dataTransfer.setData(MAIL_DRAG_TYPE, String(draggedMessagesRef.current.length));
+                          }}
+                          onDragEnd={() => {
+                            draggedMessagesRef.current = [];
+                            setDropFolder(null);
+                          }}
                           role="button"
                           tabIndex={0}
                           aria-pressed={active}
+                          data-testid="mail-message-row"
+                          data-uid={message.uid}
+                          data-unread={unread ? "true" : "false"}
+                          data-flagged={isFlagged(message) ? "true" : "false"}
                           className={`w-full min-h-[82px] px-3 py-2.5 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] cursor-pointer ${active ? "bg-[var(--taomni-selected)]" : ""}`}
                           onClick={() => selectMessage(message, "mailbox")}
                           onDoubleClick={() => openMessageTab(message)}
@@ -3758,14 +5602,58 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                               onClick={(event) => event.stopPropagation()}
                               onChange={(event) => toggleMessageChecked(message, event.target.checked)}
                             />
+                            {threadView && row.isRoot && row.threadSize > 1 && (
+                              <button
+                                type="button"
+                                className="mt-0.5 shrink-0 inline-flex items-center gap-0.5 rounded px-1 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
+                                data-testid="mail-thread-expand"
+                                aria-expanded={row.expanded}
+                                aria-label={`${row.expanded ? "Collapse" : "Expand"} conversation of ${row.threadSize} messages`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleThreadExpanded(row.threadKey);
+                                }}
+                              >
+                                <ChevronDown className={`w-3 h-3 transition-transform ${row.expanded ? "" : "-rotate-90"}`} />
+                                <span data-testid="mail-thread-size">{row.threadSize}</span>
+                                {row.threadUnread > 0 && !row.expanded && (
+                                  <span className="text-[var(--taomni-accent)]">({row.threadUnread})</span>
+                                )}
+                              </button>
+                            )}
                             <div className="min-w-0 flex-1">
-                              <div className={`min-w-0 text-[14px] leading-5 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "font-medium text-[var(--taomni-text-muted)]"}`}>
-                                {message.subject || "(no subject)"}
+                              <div className="min-w-0 flex items-center gap-1.5">
+                                {isJunk(message) && (
+                                  <span title="Junk" data-testid="mail-message-junk" className="shrink-0 text-[var(--taomni-text-muted)]">
+                                    <Ban className="w-3 h-3" />
+                                  </span>
+                                )}
+                                <div className={`min-w-0 text-[14px] leading-5 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "font-medium text-[var(--taomni-text-muted)]"}`}>
+                                  {message.subject || "(no subject)"}
+                                </div>
+                                {messageTags(message).map((tag) => (
+                                  <span
+                                    key={tag.keyword}
+                                    className="shrink-0 inline-block w-2 h-2 rounded-full"
+                                    style={{ background: tag.color }}
+                                    title={tag.label}
+                                    data-testid="mail-message-tag"
+                                    data-tag={tag.keyword}
+                                  />
+                                ))}
                               </div>
                               <div className="mt-1 flex items-center gap-1.5 text-[12px] leading-4">
                                 <span className={`min-w-0 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "text-[var(--taomni-text-muted)]"}`}>
                                   {addressLabel(message.from) || "(unknown)"}
                                 </span>
+                                {message.folder !== selectedFolder && (
+                                  <span
+                                    className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-[10px] text-[var(--taomni-text-muted)]"
+                                    data-testid="mail-message-folder"
+                                  >
+                                    {decodeFolderLabel(message.folder, displayFolders)}
+                                  </span>
+                                )}
                                 {message.hasAttachments && <Paperclip className="w-3 h-3 text-[var(--taomni-text-muted)] shrink-0" />}
                                 {message.bodyCached && <FileText className="w-3 h-3 text-[var(--taomni-accent)] shrink-0" />}
                               </div>
@@ -3778,13 +5666,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                         </div>
                       );
                     })}
-                    {!query.trim() && (hasMoreMessages || loadingMoreMessages) && (
+                    {!query.trim() && !quickFilterActive && (hasMoreMessages || loadingMoreMessages) && (
                       <div className="p-2">
                         <button
                           type="button"
                           className="taomni-btn h-7 w-full inline-flex items-center justify-center gap-1.5 text-[12px]"
                           onClick={() => void loadMoreMessages()}
                           disabled={loadingMoreMessages}
+                          data-testid="mail-load-more"
                         >
                           {loadingMoreMessages ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           Load older messages
@@ -3917,6 +5806,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                           {selectedAllowsRemote ? "Block remote images" : "Load remote images"}
                         </button>
                       )}
+                      {renderUnsubscribe(selectedMessage)}
                     </div>
                     {visibleAttachments.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -3961,6 +5851,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                     ) : null}
                   </div>
 
+                  {renderInviteCard(selectedMessage)}
+                  {renderReceiptBanner(selectedMessage)}
+
                   <RemoteImagesBanner
                     visible={selectedHasRemoteImages}
                     allowRemoteImages={selectedAllowsRemote}
@@ -3979,6 +5872,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                       fontSize={mailFontSize}
                       title={selectedMessage.subject || "Message body"}
                       loading={!!selectedMessage && bodyLoadingKey === messageKey(selectedMessage) && !selectedBody}
+                      onMailtoLink={openComposeFromMailto}
                     />
                   </div>
                 </div>
@@ -4050,12 +5944,223 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         </div>
       )}
 
+      {certReview && (
+        <div className="absolute inset-0 z-[150] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title={`${certReview.protocol.toUpperCase()} server certificate`}
+            icon={<ShieldCheck className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Server certificate"
+            minWidth={420}
+            minHeight={260}
+            className="w-[min(620px,92vw)] min-h-[280px]"
+            onClose={() => setCertReview(null)}
+          >
+            <div className="flex-1 min-h-0 overflow-auto p-3 text-[12px] flex flex-col gap-2" data-testid="mail-cert-dialog">
+              {certReview.loading && (
+                <div className="flex items-center gap-2 text-[var(--taomni-text-muted)]">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Fetching the certificate…
+                </div>
+              )}
+              {certReview.error && <div className="text-red-500">{certReview.error}</div>}
+              {certReview.info && (
+                <>
+                  <div className="text-[var(--taomni-warning,#d97706)]">
+                    {certReview.info.trustedBySystem
+                      ? "This certificate is trusted by the system."
+                      : `Not trusted by the system: ${certReview.info.verifyError ?? "unknown issuer"}`}
+                  </div>
+                  <div className="grid grid-cols-[92px_1fr] gap-x-2 gap-y-1">
+                    <span className="text-[var(--taomni-text-muted)]">Server</span>
+                    <span>{certReview.info.host}:{certReview.info.port}</span>
+                    <span className="text-[var(--taomni-text-muted)]">Subject</span>
+                    <span className="break-all">{certReview.info.subject || "(none)"}</span>
+                    <span className="text-[var(--taomni-text-muted)]">Issuer</span>
+                    <span className="break-all">{certReview.info.issuer || "(none)"}</span>
+                    <span className="text-[var(--taomni-text-muted)]">Valid</span>
+                    <span>{certReview.info.notBefore} – {certReview.info.notAfter}</span>
+                    <span className="text-[var(--taomni-text-muted)]">SHA-256</span>
+                    <code className="break-all font-mono text-[11px]" data-testid="mail-cert-fingerprint">
+                      {certReview.info.sha256}
+                    </code>
+                  </div>
+                  <div className="text-[11px] text-[var(--taomni-text-muted)]">
+                    Compare the fingerprint with the one your mail administrator gave you. Only this exact
+                    certificate will be accepted for this server; if it changes you will be asked again.
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="h-10 px-3 flex items-center justify-end gap-2 border-t border-[var(--taomni-divider)]">
+              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" onClick={() => setCertReview(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="taomni-btn h-7 px-3 text-[12px]"
+                data-primary="true"
+                data-testid="mail-cert-trust"
+                disabled={!certReview.info}
+                onClick={() => void trustReviewedCertificate()}
+              >
+                Trust for this account
+              </button>
+            </div>
+          </MailDraggableDialog>
+        </div>
+      )}
+
+      {undoSend && (
+        <div
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[160] h-9 px-3 rounded shadow-lg border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] flex items-center gap-3 text-[12px]"
+          role="status"
+          data-testid="mail-undo-send"
+        >
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          Sending in {Math.max(0, Math.ceil(undoSend.until - undoNow / 1000))}s…
+          <button type="button" className="taomni-btn h-7 px-2" data-testid="mail-undo-send-button" onClick={() => void handleUndoSend()}>
+            Undo
+          </button>
+        </div>
+      )}
+
+      {agendaOpen && info.caldav && (
+        <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title="Agenda"
+            icon={<CalendarDays className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Agenda"
+            closeTestId="mail-agenda-close"
+            minWidth={380}
+            minHeight={300}
+            className="w-[min(560px,92vw)] h-[min(520px,80vh)] min-h-[320px]"
+            onClose={() => setAgendaOpen(false)}
+          >
+            <MailAgendaPanel
+              info={info}
+              revision={agendaRevision}
+              onStatus={setStatus}
+              onChanged={onAgendaChanged}
+            />
+          </MailDraggableDialog>
+        </div>
+      )}
+
+      {addressBookOpen && (
+        <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title="Address book"
+            icon={<BookUser className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Address book"
+            closeTestId="mail-address-book-close"
+            minWidth={420}
+            minHeight={320}
+            className="w-[min(640px,92vw)] h-[min(560px,80vh)] min-h-[340px]"
+            onClose={() => setAddressBookOpen(false)}
+          >
+            <MailAddressBookPanel
+              info={info}
+              initialDraft={contactDraft}
+              onStatus={setStatus}
+              onCompose={(entry) => {
+                setAddressBookOpen(false);
+                openCompose({ to: parseRecipientsText(entry.displayName ? `${entry.displayName} <${entry.emails[0]}>` : entry.emails[0]) });
+              }}
+            />
+          </MailDraggableDialog>
+        </div>
+      )}
+
+      {filtersOpen && (
+        <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title="Message filters"
+            icon={<FilterIcon className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Message filters"
+            closeTestId="mail-filters-close"
+            minWidth={460}
+            minHeight={320}
+            className="w-[min(720px,92vw)] h-[min(560px,80vh)] min-h-[340px]"
+            onClose={() => {
+              setFiltersOpen(false);
+              setFilterErrors([]);
+            }}
+          >
+            <MailFiltersPanel
+              recentErrors={filterErrors}
+              accountId={info.sessionId}
+              folders={displayFolders.filter(isSelectable).map((folder) => ({ name: folder.name, label: folderLabel(folder) }))}
+              currentFolder={{
+                name: selectedFolder,
+                label: folderLabel(displayFolders.find((folder) => folder.name === selectedFolder) ?? { name: selectedFolder, displayName: selectedFolder } as MailFolder),
+              }}
+              initialDraft={filterDraft}
+              onRun={runFiltersOnFolder}
+              onStatus={setStatus}
+            />
+          </MailDraggableDialog>
+        </div>
+      )}
+
+      {subscriptionsOpen && (
+        <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
+          <MailDraggableDialog
+            title="Folder subscriptions"
+            icon={<ListChecks className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
+            ariaLabel="Folder subscriptions"
+            minWidth={360}
+            minHeight={280}
+            className="w-[min(520px,90vw)] h-[min(520px,78vh)] min-h-[300px]"
+            onClose={() => setSubscriptionsOpen(false)}
+          >
+            <div className="h-9 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[12px]">
+              <label className="inline-flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={subscribedOnly}
+                  data-testid="mail-subscribed-only"
+                  onChange={(event) => setSubscribedOnly(event.target.checked)}
+                />
+                Show only subscribed folders
+              </label>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto p-2" data-testid="mail-subscriptions-dialog">
+              {displayFolders.filter(isSelectable).map((folder) => {
+                const subscribed = isSubscribed(folder);
+                const inbox = folder.name.toUpperCase() === "INBOX";
+                return (
+                  <label
+                    key={folder.name}
+                    className="h-7 px-2 flex items-center gap-2 rounded text-[12px] hover:bg-[var(--taomni-hover)]"
+                    style={{ paddingLeft: `${8 + Math.min(folderDepth(folder), 6) * 14}px` }}
+                    data-testid="mail-subscription-row"
+                    data-folder-name={folder.name}
+                    data-subscribed={subscribed ? "true" : "false"}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={subscribed}
+                      disabled={inbox || subscriptionBusy != null}
+                      aria-label={`Subscribe to ${folderLabel(folder)}`}
+                      data-testid="mail-subscription-toggle"
+                      onChange={(event) => void toggleSubscription(folder, event.target.checked)}
+                    />
+                    <span className="text-[var(--taomni-text-muted)]">{folderIcon(folder)}</span>
+                    <span className="min-w-0 flex-1 truncate">{folderLabel(folder)}</span>
+                    {subscriptionBusy === folder.name && <Loader2 className="w-3 h-3 animate-spin" />}
+                  </label>
+                );
+              })}
+            </div>
+          </MailDraggableDialog>
+        </div>
+      )}
+
       {draftsOpen && (
         <div className="absolute inset-0 z-[145] bg-black/30 flex items-center justify-center p-5">
           <MailDraggableDialog
-            title="Local drafts"
+            title={draftsTab === "drafts" ? "Drafts" : draftsTab === "templates" ? "Templates" : "Outbox"}
             icon={<FileText className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
-            ariaLabel="Local drafts"
+            ariaLabel="Drafts and templates"
             minWidth={420}
             minHeight={300}
             className="w-[min(680px,90vw)] h-[min(520px,78vh)] min-h-[340px]"
@@ -4065,33 +6170,89 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               <button type="button" className="taomni-btn h-7 px-2 text-[12px]" onClick={() => void refreshDrafts()} disabled={draftsLoading}>
                 {draftsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
               </button>
-              <span className="text-[12px] text-[var(--taomni-text-muted)]">{drafts.length} draft{drafts.length === 1 ? "" : "s"}</span>
+              <div className="flex items-center gap-1" role="tablist" aria-label="Drafts and templates">
+                {(["drafts", "templates", "outbox"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={draftsTab === tab}
+                    data-testid={`mail-drafts-tab-${tab}`}
+                    className={`taomni-btn h-7 px-2 text-[12px] ${draftsTab === tab ? "text-[var(--taomni-accent)]" : ""}`}
+                    onClick={() => setDraftsTab(tab)}
+                  >
+                    {tab === "drafts" ? "Drafts" : tab === "templates" ? "Templates" : `Outbox${outboxCount > 0 ? ` (${outboxCount})` : ""}`}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[12px] text-[var(--taomni-text-muted)]">
+                {visibleDrafts.length} {draftsTab === "drafts" ? "draft" : draftsTab === "templates" ? "template" : "queued message"}{visibleDrafts.length === 1 ? "" : "s"}
+              </span>
+              {draftsTab === "outbox" && (
+                <button
+                  type="button"
+                  className="taomni-btn h-7 px-2 text-[12px] ml-auto inline-flex items-center gap-1.5"
+                  data-testid="mail-outbox-send-all"
+                  disabled={visibleDrafts.length === 0}
+                  onClick={() => void processOutbox(true)}
+                  title="Send every queued message now"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Send all
+                </button>
+              )}
             </div>
             <div className="flex-1 min-h-0 overflow-auto p-2" data-testid="mail-drafts-dialog">
-              {drafts.length === 0 ? (
+              {visibleDrafts.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-                  No saved drafts
+                  {draftsTab === "drafts"
+                    ? "No saved drafts"
+                    : draftsTab === "templates"
+                      ? "No templates. Use \"Save as template\" in the composer."
+                      : "The Outbox is empty. Queued and scheduled messages send while this tab is open."}
                 </div>
-              ) : drafts.map((saved) => (
+              ) : visibleDrafts.map((saved) => (
                 <div
                   key={saved.id}
                   className="min-h-14 px-2 py-1.5 rounded border border-transparent hover:border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] flex items-center gap-2"
-                  data-testid="mail-draft-row"
+                  data-testid={isOutbox(saved) ? "mail-outbox-row" : isTemplate(saved) ? "mail-template-row" : "mail-draft-row"}
                 >
                   <button
                     type="button"
                     className="min-w-0 flex-1 text-left"
-                    onClick={() => openSavedDraft(saved)}
+                    onClick={() => (isTemplate(saved) ? openFromTemplate(saved) : openSavedDraft(saved))}
                   >
                     <div className="text-[12px] font-semibold truncate">{saved.subject || "(no subject)"}</div>
                     <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
                       {[...saved.to, ...saved.cc, ...saved.bcc].join(", ") || "(no recipients)"}
                     </div>
+                    {isOutbox(saved) && (() => {
+                      const state = outboxState(saved)!;
+                      const at = outboxNextAttemptAt(state);
+                      return (
+                        <div className="text-[10px] text-[var(--taomni-text-muted)]" data-testid="mail-outbox-state">
+                          {at ? `Sends ${new Date(at * 1000).toLocaleString()}` : "Waiting for Send now"}
+                          {state.lastError ? ` · attempt ${state.attempts} failed: ${state.lastError}` : ""}
+                        </div>
+                      );
+                    })()}
                     <div className="text-[10px] text-[var(--taomni-text-muted)]">
                       {formatShortDate(saved.updatedAt)}
                       {saved.attachments.length > 0 ? ` · ${saved.attachments.length} attachment${saved.attachments.length === 1 ? "" : "s"}` : ""}
                     </div>
                   </button>
+                  {isOutbox(saved) && (
+                    <button
+                      type="button"
+                      className="taomni-btn h-7 px-2 text-[12px] inline-flex items-center gap-1"
+                      data-testid="mail-outbox-send"
+                      title="Send this message now"
+                      onClick={() => void sendOutboxItem(saved, true)}
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      Send now
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
@@ -4192,6 +6353,33 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               </div>
             )}
             <div className="p-3 grid grid-cols-[56px_1fr] gap-2 text-[12px]">
+              <label className="self-center text-[var(--taomni-text-muted)]" htmlFor={`mail-from-${tabId}`}>From</label>
+              <select
+                id={`mail-from-${tabId}`}
+                className="taomni-input h-7"
+                data-testid="mail-compose-from"
+                value={identityById(draft.identityId).id}
+                disabled={sending || identities.length < 2}
+                onChange={(event) => {
+                  const next = identityById(event.target.value);
+                  setDraft((current) => {
+                    const previous = identityById(current.identityId);
+                    return {
+                      ...current,
+                      identityId: next.id,
+                      htmlBody: swapSignature(
+                        current.htmlBody,
+                        signatureToMailHtml(previous.signature),
+                        signatureToMailHtml(next.signature),
+                      ),
+                    };
+                  });
+                }}
+              >
+                {identities.map((identity) => (
+                  <option key={identity.id} value={identity.id}>{identityLabel(identity)}</option>
+                ))}
+              </select>
               <RecipientField
                 id={`mail-to-${tabId}`}
                 label="To"
@@ -4289,6 +6477,34 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 </div>
               )}
             </div>
+            {attachReminder && (
+              <div
+                className="px-3 py-1.5 flex items-center gap-2 text-[12px] border-t border-[var(--taomni-divider)] bg-[var(--taomni-warning-bg,rgba(217,119,6,0.12))]"
+                role="alert"
+                data-testid="mail-attach-reminder"
+              >
+                <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                <span className="flex-1">The message mentions an attachment, but nothing is attached.</span>
+                <button
+                  type="button"
+                  className="taomni-btn h-6 px-2 text-[11px]"
+                  onClick={() => {
+                    setAttachReminder(false);
+                    void handleAddDraftAttachments();
+                  }}
+                >
+                  Attach…
+                </button>
+                <button
+                  type="button"
+                  className="taomni-btn h-6 px-2 text-[11px]"
+                  data-testid="mail-attach-reminder-send"
+                  onClick={() => void handleSendDraft(true)}
+                >
+                  Send anyway
+                </button>
+              </div>
+            )}
             <div className="h-10 px-3 flex items-center justify-end gap-2 border-t border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
               <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 mr-auto" onClick={() => void handleAddDraftAttachments()} disabled={sending}>
                 <Paperclip className="w-3.5 h-3.5" />
@@ -4298,10 +6514,69 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 {savingDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 Save draft
               </button>
-              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" onClick={() => void discardCurrentDraft()} disabled={sending}>
+              <button
+                type="button"
+                className="taomni-btn h-7 px-3 text-[12px]"
+                data-testid="mail-compose-save-template"
+                onClick={() => void saveCurrentAsTemplate()}
+                disabled={savingDraft || sending || !draftHasContent(draft)}
+                title="Save this message as a reusable template"
+              >
+                Save as template
+              </button>
+              <button type="button" className="taomni-btn h-7 px-3 text-[12px]" data-testid="mail-compose-discard" onClick={() => void discardCurrentDraft()} disabled={sending}>
                 Discard
               </button>
-              <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" data-primary="true" data-testid="mail-compose-send" onClick={handleSendDraft} disabled={sending}>
+              <label className="inline-flex items-center gap-1 text-[12px] text-[var(--taomni-text-muted)]" title="Ask the recipient's client to send a read receipt">
+                <input
+                  type="checkbox"
+                  checked={draft.readReceipt === true}
+                  data-testid="mail-compose-read-receipt"
+                  onChange={(event) => setDraft((current) => ({ ...current, readReceipt: event.target.checked }))}
+                />
+                Receipt
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  className="taomni-btn h-7 px-3 text-[12px]"
+                  data-testid="mail-compose-send-later"
+                  disabled={sending}
+                  onClick={() => {
+                    setSendLaterAt((current) => current || toDateTimeLocal(Math.floor(Date.now() / 1000) + 3600));
+                    setSendLaterOpen((open) => !open);
+                  }}
+                >
+                  Send later
+                </button>
+                {sendLaterOpen && (
+                  <div
+                    className="absolute bottom-9 right-0 z-10 w-72 p-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg text-[12px] flex flex-col gap-2"
+                    data-testid="mail-send-later-panel"
+                  >
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[var(--taomni-text-muted)]">Send at (empty = keep in Outbox)</span>
+                      <input
+                        type="datetime-local"
+                        className="taomni-input"
+                        value={sendLaterAt}
+                        data-testid="mail-send-later-at"
+                        onChange={(event) => setSendLaterAt(event.target.value)}
+                      />
+                    </label>
+                    <span className="text-[11px] text-[var(--taomni-text-muted)]">
+                      Scheduled mail only goes out while this account's tab is open.
+                    </span>
+                    <div className="flex justify-end gap-2">
+                      <button type="button" className="taomni-btn h-7 px-2" onClick={() => setSendLaterOpen(false)}>Cancel</button>
+                      <button type="button" className="taomni-btn h-7 px-2" data-primary="true" data-testid="mail-send-later-confirm" onClick={() => void handleSendLater()}>
+                        Queue
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5" data-primary="true" data-testid="mail-compose-send" onClick={() => void handleSendDraft()} disabled={sending}>
                 {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 Send
               </button>

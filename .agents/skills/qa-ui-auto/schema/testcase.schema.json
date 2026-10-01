@@ -86,7 +86,8 @@
           "parity006_replace",
           "parity008_git",
           "parity009_ssr",
-          "parity007_extract"
+          "parity007_extract",
+          "mail_server"
         ]
       },
       "uniqueItems": true
@@ -338,6 +339,9 @@
         },
         "hover": {
           "$ref": "#/$defs/hover_arg"
+        },
+        "mouse_path": {
+          "$ref": "#/$defs/mouse_path_arg"
         },
         "drag_to": {
           "$ref": "#/$defs/drag_arg"
@@ -1048,6 +1052,205 @@
               "type": "string"
             }
           }
+        },
+        "mail_server_assert_idle_clients": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "equals"
+          ],
+          "properties": {
+            "equals": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "mail_server_deliver": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            },
+            "prefix": {
+              "type": "string",
+              "minLength": 1
+            },
+            "thread": {
+              "type": "boolean"
+            },
+            "list_unsubscribe": {
+              "type": "string",
+              "minLength": 1
+            },
+            "invite": {
+              "type": "string",
+              "minLength": 1
+            },
+            "read_receipt": {
+              "type": "boolean"
+            }
+          }
+        },
+        "mail_server_assert_caldav_contains": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "mail_server_assert_smtp_contains": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "mail_server_expunge_newest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "mail_server_set_flags_newest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "flags"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            },
+            "flags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "mail_server_assert_list_matches": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "folder": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unread": {
+                  "type": "boolean"
+                },
+                "timeout_sec": {
+                  "type": "number",
+                  "minimum": 1
+                }
+              }
+            }
+          ]
+        },
+        "mail_server_assert_folder_count": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "folder"
+          ],
+          "properties": {
+            "folder": {
+              "type": "string",
+              "minLength": 1
+            },
+            "min": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "equals": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "has_subject": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lacks_subject": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeout_sec": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "seed_clipboard_image": {
+          "$ref": "#/$defs/seed_clipboard_image_arg"
+        },
+        "browser_fake_camera": {
+          "$ref": "#/$defs/browser_fake_camera_arg"
+        },
+        "assert_totp_code": {
+          "$ref": "#/$defs/assert_totp_code_arg"
+        },
+        "native_clipboard_image": {
+          "$ref": "#/$defs/mfa_png_arg"
+        },
+        "native_show_image_window": {
+          "$ref": "#/$defs/native_show_image_window_arg"
         }
       }
     },
@@ -1206,12 +1409,53 @@
     "hover_arg": {
       "$ref": "#/$defs/selector"
     },
+    "mouse_path_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "points"
+      ],
+      "description": "Move the pointer through element-relative points without clicking: dx/dy are CSS-pixel offsets from the element centre (W3C element origin), steps interpolates intermediate moves, pause_ms rests afterwards.",
+      "properties": {
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "properties": {
+              "selector": {
+                "$ref": "#/$defs/selector"
+              },
+              "dx": {
+                "type": "number"
+              },
+              "dy": {
+                "type": "number"
+              },
+              "steps": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 60
+              },
+              "pause_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000
+              }
+            }
+          }
+        }
+      }
+    },
     "drag_arg": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "from",
-        "to"
+        "from"
       ],
       "properties": {
         "from": {
@@ -1219,8 +1463,41 @@
         },
         "to": {
           "$ref": "#/$defs/selector"
+        },
+        "by": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dx"
+          ],
+          "description": "Offset drag from the element's centre (CSS px); never scrolls a target into view mid-drag.",
+          "properties": {
+            "dx": {
+              "type": "number"
+            },
+            "dy": {
+              "type": "number"
+            },
+            "steps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "to"
+          ]
+        },
+        {
+          "required": [
+            "by"
+          ]
+        }
+      ]
     },
     "fill_arg": {
       "type": "object",
@@ -2270,6 +2547,172 @@
           "minLength": 1
         }
       }
+    },
+    "mfa_png_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "description": "MFA image fixture (qa-ui-auto-tests/synthetic-fixtures/mfa/*.png).",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\.png$",
+          "description": "PNG fixture; relative paths resolve from the repository root."
+        }
+      }
+    },
+    "browser_fake_camera_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "description": "Browser-only: replace navigator.mediaDevices with one fake camera. qr streams `image` from a canvas, none reports no camera, denied rejects getUserMedia with NotAllowedError. Not camera hardware or permission evidence.",
+      "properties": {
+        "mode": {
+          "enum": [
+            "qr",
+            "none",
+            "denied"
+          ]
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\.png$",
+          "description": "PNG fixture; relative paths resolve from the repository root."
+        }
+      },
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "qr"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "image"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "image"
+          ]
+        }
+      }
+    },
+    "assert_totp_code_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "secret"
+      ],
+      "description": "Exactly one element's code attribute must equal an independent Python RFC 6238 code for the current (or just-rolled-over) time step.",
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "secret": {
+          "type": "string",
+          "pattern": "^[A-Za-z2-7 =-]{16,}$"
+        },
+        "period": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 300
+        },
+        "digits": {
+          "type": "integer",
+          "minimum": 6,
+          "maximum": 8
+        },
+        "algorithm": {
+          "enum": [
+            "SHA1",
+            "SHA256",
+            "SHA512"
+          ]
+        },
+        "attribute": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "native_show_image_window_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Native Linux/X11 and Windows: show (default) a topmost Tk window with a PNG fixture for a real screen capture, or close it. Closed automatically after the case.",
+      "properties": {
+        "action": {
+          "enum": [
+            "show",
+            "close"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\.png$",
+          "description": "PNG fixture; relative paths resolve from the repository root."
+        },
+        "x": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "if": {
+        "properties": {
+          "action": {
+            "const": "close"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "maxProperties": 1
+      },
+      "else": {
+        "required": [
+          "path"
+        ]
+      }
+    },
+    "seed_clipboard_image_arg": {
+      "description": "Browser-only: put a PNG fixture ({path}) or a screenshot of one element ({selector}) on Chromium's clipboard as image/png.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/mfa_png_arg"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selector"
+          ],
+          "properties": {
+            "selector": {
+              "$ref": "#/$defs/selector"
+            }
+          }
+        }
+      ]
     }
   }
 }

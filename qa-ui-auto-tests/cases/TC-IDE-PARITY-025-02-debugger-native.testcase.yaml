@@ -1,0 +1,220 @@
+id: TC-IDE-PARITY-025-02-debugger-native
+title: 'IDEA debugger parity: non-suspending stack-trace breakpoint, Remove once hit, frames, threads and evaluate'
+description: 'ED-PARITY-025 A4/A5 native case on the isolated Java 25 Maven fixture. Two line breakpoints are configured through IDEA''s balloon and Breakpoints dialog: line 6 without Suspend and with Stack trace logging, line 7 with Remove once hit. The real java-debug session must pass line 6 without showing a stop while the console prints IDEA''s "Breakpoint reached" stack, stop on line 7 and remove that breakpoint, render the frame as main:7, App (com.example.app) with the "main" thread combo and value = 42, evaluate value + 1 to 43 from the Variables field with Enter, and resume to completion. Highest claim on green: L2 provider-backed native DAP behavior.
+
+  '
+covers:
+- F25.1
+- F25.5
+tags:
+- code-workspace
+- java25
+- debug
+- dap
+- ed-parity-025
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- java25_projects
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-java25-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-java25-debug","name":"maven-java25","roots":[{"id":"maven-java25","name":"maven-java25","path":"${fixture.java25_maven_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-java25","path":"src/main/java/com/example/app/App.java"},"lastOpenedAt":1788537600000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.java25_maven_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: System.out.println("debug-value=" + value);
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="code-workspace-lsp-status-pill"]'
+    contains: Java
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Control+Home
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - ArrowDown
+    - Home
+    - Control+F8
+    - ArrowDown
+    - Control+F8
+    - ArrowUp
+    - Control+Shift+F8
+- wait_for: '[data-testid="debug-breakpoint-popup"]'
+- assert_text:
+    selector: '[data-testid="debug-breakpoint-popup-title"]'
+    contains: App.java:6
+- click: '[data-testid="debug-breakpoint-popup-more"]'
+- wait_for: '[data-testid="debug-breakpoints-dialog"]'
+- click: '[data-testid="debug-breakpoints-dialog-suspend"]'
+- click: '[data-testid="debug-breakpoints-dialog-log-stack"]'
+- click: '[data-testid="debug-breakpoints-dialog-line"][data-breakpoint-line="7"]'
+- click: '[data-testid="debug-breakpoints-dialog-remove-once-hit"]'
+- click: '[data-testid="debug-breakpoints-dialog-done"]'
+- wait_for:
+    selector: '[data-testid="debug-breakpoints-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor"] [data-bp-gutter-line="6"] .taomni-bp'
+    name: data-bp-kind
+    equals: no-suspend
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor"] [data-bp-gutter-line="7"] .taomni-bp'
+    name: data-bp-temporary
+    equals: 'true'
+- native_click:
+    selector: '[data-testid="code-workspace-debug-target"]'
+- assert_text:
+    selector: '[data-testid="debug-panel"]'
+    contains: stopped · breakpoint
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="debug-frames-list"]'
+    contains: main:7, App (com.example.app)
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="debug-thread-select"]'
+    contains: '"main"@'
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="code-workspace-editor"] [data-bp-gutter-line="7"] .taomni-bp'
+    state: detached
+    timeout_sec: 15
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor"] [data-bp-gutter-line="6"] .taomni-bp'
+    name: data-bp-kind
+    equals: no-suspend
+- assert_text:
+    selector: '[data-testid="debug-variables-tree"]'
+    contains: = 42
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="debug-watch-input"]'
+    value: value + 1
+- press:
+    key: Enter
+    selector: '[data-testid="debug-watch-input"]'
+- assert_text:
+    selector: '[data-testid="debug-evaluate-inline-result"]'
+    contains: '43'
+    timeout_sec: 30
+- screenshot: tc-ide-parity-025-02-debugger.png
+- click: '[data-testid="debug-subtab-console"]'
+- assert_text:
+    selector: '[data-testid="debug-console-output"]'
+    contains: Breakpoint reached
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="debug-console-output"]'
+    contains: App.main(App.java:6)
+    timeout_sec: 10
+- click: '[data-testid="debug-continue"]'
+- assert_text:
+    selector: '[data-testid="debug-console-output"]'
+    contains: debug-value=42
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="debug-panel"]'
+    contains: terminated
+    timeout_sec: 60
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A4：在断点行按 Ctrl+Shift+F8 打开 IDEA 气泡（App.java:6），More 打开 Breakpoints 对话框；在对话框里取消 Suspend 并勾选 Stack trace，选中 App.java:7 勾选 Remove once hit，Done 后槽图标分别为非挂起与临时断点。
+    actions:
+    - 11
+    - 12
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    checkpoints:
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"debug-breakpoint-popup\"]"}'
+    - step: 14
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-breakpoint-popup-title\"]", "contains": "App.java:6"}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"debug-breakpoints-dialog\"]"}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"debug-breakpoints-dialog\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"6\"] .taomni-bp", "name": "data-bp-kind", "equals": "no-suspend"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"7\"] .taomni-bp", "name": "data-bp-temporary", "equals": "true"}}'
+    results:
+    - 13
+    - 14
+    - 16
+    - 22
+    - 23
+    - 24
+  - id: R2
+    requirement: A5：真实 java-debug 会话在第 6 行不显示停止、控制台打印 “Breakpoint reached” 与 App.main(App.java:6) 栈；停在第 7 行后移除该临时断点，帧显示 main:7, App (com.example.app)、线程下拉含 "main"@、变量含 = 42，变量区输入 value + 1 回车求值得 43，Resume 后输出 debug-value=42 并终止。
+    actions:
+    - 25
+    - 32
+    - 33
+    - 36
+    - 39
+    checkpoints:
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-panel\"]", "contains": "stopped · breakpoint", "timeout_sec": 60}}'
+    - step: 27
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-frames-list\"]", "contains": "main:7, App (com.example.app)", "timeout_sec": 30}}'
+    - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-thread-select\"]", "contains": "\"main\"@", "timeout_sec": 30}}'
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"7\"] .taomni-bp", "state": "detached", "timeout_sec": 15}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor\"] [data-bp-gutter-line=\"6\"] .taomni-bp", "name": "data-bp-kind", "equals": "no-suspend"}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-variables-tree\"]", "contains": "= 42", "timeout_sec": 30}}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-evaluate-inline-result\"]", "contains": "43", "timeout_sec": 30}}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-console-output\"]", "contains": "Breakpoint reached", "timeout_sec": 30}}'
+    - step: 38
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-console-output\"]", "contains": "App.main(App.java:6)", "timeout_sec": 10}}'
+    - step: 40
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-console-output\"]", "contains": "debug-value=42", "timeout_sec": 30}}'
+    - step: 41
+      expectation: '{"assert_text": {"selector": "[data-testid=\"debug-panel\"]", "contains": "terminated", "timeout_sec": 60}}'
+    results:
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 34
+    - 37
+    - 38
+    - 40
+    - 41
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

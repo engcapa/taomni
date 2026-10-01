@@ -398,10 +398,24 @@ const REGION_LINE_TOKENS: Record<string, RegExp> = {
   ";": /;/,
 };
 
+/**
+ * The fold gutter asks the region fold service about every visible line on
+ * every update, so the grammar and its matchers are cached per extension.
+ */
+const regionGrammarCache = new Map<string, RegionCommentGrammar | null>();
+const regionMatcherCache = new WeakMap<RegionCommentGrammar, { start: RegExp; end: RegExp }>();
+
 function regionGrammarForPath(path: string | null | undefined): RegionCommentGrammar | null {
   if (!path) return null;
   const lower = path.toLowerCase();
   const ext = lower.slice(lower.lastIndexOf(".") + 1);
+  if (regionGrammarCache.has(ext)) return regionGrammarCache.get(ext) ?? null;
+  const grammar = regionGrammarForExtension(ext);
+  regionGrammarCache.set(ext, grammar);
+  return grammar;
+}
+
+function regionGrammarForExtension(ext: string): RegionCommentGrammar | null {
   const byLine = (token: RegExp): RegionCommentGrammar => ({ lineToken: token });
   switch (ext) {
     case "java":
@@ -460,6 +474,14 @@ function regionGrammarForPath(path: string | null | undefined): RegionCommentGra
 }
 
 function buildRegionMatchers(grammar: RegionCommentGrammar): { start: RegExp; end: RegExp } {
+  const cached = regionMatcherCache.get(grammar);
+  if (cached) return cached;
+  const matchers = buildRegionMatchersUncached(grammar);
+  regionMatcherCache.set(grammar, matchers);
+  return matchers;
+}
+
+function buildRegionMatchersUncached(grammar: RegionCommentGrammar): { start: RegExp; end: RegExp } {
   const tokenSource = `(?:${grammar.lineToken.source}${grammar.block ? `|${grammar.block.open.source}` : ""})`;
   return {
     start: new RegExp(`^\\s*${tokenSource}\\s*#?region(?:\\s|$)`, "i"),

@@ -923,11 +923,11 @@ describe("dapDebugModel", () => {
 
   it("builds an inline value label from the locals mentioned on a line", () => {
     const variables = { sum: "10", i: "3", other: "9" };
-    expect(inlineValueLabel("sum += values[i];", variables)).toBe("sum = 10, i = 3");
+    expect(inlineValueLabel("sum += values[i];", variables)).toBe("sum: 10, i: 3");
     // Field access is not the local of the same name, and comments are ignored.
     expect(inlineValueLabel("node.sum = 1; // i", variables)).toBeNull();
     // Each variable appears once even when mentioned twice.
-    expect(inlineValueLabel("i = i + 1;", variables)).toBe("i = 3");
+    expect(inlineValueLabel("i = i + 1;", variables)).toBe("i: 3");
     expect(inlineValueLabel("System.out.println();", variables)).toBeNull();
     expect(inlineValueLabel("sum = 1;", {})).toBeNull();
   });
