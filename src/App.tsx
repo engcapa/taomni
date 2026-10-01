@@ -199,13 +199,22 @@ function App() {
     isScreenshotOverlayWindow() ||
     overlayHash.startsWith("#screenshot-overlay")
   ) {
-    return <ScreenshotOverlay />;
+    // The overlay needs the app-dialog host for its save-path prompt.
+    return (
+      <AppDialogProvider>
+        <ScreenshotOverlay />
+      </AppDialogProvider>
+    );
   }
   if (
     isScreenshotRecorderWindow() ||
     overlayHash.startsWith("#screenshot-recorder")
   ) {
-    return <RecorderBar />;
+    return (
+      <AppDialogProvider>
+        <RecorderBar />
+      </AppDialogProvider>
+    );
   }
   const detachedSftpId = detectDetachedSftpRoute();
   if (detachedSftpId) {

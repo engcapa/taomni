@@ -479,6 +479,9 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
           top: 0,
           width: imageWidth,
           height: imageHeight,
+          // Above the z-20 region-select interaction layer so draw tools
+          // receive pointer events; below the z-50 toolbar.
+          zIndex: 30,
           pointerEvents: interactive ? "auto" : "none",
           cursor: interactive ? "crosshair" : "default",
         }}

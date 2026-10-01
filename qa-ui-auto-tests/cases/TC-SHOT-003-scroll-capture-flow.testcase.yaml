@@ -30,4 +30,4 @@ steps:
     timeout_sec: 30
 - assert_not_visible: '[data-testid="screenshot-scroll-busy"]'
 - eval_readonly:
-    expression: JSON.stringify(window.__tauriStubScreenshotCalls || []).includes("screenshot_scroll_capture")
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_scroll_capture")

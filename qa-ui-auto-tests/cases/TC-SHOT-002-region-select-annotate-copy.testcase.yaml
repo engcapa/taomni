@@ -49,4 +49,4 @@ steps:
 - click: '[data-testid="screenshot-copy"]'
 - wait_for: '[data-testid="screenshot-toast"]'
 - eval_readonly:
-    expression: JSON.stringify(window.__tauriStubScreenshotCalls || []).includes("screenshot_copy_image")
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_copy_image")

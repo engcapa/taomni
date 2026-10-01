@@ -18,4 +18,4 @@ steps:
 - wait_for:
     selector: '[data-testid="system-screenshot"]'
 - eval_readonly:
-    expression: JSON.stringify(window.__tauriStubScreenshotCalls || []).includes("screenshot_cancel_recording")
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_cancel_recording")

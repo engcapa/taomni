@@ -12,7 +12,7 @@ modes:
 fixtures:
 - reset_db
 steps:
-- open: ${cfg.app.base_url}#screenshot-overlay
+- open: "#screenshot-overlay"
 - wait_for:
     selector: '[data-testid="screenshot-base-image"]'
     timeout_sec: 30

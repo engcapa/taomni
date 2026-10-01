@@ -18,14 +18,14 @@ steps:
 - assert_attribute:
     selector: '[data-testid="system-screenshot"]'
     name: title
-    matches: "Shift\\+A"
+    matches: ".*Shift\\+A.*"
 - click: '[data-testid="system-screenshot"]'
 - wait_for: '[data-testid="screenshot-overlay"]'
 - assert_visible: '[data-testid="screenshot-overlay"]'
 - assert_visible: '[data-testid="screenshot-base-image"]'
 - assert_visible: '[data-testid="screenshot-hint"]'
 - eval_readonly:
-    expression: JSON.stringify(window.__tauriStubScreenshotCalls || []).includes("screenshot_open_overlay")
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_open_overlay")
 - press: Escape
 - wait_for:
     selector: '[data-testid="system-screenshot"]'

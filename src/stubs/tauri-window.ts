@@ -26,6 +26,18 @@ class MockWindow {
   async close(): Promise<void> {
     return undefined;
   }
+
+  async hide(): Promise<void> {
+    return undefined;
+  }
+
+  async show(): Promise<void> {
+    return undefined;
+  }
+
+  async setFocus(): Promise<void> {
+    return undefined;
+  }
 }
 
 const mockWindow = new MockWindow();

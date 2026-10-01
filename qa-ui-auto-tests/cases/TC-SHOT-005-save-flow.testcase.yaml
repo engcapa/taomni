@@ -31,4 +31,4 @@ steps:
 - click: '[data-testid="text-input-dialog-confirm"]'
 - wait_for: '[data-testid="screenshot-toast"]'
 - eval_readonly:
-    expression: JSON.stringify(window.__tauriStubScreenshotCalls || []).includes("qa-ui-auto-shot.png")
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("qa-ui-auto-shot.png")

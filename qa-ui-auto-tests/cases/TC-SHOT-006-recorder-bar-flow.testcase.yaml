@@ -16,14 +16,14 @@ steps:
 - assert_visible: '[data-testid="screenshot-recorder-timer"]'
 - assert_visible: '[data-testid="screenshot-recorder-stop"]'
 - eval_readonly:
-    expression: JSON.stringify(window.__tauriStubScreenshotCalls || []).includes("screenshot_current_recording")
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_current_recording")
 - click: '[data-testid="screenshot-recorder-stop"]'
 - wait_for: '[data-testid="screenshot-recorder-preview"]'
 - assert_visible: '[data-testid="screenshot-recorder-preview"]'
 - assert_visible: '[data-testid="screenshot-recorder-save"]'
 - assert_visible: '[data-testid="screenshot-recorder-done"]'
 - eval_readonly:
-    expression: JSON.stringify(window.__tauriStubScreenshotCalls || []).includes("screenshot_stop_recording")
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_stop_recording")
 - click: '[data-testid="screenshot-recorder-save"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - click: '[data-testid="text-input-dialog-cancel"]'
@@ -32,4 +32,4 @@ steps:
 - wait_for:
     selector: '[data-testid="system-screenshot"]'
 - eval_readonly:
-    expression: JSON.stringify(window.__tauriStubScreenshotCalls || []).includes("screenshot_stop_recording")
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_stop_recording")
