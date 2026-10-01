@@ -5,6 +5,10 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
 * reset_db        - clears Taomni persistent state for this worker before the case
 * ssh_required    - probe the configured ssh.host:port over TCP; skip case otherwise
 * sftp_required   - probe the configured sftp.host:port over TCP; skip case otherwise
+* vnc_required    - reset the scriptable VNC fixture and expose a per-case event
+                    log and command file as ${fixture.vnc_events} / ${fixture.vnc_control}
+* ard_required    - macOS Screen Sharing with ARD login: ${fixture.ard_host} /
+                    ${fixture.ard_port} / ${fixture.ard_user}, password in QA_ARD_PASSWORD
 * jdtls_required  - JDK-on-PATH probe; skip case otherwise (never auto-fallback)
 * java_test_bundle - resolve an installed java-test extension for native tests
 * linux_x11_required - require the Linux X11/fcitx5 tools used by X11 gates
@@ -51,7 +55,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
-from . import editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, welcome_recents, workspace_root
+from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
 from . import project_tree
 from . import parity005_completion
 from . import parity006_replace
@@ -87,6 +91,8 @@ REGISTRY: dict[str, Fixture] = {
     "ssh_required": Fixture("ssh_required", ssh_required.setup),
     "sftp_required": Fixture("sftp_required", sftp_required.setup),
     "mysql_required": Fixture("mysql_required", mysql_required.setup),
+    "vnc_required": Fixture("vnc_required", vnc_required.setup),
+    "ard_required": Fixture("ard_required", ard_required.setup, ard_required.teardown),
     "jdtls_required": Fixture("jdtls_required", jdtls_required.setup),
     "java_test_bundle": Fixture("java_test_bundle", java_test_bundle.setup),
     "linux_x11_required": Fixture("linux_x11_required", linux_x11_required.setup),

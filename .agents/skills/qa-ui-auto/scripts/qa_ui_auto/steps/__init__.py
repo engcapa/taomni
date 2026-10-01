@@ -76,7 +76,9 @@ from . import keyboard     # noqa: E402,F401
 from . import assertions   # noqa: E402,F401
 from . import app_specific # noqa: E402,F401
 from . import persistence  # noqa: E402,F401
+from . import host_files   # noqa: E402,F401
 from . import parity005    # noqa: E402,F401
 from . import parity0089   # noqa: E402,F401
 from . import parity007    # noqa: E402,F401
 from . import mail         # noqa: E402,F401
+from . import mfa          # noqa: E402,F401

@@ -19,7 +19,9 @@ export function useDebugVariables(
   debug: CodeDebugSession,
   selectedFrameId: number | null,
   stopped: boolean,
+  options: { onEvaluateExpression?: (expression: string) => void } = {},
 ) {
+  const { onEvaluateExpression } = options;
   const [variables, setVariables] = useState<VarNode[]>([]);
   const [watchNodes, setWatchNodes] = useState<VarNode[]>([]);
   const [watchTick, setWatchTick] = useState(0);
@@ -288,9 +290,46 @@ export function useDebugVariables(
 
   const handleVariableContextMenu = useCallback((e: MouseEvent, node: VarNode, onRemove?: () => void) => {
     e.preventDefault();
+    // IDEA's XDebugger.ValueGroup order: value actions, evaluation, then
+    // watches; data breakpoints and watch removal follow.
     const items: MenuItem[] = [];
+    if (canSetVariable && stopped && node.parentRef > 0) {
+      items.push({
+        label: "Set Value...",
+        testId: "debug-variable-menu-set-value",
+        shortcut: "F2",
+        onClick: () => startEdit(node),
+      });
+    }
+    items.push({
+      label: "Copy Value",
+      testId: "debug-variable-menu-copy-value",
+      shortcut: "Ctrl+C",
+      onClick: () => { void navigator.clipboard.writeText(node.value); },
+    });
+    items.push({
+      label: "Copy Name",
+      testId: "debug-variable-menu-copy-name",
+      onClick: () => { void navigator.clipboard.writeText(node.name); },
+    });
+    items.push({ separator: true, label: "" });
+    if (onEvaluateExpression) {
+      items.push({
+        label: "Evaluate Expression...",
+        testId: "debug-variable-menu-evaluate",
+        shortcut: "Alt+F8",
+        disabled: !stopped,
+        onClick: () => onEvaluateExpression(node.name),
+      });
+    }
+    items.push({
+      label: "Add to Watches",
+      testId: "debug-variable-menu-add-watch",
+      onClick: () => debug.addWatchExpression(node.name),
+    });
     const dataBreakpointEligible = node.parentRef > 0 || !!node.dataBreakpointExpression;
     if (dataBreakpointEligible && canAddDataBreakpoint) {
+      items.push({ separator: true, label: "" });
       items.push({
         label: `Add Data Breakpoint for "${node.name}"`,
         testId: "debug-variable-menu-data-breakpoint",
@@ -298,40 +337,18 @@ export function useDebugVariables(
         onClick: () => { void addDataBreakpointForNode(node); },
       });
     }
-    items.push({
-      label: `Add to Watches ("${node.name}")`,
-      testId: "debug-variable-menu-add-watch",
-      onClick: () => debug.addWatchExpression(node.name),
-    });
-    items.push({
-      label: "Copy Value",
-      testId: "debug-variable-menu-copy-value",
-      onClick: () => { void navigator.clipboard.writeText(node.value); },
-    });
-    items.push({
-      label: "Copy Variable Name",
-      testId: "debug-variable-menu-copy-name",
-      onClick: () => { void navigator.clipboard.writeText(node.name); },
-    });
-    if (canSetVariable && stopped) {
-      items.push({ separator: true, label: "" });
-      items.push({
-        label: "Set Value...",
-        testId: "debug-variable-menu-set-value",
-        onClick: () => startEdit(node),
-      });
-    }
     if (onRemove) {
       items.push({ separator: true, label: "" });
       items.push({
         label: "Remove Watch",
         testId: "debug-variable-menu-remove-watch",
+        shortcut: "Delete",
         danger: true,
         onClick: onRemove,
       });
     }
     variableMenu.show(e, items);
-  }, [canAddDataBreakpoint, canSetVariable, stopped, addDataBreakpointForNode, debug, startEdit, variableMenu]);
+  }, [canAddDataBreakpoint, canSetVariable, stopped, addDataBreakpointForNode, debug, onEvaluateExpression, startEdit, variableMenu]);
 
   return {
     variables,

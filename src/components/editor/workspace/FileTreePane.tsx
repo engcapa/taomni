@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
@@ -9,25 +10,23 @@ import {
   type RefObject,
 } from "react";
 import {
-  ChevronLeft,
-  Columns2,
+  ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
   File,
-  FilePlus,
   FolderOpen,
-  FolderPlus,
-  List,
-  ListTree,
-  MoreHorizontal,
+  LocateFixed,
+  Minus,
+  MoreVertical,
+  Plus,
   Search,
-  ZoomIn,
-  ZoomOut,
+  X,
 } from "lucide-react";
 import { useContextMenu, type MenuItem } from "../../ContextMenu";
 import {
-  nextTreeViewMode,
   treeToolbarDensity,
   treeToolbarVisibility,
-  treeViewModeLabel,
+  treeViewTitle,
   type FileTreeViewMode,
 } from "./treeToolbarChrome";
 
@@ -57,6 +56,16 @@ interface FileTreePaneProps {
   onRename: () => void;
   onDelete: () => void;
   onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
+  /** IDEA Project view header: Select Opened File (locate the active editor). */
+  onSelectOpenedFile?: () => void;
+  /** IDEA Project view header: Expand All / Collapse All. */
+  onExpandAll?: () => void;
+  onCollapseAll?: () => void;
+  /** IDEA tool window ⋮ Options (View Mode, Move to, Resize, Remove, Hide). */
+  toolWindowOptions?: () => MenuItem[];
+  /** IDEA Appearance › Details: modification time and size after file names. */
+  showDetails?: boolean;
+  onShowDetailsChange?: (value: boolean) => void;
   children: ReactNode;
 }
 
@@ -93,17 +102,6 @@ function TreeIconButton({
   );
 }
 
-function viewModeIcon(mode: FileTreeViewMode): ReactNode {
-  switch (mode) {
-    case "tree":
-      return <ListTree className="w-3.5 h-3.5" />;
-    case "compact":
-      return <Columns2 className="w-3.5 h-3.5" />;
-    case "flat":
-      return <List className="w-3.5 h-3.5" />;
-  }
-}
-
 export function FileTreePane({
   paneRef,
   style,
@@ -128,11 +126,57 @@ export function FileTreePane({
   onDelete,
   children,
   onKeyDown,
+  onSelectOpenedFile,
+  onExpandAll,
+  onCollapseAll,
+  toolWindowOptions,
+  showDetails = false,
+  onShowDetailsChange,
 }: FileTreePaneProps) {
   const toolbarMenu = useContextMenu();
   const [toolbarWidth, setToolbarWidth] = useState(TREE_DEFAULT_WIDTH_ASSUMPTION);
   const density = treeToolbarDensity(toolbarWidth);
   const visibility = useMemo(() => treeToolbarVisibility(density), [density]);
+  // IDEA speed search: typing in the tree opens the search field; it stays
+  // while it holds a query.
+  const [speedSearchOpen, setSpeedSearchOpen] = useState(false);
+  const speedSearchRef = useRef<HTMLInputElement>(null);
+  const speedSearchVisible = speedSearchOpen || filter !== "";
+  const [speedSearchFocusNonce, setSpeedSearchFocusNonce] = useState(0);
+  useEffect(() => {
+    if (speedSearchFocusNonce === 0) return;
+    speedSearchRef.current?.focus();
+  }, [speedSearchFocusNonce]);
+
+  const openSpeedSearch = (initial?: string) => {
+    setSpeedSearchOpen(true);
+    if (initial !== undefined) onFilterChange(`${filter}${initial}`);
+    setSpeedSearchFocusNonce((nonce) => nonce + 1);
+  };
+  const closeSpeedSearch = () => {
+    setSpeedSearchOpen(false);
+    onFilterChange("");
+    const tree = paneRef.current?.querySelector<HTMLElement>("[data-testid='code-workspace-tree']");
+    const row = tree?.querySelector<HTMLElement>("[role='treeitem'][data-selected='true']")
+      ?? tree?.querySelector<HTMLElement>("[role='treeitem']");
+    (row ?? paneRef.current)?.focus({ preventScroll: true });
+  };
+
+  const handlePaneKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const inField = !!target?.closest("input, textarea, select, [contenteditable='true']");
+    if (!inField && !event.nativeEvent.isComposing) {
+      const printable = event.key.length === 1 && event.key !== " " && !event.ctrlKey && !event.metaKey && !event.altKey;
+      const findChord = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "f";
+      if (printable || findChord) {
+        event.preventDefault();
+        event.stopPropagation();
+        openSpeedSearch(printable ? event.key : undefined);
+        return;
+      }
+    }
+    onKeyDown?.(event);
+  };
 
   useEffect(() => {
     const pane = paneRef.current;
@@ -154,49 +198,89 @@ export function FileTreePane({
     };
   }, [paneRef]);
 
+  /** IDEA "Project ▾": the view list of the Project tool window. */
+  const openViewSelector = (event: MouseEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    toolbarMenu.showAt(rect.left, rect.bottom, [
+      {
+        label: "Project",
+        testId: "code-workspace-tree-view-project",
+        checked: viewMode !== "flat",
+        onClick: () => { if (viewMode === "flat") onViewModeChange("tree"); },
+      },
+      {
+        label: "Project Files",
+        testId: "code-workspace-tree-view-project-files",
+        checked: viewMode === "flat",
+        onClick: () => onViewModeChange("flat"),
+      },
+    ]);
+  };
+
+  /** IDEA title action New (+): new elements, plus Taomni's workspace entry points. */
+  const openNewMenu = (event: MouseEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    toolbarMenu.showAt(rect.left, rect.bottom, [
+      { label: "File", testId: "code-workspace-tree-new-file", icon: <File className="w-3.5 h-3.5" />, disabled: !canCreate, onClick: onCreateFile },
+      { label: "Directory", testId: "code-workspace-tree-new-directory", icon: <FolderOpen className="w-3.5 h-3.5" />, disabled: !canCreate, onClick: onCreateDirectory },
+      { separator: true, label: "" },
+      { label: "Open File…", testId: "code-workspace-tree-open-file", onClick: onOpenFile },
+      { label: "Add Folder to Workspace…", testId: "code-workspace-tree-add-folder", onClick: onAddFolder },
+    ]);
+  };
+
+  /** IDEA ⋮ Options: Appearance, then the tool window options. */
   const openToolbarOverflow = (event: MouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const items: MenuItem[] = [];
-    if (!visibility.showNewFile) {
-      items.push({ label: "New file", disabled: !canCreate, onClick: onCreateFile });
+    if (onExpandAll && !visibility.showExpandAll) {
+      items.push({ label: "Expand All", testId: "code-workspace-tree-menu-expand-all", onClick: onExpandAll }, { separator: true, label: "" });
     }
-    if (!visibility.showNewDirectory) {
-      items.push({ label: "New directory", disabled: !canCreate, onClick: onCreateDirectory });
-    }
-    if (items.length > 0) {
-      items.push({ separator: true, label: "" });
-    }
-    items.push(
-      { label: "Rename", disabled: !canMutateSelection, onClick: onRename },
-      { label: "Delete or remove", disabled: !canMutateSelection, onClick: onDelete },
-    );
-    if (!visibility.showZoom) {
-      items.push(
+    items.push({
+      label: "Appearance",
+      testId: "code-workspace-tree-menu-appearance",
+      children: [
+        ...(onShowDetailsChange ? [{
+          label: "Details",
+          testId: "code-workspace-tree-menu-details",
+          checked: showDetails,
+          onClick: () => onShowDetailsChange(!showDetails),
+        }] : []),
+        {
+          label: "Compact Directories",
+          testId: "code-workspace-tree-menu-compact",
+          checked: viewMode === "compact",
+          disabled: viewMode === "flat",
+          onClick: () => onViewModeChange(viewMode === "compact" ? "tree" : "compact"),
+        },
         { separator: true, label: "" },
         {
-          label: "Zoom out",
+          label: "Zoom In",
+          testId: "code-workspace-tree-zoom-in",
+          disabled: fontSize >= maxFontSize,
+          onClick: () => onFontSizeChange(fontSize + 1),
+        },
+        {
+          label: "Zoom Out",
+          testId: "code-workspace-tree-zoom-out",
           disabled: fontSize <= minFontSize,
           onClick: () => onFontSizeChange(fontSize - 1),
         },
         {
-          label: `Reset zoom (${defaultFontSize}px)`,
+          label: `Reset Zoom (${defaultFontSize}px)`,
+          testId: "code-workspace-tree-zoom-reset",
+          disabled: fontSize === defaultFontSize,
           onClick: () => onFontSizeChange(defaultFontSize),
         },
-        {
-          label: "Zoom in",
-          disabled: fontSize >= maxFontSize,
-          onClick: () => onFontSizeChange(fontSize + 1),
-        },
-      );
-    }
-    if (visibility.showViewCycle) {
-      items.push(
-        { separator: true, label: "" },
-        { label: "Tree view", checked: viewMode === "tree", onClick: () => onViewModeChange("tree") },
-        { label: "Compact tree view", checked: viewMode === "compact", onClick: () => onViewModeChange("compact") },
-        { label: "Flat file view", checked: viewMode === "flat", onClick: () => onViewModeChange("flat") },
-      );
-    }
+      ],
+    });
+    items.push(
+      { separator: true, label: "" },
+      { label: "Rename…", disabled: !canMutateSelection, onClick: onRename },
+      { label: "Delete…", disabled: !canMutateSelection, onClick: onDelete },
+    );
+    const options = toolWindowOptions?.() ?? [];
+    if (options.length > 0) items.push({ separator: true, label: "" }, ...options);
     toolbarMenu.showAt(rect.right, rect.bottom, items);
   };
 
@@ -208,13 +292,12 @@ export function FileTreePane({
       data-tree-toolbar-density={density}
       className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-gutter-bg)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--taomni-accent)]"
       style={style}
-      onKeyDown={onKeyDown}
+      onKeyDown={handlePaneKeyDown}
     >
       {/*
-        Two-row chrome (fixed px heights):
-        - Row 1: project actions. Open/Add always visible; New* collapse first.
-        - Row 2: filter + view/zoom (zoom/views collapse before Open/Add).
-        No classic overflow-x-auto row — progressive hide + ⋯ menu only.
+        IDEA Project tool window title row: the view selector on the left,
+        then New / Select Opened File / Expand All / Collapse All / Options /
+        Hide. Speed search replaces a permanent filter row.
       */}
       <div
         data-testid="code-workspace-tree-toolbar"
@@ -222,135 +305,102 @@ export function FileTreePane({
       >
         <div
           data-testid="code-workspace-tree-toolbar-actions"
-          className="h-[28px] flex items-center gap-0.5 px-1.5"
+          className="h-[30px] flex items-center gap-0.5 pl-1 pr-1"
         >
-          <TreeIconButton
-            label="Open file"
-            testId="code-workspace-tree-open-file"
-            icon={<File className="w-3.5 h-3.5" />}
-            onClick={onOpenFile}
-          />
-          <TreeIconButton
-            label="Add folder"
-            testId="code-workspace-tree-add-folder"
-            icon={<FolderOpen className="w-3.5 h-3.5" />}
-            onClick={onAddFolder}
-          />
-          {visibility.showNewFile && (
-            <TreeIconButton
-              label="New file"
-              testId="code-workspace-tree-new-file"
-              icon={<FilePlus className="w-3.5 h-3.5" />}
-              disabled={!canCreate}
-              onClick={onCreateFile}
-            />
-          )}
-          {visibility.showNewDirectory && (
-            <TreeIconButton
-              label="New directory"
-              testId="code-workspace-tree-new-directory"
-              icon={<FolderPlus className="w-3.5 h-3.5" />}
-              disabled={!canCreate}
-              onClick={onCreateDirectory}
-            />
-          )}
+          <button
+            type="button"
+            data-testid="code-workspace-tree-view-selector"
+            aria-haspopup="menu"
+            title="Select view"
+            className="h-6 min-w-0 inline-flex items-center gap-0.5 rounded px-1.5 text-[12px] font-semibold text-[var(--taomni-code-text)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            onClick={openViewSelector}
+          >
+            <span className="truncate">{treeViewTitle(viewMode)}</span>
+            <ChevronDown className="w-3 h-3 shrink-0 text-[var(--taomni-code-muted)]" />
+          </button>
           <div className="flex-1 min-w-0" />
           <TreeIconButton
-            label="More tree actions"
+            label="New…"
+            testId="code-workspace-tree-new"
+            icon={<Plus className="w-3.5 h-3.5" />}
+            onClick={openNewMenu}
+          />
+          {onSelectOpenedFile && (
+            <TreeIconButton
+              label="Select Opened File (Alt+F1)"
+              testId="code-workspace-tree-select-opened"
+              icon={<LocateFixed className="w-3.5 h-3.5" />}
+              onClick={onSelectOpenedFile}
+            />
+          )}
+          {onExpandAll && visibility.showExpandAll && (
+            <TreeIconButton
+              label="Expand All"
+              testId="code-workspace-tree-expand-all"
+              icon={<ChevronsUpDown className="w-3.5 h-3.5" />}
+              onClick={onExpandAll}
+            />
+          )}
+          {onCollapseAll && (
+            <TreeIconButton
+              label="Collapse All"
+              testId="code-workspace-tree-collapse-all"
+              icon={<ChevronsDownUp className="w-3.5 h-3.5" />}
+              onClick={onCollapseAll}
+            />
+          )}
+          <TreeIconButton
+            label="Options"
             testId="code-workspace-tree-toolbar-more"
-            icon={<MoreHorizontal className="w-3.5 h-3.5" />}
+            icon={<MoreVertical className="w-3.5 h-3.5" />}
             onClick={openToolbarOverflow}
           />
           {onToggleCollapse && (
             <TreeIconButton
-              label={collapsed ? "Show project tree" : "Hide project tree"}
+              label={collapsed ? "Show project tree" : "Hide (Shift+Escape)"}
               testId="code-workspace-tree-collapse"
-              icon={<ChevronLeft className="w-3.5 h-3.5" />}
+              icon={<Minus className="w-3.5 h-3.5" />}
               onClick={onToggleCollapse}
             />
           )}
         </div>
+      </div>
+      {speedSearchVisible && (
         <div
-          data-testid="code-workspace-tree-toolbar-browse"
-          className="h-[28px] flex items-center gap-1 px-1.5 border-t border-[var(--taomni-code-border)]"
+          data-testid="code-workspace-tree-speed-search"
+          className="shrink-0 mx-1 mt-1 h-[24px] flex items-center gap-1 rounded border border-[var(--taomni-accent)] bg-[var(--taomni-code-bg)] px-1.5"
         >
           <Search className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-          <div className="min-w-0 flex-1 flex items-center gap-0.5">
-            <input
-              type="search"
-              data-testid="code-workspace-tree-filter"
-              value={filter}
-              onChange={(event) => onFilterChange(event.target.value)}
-              placeholder="Filter"
-              aria-label="Filter files"
-              className="min-w-0 flex-1 bg-transparent outline-none text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
-              style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
-            />
-          </div>
-          {visibility.showViewModes && (
-            <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-0.5">
-              <TreeIconButton
-                label="Tree view"
-                testId="code-workspace-view-tree"
-                icon={<ListTree className="w-3.5 h-3.5" />}
-                active={viewMode === "tree"}
-                onClick={() => onViewModeChange("tree")}
-              />
-              <TreeIconButton
-                label="Compact tree view"
-                testId="code-workspace-view-compact"
-                icon={<Columns2 className="w-3.5 h-3.5" />}
-                active={viewMode === "compact"}
-                onClick={() => onViewModeChange("compact")}
-              />
-              <TreeIconButton
-                label="Flat file view"
-                testId="code-workspace-view-flat"
-                icon={<List className="w-3.5 h-3.5" />}
-                active={viewMode === "flat"}
-                onClick={() => onViewModeChange("flat")}
-              />
-            </div>
-          )}
-          {visibility.showViewCycle && (
-            <TreeIconButton
-              label={`Cycle view (${treeViewModeLabel(viewMode)})`}
-              testId="code-workspace-view-cycle"
-              icon={viewModeIcon(viewMode)}
-              active
-              onClick={() => onViewModeChange(nextTreeViewMode(viewMode))}
-            />
-          )}
-          {visibility.showZoom && (
-            <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-0.5">
-              <TreeIconButton
-                label="Tree zoom out"
-                testId="code-workspace-tree-zoom-out"
-                icon={<ZoomOut className="w-3.5 h-3.5" />}
-                disabled={fontSize <= minFontSize}
-                onClick={() => onFontSizeChange(fontSize - 1)}
-              />
-              <button
-                type="button"
-                data-testid="code-workspace-tree-zoom-reset"
-                title="Reset tree zoom"
-                aria-label="Reset tree zoom"
-                className="h-6 min-w-8 rounded px-1 text-[11px] tabular-nums text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
-                onClick={() => onFontSizeChange(defaultFontSize)}
-              >
-                {fontSize}px
-              </button>
-              <TreeIconButton
-                label="Tree zoom in"
-                testId="code-workspace-tree-zoom-in"
-                icon={<ZoomIn className="w-3.5 h-3.5" />}
-                disabled={fontSize >= maxFontSize}
-                onClick={() => onFontSizeChange(fontSize + 1)}
-              />
-            </div>
-          )}
+          <input
+            ref={speedSearchRef}
+            type="search"
+            data-testid="code-workspace-tree-filter"
+            value={filter}
+            onChange={(event) => onFilterChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                event.stopPropagation();
+                closeSpeedSearch();
+              }
+            }}
+            placeholder="Search for"
+            aria-label="Filter files"
+            className="min-w-0 flex-1 bg-transparent outline-none text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
+            style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
+          />
+          <button
+            type="button"
+            data-testid="code-workspace-tree-speed-search-close"
+            title="Close search"
+            aria-label="Close search"
+            className="h-5 w-5 shrink-0 inline-flex items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            onClick={closeSpeedSearch}
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
-      </div>
+      )}
       <div
         data-testid="code-workspace-tree"
         role="tree"

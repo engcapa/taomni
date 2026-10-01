@@ -18,7 +18,9 @@ from .console import configure_console_encoding
 PLATFORMS = ("Linux", "Windows", "macOS")
 LINUX_VERBS = {"native_set_writable", "assert_native_process_delta", "native_process_snapshot",
                "native_click", "native_pointer_drag", "native_ime_keys", "native_clipboard_owner",
-               "assert_system_clipboard"}
+               "assert_system_clipboard", "native_clipboard_image"}
+# Verbs available on a subset of native platforms beyond Linux-only ones.
+PLATFORM_VERBS = {"native_show_image_window": {"Linux", "Windows"}}
 REVIEW_TAGS = {"needs-review", "legacy-imported"}
 
 
@@ -45,6 +47,8 @@ def native_support(case: TestCase, target: str) -> str | None:
                                              and args.get("transport", "x11") == "x11")
         if linux_only and target != "Linux":
             return f"{verb} requires Linux/X11"
+        if verb in PLATFORM_VERBS and target not in PLATFORM_VERBS[verb]:
+            return f"{verb} requires {'/'.join(sorted(PLATFORM_VERBS[verb]))}"
     return None
 
 

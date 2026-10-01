@@ -48,7 +48,7 @@ import type { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTrans
 import type { EditorAppearanceExtensionProfile } from "./editorAppearanceExtension";
 import { EditorBanner } from "./EditorBanner";
 import { FileTypeIcon } from "./fileTypeIcon";
-import type { GoToLineRequest } from "./CodeMirrorHost";
+import type { BreakpointGutterActions, GoToLineRequest } from "./CodeMirrorHost";
 import { createPortal } from "react-dom";
 import { useCodeWorkspaceStatusStore } from "../../../stores/codeWorkspaceStatusStore";
 import type { EditorBannerItem } from "./editorBannerModel";
@@ -164,7 +164,8 @@ interface EditorGroupProps {
   /** Selected-frame locals rendered as inline values on the active file. */
   activeDebugInlineValues?: Record<string, string>;
   onToggleBreakpoint?: (line: number) => void;
-  onEditBreakpoint?: (line: number) => void;
+  onEditBreakpoint?: (line: number, anchor?: { x: number; y: number }) => void;
+  breakpointGutterActions?: BreakpointGutterActions;
   /** Debugger keymap actions (F7/F8/F9/Ctrl+F2/Alt+F9); null when idle. */
   debugStep?: ((action: DebugStepAction) => void) | null;
   debugRunToCursor?: ((line: number) => void) | null;
@@ -347,6 +348,7 @@ export function EditorGroup({
   activeDebugInlineValues,
   onToggleBreakpoint,
   onEditBreakpoint,
+  breakpointGutterActions,
   debugStep,
   debugRunToCursor,
   debugStop,
@@ -1141,6 +1143,7 @@ export function EditorGroup({
                       debugEvaluate={debugEvaluate}
                       onToggleBreakpoint={onToggleBreakpoint}
                       onEditBreakpoint={onEditBreakpoint}
+                      breakpointGutterActions={breakpointGutterActions}
                       reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
                       readOnly={readOnly || !!activeFile.library}
                       onChange={(doc, caret, caretOffset) => {

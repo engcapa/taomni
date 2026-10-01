@@ -2,7 +2,7 @@
  * Project tree body: roots, hierarchical/flat entries, and loose files.
  * Presentation + expand/open callbacks only — load/mutate logic stays in the shell.
  */
-import { Fragment, type MouseEvent, type ReactNode } from "react";
+import { Fragment, memo, type MouseEvent, type ReactNode } from "react";
 import "./ProjectTree.css";
 import {
   ChevronDown,
@@ -41,6 +41,8 @@ import {
   type TreeSelection,
   type TreeViewMode,
 } from "./codeWorkspaceModel";
+import { treeFileDetails } from "./treeToolbarChrome";
+import { getLocale } from "../../../lib/i18n";
 
 export interface ProjectTreeOpenFileHint {
   dirty?: boolean;
@@ -65,6 +67,11 @@ export interface ProjectTreeProps {
   onSelect: (selection: TreeSelection) => void;
   onOpenFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean }) => void;
   onContextMenu: (event: MouseEvent, selection: TreeSelection) => void;
+  /** Empty workspace entry points (the header keeps them under New +). */
+  onAddFolder?: () => void;
+  onOpenLooseFile?: () => void;
+  /** IDEA Appearance › Details: modification time and size after file names. */
+  showDetails?: boolean;
 }
 
 function GitStatusBadge({ change }: { change: GitChange | undefined }): ReactNode {
@@ -166,7 +173,7 @@ function renderMatchingFlatFiles(
               style={{ fontSize: "var(--taomni-code-tree-small-font-size)" }}
               data-testid="code-workspace-flat-group"
             >
-              <Folder className="w-3.5 h-3.5 text-[#d59d32]" />
+              <Folder className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
               <span>{group}</span>
               <span className="ml-auto text-[10px] font-normal">{groupEntries.length}</span>
             </div>
@@ -205,6 +212,11 @@ function renderMatchingFlatFiles(
               >
                 <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                 <span className="truncate">{label}</span>
+                {props.showDetails && (
+                  <span data-testid="code-workspace-tree-file-details" className="min-w-0 truncate text-[var(--taomni-code-muted)]">
+                    {treeFileDetails(entry.size, entry.mtime, getLocale())}
+                  </span>
+                )}
                 {(change || open?.dirty) && (
                   <span className="ml-auto flex shrink-0 items-center gap-1">
                     <GitStatusBadge change={change} />
@@ -336,7 +348,7 @@ function renderEntries(
                 <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
               )}
             </span>
-            <Folder className="w-3.5 h-3.5 shrink-0 text-[#d59d32]" />
+            <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
             <span className="truncate">{displayName}</span>
             {(changeCount > 0 || childState?.loading || chain?.loading) && (
               <span className="ml-auto flex shrink-0 items-center gap-1">
@@ -387,6 +399,11 @@ function renderEntries(
         <span className="w-3.5 shrink-0" />
         <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
         <span className="truncate">{entry.name}</span>
+        {props.showDetails && (
+          <span data-testid="code-workspace-tree-file-details" className="min-w-0 truncate text-[var(--taomni-code-muted)]">
+            {treeFileDetails(entry.size, entry.mtime, getLocale())}
+          </span>
+        )}
         {(change || open?.dirty) && (
           <span className="ml-auto flex shrink-0 items-center gap-1">
             <GitStatusBadge change={change} />
@@ -398,7 +415,11 @@ function renderEntries(
   });
 }
 
-export function ProjectTree(props: ProjectTreeProps) {
+/**
+ * Memoized: the workspace shell re-renders per caret move; with stable
+ * handlers (useLatestHandlers) the tree only re-renders when its data changes.
+ */
+export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
   const {
     roots,
     looseFiles,
@@ -417,8 +438,30 @@ export function ProjectTree(props: ProjectTreeProps) {
 
   if (roots.length === 0 && looseFiles.length === 0) {
     return (
-      <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
-        Open a file or add a folder
+      <div data-testid="code-workspace-tree-empty" className="px-3 py-3 flex flex-col items-start gap-1.5 text-[var(--taomni-code-muted)]">
+        <span>Open a file or add a folder</span>
+        {props.onAddFolder && (
+          <button
+            type="button"
+            data-testid="code-workspace-tree-add-folder"
+            className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[var(--taomni-accent)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            onClick={props.onAddFolder}
+          >
+            <Folder className="w-3.5 h-3.5 shrink-0" />
+            Add Folder to Workspace…
+          </button>
+        )}
+        {props.onOpenLooseFile && (
+          <button
+            type="button"
+            data-testid="code-workspace-tree-open-file"
+            className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[var(--taomni-accent)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            onClick={props.onOpenLooseFile}
+          >
+            <File className="w-3.5 h-3.5 shrink-0" />
+            Open File…
+          </button>
+        )}
       </div>
     );
   }
@@ -468,16 +511,19 @@ export function ProjectTree(props: ProjectTreeProps) {
                   <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                 )}
               </span>
-              <Folder className="w-3.5 h-3.5 shrink-0 text-[#d59d32]" />
-              <span className="truncate">{root.name}</span>
-              <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] font-normal text-[var(--taomni-code-muted)]">
-                {rootChangeCount > 0 && (
+              <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+              <span className="shrink-0 max-w-[60%] truncate">{root.name}</span>
+              {/* IDEA shows the project root's location after its name. */}
+              <span data-testid="code-workspace-tree-root-path" className="min-w-0 truncate font-normal text-[var(--taomni-code-muted)]">
+                {root.path}
+              </span>
+              {rootChangeCount > 0 && (
+                <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] font-normal text-[var(--taomni-code-muted)]">
                   <span className="rounded border border-[var(--taomni-code-border)] px-1">
                     {rootChangeCount}
                   </span>
-                )}
-                <span>{root.kind}</span>
-              </span>
+                </span>
+              )}
             </button>
             {expanded && (
               treeViewMode === "flat"
@@ -538,4 +584,4 @@ export function ProjectTree(props: ProjectTreeProps) {
       )}
     </>
   );
-}
+});

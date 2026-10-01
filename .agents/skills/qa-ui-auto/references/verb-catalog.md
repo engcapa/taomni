@@ -202,6 +202,20 @@ Native verbs live in `scripts/qa_ui_auto/rdp_steps.py`. Connection defaults come
 | `save_text` | `{selector, path}` | Native only, diagnostics. Writes the element's text (e.g. `server-log`) to a file inside the report root so passing runs keep it too; asserts nothing. |
 | `rdp_canvas_click` | `{x, y, selector?='[data-testid="rdp-canvas"]'}` | Native only. Maps a remote desktop coordinate to the Taomni RDP client canvas (CSS scale from its bounding box and intrinsic size) and clicks with W3C pointer actions; used by joint client↔server cases. |
 
+## MFA authenticator fixtures
+
+Images live in `qa-ui-auto-tests/synthetic-fixtures/mfa/` (regenerate with its
+`generate.mjs`; `manifest.json` lists each QR payload and expected codes).
+Relative paths resolve from the repository root.
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `seed_clipboard_image` | `{path}` or `{selector}` | Browser-only. Writes a PNG fixture, or a screenshot of one rendered element (saved as `clipboard-image-step<N>.png`), to Chromium's clipboard as `image/png` and reads it back. Lets a case scan an exported QR with the app's own import path. Not the OS clipboard. |
+| `browser_fake_camera` | `{mode: qr \| none \| denied, image?}` | Browser-only. Replaces `navigator.mediaDevices` before the camera pane opens: `qr` streams `image` from a canvas, `none` reports no camera, `denied` rejects with `NotAllowedError`. `window.__taomniQaCamera.{created,live}` lets `eval_readonly` prove the tracks were stopped. Not camera hardware or permission evidence. |
+| `assert_totp_code` | `{selector, secret, period?=30, digits?=6, algorithm?=SHA1, attribute?=data-code, timeout_sec?=10}` | Browser/native. Exactly one match; polls until its attribute equals an independent Python RFC 6238 code for the current step (or the previous step within 5 s of a rollover). |
+| `native_clipboard_image` | `{path}` | Native Linux/X11 only. An external `xclip` process owns CLIPBOARD as `image/png`; a separate TARGETS read confirms it. The app must read it through arboard. The host selection is replaced and the owner is killed after the case. |
+| `native_show_image_window` | `{path, x?, y?}` or `{action: close}` | Native Linux/X11 and Windows. Shows a topmost Tk window with the PNG so a real screen capture contains the QR; records geometry in `native-image-window.json`; closed automatically after the case. |
+
 ## Last-resort escape hatch
 
 | Verb | Args | Notes |

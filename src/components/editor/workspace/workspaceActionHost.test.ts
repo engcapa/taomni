@@ -86,6 +86,54 @@ describe("WorkspaceActionHost (N0.1)", () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps keyboard lookup current across re-registration, disposal and keymap changes", async () => {
+    const host = new WorkspaceActionHost({
+      workspaceId: "ws-binding-index",
+      getContext: () => ({ focus: "editor" }),
+    });
+    const key = (key: string, mods: { ctrl?: boolean; alt?: boolean } = {}) => ({
+      key,
+      code: `Key${key.toUpperCase()}`,
+      ctrlKey: !!mods.ctrl,
+      altKey: !!mods.alt,
+      shiftKey: false,
+      metaKey: false,
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+    });
+    const first = vi.fn(async () => ({ kind: "applied" as const }));
+    const disposeFirst = host.registerAction({
+      id: "action.first", title: "First", category: "Edit", provenance: "local", keybinding: "Ctrl+Alt+J", run: first,
+    });
+    expect((await host.dispatchKeydown(key("j", { ctrl: true, alt: true })))?.id).toBe("action.first");
+    // A fresh registration object with a different binding replaces the old lookup.
+    disposeFirst();
+    const second = vi.fn(async () => ({ kind: "applied" as const }));
+    host.registerAction({
+      id: "action.first", title: "First", category: "Edit", provenance: "local", keybinding: "Ctrl+Alt+K", run: second,
+    });
+    expect(await host.dispatchKeydown(key("j", { ctrl: true, alt: true }))).toBeNull();
+    expect((await host.dispatchKeydown(key("k", { ctrl: true, alt: true })))?.id).toBe("action.first");
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(host.claimsSingleStroke(key("k", { ctrl: true, alt: true }))).toBe(true);
+    // A user scheme override moves the stroke without re-registering.
+    host.setKeymapScheme({
+      schemaVersion: 3,
+      id: "custom",
+      name: "Custom",
+      base: null,
+      readOnly: false,
+      bindings: {
+        "action.first": [{ kind: "keyboard", strokes: [{ code: "KeyU", ctrl: true, alt: true, shift: false, meta: false }] }],
+      },
+      disabledActionIds: [],
+      updatedAt: 0,
+    });
+    expect(host.claimsSingleStroke(key("k", { ctrl: true, alt: true }))).toBe(false);
+    expect((await host.dispatchKeydown(key("u", { ctrl: true, alt: true })))?.id).toBe("action.first");
+    expect(host.effectiveKeybindingDisplay("action.first")).toEqual(["Ctrl+Alt+U"]);
+  });
+
   it("dispatches platform-native secondary keybindings", async () => {
     const host = new WorkspaceActionHost({
       workspaceId: "ws-platform-shortcut",

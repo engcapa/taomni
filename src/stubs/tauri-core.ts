@@ -27,6 +27,7 @@ import {
 } from "./mailContactsStub";
 import type { MailAddressBookEntry } from "../lib/mailContacts";
 import { stubAddInviteToCalendar, stubCalDavSync, stubListAgenda } from "./mailCalendarStub";
+import { stubMfaInvoke } from "./mfaStub";
 import type { MailFilter } from "../lib/mailFilters";
 import type { SessionConfig, SessionGroup, LocalShellOption, LocalDirectoryShortcut, IpcRunSnapshotRecord, IpcSnapshotEntry } from "../lib/ipc";
 import {
@@ -71,6 +72,7 @@ import {
   VFS_ROOT,
 } from "./localVfs";
 import { emit } from "./tauri-event";
+import { vncBridgeCancel, vncBridgeConnect, vncBridgeDisconnect, vncBridgeTest } from "./vncClient";
 import { promptAppDialog } from "../lib/appDialogs";
 import {
   parity005Completion,
@@ -1702,6 +1704,11 @@ function stubSystemRdpStatus(): Record<string, unknown> {
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
   // ED-PARITY-008 isolated two-repository Git fixture (opt-in via localStorage).
   if (parity008Handles(cmd, args)) return await parity008Invoke(cmd, args) as T;
+  // MFA authenticator: localStorage mirror of mfa.db gated by the stub vault.
+  if (cmd.startsWith("mfa_")) {
+    const vault = loadStubVault();
+    return await stubMfaInvoke(cmd, args, vault.state === "unlocked", vault.masterPassword) as T;
+  }
   switch (cmd) {
     case "structural_search_capabilities":
       return parity009Capabilities() as T;
@@ -2469,8 +2476,39 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "lsp_hover": {
+      const hoverArgs = args as InvokeArgs;
+      const status = stubLspDocumentStatus(hoverArgs);
+      const hoverPath = parity005DocumentPath(hoverArgs);
+      // B-005 controlled provider: documentation for the identifier under the
+      // pointer so browser QA can drive the IDEA hover popup lifecycle.
+      if (parity005Enabled(hoverPath)) {
+        const text = await vfsReadText(hoverPath).catch(() => "");
+        const lineText = text.split("\n")[Number(hoverArgs?.line ?? -1)] ?? "";
+        const character = Number(hoverArgs?.character ?? -1);
+        let start = character;
+        let end = character;
+        while (start > 0 && /[\w$]/.test(lineText[start - 1] ?? "")) start -= 1;
+        while (end < lineText.length && /[\w$]/.test(lineText[end] ?? "")) end += 1;
+        const word = lineText.slice(start, end);
+        if (word && /[A-Za-z_$]/.test(word[0] ?? "")) {
+          const line = Number(hoverArgs?.line);
+          return {
+            status,
+            contents: [
+              "```java",
+              `parity005.${word}`,
+              "```",
+              "",
+              `Browser B-005 documentation for \`${word}\`.`,
+              "",
+              Array.from({ length: 12 }, (_, index) => `Line ${index + 1} of the ${word} description keeps the popup scrollable.`).join("\n\n"),
+            ].join("\n"),
+            range: { start: { line, character: start }, end: { line, character: end } },
+          } as T;
+        }
+      }
       return {
-        status: stubLspDocumentStatus(args as InvokeArgs),
+        status,
         contents: null,
         range: null,
       } as T;
@@ -3178,6 +3216,16 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         onOutput: args?.onOutput as SshConnectArgs["onOutput"],
       })) as T;
     }
+    case "vnc_connect":
+      // Proxy / jump-host rows are ignored here, as for SSH in the preview.
+      return await vncBridgeConnect<T>(args);
+    case "vnc_test_connection":
+      return await vncBridgeTest<T>(args);
+    case "vnc_disconnect":
+      await vncBridgeDisconnect(args?.sessionId);
+      return undefined as T;
+    case "vnc_cancel_connect":
+      return (await vncBridgeCancel(args?.attemptId)) as T;
     case "submit_ssh_auth_response": {
       // Keyboard-interactive (MFA) auth is driven by the real Rust backend.
       // The browser preview's WS SSH proxy doesn't surface interactive

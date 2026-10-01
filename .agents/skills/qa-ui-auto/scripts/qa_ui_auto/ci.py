@@ -88,6 +88,10 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("ssh")
         if "mysql_required" in fixtures:
             result.add("mysql")
+        if "vnc_required" in fixtures:
+            result.add("vnc")
+        if "ard_required" in fixtures:
+            result.add("ard")
         if mode == "native":
             result.add("display")
             if fixtures & {"jdtls_required", "java25_projects", "java_test_bundle", "java_sample_projects", "sortable_java_fixtures"}:

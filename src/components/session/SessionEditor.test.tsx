@@ -768,6 +768,35 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     expect(screen.queryByTestId("terminal-appearance-settings")).not.toBeInTheDocument();
   });
 
+  it("shows the VNC section in English with the in-session Properties wording", async () => {
+    renderEditor(undefined, { initialProto: "VNC" });
+    const english = await screen.findByTestId("session-vnc-policies");
+    expect(english).toHaveTextContent("Security policy");
+    expect(screen.getByRole("option", { name: "Allow unauthenticated None" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Scale Automatically" })).toBeInTheDocument();
+    expect(english).toHaveTextContent("Share the desktop with other viewers");
+    expect(english).toHaveTextContent("None is rejected unless explicitly allowed.");
+  });
+
+  it("localizes the VNC section labels, options and note in Chinese", async () => {
+    setLocale("zh-CN");
+    renderEditor(undefined, { initialProto: "VNC" });
+    const chinese = await screen.findByTestId("session-vnc-policies");
+    for (const text of ["安全策略", "画质", "缩放", "按键", "剪贴板", "输入", "连接时剪贴板", "连接", "除非明确允许，否则拒绝 None。"]) {
+      expect(chinese).toHaveTextContent(text);
+    }
+    const policy = screen.getByTestId("session-vnc-security-policy");
+    expect(Array.from((policy as HTMLSelectElement).options).map((option) => option.textContent)).toEqual([
+      "优先使用最强的可用方式",
+      "要求加密的 RA2",
+      "兼容旧服务器（不允许 None）",
+      "优先不加密（服务器提供时用未加密的 VNCAuth）",
+      "允许无认证的 None",
+    ]);
+    expect(chinese).not.toHaveTextContent("Security policy");
+    expect(chinese).not.toHaveTextContent("Share the desktop with other viewers");
+  });
+
   it("persists VNC security, clipboard, and view-only policies", async () => {
     const user = userEvent.setup();
     renderEditor(undefined, { initialProto: "VNC" });

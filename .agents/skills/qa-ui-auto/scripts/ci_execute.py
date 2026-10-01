@@ -107,10 +107,13 @@ def main():
         write_json(args.report / "environment.json", {"platform": platform.system(), "architecture": architecture,
                    "python": platform.python_version(), "head": manifest["head"], "capabilities": entry["capabilities"]})
         with ExitStack() as stack:
+            # The SSH account, the VNC fixture's per-case event log and the
+            # macOS console session behind Screen Sharing are shared.
+            serial = set(entry["capabilities"]) & {"ssh", "vnc", "ard"}
             config = {"app": {"base_url": "http://127.0.0.1:5000", "mode": entry["mode"]},
-                      "worker": {"parallel": 1 if "ssh" in entry["capabilities"] else 2},
+                      "worker": {"parallel": 1 if serial else 2},
                       "report": {"dir": str(args.report), "keep_runs": 0}}
-            if set(entry["capabilities"]) & {"ssh", "mysql"}:
+            if set(entry["capabilities"]) & {"ssh", "mysql", "vnc", "ard"}:
                 from ci_services import Services
                 stack.enter_context(Services(args.report / "services", entry["capabilities"], config))
             if "java" in entry["capabilities"]:

@@ -34,7 +34,18 @@ impl VncError {
             message.push_str("...");
         }
         let lower = message.to_ascii_lowercase();
-        let (code, stage, retryable) = if lower.contains("dns") {
+        let (code, stage, retryable) = if lower.contains("unencrypted connection requires confirmation")
+        {
+            ("unencrypted-confirmation-required", VncStage::Security, false)
+        } else if lower.starts_with("credentials required:") {
+            // Only the client's own stop (rfb::CREDENTIALS_REQUIRED), never a
+            // server's failure reason.
+            ("credentials-required", VncStage::Authentication, false)
+        } else if lower.contains("attempt stopped by the user") {
+            ("connection-stopped", VncStage::Runtime, false)
+        } else if lower.contains("keepalive") {
+            ("keepalive-timeout", VncStage::Runtime, true)
+        } else if lower.contains("dns") {
             ("dns-failed", VncStage::Dns, true)
         } else if lower.contains("proxy") || lower.contains("jump host") {
             ("network-route-failed", VncStage::Proxy, true)
@@ -113,6 +124,46 @@ mod tests {
         );
         assert!(VncError::classify("read failed: unexpected EOF").retryable);
         assert!(!VncError::classify("server rejected connection: authentication failed").retryable);
+    }
+
+    #[test]
+    fn ard_failures_reopen_the_credential_prompt() {
+        // The prompt has a username field, which a username-less ARD login needs.
+        for message in [
+            "ARD authentication requires the macOS account name: no VNC username was provided",
+            "ARD authentication: the password must be under 64 bytes without NUL characters",
+            "authentication failed: Authentication failure",
+        ] {
+            let error = VncError::classify(message);
+            assert_eq!(error.code, "authentication-failed", "{message}");
+            assert!(!error.retryable, "{message}");
+        }
+    }
+
+    #[test]
+    fn missing_credentials_ask_without_counting_as_a_failure() {
+        let error = VncError::classify(crate::vnc::rfb::CREDENTIALS_REQUIRED);
+        assert_eq!(error.code, "credentials-required");
+        assert_eq!(error.stage, VncStage::Authentication);
+        assert!(!error.retryable);
+        let reason = VncError::classify("authentication failed: credentials required: retry");
+        assert_eq!(reason.code, "authentication-failed");
+    }
+
+    #[test]
+    fn lifecycle_codes_are_distinct() {
+        let warn = VncError::classify(
+            "unencrypted connection requires confirmation: the server offers no encrypted security type",
+        );
+        assert_eq!(warn.code, "unencrypted-confirmation-required");
+        assert!(!warn.retryable);
+        assert_eq!(
+            VncError::classify("VNC connection attempt stopped by the user").code,
+            "connection-stopped"
+        );
+        let keepalive = VncError::classify("VNC keepalive: no response from the server for 60 s");
+        assert_eq!(keepalive.code, "keepalive-timeout");
+        assert!(keepalive.retryable);
     }
 
     #[test]

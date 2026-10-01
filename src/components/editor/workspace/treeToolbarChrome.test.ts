@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatTreeBytes,
   nextTreeViewMode,
+  treeFileDetails,
   treeToolbarDensity,
   treeToolbarVisibility,
+  treeViewTitle,
   TREE_TOOLBAR_MEDIUM_MIN_PX,
   TREE_TOOLBAR_WIDE_MIN_PX,
 } from "./treeToolbarChrome";
@@ -17,29 +20,26 @@ describe("treeToolbarChrome", () => {
     expect(treeToolbarDensity(120)).toBe("narrow");
   });
 
-  it("never collapses Open/Add; progressively hides New/view/zoom", () => {
-    const wide = treeToolbarVisibility("wide");
-    expect(wide.showOpenAndAdd).toBe(true);
-    expect(wide.showNewFile).toBe(true);
-    expect(wide.showNewDirectory).toBe(true);
-    expect(wide.showViewModes).toBe(true);
-    expect(wide.showZoom).toBe(true);
-    expect(wide.showViewCycle).toBe(false);
+  it("keeps IDEA's title actions inline and folds only Expand All when narrow", () => {
+    expect(treeToolbarVisibility("wide").showExpandAll).toBe(true);
+    expect(treeToolbarVisibility("medium").showExpandAll).toBe(true);
+    expect(treeToolbarVisibility("narrow").showExpandAll).toBe(false);
+  });
 
-    const medium = treeToolbarVisibility("medium");
-    expect(medium.showOpenAndAdd).toBe(true);
-    expect(medium.showNewFile).toBe(true);
-    expect(medium.showNewDirectory).toBe(false);
-    expect(medium.showViewModes).toBe(true);
-    expect(medium.showZoom).toBe(false);
+  it("titles the view selector like IDEA's Project / Project Files views", () => {
+    expect(treeViewTitle("tree")).toBe("Project");
+    expect(treeViewTitle("compact")).toBe("Project");
+    expect(treeViewTitle("flat")).toBe("Project Files");
+  });
 
-    const narrow = treeToolbarVisibility("narrow");
-    expect(narrow.showOpenAndAdd).toBe(true);
-    expect(narrow.showNewFile).toBe(false);
-    expect(narrow.showNewDirectory).toBe(false);
-    expect(narrow.showViewModes).toBe(false);
-    expect(narrow.showViewCycle).toBe(true);
-    expect(narrow.showZoom).toBe(false);
+  it("formats IDEA Details as modification time and size", () => {
+    const ms = new Date(2026, 8, 28, 17, 31).getTime();
+    expect(treeFileDetails(327, ms, "zh-CN")).toBe("2026/9/28 17:31, 327 B");
+    // Seconds are accepted as well as milliseconds.
+    expect(treeFileDetails(67, Math.floor(ms / 1000), "zh-CN")).toBe("2026/9/28 17:31, 67 B");
+    expect(treeFileDetails(2048, 0)).toBe("2 KB");
+    expect(formatTreeBytes(1536)).toBe("1.5 KB");
+    expect(formatTreeBytes(5 * 1024 * 1024)).toBe("5 MB");
   });
 
   it("cycles view modes in a stable order", () => {

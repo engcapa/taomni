@@ -243,6 +243,7 @@ steps:
   - parity005_set_mode: normal
   - press: Control+Space
   - wait_for: '.cm-tooltip-autocomplete li:has-text("StringBuffer")'
+  - wait: 0.12
   - press: ArrowDown
   - assert_text:
       selector: '.cm-tooltip-autocomplete li[aria-selected="true"]'
@@ -281,7 +282,7 @@ steps:
       equals: ['package parity005;', '', 'public class Main {', '    void sample() {', '        Stri;', '    }', '}', '']
   - set_viewport: {width: 950, height: 390}
   - press: Control+Space
-  - wait_for: '.cm-tooltip-autocomplete li:has-text("StringJoiner")'
+  - wait_for: '.cm-tooltip-autocomplete:not([style*="-10000px"]) li:has-text("StringJoiner")'
   - eval_readonly:
       expression: document.querySelector('.cm-tooltip-autocomplete')?.getBoundingClientRect().left >= 0 && document.querySelector('.cm-tooltip-autocomplete')?.getBoundingClientRect().right <= innerWidth && document.querySelector('.cm-tooltip-autocomplete')?.getBoundingClientRect().top >= 0 && document.querySelector('.cm-tooltip-autocomplete')?.getBoundingClientRect().bottom <= innerHeight
       expect_truthy: true
@@ -420,51 +421,51 @@ verification:
       results: [112, 125, 126, 128, 130, 132, 134]
     - id: ED-PARITY-005-V2-nonfirst
       requirement: Keyboard and mouse select different non-first raw items, each resolving its own import and remaining one-Undo recoverable.
-      actions: [136, 138, 141, 144, 146, 148, 151, 154]
+      actions: [136, 139, 142, 145, 147, 149, 152, 155]
       checkpoints:
-        - step: 139
+        - step: 140
           expectation: ArrowDown selects StringBuffer.
-        - step: 142
-          expectation: StringBuffer lands only its matching import and text.
         - step: 143
+          expectation: StringBuffer lands only its matching import and text.
+        - step: 144
           expectation: The resolve raw identity remains parity005-buffer-2.
-        - step: 145
+        - step: 146
           expectation: One Undo restores B1.
-        - step: 149
-          expectation: A single click selects StringJoiner without editing.
         - step: 150
+          expectation: A single click selects StringJoiner without editing.
+        - step: 151
           expectation: The editor still contains the original prefix before double-click.
-        - step: 152
-          expectation: StringJoiner lands only its matching import and text.
         - step: 153
+          expectation: StringJoiner lands only its matching import and text.
+        - step: 154
           expectation: The resolve raw identity remains parity005-joiner-3.
-        - step: 155
+        - step: 156
           expectation: One Undo restores B1.
-      results: [139, 142, 143, 145, 149, 150, 152, 153, 155]
+      results: [140, 143, 144, 146, 150, 151, 153, 154, 156]
     - id: ED-PARITY-005-V2-narrow
       requirement: At 950 by 390 the completion list stays within the viewport and Escape leaves the buffer intact.
-      actions: [156, 157, 161]
+      actions: [157, 158, 162]
       checkpoints:
-        - step: 159
+        - step: 160
           expectation: The popup rectangle is fully within the viewport.
-        - step: 162
+        - step: 163
           expectation: Escape leaves B1 untouched.
-      results: [159, 162]
+      results: [160, 163]
     - id: ED-PARITY-005-V2-shared-history
       requirement: Two UI views of Main.java show the same atomic acceptance; Undo from the sibling view restores both and removes the import.
-      actions: [165, 175, 178, 181, 182]
+      actions: [166, 176, 179, 182, 183]
       checkpoints:
-        - step: 166
+        - step: 167
           expectation: The split exposes two editor views.
-        - step: 179
-          expectation: Both views show the same single import.
         - step: 180
+          expectation: Both views show the same single import.
+        - step: 181
           expectation: Both views show the accepted snippet text.
-        - step: 183
-          expectation: One Undo in the sibling view restores the prefix in both views.
         - step: 184
+          expectation: One Undo in the sibling view restores the prefix in both views.
+        - step: 185
           expectation: The import is absent from both views after Undo.
-      results: [166, 179, 180, 183, 184]
+      results: [167, 180, 181, 184, 185]
   visual:
     - check: Selected row, documentation, popup anchor, density and clipping against IDEA R1/R2/R6.
       method: manual

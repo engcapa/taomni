@@ -33,6 +33,12 @@ controls:
     selector: '[data-testid="collapsed-sidebar-rail"]'
     kind: interactive
     optional: true       # only when sidebar collapsed
+  - id: sidebar-tool-window-rail      # ED-PARITY-027: the active tab's tool window bar inside the collapsed rail
+    selector: '[data-testid="sidebar-tool-window-rail"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="sidebar-rail"]'
   - id: sidebar-resize-handle
     selector: '[data-testid="main-sidebar-resize-handle"]'
     kind: display    # drag handle — meaningless to click; existence is the assertion
@@ -69,6 +75,10 @@ controls:
   - id: control-bar
     selector: '[data-testid="control-bar"]'
     kind: display
+  - id: tab-action-slot               # active tab's actions (Capture, Detach, …) in the control bar
+    selector: '[data-testid="tab-action-slot"]'
+    kind: display
+    optional: true
   - id: window-drag-handle
     selector: '[data-testid="window-drag-handle"]'
     kind: display    # dedicated native window-move target; presence is asserted in browser mode
@@ -2593,23 +2603,26 @@ files:
 controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas surface is owned by F9.6
 -->
 
-- Rust 端 VNC 模块：`src-tauri/src/vnc/{mod,rfb,tls,ws,encodings,clipboard,error,limits,policy,queue}.rs`
-- Tauri 命令：`vnc_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim`
+- Rust 端 VNC 模块：`src-tauri/src/vnc/{mod,rfb,tls,ws,encodings,tight,pixel,quality,framebuffer,clipboard,error,limits,policy,queue,keyboard_hook,native_pointer}.rs`
+- Tauri 命令：`vnc_connect / vnc_cancel_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim / vnc_set_special_key_capture / vnc_special_key_capture_status`
 - 本地动态端口 WebSocket relay：VNC server ↔ 前端 Canvas（前端不再直接持有 TCP 套接字）
 
 ### 9.2 RFB 握手与认证 ✅
-- 安全类型：None（仅显式 `allow-none`）、VNC password、RFB 18 anonymous TLS + 内层安全协商、RealVNC RA2 / RA2ne（128 / 256 位 AES）
+- 安全类型：None（仅显式 `allow-none`）、VNC password、RFB 18 anonymous TLS + 内层安全协商、RealVNC RA2 / RA2ne（128 / 256 位 AES）、Apple Remote Desktop（RFB 30，macOS 屏幕共享：会话填写 macOS 账户名时用 DH + AES-128 发送账户密码；未填用户名时有 VNCAuth 则用 VNCAuth；会话本身不加密，同样先弹未加密警告；TC-152 在 macOS runner 上连真实屏幕共享）
+- macOS 屏幕共享宣告 `RFB 003.889`，按 3.8 协商
+- 凭据按需询问：没有密码时不回应 VNCAuth、RA2/RA2ne、ARD 的挑战，以 `credentials-required`（认证阶段、不重试）结束这次尝试，由会话内认证表单询问；None 不需要任何输入（VNC-AUTH-002，DEC-VNC-21）
 - RA2 子模式：USER_PASS、PASS-only；公钥位长度合法性校验（1024–8192 bit）
 - TCP 建连使用独立 15 秒 deadline；RFB 安全协商和认证使用 45 秒 timeout，支持服务端认证限速/延迟，并将超时标记为可重试的 authentication/security 阶段错误
 - Tokio socket 交给同步 RFB 解码器前恢复 blocking mode，避免 `WouldBlock` 被误报为认证超时
 - RFB 18 TLS 使用匿名密码套件，能够加密传输但不验证服务器身份；`RequireEncryption` 继续 fail closed，VeNCrypt/X509 TLS 和证书校验仍未实现
 
 ### 9.3 编码与画面 ✅
-- 解码器：Raw（0）、CopyRect（1）、Hextile（5）、ZRLE（16，单一持久 zlib 流）
+- 解码器：Raw（0）、CopyRect（1）、Hextile（5）、ZRLE（16，单一持久 zlib 流）；运行期读缓冲，整矩形解码进后端权威帧缓冲，relay 按 damage 合并（≤16 矩形/帧），WebView 绘制完成即发送最新像素，解码完成立即请求下一增量更新（VNC-PERF-001/002）
 - 伪编码：DesktopSize（-223）接收；窗口变化仅调整本地 fit，不宣称或发送 SetDesktopSize；丢帧恢复时才请求全量刷新
 - ZRLE 单 zlib 状态贯穿整个 session，已修复历史的 "zrle: eof cpixel" 间歇性断连
-- 像素格式 `set_pixel_format_rgba()` 协商成 little-endian RGBA，前端按位图直接渲染
-- Tight 编码暂未启用（解码器尚未 RFC-conformant，避免 stream 失步）
+- 像素格式 `set_pixel_format_rgba()` 协商成 little-endian RGBA，前端按位图直接渲染；服务器静止时不调度绘制（VNC-PERF-003）
+- Tight（7，含 JPEG 质量与 zlib 级别伪编码）与画质 Automatic / High / Medium / Low：Medium/Low 优先 Tight + JPEG，服务器不支持 Tight 时改用降色深像素格式；Automatic 按线路速度升降档；切换像素格式前等待在途更新（VNC-PERF-004，TC-153 native 验证 Low 的编码请求与之后的绘制）
+- 首选编码自适应：只认客户端第一个编码的服务器（如 VMware 内置 VNC）用 Raw 回应大块更新时，High/Automatic 依次把 Tight（JPEG 质量 9）、Hextile 移到首位，降色深档改用 Hextile；服务器已按首选编码压缩时不再试探（VNC-PERF-006，DEC-VNC-22）
 
 ### 9.4 ExtendedClipboard 互通 ✅
 - 实现 ExtendedClipboard 伪编码（`0xC0A1E5CE` + 旧 draft 值 `-1063` 双广告兼容）
@@ -2619,9 +2632,9 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 - 前端 ↔ 后端剪贴板桥：`vncStore` 协调，文本/HTML/RTF 选择性传输
 
 ### 9.5 输入处理 ✅
-- 鼠标：左/中/右键、滚轮、拖拽（pointer capture）
-- 键盘：包含 RealVNC 输入修复，组合键正确转发
-- 剪贴板：双向同步，自动切换 Extended / Legacy
+- 鼠标：左/中/右键、滚轮、拖拽（pointer capture）；Windows 上画布无按键时 relay 直接采样系统光标位置，绕开 WebView 按刷新对齐的 pointermove（VNC-PERF-005，`TAOMNI_VNC_NATIVE_POINTER=0` 关闭）
+- 键盘：包含 RealVNC 输入修复，组合键正确转发；菜单键（默认 F8，可改或关闭）打开会话菜单而不发往远端；Windows 低级键盘钩子把 Win、Alt+Tab、Alt+Esc、Ctrl+Esc、PrtScn 直通远端（可关闭），AltGr 发送 ISO_Level3_Shift（VNC-INPUT-002/003）
+- 剪贴板：双向同步，自动切换 Extended / Legacy；连接时不推送本地剪贴板，指针进入画布、窗口重新获得焦点或本地复制时发送变化，远端写入本机后不回送（VNC-CLIP-001）
 
 ### 9.6 前端 `VncPanel` ✅
 
@@ -2632,7 +2645,21 @@ area: vnc
 components: [VncPanel, FloatingToolbar, CaptureToolbar, SessionEditor]
 files:
   - src/components/vnc/VncPanel.tsx
+  - src/components/vnc/vncSessionMenu.ts
+  - src/components/vnc/VncConnectionOverlay.tsx
+  - src/components/vnc/VncPropertiesDialog.tsx
+  - src/components/vnc/VncSessionInfoDialog.tsx
+  - src/components/vnc/VncFullScreenToolbar.tsx
+  - src/lib/vnc.ts
+  - src/lib/vncFramePainter.ts
+  - src/lib/vncOptions.ts
   - src/components/session/SessionEditor.tsx
+  # Browser-preview VNC bridge and the scriptable RFB fixture behind vnc_required.
+  - vite-plugins/vncProxy.ts
+  - vite-plugins/vncBridge.ts
+  - vite-plugins/vncDes.ts
+  - src/stubs/vncClient.ts
+  - .agents/skills/vnc-realvnc-task/scripts/vnc_fixture_server.py
 controls:
   # Detach/reattach/fullscreen controls rendered by VncPanel are owned by
   # F-Detach-1 to avoid duplicate selector ownership.
@@ -2642,16 +2669,59 @@ controls:
   - id: canvas
     selector: '[data-testid="vnc-canvas"]'
     kind: display       # pointer / wheel / context-menu handlers fire only after a live RFB session;
-                        # without a configured VNC fixture we can only verify the canvas is attached.
-                        # Driving it is left to feature-flagged conformance tests.
+                        # TC-151 (both modes) and TC-153 (native) drive it against the hosted vnc_required fixture.
   - id: scale-toggle
     selector: '[data-testid="vnc-scale-toggle"]'
     kind: interactive
-    optional: true          # inside the floating toolbar
+    optional: true          # inside the floating toolbar; Scale to 100% / Scale Automatically
+  - id: send-ctrl-alt-del
+    selector: '[data-testid="vnc-send-cad"]'
+    kind: interactive
+    optional: true          # connected, not view-only (VNC-INPUT-002)
+  - id: fullscreen
+    selector: '[data-testid="vnc-fullscreen"]'
+    kind: interactive
+    optional: true          # connected tab sessions (VNC-SESS-001 / DEC-VNC-10)
+  - id: session-menu
+    selector: '[data-testid="vnc-session-menu"]'
+    kind: interactive
+    optional: true          # connected; same menu as F8 (VNC-SESS-001)
+  - id: menu-info
+    selector: '[data-testid="vnc-menu-info"]'
+    kind: interactive
+    optional: true          # session menu → Information; TC-152 reads the negotiated ARD security type
+  - id: menu-quality
+    selector: '[data-testid="vnc-menu-quality"]'
+    kind: interactive
+    optional: true          # session menu → Picture quality submenu (VNC-PERF-004)
+  - id: quality-low
+    selector: '[data-testid="vnc-quality-low"]'
+    kind: interactive
+    optional: true          # Picture quality → Low; TC-153 checks the Tight/JPEG SetEncodings
+  - id: menu-send-f8
+    selector: '[data-testid="vnc-menu-send-f8"]'
+    kind: interactive
+    optional: true          # session menu → Send F8 (VNC-INPUT-002)
+  - id: session-info
+    selector: '[data-testid="vnc-session-info"]'
+    kind: display
+    optional: true          # Session Information dialog (VNC-SESS-002)
   - id: reconnect
     selector: '[data-testid="vnc-reconnect"]'
     kind: interactive
     optional: true          # only on disconnected/error state
+  - id: unencrypted-continue
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    kind: interactive
+    optional: true          # per-attempt unencrypted-connection warning (VNC-SESS-003, DEC-VNC-19)
+  - id: vnc-auth-password
+    selector: '[data-testid="vnc-auth-password"]'
+    kind: interactive
+    optional: true          # in-session authentication form, shown only when the server asks for a password (VNC-AUTH-002, DEC-VNC-21)
+  - id: vnc-auth-ok
+    selector: '[data-testid="vnc-auth-ok"]'
+    kind: interactive
+    optional: true          # submits the in-session form; the retry keeps the confirmed unencrypted warning
   - id: policy-settings
     selector: '[data-testid="session-vnc-policies"]'
     kind: display
@@ -2670,15 +2740,22 @@ controls:
     optional: true
 -->
 
-- Canvas 画面渲染 + fit / 1:1 缩放
+- Canvas 画面渲染；RealVNC 对齐缩放：自动（只缩小）/ 适应窗口 / 适应宽度 / 适应高度 / 25–400%，100% 为一个远端像素对应一个设备像素，可保持宽高比（VNC-VIEW-001）
+- F8 会话菜单与工具栏菜单按钮：关闭连接、全屏、发送 F8、发送 Ctrl+Alt+Del、以按键发送剪贴板、Ctrl/Alt 锁定、缩放、画质、刷新屏幕、会话信息、属性（VNC-SESS-001、VNC-INPUT-002、VNC-PERF-004；TC-153 native 用 F8 打开菜单、切到 Low 并发送 F8）
+- 屏幕级全屏：Esc 发往远端，顶端热区滑出工具栏、离开即收起，退出恢复原窗口状态（VNC-VIEW-002）
+- 连接生命周期浮层：每次连接前的未加密警告（可选不再提示）、认证表单（只在服务器要求密码时出现，提交后的重连沿用已确认的未加密警告，VNC-AUTH-002）、Stop、断线后自动重连倒计时、KeepAlive 探测（VNC-SESS-003）
+- 会话内 Properties：画质、view-only、缩放、菜单键、特殊键直通、剪贴板方向与连接时推送、共享会话、未加密警告、自动重连、响铃，写回会话，需要时提示重连生效（VNC-CONN-001）
+- 会话信息：桌面名、尺寸、像素格式、请求/最近编码、线路速度、更新/帧速率、协议、安全、连接类型（VNC-SESS-002）
+- 鼠标：右键即时发送；滚轮按刻度累积、Shift+滚轮水平；后退键映射按键 8；失焦不再把远端指针移到 (0,0)（VNC-INPUT-001）
 - 浮动 `FloatingToolbar`：可拖拽 / 折叠 / 位置持久化
 - 内嵌 `CaptureToolbar`：可见区域 PNG / 全帧 PNG / GIF 录制（与终端共用截图链路）
 - 断开提示 + Reconnect、错误分类（区分用户主动断开 / 服务端断开 / 网络异常）
-- 保存的 VNC 会话可从会话树双击连接，密码场景复用 `AuthPrompt`
+- 保存的 VNC 会话可从会话树双击连接；没保存密码时直接连接，不弹连接前的密码框，服务器要求密码时由会话内认证表单询问，`vnc://` 快速连接相同（VNC-AUTH-002；TC-151/TC-152/TC-153 经会话内表单登录，TC-107 确认不弹连接前密码框）
+- 浏览器预览（`pnpm dev`）经 dev server VNC bridge 连接真实 RFB 服务器：None/VNCAuth、Raw、DesktopSize、Bell、legacy 与 ExtendedClipboard；不含原生 relay 的编码、OS 输入和系统剪贴板（TC-151 双模式）
 - VNC tab 常驻挂载，切换标签时连接不主动销毁
 - 已修复 VNC 剪贴板与输入延迟、Windows 11 上的 client→server 文本粘贴
 - view-only 与剪贴板方向（disabled / client→server / server→client / bidirectional）由前后端同时执行；None 默认拒绝
-- 当前不启用 Tight/JPEG、VeNCrypt/X509 TLS，也不发送 RFB SetDesktopSize；RFB 18 anonymous TLS 已支持，但不提供服务器身份验证；窗口变化只调整本地显示
+- 当前不支持 VeNCrypt/X509 TLS，也不发送 RFB SetDesktopSize；RFB 18 anonymous TLS 已支持，但不提供服务器身份验证；窗口变化只调整本地显示
 
 ### 9.7 RDP client（IronRDP 0.17）🟡
 
@@ -2886,6 +2963,10 @@ controls:
   - id: welcome-recent-session-limit
     selector: '[data-testid="settings-welcome-recent-session-limit"]'
     kind: interactive
+  - id: settings-merge-tool-window-rail   # ED-PARITY-027 single tool window bar toggle
+    selector: '[data-testid="settings-merge-tool-window-rail"]'
+    kind: interactive
+    optional: true
   - id: search-input
     selector: '[data-testid="settings-search-input"]'
     kind: interactive
@@ -6938,6 +7019,88 @@ controls:
   - id: debug-panel
     selector: '[data-testid="debug-panel"]'
     kind: display
+  - id: debug-toolbar-resume          # ED-PARITY-025 IDEA TopToolbar3 (Rerun…Mute, More)
+    selector: '[data-testid="debug-continue"]'
+    kind: interactive
+    optional: true       # enabled while a debug session is suspended
+  - id: debug-subtab-console
+    selector: '[data-testid="debug-subtab-console"]'
+    kind: interactive
+    optional: true
+  - id: debug-console-output
+    selector: '[data-testid="debug-console-output"]'
+    kind: display
+    optional: true
+  - id: debug-frames-list              # ED-PARITY-025 IDEA Frames view (method:line, Class (package))
+    selector: '[data-testid="debug-frames-list"]'
+    kind: display
+    optional: true       # frames exist only while suspended
+  - id: debug-thread-select            # ED-PARITY-025 IDEA thread combo
+    selector: '[data-testid="debug-thread-select"]'
+    kind: display
+    optional: true
+  - id: debug-variables-tree           # ED-PARITY-025 merged watches + variables tree
+    selector: '[data-testid="debug-variables-tree"]'
+    kind: display
+    optional: true
+  - id: debug-watch-input              # Evaluate expression (Enter) or add a watch (Ctrl+Shift+Enter)
+    selector: '[data-testid="debug-watch-input"]'
+    kind: interactive
+    optional: true
+  - id: debug-evaluate-inline-result
+    selector: '[data-testid="debug-evaluate-inline-result"]'
+    kind: display
+    optional: true       # rendered after an Enter evaluation while suspended
+  - id: debug-breakpoint-popup         # ED-PARITY-025 IDEA breakpoint balloon
+    selector: '[data-testid="debug-breakpoint-popup"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoint-popup-title"]'
+      - '[data-testid="debug-breakpoint-popup-log-stack"]'
+      - '[data-testid="debug-breakpoint-popup-log-message"]:checked'
+  - id: debug-breakpoint-popup-condition
+    selector: '[data-testid="debug-breakpoint-popup-condition"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoint-popup-condition"]:focus'
+  - id: debug-breakpoint-popup-actions
+    selector: '[data-testid="debug-breakpoint-popup-done"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoint-popup-more"]'
+  - id: debug-gutter-menu              # IDEA Add Breakpoint / Conditional / Logging menu
+    selector: '[data-testid="debug-gutter-menu-add-conditional"]'
+    kind: interactive
+    optional: true
+  - id: debug-breakpoints-dialog       # ED-PARITY-025 IDEA View Breakpoints dialog
+    selector: '[data-testid="debug-breakpoints-dialog"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoints-dialog-condition"]'
+      - '[data-testid="debug-breakpoints-dialog-enabled-2"]:checked'
+      - '[data-testid="debug-breakpoints-dialog-remove-once-hit"]:checked'
+  - id: debug-breakpoints-dialog-tree
+    selector: '[data-testid="debug-breakpoints-dialog-tree"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoints-dialog-line"]'
+      - '[data-testid="debug-breakpoints-dialog-line"][data-breakpoint-line="7"]'
+  - id: debug-breakpoints-dialog-properties
+    selector: '[data-testid="debug-breakpoints-dialog-suspend"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoints-dialog-log-stack"]'
+      - '[data-testid="debug-breakpoints-dialog-remove-once-hit"]'
+  - id: debug-breakpoints-dialog-done
+    selector: '[data-testid="debug-breakpoints-dialog-done"]'
+    kind: interactive
+    optional: true
   - id: debug-stop
     selector: '[data-testid="debug-stop"]'
     kind: interactive
@@ -7528,10 +7691,53 @@ controls:
     selector: '[data-testid="code-workspace-tree-dir"]'
     kind: interactive
     optional: true       # directory rows; cases refine with [data-path="..."] (C8-07)
-  - id: tree-view
-    selector: '[data-testid="code-workspace-view-tree"]'
+  - id: tree-view                     # IDEA "Project ▾" view selector (Project / Project Files)
+    selector: '[data-testid="code-workspace-tree-view-selector"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-view-project"]'
+      - '[data-testid="code-workspace-tree-view-project-files"]'
+  - id: tree-new-menu                 # IDEA title action New (+): File, Directory, Open File…, Add Folder…
+    selector: '[data-testid="code-workspace-tree-new"]'
+    kind: interactive
+    optional: true
+  - id: tree-open-file
+    selector: '[data-testid="code-workspace-tree-open-file"]'
+    kind: interactive
+    optional: true       # New (+) menu item and empty-workspace entry point
+  - id: tree-options-appearance       # ⋮ Options › Appearance: Details, Compact Directories, zoom
+    selector: '[data-testid="code-workspace-tree-menu-appearance"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-menu-details"]'
+      - '[data-testid="code-workspace-tree-menu-compact"]'
+      - '[data-testid="code-workspace-tree-zoom-in"]'
+      - '[data-testid="code-workspace-tree-zoom-out"]'
+      - '[data-testid="code-workspace-tree-zoom-reset"]'
+  - id: tree-options                  # IDEA ⋮ Options and − Hide title actions
+    selector: '[data-testid="code-workspace-tree-toolbar-more"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-collapse"]'
+      - '[data-testid="code-workspace-tree-menu-expand-all"]'
+  - id: tree-speed-search             # IDEA speed search: typing in the tree opens it
+    selector: '[data-testid="code-workspace-tree-speed-search"]'
     kind: display
-    optional: true       # tree view container used by template flows
+    optional: true
+  - id: tree-speed-search-close
+    selector: '[data-testid="code-workspace-tree-speed-search-close"]'
+    kind: interactive
+    optional: true
+  - id: tree-row-details              # root location and Appearance › Details (time, size)
+    selector: '[data-testid="code-workspace-tree-root-path"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-file-details"]'
+      - '[data-testid="code-workspace-tree-empty"]'
   - id: new-java-class-package
     selector: '[data-testid="new-java-class-package"]'
     kind: display
@@ -8286,6 +8492,55 @@ controls:
       - '[data-testid="code-workspace-tool-rail-structure"]'
       - '[data-testid="code-workspace-tool-rail-commit"]'
       - '[data-testid="code-workspace-tool-rail-documentation"]'
+  - id: tool-rail-resize              # ED-PARITY-024 stripe width handle (names shown)
+    selector: '[data-testid="code-workspace-tool-rail-left-resize"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-rail-right-resize"]'
+  - id: tool-rail-menu                # ED-PARITY-024 stripe button context menu
+    selector: '[data-testid="code-workspace-tool-rail-menu-move"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-rail-menu-move-right-top"]'
+      - '[data-testid="code-workspace-tool-rail-menu-remove"]'
+      - '[data-testid="code-workspace-tool-rail-menu-show-names"]'
+      - '[data-testid="code-workspace-tool-rail-menu-toggle"]'
+  - id: tool-window-pane              # ED-PARITY-024 re-parentable tool window decorator
+    selector: '[data-testid="code-workspace-tool-window-problems"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-window-structure"]'
+      - '[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]'
+  - id: tool-window-options-menu      # ED-PARITY-024 ⋮ Options: View Mode / Move to / Resize / Remove
+    selector: '[data-testid="code-workspace-tool-window-options-problems"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-window-options-terminal"]'
+      - '[data-testid="code-workspace-tool-window-move"]'
+      - '[data-testid="code-workspace-tool-window-move-bottom-left"]'
+  - id: tool-window-more-item         # More tool windows entries
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-run"]'
+    kind: interactive
+    optional: true
+  - id: project-header-actions        # ED-PARITY-024 IDEA Project header: Expand All / Collapse All / Select Opened File
+    selector: '[data-testid="code-workspace-tree-expand-all"]'
+    kind: interactive
+    optional: true       # Expand All folds into ⋯ at narrow widths
+    aliases:
+      - '[data-testid="code-workspace-tree-collapse-all"]'
+      - '[data-testid="code-workspace-tree-select-opened"]'
+  - id: search-everywhere-tab         # ED-PARITY-024 category tabs (Tab / Shift+Tab)
+    selector: '[data-testid="search-everywhere-tab-files"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="search-everywhere-tab-classes"]'
+      - '[data-testid="search-everywhere-tab-symbols"]'
+      - '[data-testid="search-everywhere-tab-actions"]'
   - id: tool-window-header
     selector: '[data-testid="code-workspace-tool-window-header"]'
     kind: display
@@ -8531,6 +8786,18 @@ controls:
     selector: '[data-testid="code-workspace-quick-doc"]'
     kind: display
     optional: true       # explicit Quick Documentation popup
+  - id: hover-doc-popup
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    kind: display
+    optional: true       # IDEA hover documentation; stays while the pointer heads into it
+  - id: hover-doc-pin
+    selector: '[data-testid="code-workspace-hover-doc-pin"]'
+    kind: interactive
+    optional: true       # pins the hover documentation to the Documentation tool window
+  - id: documentation-pane
+    selector: '[data-testid="code-workspace-documentation-pane"]'
+    kind: display
+    optional: true       # Documentation tool window (pinned quick documentation)
   # §8.20.2 W1 actionable editor conditions and retryable actions.
   - id: editor-banners
     selector: '[data-testid="code-workspace-editor-banners"]'
@@ -9405,6 +9672,441 @@ controls:
 
 - Workspace Git 的 Changes 按仓库分组；diff 面板显示 `HEAD <oid>` / `Working tree` 两侧标签与 `n/N files` 上一个/下一个文件导航，顺序与平铺列表一致（未跟踪文件内联计入，IDEA 另置 Unversioned 节点）。
 - 快照请求按 repoRoot 分代，diff pair 按 repoRoot+path+状态+快照版本键控：迟到响应不污染新仓库；只读快照使用 `git --no-optional-locks status`，不回写 `.git/index`。
+
+## 27. MFA 验证器（TOTP / HOTP）
+
+### 27.1 MFA 标签、列表组织、编辑与二维码导出 ✅
+
+<!-- feature
+id: F-MFA-1
+status: done
+area: tools/mfa
+components: [MfaTab, MfaPanel, MfaAccountRow, MfaCountdown, MfaEditDialog, MfaQrDialog, VaultGate]
+files:
+  - src-tauri/src/mfa/mod.rs
+  - src-tauri/src/mfa/otp.rs
+  - src-tauri/src/mfa/crypto.rs
+  - src-tauri/src/mfa/store.rs
+  - src-tauri/src/mfa/commands.rs
+  - src/lib/mfa/types.ts
+  - src/lib/mfa/ipc.ts
+  - src/lib/mfa/sort.ts
+  - src/lib/mfa/format.ts
+  - src/lib/mfa/qrSvg.ts
+  - src/stores/mfaStore.ts
+  - src/stubs/mfaStub.ts
+  - src/components/mfa/MfaTab.tsx
+  - src/components/mfa/MfaPanel.tsx
+  - src/components/mfa/MfaAccountRow.tsx
+  - src/components/mfa/MfaCountdown.tsx
+  - src/components/mfa/MfaEditDialog.tsx
+  - src/components/mfa/MfaQrDialog.tsx
+  - src/components/vault/VaultGate.tsx
+controls:
+  - id: open-sidebar
+    selector: '[data-testid="sidebar-tool-mfa"]'
+    kind: interactive
+  - id: open-menu
+    selector: '[data-testid="context-menu-item-mfa"]'
+    kind: interactive
+    optional: true       # app menu (Tools); the macOS desktop app uses the native menu
+  - id: tab
+    selector: '[data-testid="mfa-tab"]'
+    kind: display
+  - id: gate-placeholder
+    selector: '[data-testid="vault-gate-placeholder"]'
+    kind: display
+  - id: gate-action
+    selector: '[data-testid="vault-gate-action"]'
+    kind: interactive
+  - id: panel
+    selector: '[data-testid="mfa-panel"]'
+    kind: display
+  - id: search
+    selector: '[data-testid="mfa-search"]'
+    kind: interactive
+  - id: group-filter
+    selector: '[data-testid="mfa-group-filter"]'
+    kind: interactive
+  - id: sort-mode
+    selector: '[data-testid="mfa-sort-mode"]'
+    kind: interactive
+  - id: add
+    selector: '[data-testid="mfa-add"]'
+    kind: interactive
+  - id: empty
+    selector: '[data-testid="mfa-empty"]'
+    kind: display
+  - id: empty-add-secret
+    selector: '[data-testid="mfa-empty-add-secret"]'
+    kind: interactive
+  - id: empty-add-image
+    selector: '[data-testid="mfa-empty-add-image"]'
+    kind: interactive
+  - id: empty-add-screen
+    selector: '[data-testid="mfa-empty-add-screen"]'
+    kind: interactive
+  - id: empty-add-camera
+    selector: '[data-testid="mfa-empty-add-camera"]'
+    kind: interactive
+  - id: no-results
+    selector: '[data-testid="mfa-no-results"]'
+    kind: display
+  - id: list
+    selector: '[data-testid="mfa-list"]'
+    kind: display
+    optional: true       # container; rows carry the assertions
+  - id: status
+    selector: '[data-testid="mfa-status"]'
+    kind: display
+  - id: row
+    selector: '[data-testid="mfa-account-row"]'
+    kind: interactive    # right-click opens the account menu
+  - id: code
+    selector: '[data-testid="mfa-account-code"]'
+    kind: interactive
+  - id: next-code
+    selector: '[data-testid="mfa-account-next-code"]'
+    kind: interactive
+    optional: true       # only in the last 10 s of a TOTP window
+  - id: countdown
+    selector: '[data-testid="mfa-account-countdown"]'
+    kind: display
+  - id: group-pill
+    selector: '[data-testid="mfa-account-group"]'
+    kind: display
+  - id: issuer-label
+    selector: '[data-testid="mfa-account-issuer"]'
+    kind: display
+    optional: true       # rows are asserted through data-issuer
+  - id: account-label
+    selector: '[data-testid="mfa-account-name"]'
+    kind: display
+    optional: true       # rows are asserted through data-account
+  - id: hotp-next
+    selector: '[data-testid="mfa-account-hotp-next"]'
+    kind: interactive
+  - id: copy
+    selector: '[data-testid="mfa-account-copy"]'
+    kind: interactive
+  - id: pin
+    selector: '[data-testid="mfa-account-pin"]'
+    kind: interactive
+  - id: menu
+    selector: '[data-testid="mfa-account-menu"]'
+    kind: interactive
+  - id: drag
+    selector: '[data-testid="mfa-account-drag"]'
+    kind: interactive
+  - id: menu-edit
+    selector: '[data-testid="mfa-menu-edit"]'
+    kind: interactive
+  - id: menu-qr
+    selector: '[data-testid="mfa-menu-qr"]'
+    kind: interactive
+  - id: menu-pin
+    selector: '[data-testid="mfa-menu-pin"]'
+    kind: interactive
+  - id: menu-move-up
+    selector: '[data-testid="mfa-menu-move-up"]'
+    kind: interactive
+  - id: menu-move-down
+    selector: '[data-testid="mfa-menu-move-down"]'
+    kind: interactive
+  - id: menu-delete
+    selector: '[data-testid="mfa-menu-delete"]'
+    kind: interactive
+  - id: edit-dialog
+    selector: '[data-testid="mfa-edit-dialog"]'
+    kind: display
+  - id: edit-issuer
+    selector: '[data-testid="mfa-edit-issuer"]'
+    kind: interactive
+  - id: edit-account
+    selector: '[data-testid="mfa-edit-account"]'
+    kind: interactive
+  - id: edit-group
+    selector: '[data-testid="mfa-edit-group"]'
+    kind: interactive
+  - id: edit-note
+    selector: '[data-testid="mfa-edit-note"]'
+    kind: interactive
+  - id: edit-error
+    selector: '[data-testid="mfa-edit-error"]'
+    kind: display
+  - id: edit-save
+    selector: '[data-testid="mfa-edit-save"]'
+    kind: interactive
+  - id: edit-cancel
+    selector: '[data-testid="mfa-edit-cancel"]'
+    kind: interactive
+  - id: qr-dialog
+    selector: '[data-testid="mfa-qr-dialog"]'
+    kind: display
+  - id: qr-password
+    selector: '[data-testid="mfa-qr-password"]'
+    kind: interactive
+  - id: qr-reveal
+    selector: '[data-testid="mfa-qr-reveal"]'
+    kind: interactive
+  - id: qr-image
+    selector: '[data-testid="mfa-qr-image"]'
+    kind: display
+  - id: qr-error
+    selector: '[data-testid="mfa-qr-error"]'
+    kind: display
+  - id: qr-close
+    selector: '[data-testid="mfa-qr-close"]'
+    kind: interactive
+  - id: error-banner
+    selector: '[data-testid="mfa-error"]'
+    kind: display
+    optional: true       # transient backend error while the list is shown
+  - id: loading
+    selector: '[data-testid="mfa-loading"]'
+    kind: display
+    optional: true       # first load only
+  - id: load-error
+    selector: '[data-testid="mfa-load-error"]'
+    kind: display
+    optional: true       # unreadable mfa.db
+  - id: retry
+    selector: '[data-testid="mfa-retry"]'
+    kind: interactive
+    optional: true       # unreadable mfa.db
+  - id: key-error
+    selector: '[data-testid="mfa-key-error"]'
+    kind: display
+    optional: true       # vault no longer holds the key of mfa.db (restore mismatch)
+  - id: reset-store
+    selector: '[data-testid="mfa-reset-store"]'
+    kind: interactive
+    optional: true       # destructive recovery from key-error; Rust unit tests cover it
+-->
+
+- Tools 菜单与侧栏 Tools 面板打开唯一的 MFA 标签；保险库未设置/已锁定时由 `VaultGate` 先要求设置或解锁主密码，取消后保留可重试的占位。
+- 账户密钥用保险库中的数据密钥（`mfa.data-key-v1`）以 AES-256-GCM 加密存入独立的 `mfa.db`；验证码在 Rust 后端生成，渲染层不接收已存密钥。
+- 列表显示发行方、账户、分组、验证码（3+3 分组显示，复制为纯数字）、TOTP 倒计时与最后 10 秒的下一个码、HOTP「下一个」；点击验证码或复制按钮写入剪贴板并在状态栏播报。
+- 搜索（发行方/账户/分组/备注，Enter 复制首个结果，方向键在验证码间移动）、分组筛选（含无分组）、6 种排序（自定义/发行方/账户/最近使用/最常用/最近添加）、置顶、菜单上移/下移与拖拽调整自定义顺序；排序与筛选偏好持久化。
+- 右键或 ⋯ 菜单：编辑（发行方、账户、分组、备注）、显示二维码、置顶、上移/下移、删除（确认后执行）。
+- 显示二维码：重新输入主密码后由后端 `mfa_export_uri` 生成 `otpauth://` 链接并在本地渲染为二维码，供其他验证器扫码迁移；关闭即清除，再次打开需重新验证。
+
+### 27.2 添加账户：密钥、截图、屏幕扫描与摄像头 ✅
+
+<!-- feature
+id: F-MFA-2
+status: done
+area: tools/mfa
+components: [MfaAddDialog, MfaSecretForm, MfaImagePane, MfaScreenPane, MfaCameraPane, MfaImportPreview]
+files:
+  - src-tauri/src/mfa/capture.rs
+  - src/lib/mfa/base32.ts
+  - src/lib/mfa/otpauth.ts
+  - src/lib/mfa/migration.ts
+  - src/lib/mfa/qrImage.ts
+  - src/lib/mfa/frames.ts
+  - src/lib/mfa/sources.ts
+  - src/components/mfa/MfaAddDialog.tsx
+  - src/components/mfa/MfaSecretForm.tsx
+  - src/components/mfa/MfaImagePane.tsx
+  - src/components/mfa/MfaScreenPane.tsx
+  - src/components/mfa/MfaCameraPane.tsx
+  - src/components/mfa/MfaImportPreview.tsx
+controls:
+  - id: dialog
+    selector: '[data-testid="mfa-add-dialog"]'
+    kind: display
+  - id: close
+    selector: '[data-testid="mfa-add-close"]'
+    kind: interactive
+  - id: mode-secret
+    selector: '[data-testid="mfa-add-mode-secret"]'
+    kind: interactive
+  - id: mode-image
+    selector: '[data-testid="mfa-add-mode-image"]'
+    kind: interactive
+  - id: mode-screen
+    selector: '[data-testid="mfa-add-mode-screen"]'
+    kind: interactive
+  - id: mode-camera
+    selector: '[data-testid="mfa-add-mode-camera"]'
+    kind: interactive
+  - id: secret-form
+    selector: '[data-testid="mfa-secret-form"]'
+    kind: display
+    optional: true       # fields carry the assertions
+  - id: uri
+    selector: '[data-testid="mfa-add-uri"]'
+    kind: interactive
+  - id: issuer
+    selector: '[data-testid="mfa-add-issuer"]'
+    kind: interactive
+  - id: account
+    selector: '[data-testid="mfa-add-account"]'
+    kind: interactive
+  - id: secret
+    selector: '[data-testid="mfa-add-secret"]'
+    kind: interactive
+  - id: group
+    selector: '[data-testid="mfa-add-group"]'
+    kind: interactive
+  - id: advanced
+    selector: '[data-testid="mfa-add-advanced"]'
+    kind: interactive
+  - id: advanced-panel
+    selector: '[data-testid="mfa-add-advanced-panel"]'
+    kind: display
+  - id: kind
+    selector: '[data-testid="mfa-add-kind"]'
+    kind: interactive
+  - id: counter
+    selector: '[data-testid="mfa-add-counter"]'
+    kind: interactive
+  - id: algorithm
+    selector: '[data-testid="mfa-add-algorithm"]'
+    kind: interactive
+    optional: true       # set through otpauth links in the cases
+  - id: digits
+    selector: '[data-testid="mfa-add-digits"]'
+    kind: interactive
+    optional: true       # set through otpauth links in the cases
+  - id: period
+    selector: '[data-testid="mfa-add-period"]'
+    kind: interactive
+    optional: true       # set through otpauth links in the cases
+  - id: notice
+    selector: '[data-testid="mfa-add-notice"]'
+    kind: display
+  - id: error
+    selector: '[data-testid="mfa-add-error"]'
+    kind: display
+  - id: cancel
+    selector: '[data-testid="mfa-add-cancel"]'
+    kind: interactive
+  - id: submit
+    selector: '[data-testid="mfa-add-submit"]'
+    kind: interactive
+  - id: image-dropzone
+    selector: '[data-testid="mfa-image-dropzone"]'
+    kind: interactive    # paste/drop target
+  - id: image-paste
+    selector: '[data-testid="mfa-image-paste"]'
+    kind: interactive
+  - id: image-choose
+    selector: '[data-testid="mfa-image-choose"]'
+    kind: interactive
+    optional: true       # opens the OS file chooser; cases drive the hidden input
+  - id: image-file
+    selector: '[data-testid="mfa-image-file"]'
+    kind: interactive
+  - id: image-status
+    selector: '[data-testid="mfa-image-status"]'
+    kind: display
+  - id: screen-scan
+    selector: '[data-testid="mfa-screen-scan"]'
+    kind: interactive
+  - id: screen-status
+    selector: '[data-testid="mfa-screen-status"]'
+    kind: display
+  - id: camera-state
+    selector: '[data-testid="mfa-camera-state"]'
+    kind: display
+  - id: camera-video
+    selector: '[data-testid="mfa-camera-video"]'
+    kind: display
+  - id: camera-retry
+    selector: '[data-testid="mfa-camera-retry"]'
+    kind: interactive
+  - id: camera-device
+    selector: '[data-testid="mfa-camera-device"]'
+    kind: interactive
+    optional: true       # only with more than one camera
+  - id: import-preview
+    selector: '[data-testid="mfa-import-preview"]'
+    kind: display
+  - id: import-item
+    selector: '[data-testid="mfa-import-item"]'
+    kind: display
+  - id: import-item-check
+    selector: '[data-testid="mfa-import-item-check"]'
+    kind: interactive
+  - id: import-item-label
+    selector: '[data-testid="mfa-import-item-label"]'
+    kind: display
+  - id: import-issuer
+    selector: '[data-testid="mfa-import-issuer"]'
+    kind: interactive
+  - id: import-account
+    selector: '[data-testid="mfa-import-account"]'
+    kind: interactive
+  - id: import-group
+    selector: '[data-testid="mfa-import-group"]'
+    kind: interactive
+  - id: import-duplicate
+    selector: '[data-testid="mfa-import-duplicate"]'
+    kind: display
+  - id: import-all-duplicates
+    selector: '[data-testid="mfa-import-all-duplicates"]'
+    kind: display
+  - id: import-invalid
+    selector: '[data-testid="mfa-import-invalid"]'
+    kind: display
+    optional: true       # migration entry with an unsupported algorithm/type (Vitest)
+  - id: import-error
+    selector: '[data-testid="mfa-import-error"]'
+    kind: display
+    optional: true       # backend refusal while importing
+  - id: import-back
+    selector: '[data-testid="mfa-import-back"]'
+    kind: interactive
+  - id: import-confirm
+    selector: '[data-testid="mfa-import-confirm"]'
+    kind: interactive
+-->
+
+- 密钥模式：发行方/账户/Base32 密钥（允许小写、空格分组）/分组，高级项可选 TOTP/HOTP、SHA1/256/512、6～8 位、周期或初始计数；粘贴 `otpauth://` 链接自动填表；逐项校验并拒绝重复密钥。
+- 截图模式：粘贴截图（按钮或 Ctrl/⌘+V，桌面版经 Rust arboard 读取系统剪贴板图片）、拖入或选择图片文件；在 MFA 标签上直接粘贴截图会跳到导入预览。
+- 屏幕扫描（桌面版）：临时隐藏 Taomni，截取所有显示器后恢复窗口；macOS 需屏幕录制权限。摄像头：设备选择、无设备/拒绝授权状态与重试，识别后立即停止视频流。
+- 二维码由渲染层 `qr` 解码；支持 Google Authenticator `otpauth-migration` 批量导出码。导入前预览每个账户（可取消勾选、改名、统一分组），已存在的账户标记为“已添加”。
+
+### 27.3 备份与恢复中的 MFA 数据 ✅
+
+<!-- feature
+id: F-MFA-3
+status: done
+area: settings/backup
+components: [BackupSettingsPanel]
+files:
+  - src-tauri/src/backup/engine.rs
+  - src-tauri/src/backup/restore.rs
+  - src/components/settings/BackupSettingsPanel.tsx
+  - src/lib/backup.ts
+controls:
+  - id: group-toggle-backup
+    selector: '[data-testid="settings-group-toggle-backup"]'
+    kind: interactive
+  - id: create-now
+    selector: '[data-testid="backup-create-now"]'
+    kind: interactive
+  - id: action-success
+    selector: '[data-testid="backup-action-success"]'
+    kind: display
+  - id: history-row
+    selector: '[data-testid="backup-history-row"]'
+    kind: display
+  - id: history-restore
+    selector: '[data-testid="backup-history-restore"]'
+    kind: interactive
+  - id: restore-files
+    selector: '[data-testid="backup-restore-files"]'
+    kind: display
+  - id: restore-cancel
+    selector: '[data-testid="backup-restore-cancel"]'
+    kind: interactive
+-->
+
+- 轻量核心与完整备份都包含 `databases/mfa.db`；自定义范围勾选 MFA 时强制同时包含 `vault.db`（数据密钥在保险库中）。从未使用 MFA 的配置不生成 `mfa.db`。
+- 恢复时替换 `mfa.db` 并为原文件保留安全副本；恢复后若保险库与 `mfa.db` 不匹配，MFA 标签提示并提供清空重建入口。
 
 ---
 
