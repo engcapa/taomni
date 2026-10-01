@@ -40,6 +40,27 @@ pub(crate) struct RfxStats {
     /// Context `flags` (0x02 = image mode, 0x00 = video mode) → contexts.
     modes: BTreeMap<u16, u64>,
     compressed_updates: u64,
+    /// Fast-path update code → (updates, payload bytes of all fragments), so
+    /// a server that answers with bitmap updates instead of RemoteFX shows.
+    updates: BTreeMap<u8, (u64, u64)>,
+}
+
+fn update_name(code: u8) -> String {
+    match code {
+        0x0 => "orders".into(),
+        0x1 => "bitmap".into(),
+        0x2 => "palette".into(),
+        0x3 => "synchronize".into(),
+        0x4 => "surface_commands".into(),
+        0x5 => "pointer_hidden".into(),
+        0x6 => "pointer_default".into(),
+        0x8 => "pointer_position".into(),
+        0x9 => "pointer_color".into(),
+        0xA => "pointer_cached".into(),
+        0xB => "pointer_new".into(),
+        0xC => "pointer_large".into(),
+        other => format!("code_{other:#x}"),
+    }
 }
 
 fn u16_at(data: &[u8], at: usize) -> Option<u16> {
@@ -85,6 +106,14 @@ impl RfxStats {
             let body = &tail[2..];
             let size = usize::from(size).min(body.len());
             let (data, next) = body.split_at(size);
+            let entry = self.updates.entry(code).or_default();
+            if matches!(
+                fragmentation,
+                FASTPATH_FRAGMENT_SINGLE | FASTPATH_FRAGMENT_FIRST
+            ) {
+                entry.0 += 1;
+            }
+            entry.1 += size as u64;
             if compressed {
                 self.compressed_updates += 1;
             } else if code == FASTPATH_UPDATETYPE_SURFCMDS
@@ -198,6 +227,11 @@ impl RfxStats {
             "bytes_per_tile": if self.tiles == 0 { Value::Null } else { json!(self.rfx_bytes / self.tiles) },
             "quants": self.quants,
             "context_modes": self.modes.iter().map(|(mode, n)| (format!("{mode:#x}"), *n)).collect::<BTreeMap<_, _>>(),
+            "updates": self
+                .updates
+                .iter()
+                .map(|(code, (count, bytes))| (update_name(*code), json!({ "count": count, "bytes": bytes })))
+                .collect::<BTreeMap<_, _>>(),
             "compressed_updates": self.compressed_updates,
         })
     }
@@ -264,6 +298,7 @@ mod tests {
         assert_eq!(report["quants"]["6,6,6,6,7,7,8,8,8,9"], 1);
         assert_eq!(report["quants"]["8,8,8,8,9,9,10,10,10,11"], 1);
         assert_eq!(report["context_modes"]["0x2"], 2);
+        assert_eq!(report["updates"]["surface_commands"]["count"], 2);
     }
 
     #[test]
