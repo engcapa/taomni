@@ -76,7 +76,9 @@ steps:
 - fill:
     selector: '[data-testid="annotation-text-input"]'
     value: qa-shot
-- press: Enter
+- press:
+    key: Enter
+    selector: '[data-testid="annotation-text-input"]'
 - wait: 1
 # Sweep the remaining colors.
 - click: '[data-testid="screenshot-color-yellow"]'
