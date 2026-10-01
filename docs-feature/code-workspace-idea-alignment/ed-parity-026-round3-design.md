@@ -67,4 +67,4 @@
 
 - IDEA Project 视图的 Packages / Open Files / Scratches 等其它视图、Behavior 与 Sort 子菜单、文件类型图标与源根着色未做。
 - 悬停弹窗的“朝向判断”不含 IDEA 的时间衰减；调试值悬停（debugEditorChrome）仍用 CodeMirror 默认行为。
-- ED-PARITY-027 只给 Code Workspace 与终端接入工具条；SFTP、数据库、邮件等标签类型暂无工具窗口，沿用“其它”组；后续接入时只需按同一宿主渲染按钮并加入分组。
+- ED-PARITY-027 只给 Code Workspace 与终端接入工具条。数据库 / Redis / HBase Shell 标签的左侧导航（Schema/Objects/Keys 与 Queries 页签）和邮件的文件夹栏同属工具窗口性质，目前沿用“其它”组（主侧栏不自动折叠、导航不进工具条）；接入时按同一宿主（`useMainRailHostStore`）渲染按钮并新增分组即可，代价是打开这些标签时会话树也随之收起，需用户确认后再做（涉及 DB-* 看板）。
