@@ -66,6 +66,53 @@ def sshd_forwarding_policy(private: Path) -> tuple[Path, str]:
     return config, "/config/sshd/sshd_config.d/qa-forwarding.conf:ro"
 
 
+def exact(sock, size):
+    data = b""
+    while len(data) < size:
+        chunk = sock.recv(size - len(data))
+        if not chunk:
+            raise ConnectionError("the RFB server closed the probe connection")
+        data += chunk
+    return data
+
+
+def ard_probe(port, user, password):
+    """Log in to macOS Screen Sharing with ARD (RFB security type 30): DH key
+    agreement, MD5 of the secret as AES-128 key, {user[64], password[64]}."""
+    import hashlib
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+    with socket.create_connection(("127.0.0.1", port), timeout=10) as sock:
+        sock.settimeout(10)
+        banner = exact(sock, 12)
+        if not banner.startswith(b"RFB 003."):
+            raise RuntimeError(f"not an RFB server: {banner!r}")
+        sock.sendall(b"RFB 003.008\n")
+        offered = list(exact(sock, exact(sock, 1)[0]))
+        if 30 not in offered:
+            raise RuntimeError(f"Screen Sharing does not offer ARD authentication: {offered}")
+        sock.sendall(bytes([30]))
+        generator, key_len = struct.unpack(">HH", exact(sock, 4))
+        prime = int.from_bytes(exact(sock, key_len), "big")
+        server_public = int.from_bytes(exact(sock, key_len), "big")
+        private = secrets.randbelow(prime - 2) + 1
+        public = pow(generator, private, prime).to_bytes(key_len, "big")
+        shared = pow(server_public, private, prime).to_bytes(key_len, "big")
+        block = bytearray(secrets.token_bytes(128))
+        for offset, value in ((0, user), (64, password)):
+            data = value.encode() + b"\0"
+            block[offset:offset + len(data)] = data
+        encryptor = Cipher(algorithms.AES(hashlib.md5(shared).digest()), modes.ECB()).encryptor()
+        sock.sendall(encryptor.update(bytes(block)) + encryptor.finalize() + public)
+        if struct.unpack(">I", exact(sock, 4))[0] != 0:
+            raise RuntimeError("Screen Sharing rejected the ARD credentials")
+        sock.sendall(b"\x01")
+        width, height = struct.unpack(">HH", exact(sock, 4))
+        exact(sock, 16)
+        exact(sock, struct.unpack(">I", exact(sock, 4))[0])
+    return banner.decode("latin-1").strip(), offered, width, height
+
+
 def rfb_probe(port, password):
     """Authenticate to the VNC fixture with VNCAuth and read its ServerInit."""
     sys.path.insert(0, str(VNC_FIXTURE.parent.resolve()))
@@ -73,15 +120,6 @@ def rfb_probe(port, password):
         from vnc_des import vnc_auth_response
     finally:
         sys.path.pop(0)
-
-    def exact(sock, size):
-        data = b""
-        while len(data) < size:
-            chunk = sock.recv(size - len(data))
-            if not chunk:
-                raise ConnectionError("VNC fixture closed the probe connection")
-            data += chunk
-        return data
 
     with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
         sock.settimeout(5)
@@ -461,8 +499,38 @@ class Services:
         return {"authentication": True, "server_init": [width, height, name], "port": port,
                 "control_port": control_port}
 
+    def ard(self):
+        """macOS Screen Sharing with ARD login for the console account."""
+        if platform.system() != "Darwin":
+            raise RuntimeError("macOS Screen Sharing (ARD) needs a macOS runner")
+        user = os.environ.get("USER") or command(["id", "-un"])
+        # ARD logs in with the macOS account; give the job's console account a
+        # disposable password (the VM is discarded after the job).
+        password = secret("QA_ARD_PASSWORD", "Qa1-" + secrets.token_hex(8))
+        command(["sudo", "-n", "dscl", ".", "-passwd", f"/Users/{user}", password])
+        plist = "/System/Library/LaunchDaemons/com.apple.screensharing.plist"
+        command(["sudo", "-n", "launchctl", "enable", "system/com.apple.screensharing"])
+        # Fails harmlessly when the service is already loaded.
+        subprocess.run(["sudo", "-n", "launchctl", "bootstrap", "system", plist], capture_output=True)
+        self.cleanup_command(["sudo", "-n", "launchctl", "bootout", "system/com.apple.screensharing"])
+        try:
+            banner, offered, width, height = retry(lambda: ard_probe(5900, user, password), 90)
+        except Exception:
+            report = []
+            for argv in (["sudo", "-n", "launchctl", "print", "system/com.apple.screensharing"],
+                         ["netstat", "-an", "-p", "tcp"], ["sw_vers"]):
+                result = subprocess.run(argv, capture_output=True, text=True, errors="replace")
+                report.append(f"$ {' '.join(argv)}\n{result.stdout[-4000:]}{result.stderr[-1000:]}")
+            (self.root / "screensharing-diagnostics.txt").write_text("\n".join(report), encoding="utf-8")
+            raise
+        self.resources.append("screensharing:5900")
+        self.config["ard"] = {"host": "127.0.0.1", "port": 5900, "user": user,
+                              "password": "${env.QA_ARD_PASSWORD}"}
+        return {"authentication": True, "banner": banner, "security_types": offered,
+                "server_init": [width, height]}
+
     def __enter__(self):
-        accounts = self.capabilities & {"ssh", "mysql"}
+        accounts = self.capabilities & {"ssh", "mysql", "ard"}
         if accounts and platform.system() != "Linux" and os.environ.get("GITHUB_ACTIONS") != "true":
             raise RuntimeError("native service account setup is restricted to hosted CI")
         self.root.mkdir(parents=True, exist_ok=True)
@@ -476,6 +544,8 @@ class Services:
                 facts["mysql"] = self.mysql()
             if "vnc" in self.capabilities:
                 facts["vnc"] = self.vnc()
+            if "ard" in self.capabilities:
+                facts["ard"] = self.ard()
             write_json(self.root / "lease.json", facts)
             return self
         except BaseException:

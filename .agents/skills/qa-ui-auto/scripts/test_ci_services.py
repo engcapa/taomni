@@ -104,6 +104,35 @@ class HostedServicesTest(unittest.TestCase):
             self.assertEqual(lease['vnc']['server_init'], [1280, 720, 'taomni-vnc-fixture'])
             self.assertNotIn(password, json.dumps(lease))
 
+    def test_screen_sharing_is_enabled_for_the_console_account_on_macos(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.dict('os.environ', {'GITHUB_ACTIONS': 'true', 'USER': 'runner'}), \
+                patch('ci_services.platform.system', return_value='Darwin'), \
+                patch('ci_services.command') as run, \
+                patch('ci_services.subprocess.run') as bootstrap, \
+                patch('ci_services.ard_probe', return_value=('RFB 003.889', [30, 33, 36, 35], 1920, 1080)) as probe:
+            config = {}
+            with Services(Path(directory), ['ard'], config):
+                password = os.environ['QA_ARD_PASSWORD']
+            calls = [call.args[0] for call in run.call_args_list]
+            self.assertIn(['sudo', '-n', 'dscl', '.', '-passwd', '/Users/runner', password], calls)
+            self.assertIn(['sudo', '-n', 'launchctl', 'enable', 'system/com.apple.screensharing'], calls)
+            self.assertIn(['sudo', '-n', 'launchctl', 'bootout', 'system/com.apple.screensharing'], calls)
+            self.assertEqual(bootstrap.call_args.args[0][-1], '/System/Library/LaunchDaemons/com.apple.screensharing.plist')
+            self.assertEqual(probe.call_args.args, (5900, 'runner', password))
+            self.assertEqual(config['ard'], {'host': '127.0.0.1', 'port': 5900, 'user': 'runner',
+                                             'password': '${env.QA_ARD_PASSWORD}'})
+            lease = (Path(directory) / 'lease.json').read_text(encoding='utf-8')
+            self.assertIn('RFB 003.889', lease)
+            self.assertNotIn(password, lease)
+
+    def test_screen_sharing_needs_a_macos_runner(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+                patch('ci_services.platform.system', return_value='Linux'):
+            with self.assertRaisesRegex(RuntimeError, 'macOS runner'):
+                Services(Path(directory), ['ard'], {}).__enter__()
+
     def test_vnc_packages_install_only_for_the_vnc_capability(self):
         with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
                 patch('ci_services.platform.system', return_value='Linux'), \

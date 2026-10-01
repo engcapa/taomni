@@ -2598,7 +2598,8 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 - 本地动态端口 WebSocket relay：VNC server ↔ 前端 Canvas（前端不再直接持有 TCP 套接字）
 
 ### 9.2 RFB 握手与认证 ✅
-- 安全类型：None（仅显式 `allow-none`）、VNC password、RFB 18 anonymous TLS + 内层安全协商、RealVNC RA2 / RA2ne（128 / 256 位 AES）
+- 安全类型：None（仅显式 `allow-none`）、VNC password、RFB 18 anonymous TLS + 内层安全协商、RealVNC RA2 / RA2ne（128 / 256 位 AES）、Apple Remote Desktop（RFB 30，macOS 屏幕共享：会话填写 macOS 账户名时用 DH + AES-128 发送账户密码；未填用户名时有 VNCAuth 则用 VNCAuth；会话本身不加密，同样先弹未加密警告；TC-152 在 macOS runner 上连真实屏幕共享）
+- macOS 屏幕共享宣告 `RFB 003.889`，按 3.8 协商
 - RA2 子模式：USER_PASS、PASS-only；公钥位长度合法性校验（1024–8192 bit）
 - TCP 建连使用独立 15 秒 deadline；RFB 安全协商和认证使用 45 秒 timeout，支持服务端认证限速/延迟，并将超时标记为可重试的 authentication/security 阶段错误
 - Tokio socket 交给同步 RFB 解码器前恢复 blocking mode，避免 `WouldBlock` 被误报为认证超时
@@ -2665,6 +2666,10 @@ controls:
     selector: '[data-testid="vnc-session-menu"]'
     kind: interactive
     optional: true          # connected; same menu as F8 (VNC-SESS-001)
+  - id: menu-info
+    selector: '[data-testid="vnc-menu-info"]'
+    kind: interactive
+    optional: true          # session menu → Information; TC-152 reads the negotiated ARD security type
   - id: session-info
     selector: '[data-testid="vnc-session-info"]'
     kind: display

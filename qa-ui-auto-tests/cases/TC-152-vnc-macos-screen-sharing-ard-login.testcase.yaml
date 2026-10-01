@@ -1,0 +1,126 @@
+id: TC-152
+title: VNC session logs in to macOS Screen Sharing with ARD and shows the remote desktop
+description: 'Native macOS check for F9.2 against the real Screen Sharing server of the
+  runner (ard_required): a saved VNC session with the macOS account name uses Apple
+  Remote Desktop authentication (RFB security type 30), passes the per-attempt
+  unencrypted-connection warning, paints the remote desktop and reports ARD in
+  Session Information.
+
+  '
+covers:
+- F9.1
+- F9.6
+tags:
+- vnc
+- p1
+- macos
+- session
+modes:
+- native
+native_platforms:
+- macOS
+fixtures:
+- reset_db
+- ard_required
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-vnc"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${fixture.ard_host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${fixture.ard_port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${fixture.ard_user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-ui-auto-mac-ard
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-mac-ard"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-mac-ard"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_ARD_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    timeout_sec: 30
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width]:not([width="300"])'
+    timeout_sec: 45
+- click: '[data-testid="vnc-session-menu"]'
+- click: '[data-testid="vnc-menu-info"]'
+- wait_for: '[data-testid="vnc-session-info"]'
+- assert_text:
+    selector: '[data-testid="vnc-session-info"]'
+    contains: ARD (Apple Remote Desktop)
+- screenshot: 152-vnc-macos-ard.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A VNC session with the macOS account name logs in to Screen Sharing with ARD after the unencrypted-connection confirmation and paints the remote desktop.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 16
+    - 17
+    - 19
+    checkpoints:
+    - step: 3
+      expectation: The session editor opens.
+    - step: 10
+      expectation: The bookmark section is shown.
+    - step: 13
+      expectation: The saved session appears in the session tree.
+    - step: 15
+      expectation: Opening the session asks for the password.
+    - step: 18
+      expectation: Screen Sharing is reached and the connection stops for the unencrypted-connection warning.
+    - step: 20
+      expectation: The frame painter sizes the canvas to the Mac's framebuffer when the first frame arrives.
+    results:
+    - 18
+    - 20
+  - id: R2
+    requirement: Session Information names the ARD security method.
+    actions:
+    - 21
+    - 22
+    checkpoints:
+    - step: 23
+      expectation: The Session Information dialog opens.
+    - step: 24
+      expectation: The security row reads ARD (Apple Remote Desktop).
+    results:
+    - 23
+    - 24
+  visual:
+  - check: The macOS desktop is visible in the session without overlays or clipping.
+    method: manual
+    reason: Pixel content of the real Mac desktop is judged from the screenshot.
+  native:
+  - check: Runs only on the hosted macOS runner (Screen Sharing on the same Mac, console account with a disposable password); Windows and Linux have no ARD server.
+    method: automated
+    reason: Proves the Rust ARD client against Apple's server; keyboard layouts and pointer input on macOS are not part of this case.

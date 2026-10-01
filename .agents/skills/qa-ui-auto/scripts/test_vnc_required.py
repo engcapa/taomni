@@ -7,7 +7,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from qa_ui_auto.fixtures import FixtureSkip, vnc_required
+from qa_ui_auto.fixtures import FixtureSkip, ard_required, vnc_required
 from qa_ui_auto.steps import REGISTRY, StepContext, StepError
 
 
@@ -90,6 +90,30 @@ class VncRequiredTest(unittest.TestCase):
             ctx = context(Path(directory), {"vnc": {"host": "127.0.0.1", "port": closed, "control_port": closed}})
             with self.assertRaisesRegex(FixtureSkip, "unreachable"):
                 vnc_required.setup(ctx)
+
+
+class ArdRequiredTest(unittest.TestCase):
+    def test_skips_without_screen_sharing_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(FixtureSkip, "ard.host"):
+                ard_required.setup(context(Path(directory), {"ard": {"host": "127.0.0.1", "port": 5900}}))
+
+    def test_exposes_the_account_when_screen_sharing_answers(self):
+        server = socket.create_server(("127.0.0.1", 0))
+        def answer():
+            conn, _ = server.accept()
+            with conn:
+                conn.sendall(b"RFB 003.889\n")
+        threading.Thread(target=answer, daemon=True).start()
+        try:
+            with tempfile.TemporaryDirectory() as directory, patch.dict("os.environ", {"QA_ARD_PASSWORD": "Qa1-x"}):
+                ctx = context(Path(directory), {"ard": {"host": "127.0.0.1", "port": server.getsockname()[1],
+                                                        "user": " runner "}})
+                ard_required.setup(ctx)
+                self.assertEqual(ctx.values["ard_user"], "runner")
+                self.assertEqual(ctx.values["ard_port"], str(server.getsockname()[1]))
+        finally:
+            server.close()
 
 
 class BrowserHostFilesTest(unittest.TestCase):
