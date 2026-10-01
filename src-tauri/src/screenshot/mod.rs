@@ -434,12 +434,13 @@ pub async fn screenshot_test_recording(
         let app_clone = app.clone();
         let format_clone = format.clone();
         tokio::task::spawn_blocking(move || {
-            record::start_recording(
+            record::start_recording_with_overlay(
                 &app_clone,
                 None,
                 Some((0, 0, 200, 200)),
                 &format_clone,
                 Some(5),
+                true, // test overlay: moving red dot
             )
         })
         .await
@@ -485,7 +486,14 @@ pub async fn screenshot_test_gif_complete(
     let recording_id = {
         let app_clone = app.clone();
         tokio::task::spawn_blocking(move || {
-            record::start_recording(&app_clone, None, Some((0, 0, 200, 200)), "gif", Some(fps))
+            record::start_recording_with_overlay(
+                &app_clone,
+                None,
+                Some((0, 0, 200, 200)),
+                "gif",
+                Some(fps),
+                true,
+            )
         })
         .await
         .map_err(|e| format!("start task failed: {e}"))?
@@ -555,7 +563,14 @@ pub async fn screenshot_test_mp4_complete(
     let recording_id = {
         let app_clone = app.clone();
         tokio::task::spawn_blocking(move || {
-            record::start_recording(&app_clone, None, Some((0, 0, 200, 200)), "mp4", Some(fps))
+            record::start_recording_with_overlay(
+                &app_clone,
+                None,
+                Some((0, 0, 200, 200)),
+                "mp4",
+                Some(fps),
+                true,
+            )
         })
         .await
         .map_err(|e| format!("start task failed: {e}"))?
@@ -629,15 +644,22 @@ pub async fn screenshot_test_mp4_complete(
 /// Test-only: verify scroll-stitch content is real (not duplicated frames).
 /// Divides the stitched image into 3 vertical thirds and checks at least 2
 /// have different average colors, proving the wheel actually scrolled.
+/// Saves a full-display screenshot as the visual QA artifact (the scroll
+/// region is black on headless CI VMs).
 #[tauri::command]
 pub async fn screenshot_test_scroll_content(
     app: AppHandle,
     width: u32,
     height: u32,
 ) -> Result<String, String> {
-    let r = screenshot_scroll_capture(app, None, 0, 0, width, height).await?;
+    let r = screenshot_scroll_capture(app.clone(), None, 0, 0, width, height).await?;
     let path = r.path.clone();
-    save_qa_artifact(&path, "n9-scroll-content.png");
+    // Save full display for visual artifact (scroll region is empty on CI).
+    if let Ok(full) = screenshot_capture_full(app, None).await {
+        save_qa_artifact(&full.path, "n9-scroll-content.png");
+    } else {
+        save_qa_artifact(&path, "n9-scroll-content.png");
+    }
     let differ = tokio::task::spawn_blocking(move || {
         let img = image::open(&path)
             .map_err(|e| format!("open failed: {e}"))?

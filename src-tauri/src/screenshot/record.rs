@@ -72,7 +72,11 @@ pub struct RecordingParams {
 }
 
 enum SessionOutcome {
-    Done { width: u32, height: u32, frames: u32 },
+    Done {
+        width: u32,
+        height: u32,
+        frames: u32,
+    },
     Failed(String),
 }
 
@@ -106,6 +110,19 @@ pub fn start_recording(
     format: &str,
     fps: Option<u32>,
 ) -> anyhow::Result<String> {
+    start_recording_with_overlay(app, display_id, region, format, fps, false)
+}
+
+/// Start a recording, with optional test overlay (moving red dot drawn on
+/// each frame for visual verification in CI artifacts).
+pub fn start_recording_with_overlay(
+    app: &tauri::AppHandle,
+    display_id: Option<String>,
+    region: Option<(u32, u32, u32, u32)>,
+    format: &str,
+    fps: Option<u32>,
+    test_overlay: bool,
+) -> anyhow::Result<String> {
     let format = RecordFormat::parse(format)?;
     if format == RecordFormat::Mp4 && !ffmpeg_available() {
         anyhow::bail!(
@@ -136,7 +153,16 @@ pub fn start_recording(
     let handle = {
         let thread_output = output_path.clone();
         thread::spawn(move || {
-            run_capture_loop(&app, display_id.as_deref(), (rx, ry, rw, rh), format, fps, &thread_output, &stop_flag)
+            run_capture_loop(
+                &app,
+                display_id.as_deref(),
+                (rx, ry, rw, rh),
+                format,
+                fps,
+                &thread_output,
+                &stop_flag,
+                test_overlay,
+            )
         })
     };
 
@@ -162,7 +188,11 @@ pub fn stop_recording(recording_id: &str) -> anyhow::Result<ScreenshotFile> {
     session.stop.store(true, Ordering::SeqCst);
     let handle = session.handle.take().context("recording already stopped")?;
     match handle.join() {
-        Ok(SessionOutcome::Done { width, height, frames }) => {
+        Ok(SessionOutcome::Done {
+            width,
+            height,
+            frames,
+        }) => {
             if frames == 0 {
                 anyhow::bail!("no frames were captured")
             }
@@ -225,8 +255,18 @@ fn run_capture_loop(
     fps: u32,
     output_path: &PathBuf,
     stop: &AtomicBool,
+    test_overlay: bool,
 ) -> SessionOutcome {
-    match capture_loop(app, display_id, region, format, fps, output_path, stop) {
+    match capture_loop(
+        app,
+        display_id,
+        region,
+        format,
+        fps,
+        output_path,
+        stop,
+        test_overlay,
+    ) {
         Ok(outcome) => outcome,
         Err(e) => SessionOutcome::Failed(format!("{e:#}")),
     }
@@ -240,6 +280,7 @@ fn capture_loop(
     fps: u32,
     output_path: &PathBuf,
     stop: &AtomicBool,
+    test_overlay: bool,
 ) -> anyhow::Result<SessionOutcome> {
     let (x, y, w, h) = region;
     let frame_interval = Duration::from_secs_f64(1.0 / fps as f64);
@@ -255,7 +296,30 @@ fn capture_loop(
     while !stop.load(Ordering::SeqCst) && Instant::now() < deadline {
         let tick = Instant::now();
         match capture_region_image(app, display_id, x, y, w, h) {
-            Ok(frame) => {
+            Ok(mut frame) => {
+                // Test overlay: draw a moving red dot for visual verification.
+                if test_overlay {
+                    let t = frames as f32 / fps as f32;
+                    // Move in a circle: center (w/2, h/2), radius min(w,h)/3
+                    let cx = w as f32 / 2.0;
+                    let cy = h as f32 / 2.0;
+                    let r = (w.min(h) as f32 / 3.0).max(20.0);
+                    let dot_x = (cx + r * (t * 2.0).cos()) as u32;
+                    let dot_y = (cy + r * (t * 2.0).sin()) as u32;
+                    // Draw 8x8 red square
+                    let rgb = frame.to_rgb8();
+                    let mut rgb = rgb;
+                    for ox in 0..8 {
+                        for oy in 0..8 {
+                            let px = dot_x.saturating_sub(4) + ox;
+                            let py = dot_y.saturating_sub(4) + oy;
+                            if px < w && py < h {
+                                rgb.put_pixel(px, py, image::Rgb([255, 0, 0]));
+                            }
+                        }
+                    }
+                    frame = image::DynamicImage::ImageRgb8(rgb);
+                }
                 let (fw, fh) = sink.push(frame)?;
                 out_w = fw;
                 out_h = fh;
@@ -316,16 +380,25 @@ impl FrameSink {
         let child = Command::new("ffmpeg")
             .args([
                 "-y",
-                "-f", "rawvideo",
-                "-pix_fmt", "rgba",
-                "-s", &format!("{width}x{height}"),
-                "-framerate", &fps.to_string(),
-                "-i", "pipe:0",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgba",
+                "-s",
+                &format!("{width}x{height}"),
+                "-framerate",
+                &fps.to_string(),
+                "-i",
+                "pipe:0",
                 "-an",
-                "-c:v", "libx264",
-                "-preset", "veryfast",
-                "-pix_fmt", "yuv420p",
-                "-movflags", "+faststart",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-movflags",
+                "+faststart",
                 &path.to_string_lossy(),
             ])
             .stdin(Stdio::piped())
@@ -370,7 +443,11 @@ impl FrameSink {
                 encoder.write_frame(&gif_frame).context("write gif frame")?;
                 Ok((w16 as u32, h16 as u32))
             }
-            Self::Mp4 { child, width, height } => {
+            Self::Mp4 {
+                child,
+                width,
+                height,
+            } => {
                 let frame = if frame.dimensions() == (*width, *height) {
                     frame
                 } else {
@@ -392,7 +469,8 @@ impl FrameSink {
                 // Dropping the encoder writes the GIF trailer.
                 *encoder = None;
                 Ok(())
-            }            Self::Mp4 { child, .. } => {
+            }
+            Self::Mp4 { child, .. } => {
                 drop(child.stdin.take());
                 let status = child.wait().context("wait for ffmpeg")?;
                 if !status.success() {
