@@ -24,6 +24,7 @@ import { DebugVariablesPane } from "./debug/DebugVariablesPane";
 import { DebugConsolePane } from "./debug/DebugConsolePane";
 import { DebugBreakpointsPane } from "./debug/DebugBreakpointsPane";
 import { DebugMemoryPane } from "./debug/DebugMemoryPane";
+import { DebugToolWindowToolbar } from "./debug/DebugToolbar";
 import {
   Group as PanelGroup,
   Panel,
@@ -78,6 +79,12 @@ export interface DebugPanelProps {
   activeSubTab?: DebugSubTabId;
   onSubTabChange?: (tab: DebugSubTabId) => void;
   onOpenLocation?: (filePath: string, line: number, column?: number) => void;
+  /** IDEA View Breakpoints… dialog (toolbar / Ctrl+Shift+F8). */
+  onViewBreakpoints?: () => void;
+  /** IDEA Evaluate Expression… dialog, optionally prefilled. */
+  onEvaluateExpression?: (expression?: string) => void;
+  /** Run to the active editor caret (IDEA Run to Cursor); null without a target. */
+  onRunToCursor?: (() => void) | null;
 }
 
 export function DebugPanel({
@@ -96,6 +103,9 @@ export function DebugPanel({
   activeSubTab,
   onSubTabChange,
   onOpenLocation,
+  onViewBreakpoints,
+  onEvaluateExpression,
+  onRunToCursor = null,
 }: DebugPanelProps) {
   const { state } = debug;
   const activeRunning = !!state && state.status !== "terminated";
@@ -148,7 +158,13 @@ export function DebugPanel({
   const [compactDebuggerTab, setCompactDebuggerTab] = useState<"frames" | "variables">("frames");
 
   const frameId = stopped && currentTab === "debugger" ? state?.selectedFrameId ?? state?.frames[0]?.id ?? null : null;
-  const variablesHook = useDebugVariables(debug, frameId, stopped);
+  const variablesHook = useDebugVariables(debug, frameId, stopped, {
+    onEvaluateExpression: onEvaluateExpression ? (expression) => onEvaluateExpression(expression) : undefined,
+  });
+  const showExecutionPoint = () => {
+    const frame = state?.frames.find((f) => f.id === state.selectedFrameId) ?? state?.frames[0];
+    if (frame && (frame.path || frame.sourceReference > 0)) onOpenFrame(frame);
+  };
 
   // Read persisted horizontal layout with workspace instance scoping (D9.4).
   // v3 deliberately starts clean: every v1/v2 layout was recorded while the
@@ -214,6 +230,8 @@ export function DebugPanel({
       canAddDataBreakpoint={variablesHook.canAddDataBreakpoint}
       variableMenuRender={variablesHook.variableMenu.render}
       instanceId={workspaceInstanceId}
+      onEvaluate={(expression) => debug.evaluate(expression, "repl")}
+      fetchVariables={(ref) => debug.fetchVariables(ref)}
     />
   );
 
@@ -235,6 +253,17 @@ export function DebugPanel({
             : undefined,
         }}
         statusText={state ? `${state.status}${state.stoppedReason ? ` · ${state.stoppedReason}` : ""}` : null}
+        toolbar={state ? (
+          <DebugToolWindowToolbar
+            debug={debug}
+            activeRunning={activeRunning}
+            stopped={stopped}
+            onShowExecutionPoint={showExecutionPoint}
+            onViewBreakpoints={onViewBreakpoints}
+            onEvaluateExpression={onEvaluateExpression ? () => onEvaluateExpression() : undefined}
+            onRunToCursor={onRunToCursor}
+          />
+        ) : undefined}
         trailing={
           isCompact && currentTab === "debugger" && state ? (
             <div className="flex items-center rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] p-0.5 text-[10px]">
@@ -332,7 +361,7 @@ export function DebugPanel({
                   <Plug className="h-4 w-4 text-sky-500 dark:text-sky-400" />
                 </button>
               )}
-              {debug.canRestart && (
+              {debug.canRestart && !state && (
                 <button
                   type="button"
                   data-testid="debug-restart"

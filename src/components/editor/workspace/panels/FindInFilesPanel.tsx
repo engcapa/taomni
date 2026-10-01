@@ -346,13 +346,23 @@ export function FindInFilesPanel({
   const groupsRef = useRef<Map<string, MatchGroup>>(new Map());
   const languagesRef = useRef<Record<string, Language | null>>({});
 
-  useEffect(() => {
+  // Before paint, so typing right after Ctrl+Shift+F lands in the query; a
+  // panel whose tool window shows in a later commit retries on the next frame.
+  useLayoutEffect(() => {
     if (!focusNonce) return;
-    const target = focusTarget === "replace" && query.trim()
-      ? replacementInputRef.current
-      : inputRef.current;
-    target?.focus();
-    target?.select();
+    const focusField = () => {
+      const target = focusTarget === "replace" && query.trim()
+        ? replacementInputRef.current
+        : inputRef.current;
+      target?.focus();
+      target?.select();
+      return !!target && document.activeElement === target;
+    };
+    if (focusField()) return;
+    const frame = requestAnimationFrame(() => {
+      focusField();
+    });
+    return () => cancelAnimationFrame(frame);
   }, [focusNonce, focusTarget]);
 
   useLayoutEffect(() => {

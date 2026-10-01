@@ -50,7 +50,10 @@ import {
   parseSetInstructionBreakpointsResponse,
   parseReadMemoryResponse,
   parseWriteMemoryResponse,
+  effectiveSuspend,
+  isBreakpointEnabled,
   parseStackFrames,
+  parseStackTotal,
   parseThreads,
   planBreakpointSync,
   planDataBreakpointSync,
@@ -85,6 +88,17 @@ import {
   type DebugStepAction,
   type EvaluateResult,
 } from "./dapDebugModel";
+import {
+  breakpointHitLogText,
+  breakpointMasterKeys,
+  breakpointRefKey,
+  dependentsOf,
+  hasClientNonSuspending,
+  logTemplateParts,
+  masterOf,
+  needsClientHit,
+} from "./debugBreakpointProperties";
+import { fsPathEquals } from "./codeWorkspaceModel";
 
 /** Breakpoints keyed by absolute file path. */
 export type BreakpointMap = Record<string, DebugBreakpoint[]>;
@@ -195,6 +209,10 @@ export interface CodeDebugSession {
   restart: () => void;
   canRestart: boolean;
   toggleBreakpoint: (path: string, line: number) => void;
+  /** Add (or update) a line breakpoint with IDEA properties (temporary, logging…). */
+  addBreakpoint: (path: string, line: number, options?: Partial<DebugBreakpoint>) => void;
+  /** IDEA middle-click: flip a breakpoint's enabled state. */
+  toggleBreakpointEnabled: (path: string, line: number) => void;
   setBreakpointOptions: (path: string, line: number, options: Partial<DebugBreakpoint>) => void;
   /** Persist a source-breakpoint mode for the active adapter only. */
   setBreakpointMode: (path: string, line: number, mode: string) => void;
@@ -238,6 +256,8 @@ export interface CodeDebugSession {
   selectThread: (threadId: number) => void;
   /** Pick the frame that variables / watches / evaluate target. */
   selectFrame: (frameId: number) => void;
+  /** Fetch the next page of the shown thread's stack (IDEA lazy frames). */
+  loadMoreFrames: () => Promise<void>;
   /** Re-enter a frame from its start (IDEA Drop Frame; capability-gated). */
   restartFrame: (frameId: number) => void;
   /** Hot-reload changed classes (java-debug `redefineClasses`); best-effort (D5). */
@@ -328,6 +348,18 @@ interface DebugSessionRecord {
   dataSyncGeneration: number;
   exceptionSyncGeneration: number;
   tempRunToCursor: { path: string } | null;
+  /** Dependent breakpoints armed by a master hit (IDEA "Disable until…"). */
+  armedDependents: Set<string>;
+  /**
+   * While a breakpoint stop is checked for a pass-through (non-suspending)
+   * hit, later events queue here so they keep their order.
+   */
+  eventGate: { queue: DapEventPayload[] } | null;
+  /**
+   * `exited`/`terminated` held while the debuggee's last output drains: the
+   * adapter's stream reader can deliver stdout after the exit events.
+   */
+  closing: { events: DapEventPayload[]; timer: ReturnType<typeof setTimeout> | null } | null;
   abortScopeIds: string[];
   ready: Promise<void>;
   readyResolve: () => void;
@@ -388,6 +420,10 @@ function exceptionBreakpointRulesKey(workspaceInstanceId: string): string {
   return `taomni.codeWorkspace.debugExceptionBreakpointRules.v1.${workspaceInstanceId}`;
 }
 
+/** Output still accepted after `terminated` before the session is freed. */
+const CLOSING_OUTPUT_DRAIN_MS = 250;
+/** Fallback when an adapter reports `exited` but never `terminated`. */
+const EXITED_WITHOUT_TERMINATED_MS = 1500;
 const MAX_FUNCTION_BREAKPOINTS = 256;
 const MAX_FUNCTION_BREAKPOINT_NAME_LENGTH = 1024;
 const MAX_FUNCTION_BREAKPOINT_EXPRESSION_LENGTH = 4096;
@@ -412,6 +448,8 @@ const MAX_EXCEPTION_PATH_NAMES = 64;
 const MAX_EXCEPTION_PATH_NAME_LENGTH = 1024;
 const MAX_BREAKPOINT_MODE_ID_LENGTH = 1024;
 const MAX_SOURCE_BREAKPOINT_ADAPTER_MODES = 64;
+/** Frames fetched per `stackTrace` page (the first page and each "load more"). */
+const FRAME_PAGE_SIZE = 40;
 let exceptionBreakpointRuleSequence = 0;
 
 function normalizeBreakpointModeId(value: unknown): string | undefined {
@@ -1127,16 +1165,23 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
     options: { list?: DebugBreakpoint[]; extraTempLine?: number; sessionIds?: readonly string[] } = {},
   ) => {
     const stored = options.list ?? breakpointsRef.current[path] ?? [];
-    const plan = planBreakpointSync(stored, {
-      muted: mutedRef.current,
-      extraLine: options.extraTempLine,
-    });
+    const map = { ...breakpointsRef.current, [path]: stored };
+    const masters = breakpointMasterKeys(map);
     const requestedIds = options.sessionIds ?? Array.from(sessionsRef.current.values())
       .filter((record) => record.live)
       .map((record) => record.id);
     await Promise.all(requestedIds.map(async (id) => {
       const record = sessionsRef.current.get(id);
       if (!record?.live) return;
+      // Dependents arm per session: each child of a compound run tracks its
+      // own master hits.
+      const plan = planBreakpointSync(stored, {
+        muted: mutedRef.current,
+        extraLine: options.extraTempLine,
+        path,
+        isArmed: (bp) => !masterOf(bp, map) || record.armedDependents.has(breakpointRefKey(path, bp.line)),
+        clientManaged: (bp) => needsClientHit(bp, masters.has(breakpointRefKey(path, bp.line))),
+      });
       // Two quick toggles on the same file put two requests in flight; an older
       // response landing last would otherwise re-apply the set it was built from.
       const generation = (record.syncGeneration.get(path) ?? 0) + 1;
@@ -1571,6 +1616,69 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
     void syncBreakpointsForPath(path, { list: nextList, sessionIds: options.sessionIds });
   }, [persistBreakpoints, syncBreakpointsForPath]);
 
+  /** The stored breakpoint a `breakpoint` stop landed on (its top frame). */
+  const findHitBreakpoint = useCallback((frames: DebugStackFrame[]) => {
+    const top = frames[0];
+    if (!top?.path) return null;
+    for (const [path, list] of Object.entries(breakpointsRef.current)) {
+      if (!fsPathEquals(path, top.path)) continue;
+      const bp = list.find((entry) => entry.line === top.line && isBreakpointEnabled(entry));
+      if (bp) return { path, bp };
+    }
+    return null;
+  }, []);
+
+  /**
+   * Run the IDEA breakpoint actions DAP cannot express for one hit: log the
+   * hit message / stack trace / evaluated values, remove a temporary
+   * breakpoint, arm the master's dependents and disarm a dependent that is
+   * disabled again after its hit.
+   */
+  const applyBreakpointHit = useCallback(async (
+    sessionId: string,
+    hit: { path: string; bp: DebugBreakpoint },
+    frames: DebugStackFrame[],
+  ) => {
+    const record = sessionsRef.current.get(sessionId);
+    if (!record) return;
+    const { path, bp } = hit;
+    const frameId = frames[0]?.id;
+    const evaluateText = async (expression: string): Promise<string> => {
+      const body = await dapSendRequest(sessionId, "evaluate", { expression, frameId, context: "watch" })
+        .catch((error) => ({ result: `Error: ${errorText(error)}` }));
+      return parseEvaluate(body).value;
+    };
+    const expression = bp.logExpression?.trim() ? await evaluateText(bp.logExpression.trim()) : null;
+    let template: string | null = null;
+    if (effectiveSuspend(bp) && bp.logMessage?.trim()) {
+      const parts = await Promise.all(logTemplateParts(bp.logMessage.trim()).map((part) => (
+        "text" in part ? Promise.resolve(part.text) : evaluateText(part.expression)
+      )));
+      template = parts.join("");
+    }
+    const text = breakpointHitLogText(bp, frames, { expression, template });
+    if (text && mountedRef.current) {
+      updateSessionState(sessionId, (current) => appendConsoleLine(current, "console", text));
+    }
+    const map = breakpointsRef.current;
+    const touched = new Set<string>();
+    for (const dependent of dependentsOf({ path, line: bp.line }, map)) {
+      record.armedDependents.add(breakpointRefKey(dependent.path, dependent.line));
+      touched.add(dependent.path);
+    }
+    if (masterOf(bp, map) && !bp.leaveEnabled && record.armedDependents.delete(breakpointRefKey(path, bp.line))) {
+      touched.add(path);
+    }
+    if (bp.temporary) {
+      // Removing re-syncs this file for every session.
+      mutateBreakpoints(path, (list) => list.filter((entry) => entry.line !== bp.line));
+      touched.delete(path);
+    }
+    await Promise.all(Array.from(touched, (touchedPath) => (
+      syncBreakpointsForPath(touchedPath, { sessionIds: [sessionId] })
+    )));
+  }, [mountedRef, mutateBreakpoints, syncBreakpointsForPath, updateSessionState]);
+
   /**
    * Snapshot the frame's local variables as `name → value` for the editor's
    * inline values (IDEA renders them next to the code). Only the first scope is
@@ -1624,17 +1732,26 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
     const threads = parseThreads(threadsBody);
     const tid = threadId ?? threads[0]?.id ?? null;
     let frames: DebugStackFrame[] = [];
+    let framesTotal: number | null = null;
     if (tid != null) {
-      const stackBody = await dapSendRequest(sessionId, "stackTrace", { threadId: tid, startFrame: 0, levels: 40 })
+      const stackBody = await dapSendRequest(sessionId, "stackTrace", { threadId: tid, startFrame: 0, levels: FRAME_PAGE_SIZE })
         .catch(() => null);
       frames = parseStackFrames(stackBody);
+      framesTotal = parseStackTotal(stackBody);
     }
     if (!mountedRef.current || record.stopEpoch !== epoch) return;
     updateSessionState(sessionId, (prev) => (prev.status === "stopped"
-      ? { ...prev, threads, frames, selectedThreadId: tid, selectedFrameId: frames[0]?.id ?? null }
+      ? { ...prev, threads, frames, framesTotal, selectedThreadId: tid, selectedFrameId: frames[0]?.id ?? null }
       : prev));
     if (frames[0] && activeSessionIdRef.current === sessionId) {
       void refreshFrameVariables(frames[0].id, epoch);
+    }
+    if (reason === "breakpoint") {
+      const hit = findHitBreakpoint(frames);
+      const masters = hit ? breakpointMasterKeys(breakpointsRef.current) : null;
+      if (hit && masters && needsClientHit(hit.bp, masters.has(breakpointRefKey(hit.path, hit.bp.line)))) {
+        void applyBreakpointHit(sessionId, hit, frames);
+      }
     }
     // IDEA-style exception details when the stop is an exception break.
     if (
@@ -1649,11 +1766,26 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
         updateSessionState(sessionId, (prev) => (prev.status === "stopped" ? { ...prev, exceptionInfo: info } : prev));
       }
     }
-  }, [refreshFrameVariables, updateSessionState]);
+  }, [applyBreakpointHit, findHitBreakpoint, refreshFrameVariables, updateSessionState]);
 
-  const handleEvent = useCallback((payload: DapEventPayload) => {
+  const finishClosingRef = useRef<(record: DebugSessionRecord) => void>(() => {});
+  const processEvent = useCallback((payload: DapEventPayload) => {
     const record = sessionsRef.current.get(payload.sessionId);
     if (!record) return;
+    if (payload.event === "terminated" || payload.event === "exited") {
+      // The debuggee's last stdout lines may still be on their way (java-debug
+      // reads the process streams on its own thread), so keep listening for a
+      // short drain and only then print the exit line and free the session.
+      const closing = record.closing ?? { events: [], timer: null };
+      record.closing = closing;
+      closing.events.push(payload);
+      if (closing.timer) clearTimeout(closing.timer);
+      const drainMs = closing.events.some((event) => event.event === "terminated")
+        ? CLOSING_OUTPUT_DRAIN_MS
+        : EXITED_WITHOUT_TERMINATED_MS;
+      closing.timer = setTimeout(() => finishClosingRef.current(record), drainMs);
+      return;
+    }
     updateSessionState(payload.sessionId, (prev) => reduceDebugEvent(prev, payload.event, payload.message));
     if (payload.event === "initialized") {
       record.initialized = true;
@@ -1753,52 +1885,118 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
           }
         }
       }
-    } else if (payload.event === "terminated" || payload.event === "exited") {
-      // Free the backend session (drops the adapter transport / child); the final
-      // state stays visible in the panel until the next start.
-      record.live = false;
-      record.functionSyncGeneration += 1;
-      record.instructionSyncGeneration += 1;
-      record.dataSyncGeneration += 1;
-      record.exceptionSyncGeneration += 1;
-      if (!record.readySettled) {
-        record.readySettled = true;
-        record.readyReject(new Error(`${record.label} terminated before the debug adapter became ready`));
-      }
-      record.unlisten?.();
-      record.unlisten = null;
-      record.bpIdIndex.clear();
-      record.tempRunToCursor = null;
-      record.breakpointRuntime = {};
-      record.functionBreakpointRuntime = {};
-      record.instructionBreakpointRuntime = {};
-      record.dataBreakpointRuntime = {};
-      record.exceptionBreakpointRuntime = {};
-      record.exceptionBreakpointRuleRuntime = {};
-      record.frameVariables = {};
-      void dapTerminate(record.id).catch(() => {});
-      dropSessionDataBreakpoints(new Set([record.id]));
-      if (activeSessionIdRef.current === record.id) {
-        const fallback = Array.from(sessionsRef.current.values())
-          .filter((candidate) => candidate.live)
-          .sort((left, right) => left.order - right.order)[0] ?? record;
-        publishActiveSession(fallback);
-      } else {
-        publishSessionList();
-      }
     }
   }, [
     publishActiveSession,
-    publishSessionList,
     refreshStoppedContext,
     syncBreakpointsForPath,
     syncDataBreakpoints,
     syncExceptionBreakpoints,
     syncFunctionBreakpoints,
     syncInstructionBreakpoints,
-    dropSessionDataBreakpoints,
     updateSessionState,
   ]);
+
+  /** Apply the held `exited`/`terminated` events once the output drained. */
+  const finishClosing = useCallback((record: DebugSessionRecord) => {
+    const closing = record.closing;
+    if (!closing) return;
+    record.closing = null;
+    if (closing.timer) clearTimeout(closing.timer);
+    if (!sessionsRef.current.has(record.id)) return;
+    for (const event of closing.events) {
+      updateSessionState(record.id, (prev) => reduceDebugEvent(prev, event.event, event.message));
+    }
+    // Free the backend session (drops the adapter transport / child); the final
+    // state stays visible in the panel until the next start.
+    record.live = false;
+    record.functionSyncGeneration += 1;
+    record.instructionSyncGeneration += 1;
+    record.dataSyncGeneration += 1;
+    record.exceptionSyncGeneration += 1;
+    if (!record.readySettled) {
+      record.readySettled = true;
+      record.readyReject(new Error(`${record.label} terminated before the debug adapter became ready`));
+    }
+    record.unlisten?.();
+    record.unlisten = null;
+    record.bpIdIndex.clear();
+    record.tempRunToCursor = null;
+    record.breakpointRuntime = {};
+    record.functionBreakpointRuntime = {};
+    record.instructionBreakpointRuntime = {};
+    record.dataBreakpointRuntime = {};
+    record.exceptionBreakpointRuntime = {};
+    record.exceptionBreakpointRuleRuntime = {};
+    record.frameVariables = {};
+    void dapTerminate(record.id).catch(() => {});
+    dropSessionDataBreakpoints(new Set([record.id]));
+    if (activeSessionIdRef.current === record.id) {
+      const fallback = Array.from(sessionsRef.current.values())
+        .filter((candidate) => candidate.live)
+        .sort((left, right) => left.order - right.order)[0] ?? record;
+      publishActiveSession(fallback);
+    } else {
+      publishSessionList();
+    }
+  }, [dropSessionDataBreakpoints, publishActiveSession, publishSessionList, updateSessionState]);
+  finishClosingRef.current = finishClosing;
+
+  const handleEventRef = useRef<(payload: DapEventPayload) => void>(() => {});
+  /**
+   * Event entry point. A `breakpoint` stop that may belong to a
+   * non-suspending (IDEA "Suspend" unchecked) breakpoint is inspected first:
+   * a pass-through hit runs its actions and resumes without ever showing a
+   * stopped state. Events arriving meanwhile queue so they keep their order.
+   */
+  const handleEvent = useCallback((payload: DapEventPayload) => {
+    const record = sessionsRef.current.get(payload.sessionId);
+    if (!record) return;
+    if (record.eventGate) {
+      record.eventGate.queue.push(payload);
+      return;
+    }
+    const body = payload.event === "stopped"
+      ? (payload.message as { body?: { threadId?: number; reason?: string } } | null)?.body
+      : undefined;
+    const threadId = body?.threadId;
+    if (
+      !body
+      || body.reason !== "breakpoint"
+      || typeof threadId !== "number"
+      || !record.live
+      || !hasClientNonSuspending(breakpointsRef.current)
+    ) {
+      processEvent(payload);
+      return;
+    }
+    const gate = { queue: [] as DapEventPayload[] };
+    record.eventGate = gate;
+    void (async () => {
+      let passedThrough = false;
+      try {
+        const stackBody = await dapSendRequest(record.id, "stackTrace", { threadId, startFrame: 0, levels: FRAME_PAGE_SIZE });
+        const frames = parseStackFrames(stackBody);
+        const hit = findHitBreakpoint(frames);
+        if (hit && !effectiveSuspend(hit.bp)) {
+          const masters = breakpointMasterKeys(breakpointsRef.current);
+          if (needsClientHit(hit.bp, masters.has(breakpointRefKey(hit.path, hit.bp.line)))) {
+            await applyBreakpointHit(record.id, hit, frames);
+            await dapSendRequest(record.id, "continue", { threadId });
+            passedThrough = true;
+          }
+        }
+      } catch {
+        // Anything unexpected shows the stop instead of leaving a silently
+        // suspended thread behind.
+        passedThrough = false;
+      }
+      record.eventGate = null;
+      if (!passedThrough) processEvent(payload);
+      for (const queued of gate.queue) handleEventRef.current(queued);
+    })();
+  }, [applyBreakpointHit, findHitBreakpoint, processEvent]);
+  handleEventRef.current = handleEvent;
 
   const terminateSessions = useCallback(async (scopeIds?: ReadonlySet<string>) => {
     const records = Array.from(sessionsRef.current.values()).filter((record) => (
@@ -1941,6 +2139,9 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
       dataSyncGeneration: 0,
       exceptionSyncGeneration: 0,
       tempRunToCursor: null,
+      armedDependents: new Set(),
+      eventGate: null,
+      closing: null,
       abortScopeIds,
       ready,
       readyResolve,
@@ -2135,11 +2336,36 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
   }, [mutateBreakpoints]);
 
   const setBreakpointOptions = useCallback((path: string, line: number, options: Partial<DebugBreakpoint>) => {
+    const previousMaster = breakpointsRef.current[path]?.find((bp) => bp.line === line)?.dependsOn;
     mutateBreakpoints(path, (list) => (
       list.some((bp) => bp.line === line)
         ? list.map((bp) => (bp.line === line ? { ...bp, ...options } : bp))
         : list
     ));
+    // A master's own request changes once something depends on it (its hits
+    // must reach the client), so re-sync the old and new master files.
+    if ("dependsOn" in options) {
+      const masterPaths = new Set([previousMaster?.path, options.dependsOn?.path]);
+      masterPaths.delete(undefined);
+      masterPaths.delete(path);
+      for (const masterPath of masterPaths) if (masterPath) void syncBreakpointsForPath(masterPath);
+    }
+  }, [mutateBreakpoints, syncBreakpointsForPath]);
+
+  /** Add (or update) a breakpoint with IDEA properties — Alt/Shift+click kinds. */
+  const addBreakpoint = useCallback((path: string, line: number, options: Partial<DebugBreakpoint> = {}) => {
+    mutateBreakpoints(path, (list) => (
+      list.some((bp) => bp.line === line)
+        ? list.map((bp) => (bp.line === line ? { ...bp, ...options, line } : bp))
+        : [...list, { ...options, line }]
+    ));
+  }, [mutateBreakpoints]);
+
+  /** IDEA middle-click / Toggle Breakpoint Enabled. */
+  const toggleBreakpointEnabled = useCallback((path: string, line: number) => {
+    mutateBreakpoints(path, (list) => list.map((bp) => (
+      bp.line === line ? { ...bp, enabled: bp.enabled === false } : bp
+    )));
   }, [mutateBreakpoints]);
 
   const setBreakpointMode = useCallback((path: string, line: number, rawMode: string) => {
@@ -2744,16 +2970,45 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
     if (!id || !record || stateRef.current?.status !== "stopped") return;
     void (async () => {
       const epoch = record.stopEpoch;
-      const stackBody = await dapSendRequest(id, "stackTrace", { threadId, startFrame: 0, levels: 40 })
+      const stackBody = await dapSendRequest(id, "stackTrace", { threadId, startFrame: 0, levels: FRAME_PAGE_SIZE })
         .catch(() => null);
       const frames = parseStackFrames(stackBody);
+      const framesTotal = parseStackTotal(stackBody);
       if (!mountedRef.current || record.stopEpoch !== epoch) return;
       updateSessionState(id, (prev) => (prev.status === "stopped"
-        ? { ...prev, selectedThreadId: threadId, frames, selectedFrameId: frames[0]?.id ?? null }
+        ? { ...prev, selectedThreadId: threadId, frames, framesTotal, selectedFrameId: frames[0]?.id ?? null }
         : prev));
       if (frames[0]) void refreshFrameVariables(frames[0].id, epoch);
     })();
   }, [refreshFrameVariables, updateSessionState]);
+
+  /** IDEA loads deep stacks lazily: fetch the next page of the shown thread. */
+  const loadMoreFrames = useCallback(async () => {
+    const id = sessionIdRef.current;
+    const record = id ? sessionsRef.current.get(id) : undefined;
+    const current = stateRef.current;
+    if (!id || !record || current?.status !== "stopped") return;
+    const threadId = current.selectedThreadId ?? current.stoppedThreadId;
+    if (threadId == null) return;
+    const epoch = record.stopEpoch;
+    const startFrame = current.frames.length;
+    const body = await dapSendRequest(id, "stackTrace", { threadId, startFrame, levels: FRAME_PAGE_SIZE })
+      .catch(() => null);
+    if (!mountedRef.current || record.stopEpoch !== epoch) return;
+    const more = parseStackFrames(body);
+    const total = parseStackTotal(body);
+    updateSessionState(id, (prev) => {
+      if (
+        prev.status !== "stopped"
+        || (prev.selectedThreadId ?? prev.stoppedThreadId) !== threadId
+        || prev.frames.length !== startFrame
+      ) return prev;
+      const known = new Set(prev.frames.map((frame) => frame.id));
+      const frames = [...prev.frames, ...more.filter((frame) => !known.has(frame.id))];
+      // An empty page means the adapter has nothing more, whatever it claimed.
+      return { ...prev, frames, framesTotal: more.length === 0 ? frames.length : total ?? prev.framesTotal ?? null };
+    });
+  }, [mountedRef, updateSessionState]);
 
   const selectFrame = useCallback((frameId: number) => {
     const id = sessionIdRef.current;
@@ -3010,6 +3265,8 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
     restart,
     canRestart,
     toggleBreakpoint,
+    addBreakpoint,
+    toggleBreakpointEnabled,
     setBreakpointOptions,
     setBreakpointMode,
     removeBreakpoint,
@@ -3032,6 +3289,7 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
     runToCursor,
     selectThread,
     selectFrame,
+    loadMoreFrames,
     restartFrame,
     hotReload,
     evaluate,

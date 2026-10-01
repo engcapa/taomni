@@ -30,6 +30,7 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tree-new"]'
 - click: '[data-testid="code-workspace-tree-new-file"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
@@ -40,6 +41,7 @@ steps:
     selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key$="a011.txt"]'
     timeout_sec: 15
 - press: Control+F4
+- click: '[data-testid="code-workspace-tree-new"]'
 - click: '[data-testid="code-workspace-tree-new-file"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
@@ -50,6 +52,7 @@ steps:
     selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key$="b011.txt"]'
     timeout_sec: 15
 - press: Control+F4
+- click: '[data-testid="code-workspace-tree-new"]'
 - click: '[data-testid="code-workspace-tree-new-file"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
@@ -120,19 +123,19 @@ verification:
   - id: R1
     requirement: A2/A4/DEC-011-04：Go to File 连开三个文件得到三个正式 tab（不替换、无 preview）。
     actions:
-    - 37
-    - 44
-    - 51
+    - 40
+    - 47
+    - 54
     checkpoints:
-    - step: 31
+    - step: 34
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]", "equal": 1}}'
-    - step: 53
+    - step: 56
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-editor-tab-key]", "equal": 4}}'
-    - step: 54
+    - step: 57
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-preview=\"true\"]", "equal": 0}}'
     results:
-    - 53
-    - 54
+    - 56
+    - 57
   visual:
   - check: 检查 widget 与 tab 胶囊/图标需对照 IDEA idea-03/idea-29。
     method: manual

@@ -68,11 +68,36 @@ export function sniffIndentation(text: string): {
   type: "spaces" | "tabs";
   size: number;
 } {
+  // Style resolution runs on every workspace render; the open buffer string
+  // is usually the same object, so remember the last few answers.
+  const cached = sniffCache.find((entry) => entry.text === text);
+  if (cached) return { ...cached.result };
+  const result = sniffIndentationUncached(text);
+  sniffCache.unshift({ text, result });
+  if (sniffCache.length > 4) sniffCache.length = 4;
+  return { ...result };
+}
+
+const sniffCache: Array<{ text: string; result: { type: "spaces" | "tabs"; size: number } }> = [];
+
+function sniffIndentationUncached(text: string): {
+  type: "spaces" | "tabs";
+  size: number;
+} {
   let tabCount = 0;
   let space2Count = 0;
   let space4Count = 0;
 
-  for (const line of text.split("\n").slice(0, 300)) {
+  // Only the first 300 lines matter; do not split the whole buffer.
+  const lines: string[] = [];
+  let start = 0;
+  while (lines.length < 300 && start <= text.length) {
+    const end = text.indexOf("\n", start);
+    lines.push(end < 0 ? text.slice(start) : text.slice(start, end));
+    if (end < 0) break;
+    start = end + 1;
+  }
+  for (const line of lines) {
     if (!line || /^\s*$/.test(line)) continue;
     if (line.startsWith("\t")) {
       tabCount += 1;

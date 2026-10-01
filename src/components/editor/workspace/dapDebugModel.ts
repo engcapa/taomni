@@ -23,6 +23,24 @@ export interface DebugBreakpoint {
   enabled?: boolean;
   /** Adapter-specific source-breakpoint mode ids (for example hardware/software). */
   adapterModes?: Record<string, string>;
+  /**
+   * IDEA "Suspend". False makes a non-suspending breakpoint that only logs or
+   * triggers dependents. Undefined keeps the pre-existing meaning: a stored
+   * `logMessage` is a logpoint, anything else suspends.
+   */
+  suspend?: boolean;
+  /** IDEA Log: "Breakpoint hit" message. */
+  logHitMessage?: boolean;
+  /** IDEA Log: Stack trace. */
+  logStack?: boolean;
+  /** IDEA Log: Evaluate and log — the expression whose value is printed. */
+  logExpression?: string;
+  /** IDEA "Remove once hit" (temporary breakpoint). */
+  temporary?: boolean;
+  /** IDEA "Disable until hitting the following breakpoint". */
+  dependsOn?: { path: string; line: number };
+  /** IDEA "After hit": true = Leave enabled, otherwise Disable again. */
+  leaveEnabled?: boolean;
 }
 
 /** A DAP function/method breakpoint, independent of any source path. */
@@ -170,6 +188,8 @@ export interface DebugStackFrame {
   sourceReference: number;
   /** Display name from the adapter (`String.java`), for a library buffer's tab. */
   sourceName: string | null;
+  /** DAP frame/source presentation hint (`subtle`, `deemphasize`, `label`…). */
+  presentationHint?: string | null;
 }
 
 export interface DebugThread {
@@ -328,6 +348,10 @@ export interface DebugSessionState {
   selectedThreadId: number | null;
   /** Frame that variables / watches / evaluate target (defaults to the top frame). */
   selectedFrameId: number | null;
+  /** Adapter-reported stack depth of the selected thread (more frames can load). */
+  framesTotal?: number | null;
+  /** The last stop suspended every thread (DAP `allThreadsStopped`). */
+  allThreadsStopped?: boolean;
   /** Populated via `exceptionInfo` when stopped on an exception. */
   exceptionInfo: DebugExceptionInfo | null;
   /** Console lines from `output` events + client-side REPL echoes. */
@@ -600,25 +624,68 @@ export interface BreakpointSyncPlan {
   sent: DebugBreakpoint[];
   /** `sent[k]` is `sorted[indexes[k]]`; -1 for a transient (run-to-cursor) entry. */
   indexes: number[];
+  /**
+   * DAP `logMessage` for `sent[k]`, or null when the adapter must suspend so
+   * the client can run the breakpoint's actions itself.
+   */
+  logMessages?: (string | null)[];
+}
+
+/** True when the breakpoint stops the program (IDEA "Suspend"). */
+export function effectiveSuspend(bp: DebugBreakpoint): boolean {
+  return bp.suspend ?? !bp.logMessage?.trim();
+}
+
+/**
+ * The logpoint text a non-suspending breakpoint hands to the adapter. Null
+ * for suspending breakpoints and for ones with nothing to log.
+ */
+export function adapterLogMessage(bp: DebugBreakpoint, path: string): string | null {
+  if (effectiveSuspend(bp)) return null;
+  const parts: string[] = [];
+  if (bp.logHitMessage) {
+    const file = path.split(/[\\/]/).pop();
+    parts.push(file ? `Breakpoint reached at ${file}:${bp.line}` : `Breakpoint reached at line ${bp.line}`);
+  }
+  if (bp.logExpression?.trim()) parts.push(`{${bp.logExpression.trim()}}`);
+  if (bp.logMessage?.trim()) parts.push(bp.logMessage.trim());
+  return parts.length > 0 ? parts.join("\n") : null;
 }
 
 /**
  * Decide which of a file's breakpoints go to the adapter.
  * `muted` suppresses all of them (IDEA "Mute Breakpoints"); `extraLine` adds a
- * transient run-to-cursor breakpoint that is never stored.
+ * transient run-to-cursor breakpoint that is never stored. `isArmed` keeps a
+ * dependent breakpoint back until its master is hit, and `clientManaged`
+ * marks breakpoints whose hit the client must observe (the adapter then
+ * suspends and the client resumes after running the actions).
  */
 export function planBreakpointSync(
   list: DebugBreakpoint[],
-  options: { muted?: boolean; extraLine?: number } = {},
+  options: {
+    muted?: boolean;
+    extraLine?: number;
+    path?: string;
+    isArmed?: (bp: DebugBreakpoint) => boolean;
+    clientManaged?: (bp: DebugBreakpoint) => boolean;
+  } = {},
 ): BreakpointSyncPlan {
   const sorted = sortedBreakpoints(list);
   const sent: DebugBreakpoint[] = [];
   const indexes: number[] = [];
+  const logMessages: (string | null)[] = [];
   if (!options.muted) {
     sorted.forEach((bp, index) => {
       if (!isBreakpointEnabled(bp)) return;
+      if (options.isArmed && !options.isArmed(bp)) return;
+      const managed = options.clientManaged?.(bp) ?? false;
+      const log = managed ? null : adapterLogMessage(bp, options.path ?? "");
+      // A non-suspending breakpoint with nothing to log and nothing for the
+      // client to do would only slow the debuggee down.
+      if (!managed && !effectiveSuspend(bp) && log == null) return;
       sent.push(bp);
       indexes.push(index);
+      logMessages.push(log);
     });
   }
   const extra = options.extraLine;
@@ -628,8 +695,9 @@ export function planBreakpointSync(
     const insertAt = at === -1 ? sent.length : at;
     sent.splice(insertAt, 0, { line: extra });
     indexes.splice(insertAt, 0, -1);
+    logMessages.splice(insertAt, 0, null);
   }
-  return { sorted, sent, indexes };
+  return { sorted, sent, indexes, logMessages };
 }
 
 export interface FunctionBreakpointSyncPlan {
@@ -903,11 +971,12 @@ export function buildSetBreakpointsArgs(
 ) {
   return {
     source: { path, name: path.split(/[\\/]/).pop() ?? path },
-    breakpoints: plan.sent.map((bp) => {
+    breakpoints: plan.sent.map((bp, index) => {
       const entry: Record<string, unknown> = { line: bp.line };
       if (bp.condition && bp.condition.trim()) entry.condition = bp.condition.trim();
       if (bp.hitCondition && bp.hitCondition.trim()) entry.hitCondition = bp.hitCondition.trim();
-      if (bp.logMessage && bp.logMessage.trim()) entry.logMessage = bp.logMessage.trim();
+      const logMessage = plan.logMessages ? plan.logMessages[index] : bp.logMessage?.trim();
+      if (logMessage) entry.logMessage = logMessage;
       const mode = resolveBreakpointMode(
         options.adapterId ? bp.adapterModes?.[options.adapterId] : undefined,
         options.breakpointModes ?? [],
@@ -1477,8 +1546,17 @@ export function parseStackFrames(body: unknown): DebugStackFrame[] {
       column: typeof rec.column === "number" ? rec.column : 0,
       sourceReference: typeof source.sourceReference === "number" ? source.sourceReference : 0,
       sourceName: typeof source.name === "string" && source.name ? source.name : null,
+      presentationHint: typeof rec.presentationHint === "string"
+        ? rec.presentationHint
+        : typeof source.presentationHint === "string" ? source.presentationHint : null,
     }];
   });
+}
+
+/** `totalFrames` from a `stackTrace` response, when the adapter reports it. */
+export function parseStackTotal(body: unknown): number | null {
+  const total = asRecord(body).totalFrames;
+  return typeof total === "number" && Number.isFinite(total) && total >= 0 ? total : null;
 }
 
 /** Parse an `exceptionInfo` response body (null when the adapter has nothing). */
@@ -1538,6 +1616,7 @@ export function reduceDebugEvent(
         stoppedThreadId: threadId,
         selectedThreadId: threadId,
         stoppedReason: typeof body.reason === "string" ? body.reason : "stopped",
+        allThreadsStopped: body.allThreadsStopped === true,
         exceptionInfo: null,
       };
     }
@@ -1628,7 +1707,7 @@ export function hoverExpressionAt(lineText: string, pos: number): string | null 
 
 /**
  * Inline value label for one source line (IDEA shows evaluated locals next to
- * the code). Returns `name = value` pairs for every known variable mentioned on
+ * the code). Returns `name: value` pairs for every known variable mentioned on
  * the line, in order of appearance, or null when none are.
  */
 export function inlineValueLabel(
@@ -1649,7 +1728,8 @@ export function inlineValueLabel(
     if (match.index > 0 && code[match.index - 1] === ".") continue;
     if (seen.has(name) || !(name in variables)) continue;
     seen.add(name);
-    parts.push(`${name} = ${variables[name]}`);
+    // IDEA renders inline values as `name: value`.
+    parts.push(`${name}: ${variables[name]}`);
   }
   return parts.length > 0 ? parts.join(", ") : null;
 }

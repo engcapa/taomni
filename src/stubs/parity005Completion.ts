@@ -118,6 +118,14 @@ function range(line: number, from: number, to: number): LspRange {
   return { start: { line, character: from }, end: { line, character: to } };
 }
 
+/** QA opt-in: advertise hover so the browser hover-documentation popup runs. */
+const hoverKey = "taomni.qa.parity005.hover";
+
+function hoverEnabled(): boolean {
+  try { return localStorage.getItem(hoverKey) === "true"; }
+  catch { return false; }
+}
+
 export function parity005Status(path: string): LspDocumentStatus {
   return {
     path,
@@ -132,6 +140,31 @@ export function parity005Status(path: string): LspDocumentStatus {
     selectedCommand: null,
     installHint: null,
     error: null,
+    ...(hoverEnabled() ? {
+      capabilities: {
+        completion: true,
+        signatureHelp: false,
+        hover: true,
+        definition: false,
+        typeDefinition: false,
+        implementation: false,
+        references: false,
+        documentSymbol: false,
+        workspaceSymbol: false,
+        rename: false,
+        formatting: false,
+        rangeFormatting: false,
+        codeAction: false,
+        documentHighlight: false,
+        callHierarchy: false,
+        typeHierarchy: false,
+        inlayHint: false,
+        selectionRange: false,
+        semanticTokens: false,
+        completionTriggerCharacters: ["."],
+        signatureTriggerCharacters: [],
+      },
+    } : {}),
   };
 }
 

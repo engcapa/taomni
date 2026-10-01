@@ -1361,6 +1361,8 @@ describe("CodeWorkspaceTab", () => {
       "var(--taomni-code-tree-font-size)",
     );
 
+    fireEvent.click(screen.getByTestId("code-workspace-tree-toolbar-more"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-menu-appearance"));
     fireEvent.click(screen.getByTestId("code-workspace-tree-zoom-in"));
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
     expect(screen.getByTestId("code-workspace-tree-pane").style.getPropertyValue("--taomni-code-tree-font-size")).toBe("13px");
@@ -1388,6 +1390,8 @@ describe("CodeWorkspaceTab", () => {
     saved = JSON.parse(window.localStorage.getItem(appearanceKey) ?? "{}");
     expect(saved.profile.fontSizePx).toBe(14);
 
+    fireEvent.click(screen.getByTestId("code-workspace-tree-toolbar-more"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-menu-appearance"));
     fireEvent.click(screen.getByTestId("code-workspace-tree-zoom-out"));
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
   });
@@ -1414,7 +1418,8 @@ describe("CodeWorkspaceTab", () => {
     renderWorkspace(workspace);
 
     expect(await screen.findByText("Code · Flat")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("code-workspace-view-flat"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-view-selector"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-view-project-files"));
 
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeViewMode.v1")).toBe("flat");
     expect(await screen.findByText("src")).toBeInTheDocument();
@@ -1498,7 +1503,9 @@ describe("CodeWorkspaceTab", () => {
     renderWorkspace(workspace);
 
     expect(await screen.findByText("Code · Compact")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("code-workspace-view-compact"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-toolbar-more"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-menu-appearance"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-menu-compact"));
 
     const compactDir = await screen.findByText("src/main/java/com/example");
     fireEvent.doubleClick(compactDir);
@@ -2238,10 +2245,49 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(lspMocks.lspDocumentSymbols).toHaveBeenCalled());
     fireEvent.click(toolbarControl("code-workspace-right-pane-toggle"));
 
-    expect(screen.getByRole("tab", { name: "Outline", selected: true })).toBeInTheDocument();
+    // ED-PARITY-024: IDEA Structure is its own tool window (left bottom by default).
+    const structureWindow = await screen.findByTestId("code-workspace-tool-window-structure");
+    expect(within(structureWindow).getByTestId("code-workspace-tool-window-title-structure")).toHaveTextContent("Structure");
     const outline = await screen.findByTestId("code-workspace-outline-pane");
     expect(outline).toHaveTextContent("render");
     fireEvent.click(within(outline).getByText("render"));
+  });
+
+  it("renders its left tool window bar into the collapsed sidebar rail (ED-PARITY-027)", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-rail",
+      workspaceInstanceId: "instance-rail",
+      name: "Rail",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const { useMainRailHostStore } = await import("../../stores/mainRailHostStore");
+    useMainRailHostStore.setState({ host });
+    useAppStore.setState({ mergeToolWindowRail: true, sidebarCollapsed: true });
+    try {
+      const { rerender } = renderWorkspace(workspace);
+      await waitFor(() => expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).not.toBeNull());
+      expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).toHaveAttribute("data-embedded", "true");
+      expect(host.querySelector('[data-tool-window-id="project"]')).not.toBeNull();
+      // The right bar stays inside the workspace.
+      expect(host.querySelector('[data-testid="code-workspace-tool-rail-right"]')).toBeNull();
+      // Expanding the sidebar returns the bar to the workspace.
+      act(() => useAppStore.setState({ sidebarCollapsed: false }));
+      await waitFor(() => expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).toBeNull());
+      expect(screen.getByTestId("code-workspace-tool-rail-left")).not.toHaveAttribute("data-embedded");
+      // An inactive workspace never claims the rail.
+      act(() => useAppStore.setState({ sidebarCollapsed: true }));
+      rerender(<CodeWorkspaceTab tabId="tab-code" workspace={workspace} visible={false} />);
+      expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).toBeNull();
+    } finally {
+      useMainRailHostStore.setState({ host: null });
+      useAppStore.setState({ sidebarCollapsed: false });
+      host.remove();
+    }
   });
 
   it("opens quick documentation with Ctrl+Q, navigates to its exact source, and pins it", async () => {
@@ -2336,7 +2382,7 @@ describe("CodeWorkspaceTab", () => {
 
     const pane = await screen.findByTestId("code-workspace-documentation-pane");
     expect(pane).toHaveTextContent("Opens");
-    expect(screen.getByRole("tab", { name: "Documentation", selected: true })).toBeInTheDocument();
+    expect(await screen.findByTestId("code-workspace-tool-window-documentation")).toBeInTheDocument();
     expect(screen.queryByTestId("code-workspace-quick-doc")).not.toBeInTheDocument();
     expect(within(pane).queryByLabelText("Pinned")).not.toBeInTheDocument();
     expect(within(pane).queryByRole("button", { name: "Unpin documentation" })).not.toBeInTheDocument();
@@ -5059,6 +5105,63 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(lspMocks.lspSelectionRanges).toHaveBeenCalled());
   });
 
+  it("highlights usages at the caret the editor just reported, before the caret state commits", async () => {
+    const { EditorView } = await import("@codemirror/view");
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-occurrence-fresh-caret", workspaceInstanceId: "instance-occurrence-fresh-caret",
+      name: "Occurrence fresh caret", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [], initialFile: { kind: "root", rootId: "app", path: "notes.txt" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("notes.txt", "notes.txt")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("notes.txt", "item\nsecond item\nthird item"));
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    const rendered = renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / notes.txt");
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(content)!;
+    let executePromise: Promise<unknown> | undefined;
+    act(() => {
+      // Caret onto the third "item" and run the action in the same task, as
+      // Ctrl+End followed at once by Ctrl+Shift+F7 does.
+      view.dispatch({ selection: { anchor: view.state.doc.length - 2 } });
+      executePromise = registrationRef.current?.executeAction("workspace.highlightUsagesInFile");
+    });
+    await act(async () => {
+      await executePromise;
+    });
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Occurrence 3 of 3"));
+  });
+
+  it("evaluates the keymap cheat sheet in its modal context: editor-only actions are not runnable there", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-cheat-sheet-modal", workspaceInstanceId: "instance-cheat-sheet-modal",
+      name: "Cheat sheet modal", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [], initialFile: { kind: "root", rootId: "app", path: "notes.txt" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("notes.txt", "notes.txt")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("notes.txt", "item\nsecond item\nthird item"));
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    const rendered = renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / notes.txt");
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    act(() => { content.focus(); });
+    await act(async () => {
+      await registrationRef.current?.executeAction("workspace.openKeymapCheatsheet");
+    });
+    fireEvent.change(await screen.findByTestId("keymap-search-input"), { target: { value: "Basic Completion" } });
+    expect(screen.getByTestId("keymap-item-editor.basicCompletion")).toBeInTheDocument();
+    expect(screen.queryByTestId("keymap-run-editor.basicCompletion")).toBeNull();
+    // Workspace actions stay runnable from the cheat sheet.
+    fireEvent.change(screen.getByTestId("keymap-search-input"), { target: { value: "Find in Files" } });
+    expect(screen.getByTestId("keymap-run-workspace.findInFiles")).toBeInTheDocument();
+  });
+
   it("does not restore occurrence highlights when a cleared request returns late", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
@@ -6700,8 +6803,8 @@ describe("CodeWorkspaceTab", () => {
     const after = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav");
     expect(after.editorGroups.primary).toEqual(before.editorGroups.primary);
     expect(after.openFiles).toEqual(before.openFiles);
-    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-open-file"), { key: "ArrowDown" });
-    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-filter"), { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-new"), { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-view-selector"), { key: "ArrowDown" });
     expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav").treeSelection).toEqual(after.treeSelection);
   });
 
@@ -7212,6 +7315,7 @@ describe("CodeWorkspaceTab", () => {
     expect(disk.has("src/bookmark.ts")).toBe(false);
 
     vi.mocked(promptAppDialog).mockResolvedValueOnce("src/bookmark.ts");
+    fireEvent.click(screen.getByTestId("code-workspace-tree-new"));
     fireEvent.click(screen.getByTestId("code-workspace-tree-new-file"));
     await waitFor(() => expect(screen.getByTestId("code-workspace-bookmark-item"))
       .toHaveAttribute("data-state", "current"));
@@ -13877,6 +13981,8 @@ end_of_record
       renderWorkspace(workspace);
       await screen.findByTitle("app / src/App.java");
 
+      // IDEA speed search: typing in the tree opens the search field.
+      fireEvent.keyDown(screen.getByTestId("code-workspace-tree-pane"), { key: "a" });
       const filterInput = screen.getByTestId("code-workspace-tree-filter");
       filterInput.focus();
       expect(document.activeElement).toBe(filterInput);
@@ -14296,6 +14402,26 @@ end_of_record
       await waitFor(() => expect(
         view.state.doc.lineAt(view.state.selection.main.head).text,
       ).toBe("        int sum = sumOf(values);"));
+
+      // Fresh setup: the watcher echo of the extract's own save, delivered while
+      // the naming prompt is open, is not a workspace change (no stale cancel).
+      await cleanup();
+      runtimeState.tauri = true;
+      const echoed = setupExtract("instance-extract-echo");
+      const echo = await mountExtract(echoed);
+      selectExtractRange(echo.content);
+      pressExtractChord(echo.pane);
+      const echoInput = await screen.findByTestId("text-input-dialog-input");
+      await waitFor(() => expect(echoed.disk[EXTRACT_PATH]).toBe(B1));
+      await act(async () => {
+        await emit("lsp://external-file-change", { workspaceId: "instance-extract-echo", path: EXTRACT_ABS, type: 2 });
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
+      fireEvent.change(echoInput, { target: { value: "sumOf" } });
+      fireEvent.keyDown(echoInput, { key: "Enter" });
+      await waitFor(() => expect(echoed.text()).toBe(B2));
+      expect(useAppStore.getState().statusMessage).not.toContain("workspace changed");
+      runtimeState.tauri = false;
 
       // Fresh setup: Escape keeps the provider default name and adds no history.
       await cleanup();
@@ -14745,6 +14871,27 @@ end_of_record
         fireEvent.keyDown(content, { key: "F12", code: "F12", ctrlKey: true, shiftKey: true });
       });
       await waitFor(() => expect(ui().languagePanelOpen).toBe(true));
+    });
+
+    it("A4.2b: Shift+Esc in a tool window hands focus to the editor as it hides", async () => {
+      setKeymapPlatformOverride("linux");
+      const { rendered } = await mountJava();
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+      const ui = () => selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), instanceId);
+      await act(async () => {
+        fireEvent.keyDown(content, { key: "6", code: "Digit6", altKey: true });
+      });
+      await waitFor(() => expect(ui().bottomDockOpen).toBe(true));
+      const dock = await screen.findByTestId("code-workspace-bottom-dock");
+      const inside = dock.querySelector<HTMLElement>("button")!;
+      act(() => inside.focus());
+      expect(dock.contains(document.activeElement)).toBe(true);
+      act(() => {
+        fireEvent.keyDown(inside, { key: "Escape", code: "Escape", shiftKey: true });
+      });
+      // No frame has run yet: the editor already owns focus.
+      expect(document.activeElement?.classList.contains("cm-content")).toBe(true);
+      await waitFor(() => expect(ui().bottomDockOpen).toBe(false));
     });
 
     it("DEC-013-06: migration notice shows once for a profile with prior workspace data", async () => {

@@ -179,7 +179,25 @@
 - `[data-testid="code-workspace-tree-root"]` — interactive [optional] — F25.5.tree-root-row
 - `[data-testid="code-workspace-tree-file"]` — interactive [optional] — F25.5.tree-file-row
 - `[data-testid="code-workspace-tree-dir"]` — interactive [optional] — F25.5.tree-dir-row
-- `[data-testid="code-workspace-view-tree"]` — display [optional] — F25.5.tree-view
+- `[data-testid="code-workspace-tree-view-selector"]` — interactive [optional] — F25.5.tree-view
+  ↳ `[data-testid="code-workspace-tree-view-project"]` — alias
+  ↳ `[data-testid="code-workspace-tree-view-project-files"]` — alias
+- `[data-testid="code-workspace-tree-new"]` — interactive [optional] — F25.5.tree-new-menu
+- `[data-testid="code-workspace-tree-open-file"]` — interactive [optional] — F25.5.tree-open-file
+- `[data-testid="code-workspace-tree-menu-appearance"]` — interactive [optional] — F25.5.tree-options-appearance
+  ↳ `[data-testid="code-workspace-tree-menu-details"]` — alias
+  ↳ `[data-testid="code-workspace-tree-menu-compact"]` — alias
+  ↳ `[data-testid="code-workspace-tree-zoom-in"]` — alias
+  ↳ `[data-testid="code-workspace-tree-zoom-out"]` — alias
+  ↳ `[data-testid="code-workspace-tree-zoom-reset"]` — alias
+- `[data-testid="code-workspace-tree-toolbar-more"]` — interactive [optional] — F25.5.tree-options
+  ↳ `[data-testid="code-workspace-tree-collapse"]` — alias
+  ↳ `[data-testid="code-workspace-tree-menu-expand-all"]` — alias
+- `[data-testid="code-workspace-tree-speed-search"]` — display [optional] — F25.5.tree-speed-search
+- `[data-testid="code-workspace-tree-speed-search-close"]` — interactive [optional] — F25.5.tree-speed-search-close
+- `[data-testid="code-workspace-tree-root-path"]` — display [optional] — F25.5.tree-row-details
+  ↳ `[data-testid="code-workspace-tree-file-details"]` — alias
+  ↳ `[data-testid="code-workspace-tree-empty"]` — alias
 - `[data-testid="new-java-class-package"]` — display [optional] — F25.5.new-java-class-package
 - `[data-testid="new-java-class-submit"]` — interactive [optional] — F25.5.new-java-class-submit
 - `[data-testid="external-file-conflict-dialog"]` — display [optional] — F25.5.external-file-conflict-dialog
@@ -370,6 +388,28 @@
   ↳ `[data-testid="code-workspace-tool-rail-structure"]` — alias
   ↳ `[data-testid="code-workspace-tool-rail-commit"]` — alias
   ↳ `[data-testid="code-workspace-tool-rail-documentation"]` — alias
+- `[data-testid="code-workspace-tool-rail-left-resize"]` — interactive [optional] — F25.5.tool-rail-resize
+  ↳ `[data-testid="code-workspace-tool-rail-right-resize"]` — alias
+- `[data-testid="code-workspace-tool-rail-menu-move"]` — interactive [optional] — F25.5.tool-rail-menu
+  ↳ `[data-testid="code-workspace-tool-rail-menu-move-right-top"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-menu-remove"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-menu-show-names"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-menu-toggle"]` — alias
+- `[data-testid="code-workspace-tool-window-problems"]` — display [optional] — F25.5.tool-window-pane
+  ↳ `[data-testid="code-workspace-tool-window-structure"]` — alias
+  ↳ `[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]` — alias
+- `[data-testid="code-workspace-tool-window-options-problems"]` — interactive [optional] — F25.5.tool-window-options-menu
+  ↳ `[data-testid="code-workspace-tool-window-options-terminal"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-move"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-move-bottom-left"]` — alias
+- `[data-testid="code-workspace-bottom-tab-overflow-run"]` — interactive [optional] — F25.5.tool-window-more-item
+- `[data-testid="code-workspace-tree-expand-all"]` — interactive [optional] — F25.5.project-header-actions
+  ↳ `[data-testid="code-workspace-tree-collapse-all"]` — alias
+  ↳ `[data-testid="code-workspace-tree-select-opened"]` — alias
+- `[data-testid="search-everywhere-tab-files"]` — interactive [optional] — F25.5.search-everywhere-tab
+  ↳ `[data-testid="search-everywhere-tab-classes"]` — alias
+  ↳ `[data-testid="search-everywhere-tab-symbols"]` — alias
+  ↳ `[data-testid="search-everywhere-tab-actions"]` — alias
 - `[data-testid="code-workspace-tool-window-header"]` — display [optional] — F25.5.tool-window-header
 - `[data-testid="code-workspace-tool-window-title"]` — display [optional] — F25.5.tool-window-title
 - `[data-testid="code-workspace-tool-window-hide"]` — interactive [optional] — F25.5.tool-window-hide
@@ -436,6 +476,9 @@
 - `[data-testid="search-everywhere-assign-shortcut-hint"]` — display [optional] — F25.5.search-everywhere-assign-shortcut-hint
 - `[data-testid="code-workspace-parameter-info"]` — display [optional] — F25.5.parameter-info-tooltip
 - `[data-testid="code-workspace-quick-doc"]` — display [optional] — F25.5.quick-doc-popup
+- `[data-testid="code-workspace-hover-doc"]` — display [optional] — F25.5.hover-doc-popup
+- `[data-testid="code-workspace-hover-doc-pin"]` — interactive [optional] — F25.5.hover-doc-pin
+- `[data-testid="code-workspace-documentation-pane"]` — display [optional] — F25.5.documentation-pane
 - `[data-testid="code-workspace-editor-banners"]` — display [optional] — F25.5.editor-banners
 - `[data-testid="banner-action-open-settings"]` — interactive [optional] — F25.5.editor-banner-open-settings
 - `[data-testid="banner-action-error-open-settings"]` — display [optional] — F25.5.editor-banner-action-error
@@ -572,6 +615,34 @@
 - `[data-testid^="tests-rerun-"]` — interactive [optional] — F25.1.tests-rerun
 - `[data-testid^="tests-failure-details-"]` — interactive [optional] — F25.1.tests-failure-details
 - `[data-testid="debug-panel"]` — display — F25.1.debug-panel
+- `[data-testid="debug-continue"]` — interactive [optional] — F25.1.debug-toolbar-resume
+- `[data-testid="debug-subtab-console"]` — interactive [optional] — F25.1.debug-subtab-console
+- `[data-testid="debug-console-output"]` — display [optional] — F25.1.debug-console-output
+- `[data-testid="debug-frames-list"]` — display [optional] — F25.1.debug-frames-list
+- `[data-testid="debug-thread-select"]` — display [optional] — F25.1.debug-thread-select
+- `[data-testid="debug-variables-tree"]` — display [optional] — F25.1.debug-variables-tree
+- `[data-testid="debug-watch-input"]` — interactive [optional] — F25.1.debug-watch-input
+- `[data-testid="debug-evaluate-inline-result"]` — display [optional] — F25.1.debug-evaluate-inline-result
+- `[data-testid="debug-breakpoint-popup"]` — display [optional] — F25.1.debug-breakpoint-popup
+  ↳ `[data-testid="debug-breakpoint-popup-title"]` — alias
+  ↳ `[data-testid="debug-breakpoint-popup-log-stack"]` — alias
+  ↳ `[data-testid="debug-breakpoint-popup-log-message"]:checked` — alias
+- `[data-testid="debug-breakpoint-popup-condition"]` — interactive [optional] — F25.1.debug-breakpoint-popup-condition
+  ↳ `[data-testid="debug-breakpoint-popup-condition"]:focus` — alias
+- `[data-testid="debug-breakpoint-popup-done"]` — interactive [optional] — F25.1.debug-breakpoint-popup-actions
+  ↳ `[data-testid="debug-breakpoint-popup-more"]` — alias
+- `[data-testid="debug-gutter-menu-add-conditional"]` — interactive [optional] — F25.1.debug-gutter-menu
+- `[data-testid="debug-breakpoints-dialog"]` — display [optional] — F25.1.debug-breakpoints-dialog
+  ↳ `[data-testid="debug-breakpoints-dialog-condition"]` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-enabled-2"]:checked` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-remove-once-hit"]:checked` — alias
+- `[data-testid="debug-breakpoints-dialog-tree"]` — interactive [optional] — F25.1.debug-breakpoints-dialog-tree
+  ↳ `[data-testid="debug-breakpoints-dialog-line"]` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-line"][data-breakpoint-line="7"]` — alias
+- `[data-testid="debug-breakpoints-dialog-suspend"]` — interactive [optional] — F25.1.debug-breakpoints-dialog-properties
+  ↳ `[data-testid="debug-breakpoints-dialog-log-stack"]` — alias
+  ↳ `[data-testid="debug-breakpoints-dialog-remove-once-hit"]` — alias
+- `[data-testid="debug-breakpoints-dialog-done"]` — interactive [optional] — F25.1.debug-breakpoints-dialog-done
 - `[data-testid="debug-stop"]` — interactive [optional] — F25.1.debug-stop
 - `.taomni-debug-current-line` — display [optional] — F25.1.debug-current-line
 - `[data-testid="debug-active-configuration"]` — interactive [optional] — F25.1.debug-active-configuration
@@ -1218,6 +1289,8 @@
 ## main (F1.2)
 
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail
+- `[data-testid="sidebar-tool-window-rail"]` — display [optional] — F1.2.sidebar-tool-window-rail
+  ↳ `[data-testid="sidebar-rail"]` — alias
 - `[data-testid="main-sidebar-resize-handle"]` — display — F1.2.sidebar-resize-handle
 
 ## main/commands (F1.9)
@@ -1354,6 +1427,7 @@
 - `[data-testid="app-titlebar"]` — display — F1.3.titlebar
 - `[data-testid="titlebar-tray"]` — display — F1.3.tray
 - `[data-testid="control-bar"]` — display — F1.3.control-bar
+- `[data-testid="tab-action-slot"]` — display [optional] — F1.3.tab-action-slot
 - `[data-testid="window-drag-handle"]` — display — F1.3.window-drag-handle
 - `[data-testid="titlebar-actions-more"]` — interactive [optional] — F1.3.titlebar-actions-more
 - `[data-testid="theme-cycle"]` — interactive — F1.3.theme-cycle
@@ -1702,6 +1776,7 @@
 
 - `[data-testid="settings-panel"]` — display — F11.1.panel-root
 - `[data-testid="settings-welcome-recent-session-limit"]` — interactive — F11.1.welcome-recent-session-limit
+- `[data-testid="settings-merge-tool-window-rail"]` — interactive [optional] — F11.1.settings-merge-tool-window-rail
 - `[data-testid="settings-search-input"]` — interactive — F11.1.search-input
 - `[data-testid="settings-search-count"]` — display — F11.1.search-count
 - `[data-testid="settings-search-empty"]` — display — F11.1.search-empty

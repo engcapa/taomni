@@ -33,6 +33,12 @@ controls:
     selector: '[data-testid="collapsed-sidebar-rail"]'
     kind: interactive
     optional: true       # only when sidebar collapsed
+  - id: sidebar-tool-window-rail      # ED-PARITY-027: the active tab's tool window bar inside the collapsed rail
+    selector: '[data-testid="sidebar-tool-window-rail"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="sidebar-rail"]'
   - id: sidebar-resize-handle
     selector: '[data-testid="main-sidebar-resize-handle"]'
     kind: display    # drag handle — meaningless to click; existence is the assertion
@@ -69,6 +75,10 @@ controls:
   - id: control-bar
     selector: '[data-testid="control-bar"]'
     kind: display
+  - id: tab-action-slot               # active tab's actions (Capture, Detach, …) in the control bar
+    selector: '[data-testid="tab-action-slot"]'
+    kind: display
+    optional: true
   - id: window-drag-handle
     selector: '[data-testid="window-drag-handle"]'
     kind: display    # dedicated native window-move target; presence is asserted in browser mode
@@ -2846,6 +2856,10 @@ controls:
   - id: welcome-recent-session-limit
     selector: '[data-testid="settings-welcome-recent-session-limit"]'
     kind: interactive
+  - id: settings-merge-tool-window-rail   # ED-PARITY-027 single tool window bar toggle
+    selector: '[data-testid="settings-merge-tool-window-rail"]'
+    kind: interactive
+    optional: true
   - id: search-input
     selector: '[data-testid="settings-search-input"]'
     kind: interactive
@@ -6765,6 +6779,88 @@ controls:
   - id: debug-panel
     selector: '[data-testid="debug-panel"]'
     kind: display
+  - id: debug-toolbar-resume          # ED-PARITY-025 IDEA TopToolbar3 (Rerun…Mute, More)
+    selector: '[data-testid="debug-continue"]'
+    kind: interactive
+    optional: true       # enabled while a debug session is suspended
+  - id: debug-subtab-console
+    selector: '[data-testid="debug-subtab-console"]'
+    kind: interactive
+    optional: true
+  - id: debug-console-output
+    selector: '[data-testid="debug-console-output"]'
+    kind: display
+    optional: true
+  - id: debug-frames-list              # ED-PARITY-025 IDEA Frames view (method:line, Class (package))
+    selector: '[data-testid="debug-frames-list"]'
+    kind: display
+    optional: true       # frames exist only while suspended
+  - id: debug-thread-select            # ED-PARITY-025 IDEA thread combo
+    selector: '[data-testid="debug-thread-select"]'
+    kind: display
+    optional: true
+  - id: debug-variables-tree           # ED-PARITY-025 merged watches + variables tree
+    selector: '[data-testid="debug-variables-tree"]'
+    kind: display
+    optional: true
+  - id: debug-watch-input              # Evaluate expression (Enter) or add a watch (Ctrl+Shift+Enter)
+    selector: '[data-testid="debug-watch-input"]'
+    kind: interactive
+    optional: true
+  - id: debug-evaluate-inline-result
+    selector: '[data-testid="debug-evaluate-inline-result"]'
+    kind: display
+    optional: true       # rendered after an Enter evaluation while suspended
+  - id: debug-breakpoint-popup         # ED-PARITY-025 IDEA breakpoint balloon
+    selector: '[data-testid="debug-breakpoint-popup"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoint-popup-title"]'
+      - '[data-testid="debug-breakpoint-popup-log-stack"]'
+      - '[data-testid="debug-breakpoint-popup-log-message"]:checked'
+  - id: debug-breakpoint-popup-condition
+    selector: '[data-testid="debug-breakpoint-popup-condition"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoint-popup-condition"]:focus'
+  - id: debug-breakpoint-popup-actions
+    selector: '[data-testid="debug-breakpoint-popup-done"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoint-popup-more"]'
+  - id: debug-gutter-menu              # IDEA Add Breakpoint / Conditional / Logging menu
+    selector: '[data-testid="debug-gutter-menu-add-conditional"]'
+    kind: interactive
+    optional: true
+  - id: debug-breakpoints-dialog       # ED-PARITY-025 IDEA View Breakpoints dialog
+    selector: '[data-testid="debug-breakpoints-dialog"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoints-dialog-condition"]'
+      - '[data-testid="debug-breakpoints-dialog-enabled-2"]:checked'
+      - '[data-testid="debug-breakpoints-dialog-remove-once-hit"]:checked'
+  - id: debug-breakpoints-dialog-tree
+    selector: '[data-testid="debug-breakpoints-dialog-tree"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoints-dialog-line"]'
+      - '[data-testid="debug-breakpoints-dialog-line"][data-breakpoint-line="7"]'
+  - id: debug-breakpoints-dialog-properties
+    selector: '[data-testid="debug-breakpoints-dialog-suspend"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="debug-breakpoints-dialog-log-stack"]'
+      - '[data-testid="debug-breakpoints-dialog-remove-once-hit"]'
+  - id: debug-breakpoints-dialog-done
+    selector: '[data-testid="debug-breakpoints-dialog-done"]'
+    kind: interactive
+    optional: true
   - id: debug-stop
     selector: '[data-testid="debug-stop"]'
     kind: interactive
@@ -7355,10 +7451,53 @@ controls:
     selector: '[data-testid="code-workspace-tree-dir"]'
     kind: interactive
     optional: true       # directory rows; cases refine with [data-path="..."] (C8-07)
-  - id: tree-view
-    selector: '[data-testid="code-workspace-view-tree"]'
+  - id: tree-view                     # IDEA "Project ▾" view selector (Project / Project Files)
+    selector: '[data-testid="code-workspace-tree-view-selector"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-view-project"]'
+      - '[data-testid="code-workspace-tree-view-project-files"]'
+  - id: tree-new-menu                 # IDEA title action New (+): File, Directory, Open File…, Add Folder…
+    selector: '[data-testid="code-workspace-tree-new"]'
+    kind: interactive
+    optional: true
+  - id: tree-open-file
+    selector: '[data-testid="code-workspace-tree-open-file"]'
+    kind: interactive
+    optional: true       # New (+) menu item and empty-workspace entry point
+  - id: tree-options-appearance       # ⋮ Options › Appearance: Details, Compact Directories, zoom
+    selector: '[data-testid="code-workspace-tree-menu-appearance"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-menu-details"]'
+      - '[data-testid="code-workspace-tree-menu-compact"]'
+      - '[data-testid="code-workspace-tree-zoom-in"]'
+      - '[data-testid="code-workspace-tree-zoom-out"]'
+      - '[data-testid="code-workspace-tree-zoom-reset"]'
+  - id: tree-options                  # IDEA ⋮ Options and − Hide title actions
+    selector: '[data-testid="code-workspace-tree-toolbar-more"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-collapse"]'
+      - '[data-testid="code-workspace-tree-menu-expand-all"]'
+  - id: tree-speed-search             # IDEA speed search: typing in the tree opens it
+    selector: '[data-testid="code-workspace-tree-speed-search"]'
     kind: display
-    optional: true       # tree view container used by template flows
+    optional: true
+  - id: tree-speed-search-close
+    selector: '[data-testid="code-workspace-tree-speed-search-close"]'
+    kind: interactive
+    optional: true
+  - id: tree-row-details              # root location and Appearance › Details (time, size)
+    selector: '[data-testid="code-workspace-tree-root-path"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-file-details"]'
+      - '[data-testid="code-workspace-tree-empty"]'
   - id: new-java-class-package
     selector: '[data-testid="new-java-class-package"]'
     kind: display
@@ -8113,6 +8252,55 @@ controls:
       - '[data-testid="code-workspace-tool-rail-structure"]'
       - '[data-testid="code-workspace-tool-rail-commit"]'
       - '[data-testid="code-workspace-tool-rail-documentation"]'
+  - id: tool-rail-resize              # ED-PARITY-024 stripe width handle (names shown)
+    selector: '[data-testid="code-workspace-tool-rail-left-resize"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-rail-right-resize"]'
+  - id: tool-rail-menu                # ED-PARITY-024 stripe button context menu
+    selector: '[data-testid="code-workspace-tool-rail-menu-move"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-rail-menu-move-right-top"]'
+      - '[data-testid="code-workspace-tool-rail-menu-remove"]'
+      - '[data-testid="code-workspace-tool-rail-menu-show-names"]'
+      - '[data-testid="code-workspace-tool-rail-menu-toggle"]'
+  - id: tool-window-pane              # ED-PARITY-024 re-parentable tool window decorator
+    selector: '[data-testid="code-workspace-tool-window-problems"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-window-structure"]'
+      - '[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]'
+  - id: tool-window-options-menu      # ED-PARITY-024 ⋮ Options: View Mode / Move to / Resize / Remove
+    selector: '[data-testid="code-workspace-tool-window-options-problems"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tool-window-options-terminal"]'
+      - '[data-testid="code-workspace-tool-window-move"]'
+      - '[data-testid="code-workspace-tool-window-move-bottom-left"]'
+  - id: tool-window-more-item         # More tool windows entries
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-run"]'
+    kind: interactive
+    optional: true
+  - id: project-header-actions        # ED-PARITY-024 IDEA Project header: Expand All / Collapse All / Select Opened File
+    selector: '[data-testid="code-workspace-tree-expand-all"]'
+    kind: interactive
+    optional: true       # Expand All folds into ⋯ at narrow widths
+    aliases:
+      - '[data-testid="code-workspace-tree-collapse-all"]'
+      - '[data-testid="code-workspace-tree-select-opened"]'
+  - id: search-everywhere-tab         # ED-PARITY-024 category tabs (Tab / Shift+Tab)
+    selector: '[data-testid="search-everywhere-tab-files"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="search-everywhere-tab-classes"]'
+      - '[data-testid="search-everywhere-tab-symbols"]'
+      - '[data-testid="search-everywhere-tab-actions"]'
   - id: tool-window-header
     selector: '[data-testid="code-workspace-tool-window-header"]'
     kind: display
@@ -8358,6 +8546,18 @@ controls:
     selector: '[data-testid="code-workspace-quick-doc"]'
     kind: display
     optional: true       # explicit Quick Documentation popup
+  - id: hover-doc-popup
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    kind: display
+    optional: true       # IDEA hover documentation; stays while the pointer heads into it
+  - id: hover-doc-pin
+    selector: '[data-testid="code-workspace-hover-doc-pin"]'
+    kind: interactive
+    optional: true       # pins the hover documentation to the Documentation tool window
+  - id: documentation-pane
+    selector: '[data-testid="code-workspace-documentation-pane"]'
+    kind: display
+    optional: true       # Documentation tool window (pinned quick documentation)
   # §8.20.2 W1 actionable editor conditions and retryable actions.
   - id: editor-banners
     selector: '[data-testid="code-workspace-editor-banners"]'
