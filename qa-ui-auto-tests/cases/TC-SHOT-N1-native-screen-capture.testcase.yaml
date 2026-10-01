@@ -1,5 +1,5 @@
 id: TC-SHOT-N1
-title: Native real screen capture renders in the overlay
+title: Native real screen capture backend returns a valid image
 covers:
 - F27.1
 tags:
@@ -12,12 +12,16 @@ fixtures:
 - reset_db
 steps:
 - open: ${cfg.app.base_url}
-- eval: 'window.location.hash = "screenshot-overlay"'
-# No overlay-init payload exists on the hash route, so the overlay falls
-# back to the real screenshot_capture_full backend on the runner OS.
-- wait_for:
-    selector: '[data-testid="screenshot-base-image"]'
-    timeout_sec: 30
+# The overlay opens in a separate WebviewWindow in native mode, which the
+# runner cannot address; verify the real backend directly. WebDriver waits
+# for the returned promise to resolve; JSON.stringify + contains avoids the
+# audit's ban on assignment and arrow functions in eval_readonly.
 - eval_readonly:
-    expression: document.getElementsByTagName("img")[0].naturalWidth > 0
-- assert_visible: '[data-testid="screenshot-hint"]'
+    expression: 'window.__TAURI__.core.invoke("screenshot_list_displays").then(JSON.stringify)'
+    contains: '"width"'
+- eval_readonly:
+    expression: 'window.__TAURI__.core.invoke("screenshot_capture_full", {displayId: null}).then(JSON.stringify)'
+    contains: '"path"'
+- eval_readonly:
+    expression: 'window.__TAURI__.core.invoke("screenshot_probe").then(JSON.stringify)'
+    contains: '"permission"'

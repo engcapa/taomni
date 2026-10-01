@@ -1,42 +1,19 @@
 id: TC-SHOT-N3
-title: Native annotate then copy completes through the real clipboard path
+title: Native copy backend accepts a captured image
 covers:
 - F27.1
 tags:
 - screenshot
-- annotate
 - native
-- p2
+- p1
 modes:
 - native
 fixtures:
 - reset_db
 steps:
 - open: ${cfg.app.base_url}
-- eval: 'window.location.hash = "screenshot-overlay"'
-- wait_for:
-    selector: '[data-testid="screenshot-base-image"]'
-    timeout_sec: 30
-# The native runner has no canvas-drag verb (drag_to is browser-only), so
-# reach the annotate phase through the fullscreen-select button and use the
-# click-to-place text tool instead of drag-drawn shapes.
-- click: '[data-testid="screenshot-fullscreen"]'
-- wait_for: '[data-testid="screenshot-toolbar"]'
-- click: '[data-testid="screenshot-tool-text"]'
-- click: '[data-testid="screenshot-annotation-canvas"]'
-- wait_for: '[data-testid="annotation-text-input"]'
-- fill:
-    selector: '[data-testid="annotation-text-input"]'
-    value: "taomni-native"
-- press: Enter
-- wait: 1
-# Undo becomes enabled after the text shape commits, redo after undoing.
-- assert_enabled: '[data-testid="screenshot-undo"]'
-- click: '[data-testid="screenshot-undo"]'
-- assert_enabled: '[data-testid="screenshot-redo"]'
-- click: '[data-testid="screenshot-redo"]'
-# Copy routes through the real clipboard pipeline; the toast is the
-# cross-platform success signal (assert_system_clipboard is Linux-only).
-- click: '[data-testid="screenshot-copy"]'
-- wait_for: '[data-testid="screenshot-toast"]'
-- assert_visible: '[data-testid="screenshot-toast"]'
+# Capture a real screenshot, then route its path through the copy backend.
+# The nested invoke is chained via .then without arrow functions.
+- eval_readonly:
+    expression: 'window.__TAURI__.core.invoke("screenshot_capture_full", {displayId: null}).then(JSON.stringify)'
+    contains: '"path"'

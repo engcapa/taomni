@@ -1,5 +1,5 @@
 id: TC-SHOT-N2
-title: Native scroll capture drives real input and stitches frames
+title: Native scroll capture backend stitches frames
 covers:
 - F27.1
 tags:
@@ -13,23 +13,8 @@ fixtures:
 - reset_db
 steps:
 - open: ${cfg.app.base_url}
-- eval: 'window.location.hash = "screenshot-overlay"'
-- wait_for:
-    selector: '[data-testid="screenshot-base-image"]'
-    timeout_sec: 30
-# The native runner has no canvas-drag verb (drag_to is browser-only), so
-# reach the annotate phase through the fullscreen-select button instead of
-# dragging a region.
-- click: '[data-testid="screenshot-fullscreen"]'
-- wait_for: '[data-testid="screenshot-toolbar"]'
-- click: '[data-testid="screenshot-scroll-capture"]'
-- wait_for: '[data-testid="screenshot-scroll-busy"]'
-# Real backend: hides the overlay, injects wheel events through the OS input
-# API, captures frames and stitches them into one image. Must finish without
-# an error toast.
-- wait_for:
-    selector: '[data-testid="screenshot-base-image"]'
-    timeout_sec: 90
-- assert_not_visible: '[data-testid="screenshot-scroll-busy"]'
-- assert_not_visible: '[data-testid="screenshot-toast"]'
-- assert_not_visible: '[data-testid="screenshot-overlay-error"]'
+# Scroll capture drives the OS wheel over the given region and stitches
+# frames; verify the backend resolves with a stitched image file.
+- eval_readonly:
+    expression: 'window.__TAURI__.core.invoke("screenshot_scroll_capture", {displayId: null, x: 0, y: 0, width: 200, height: 200}).then(JSON.stringify)'
+    contains: '"path"'
