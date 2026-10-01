@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive RealVNC Viewer against vnc_fixture_server.py and read its protocol behaviour.
 
-    python vnc_realvnc_probe.py --viewer C:/software/realvnc-viewer/VNC-Viewer-7.15.1-Windows-64bit.exe \
+    python vnc_realvnc_probe.py --viewer <path to the RealVNC Viewer exe on this machine> \
         --port 5988 --password-env TAOMNI_VNC_FIXTURE_PASSWORD --fixture-log fx.jsonl --fixture-control 5989 \
         --report qa-ui-auto-report/vnc-native/<run> --probe connect-clipboard --probe keepalive
 
