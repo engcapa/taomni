@@ -355,6 +355,11 @@ interface DebugSessionRecord {
    * hit, later events queue here so they keep their order.
    */
   eventGate: { queue: DapEventPayload[] } | null;
+  /**
+   * `exited`/`terminated` held while the debuggee's last output drains: the
+   * adapter's stream reader can deliver stdout after the exit events.
+   */
+  closing: { events: DapEventPayload[]; timer: ReturnType<typeof setTimeout> | null } | null;
   abortScopeIds: string[];
   ready: Promise<void>;
   readyResolve: () => void;
@@ -415,6 +420,10 @@ function exceptionBreakpointRulesKey(workspaceInstanceId: string): string {
   return `taomni.codeWorkspace.debugExceptionBreakpointRules.v1.${workspaceInstanceId}`;
 }
 
+/** Output still accepted after `terminated` before the session is freed. */
+const CLOSING_OUTPUT_DRAIN_MS = 250;
+/** Fallback when an adapter reports `exited` but never `terminated`. */
+const EXITED_WITHOUT_TERMINATED_MS = 1500;
 const MAX_FUNCTION_BREAKPOINTS = 256;
 const MAX_FUNCTION_BREAKPOINT_NAME_LENGTH = 1024;
 const MAX_FUNCTION_BREAKPOINT_EXPRESSION_LENGTH = 4096;
@@ -1759,9 +1768,24 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
     }
   }, [applyBreakpointHit, findHitBreakpoint, refreshFrameVariables, updateSessionState]);
 
+  const finishClosingRef = useRef<(record: DebugSessionRecord) => void>(() => {});
   const processEvent = useCallback((payload: DapEventPayload) => {
     const record = sessionsRef.current.get(payload.sessionId);
     if (!record) return;
+    if (payload.event === "terminated" || payload.event === "exited") {
+      // The debuggee's last stdout lines may still be on their way (java-debug
+      // reads the process streams on its own thread), so keep listening for a
+      // short drain and only then print the exit line and free the session.
+      const closing = record.closing ?? { events: [], timer: null };
+      record.closing = closing;
+      closing.events.push(payload);
+      if (closing.timer) clearTimeout(closing.timer);
+      const drainMs = closing.events.some((event) => event.event === "terminated")
+        ? CLOSING_OUTPUT_DRAIN_MS
+        : EXITED_WITHOUT_TERMINATED_MS;
+      closing.timer = setTimeout(() => finishClosingRef.current(record), drainMs);
+      return;
+    }
     updateSessionState(payload.sessionId, (prev) => reduceDebugEvent(prev, payload.event, payload.message));
     if (payload.event === "initialized") {
       record.initialized = true;
@@ -1861,52 +1885,62 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
           }
         }
       }
-    } else if (payload.event === "terminated" || payload.event === "exited") {
-      // Free the backend session (drops the adapter transport / child); the final
-      // state stays visible in the panel until the next start.
-      record.live = false;
-      record.functionSyncGeneration += 1;
-      record.instructionSyncGeneration += 1;
-      record.dataSyncGeneration += 1;
-      record.exceptionSyncGeneration += 1;
-      if (!record.readySettled) {
-        record.readySettled = true;
-        record.readyReject(new Error(`${record.label} terminated before the debug adapter became ready`));
-      }
-      record.unlisten?.();
-      record.unlisten = null;
-      record.bpIdIndex.clear();
-      record.tempRunToCursor = null;
-      record.breakpointRuntime = {};
-      record.functionBreakpointRuntime = {};
-      record.instructionBreakpointRuntime = {};
-      record.dataBreakpointRuntime = {};
-      record.exceptionBreakpointRuntime = {};
-      record.exceptionBreakpointRuleRuntime = {};
-      record.frameVariables = {};
-      void dapTerminate(record.id).catch(() => {});
-      dropSessionDataBreakpoints(new Set([record.id]));
-      if (activeSessionIdRef.current === record.id) {
-        const fallback = Array.from(sessionsRef.current.values())
-          .filter((candidate) => candidate.live)
-          .sort((left, right) => left.order - right.order)[0] ?? record;
-        publishActiveSession(fallback);
-      } else {
-        publishSessionList();
-      }
     }
   }, [
     publishActiveSession,
-    publishSessionList,
     refreshStoppedContext,
     syncBreakpointsForPath,
     syncDataBreakpoints,
     syncExceptionBreakpoints,
     syncFunctionBreakpoints,
     syncInstructionBreakpoints,
-    dropSessionDataBreakpoints,
     updateSessionState,
   ]);
+
+  /** Apply the held `exited`/`terminated` events once the output drained. */
+  const finishClosing = useCallback((record: DebugSessionRecord) => {
+    const closing = record.closing;
+    if (!closing) return;
+    record.closing = null;
+    if (closing.timer) clearTimeout(closing.timer);
+    if (!sessionsRef.current.has(record.id)) return;
+    for (const event of closing.events) {
+      updateSessionState(record.id, (prev) => reduceDebugEvent(prev, event.event, event.message));
+    }
+    // Free the backend session (drops the adapter transport / child); the final
+    // state stays visible in the panel until the next start.
+    record.live = false;
+    record.functionSyncGeneration += 1;
+    record.instructionSyncGeneration += 1;
+    record.dataSyncGeneration += 1;
+    record.exceptionSyncGeneration += 1;
+    if (!record.readySettled) {
+      record.readySettled = true;
+      record.readyReject(new Error(`${record.label} terminated before the debug adapter became ready`));
+    }
+    record.unlisten?.();
+    record.unlisten = null;
+    record.bpIdIndex.clear();
+    record.tempRunToCursor = null;
+    record.breakpointRuntime = {};
+    record.functionBreakpointRuntime = {};
+    record.instructionBreakpointRuntime = {};
+    record.dataBreakpointRuntime = {};
+    record.exceptionBreakpointRuntime = {};
+    record.exceptionBreakpointRuleRuntime = {};
+    record.frameVariables = {};
+    void dapTerminate(record.id).catch(() => {});
+    dropSessionDataBreakpoints(new Set([record.id]));
+    if (activeSessionIdRef.current === record.id) {
+      const fallback = Array.from(sessionsRef.current.values())
+        .filter((candidate) => candidate.live)
+        .sort((left, right) => left.order - right.order)[0] ?? record;
+      publishActiveSession(fallback);
+    } else {
+      publishSessionList();
+    }
+  }, [dropSessionDataBreakpoints, publishActiveSession, publishSessionList, updateSessionState]);
+  finishClosingRef.current = finishClosing;
 
   const handleEventRef = useRef<(payload: DapEventPayload) => void>(() => {});
   /**
@@ -2107,6 +2141,7 @@ export function useCodeDebugSession(workspaceInstanceId: string): CodeDebugSessi
       tempRunToCursor: null,
       armedDependents: new Set(),
       eventGate: null,
+      closing: null,
       abortScopeIds,
       ready,
       readyResolve,

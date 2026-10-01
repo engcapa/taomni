@@ -1851,6 +1851,28 @@ describe("useCodeDebugSession", () => {
     expect(result.current.state?.output).toEqual([]);
   });
 
+  it("keeps the debuggee's last output that arrives after exited/terminated, before the exit line", async () => {
+    const { result } = renderHook(() => useCodeDebugSession("ws-1"));
+    const emit = await startSession(result.current.startDebug);
+    act(() => emit({ sessionId: "sess-1", event: "initialized", message: {} }));
+    dapTerminate.mockClear();
+    act(() => emit({ sessionId: "sess-1", event: "exited", message: { body: { exitCode: 0 } } }));
+    act(() => emit({ sessionId: "sess-1", event: "terminated", message: {} }));
+    // java-debug's stream reader delivers the final println after the exit events.
+    act(() => emit({
+      sessionId: "sess-1",
+      event: "output",
+      message: { body: { category: "stdout", output: "debug-value=42\n" } },
+    }));
+    expect(dapTerminate).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.state?.status).toBe("terminated"));
+    const texts = result.current.state!.output.map((line) => line.text);
+    const value = texts.indexOf("debug-value=42\n");
+    expect(value).toBeGreaterThan(-1);
+    expect(value).toBeLessThan(texts.findIndex((text) => text.includes("Process finished with exit code 0")));
+    expect(dapTerminate).toHaveBeenCalledWith("sess-1");
+  });
+
   it("starts parallel compound children and broadcasts breakpoints to every live session", async () => {
     const handlers = new Map<string, (payload: { sessionId: string; event: string; message: unknown }) => void>();
     listenDapEvents.mockImplementation((id: string, handler: (payload: {
