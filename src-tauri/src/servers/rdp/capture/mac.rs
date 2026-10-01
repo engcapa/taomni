@@ -17,7 +17,8 @@ use super::{CaptureDisplay, CaptureProbe, Capturer, Frame};
 use crate::servers::engine::LogEmitter;
 use crate::servers::rdp::input::control_permission_granted;
 
-mod sck;
+/// Also used by the RDPSND loopback (`servers/rdp/sound_macos.rs`).
+pub(crate) mod sck;
 
 const INITIAL_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
 const FRAME_TIMEOUT: Duration = Duration::from_secs(2);

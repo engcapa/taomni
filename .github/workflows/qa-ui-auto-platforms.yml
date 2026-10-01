@@ -194,11 +194,12 @@ jobs:
           Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
           Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
           $driver >> $env:GITHUB_PATH
-      # RDP audio cases (rdp_audio_required): hosted Windows runners have no
-      # audio endpoint. This installs the VB-CABLE virtual device (devcon with
-      # its publisher certificate trusted); the fixture only verifies it.
-      - name: Windows virtual audio output
-        if: runner.os == 'Windows' && contains(matrix.capabilities, 'audio')
+      # RDP audio cases (rdp_audio_required): hosted Windows/macOS runners have
+      # no audio output. This installs VB-CABLE (Windows, devcon with its
+      # publisher certificate trusted) or Background Music (macOS); the fixture
+      # only verifies the device. Linux uses PipeWire packages above.
+      - name: Virtual audio output
+        if: runner.os != 'Linux' && contains(matrix.capabilities, 'audio')
         uses: LABSN/sound-ci-helpers@d08c889a7bba7d9b1b059f8f76dac4672ea3a9cf # v1.0.4
       - name: macOS build dependencies
         if: runner.os == 'macOS' && matrix.mode == 'native'

@@ -5,7 +5,7 @@
 //! computer" redirection:
 //! - Windows: WASAPI loopback (a cpal input stream on the output device);
 //! - Linux: a PipeWire capture stream on the default sink's monitor;
-//! - macOS: not available yet (logged; video is unaffected).
+//! - macOS 13+: ScreenCaptureKit system audio (`sound_macos.rs`).
 //!
 //! Capture runs on its own thread and pushes interleaved `f32` frames into a
 //! [`WavePump`], which converts them to the negotiated 16-bit PCM format and
@@ -470,9 +470,14 @@ mod platform {
     }
 }
 
+#[cfg(target_os = "macos")]
+#[path = "sound_macos.rs"]
+mod platform;
+
 #[cfg(not(any(
     all(target_os = "windows", feature = "rdp-server-audio"),
-    target_os = "linux"
+    target_os = "linux",
+    target_os = "macos"
 )))]
 mod platform {
     use super::WaveSink;

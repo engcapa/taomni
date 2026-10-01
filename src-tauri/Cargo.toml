@@ -301,6 +301,8 @@ dispatch2 = "0.3.1"
 objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSError"] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSPasteboard"] }
 objc2-core-media = { version = "0.3.2", features = ["CMSampleBuffer", "objc2-core-video"] }
+# AudioBufferList/ASBD for the RDPSND ScreenCaptureKit system-audio loopback.
+objc2-core-audio-types = { version = "0.3.2", default-features = false, features = ["std", "CoreAudioBaseTypes"] }
 objc2-core-video = { version = "0.3.2", features = ["CVBase", "CVBuffer", "CVImageBuffer", "CVPixelBuffer", "CVReturn"] }
 objc2-core-foundation = "0.3.2"
 objc2-screen-capture-kit = { version = "0.3.2", default-features = false, features = ["std", "SCShareableContent", "SCStream", "block2", "dispatch2", "objc2-core-graphics", "objc2-core-media"] }

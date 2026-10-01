@@ -11,8 +11,9 @@ provides a virtual output and makes it the default:
   required. The fixture never installs drivers; the workflow installs the
   VB-CABLE virtual device for the ``audio`` capability (pinned
   LABSN/sound-ci-helpers), local runs need a real or virtual output.
-* macOS: output loopback is not implemented in the server yet; the case is
-  skipped with that reason instead of passing.
+* macOS: a default output device is required (the server captures system
+  audio with ScreenCaptureKit, which needs something to render to); the
+  workflow installs the Background Music virtual device for ``audio``.
 
 Exports ``QA_AUDIO_BACKEND`` describing what was prepared.
 """
@@ -121,6 +122,23 @@ def _windows(ctx: Any) -> str:
     return "windows " + ", ".join(devices)
 
 
+def _macos(ctx: Any) -> str:
+    from . import FixtureSkip
+
+    result = subprocess.run(["system_profiler", "SPAudioDataType", "-json"],
+                            capture_output=True, text=True, timeout=120)
+    try:
+        groups = json.loads(result.stdout or "{}").get("SPAudioDataType") or []
+    except ValueError:
+        groups = []
+    outputs = [item.get("_name", "?") for group in groups for item in group.get("_items") or []
+               if item.get("coreaudio_default_audio_output_device") == "spaudio_yes"]
+    if not outputs:
+        raise FixtureSkip("no default audio output device; CI installs Background Music for the "
+                          "audio capability (LABSN/sound-ci-helpers), local runs need an output")
+    return "macos " + ", ".join(outputs)
+
+
 def setup(ctx: Any) -> None:
     from . import FixtureSkip
 
@@ -129,8 +147,10 @@ def setup(ctx: Any) -> None:
         backend = _linux(ctx)
     elif system == "Windows":
         backend = _windows(ctx)
+    elif system == "Darwin":
+        backend = _macos(ctx)
     else:
-        raise FixtureSkip("capturing the host audio output is not implemented on macOS yet")
+        raise FixtureSkip(f"no host audio provisioning for {system}")
     _export(ctx, "QA_AUDIO_BACKEND", backend)
 
 
