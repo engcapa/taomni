@@ -192,6 +192,16 @@ export function isScreenshotRecorderWindow(): boolean {
   }
 }
 
+/** True when running inside a pinned-screenshot window. */
+export function isScreenshotPinWindow(): boolean {
+  if (!isTauriRuntime()) return false;
+  try {
+    return getCurrentWindow().label.startsWith("screenshot-pin-");
+  } catch {
+    return false;
+  }
+}
+
 /** A 2D point in CSS pixels. */
 export interface ScreenshotPoint {
   x: number;

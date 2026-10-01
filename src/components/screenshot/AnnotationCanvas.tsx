@@ -15,9 +15,13 @@ export type AnnotationTool =
   | "arrow"
   | "line"
   | "pen"
+  | "highlighter"
   | "text"
   | "mosaic"
-  | "number";
+  | "blur"
+  | "number"
+  | "balloon"
+  | "eraser";
 
 export interface CssRect {
   x: number;
@@ -38,7 +42,7 @@ interface ShapeBase {
 }
 
 export interface RectLikeShape extends ShapeBase {
-  kind: "rect" | "ellipse" | "mosaic";
+  kind: "rect" | "ellipse" | "mosaic" | "blur";
   x: number;
   y: number;
   w: number;
@@ -54,7 +58,7 @@ export interface LineLikeShape extends ShapeBase {
 }
 
 export interface PenShape extends ShapeBase {
-  kind: "pen";
+  kind: "pen" | "highlighter";
   pts: Point[];
 }
 
@@ -73,13 +77,26 @@ export interface NumberShape extends ShapeBase {
   num: number;
 }
 
-export type Shape = RectLikeShape | LineLikeShape | PenShape | TextShape | NumberShape;
+export interface BalloonShape extends ShapeBase {
+  kind: "balloon";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Tail tip position (points to the annotated target). */
+  tx: number;
+  ty: number;
+}
+
+export type Shape = RectLikeShape | LineLikeShape | PenShape | TextShape | NumberShape | BalloonShape;
 
 export interface AnnotationCanvasHandle {
   undo: () => void;
   redo: () => void;
   clear: () => void;
   exportDataUrl: (base: HTMLImageElement, scale: number) => string;
+  /** Programmatically add shapes (e.g. auto-redact boxes). */
+  addShapes: (shapes: Shape[]) => void;
 }
 
 interface AnnotationCanvasProps {
@@ -229,6 +246,26 @@ function paintShape(
         ctx.fill();
       }
       break;
+    case "highlighter": {
+      // Translucent marker strokes.
+      const prevAlpha = ctx.globalAlpha;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = Math.max(8, shape.lineWidth * 3 * s);
+      if (shape.pts.length >= 2) {
+        ctx.beginPath();
+        ctx.moveTo(shape.pts[0].x * s, shape.pts[0].y * s);
+        for (let i = 1; i < shape.pts.length; i++) {
+          ctx.lineTo(shape.pts[i].x * s, shape.pts[i].y * s);
+        }
+        ctx.stroke();
+      } else if (shape.pts.length === 1) {
+        ctx.beginPath();
+        ctx.arc(shape.pts[0].x * s, shape.pts[0].y * s, ctx.lineWidth / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = prevAlpha;
+      break;
+    }
     case "text":
       ctx.font = `${Math.max(8, shape.fontSize * s)}px Inter, -apple-system, "Segoe UI", sans-serif`;
       ctx.textBaseline = "top";
@@ -245,6 +282,22 @@ function paintShape(
         );
       }
       break;
+    case "blur": {
+      // Gaussian blur region (distinct from pixel mosaic).
+      if (base) {
+        const bx = shape.x * s;
+        const by = shape.y * s;
+        const bw = Math.abs(shape.w * s);
+        const bh = Math.abs(shape.h * s);
+        const sx = Math.min(shape.x, shape.x + shape.w) * s;
+        const sy = Math.min(shape.y, shape.y + shape.h) * s;
+        ctx.save();
+        ctx.filter = `blur(${Math.max(2, 6 * s)}px)`;
+        ctx.drawImage(base, sx, sy, bw, bh, bx, by, bw, bh);
+        ctx.restore();
+      }
+      break;
+    }
     case "number": {
       // Flameshot-style numbered marker: filled circle with a white number.
       const r = Math.max(12, 9 + shape.lineWidth * 1.5) * s;
@@ -258,6 +311,40 @@ function paintShape(
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(String(shape.num), cx, cy + r * 0.06);
+      break;
+    }
+    case "balloon": {
+      // Speech balloon: rounded rect with a tail pointing to (tx, ty).
+      const bx = Math.min(shape.x, shape.x + shape.w) * s;
+      const by = Math.min(shape.y, shape.y + shape.h) * s;
+      const bw = Math.abs(shape.w * s);
+      const bh = Math.abs(shape.h * s);
+      const radius = Math.min(16 * s, bw / 4, bh / 4);
+      const tx = shape.tx * s;
+      const ty = shape.ty * s;
+      // Tail triangle: from tail tip to two points on the balloon edge.
+      const cx = bx + bw / 2;
+      const cy = by + bh / 2;
+      const angle = Math.atan2(ty - cy, tx - cx);
+      const edgeX = cx + Math.cos(angle) * (bw / 2);
+      const edgeY = cy + Math.sin(angle) * (bh / 2);
+      const perp = angle + Math.PI / 2;
+      const spread = Math.min(20 * s, bw / 4);
+      const p1x = edgeX + Math.cos(perp) * spread;
+      const p1y = edgeY + Math.sin(perp) * spread;
+      const p2x = edgeX - Math.cos(perp) * spread;
+      const p2y = edgeY - Math.sin(perp) * spread;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(p1x, p1y);
+      ctx.lineTo(p2x, p2y);
+      ctx.closePath();
+      ctx.fill();
+      // Rounded rect body.
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, radius);
+      ctx.fill();
+      ctx.stroke();
       break;
     }
   }
@@ -325,6 +412,13 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       setRedoStack([]);
     }, []);
 
+    const addShapes = useCallback((newShapes: Shape[]) => {
+      if (newShapes.length === 0) return;
+      shapesRef.current = [...shapesRef.current, ...newShapes];
+      setShapes(shapesRef.current);
+      setRedoStack([]);
+    }, []);
+
     const undo = useCallback(() => {
       const prev = shapesRef.current;
       if (prev.length === 0) return;
@@ -364,11 +458,12 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       return c.toDataURL("image/png");
     }, []);
 
-    useImperativeHandle(ref, () => ({ undo, redo, clear, exportDataUrl }), [
+    useImperativeHandle(ref, () => ({ undo, redo, clear, exportDataUrl, addShapes }), [
       undo,
       redo,
       clear,
       exportDataUrl,
+      addShapes,
     ]);
 
     // Live redraw (HiDPI-aware; CSS-px coordinate space).
@@ -404,7 +499,8 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       switch (tool) {
         case "rect":
         case "ellipse":
-        case "mosaic": {
+        case "mosaic":
+        case "blur": {
           const r = rectFromDrag(a, b);
           return { ...base, kind: tool, ...r };
         }
@@ -412,7 +508,12 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         case "arrow":
           return { ...base, kind: tool, x1: a.x, y1: a.y, x2: b.x, y2: b.y };
         case "pen":
-          return { ...base, kind: "pen", pts: [a, b] };
+        case "highlighter":
+          return { ...base, kind: tool, pts: [a, b] };
+        case "balloon": {
+          const r = rectFromDrag(a, b);
+          return { ...base, kind: "balloon", ...r, tx: a.x, ty: a.y };
+        }
         default:
           return null;
       }
@@ -449,12 +550,58 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       const d = drawingRef.current;
       if (!d || tool === "select" || tool === "text") return;
       const p = localPos(e);
-      if (tool === "pen") {
+      if (tool === "pen" || tool === "highlighter" || tool === "eraser") {
         d.pts = [...d.pts, p];
-        setDraft({ id: -1, color, lineWidth, kind: "pen", pts: d.pts });
+        if (tool === "eraser") {
+          // Eraser shows a trail but doesn't create a shape.
+          setDraft(null);
+        } else {
+          setDraft({ id: -1, color, lineWidth, kind: tool, pts: d.pts });
+        }
       } else {
         const next = makeDraft(d.start, p);
         if (next) setDraft(next);
+      }
+    };
+
+    /** Check if a point is within `radius` of a shape's geometry. */
+    const shapeHitTest = (shape: Shape, p: Point, radius: number): boolean => {
+      switch (shape.kind) {
+        case "rect":
+        case "ellipse":
+        case "mosaic":
+        case "blur": {
+          const x = Math.min(shape.x, shape.x + shape.w) - radius;
+          const y = Math.min(shape.y, shape.y + shape.h) - radius;
+          const w = Math.abs(shape.w) + radius * 2;
+          const h = Math.abs(shape.h) + radius * 2;
+          return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
+        }
+        case "line":
+        case "arrow": {
+          // Distance from point to line segment.
+          const dx = shape.x2 - shape.x1;
+          const dy = shape.y2 - shape.y1;
+          const lenSq = dx * dx + dy * dy;
+          if (lenSq === 0) return Math.hypot(p.x - shape.x1, p.y - shape.y1) <= radius;
+          const t = Math.max(0, Math.min(1, ((p.x - shape.x1) * dx + (p.y - shape.y1) * dy) / lenSq));
+          const projX = shape.x1 + t * dx;
+          const projY = shape.y1 + t * dy;
+          return Math.hypot(p.x - projX, p.y - projY) <= radius;
+        }
+        case "pen":
+        case "highlighter":
+          return shape.pts.some((pt) => Math.hypot(pt.x - p.x, pt.y - p.y) <= radius);
+        case "text":
+        case "number":
+          return Math.hypot(shape.x - p.x, shape.y - p.y) <= radius + 12;
+        case "balloon": {
+          const x = Math.min(shape.x, shape.x + shape.w) - radius;
+          const y = Math.min(shape.y, shape.y + shape.h) - radius;
+          const w = Math.abs(shape.w) + radius * 2;
+          const h = Math.abs(shape.h) + radius * 2;
+          return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
+        }
       }
     };
 
@@ -464,21 +611,43 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       setDraft(null);
       if (!d || tool === "select" || tool === "text") return;
       const p = localPos(e);
+      // Eraser: delete shapes intersecting the eraser path.
+      if (tool === "eraser") {
+        const eraserPts = [...d.pts, p];
+        const radius = Math.max(10, lineWidth * 2);
+        const prev = shapesRef.current;
+        const removed: Shape[] = [];
+        const kept = prev.filter((s) => {
+          const hit = eraserPts.some((pt) => shapeHitTest(s, pt, radius));
+          if (hit) removed.push(s);
+          return !hit;
+        });
+        if (removed.length > 0) {
+          // Erased shapes go to the redo stack (in original order) so each
+          // undo step restores one shape.
+          shapesRef.current = kept;
+          setShapes(kept);
+          setRedoStack((r) => [...r, ...removed]);
+        }
+        return;
+      }
       let shape: Shape | null = null;
-      if (tool === "pen") {
+      if (tool === "pen" || tool === "highlighter") {
         const pts = [...d.pts, p];
-        shape = pts.length >= 2 ? { id: -1, color, lineWidth, kind: "pen", pts } : null;
+        shape = pts.length >= 2 ? { id: -1, color, lineWidth, kind: tool, pts } : null;
       } else {
         shape = makeDraft(d.start, p);
       }
       if (!shape) return;
       let valid = false;
-      if (shape.kind === "rect" || shape.kind === "ellipse" || shape.kind === "mosaic") {
-        valid = shape.w >= 3 && shape.h >= 3;
+      if (shape.kind === "rect" || shape.kind === "ellipse" || shape.kind === "mosaic" || shape.kind === "blur") {
+        valid = Math.abs(shape.w) >= 3 && Math.abs(shape.h) >= 3;
       } else if (shape.kind === "line" || shape.kind === "arrow") {
         valid = dist({ x: shape.x1, y: shape.y1 }, { x: shape.x2, y: shape.y2 }) >= 5;
-      } else if (shape.kind === "pen") {
+      } else if (shape.kind === "pen" || shape.kind === "highlighter") {
         valid = shape.pts.length >= 2;
+      } else if (shape.kind === "balloon") {
+        valid = Math.abs(shape.w) >= 20 && Math.abs(shape.h) >= 20;
       }
       if (valid) addShape({ ...shape, id: idRef.current++ });
     };

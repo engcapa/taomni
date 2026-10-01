@@ -1,0 +1,34 @@
+id: TC-SHOT-017
+title: Watermark panel applies and OCR panel opens
+covers:
+- F27.1
+tags:
+- screenshot
+- annotate
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for: '[data-testid="screenshot-base-image"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- wait_for: '[data-testid="screenshot-toolbar"]'
+# Watermark: open panel, type text, apply; button stays highlighted.
+- click: '[data-testid="screenshot-watermark"]'
+- wait_for: '[data-testid="screenshot-watermark-panel"]'
+- fill:
+    selector: '[data-testid="screenshot-watermark-text"]'
+    value: "QA"
+- click: '[data-testid="screenshot-watermark-apply"]'
+- assert_not_visible: '[data-testid="screenshot-watermark-panel"]'
+# OCR: panel opens and finishes (stub has no tesseract -> error text shown).
+- click: '[data-testid="screenshot-ocr"]'
+- wait_for: '[data-testid="screenshot-ocr-panel"]'
+- wait_for: '[data-testid="screenshot-ocr-text"]'
+- click: '[data-testid="screenshot-ocr-close"]'
+- assert_not_visible: '[data-testid="screenshot-ocr-panel"]'
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for:
+    selector: '[data-testid="system-screenshot"]'

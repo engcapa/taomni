@@ -9243,6 +9243,7 @@ components: [ScreenshotOverlay, AnnotationCanvas, RecorderBar, ControlBar, scree
 files:
   - src/components/screenshot/ScreenshotOverlay.tsx
   - src/components/screenshot/AnnotationCanvas.tsx
+  - src/components/screenshot/PinnedImage.tsx
   - src/components/screenshot/RecorderBar.tsx
   - src/lib/screenshot.ts
   - src/components/tabbar/ControlBar.tsx
@@ -9250,6 +9251,7 @@ files:
   - src-tauri/src/screenshot/capture.rs
   - src-tauri/src/screenshot/scroll.rs
   - src-tauri/src/screenshot/record.rs
+  - src-tauri/src/screenshot/ocr.rs
 controls:
   - id: system-screenshot
     selector: '[data-testid="system-screenshot"]'
@@ -9292,6 +9294,60 @@ controls:
     kind: interactive
   - id: screenshot-tool-mosaic
     selector: '[data-testid="screenshot-tool-mosaic"]'
+    kind: interactive
+  - id: screenshot-tool-highlighter
+    selector: '[data-testid="screenshot-tool-highlighter"]'
+    kind: interactive
+  - id: screenshot-tool-blur
+    selector: '[data-testid="screenshot-tool-blur"]'
+    kind: interactive
+  - id: screenshot-tool-balloon
+    selector: '[data-testid="screenshot-tool-balloon"]'
+    kind: interactive
+  - id: screenshot-tool-eraser
+    selector: '[data-testid="screenshot-tool-eraser"]'
+    kind: interactive
+  - id: screenshot-color-picker
+    selector: '[data-testid="screenshot-color-picker"]'
+    kind: interactive
+  - id: screenshot-picker-layer
+    selector: '[data-testid="screenshot-picker-layer"]'
+    kind: display
+  - id: screenshot-picker-popup
+    selector: '[data-testid="screenshot-picker-popup"]'
+    kind: display
+  - id: screenshot-recrop
+    selector: '[data-testid="screenshot-recrop"]'
+    kind: interactive
+  - id: screenshot-watermark
+    selector: '[data-testid="screenshot-watermark"]'
+    kind: interactive
+  - id: screenshot-watermark-panel
+    selector: '[data-testid="screenshot-watermark-panel"]'
+    kind: display
+  - id: screenshot-watermark-text
+    selector: '[data-testid="screenshot-watermark-text"]'
+    kind: interactive
+  - id: screenshot-watermark-apply
+    selector: '[data-testid="screenshot-watermark-apply"]'
+    kind: interactive
+  - id: screenshot-pin
+    selector: '[data-testid="screenshot-pin"]'
+    kind: interactive
+  - id: screenshot-ocr
+    selector: '[data-testid="screenshot-ocr"]'
+    kind: interactive
+  - id: screenshot-ocr-panel
+    selector: '[data-testid="screenshot-ocr-panel"]'
+    kind: display
+  - id: screenshot-ocr-text
+    selector: '[data-testid="screenshot-ocr-text"]'
+    kind: display
+  - id: screenshot-ocr-close
+    selector: '[data-testid="screenshot-ocr-close"]'
+    kind: interactive
+  - id: screenshot-auto-redact
+    selector: '[data-testid="screenshot-auto-redact"]'
     kind: interactive
   - id: screenshot-undo
     selector: '[data-testid="screenshot-undo"]'

@@ -1,0 +1,30 @@
+id: TC-SHOT-015
+title: Color picker shows color and copies on click
+covers:
+- F27.1
+tags:
+- screenshot
+- annotate
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for: '[data-testid="screenshot-base-image"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- wait_for: '[data-testid="screenshot-toolbar"]'
+# Enter picker mode; the picker layer appears.
+- click: '[data-testid="screenshot-color-picker"]'
+- wait_for: '[data-testid="screenshot-picker-layer"]'
+# Hover over the image; the popup shows a hex color.
+- hover: '[data-testid="screenshot-picker-layer"]'
+- wait_for: '[data-testid="screenshot-picker-popup"]'
+# Click copies the color and exits picker mode; toast confirms.
+- click: '[data-testid="screenshot-picker-layer"]'
+- wait_for: '[data-testid="screenshot-toast"]'
+- assert_not_visible: '[data-testid="screenshot-picker-layer"]'
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for:
+    selector: '[data-testid="system-screenshot"]'

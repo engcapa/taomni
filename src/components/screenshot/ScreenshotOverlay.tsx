@@ -1,17 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import {
   ArrowUpRight,
   ChevronDown,
   Circle,
   Clipboard,
   Download,
+  Eraser,
+  Highlighter,
   LayoutGrid,
   ListOrdered,
   Maximize,
+  MessageCircle,
   Minus,
   Pencil,
+  Pipette,
+  Pin,
+  Crop,
+  Stamp,
+  ScanText,
+  ShieldAlert,
   Redo2,
   ScrollText,
   Square,
@@ -19,6 +29,7 @@ import {
   Undo2,
   Video,
   X,
+  Droplets,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useT } from "../../lib/i18n";
@@ -62,9 +73,13 @@ const TOOLS: { tool: AnnotationTool; testid: string; titleKey: string; Icon: Luc
   { tool: "arrow", testid: "screenshot-tool-arrow", titleKey: "screenshot.toolArrow", Icon: ArrowUpRight },
   { tool: "line", testid: "screenshot-tool-line", titleKey: "screenshot.toolLine", Icon: Minus },
   { tool: "pen", testid: "screenshot-tool-pen", titleKey: "screenshot.toolPen", Icon: Pencil },
+  { tool: "highlighter", testid: "screenshot-tool-highlighter", titleKey: "screenshot.toolHighlighter", Icon: Highlighter },
   { tool: "text", testid: "screenshot-tool-text", titleKey: "screenshot.toolText", Icon: Type },
+  { tool: "balloon", testid: "screenshot-tool-balloon", titleKey: "screenshot.toolBalloon", Icon: MessageCircle },
   { tool: "mosaic", testid: "screenshot-tool-mosaic", titleKey: "screenshot.toolMosaic", Icon: LayoutGrid },
+  { tool: "blur", testid: "screenshot-tool-blur", titleKey: "screenshot.toolBlur", Icon: Droplets },
   { tool: "number", testid: "screenshot-tool-number", titleKey: "screenshot.toolNumber", Icon: ListOrdered },
+  { tool: "eraser", testid: "screenshot-tool-eraser", titleKey: "screenshot.toolEraser", Icon: Eraser },
 ];
 
 const LINE_WIDTHS = [2, 4, 8];
@@ -98,6 +113,44 @@ function cropDataUrl(
       resolve(c.toDataURL("image/png"));
     };
     image.onerror = () => reject(new Error("failed to crop screenshot"));
+    image.src = dataUrl;
+  });
+}
+
+export interface WatermarkSettings {
+  text: string;
+  opacity: number;
+  color: string;
+}
+
+/** Overlay a text watermark at the bottom-right corner. */
+function applyWatermark(dataUrl: string, wm: WatermarkSettings): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = image.naturalWidth;
+      c.height = image.naturalHeight;
+      const ctx = c.getContext("2d");
+      if (!ctx) {
+        reject(new Error("canvas 2d context unavailable"));
+        return;
+      }
+      ctx.drawImage(image, 0, 0);
+      const fontSize = Math.max(14, Math.round(c.width / 40));
+      ctx.font = `500 ${fontSize}px Inter, -apple-system, "Segoe UI", sans-serif`;
+      ctx.globalAlpha = wm.opacity;
+      ctx.fillStyle = wm.color;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      const pad = Math.round(fontSize * 0.8);
+      // Subtle shadow for readability on any background.
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = Math.round(fontSize / 4);
+      ctx.fillText(wm.text, c.width - pad, c.height - pad);
+      resolve(c.toDataURL("image/png"));
+    };
+    image.onerror = () => reject(new Error("failed to apply watermark"));
     image.src = dataUrl;
   });
 }
@@ -226,6 +279,19 @@ export function ScreenshotOverlay() {
   const [recordOpen, setRecordOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
+  const [pickerMode, setPickerMode] = useState(false);
+  const [pickerInfo, setPickerInfo] = useState<{ x: number; y: number; hex: string; rgb: string } | null>(null);
+  const pickerCacheRef = useRef<ImageData | null>(null);
+  /** True when the select phase was entered via the crop button (keeps annotations). */
+  const [isRecrop, setIsRecrop] = useState(false);
+  const [watermarkOpen, setWatermarkOpen] = useState(false);
+  const [watermark, setWatermark] = useState<WatermarkSettings | null>(null);
+  const [watermarkText, setWatermarkText] = useState("");
+  const [watermarkOpacity, setWatermarkOpacity] = useState(0.5);
+  const [watermarkColor, setWatermarkColor] = useState("#ffffff");
+  const [ocrOpen, setOcrOpen] = useState(false);
+  const [ocrText, setOcrText] = useState("");
+  const [ocrLoading, setOcrLoading] = useState(false);
   const canvasRef = useRef<AnnotationCanvasHandle | null>(null);
   const dragRef = useRef<{ start: { x: number; y: number } } | null>(null);
   const toastTimer = useRef<number | null>(null);
@@ -239,6 +305,55 @@ export function ScreenshotOverlay() {
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 2500);
   }, []);
+
+  /** Enter color-picker mode: cache the background pixels for fast lookup. */
+  const enterPickerMode = useCallback(() => {
+    if (!img) return;
+    try {
+      const c = document.createElement("canvas");
+      c.width = viewport.w;
+      c.height = viewport.h;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, viewport.w, viewport.h);
+      pickerCacheRef.current = ctx.getImageData(0, 0, viewport.w, viewport.h);
+      setPickerInfo(null);
+      setPickerMode(true);
+    } catch {
+      showToast(t("screenshot.pickerUnavailable"));
+    }
+  }, [img, viewport.w, viewport.h, showToast, t]);
+
+  const exitPickerMode = useCallback(() => {
+    setPickerMode(false);
+    setPickerInfo(null);
+    pickerCacheRef.current = null;
+  }, []);
+
+  const handlePickerMove = useCallback((e: ReactMouseEvent) => {
+    const cache = pickerCacheRef.current;
+    if (!cache) return;
+    const x = Math.max(0, Math.min(viewport.w - 1, Math.floor(e.clientX)));
+    const y = Math.max(0, Math.min(viewport.h - 1, Math.floor(e.clientY)));
+    const i = (y * viewport.w + x) * 4;
+    const r = cache.data[i];
+    const g = cache.data[i + 1];
+    const b = cache.data[i + 2];
+    const hex = `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+    setPickerInfo({ x: e.clientX, y: e.clientY, hex, rgb: `rgb(${r}, ${g}, ${b})` });
+  }, [viewport.w, viewport.h]);
+
+  const handlePickerPick = useCallback(async () => {
+    if (!pickerInfo) return;
+    try {
+      const { writeText } = await import("../../lib/clipboard");
+      await writeText(pickerInfo.hex);
+      showToast(t("screenshot.pickerCopied", { color: pickerInfo.hex }));
+    } catch {
+      showToast(t("screenshot.pickerCopyFailed"));
+    }
+    exitPickerMode();
+  }, [pickerInfo, showToast, t, exitPickerMode]);
 
   useEffect(() => {
     return () => {
@@ -292,15 +407,33 @@ export function ScreenshotOverlay() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  /** Re-crop after capture: back to select phase, keep annotations. */
+  const startRecrop = useCallback(() => {
+    exitPickerMode();
+    setIsRecrop(true);
+    setPhase("select");
+  }, [exitPickerMode]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (pickerMode) {
+          e.stopImmediatePropagation();
+          exitPickerMode();
+          return;
+        }
+        if (isRecrop) {
+          e.stopImmediatePropagation();
+          setIsRecrop(false);
+          setPhase("annotate");
+          return;
+        }
         void closeScreenshotOverlay().catch(() => undefined);
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [pickerMode, isRecrop, exitPickerMode]);
 
   const pointInSel = (x: number, y: number): boolean =>
     sel !== null && x >= sel.x && x <= sel.x + sel.w && y >= sel.y && y <= sel.y + sel.h;
@@ -345,7 +478,16 @@ export function ScreenshotOverlay() {
     if (!dragRef.current || phase !== "select") return;
     dragRef.current = null;
     if (sel && sel.w >= MIN_SEL && sel.h >= MIN_SEL) {
-      setTool("rect");
+      if (isRecrop) {
+        setIsRecrop(false);
+        setPhase("annotate");
+      } else {
+        setTool("rect");
+        setPhase("annotate");
+      }
+    } else if (isRecrop) {
+      // Too small: cancel re-crop, keep previous selection and annotations.
+      setIsRecrop(false);
       setPhase("annotate");
     } else {
       setSel(null);
@@ -368,13 +510,21 @@ export function ScreenshotOverlay() {
     const canvas = canvasRef.current;
     if (!canvas || !img) throw new Error("screenshot not ready");
     const full = canvas.exportDataUrl(img, scale);
-    if (!sel) return full;
-    return cropDataUrl(full, {
-      x: sel.x * scale,
-      y: sel.y * scale,
-      w: sel.w * scale,
-      h: sel.h * scale,
-    });
+    let out: string;
+    if (!sel) {
+      out = full;
+    } else {
+      out = await cropDataUrl(full, {
+        x: sel.x * scale,
+        y: sel.y * scale,
+        w: sel.w * scale,
+        h: sel.h * scale,
+      });
+    }
+    if (watermark && watermark.text.trim()) {
+      out = await applyWatermark(out, watermark);
+    }
+    return out;
   };
 
   const handleCopy = async () => {
@@ -386,6 +536,77 @@ export function ScreenshotOverlay() {
       await closeScreenshotOverlay();
     } catch {
       showToast(t("screenshot.copyFailed"));
+    }
+  };
+
+  /** Pin the current screenshot (with annotations) to the screen. */
+  const handlePin = async () => {
+    try {
+      const dataUrl = await exportCropped();
+      const file = await saveDataUrl(dataUrl);
+      await invoke("screenshot_pin_to_screen", { path: file.path });
+      showToast(t("screenshot.pinned"));
+    } catch {
+      showToast(t("screenshot.pinFailed"));
+    }
+  };
+
+  interface OcrResponse {
+    text: string;
+    words: unknown[];
+    langs: string;
+  }
+
+  /** Extract text from the current screenshot via OCR. */
+  const handleOcr = async () => {
+    setOcrLoading(true);
+    setOcrOpen(true);
+    setOcrText("");
+    try {
+      const dataUrl = await exportCropped();
+      const file = await saveDataUrl(dataUrl);
+      const res = await invoke<OcrResponse>("screenshot_ocr", { path: file.path });
+      setOcrText(res.text || t("screenshot.ocrEmpty"));
+    } catch (e) {
+      setOcrText(t("screenshot.ocrFailed", { error: String(e) }));
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  interface RedactResponse {
+    boxes: { x: number; y: number; w: number; h: number; kind: string }[];
+    count: number;
+  }
+
+  /** Auto-redact e-mail / phone / ID tokens found by OCR. */
+  const handleAutoRedact = async () => {
+    try {
+      const dataUrl = await exportCropped();
+      const file = await saveDataUrl(dataUrl);
+      const res = await invoke<RedactResponse>("screenshot_auto_redact", { path: file.path });
+      if (res.count === 0) {
+        showToast(t("screenshot.redactNone"));
+        return;
+      }
+      // Backend boxes are physical pixels relative to the exported (cropped)
+      // image. Convert to CSS pixels relative to the overlay viewport.
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const shapes = res.boxes.map((b) => ({
+        id: -1,
+        kind: "mosaic" as const,
+        color: "#000000",
+        lineWidth: 2,
+        x: (sel ? sel.x : 0) + b.x / scale,
+        y: (sel ? sel.y : 0) + b.y / scale,
+        w: b.w / scale,
+        h: b.h / scale,
+      }));
+      canvas.addShapes(shapes);
+      showToast(t("screenshot.redacted", { count: res.count }));
+    } catch (e) {
+      showToast(t("screenshot.redactFailed", { error: String(e) }));
     }
   };
 
@@ -669,6 +890,136 @@ export function ScreenshotOverlay() {
             >
               <ScrollText size={16} />
             </ToolButton>
+            <ToolButton
+              testid="screenshot-color-picker"
+              title={t("screenshot.colorPicker")}
+              active={pickerMode}
+              onClick={() => (pickerMode ? exitPickerMode() : enterPickerMode())}
+            >
+              <Pipette size={16} />
+            </ToolButton>
+            <ToolButton
+              testid="screenshot-recrop"
+              title={t("screenshot.recrop")}
+              onClick={startRecrop}
+            >
+              <Crop size={16} />
+            </ToolButton>
+            <ToolButton
+              testid="screenshot-pin"
+              title={t("screenshot.pin")}
+              onClick={() => void handlePin()}
+            >
+              <Pin size={16} />
+            </ToolButton>
+            <ToolButton
+              testid="screenshot-ocr"
+              title={t("screenshot.ocr")}
+              onClick={() => void handleOcr()}
+            >
+              <ScanText size={16} />
+            </ToolButton>
+            <ToolButton
+              testid="screenshot-auto-redact"
+              title={t("screenshot.autoRedact")}
+              onClick={() => void handleAutoRedact()}
+            >
+              <ShieldAlert size={16} />
+            </ToolButton>
+            <div className="relative">
+              <ToolButton
+                testid="screenshot-watermark"
+                title={t("screenshot.watermark")}
+                active={watermarkOpen || watermark !== null}
+                onClick={() => setWatermarkOpen((v) => !v)}
+              >
+                <Stamp size={16} />
+              </ToolButton>
+              {watermarkOpen && (
+                <div
+                  data-testid="screenshot-watermark-panel"
+                  className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 rounded-lg shadow-2xl p-3 w-56"
+                  style={{
+                    zIndex: 10,
+                    background: "var(--taomni-panel-bg)",
+                    border: "1px solid var(--taomni-divider)",
+                    color: "var(--taomni-text)",
+                  }}
+                >
+                  <input
+                    type="text"
+                    data-testid="screenshot-watermark-text"
+                    value={watermarkText}
+                    onChange={(e) => setWatermarkText(e.target.value)}
+                    placeholder={t("screenshot.watermarkPlaceholder")}
+                    className="w-full rounded px-2 py-1 text-[13px] mb-2"
+                    style={{
+                      background: "var(--taomni-input-bg, transparent)",
+                      border: "1px solid var(--taomni-divider)",
+                      color: "var(--taomni-text)",
+                    }}
+                  />
+                  <label className="flex items-center gap-2 text-[12px] mb-2">
+                    <span className="shrink-0">{t("screenshot.watermarkOpacity")}</span>
+                    <input
+                      type="range"
+                      data-testid="screenshot-watermark-opacity"
+                      min={10}
+                      max={80}
+                      value={Math.round(watermarkOpacity * 100)}
+                      onChange={(e) => setWatermarkOpacity(Number(e.target.value) / 100)}
+                      className="flex-1"
+                    />
+                    <span className="w-8 text-right font-mono">{Math.round(watermarkOpacity * 100)}%</span>
+                  </label>
+                  <div className="flex items-center gap-1.5 mb-3">
+                    {["#ffffff", "#000000", "#ff4444", "#ffcc00", "#00aaff"].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        data-testid={`screenshot-watermark-color-${c.slice(1)}`}
+                        onClick={() => setWatermarkColor(c)}
+                        className="w-5 h-5 rounded-full shrink-0"
+                        style={{
+                          background: c,
+                          outline: watermarkColor === c ? "2px solid var(--taomni-accent)" : "1px solid rgba(128,128,128,0.45)",
+                          outlineOffset: 1,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      data-testid="screenshot-watermark-apply"
+                      onClick={() => {
+                        if (watermarkText.trim()) {
+                          setWatermark({ text: watermarkText.trim(), opacity: watermarkOpacity, color: watermarkColor });
+                        }
+                        setWatermarkOpen(false);
+                      }}
+                      className="flex-1 rounded px-2 py-1 text-[13px]"
+                      style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+                    >
+                      {t("screenshot.watermarkApply")}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="screenshot-watermark-clear"
+                      onClick={() => {
+                        setWatermark(null);
+                        setWatermarkText("");
+                        setWatermarkOpen(false);
+                      }}
+                      className="rounded px-2 py-1 text-[13px]"
+                      style={{ border: "1px solid var(--taomni-divider)" }}
+                    >
+                      {t("screenshot.watermarkClear")}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="relative">
               <ToolButton
                 testid="screenshot-record"
@@ -780,6 +1131,99 @@ export function ScreenshotOverlay() {
             <Maximize size={13} />
             {t("screenshot.fullscreen")}
           </button>
+        </div>
+      )}
+
+      {/* Color picker layer (above canvas z-30, below toolbar z-50). */}
+      {pickerMode && (
+        <div
+          data-testid="screenshot-picker-layer"
+          className="fixed inset-0"
+          style={{ zIndex: 40, cursor: "crosshair" }}
+          onMouseMove={handlePickerMove}
+          onMouseLeave={() => setPickerInfo(null)}
+          onClick={handlePickerPick}
+        />
+      )}
+      {pickerMode && pickerInfo && (
+        <div
+          data-testid="screenshot-picker-popup"
+          className="fixed pointer-events-none flex items-center gap-2 rounded-lg px-2.5 py-1.5 shadow-2xl"
+          style={{
+            zIndex: 45,
+            left: Math.min(pickerInfo.x + 18, viewport.w - 190),
+            top: Math.min(pickerInfo.y + 18, viewport.h - 60),
+            background: "rgba(20, 20, 20, 0.92)",
+            color: "#ffffff",
+            fontSize: 12,
+          }}
+        >
+          <span
+            className="w-6 h-6 rounded shrink-0"
+            style={{ background: pickerInfo.hex, border: "1px solid rgba(255,255,255,0.4)" }}
+          />
+          <span className="font-mono whitespace-nowrap">{pickerInfo.hex}</span>
+          <span className="opacity-70 font-mono whitespace-nowrap">{pickerInfo.rgb}</span>
+        </div>
+      )}
+
+      {/* OCR result panel. */}
+      {ocrOpen && (
+        <div
+          data-testid="screenshot-ocr-panel"
+          className="fixed rounded-xl shadow-2xl p-4 w-80"
+          style={{
+            zIndex: 60,
+            right: 16,
+            top: 16,
+            background: "var(--taomni-panel-bg)",
+            border: "1px solid var(--taomni-divider)",
+            color: "var(--taomni-text)",
+          }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[13px] font-medium">{t("screenshot.ocrTitle")}</span>
+            <button
+              type="button"
+              data-testid="screenshot-ocr-close"
+              onClick={() => setOcrOpen(false)}
+              className="rounded p-1 hover:bg-[var(--taomni-hover)]"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          {ocrLoading ? (
+            <div className="text-[13px] opacity-70 py-4 text-center">{t("screenshot.ocrLoading")}</div>
+          ) : (
+            <>
+              <textarea
+                data-testid="screenshot-ocr-text"
+                readOnly
+                value={ocrText}
+                rows={8}
+                className="w-full rounded px-2 py-1.5 text-[13px] font-mono resize-y mb-2"
+                style={{
+                  background: "var(--taomni-input-bg, transparent)",
+                  border: "1px solid var(--taomni-divider)",
+                  color: "var(--taomni-text)",
+                }}
+              />
+              <button
+                type="button"
+                data-testid="screenshot-ocr-copy"
+                onClick={() => {
+                  import("../../lib/clipboard")
+                    .then(({ writeText }) => writeText(ocrText))
+                    .then(() => showToast(t("screenshot.ocrCopied")))
+                    .catch(() => showToast(t("screenshot.ocrCopyFailed")));
+                }}
+                className="w-full rounded px-2 py-1.5 text-[13px]"
+                style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+              >
+                {t("screenshot.ocrCopy")}
+              </button>
+            </>
+          )}
         </div>
       )}
 

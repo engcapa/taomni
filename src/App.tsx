@@ -12,10 +12,12 @@ import { RdpServerApprovalBridge } from "./components/servers/RdpServerApprovalB
 import { detectDetachedRoute } from "./lib/detachedSession";
 import {
   isScreenshotOverlayWindow,
+  isScreenshotPinWindow,
   isScreenshotRecorderWindow,
   openScreenshotOverlay,
 } from "./lib/screenshot";
 import { ScreenshotOverlay } from "./components/screenshot/ScreenshotOverlay";
+import { PinnedImage } from "./components/screenshot/PinnedImage";
 import { RecorderBar } from "./components/screenshot/RecorderBar";
 import { useAppTheme } from "./lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
@@ -215,6 +217,12 @@ function App() {
         <RecorderBar />
       </AppDialogProvider>
     );
+  }
+  if (
+    isScreenshotPinWindow() ||
+    overlayHash.startsWith("#screenshot-pin")
+  ) {
+    return <PinnedImage />;
   }
   const detachedSftpId = detectDetachedSftpRoute();
   if (detachedSftpId) {

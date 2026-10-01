@@ -11,6 +11,7 @@
 //! avoids transparent-window focus and click-through problems on Linux.
 
 pub mod capture;
+pub mod ocr;
 pub mod record;
 pub mod scroll;
 
@@ -25,6 +26,15 @@ use scroll::ScrollCaptureResult;
 
 const OVERLAY_LABEL: &str = "screenshot-overlay";
 const RECORDER_LABEL: &str = "screenshot-recorder";
+const PIN_LABEL_PREFIX: &str = "screenshot-pin-";
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PinInit {
+    pub path: String,
+    pub width: u32,
+    pub height: u32,
+}
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,9 +65,19 @@ pub struct RecordingStarted {
 static OVERLAY_INIT: OnceLock<Mutex<Option<OverlayInit>>> = OnceLock::new();
 static HIDDEN_WINDOWS: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
 static CURRENT_RECORDING: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+static PIN_INIT: OnceLock<Mutex<Option<PinInit>>> = OnceLock::new();
+static PIN_COUNTER: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
 
 fn overlay_init_slot() -> &'static Mutex<Option<OverlayInit>> {
     OVERLAY_INIT.get_or_init(|| Mutex::new(None))
+}
+
+fn pin_init_slot() -> &'static Mutex<Option<PinInit>> {
+    PIN_INIT.get_or_init(|| Mutex::new(None))
+}
+
+fn pin_counter() -> &'static std::sync::atomic::AtomicU64 {
+    PIN_COUNTER.get_or_init(|| std::sync::atomic::AtomicU64::new(1))
 }
 
 fn hidden_windows_slot() -> &'static Mutex<Vec<String>> {
@@ -611,6 +631,101 @@ pub async fn screenshot_close_overlay(app: AppHandle) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Pin to screen
+// ---------------------------------------------------------------------------
+
+/// Open a frameless always-on-top window showing the given image file.
+/// Returns the new window label.
+#[tauri::command]
+pub async fn screenshot_pin_to_screen(app: AppHandle, path: String) -> Result<String, String> {
+    let (width, height) = tokio::task::spawn_blocking({
+        let path = path.clone();
+        move || -> Result<(u32, u32), String> {
+            let img = image::open(&path).map_err(|e| format!("open pin image: {e}"))?;
+            Ok((img.width(), img.height()))
+        }
+    })
+    .await
+    .map_err(|e| format!("pin task failed: {e}"))??;
+
+    // Cap the initial window size so huge screenshots don't cover the screen.
+    const MAX_DIM: f64 = 640.0;
+    let scale = (MAX_DIM / width.max(height) as f64).min(1.0);
+    let win_w = (width as f64 * scale).round();
+    let win_h = (height as f64 * scale).round();
+
+    let id = pin_counter().fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let label = format!("{PIN_LABEL_PREFIX}{id}");
+    *pin_init_slot().lock().unwrap() = Some(PinInit {
+        path,
+        width,
+        height,
+    });
+
+    let url = WebviewUrl::App("index.html#screenshot-pin".into());
+    WebviewWindowBuilder::new(&app, &label, url)
+        .title("Pinned Screenshot")
+        .inner_size(win_w, win_h)
+        .decorations(false)
+        .resizable(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .build()
+        .map_err(|e| format!("open pin window: {e}"))?;
+    Ok(label)
+}
+
+/// One-shot fetch of the pending pin payload, set by [`screenshot_pin_to_screen`].
+#[tauri::command]
+pub async fn screenshot_pin_init() -> Result<PinInit, String> {
+    pin_init_slot()
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| "no pending screenshot pin".to_string())
+}
+
+/// Close a pinned screenshot window by label.
+#[tauri::command]
+pub async fn screenshot_close_pin(app: AppHandle, label: String) -> Result<(), String> {
+    if !label.starts_with(PIN_LABEL_PREFIX) {
+        return Err("not a pin window".to_string());
+    }
+    if let Some(window) = app.get_webview_window(&label) {
+        let _ = window.close();
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// OCR & auto-redact
+// ---------------------------------------------------------------------------
+
+/// Extract text from an image file via tesseract (if installed).
+#[tauri::command]
+pub async fn screenshot_ocr(path: String) -> Result<ocr::OcrResult, String> {
+    tokio::task::spawn_blocking(move || ocr::ocr_image(&path))
+        .await
+        .map_err(|e| format!("ocr task failed: {e}"))?
+}
+
+/// Find sensitive tokens (e-mail / phone / ID) in an image via OCR.
+/// Returns bounding boxes in physical pixels relative to the image.
+#[tauri::command]
+pub async fn screenshot_auto_redact(path: String) -> Result<ocr::RedactResult, String> {
+    tokio::task::spawn_blocking(move || {
+        let result = ocr::ocr_image(&path)?;
+        let boxes = ocr::find_sensitive(&result.words);
+        Ok::<_, String>(ocr::RedactResult {
+            count: boxes.len(),
+            boxes,
+        })
+    })
+    .await
+    .map_err(|e| format!("redact task failed: {e}"))?
 }
 
 // ---------------------------------------------------------------------------
