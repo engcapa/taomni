@@ -548,14 +548,14 @@ export function ScreenshotOverlay() {
       {phase === "select" && img && cursor && !dragRef.current && (
         <Magnifier img={img} cursor={cursor} scale={scale} />
       )}
-      {phase === "select" && sel && (sel.w > 0 || sel.h > 0) && cursor && (
+      {(phase === "select" || phase === "annotate") && sel && (sel.w > 0 || sel.h > 0) && (cursor || phase === "annotate") && (
         <div
           data-testid="screenshot-size-hint"
           style={{
             position: "fixed",
             zIndex: 60,
-            left: Math.min(cursor.x + 16, viewport.w - 110),
-            top: Math.min(cursor.y + 150, viewport.h - 40),
+            left: Math.min((cursor ? cursor.x : sel.x + sel.w) + 16, viewport.w - 110),
+            top: Math.min((cursor ? cursor.y : sel.y + sel.h) + 16, viewport.h - 40),
             pointerEvents: "none",
             background: "rgba(0, 0, 0, 0.75)",
             color: "#ffffff",
