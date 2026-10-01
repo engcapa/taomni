@@ -59,6 +59,25 @@ class HostedServicesTest(unittest.TestCase):
             self.assertEqual(observed, ['/c/qa-temp', '/C:/qa-temp', '644',
                                         'chmod failed: remote server ignored requested permissions'])
 
+    def test_teardown_failure_is_reported_without_failing_the_entry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service = Services(Path(directory), [], {})
+            finished = []
+
+            def failing():
+                raise RuntimeError("pwsh.exe failed (1); ")
+
+            service.cleanup_action("sshd-stop", failing)
+            service.cleanup_action("marker", lambda: finished.append("done"))
+            with patch("builtins.print") as printed:
+                service.__exit__(None, None, None)
+            self.assertEqual(finished, ["done"])
+            messages = [str(call.args[0]) for call in printed.call_args_list if call.args]
+            self.assertTrue(
+                any("service cleanup (sshd-stop)" in message for message in messages),
+                messages,
+            )
+
     def test_partial_provisioning_failure_releases_owned_resources(self):
         with tempfile.TemporaryDirectory() as directory, patch('ci_services.platform.system', return_value='Linux'):
             service = Services(Path(directory), ['ssh', 'mysql'], {})

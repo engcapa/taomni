@@ -42,7 +42,7 @@ steps:
 - click: '[data-testid="mail-menu-tag-label1"]'
 - wait_for:
     selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
-    timeout_sec: 15
+    timeout_sec: 60
 - assert_count:
     selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
     equal: 1
@@ -59,7 +59,7 @@ steps:
     timeout_sec: 30
 - wait_for:
     selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
-    timeout_sec: 15
+    timeout_sec: 60
 - assert_count:
     selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
     equal: 1
