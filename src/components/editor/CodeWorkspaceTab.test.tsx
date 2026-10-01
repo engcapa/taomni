@@ -5105,6 +5105,63 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(lspMocks.lspSelectionRanges).toHaveBeenCalled());
   });
 
+  it("highlights usages at the caret the editor just reported, before the caret state commits", async () => {
+    const { EditorView } = await import("@codemirror/view");
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-occurrence-fresh-caret", workspaceInstanceId: "instance-occurrence-fresh-caret",
+      name: "Occurrence fresh caret", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [], initialFile: { kind: "root", rootId: "app", path: "notes.txt" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("notes.txt", "notes.txt")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("notes.txt", "item\nsecond item\nthird item"));
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    const rendered = renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / notes.txt");
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(content)!;
+    let executePromise: Promise<unknown> | undefined;
+    act(() => {
+      // Caret onto the third "item" and run the action in the same task, as
+      // Ctrl+End followed at once by Ctrl+Shift+F7 does.
+      view.dispatch({ selection: { anchor: view.state.doc.length - 2 } });
+      executePromise = registrationRef.current?.executeAction("workspace.highlightUsagesInFile");
+    });
+    await act(async () => {
+      await executePromise;
+    });
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Occurrence 3 of 3"));
+  });
+
+  it("evaluates the keymap cheat sheet in its modal context: editor-only actions are not runnable there", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-cheat-sheet-modal", workspaceInstanceId: "instance-cheat-sheet-modal",
+      name: "Cheat sheet modal", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [], initialFile: { kind: "root", rootId: "app", path: "notes.txt" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("notes.txt", "notes.txt")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("notes.txt", "item\nsecond item\nthird item"));
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    const rendered = renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / notes.txt");
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    act(() => { content.focus(); });
+    await act(async () => {
+      await registrationRef.current?.executeAction("workspace.openKeymapCheatsheet");
+    });
+    fireEvent.change(await screen.findByTestId("keymap-search-input"), { target: { value: "Basic Completion" } });
+    expect(screen.getByTestId("keymap-item-editor.basicCompletion")).toBeInTheDocument();
+    expect(screen.queryByTestId("keymap-run-editor.basicCompletion")).toBeNull();
+    // Workspace actions stay runnable from the cheat sheet.
+    fireEvent.change(screen.getByTestId("keymap-search-input"), { target: { value: "Find in Files" } });
+    expect(screen.getByTestId("keymap-run-workspace.findInFiles")).toBeInTheDocument();
+  });
+
   it("does not restore occurrence highlights when a cleared request returns late", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

@@ -13120,7 +13120,9 @@ export function CodeWorkspaceTab({
     // A manual request supersedes any cursor-driven request that is still in
     // flight. Its response may not overwrite the explicit session afterward.
     autoHighlightRequestGenerationRef.current += 1;
-    const position = cursorPositions[activeEditorGroupId] ?? { line: 0, character: 0 };
+    // The caret state commits in a transition; Ctrl+Shift+F7 right after a
+    // caret move must use the position the editor reported synchronously.
+    const position = cursorPositionsRef.current[activeEditorGroupId] ?? { line: 0, character: 0 };
     const descriptor = lspDescriptorForFile(file);
     const rev = lspDocumentEpochRef.current[file.key] ?? 0;
     const needsLiveLspCheck = Boolean(
@@ -13175,7 +13177,6 @@ export function CodeWorkspaceTab({
     activeEditorGroupId,
     activeFile,
     activeLspDocumentIsSynced,
-    cursorPositions,
     isCurrentLspDocumentRequest,
     lspDescriptorForFile,
     setStatusMessage,
@@ -16552,6 +16553,9 @@ export function CodeWorkspaceTab({
       editorComposing: editorState?.composing ?? false,
       editorCaretCount: editorState?.caretCount ?? 0,
       editorOccurrenceSessionActive: editorState?.occurrenceSessionActive ?? false,
+      // The cheat sheet evaluates and runs actions in its modal context, so
+      // editor-only actions show as unavailable there (ED-PARITY-005).
+      ...(keymapCheatSheetOpen ? { modalOpen: true } : {}),
     };
   }, [
     activeEditorCommandState,
@@ -16559,6 +16563,7 @@ export function CodeWorkspaceTab({
     activeFile?.path,
     activeKey,
     editorCommandContextRevision,
+    keymapCheatSheetOpen,
   ]);
 
   const actionsController = useWorkspaceActionsController({
