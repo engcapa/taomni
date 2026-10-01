@@ -69,6 +69,7 @@ pub(crate) use input::{control_permission_granted, request_control_permission};
 mod loopback_tests;
 mod metrics;
 mod session;
+mod sound;
 pub(crate) mod system_rdp;
 mod tls;
 
@@ -462,6 +463,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
 
     let view_only = config.bool_field("viewOnly", false);
     let require_control_approval = config.bool_field("requireControlApproval", true);
+    let audio_playback = config.bool_field("audioPlayback", true);
     let display_id = config.str_field("displayId", "").trim().to_string();
     let display_id = (!display_id.is_empty()).then_some(display_id);
     let security = SecurityMode::parse(config.str_field("securityMode", "hybrid"))?;
@@ -567,6 +569,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
             .clone(),
         require_control_approval,
         clipboard,
+        audio_playback,
     };
     let task = spawn_server(params, ctx.cancel.clone(), ctx.log.clone()).await?;
     Ok(ServerStarted { pid: None, task })
@@ -584,6 +587,8 @@ struct ServerParams {
     approvals: Arc<ApprovalBroker>,
     require_control_approval: bool,
     clipboard: ClipboardPolicy,
+    /// Stream this computer's audio output to the client (RDPSND).
+    audio_playback: bool,
 }
 
 /// Drive `RdpServer::run()` and bridge `cancel` → clean shutdown.
@@ -775,6 +780,12 @@ fn build_server(
                 as Box<dyn ironrdp::server::CliprdrServerFactory>
         });
 
+    let sound: Option<Box<dyn ironrdp::server::SoundServerFactory>> =
+        params.audio_playback.then(|| {
+            Box::new(sound::SoundFactory::new(log.clone()))
+                as Box<dyn ironrdp::server::SoundServerFactory>
+        });
+
     let base = RdpServer::builder().with_addr(params.addr);
     let connection_handler: Box<dyn ConnectionHandler> = Box::new(ConnectionPolicy {
         app: params.app.clone(),
@@ -792,7 +803,8 @@ fn build_server(
                 .with_hybrid(acceptor, identity.pub_key.clone())
                 .with_input_handler(input)
                 .with_display_handler(display)
-                .with_cliprdr_factory(cliprdr);
+                .with_cliprdr_factory(cliprdr)
+                .with_sound_factory(sound);
             #[cfg(target_os = "macos")]
             let builder = builder.with_honor_client_desktop_size(honor_client_desktop_size);
             #[cfg(target_os = "macos")]

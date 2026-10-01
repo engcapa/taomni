@@ -239,12 +239,39 @@ async fn throughput(args: &Args) -> ScenarioResult {
         Some(text) => parse_rect(&text).map_err(usage)?,
         None => (0, 0, session.width(), session.height()),
     };
+    let marker = match args.opt("marker") {
+        Some(text) => {
+            let parts: Vec<u16> = text
+                .split(',')
+                .filter_map(|p| p.trim().parse().ok())
+                .collect();
+            match parts.as_slice() {
+                [x, y] => Some((*x, *y)),
+                _ => return Err(usage(format!("--marker expects x,y, got {text:?}"))),
+            }
+        }
+        None => None,
+    };
     let bytes_start = session.bytes_in;
     let updates_start = session.graphics_updates;
     let started = Instant::now();
     let deadline = started + Duration::from_secs_f64(seconds);
     let mut last = session.region_signature(rect);
     let mut change_times = Vec::new();
+    // The target's marker steps through 16 grey levels, one per animation
+    // frame; summing the level steps counts delivered frames even when the
+    // codec splits one frame into several updates or the server skips some.
+    let level_of = |session: &ProbeSession, (x, y): (u16, u16)| {
+        session.pixel(x, y).map(|px| {
+            // Levels are drawn at 16·n + 8, so integer division tolerates
+            // ±7 of codec error.
+            let grey = (u32::from(px[0]) + u32::from(px[1]) + u32::from(px[2])) / 3;
+            (grey / 16).min(15)
+        })
+    };
+    let mut marker_level = marker.and_then(|m| level_of(&session, m));
+    let mut marker_frames = 0u32;
+    let mut marker_skips = 0u32;
     while Instant::now() < deadline {
         let events = match session.pump(Duration::from_millis(50)).await {
             Ok(events) => events,
@@ -255,6 +282,19 @@ async fn throughput(args: &Args) -> ScenarioResult {
             if signature != last {
                 last = signature;
                 change_times.push(started.elapsed().as_secs_f64() * 1000.0);
+            }
+            if let Some(m) = marker {
+                let level = level_of(&session, m);
+                if let (Some(previous), Some(now)) = (marker_level, level)
+                    && now != previous
+                {
+                    let step = (now + 16 - previous) % 16;
+                    marker_frames += step;
+                    marker_skips += step - 1;
+                }
+                if level.is_some() {
+                    marker_level = level;
+                }
             }
         }
     }
@@ -269,6 +309,14 @@ async fn throughput(args: &Args) -> ScenarioResult {
     report["kbps"] = json!(bytes as f64 * 8.0 / 1000.0 / elapsed);
     report["graphics_updates_in_window"] = json!(session.graphics_updates - updates_start);
     report["frame_gap_ms"] = stats::summary(&gaps);
+    if marker.is_some() {
+        report["marker"] = json!({
+            "frames": marker_frames,
+            "fps": f64::from(marker_frames) / elapsed,
+            // Frames the client never saw (level jumped by more than one).
+            "skipped": marker_skips,
+        });
+    }
     Ok(report)
 }
 
@@ -573,9 +621,9 @@ async fn receive_files(
     let mut files = Vec::new();
     for (index, descriptor) in descriptors.iter().enumerate() {
         let name = clipboard::wire_name(descriptor);
-        let is_dir = descriptor.attributes.is_some_and(|a| {
-            a.contains(ironrdp::cliprdr::pdu::ClipboardFileAttributes::DIRECTORY)
-        });
+        let is_dir = descriptor
+            .attributes
+            .is_some_and(|a| a.contains(ironrdp::cliprdr::pdu::ClipboardFileAttributes::DIRECTORY));
         if is_dir {
             files.push(json!({ "name": name, "dir": true }));
             continue;
@@ -589,7 +637,9 @@ async fn receive_files(
                     }
                     let _ = std::fs::write(&target, &bytes);
                 }
-                files.push(json!({ "name": name, "size": bytes.len(), "sha256": sha256_hex(&bytes) }));
+                files.push(
+                    json!({ "name": name, "size": bytes.len(), "sha256": sha256_hex(&bytes) }),
+                );
             }
             Err(error) => {
                 let mut report = clipboard_report(session, clip);

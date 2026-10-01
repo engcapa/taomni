@@ -77,10 +77,19 @@ def main() -> int:
         bar_w = max(8, width // 24)
         for i in range(0, width + bar_w * 2, bar_w * 2):
             bars.append(canvas.create_rectangle(i, 0, i + bar_w, height, fill="#ffffff", width=0))
+        # Frame marker: a 32x32 square in the window's top-left corner whose
+        # grey level steps through 16 values (frame % 16), coarse enough to
+        # survive lossy codecs. `rdp-probe throughput --marker` counts the
+        # level steps to get delivered animation frames per second.
+        marker = canvas.create_rectangle(0, 0, 32, 32, fill="#080808", width=0)
+        state["marker"] = {"x": 16, "y": 16, "levels": 16}
         last_written = [time.monotonic()]
 
         def step() -> None:
             state["frames"] += 1
+            level = (state["frames"] % 16) * 16 + 8
+            canvas.itemconfigure(marker, fill=f"#{level:02x}{level:02x}{level:02x}")
+            canvas.tag_raise(marker)
             for bar in bars:
                 canvas.move(bar, 4, 0)
                 x0, _, _, _ = canvas.coords(bar)

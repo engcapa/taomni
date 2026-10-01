@@ -106,9 +106,12 @@ steps:
       password-env: QA_RDP_BASELINE_PASSWORD
       seconds: 10
       rect: 40,80,640,360
+      marker: 56,96
     expect:
       visible_changes:
         min: 10
+      marker.frames:
+        min: 100
 verification:
   review: pending
   requirements:
@@ -123,7 +126,7 @@ verification:
     - step: 4
       expectation: At least 36 of 40 clicks on the in-session flip target produce an observed pixel change.
     - step: 7
-      expectation: At least 10 visible changes arrive during 10 s of the in-session animation.
+      expectation: At least 10 visible changes and 100 marker-counted animation frames arrive during 10 s of the in-session animation.
     results:
     - 4
     - 7

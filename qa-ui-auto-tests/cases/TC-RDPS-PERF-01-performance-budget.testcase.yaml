@@ -116,9 +116,12 @@ steps:
     args:
       seconds: 10
       rect: 40,80,640,360
+      marker: 56,96
     expect:
       visible_changes:
         min: 10
+      marker.frames:
+        min: 100
 - host_helper:
     action: stop
     name: animation
@@ -141,7 +144,7 @@ verification:
     - step: 19
       expectation: At least 36 of 40 latency samples were observed.
     - step: 22
-      expectation: At least 10 visible changes were received during 10 s of animation.
+      expectation: At least 10 visible changes and 100 marker-counted animation frames arrive during 10 s.
     results:
     - 19
     - 22
