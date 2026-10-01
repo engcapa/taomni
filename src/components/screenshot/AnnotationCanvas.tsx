@@ -310,10 +310,6 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     const numberRef = useRef(1);
     const drawingRef = useRef<{ start: Point; pts: Point[] } | null>(null);
     const shapesRef = useRef<Shape[]>([]);
-    // Dedupe number placement: a real click fires mousedown then click; some
-    // synthetic events may fire only one of them. Track the last placement
-    // to avoid double-placing when both fire.
-    const lastNumberAt = useRef<{ x: number; y: number; t: number } | null>(null);
 
     useEffect(() => {
       shapesRef.current = shapes;
@@ -422,26 +418,15 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       }
     };
 
-    const placeNumber = (p: Point) => {
-      const now = Date.now();
-      const last = lastNumberAt.current;
-      // Skip if we just placed a number at nearly the same spot (mousedown+click double-fire).
-      if (last && now - last.t < 500 && Math.hypot(p.x - last.x, p.y - last.y) < 10) {
-        return;
-      }
-      lastNumberAt.current = { x: p.x, y: p.y, t: now };
-      const num = numberRef.current++;
-      addShape({ id: idRef.current++, kind: "number", x: p.x, y: p.y, num, color, lineWidth });
-    };
-
     const handleMouseDown = (e: ReactMouseEvent) => {
       if (e.button !== 0 || tool === "select") return;
-      // Point tools: text is handled onClick; number handles mousedown here
-      // (with dedupe in placeNumber) so drag-style interactions also work.
+      // Text tool is handled onClick (below). Number tool places on mousedown
+      // so drag-style synthetic events work; a real click also fires mousedown.
       if (tool === "text") return;
       const p = localPos(e);
       if (tool === "number") {
-        placeNumber(p);
+        const num = numberRef.current++;
+        addShape({ id: idRef.current++, kind: "number", x: p.x, y: p.y, num, color, lineWidth });
         return;
       }
       if (selection && !inRect(p, selection)) {
@@ -511,18 +496,12 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     const interactive = tool !== "select";
 
     const handleClick = (e: React.MouseEvent) => {
-      if (tool !== "text" && tool !== "number") return;
+      // Text tool is handled onClick (not mousedown): a drag's mouseup would
+      // blur the freshly opened input via onBlur=commitText before it can be used.
+      if (tool !== "text") return;
       const p = localPos(e);
-      if (tool === "text") {
-        // Handled onClick (not mousedown): a drag's mouseup would blur the
-        // freshly opened input via onBlur=commitText before it can be used.
-        setTextAt(p);
-        setTextValue("");
-      } else {
-        // Number also handles onClick (dedupe via placeNumber) for synthetic
-        // clicks where mousedown may not fire.
-        placeNumber(p);
-      }
+      setTextAt(p);
+      setTextValue("");
     };
 
     return (

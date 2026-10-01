@@ -18,15 +18,23 @@ steps:
 # Number tool (Flameshot-style): each click places the next circled number.
 - click: '[data-testid="screenshot-tool-number"]'
 - wait: 1
-- click:
-    selector: '[data-testid="screenshot-annotation-layer"]'
-    position: {x: 100, y: 100}
-- click:
-    selector: '[data-testid="screenshot-annotation-layer"]'
-    position: {x: 200, y: 150}
-- click:
-    selector: '[data-testid="screenshot-annotation-layer"]'
-    position: {x: 300, y: 200}
+# Number places on mousedown; use 30px drags (plain click does not reliably
+# fire mousedown on the layer in synthetic events).
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 100, y: 100}
+    to_position: {x: 130, y: 130}
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 200, y: 150}
+    to_position: {x: 230, y: 180}
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 300, y: 200}
+    to_position: {x: 330, y: 230}
 # Three markers placed: undo is enabled and removes them one by one.
 - assert_enabled: '[data-testid="screenshot-undo"]'
 - click: '[data-testid="screenshot-undo"]'

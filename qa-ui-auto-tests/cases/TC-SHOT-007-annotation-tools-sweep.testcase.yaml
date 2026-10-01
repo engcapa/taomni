@@ -89,7 +89,9 @@ steps:
 - click: '[data-testid="screenshot-record"]'
 - assert_visible: '[data-testid="screenshot-record-gif"]'
 - assert_visible: '[data-testid="screenshot-record-mp4"]'
-- click: '[data-testid="screenshot-record"]'
+# Escape closes the dropdown (clicking the button again is intercepted by the
+# fullscreen dismiss overlay).
+- press: Escape
 # Cancel closes the overlay back to the main window.
 - click: '[data-testid="screenshot-cancel"]'
 - wait_for:
