@@ -735,6 +735,141 @@ def scenario_pointer_latency(app: App, args) -> None:
         time.sleep(1.0)
 
 
+def scenario_viewport_origin(app: App, args) -> None:
+    """Where the WebView viewport sits in the top-level window's client area
+    (physical px), and which window WindowFromPoint returns over the canvas."""
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    app.focus_canvas()
+    page = app.js("const r = document.querySelector('[data-testid=\"vnc-canvas\"]').getBoundingClientRect();"
+                  "return {dpr: devicePixelRatio, inner: [innerWidth, innerHeight], screen: [screenX, screenY],"
+                  " canvas: [r.left, r.top, r.width, r.height]};")
+    x, y, w, h = app.canvas_rect_screen()
+    point = wintypes.POINT(x + w // 2, y + h // 2)
+    hit = user32.WindowFromPoint(point)
+    root = user32.GetAncestor(hit, 2)
+    names = []
+    for hwnd in (hit, root):
+        buf = ctypes.create_unicode_buffer(256)
+        user32.GetClassNameW(hwnd, buf, 256)
+        rect = wintypes.RECT()
+        user32.GetClientRect(hwnd, ctypes.byref(rect))
+        origin = wintypes.POINT(0, 0)
+        user32.ClientToScreen(hwnd, ctypes.byref(origin))
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        names.append({"class": buf.value, "client": [rect.right, rect.bottom], "origin": [origin.x, origin.y],
+                      "pid": pid.value})
+    app.run.record("viewport-origin", "geometry", True, page=page, canvas_screen=[x, y, w, h],
+                   hit=names[0], root=names[1], app_pid=app.pid)
+
+
+IPC_HOOK = r"""
+const internals = window.__TAURI_INTERNALS__;
+if (internals && !window.__ipcTrace) {
+  const trace = window.__ipcTrace = {invokes: [], callbacks: 0};
+  const invoke = internals.invoke.bind(internals);
+  internals.invoke = (cmd, payload, options) => {
+    trace.invokes.push([performance.now(), String(cmd)]);
+    return invoke(cmd, payload, options);
+  };
+  const runCallback = internals.runCallback?.bind(internals);
+  if (runCallback) internals.runCallback = (...args) => { trace.callbacks += 1; return runCallback(...args); };
+}
+if (window.__ipcTrace) { window.__ipcTrace.invokes.length = 0; window.__ipcTrace.callbacks = 0; }
+return !!window.__ipcTrace;
+"""
+
+
+def scenario_ipc_idle(app: App, args) -> None:
+    """Which Tauri commands the page invokes while a VNC session idles: each
+    one is WebView2 browser-process work that competes with pointer input."""
+    import collections
+    import json
+
+    hooked = app.js(IPC_HOOK)
+    time.sleep(args.hold_seconds)
+    trace = json.loads(app.js("return JSON.stringify(window.__ipcTrace || null);") or "null")
+    counts = collections.Counter(cmd for _, cmd in trace["invokes"]) if trace else {}
+    app.run.record("ipc-idle", "invokes", bool(hooked), seconds=args.hold_seconds,
+                   commands=dict(counts.most_common()), callbacks=trace["callbacks"] if trace else None)
+
+
+def scenario_cpu_idle(app: App, args) -> None:
+    """CPU of the QA app and its WebView2 processes while the session idles:
+    a busy browser process delays pointer input by whole vsync periods."""
+    import psutil
+
+    root = psutil.Process(app.pid)
+    processes = [root, *root.children(recursive=True)]
+    for process in processes:
+        try:
+            process.cpu_percent(None)
+        except psutil.Error:
+            pass
+    time.sleep(args.hold_seconds)
+    usage = []
+    for process in processes:
+        try:
+            cmdline = " ".join(process.cmdline())
+            kind = next((part.split("=", 1)[1] for part in process.cmdline() if part.startswith("--type=")), "browser"
+                        if "msedgewebview2" in process.name().lower() else "app")
+            usage.append({"pid": process.pid, "name": process.name(), "type": kind,
+                          "cpu_percent": round(process.cpu_percent(None), 1),
+                          "utility": "network" if "network.mojom" in cmdline else None})
+        except psutil.Error:
+            continue
+    app.run.record("cpu-idle", "processes", True, seconds=args.hold_seconds,
+                   usage=sorted(usage, key=lambda item: -item["cpu_percent"]))
+
+
+def scenario_pointer_trace(app: App, args) -> None:
+    """VNC-PERF-005 tail breakdown: the pointer-latency method plus page-clock
+    stamps (event timeStamp, listener, WebSocket send), split into segments."""
+    import json
+    import sys
+    from pathlib import Path
+
+    from vnc_pointer_trace import TRACE_HOOK, segments, summary
+
+    script = Path(__file__).with_name("vnc_pointer_latency.py")
+    if not app.os_input:
+        app.run.record("pointer-trace", "unrun", False, reason="no interactive desktop: SetCursorPos latency needs real OS input")
+        return
+    raw_path = app.run.report / "pointer-trace-raw.jsonl"
+    rows = []
+    for run in range(args.latency_runs):
+        app.focus_canvas()
+        app.js(TRACE_HOOK)
+        x, y, w, h = app.canvas_rect_screen()
+        before = raw_path.read_text(encoding="utf-8").count("\n") if raw_path.exists() else 0
+        subprocess.run(
+            [sys.executable, str(script), "--up-log", args.up_log, "--x", str(x + w // 3), "--y", str(y + h // 3),
+             "--moves", "40", "--interval-ms", "200", "--size", str(args.pointer_size), "--label", f"trace-{run}",
+             "--raw-dump", str(raw_path)],
+            capture_output=True, text=True, timeout=120,
+        )
+        lines = raw_path.read_text(encoding="utf-8").splitlines() if raw_path.exists() else []
+        if len(lines) <= before:
+            app.run.record("pointer-trace", f"run-{run}", False, reason="no raw dump")
+            continue
+        pairs = json.loads(lines[-1])["pairs"]
+        trace = json.loads(app.js("return JSON.stringify(window.__vncTrace);"))
+        try:
+            run_rows = segments(pairs, trace)
+        except ValueError as error:
+            app.run.record("pointer-trace", f"run-{run}", False, reason=str(error))
+            continue
+        rows.extend(run_rows)
+        app.run.record("pointer-trace", f"run-{run}", bool(run_rows), samples=len(run_rows),
+                       foreground_ours=app.ours_in_front())
+        time.sleep(1.0)
+    (app.run.report / "pointer-trace-rows.json").write_text(json.dumps(rows), encoding="utf-8")
+    app.run.record("pointer-trace", "summary", bool(rows), **summary(rows))
+
+
 def scenario_paint(app: App, args) -> None:
     """VNC-PERF-003-A1/A3: full-frame main-thread cost and idle rAF load."""
     samples = []

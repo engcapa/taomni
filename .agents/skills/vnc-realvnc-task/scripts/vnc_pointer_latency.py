@@ -34,6 +34,7 @@ def main() -> None:
         help="only count upstream chunks of this size (6 for plain RFB PointerEvent; TLS sessions wrap it, e.g. 35)",
     )
     parser.add_argument("--dump", help="append {label, latencies_ms} as one JSON line (pool runs later)")
+    parser.add_argument("--raw-dump", help="append {label, pairs: [[move, wire|null], ...]} in perf_counter seconds")
     args = parser.parse_args()
     user32 = ctypes.windll.user32
     user32.SetProcessDPIAware()
@@ -58,10 +59,17 @@ def main() -> None:
                 continue
             ups.append((float(stamp), int(size)))
     latencies = []
+    pairs = []
     for t in moves:
         after = [stamp for stamp, _ in ups if stamp >= t and stamp - t < args.interval_ms / 1000.0]
+        pairs.append([t, after[0] if after else None])
         if after:
             latencies.append((after[0] - t) * 1000.0)
+    if args.raw_dump:
+        import json
+
+        with open(args.raw_dump, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"label": args.label, "pairs": pairs}) + "\n")
     if not latencies:
         print(f"{args.label}: no upstream pointer traffic matched")
         return

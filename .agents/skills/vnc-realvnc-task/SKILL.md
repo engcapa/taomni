@@ -15,6 +15,9 @@ $tb show VNC-PERF-001
 $tb claim VNC-PERF-003 --owner <agent>-<UTC>-<短HEAD>
 $tb update VNC-PERF-003 --owner <owner> --status in_progress
 $tb update VNC-PERF-003 --owner <owner> --status done --evidence-file <evidence.json>
+$tb add VNC-AUTH-001 --title <标题> --priority P1 --size M --spec <文档>#vnc-auth-001 \
+    --acceptance VNC-AUTH-001-A1 ... --required-evidence code-audit unit native \
+    --finding <审计发现> --audit-id <来源>   # P0 新卡；spec 小节须先写好 AC
 ```
 
 脚本强制：ID 形如 `VNC-<域>-NNN`；spec 锚点为小写 ID 且 AC 出现在该锚点小节内；一个 owner 只能有一张活动卡；依赖未 done 不可领取；`done` 需要结构化证据覆盖全部 AC 且每个 required kind 最后一次为 passed。证据种类在 IDEA 板基础上增加 `live-vnc`（真实服务器）与 `realvnc-comparison`。校验通过只说明元数据合法。
@@ -42,7 +45,7 @@ $tb update VNC-PERF-003 --owner <owner> --status done --evidence-file <evidence.
 - 凭据只经环境变量：`TAOMNI_VNC_LIVE_HOST`、`TAOMNI_VNC_LIVE_PORT`、`TAOMNI_VNC_LIVE_PASSWORD`。地址、口令、桌面名、屏幕像素不进证据、文档或提交；原始产物放 `qa-ui-auto-report/`（已忽略）。
 - 解码回放与实测：`src-tauri/src/vnc/live_bench.rs` 文件头有完整命令。实测把首个全屏更新录到 `TAOMNI_VNC_CAPTURE_DIR`，回放用同一批文件做 release 前后对比；机器上有其他编译任务时数字不可比，需空闲时重测。
 - 线上字节与节奏：`scripts/vnc_burst_proxy.py --target HOST:PORT --listen 5977 --out bursts.jsonl --up-log up.log`，客户端连 `127.0.0.1:5977`（RealVNC 写作 `127.0.0.1::5977`）。
-- 指针延迟：客户端窗口前台且指针在远端画面内时运行 `scripts/vnc_pointer_latency.py --up-log up.log --x <x> --y <y>`（只移动指针，不点击、不按键）。
+- 指针延迟：客户端窗口前台且指针在远端画面内时运行 `scripts/vnc_pointer_latency.py --up-log up.log --x <x> --y <y>`（只移动指针，不点击、不按键）。`vnc_native.py --scenario pointer-trace` 用同一方法把延迟拆成 OS → WebView 事件 → 监听器 → WebSocket 发送 → 线上（`vnc_pointer_trace.py`）；`cpu-idle` / `ipc-idle` 查空闲会话的进程 CPU 与页面 IPC，`viewport-origin` 核对视口相对顶层窗口的原点。Windows 上 `SetCursorPos` → `WM_MOUSEMOVE` 按显示刷新投递，裸 Win32 窗口同样有 1–2 个 vsync 的延迟与尾部；单次会话的 p95 会因系统状态浮动数毫秒，对比要交替多轮并合并样本。
 - RealVNC Viewer：`C:\software\realvnc-viewer\VNC-Viewer-7.15.1-Windows-64bit.exe`（先核对 Authenticode 与 SHA-256）。命令行 `-PasswordFile=<混淆口令文件> -WarnUnencrypted=0 <host>::<port>` 可免交互连接；口令文件放 `qa-ui-auto-report/` 并在采集后删除。RealVNC 会话在独立子进程中，桌面驱动需按进程/窗口标题定位；图像无法直接查看时依赖 OCR 与像素差分。F8 菜单是第三方服务器下最可靠的功能清单来源；全屏工具栏只在全屏模式出现。
 - 服务器对正确的 VNCAuth 约 25 s 才返回结果，每次实测连接都要预留该时间，尽量合并批次。
 - 系统级输入（`vnc_native.py` / `vnc_realvnc_probe.py` 的 OS 场景）只在借用的交互式 Windows 桌面上跑：扫描码 `SendInput` 带前台守卫，输入只落到被测窗口；测前备份剪贴板与 RealVNC 设置、测后恢复，临时键盘布局测后卸载。
