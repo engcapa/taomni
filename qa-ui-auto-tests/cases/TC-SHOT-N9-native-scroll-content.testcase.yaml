@@ -12,6 +12,7 @@ modes:
 native_platforms:
 - Linux
 - Windows
+- macOS
 fixtures:
 - reset_db
 steps:
