@@ -54,15 +54,19 @@ Chromium 在切换布局后的第一个死键会丢失组合，测量前先按�
 Taomni 此前离开 1.5 s 后才收起，现在与 RealVNC 一样离开即收起（50 ms 只用于从边缘条移到滑入的工具栏），滑动 250 ms。Taomni 开始滑出晚约 70 ms（WebView 指针事件与合成），完成更早。全屏从最大化窗口进入时覆盖整个屏幕；Tauri 无边框窗口的缩放边框子窗口原本盖住屏幕顶端 4 px，全屏期间关闭窗口缩放后顶端各行命中 WebView；Esc 发往远端且不退出全屏；F8 打开会话菜单、Esc 关闭后焦点回画布；退出后恢复最大化与可缩放。
 
 <a id="clipboard"></a>
-## 5. 剪贴板时机（VNC-CLIP-001，卡未领取，结果先记录）
+## 5. 剪贴板时机（VNC-CLIP-001）
+
+上午（卡领取前）与下午（`1b5f92f7` 构建，同 fixture 先 RealVNC 后 Taomni）两次：
 
 | 时机 | RealVNC 7.0.0 | Taomni |
 |---|---|---|
 | 连接时 | 不推送本地剪贴板 | 不推送 |
-| 本地复制后指针重新进入远端画面 | 8–9 ms 后发送（legacy ClientCutText） | 25–28 ms 后发送 |
-| 本地复制后窗口重新获得焦点 | 9–10 ms 后发送 | 14–18 ms 后发送 |
+| 本地复制后指针重新进入远端画面 | 上午 8–9 ms、下午 4 ms 后发送（legacy ClientCutText） | 上午 25–28 ms、下午 15 ms 后发送 |
+| 本地复制后窗口重新获得焦点 | 上午 9–10 ms、下午 3 ms 后发送 | 上午 14–18 ms、下午 23 ms 后发送 |
 | 远端复制 → 本机剪贴板 | 收到并写入；随后不回送 | 收到并写入；1 s 宽限内不回送 |
 | ExtendedClipboard | 未宣告该伪编码，只用 legacy 剪贴板；服务器端的 ExtendedClipboard 通知不处理 | 中文文本双向、HTML 富文本粘贴（Ctrl+V 先送 HTML 再送 V）通过 |
+
+VNC-QA-001 收口回归（同一构建，只跑 Taomni）再测一次：指针进入 35 ms、焦点返回 23 ms 后发送。三次合计 Taomni 15–35 / 14–23 ms，RealVNC 4–9 / 3–10 ms；时延差来自 WebView 的焦点与指针事件按刷新投递，行为一致。
 
 <a id="pointer-latency"></a>
 ## 6. 指针移动到线上延迟（VNC-PERF-005 / VNC-INPUT-001-A4）
