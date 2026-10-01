@@ -1920,6 +1920,9 @@
 - `[data-testid="vnc-fullscreen"]` — interactive [optional] — F9.6.fullscreen
 - `[data-testid="vnc-session-menu"]` — interactive [optional] — F9.6.session-menu
 - `[data-testid="vnc-menu-info"]` — interactive [optional] — F9.6.menu-info
+- `[data-testid="vnc-menu-quality"]` — interactive [optional] — F9.6.menu-quality
+- `[data-testid="vnc-quality-low"]` — interactive [optional] — F9.6.quality-low
+- `[data-testid="vnc-menu-send-f8"]` — interactive [optional] — F9.6.menu-send-f8
 - `[data-testid="vnc-session-info"]` — display [optional] — F9.6.session-info
 - `[data-testid="vnc-reconnect"]` — interactive [optional] — F9.6.reconnect
 - `[data-testid="vnc-unencrypted-continue"]` — interactive [optional] — F9.6.unencrypted-continue
