@@ -14853,6 +14853,27 @@ end_of_record
       await waitFor(() => expect(ui().languagePanelOpen).toBe(true));
     });
 
+    it("A4.2b: Shift+Esc in a tool window hands focus to the editor as it hides", async () => {
+      setKeymapPlatformOverride("linux");
+      const { rendered } = await mountJava();
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+      const ui = () => selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), instanceId);
+      await act(async () => {
+        fireEvent.keyDown(content, { key: "6", code: "Digit6", altKey: true });
+      });
+      await waitFor(() => expect(ui().bottomDockOpen).toBe(true));
+      const dock = await screen.findByTestId("code-workspace-bottom-dock");
+      const inside = dock.querySelector<HTMLElement>("button")!;
+      act(() => inside.focus());
+      expect(dock.contains(document.activeElement)).toBe(true);
+      act(() => {
+        fireEvent.keyDown(inside, { key: "Escape", code: "Escape", shiftKey: true });
+      });
+      // No frame has run yet: the editor already owns focus.
+      expect(document.activeElement?.classList.contains("cm-content")).toBe(true);
+      await waitFor(() => expect(ui().bottomDockOpen).toBe(false));
+    });
+
     it("DEC-013-06: migration notice shows once for a profile with prior workspace data", async () => {
       resetKeymapDefaultsMigrationNoticeForTests();
       window.localStorage.removeItem("taomni.codeWorkspace.keymap.v3:defaults-revision");

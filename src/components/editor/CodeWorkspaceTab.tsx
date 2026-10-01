@@ -12928,7 +12928,12 @@ export function CodeWorkspaceTab({
         hid = true;
       }
     }
-    if (hid) requestAnimationFrame(() => handleReturnToEditor());
+    if (hid) {
+      // IDEA moves focus to the editor as the tool window hides; the frame
+      // retry covers a layout that was still settling.
+      handleReturnToEditor();
+      requestAnimationFrame(() => handleReturnToEditor());
+    }
     return hid;
   }, [handleReturnToEditor, setBottomDockOpen, setLanguagePanelOpen, setRightPaneOpen, workspaceInstanceId]);
 
@@ -12944,6 +12949,7 @@ export function CodeWorkspaceTab({
       setLanguagePanelOpen(false);
       setBottomDockOpen(false);
       setRightPaneOpen(false);
+      handleReturnToEditor();
       requestAnimationFrame(() => handleReturnToEditor());
       return;
     }
@@ -13167,7 +13173,9 @@ export function CodeWorkspaceTab({
     const session = createOccurrenceSession(file.key, rev, word, highlights, position);
     setOccurrenceSession(session);
     occurrenceSessionRef.current = session;
-    setHighlightsByGroup((current) => ({
+    // An explicit action paints with its status message; only caret-driven
+    // highlighting renders as a transition.
+    setHighlightsByGroupNow((current) => ({
       ...current,
       [activeEditorGroupId]: highlights,
     }));
@@ -13204,7 +13212,7 @@ export function CodeWorkspaceTab({
     if (!session) return false;
     setOccurrenceSession(null);
     occurrenceSessionRef.current = null;
-    setHighlightsByGroup((current) => ({
+    setHighlightsByGroupNow((current) => ({
       ...current,
       [activeEditorGroupId]: [],
     }));
