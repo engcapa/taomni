@@ -1393,53 +1393,52 @@
       "$ref": "#/$defs/selector"
     },
     "mouse_path_arg": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "points"
-        ],
-        "description": "Move the pointer through element-relative points without clicking: dx/dy are CSS-pixel offsets from the element centre (W3C element origin), steps interpolates intermediate moves, pause_ms rests afterwards.",
-        "properties": {
-          "points": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "selector"
-              ],
-              "properties": {
-                "selector": {
-                  "$ref": "#/$defs/selector"
-                },
-                "dx": {
-                  "type": "number"
-                },
-                "dy": {
-                  "type": "number"
-                },
-                "steps": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 60
-                },
-                "pause_ms": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 5000
-                }
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "points"
+      ],
+      "description": "Move the pointer through element-relative points without clicking: dx/dy are CSS-pixel offsets from the element centre (W3C element origin), steps interpolates intermediate moves, pause_ms rests afterwards.",
+      "properties": {
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "properties": {
+              "selector": {
+                "$ref": "#/$defs/selector"
+              },
+              "dx": {
+                "type": "number"
+              },
+              "dy": {
+                "type": "number"
+              },
+              "steps": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 60
+              },
+              "pause_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000
               }
             }
           }
         }
-      },
+      }
+    },
     "drag_arg": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "from",
-        "to"
+        "from"
       ],
       "properties": {
         "from": {
@@ -1447,8 +1446,41 @@
         },
         "to": {
           "$ref": "#/$defs/selector"
+        },
+        "by": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dx"
+          ],
+          "description": "Offset drag from the element's centre (CSS px); never scrolls a target into view mid-drag.",
+          "properties": {
+            "dx": {
+              "type": "number"
+            },
+            "dy": {
+              "type": "number"
+            },
+            "steps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
         }
-      }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "to"
+          ]
+        },
+        {
+          "required": [
+            "by"
+          ]
+        }
+      ]
     },
     "fill_arg": {
       "type": "object",

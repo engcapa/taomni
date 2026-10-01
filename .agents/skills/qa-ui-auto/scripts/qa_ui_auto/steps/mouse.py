@@ -118,10 +118,39 @@ def step_middle_click(ctx: StepContext, args: Any) -> None:
         ctx.page.locator(selector).first.click(button="middle")
 
 
+def drag_offset(args: Any) -> tuple[float, float, int] | None:
+    """`drag_to: {from, by: {dx, dy?, steps?}}` -> (dx, dy, steps); None for `to`."""
+    by = args.get("by") if isinstance(args, dict) else None
+    if by is None:
+        return None
+    if not isinstance(by, dict) or "dx" not in by:
+        raise StepError(f"drag_to: `by` needs {{dx, dy?, steps?}}, got {by!r}")
+    return float(by["dx"]), float(by.get("dy", 0)), max(1, int(by.get("steps", 8)))
+
+
 @verb("drag_to")
 def step_drag_to(ctx: StepContext, args: Any) -> None:
     src = ctx.page.locator(args["from"]).first  # type: ignore[attr-defined]
-    dst = ctx.page.locator(args["to"]).first  # type: ignore[attr-defined]
+    offset = drag_offset(args)
+    if offset is None:
+        dst = ctx.page.locator(args["to"]).first  # type: ignore[attr-defined]
+        if ctx.dry_run:
+            return
+        src.drag_to(dst, force=True)
+        return
     if ctx.dry_run:
         return
-    src.drag_to(dst, force=True)
+    # An offset drag never scrolls a target into view mid-drag, so the moved
+    # distance does not depend on how wide the scrolled container is.
+    src.scroll_into_view_if_needed()
+    box = src.bounding_box()
+    if not box:
+        raise StepError(f"drag_to: {args['from']} has no layout box")
+    dx, dy, steps = offset
+    x = box["x"] + box["width"] / 2
+    y = box["y"] + box["height"] / 2
+    mouse = ctx.page.mouse  # type: ignore[attr-defined]
+    mouse.move(x, y)
+    mouse.down()
+    mouse.move(x + dx, y + dy, steps=steps)
+    mouse.up()
