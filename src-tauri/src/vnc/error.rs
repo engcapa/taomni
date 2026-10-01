@@ -123,6 +123,20 @@ mod tests {
     }
 
     #[test]
+    fn ard_failures_reopen_the_credential_prompt() {
+        // The prompt has a username field, which a username-less ARD login needs.
+        for message in [
+            "ARD authentication requires the macOS account name: no VNC username was provided",
+            "ARD authentication: the password must be under 64 bytes without NUL characters",
+            "authentication failed: Authentication failure",
+        ] {
+            let error = VncError::classify(message);
+            assert_eq!(error.code, "authentication-failed", "{message}");
+            assert!(!error.retryable, "{message}");
+        }
+    }
+
+    #[test]
     fn lifecycle_codes_are_distinct() {
         let warn = VncError::classify(
             "unencrypted connection requires confirmation: the server offers no encrypted security type",
