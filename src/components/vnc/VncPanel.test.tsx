@@ -158,7 +158,17 @@ function sentMessages(socket: MockWebSocket): Array<{ kind: "key"; down: boolean
     .filter((message): message is NonNullable<typeof message> => message !== null);
 }
 
-async function renderConnected(props: Partial<Parameters<typeof VncPanel>[0]> = {}) {
+function sentText(socket: MockWebSocket): Array<Record<string, unknown>> {
+  return socket.send.mock.calls
+    .map(([payload]) => payload)
+    .filter((payload): payload is string => typeof payload === "string")
+    .map((payload) => JSON.parse(payload) as Record<string, unknown>);
+}
+
+async function renderConnected(
+  props: Partial<Parameters<typeof VncPanel>[0]> = {},
+  connected: Record<string, unknown> = {},
+) {
   render(
     <VncPanel tabId="vnc-tab" host="windows.example.test" port={5900} visible {...props} />,
   );
@@ -168,7 +178,10 @@ async function renderConnected(props: Partial<Parameters<typeof VncPanel>[0]> = 
   const socket = MockWebSocket.instances[0];
   act(() => {
     socket.onmessage?.({
-      data: '{"type":"connected","width":1920,"height":1080,"name":"fixture","protocol":"3.8","security":"VNCAuth","encrypted":false}',
+      data: JSON.stringify({
+        type: "connected", width: 1920, height: 1080, name: "fixture", protocol: "3.8", security: "VNCAuth",
+        encrypted: false, ...connected,
+      }),
     } as MessageEvent);
   });
   const canvas = screen.getByTestId("vnc-canvas");
@@ -242,6 +255,52 @@ describe("VncPanel RealVNC-aligned input", () => {
     } finally {
       delete (window as unknown as Record<string, unknown>).onpointerrawupdate;
     }
+  });
+
+  it("reports the canvas to the relay's native sampler while the pointer rests over it", async () => {
+    const { socket, canvas } = await renderConnected({}, { native_pointer: true });
+    act(() => {
+      fireEvent.pointerEnter(canvas, { buttons: 0, clientX: 240, clientY: 135, pointerId: 1 });
+    });
+    expect(sentText(socket).filter((message) => message.type === "native_pointer")).toEqual([
+      { type: "native_pointer", on: true, left: 0, top: 0, width: 960, height: 540, dpr: 1, fb_width: 1920, fb_height: 1080 },
+    ]);
+    // The panel keeps sending its own moves; the relay drops the late copies.
+    act(() => {
+      fireEvent.pointerMove(canvas, { clientX: 240, clientY: 135, pointerId: 1 });
+    });
+    expect(sentMessages(socket).filter((message) => message.kind === "pointer")).toEqual([
+      { kind: "pointer", buttons: 0, x: 480, y: 270 },
+    ]);
+    act(() => {
+      fireEvent.pointerLeave(canvas, { pointerId: 1 });
+      fireEvent.pointerLeave(canvas, { pointerId: 1 });
+    });
+    expect(sentText(socket).filter((message) => message.type === "native_pointer").slice(1)).toEqual([
+      { type: "native_pointer", on: false },
+    ]);
+  });
+
+  it("stops native sampling when the window loses focus", async () => {
+    const { socket, canvas } = await renderConnected({}, { native_pointer: true });
+    act(() => {
+      fireEvent.pointerEnter(canvas, { buttons: 0, clientX: 240, clientY: 135, pointerId: 1 });
+      window.dispatchEvent(new Event("blur"));
+    });
+    expect(sentText(socket).filter((message) => message.type === "native_pointer").map((message) => message.on))
+      .toEqual([true, false]);
+  });
+
+  it("keeps the WebView pointer path when the relay offers no native sampling", async () => {
+    const { socket, canvas } = await renderConnected();
+    act(() => {
+      fireEvent.pointerEnter(canvas, { buttons: 0, clientX: 240, clientY: 135, pointerId: 1 });
+      fireEvent.pointerMove(canvas, { clientX: 240, clientY: 135, pointerId: 1 });
+    });
+    expect(sentText(socket).filter((message) => message.type === "native_pointer")).toEqual([]);
+    expect(sentMessages(socket).filter((message) => message.kind === "pointer")).toEqual([
+      { kind: "pointer", buttons: 0, x: 480, y: 270 },
+    ]);
   });
 
   it("opens the session menu on F8 without sending the key", async () => {

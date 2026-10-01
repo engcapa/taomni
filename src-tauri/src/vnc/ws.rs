@@ -24,6 +24,7 @@ use crate::vnc::clipboard::{
 };
 use crate::vnc::encodings::DecodedCursor;
 use crate::vnc::framebuffer::{Damage, FbRect, SharedFramebuffer};
+use crate::vnc::native_pointer::{NativePointerSampler, NativePointerTarget};
 use crate::vnc::policy::{VncClipboardPolicy, VncSecurityPolicy};
 use crate::vnc::quality::{QualityController, VncPictureQuality};
 use crate::vnc::queue::{FrameQueueReceiver, FrameQueueSender, QueuedWsOutgoing};
@@ -41,6 +42,9 @@ const WS_IDLE_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 const VNC_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 pub(crate) const VNC_AUTH_TIMEOUT: Duration = Duration::from_secs(45);
 const VNC_WS_PATH: &str = "/vnc";
+/// The WebView's plain moves trail the native sampler by one or two vsync
+/// periods; within this window after a sample they carry no newer position.
+const SAMPLED_POINTER_FRESH: Duration = Duration::from_millis(50);
 
 // ── Messages for internal channels ──────────────────────────────────
 
@@ -65,6 +69,16 @@ pub enum VncControl {
     Ack,
     /// Picture quality chosen in the session menu (VNC-PERF-004).
     SetQuality(VncPictureQuality),
+    /// Start (`Some`) or stop native pointer sampling over the canvas
+    /// (VNC-PERF-005).
+    NativePointer(Option<NativePointerTarget>),
+    /// A cursor position read by the native sampler (no buttons). Applied
+    /// only while no button is held; the WebView's later copies of the same
+    /// moves are then dropped.
+    SampledPointer {
+        x: u16,
+        y: u16,
+    },
     Disconnect,
 }
 
@@ -99,6 +113,26 @@ enum WsIncoming {
     },
     #[serde(rename = "refresh")]
     Refresh,
+    /// `on` with the canvas geometry starts native pointer sampling; `on:
+    /// false` (or incomplete geometry) stops it.
+    #[serde(rename = "native_pointer")]
+    NativePointer {
+        on: bool,
+        #[serde(default)]
+        left: Option<f64>,
+        #[serde(default)]
+        top: Option<f64>,
+        #[serde(default)]
+        width: Option<f64>,
+        #[serde(default)]
+        height: Option<f64>,
+        #[serde(default)]
+        dpr: Option<f64>,
+        #[serde(default)]
+        fb_width: Option<u16>,
+        #[serde(default)]
+        fb_height: Option<u16>,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -112,6 +146,9 @@ enum WsOutgoingText {
         protocol: String,
         security: String,
         encrypted: bool,
+        /// The relay samples the cursor natively while it rests over the
+        /// canvas (Windows, VNC-PERF-005).
+        native_pointer: bool,
     },
     #[serde(rename = "desktop_size")]
     DesktopSize {
@@ -702,6 +739,7 @@ async fn spawn_vnc_relay_inner(
         protocol: rfb.protocol_version(),
         security: rfb.security_label(),
         encrypted: rfb.encrypted(),
+        native_pointer: crate::vnc::native_pointer::supported() && !view_only,
     })
     .unwrap();
     let _ = ws_out_tx.send_critical_control(connected);
@@ -872,6 +910,18 @@ async fn run_relay(
                                 }))
                             }
                             WsIncoming::Refresh => Some(VncControl::Refresh),
+                            WsIncoming::NativePointer {
+                                on,
+                                left,
+                                top,
+                                width,
+                                height,
+                                dpr,
+                                fb_width,
+                                fb_height,
+                            } => Some(VncControl::NativePointer(native_pointer_target(
+                                on, left, top, width, height, dpr, fb_width, fb_height,
+                            ))),
                         };
                         if let Some(m) = ctrl_msg
                             && control_allowed(&m, view_only, clipboard_policy, &control_limits)
@@ -1095,9 +1145,13 @@ async fn run_relay(
     let framebuffer_ctrl = framebuffer.clone();
     let ws_out_ctrl = ws_out_tx.clone();
     let quality_ctrl = quality.clone();
+    let native_pointer_tx = control_tx.clone();
     let mut vnc_ctrl = tokio::spawn(async move {
         let mut deferred_ctrl: Option<VncControl> = None;
         let mut last_pointer_buttons = 0u8;
+        // Dropped with this task, which stops its sampling thread.
+        let mut native_pointer = NativePointerSampler::new();
+        let mut pointer_arbiter = PointerArbiter::default();
         loop {
             let ctrl = match deferred_ctrl.take() {
                 Some(ctrl) => ctrl,
@@ -1117,8 +1171,14 @@ async fn run_relay(
             );
             if let VncControl::Pointer { buttons, .. } = &ctrl {
                 last_pointer_buttons = *buttons;
+                native_pointer.set_buttons_held(*buttons != 0);
             }
             if !control_allowed(&ctrl, view_only, clipboard_policy, &dispatch_limits) {
+                continue;
+            }
+            if let VncControl::Pointer { x, y, buttons } = &ctrl
+                && !pointer_arbiter.web(*x, *y, *buttons, Instant::now())
+            {
                 continue;
             }
             let result = match ctrl {
@@ -1249,6 +1309,18 @@ async fn run_relay(
                     if quality_ready(&quality_ctrl, &flow_ctrl) {
                         let mut writer = rfb_ctrl.lock().await;
                         apply_pending_quality(&mut writer, &quality_ctrl, &flow_ctrl).map(|_| ())
+                    } else {
+                        Ok(())
+                    }
+                }
+                VncControl::NativePointer(target) => {
+                    pointer_arbiter.set_native(target.is_some());
+                    native_pointer.set(target, &native_pointer_tx);
+                    Ok(())
+                }
+                VncControl::SampledPointer { x, y } => {
+                    if pointer_arbiter.sample(x, y, Instant::now()) {
+                        rfb_ctrl.lock().await.send_pointer_event(x, y, 0)
                     } else {
                         Ok(())
                     }
@@ -1626,6 +1698,87 @@ fn coalesce_pointer_control(
     VncControl::Pointer { x, y, buttons }
 }
 
+/// Merges the WebView's pointer events with native cursor samples
+/// (VNC-PERF-005, DEC-VNC-20). The WebView owns the pointer while one of its
+/// buttons is down; otherwise the sampler's moves win and the WebView's later
+/// copies of them are dropped.
+#[derive(Debug, Default)]
+struct PointerArbiter {
+    native_on: bool,
+    buttons: u8,
+    sampled_at: Option<Instant>,
+    last_wire: Option<(u16, u16, u8)>,
+}
+
+impl PointerArbiter {
+    fn set_native(&mut self, on: bool) {
+        self.native_on = on;
+        if !on {
+            self.sampled_at = None;
+        }
+    }
+
+    /// Whether a WebView pointer event is sent to the server.
+    fn web(&mut self, x: u16, y: u16, buttons: u8, now: Instant) -> bool {
+        let previous = self.buttons;
+        self.buttons = buttons;
+        if buttons != 0 {
+            // After the release the WebView's moves count again until the
+            // sampler has resumed.
+            self.sampled_at = None;
+        }
+        let late_copy = buttons == 0
+            && previous == 0
+            && self.native_on
+            && self
+                .sampled_at
+                .is_some_and(|at| now.saturating_duration_since(at) < SAMPLED_POINTER_FRESH);
+        if late_copy {
+            return false;
+        }
+        self.last_wire = Some((x, y, buttons));
+        true
+    }
+
+    /// Whether a native sample is sent to the server; a sample of the
+    /// position just sent (such as the release point) is no move.
+    fn sample(&mut self, x: u16, y: u16, now: Instant) -> bool {
+        if !self.native_on || self.buttons != 0 || self.last_wire == Some((x, y, 0)) {
+            return false;
+        }
+        self.sampled_at = Some(now);
+        self.last_wire = Some((x, y, 0));
+        true
+    }
+}
+
+/// Geometry of a `native_pointer` message; `None` stops sampling.
+#[allow(clippy::too_many_arguments)]
+fn native_pointer_target(
+    on: bool,
+    left: Option<f64>,
+    top: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
+    dpr: Option<f64>,
+    fb_width: Option<u16>,
+    fb_height: Option<u16>,
+) -> Option<NativePointerTarget> {
+    if !on {
+        return None;
+    }
+    Some(NativePointerTarget {
+        left: left?,
+        top: top?,
+        width: width?,
+        height: height?,
+        dpr: dpr?,
+        fb_width: fb_width?,
+        fb_height: fb_height?,
+    })
+    .filter(NativePointerTarget::valid)
+}
+
 fn control_allowed(
     control: &VncControl,
     view_only: bool,
@@ -1633,7 +1786,10 @@ fn control_allowed(
     limits: &crate::vnc::limits::DecodeLimits,
 ) -> bool {
     match control {
-        VncControl::Key { .. } | VncControl::Pointer { .. } => !view_only,
+        VncControl::Key { .. }
+        | VncControl::Pointer { .. }
+        | VncControl::NativePointer(_)
+        | VncControl::SampledPointer { .. } => !view_only,
         VncControl::Clipboard(text) => {
             clipboard_policy.allows_client_to_server() && limits.clipboard_bytes(text.len()).is_ok()
         }
@@ -1825,6 +1981,119 @@ mod tests {
             value,
             serde_json::json!({ "type": "pointer_pos", "x": 123, "y": 456 })
         );
+    }
+
+    #[test]
+    fn native_pointer_messages_carry_the_canvas_geometry() {
+        let on: WsIncoming = serde_json::from_str(
+            r#"{"type":"native_pointer","on":true,"left":10,"top":20,"width":800,"height":450,"dpr":1.5,"fb_width":1600,"fb_height":900}"#,
+        )
+        .unwrap();
+        let WsIncoming::NativePointer {
+            on,
+            left,
+            top,
+            width,
+            height,
+            dpr,
+            fb_width,
+            fb_height,
+        } = on
+        else {
+            panic!("expected native_pointer");
+        };
+        let target =
+            native_pointer_target(on, left, top, width, height, dpr, fb_width, fb_height).unwrap();
+        // Physical (615, 367.5) is CSS (410, 245): the middle of the canvas.
+        assert_eq!(target.framebuffer_point(615.0, 367.5), Some((800, 450)));
+
+        let off: WsIncoming =
+            serde_json::from_str(r#"{"type":"native_pointer","on":false}"#).unwrap();
+        assert!(matches!(off, WsIncoming::NativePointer { on: false, .. }));
+        assert_eq!(
+            native_pointer_target(false, left, top, width, height, dpr, fb_width, fb_height),
+            None
+        );
+        // Incomplete or degenerate geometry stops sampling instead of guessing.
+        assert_eq!(
+            native_pointer_target(true, left, None, width, height, dpr, fb_width, fb_height),
+            None
+        );
+        assert_eq!(
+            native_pointer_target(true, left, top, Some(0.0), height, dpr, fb_width, fb_height),
+            None
+        );
+
+        let limits = crate::vnc::limits::DecodeLimits::default();
+        let start = VncControl::NativePointer(Some(target));
+        assert!(control_allowed(
+            &start,
+            false,
+            VncClipboardPolicy::Disabled,
+            &limits
+        ));
+        assert!(!control_allowed(
+            &start,
+            true,
+            VncClipboardPolicy::Disabled,
+            &limits
+        ));
+    }
+
+    #[test]
+    fn native_samples_lead_and_the_webview_owns_presses() {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let mut arbiter = PointerArbiter::default();
+        // Without sampling every WebView event goes out; samples do not.
+        assert!(arbiter.web(10, 10, 0, at(0)));
+        assert!(!arbiter.sample(11, 11, at(1)));
+
+        arbiter.set_native(true);
+        assert!(arbiter.sample(12, 12, at(2)));
+        // The WebView's copy of that move (and a stale one) is dropped...
+        assert!(!arbiter.web(12, 12, 0, at(12)));
+        assert!(!arbiter.web(11, 11, 0, at(20)));
+        // ...a repeated sample of the same position is no move...
+        assert!(!arbiter.sample(12, 12, at(21)));
+        // ...and once samples stop, the WebView's moves count again.
+        assert!(arbiter.web(13, 13, 0, at(80)));
+
+        // A press goes out and pauses samples until the release.
+        assert!(arbiter.sample(14, 14, at(81)));
+        assert!(arbiter.web(14, 14, 1, at(82)));
+        assert!(!arbiter.sample(20, 20, at(83)));
+        assert!(arbiter.web(20, 20, 1, at(84)));
+        assert!(
+            arbiter.web(20, 20, 0, at(85)),
+            "the release is never dropped"
+        );
+        // The sampler's first position after the release equals it.
+        assert!(!arbiter.sample(20, 20, at(86)));
+        assert!(arbiter.sample(21, 20, at(87)));
+
+        // A wheel notch (press/release pair) keeps its release.
+        assert!(arbiter.web(21, 20, 0x10, at(88)));
+        assert!(arbiter.web(21, 20, 0, at(89)));
+
+        arbiter.set_native(false);
+        assert!(arbiter.web(22, 22, 0, at(90)));
+        assert!(!arbiter.sample(23, 23, at(91)));
+    }
+
+    #[test]
+    fn connected_message_offers_native_pointer_sampling() {
+        let json = serde_json::to_value(&WsOutgoingText::Connected {
+            width: 1024,
+            height: 768,
+            name: "desk".into(),
+            protocol: "3.8".into(),
+            security: "VNC password".into(),
+            encrypted: false,
+            native_pointer: true,
+        })
+        .unwrap();
+        assert_eq!(json["native_pointer"], serde_json::json!(true));
     }
 
     #[test]

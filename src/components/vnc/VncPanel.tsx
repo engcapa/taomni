@@ -21,7 +21,14 @@ import {
   VncWheelAccumulator,
   VNC_KEYSYM,
 } from "../../lib/vnc";
-import type { VncClipboardPolicy, VncScaling, VncSecurityPolicy, VncSessionStats, WsOutgoing } from "../../lib/vnc";
+import type {
+  VncClipboardPolicy,
+  VncNativePointerTarget,
+  VncScaling,
+  VncSecurityPolicy,
+  VncSessionStats,
+  WsOutgoing,
+} from "../../lib/vnc";
 import { VncFramePainter, type VncPaintStats } from "../../lib/vncFramePainter";
 import {
   DEFAULT_VNC_VIEWER_OPTIONS,
@@ -309,6 +316,10 @@ export default function VncPanel({
   const wheelAccumulatorRef = useRef(new VncWheelAccumulator());
   // True once the WebView delivers pointerrawupdate for this canvas.
   const rawPointerMovesRef = useRef(false);
+  // VNC-PERF-005: the relay offers native cursor sampling (Windows); while it
+  // is on, the relay sends plain moves and this panel sends buttons only.
+  const nativePointerAvailableRef = useRef(false);
+  const nativePointerOnRef = useRef(false);
   const [remoteCursorCss, setRemoteCursorCss] = useState("none");
   const allowClipboardSend = clipboardPolicy === "bidirectional" || clipboardPolicy === "client-to-server";
   const allowClipboardReceive = clipboardPolicy === "bidirectional" || clipboardPolicy === "server-to-client";
@@ -739,6 +750,8 @@ export default function VncPanel({
               case "connected":
                 framebufferSizeRef.current = { width: msg.width, height: msg.height };
                 framebufferGenerationRef.current = 0;
+                nativePointerAvailableRef.current = msg.native_pointer === true;
+                nativePointerOnRef.current = false;
                 store.setConnected(tabId, msg.width, msg.height, msg.name, msg.protocol, msg.security, msg.encrypted);
                 reconnectStableTimerRef.current = window.setTimeout(() => {
                   if (generation === connectGenerationRef.current) {
@@ -1172,6 +1185,7 @@ export default function VncPanel({
     const releaseAllInput = () => {
       deadKeyPending = false;
       composingCode = null;
+      stopNativePointerRef.current();
       pressedKeysymsRef.current.forEach((keysym) => {
         // Keys latched from the session menu stay down until toggled off.
         if (!latchedKeysymsRef.current.has(keysym)) sendWsBinary(encodeWsKey(false, keysym));
@@ -1473,6 +1487,65 @@ export default function VncPanel({
     return pointerSchedulerRef.current;
   }, [sendPointerNow]);
 
+  // VNC-PERF-005 / DEC-VNC-20: Windows delivers cursor moves to the WebView
+  // one or two vsync periods late. While the pointer rests over the canvas
+  // the relay reads the cursor itself; this panel reports where the canvas
+  // is and keeps sending its own events (the relay drops the late copies).
+  const nativePointerTarget = useCallback((): VncNativePointerTarget | null => {
+    const canvas = canvasRef.current;
+    const fbWidth = conn?.width ?? 0;
+    const fbHeight = conn?.height ?? 0;
+    if (!canvas || fbWidth <= 0 || fbHeight <= 0) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    return {
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      dpr: window.devicePixelRatio || 1,
+      fb_width: fbWidth,
+      fb_height: fbHeight,
+    };
+  }, [conn?.width, conn?.height]);
+
+  const startNativePointer = useCallback(() => {
+    if (!nativePointerAvailableRef.current || viewOnly || conn?.status !== "connected") return;
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    const target = nativePointerTarget();
+    if (!target) return;
+    sendWs({ type: "native_pointer", on: true, ...target });
+    nativePointerOnRef.current = true;
+  }, [conn?.status, nativePointerTarget, sendWs, viewOnly]);
+
+  const stopNativePointer = useCallback(() => {
+    if (!nativePointerOnRef.current) return;
+    nativePointerOnRef.current = false;
+    sendWs({ type: "native_pointer", on: false });
+  }, [sendWs]);
+  const stopNativePointerRef = useRef(stopNativePointer);
+  stopNativePointerRef.current = stopNativePointer;
+
+  // The canvas moved or resized, or the framebuffer changed size: report the
+  // new geometry while sampling is on.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || conn?.status !== "connected") return;
+    const refresh = () => {
+      if (nativePointerOnRef.current) startNativePointer();
+    };
+    refresh();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(refresh);
+    observer?.observe(canvas);
+    window.addEventListener("resize", refresh);
+    document.addEventListener("scroll", refresh, true);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", refresh);
+      document.removeEventListener("scroll", refresh, true);
+    };
+  }, [conn?.status, startNativePointer]);
+
   const handlePointer = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
       if (viewOnly || conn?.status !== "connected") return;
@@ -1492,6 +1565,7 @@ export default function VncPanel({
       const pointer = { x, y, buttons };
 
       if (e.type === "pointermove") {
+        if (buttons === 0 && mapped.inside && !nativePointerOnRef.current) startNativePointer();
         // Chromium (WebView2) delivers moves earlier as pointerrawupdate;
         // once those arrive, the frame-aligned pointermove is a duplicate.
         if (rawPointerMovesRef.current) return;
@@ -1501,7 +1575,7 @@ export default function VncPanel({
 
       pointerScheduler().sendNow(pointer);
     },
-    [viewOnly, conn?.status, getFbCoords, pointerScheduler],
+    [viewOnly, conn?.status, getFbCoords, pointerScheduler, startNativePointer],
   );
 
   // VNC-PERF-005: pointermove is aligned to the next animation frame, which
@@ -1532,10 +1606,11 @@ export default function VncPanel({
 
   // Push a fresh local clipboard when the pointer enters the desktop, so a
   // paste click right after copying elsewhere sees the new content.
-  const handlePointerEnter = useCallback(() => {
+  const handlePointerEnter = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (viewOnly || conn?.status !== "connected") return;
     void syncLocalClipboardToServer("enter", true);
-  }, [viewOnly, conn?.status, syncLocalClipboardToServer]);
+    if (e.buttons === 0) startNativePointer();
+  }, [viewOnly, conn?.status, syncLocalClipboardToServer, startNativePointer]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -1897,6 +1972,7 @@ export default function VncPanel({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onPointerEnter={handlePointerEnter}
+        onPointerLeave={() => stopNativePointer()}
         onFocus={() => {
           canvasFocusedRef.current = true;
           setCanvasFocused(true);

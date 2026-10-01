@@ -4,6 +4,7 @@ pub mod error;
 pub mod framebuffer;
 pub mod keyboard_hook;
 pub mod limits;
+pub mod native_pointer;
 #[cfg(test)]
 mod live_bench;
 pub mod pixel;

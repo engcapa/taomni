@@ -214,11 +214,35 @@ export type WsOutgoing =
       html?: string;
       rtf?: string;
     }
-  | { type: "refresh" };
+  | { type: "refresh" }
+  /** VNC-PERF-005: start (with the canvas box in viewport CSS px) or stop
+   *  native cursor sampling; while on, plain moves are not sent from here. */
+  | ({ type: "native_pointer"; on: true } & VncNativePointerTarget)
+  | { type: "native_pointer"; on: false };
+
+export interface VncNativePointerTarget {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  dpr: number;
+  fb_width: number;
+  fb_height: number;
+}
 
 /** WebSocket message types received from the VNC relay. */
 export type WsIncoming =
-  | { type: "connected"; width: number; height: number; name: string; protocol: string; security: string; encrypted: boolean }
+  | {
+      type: "connected";
+      width: number;
+      height: number;
+      name: string;
+      protocol: string;
+      security: string;
+      encrypted: boolean;
+      /** The relay samples the cursor natively over the canvas (Windows). */
+      native_pointer?: boolean;
+    }
   | {
       type: "disconnected";
       code: string;
