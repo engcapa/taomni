@@ -381,6 +381,7 @@ pub async fn screenshot_test_gif_complete(
         .map_err(|e| format!("stop task failed: {e}"))?
         .map_err(internal_error)?;
     let path = file.path.clone();
+    save_qa_artifact(&path, "n7-gif-complete.gif");
     let (frames, width, height) = tokio::task::spawn_blocking(move || {
         let f = std::fs::File::open(&path).map_err(|e| format!("open failed: {e}"))?;
         let mut decoder = gif::DecodeOptions::new()
@@ -401,7 +402,6 @@ pub async fn screenshot_test_gif_complete(
     .map_err(|e| format!("decode task failed: {e}"))??;
     let expected = secs as u32 * fps;
     let ok = frames >= expected * 8 / 10 && frames <= expected * 12 / 10 && width == 200 && height == 200;
-    save_qa_artifact(&path, "n7-gif-complete.gif");
     Ok(format!(
         "{} frames={} width={} height={} expected={}",
         if ok { "OK" } else { "FAIL" },
