@@ -80,13 +80,17 @@ export function MfaAccountRow({
           aria-label={t("mfa.dragHandle", { name })}
           title={t("mfa.dragHandle", { name })}
           className="shrink-0 cursor-grab text-[var(--taomni-text-muted)] touch-none"
-          onPointerDown={(event) =>
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            // Like TabBar: no focus change, text selection or native drag on
+            // mousedown, any of which would cancel the custom drag.
+            event.preventDefault();
             startCustomDrag({
               event,
               data: { mime: MFA_DRAG_MIME, payload: account.id },
               ghostText: name,
-            })
-          }
+            });
+          }}
         >
           <GripVertical className="w-3.5 h-3.5" />
         </span>

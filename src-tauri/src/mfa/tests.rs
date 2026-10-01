@@ -487,6 +487,24 @@ fn export_uri_requires_the_master_password_and_round_trips_the_account() {
     );
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn x11_zpixmap_luma_handles_both_byte_orders() {
+    use super::capture::linux::zpixmap_to_luma;
+    // White, black and pure red pixels.
+    let bgrx = [255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 255, 0];
+    assert_eq!(
+        zpixmap_to_luma(&bgrx, 3, 1, true).unwrap(),
+        vec![255, 0, 76]
+    );
+    let xrgb = [0, 255, 255, 255, 0, 0, 0, 0, 0, 255, 0, 0];
+    assert_eq!(
+        zpixmap_to_luma(&xrgb, 3, 1, false).unwrap(),
+        vec![255, 0, 76]
+    );
+    assert!(zpixmap_to_luma(&bgrx, 4, 1, true).is_err());
+}
+
 #[test]
 fn mfa_data_key_entry_is_protected_from_vault_deletion() {
     assert!(crate::vault::is_protected_entry(MFA_DATA_KEY_ENTRY_ID));
