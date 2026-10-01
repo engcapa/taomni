@@ -350,14 +350,24 @@ def _image_digest(ctx: NativeStepContext, png: Path) -> dict:
 
 @_verb("host_clipboard")
 def _do_host_clipboard(ctx: NativeStepContext, args: Any) -> str:
-    if not isinstance(args, dict) or args.get("action") not in {"set", "assert", "clear"}:
-        raise StepError("host_clipboard: expected {action: set|assert|clear, kind, ...}")
+    if not isinstance(args, dict) or args.get("action") not in {"set", "assert", "clear", "quiet"}:
+        raise StepError("host_clipboard: expected {action: set|assert|clear|quiet, kind, ...}")
     action, kind = args["action"], str(args.get("kind") or "text")
     timeout = float(args.get("timeout_sec") or 15)
     observations = ctx.case_dir / "host-clipboard-observations.json"
     record: dict[str, Any] = {"action": action, "kind": kind, "platform": platform.system()}
+    failure = None
     if action == "clear":
         host_clipboard.clear()
+    elif action == "quiet":
+        # Nothing may keep rewriting the clipboard: an echo loop between two
+        # peers sharing it shows up as a steady stream of changes.
+        seconds = float(args.get("seconds") or 5)
+        limit = int(args.get("max_changes") or 0)
+        changes = host_clipboard.count_changes(seconds)
+        record.update(seconds=seconds, changes=changes, max_changes=limit)
+        if changes > limit:
+            failure = f"host_clipboard: the clipboard changed {changes} times in {seconds:.0f}s (max {limit})"
     elif action == "set":
         if kind == "text":
             host_clipboard.set_text(str(args["text"]))
@@ -426,6 +436,10 @@ def _do_host_clipboard(ctx: NativeStepContext, args: Any) -> str:
             history = []
     history.append(record)
     observations.write_text(json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8")
+    if failure:
+        raise StepError(failure)
+    if action == "quiet":
+        return f"host_clipboard quiet: {record['changes']} change(s) in {record['seconds']:.0f}s"
     return f"host_clipboard {action} {kind} ok"
 
 

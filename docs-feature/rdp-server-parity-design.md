@@ -139,11 +139,13 @@ Windows 基线：CI fixture 创建一次性本地账号，临时启用系统远�
 
 | 指标 | Windows 基线 TS | 绝对预算 B（三端） | 来源 |
 |---|---|---|---|
-| M1 | 待测 | 待定 | P0 基线运行 |
-| M2 p95 | 待测 | 待定 | P0 基线运行 |
-| M3 | 待测 | 待定 | P0 基线运行 |
-| M4 | 待测 | 待定 | P0 基线运行 |
-| M5 | 待测 | 待定 | P0 基线运行 |
+| M1 `first_graphics_ms` | 472 ms（已有会话重连） | ≤ 500 ms | 运行 36835206663，TC-RDPS-PERF-02 |
+| M2 p95 | 50.1 ms（p50 29.1 ms） | ≤ 65 ms（= max(1.25×TS, TS+15 ms)） | 同上 |
+| M3 | 32.0 fps（640×360 区域可见变化） | ≥ 25.6 fps（= 0.8×TS） | 同上 |
+| M4 | 3270 kbps | ≤ 4905 kbps（= 1.5×TS） | 同上 |
+| M5 | 未测：探针尚无 CPU 采样 | 待定 | — |
+
+两次测量都由同一 Windows runner 上的同一探针完成，只公告 RemoteFX；TermService 会话分辨率 1280×720，Taomni 采集控制台 1024×768，测量区域相同（目标窗口 640×360）。
 
 首轮记录（2026-10-01）：
 
@@ -151,6 +153,8 @@ Windows 基线：CI fixture 创建一次性本地账号，临时启用系统远�
 - 同一运行 Linux 另有 X11 捕获停滞：RandR 预检查已排空的 DamageNotify（NON_EMPTY 只报一次）被丢弃。已修复。
 - 运行 36809758793（debug 构建）：Linux/macOS 的 NAT-01、PERF-01 通过。RemoteFX 下 M2 p50 约 130–170 ms、M3 7–12 fps，首帧 0.6–1.4 s；QOIZ 首帧 80–230 ms。CI 默认是 debug 构建，这些数值不能作为预算依据；性能用例改为 `release_build_required`（release + 保留 debug 断言以维持 QA 隔离钩子），TermService 基线由 TC-RDPS-PERF-02 采集。
 - Windows runner 默认启用并运行系统远程桌面（3389），因此 Windows 上的启动流程先弹出选择；跨平台用例以 `platform_choice` 在 Windows 回答“仍使用 Taomni”，其它平台断言不出现。
+- TermService 基线（运行 36835206663）：Server 2025 忽略客户端指定的初始程序，基线目标改由 fixture 写入的 HKLM Run 项在会话登录时启动；首次连接在会话内等待目标就绪（约 105–127 s，含首次登录），测量连接复用已登录会话。
+- 同一运行的 Taomni release 构建（M1 / M2 p50、p95 / M3 / M4）：Windows 33 ms / 22.1、46.2 ms / 33.5 fps / 11520 kbps；Linux 105 ms / 32.4、47.8 ms / 88.6 fps / 9679 kbps；macOS 49 ms / 47.4、67.6 ms / 18.7 fps / 6545 kbps。三端 M4 均超预算（Windows 为 TS 的 3.5 倍），macOS 的 M2 p95 与 M3 也未达标，归 TASK-11。探针报告新增 `rfx` 段（量化表、每帧 tile 数与字节数），用于对比 TermService 与 Taomni 的 RemoteFX 编码差异。
 
 ### 4.8 测试基础设施（TASK-01、TASK-02）
 
@@ -215,16 +219,16 @@ workflow 改动：`Prepare local service packages` 的条件扩展到上述 capa
 |---|---|---|---|
 | TASK-01 | `rdp-probe` 探针（连接/画面/输入/剪贴板/声音/麦克风/autodetect/宿主播放录音） | — | 已实现：另加 `--codecs`（默认仿 mstsc 仅 RemoteFX）、`--snapshot`、framebuffer 统计、`image-make`、文件列表经锁下载 |
 | TASK-02 | qa-ui-auto：fixture、verb、helper、CI 供给 | TASK-01 | 已实现：`system_rdp_running`、`release_build_required`（CI `release` 能力→release QA 构建）、`rdp_baseline_required`；verb `platform_choice`、`host_make_tree`、`host_clipboard same_tree_as` |
-| TASK-03 | 基线用例 TC-RDPS-NAT-01、TC-RDPS-PERF-01 首轮三端运行，回填 §4.7 | TASK-01、02 | 进行中：Linux/macOS 首轮通过（debug 构建，数值不作预算）；release 构建与 TermService 基线（PERF-02）运行中 |
-| TASK-04 | Windows 系统远程桌面分支 | — | 已实现：UI-01/02 三端 browser 通过；native NAT-06 待 CI |
-| TASK-05 | 剪贴板 HTML/图片与方向分级 | TASK-01 | 已实现（单元测试通过）；NAT-02 待 CI |
-| TASK-06 | 剪贴板文件双向 | TASK-05 | 已实现（单元测试通过）；NAT-03 待 CI |
-| TASK-07 | RDPSND 播放三端 | TASK-01 | 待开始 |
-| TASK-08 | AUDIO_INPUT 麦克风三端 | TASK-01、07 | 待开始 |
-| TASK-09 | autodetect 与 Network Characteristics Result | TASK-01 | 待开始 |
-| TASK-10 | Taomni 客户端连接栏与质量事件 | TASK-09 | 待开始 |
+| TASK-03 | 基线用例 TC-RDPS-NAT-01、TC-RDPS-PERF-01 首轮三端运行，回填 §4.7 | TASK-01、02 | 进行中：NAT-01/PERF-01 三端 release 构建通过（运行 36828182584）；TermService 基线 PERF-02 的会话内目标改由 Explorer Run 项启动，复测中 |
+| TASK-04 | Windows 系统远程桌面分支 | — | 已实现并验证：UI-01/02 三端 browser、NAT-06 Windows native 通过（运行 36815659477、36828182584） |
+| TASK-05 | 剪贴板 HTML/图片与方向分级 | TASK-01 | 已实现：NAT-02 macOS 通过；修复“新复制覆盖未完成请求”导致 HTML 存成文本（RequestGate）；Linux xclip 与 Windows CF_HTML 判定修正后复测中 |
+| TASK-06 | 剪贴板文件双向 | TASK-05 | 已实现：探针改用 initiate_file_copy（Ready 后第二次复制发送文件）后 NAT-03 三端复测中 |
+| TASK-07 | RDPSND 播放三端 | TASK-01 | 已实现：Windows WASAPI 回环、Linux PipeWire sink monitor 的 NAT-04 通过（48 kHz 与重采样 44.1 kHz 均为 880 Hz）；macOS 优先回采环回虚拟设备输入，否则 ScreenCaptureKit，复测中 |
+| TASK-08 | AUDIO_INPUT 麦克风三端 | TASK-01、07 | 已实现：vendored `DvcServerFactory` + `audio_input.rs`；NAT-05 Linux（PipeWire 音源）与 macOS（Background Music）通过；Windows VB-CABLE 设备名匹配修正后复测中 |
+| TASK-09 | autodetect 与 Network Characteristics Result | TASK-01 | 已实现：每 2 s RTT 探测、每 4 次下发 RTT 型 Network Characteristics Result，按连接重置；连续带宽测量需客户端字节计数，ironrdp 客户端不支持，记为缺口 |
+| TASK-10 | Taomni 客户端连接栏与质量事件 | TASK-09 | 已实现：`RdpConnectionBar`（Vitest 8 项通过）+ 窗口工具栏 Ctrl+Alt+Del；联合用例 TC-RDPJ-01 复测中；browser 预览夹具（V-11）未建 |
 | TASK-11 | 性能调优至预算 | TASK-03 | 待开始 |
-| TASK-12 | 集成：三端全量 RDP 用例（含联合与参考服务器 V-18~V-21）+ 保留行为回归，交付报告 | 全部 | 待开始 |
+| TASK-12 | 集成：三端全量 RDP 用例（含联合与参考服务器 V-18~V-21）+ 保留行为回归，交付报告 | 全部 | 进行中：TC-RDPJ-01（V-18+V-20）已加入；V-19、V-21 待建 |
 
 ### TASK-01 `rdp-probe`
 

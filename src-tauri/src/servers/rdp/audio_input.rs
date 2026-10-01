@@ -300,9 +300,9 @@ impl MicChannel {
                 ));
                 self.sink = Some(sink);
             }
-            Err(error) => self
-                .log
-                .line(format!("RDP microphone unavailable on this computer: {error}")),
+            Err(error) => self.log.line(format!(
+                "RDP microphone unavailable on this computer: {error}"
+            )),
         }
     }
 }
@@ -403,12 +403,18 @@ impl DvcServerFactory for MicFactory {
 
 /// Virtual cable playback endpoints, tried in order when no device is set.
 #[cfg(any(
-    all(any(target_os = "windows", target_os = "macos"), feature = "rdp-server-audio"),
+    all(
+        any(target_os = "windows", target_os = "macos"),
+        feature = "rdp-server-audio"
+    ),
     test
 ))]
 const AUTO_DEVICES: [&str; 4] = ["CABLE Input", "VB-Audio", "BlackHole", "Background Music"];
 
-#[cfg(all(any(target_os = "windows", target_os = "macos"), feature = "rdp-server-audio"))]
+#[cfg(all(
+    any(target_os = "windows", target_os = "macos"),
+    feature = "rdp-server-audio"
+))]
 mod platform {
     use std::sync::Arc;
 
@@ -449,7 +455,9 @@ mod platform {
         match index {
             Some(index) => Ok(devices.into_iter().nth(index).expect("index into names")),
             None => Err(match wanted {
-                Some(wanted) => format!("no audio output named like {wanted:?} (outputs: {names:?})"),
+                Some(wanted) => {
+                    format!("no audio output named like {wanted:?} (outputs: {names:?})")
+                }
                 None => format!(
                     "no virtual audio cable (VB-CABLE on Windows, BlackHole on macOS) is installed (outputs: {names:?})"
                 ),
@@ -503,10 +511,14 @@ mod platform {
                 other => return Err(format!("unsupported output sample format {other:?}")),
             }
             .map_err(|e| format!("open {target}: {e}"))?;
-            stream
-                .play()
-                .map_err(|e| format!("start {target}: {e}"))?;
-            Ok((stream, ring, rate, channels, format!("{target} ({rate} Hz)")))
+            stream.play().map_err(|e| format!("start {target}: {e}"))?;
+            Ok((
+                stream,
+                ring,
+                rate,
+                channels,
+                format!("{target} ({rate} Hz)"),
+            ))
         })();
         match result {
             Ok((stream, ring, rate, channels, target)) => {
@@ -556,7 +568,9 @@ mod platform {
 
     pub(super) fn probe(_device: Option<&str>) -> Result<String, String> {
         connect()?;
-        Ok(format!("the PipeWire source \"{DESCRIPTION}\" ({NODE_NAME})"))
+        Ok(format!(
+            "the PipeWire source \"{DESCRIPTION}\" ({NODE_NAME})"
+        ))
     }
 
     pub(super) fn run(_device: Option<&str>, stop: StopReceiver, ready: ReadySender) {
@@ -668,7 +682,10 @@ mod platform {
 }
 
 #[cfg(not(any(
-    all(any(target_os = "windows", target_os = "macos"), feature = "rdp-server-audio"),
+    all(
+        any(target_os = "windows", target_os = "macos"),
+        feature = "rdp-server-audio"
+    ),
     target_os = "linux"
 )))]
 mod platform {
@@ -717,7 +734,10 @@ mod tests {
         assert_eq!(pdu[0], MSG_OPEN);
         assert_eq!(u32_at(&pdu, 1), Some(882));
         assert_eq!(u32_at(&pdu, 5), Some(1));
-        assert_eq!(parse_formats(&[&1u32.to_le_bytes()[..], &[0; 4], &pdu[9..]].concat()), vec![format]);
+        assert_eq!(
+            parse_formats(&[&1u32.to_le_bytes()[..], &[0; 4], &pdu[9..]].concat()),
+            vec![format]
+        );
     }
 
     #[test]

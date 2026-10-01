@@ -14,6 +14,7 @@ import platform
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 SYSTEM = platform.system()
@@ -260,6 +261,76 @@ def clear() -> None:
         _jxa(_JXA_PRELUDE + "pb.clearContents; 'ok'")
     else:
         _xclip_set("UTF8_STRING", b"")
+
+
+def _change_counter() -> int:
+    """The clipboard's own change counter: the window station's sequence
+    number on Windows, the general pasteboard's change count on macOS."""
+    if SYSTEM == "Windows":
+        return int(_ps("Add-Type -Namespace QaClip -Name Sequence -MemberDefinition "
+                       "'[DllImport(\"user32.dll\")] public static extern uint GetClipboardSequenceNumber();';"
+                       "[Console]::Out.Write([QaClip.Sequence]::GetClipboardSequenceNumber())"))
+    return int(_jxa(_JXA_PRELUDE + "pb.changeCount.toString()"))
+
+
+def _x11_owner_changes(seconds: float) -> int:
+    """CLIPBOARD ownership changes reported by XFixes during ``seconds``.
+
+    X11 has no change counter; every write makes its writer the selection
+    owner, so counting SetSelectionOwner notifications counts writes."""
+    import ctypes
+    import ctypes.util
+
+    xlib = ctypes.CDLL(ctypes.util.find_library("X11") or "libX11.so.6")
+    xfixes = ctypes.CDLL(ctypes.util.find_library("Xfixes") or "libXfixes.so.3")
+    xlib.XOpenDisplay.restype = ctypes.c_void_p
+    xlib.XOpenDisplay.argtypes = [ctypes.c_char_p]
+    xlib.XDefaultRootWindow.restype = ctypes.c_ulong
+    xlib.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+    xlib.XInternAtom.restype = ctypes.c_ulong
+    xlib.XInternAtom.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int]
+    xlib.XPending.argtypes = [ctypes.c_void_p]
+    xlib.XNextEvent.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    xlib.XFlush.argtypes = [ctypes.c_void_p]
+    xlib.XCloseDisplay.argtypes = [ctypes.c_void_p]
+    xfixes.XFixesQueryExtension.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int),
+                                            ctypes.POINTER(ctypes.c_int)]
+    xfixes.XFixesSelectSelectionInput.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_ulong,
+                                                  ctypes.c_ulong]
+    display = xlib.XOpenDisplay(None)
+    if not display:
+        raise RuntimeError("cannot open the X display")
+    try:
+        event_base, error_base = ctypes.c_int(), ctypes.c_int()
+        if not xfixes.XFixesQueryExtension(display, ctypes.byref(event_base), ctypes.byref(error_base)):
+            raise RuntimeError("the X server has no XFixes extension")
+        clipboard = xlib.XInternAtom(display, b"CLIPBOARD", 0)
+        set_owner_notify_mask = 1
+        xfixes.XFixesSelectSelectionInput(display, xlib.XDefaultRootWindow(display), clipboard,
+                                          set_owner_notify_mask)
+        xlib.XFlush(display)
+        event = (ctypes.c_long * 24)()  # sizeof(XEvent)
+        changes = 0
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            while xlib.XPending(display):
+                xlib.XNextEvent(display, event)
+                # XFixesSelectionNotify is the extension's first event.
+                if ctypes.c_int.from_buffer(event).value == event_base.value:
+                    changes += 1
+            time.sleep(0.05)
+        return changes
+    finally:
+        xlib.XCloseDisplay(display)
+
+
+def count_changes(seconds: float) -> int:
+    """How often the OS clipboard changes during the next ``seconds``."""
+    if SYSTEM == "Linux":
+        return _x11_owner_changes(seconds)
+    before = _change_counter()
+    time.sleep(seconds)
+    return _change_counter() - before
 
 
 def scratch_dir(base: Path) -> Path:

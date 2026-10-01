@@ -785,6 +785,8 @@ pub fn run() {
             servers::stop_local_server,
             servers::get_server_status,
             servers::list_server_statuses,
+            servers::list_server_logs,
+            servers::clear_server_log,
             servers::probe_rdp_capture,
             servers::resolve_rdp_connection_request,
             servers::probe_system_rdp,

@@ -1,7 +1,7 @@
 id: TC-RDPS-PERF-02-windows-termservice-baseline
 title: Windows TermService reference - connect time, input-to-frame latency and animation throughput with the same probe scenarios
 description: |
-  V-21 / DEC-04 (docs-feature/rdp-server-parity-design.md §4.7): the system
+  V-13 / DEC-04 (docs-feature/rdp-server-parity-design.md §4.7): the system
   Remote Desktop on the Windows runner is the performance reference for
   Taomni's RDP server (TC-RDPS-PERF-01). rdp_baseline_required prepares
   TermService and two disposable accounts. TermService gives each account
@@ -12,8 +12,9 @@ description: |
   The first connection of each account creates its session (first logon)
   and stays connected until the in-session target reports ready (the probe
   attaches the work directory's launch logs if it never does); the measured
-  connections then reconnect to the running session. The results are reference numbers for the budgets, not a pass
-  verdict on TermService: expectations only guard that measurement happened.
+  connections then reconnect to the running session. The results are
+  reference numbers for the budgets, not a pass verdict on TermService:
+  expectations only guard that measurement happened.
 covers:
 - F-RdpServer-1
 tags:

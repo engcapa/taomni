@@ -508,10 +508,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     let (clipboard, clipboard_warnings) = ClipboardPolicy::from_settings(
         config.str_field("clipboardServerToClient", ""),
         config.str_field("clipboardClientToServer", ""),
-        config.u64_field(
-            "clipboardFileMaxMb",
-            ClipboardPolicy::DEFAULT_FILE_MAX_MB,
-        ),
+        config.u64_field("clipboardFileMaxMb", ClipboardPolicy::DEFAULT_FILE_MAX_MB),
     );
     for warning in clipboard_warnings {
         ctx.log.line(warning);

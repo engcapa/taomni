@@ -233,6 +233,15 @@ export async function listServerStatuses(): Promise<ServerStatus[]> {
   return invoke<ServerStatus[]>("list_server_statuses", {});
 }
 
+/** Recent log lines kept by the backend, keyed by server type. */
+export async function listServerLogs(): Promise<Partial<Record<ServerType, string[]>>> {
+  return invoke<Partial<Record<ServerType, string[]>>>("list_server_logs", {});
+}
+
+export async function clearServerLog(serverType: ServerType): Promise<void> {
+  await invoke("clear_server_log", { serverType });
+}
+
 export async function probeRdpCapture(
   requestPermission = false,
   requestControlPermission = false,

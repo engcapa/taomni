@@ -305,7 +305,10 @@ mod capture {
 
 /// cpal capture into a [`WavePump`]: WASAPI loopback of the default output on
 /// Windows, the input side of a loopback virtual device on macOS.
-#[cfg(all(any(target_os = "windows", target_os = "macos"), feature = "rdp-server-audio"))]
+#[cfg(all(
+    any(target_os = "windows", target_os = "macos"),
+    feature = "rdp-server-audio"
+))]
 mod cpal_capture {
     use cpal::traits::{DeviceTrait, StreamTrait};
 

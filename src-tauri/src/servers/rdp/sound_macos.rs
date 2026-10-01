@@ -5,6 +5,7 @@
 //! display capture already needs. Taomni's own sounds are excluded. The stream
 //! also requires a video output; it is reduced to 2x2 at 1 fps and ignored.
 
+use std::mem::offset_of;
 use std::ptr::{NonNull, null_mut};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -14,7 +15,7 @@ use objc2::rc::Retained;
 use objc2::runtime::{NSObjectProtocol, ProtocolObject};
 use objc2::{AnyThread, DefinedClass, define_class, msg_send};
 use objc2_core_audio_types::{
-    AudioBuffer, kAudioFormatFlagIsFloat, kAudioFormatFlagIsNonInterleaved,
+    AudioBuffer, AudioBufferList, kAudioFormatFlagIsFloat, kAudioFormatFlagIsNonInterleaved,
 };
 use objc2_core_foundation::CFRetained;
 use objc2_core_media::{
@@ -35,16 +36,6 @@ use crate::servers::rdp::capture::mac::{permission_granted, sck};
 /// every sample.
 const RATE: u32 = 48_000;
 const CHANNELS: u16 = 2;
-/// Planar audio carries one buffer per channel.
-const MAX_BUFFERS: usize = 8;
-
-/// `AudioBufferList` with room for [`MAX_BUFFERS`] buffers (the system type
-/// declares a one-element variable-length array).
-#[repr(C)]
-struct BufferList {
-    number_buffers: u32,
-    buffers: [AudioBuffer; MAX_BUFFERS],
-}
 
 struct Pump {
     rate: u32,
@@ -85,9 +76,9 @@ define_class!(
                 Ok(converted) => converted,
                 Err(reason) => {
                     if ivars.rejected.fetch_add(1, Ordering::Relaxed) == 0 {
-                        ivars
-                            .sink
-                            .note(format!("RDP audio: unusable ScreenCaptureKit audio buffer: {reason}"));
+                        ivars.sink.note(format!(
+                            "RDP audio: unusable ScreenCaptureKit audio buffer: {reason}"
+                        ));
                     }
                     return;
                 }
@@ -145,44 +136,73 @@ impl AudioOutput {
 /// Copy one audio sample (32-bit float PCM, usually planar) into interleaved
 /// frames; the error says why a buffer is unusable.
 unsafe fn interleaved_f32(sample: &CMSampleBuffer) -> Result<(Vec<f32>, u32, u16), String> {
-    let description =
-        unsafe { sample.format_description() }.ok_or("no format description")?;
+    let description = unsafe { sample.format_description() }.ok_or("no format description")?;
     let asbd = unsafe { CMAudioFormatDescriptionGetStreamBasicDescription(&description).as_ref() }
         .ok_or("not an audio format description")?;
+    let format = format!(
+        "{} Hz, {} channel(s), flags 0x{:x}, {} bits",
+        asbd.mSampleRate, asbd.mChannelsPerFrame, asbd.mFormatFlags, asbd.mBitsPerChannel
+    );
     if asbd.mFormatFlags & kAudioFormatFlagIsFloat == 0 || asbd.mBitsPerChannel != 32 {
+        return Err(format!("unsupported PCM ({format})"));
+    }
+    // Planar audio carries one buffer per channel, and the delivered channel
+    // count is the device's, not necessarily the requested one: ask how
+    // large the list must be instead of guessing.
+    let flags = kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment;
+    let mut needed = 0usize;
+    let status = unsafe {
+        sample.audio_buffer_list_with_retained_block_buffer(
+            &mut needed,
+            null_mut(),
+            0,
+            None,
+            None,
+            flags,
+            null_mut(),
+        )
+    };
+    let buffers_at = offset_of!(AudioBufferList, mBuffers);
+    if status != 0 || needed < buffers_at {
         return Err(format!(
-            "unsupported PCM (flags 0x{:x}, {} bits)",
-            asbd.mFormatFlags, asbd.mBitsPerChannel
+            "audio buffer list size unavailable (OSStatus {status}, {needed} bytes; {format})"
         ));
     }
-    let empty = AudioBuffer {
-        mNumberChannels: 0,
-        mDataByteSize: 0,
-        mData: null_mut(),
-    };
-    let mut list = BufferList {
-        number_buffers: 0,
-        buffers: [empty; MAX_BUFFERS],
-    };
+    // u64 storage keeps the list pointer-aligned like the system type.
+    let mut storage = vec![0u64; needed.div_ceil(size_of::<u64>())];
     let mut block: *mut CMBlockBuffer = null_mut();
     let status = unsafe {
         sample.audio_buffer_list_with_retained_block_buffer(
             null_mut(),
-            (&raw mut list).cast(),
-            size_of::<BufferList>(),
+            storage.as_mut_ptr().cast(),
+            storage.len() * size_of::<u64>(),
             None,
             None,
-            kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
+            flags,
             &mut block,
         )
     };
     // The retained block buffer owns the memory the list points into.
     let _block = NonNull::new(block).map(|block| unsafe { CFRetained::from_raw(block) });
     if status != 0 {
-        return Err(format!("audio buffer list unavailable (OSStatus {status})"));
+        return Err(format!(
+            "audio buffer list unavailable (OSStatus {status}, {needed} bytes; {format})"
+        ));
     }
-    let count = (list.number_buffers as usize).min(MAX_BUFFERS);
-    let planes: Vec<&[f32]> = list.buffers[..count]
+    let list = storage.as_ptr().cast::<AudioBufferList>();
+    let room = (storage.len() * size_of::<u64>() - buffers_at) / size_of::<AudioBuffer>();
+    let count = (unsafe { (*list).mNumberBuffers } as usize).min(room);
+    let buffers = unsafe {
+        std::slice::from_raw_parts(
+            storage
+                .as_ptr()
+                .cast::<u8>()
+                .add(buffers_at)
+                .cast::<AudioBuffer>(),
+            count,
+        )
+    };
+    let planes: Vec<&[f32]> = buffers
         .iter()
         .map(|buffer| {
             if buffer.mData.is_null() {
@@ -211,8 +231,7 @@ unsafe fn interleaved_f32(sample: &CMSampleBuffer) -> Result<(Vec<f32>, u32, u16
         let channels = u16::try_from(planes.len()).map_err(|_| "too many channels")?;
         Ok((out, rate, channels))
     } else {
-        let channels =
-            u16::try_from(asbd.mChannelsPerFrame).map_err(|_| "too many channels")?;
+        let channels = u16::try_from(asbd.mChannelsPerFrame).map_err(|_| "too many channels")?;
         let samples = planes.first().ok_or("no audio buffers")?.to_vec();
         Ok((samples, rate, channels))
     }
@@ -268,8 +287,10 @@ fn start(rate: u32, channels: u16, sink: WaveSink) -> Result<Running, String> {
     let queue = DispatchQueue::new("taomni.rdp.audio", None);
     let stream_output: &ProtocolObject<dyn SCStreamOutput> = ProtocolObject::from_ref(&*output);
     for kind in [SCStreamOutputType::Screen, SCStreamOutputType::Audio] {
-        unsafe { stream.addStreamOutput_type_sampleHandlerQueue_error(stream_output, kind, Some(&queue)) }
-            .map_err(|_| format!("could not attach the ScreenCaptureKit output {kind:?}"))?;
+        unsafe {
+            stream.addStreamOutput_type_sampleHandlerQueue_error(stream_output, kind, Some(&queue))
+        }
+        .map_err(|_| format!("could not attach the ScreenCaptureKit output {kind:?}"))?;
     }
     sck::start_stream(&stream).map_err(|e| e.to_string())?;
     Ok((stream, output, queue))
@@ -318,9 +339,7 @@ pub(super) fn run(rate: u32, channels: u16, sink: WaveSink, stop: Stop, ready: R
     let diagnostics = sink.clone();
     match start(rate, channels, sink) {
         Ok((stream, output, _queue)) => {
-            let _ = ready.send(Ok(format!(
-                "ScreenCaptureKit system audio ({RATE} Hz)"
-            )));
+            let _ = ready.send(Ok(format!("ScreenCaptureKit system audio ({RATE} Hz)")));
             let _ = stop.recv();
             sck::stop_stream(&stream);
             let ivars = output.ivars();

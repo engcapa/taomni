@@ -126,11 +126,15 @@ mod imp {
         let found: Vec<String> = devices.iter().map(device_name).collect();
         let index = names.iter().find_map(|needle| {
             let needle = needle.to_lowercase();
-            found.iter().position(|n| n.to_lowercase().contains(&needle))
+            found
+                .iter()
+                .position(|n| n.to_lowercase().contains(&needle))
         });
         match index {
             Some(index) => Ok(devices.into_iter().nth(index).expect("index into names")),
-            None => Err(format!("no input device matching {names:?}; have {found:?}")),
+            None => Err(format!(
+                "no input device matching {names:?}; have {found:?}"
+            )),
         }
     }
 
@@ -218,7 +222,8 @@ pub(crate) fn play(freq: f64, seconds: f64, device: Option<&str>) -> Result<Valu
 /// Capture side of the virtual cables the RDP server's microphone plays into
 /// on Windows (VB-CABLE) and macOS (BlackHole, Background Music).
 #[cfg_attr(not(feature = "rdp-server-audio"), allow(dead_code))]
-const MIC_CAPTURE_DEVICES: [&str; 4] = ["CABLE Output", "VB-Audio", "BlackHole", "Background Music"];
+const MIC_CAPTURE_DEVICES: [&str; 4] =
+    ["CABLE Output", "VB-Audio", "BlackHole", "Background Music"];
 /// `node.name` of the RDP server's PipeWire microphone source on Linux.
 #[cfg(target_os = "linux")]
 const MIC_NODE: &str = "taomni-rdp-microphone";

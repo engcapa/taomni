@@ -4329,7 +4329,7 @@ controls:
 - 支持 10 类本地服务器（`SERVER_DEFS` 顺序）：ssh/sftp、ftp、tftp、http、telnet、vnc、nfs、cron、iperf、rdp；每行（`server-row-${type}`）显示运行状态点 + Start/Stop/Settings 按钮
 - 右栏：`CommonSettings`（监听端口 / 绑定地址 / 自动停止 / 开机自启）+ 每类专属设置表单（`settings/<X>Settings.tsx`，复用 `fields.tsx` 受控原语）+ `ServerOutputLog` 实时输出控制台（自动滚动 `server-log-autoscroll` / 清空 `server-log-clear`）
 - 后端 `src-tauri/src/servers/`：`ServerRegistry` 镜像 Tunnel 架构，配置持久化到 SQLite `server_configs` 表并在启动时 `autostart_servers()`；in-process 纯 Rust（ssh/sftp/http/ftp/tftp/telnet/cron）与受监管系统二进制（vnc/nfs/iperf 经 `which` + `spawn_supervised`，缺工具返回明确错误而非假「运行中」）
-- 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送（`app.emit` 全局，detached 窗口可收）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示需重启生效；有未保存修改时 Cancel / 系统关闭按钮会确认丢弃
+- 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送（`app.emit` 全局，detached 窗口可收）；后端 `ServerRegistry` 另按类型保留最近 500 行输出（`list_server_logs`），窗口打开时先显示窗口关闭期间的历史，清空按钮同时清空后端历史（`clear_server_log`）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示需重启生效；有未保存修改时 Cancel / 系统关闭按钮会确认丢弃
 - i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`
 - **e2e 测试限制**：真正 start/stop 一个服务器会绑定真实端口 / 拉起系统二进制，属带副作用操作；浏览器冒烟只验证对话框 chrome（打开 → 选行 → 设置面板/输出控制台挂载 → Cancel 关闭），实际启停留待 native/手动回归
 

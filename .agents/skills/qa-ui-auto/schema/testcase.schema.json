@@ -2698,7 +2698,8 @@
           "enum": [
             "set",
             "assert",
-            "clear"
+            "clear",
+            "quiet"
           ]
         },
         "kind": {
@@ -2708,6 +2709,16 @@
             "image",
             "files"
           ]
+        },
+        "seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "quiet: how long to watch the OS clipboard for changes."
+        },
+        "max_changes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "quiet: most clipboard changes allowed while watching (default 0)."
         },
         "text": {
           "type": "string"

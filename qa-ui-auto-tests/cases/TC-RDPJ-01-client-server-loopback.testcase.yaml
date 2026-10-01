@@ -6,15 +6,18 @@ description: |
   from Local servers and opens a saved RDP session to 127.0.0.1 on the same
   port, so the product client is tested against the product server.
 
-  After NLA and the first-use certificate confirmation the client shows the
-  host desktop. A click on the client canvas at the Tk target's desktop
-  position must flip the target on the host (its state file counts the
-  flips), proving client input reaches the host through the server. In OS
-  full screen the connection bar appears with a connection quality taken
-  from the server's Network Characteristics Result (auto-detect RTT), and
-  its restore button leaves full screen. Afterwards the server still serves
-  an independent probe connection. On Windows platform_choice picks Taomni
-  over the runner's system Remote Desktop.
+  Starting the server creates the credential vault. After NLA and the
+  first-use certificate confirmation the client shows the host desktop. A
+  click on the client canvas at the Tk target's desktop position must flip
+  the target on the host (its state file counts the flips), proving client
+  input reaches the host through the server. In OS full screen the
+  connection bar appears with a connection quality taken from the server's
+  Network Characteristics Result (auto-detect RTT); pointing at the top edge
+  brings it back after it slides away, restore leaves full screen, and in a
+  second full screen the bar's disconnect ends the session. The server then
+  accepts an independent probe connection, so it went back to waiting (it
+  serves one client at a time). On Windows platform_choice picks Taomni over
+  the runner's system Remote Desktop.
 covers:
 - F-RdpServer-1
 - F9.7
@@ -33,7 +36,6 @@ fixtures:
 timeout_sec: 480
 steps:
 - open: ${cfg.app.base_url}
-- vault_first_run: ${env.QA_VAULT_PASSWORD}
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -85,6 +87,16 @@ steps:
     dialog: '[data-testid="choice-dialog"]'
     click: '[data-testid="choice-dialog-secondary"]'
 - wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
     selector: '[data-testid="server-row-rdp"][data-status="running"]'
     timeout_sec: 90
 - host_helper:
@@ -126,11 +138,29 @@ steps:
 - wait_for:
     selector: '[data-testid="rdp-bar-quality"]:not([data-level="0"])'
     timeout_sec: 45
+- hover: '[data-testid="rdp-bar-hotzone"]'
+- wait_for:
+    selector: '[data-testid="rdp-connection-bar"][data-visible="true"]'
+    timeout_sec: 10
 - click: '[data-testid="rdp-bar-restore"]'
 - wait_for:
     selector: '[data-testid="rdp-connection-bar"]'
     state: detached
     timeout_sec: 15
+- click: '[data-testid="rdp-view-cycle"]'
+- hover: '[data-testid="rdp-bar-hotzone"]'
+- wait_for:
+    selector: '[data-testid="rdp-connection-bar"][data-visible="true"]'
+    timeout_sec: 15
+- click: '[data-testid="rdp-bar-disconnect"]'
+- wait_for:
+    selector: '[data-testid="rdp-connection-bar"]'
+    state: detached
+    timeout_sec: 15
+- assert_text:
+    selector: '[data-testid="rdp-status"]'
+    contains: Disconnected
+    timeout_sec: 20
 - rdp_probe:
     scenario: connect
     artifact: still-serving
@@ -145,46 +175,61 @@ verification:
   - id: R1
     requirement: The product client completes NLA against the product server after confirming its certificate and shows the host desktop.
     actions:
-    - 25
-    - 31
+    - 24
     - 34
-    - 36
+    - 37
+    - 39
     checkpoints:
-    - step: 27
+    - step: 26
+      expectation: Starting the server asks for the vault master password (first credential stored).
+    - step: 30
       expectation: The RDP server runs on the case port.
-    - step: 35
+    - step: 38
       expectation: The client asks to trust the server's self-signed certificate.
-    - step: 37
+    - step: 40
       expectation: The client reports the session as connected.
     results:
-    - 37
+    - 40
   - id: R2
     requirement: A click on the client canvas reaches the host desktop through the server.
     actions:
-    - 38
+    - 41
     checkpoints:
-    - step: 39
+    - step: 42
       expectation: The Tk target on the host recorded at least one flip.
     results:
-    - 39
-  - id: R3
-    requirement: In OS full screen the connection bar shows the server-measured connection quality and restores the window.
-    actions:
-    - 40
-    - 43
-    checkpoints:
-    - step: 41
-      expectation: The connection bar is visible after entering full screen.
-    - step: 42
-      expectation: The quality indicator left the not-measured state (Network Characteristics Result received).
-    - step: 44
-      expectation: Restore leaves full screen and removes the bar.
-    - step: 45
-      expectation: The server still serves a new connection.
-    results:
     - 42
-    - 44
+  - id: R3
+    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and disconnects the session.
+    actions:
+    - 43
+    - 46
+    - 48
+    - 50
+    - 51
+    - 53
+    checkpoints:
+    - step: 44
+      expectation: The connection bar is visible after entering full screen.
+    - step: 45
+      expectation: The quality indicator left the not-measured state (Network Characteristics Result received).
+    - step: 47
+      expectation: Pointing at the top edge shows the bar again.
+    - step: 49
+      expectation: Restore leaves full screen and removes the bar.
+    - step: 52
+      expectation: The bar is shown again in a second full screen.
+    - step: 54
+      expectation: Disconnect leaves full screen and removes the bar.
+    - step: 55
+      expectation: The client reports the session as disconnected.
+    - step: 56
+      expectation: The server accepts a new connection, so it went back to waiting.
+    results:
     - 45
+    - 49
+    - 55
+    - 56
   native:
   - check: Real desktop session on the runner with the product RDP client and server in one QA build, OS-level input injection and OS full screen.
     method: automated

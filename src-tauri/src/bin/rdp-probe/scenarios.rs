@@ -356,6 +356,8 @@ async fn throughput(args: &Args) -> ScenarioResult {
     };
     let bytes_start = session.bytes_in;
     let updates_start = session.graphics_updates;
+    // RemoteFX statistics describe the measured window, not the first frame.
+    session.reset_rfx_stats();
     let started = Instant::now();
     let deadline = started + Duration::from_secs_f64(seconds);
     let mut last = session.region_signature(rect);

@@ -3550,6 +3550,13 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "list_server_statuses": {
       return STUB_SERVER_TYPES.map((serverType) => ({ serverType, status: "stopped" })) as T;
     }
+    // No server runs in the browser, so there is no backend log history.
+    case "list_server_logs": {
+      return {} as T;
+    }
+    case "clear_server_log": {
+      return undefined as T;
+    }
     case "get_server_status":
     case "stop_local_server": {
       const { serverType } = (args ?? {}) as { serverType: string };

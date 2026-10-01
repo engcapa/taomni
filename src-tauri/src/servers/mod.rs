@@ -25,7 +25,7 @@ pub mod telnet;
 pub mod tftp;
 pub mod vnc;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
@@ -213,11 +213,18 @@ pub struct ActiveServer {
     _process_lock: ModuleLock,
 }
 
+/// Log lines kept per server so a Local servers window opened later shows
+/// what happened while it was closed (the window keeps as many,
+/// `MAX_LOG_LINES` in `serversStore.ts`).
+const LOG_HISTORY_LINES: usize = 500;
+
 #[derive(Default)]
 pub struct ServerRegistry {
     pub running: AsyncMutex<HashMap<ServerType, ActiveServer>>,
     pub statuses: AsyncMutex<HashMap<ServerType, ServerStatus>>,
     pub(crate) rdp_approvals: std::sync::Arc<rdp::ApprovalBroker>,
+    /// Recent `server://output/<type>` lines, oldest first.
+    logs: std::sync::Mutex<HashMap<ServerType, VecDeque<String>>>,
 }
 
 #[tauri::command]
@@ -233,6 +240,48 @@ impl ServerRegistry {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub(crate) fn record_log(&self, server_type: ServerType, line: &str) {
+        let Ok(mut logs) = self.logs.lock() else {
+            return;
+        };
+        let lines = logs.entry(server_type).or_default();
+        if lines.len() == LOG_HISTORY_LINES {
+            lines.pop_front();
+        }
+        lines.push_back(line.to_string());
+    }
+
+    fn log_history(&self) -> HashMap<String, Vec<String>> {
+        self.logs
+            .lock()
+            .map(|logs| {
+                logs.iter()
+                    .map(|(t, lines)| (t.as_str().to_string(), lines.iter().cloned().collect()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn clear_log(&self, server_type: ServerType) {
+        if let Ok(mut logs) = self.logs.lock() {
+            logs.remove(&server_type);
+        }
+    }
+}
+
+/// Recent log lines of every server that logged since the app started.
+#[tauri::command]
+pub fn list_server_logs(state: State<'_, AppState>) -> HashMap<String, Vec<String>> {
+    state.servers.log_history()
+}
+
+#[tauri::command]
+pub fn clear_server_log(state: State<'_, AppState>, server_type: String) -> Result<(), String> {
+    let st = ServerType::from_str(&server_type)
+        .ok_or_else(|| format!("unknown server type: {}", server_type))?;
+    state.servers.clear_log(st);
+    Ok(())
 }
 
 /* ---------------------------- internals ----------------------------- */
@@ -731,7 +780,10 @@ pub async fn autostart_servers(app: AppHandle) {
 mod tests {
     use serde_json::json;
 
-    use super::{redact_legacy_rdp_password, secure_rdp_config};
+    use super::{
+        LOG_HISTORY_LINES, ServerRegistry, ServerType, redact_legacy_rdp_password,
+        secure_rdp_config,
+    };
     use crate::vault::Vault;
 
     #[test]
@@ -770,5 +822,29 @@ mod tests {
         redact_legacy_rdp_password(&mut config);
         assert!(config.get("password").is_none());
         assert_eq!(config["credentialMigrationRequired"], true);
+    }
+
+    #[test]
+    fn log_history_keeps_the_latest_lines_per_server_until_cleared() {
+        let registry = ServerRegistry::new();
+        for i in 0..LOG_HISTORY_LINES + 2 {
+            registry.record_log(ServerType::Rdp, &format!("rdp {i}"));
+        }
+        registry.record_log(ServerType::Ssh, "ssh 0");
+
+        let history = registry.log_history();
+        let rdp = &history["rdp"];
+        assert_eq!(rdp.len(), LOG_HISTORY_LINES);
+        assert_eq!(rdp.first().map(String::as_str), Some("rdp 2"));
+        assert_eq!(
+            rdp.last().map(String::as_str),
+            Some(format!("rdp {}", LOG_HISTORY_LINES + 1).as_str())
+        );
+        assert_eq!(history["ssh"], vec!["ssh 0".to_string()]);
+
+        registry.clear_log(ServerType::Rdp);
+        let history = registry.log_history();
+        assert!(!history.contains_key("rdp"));
+        assert!(history.contains_key("ssh"));
     }
 }

@@ -42,7 +42,7 @@ def is_check(step: dict) -> bool:
     if verb == "rdp_probe_wait":
         return "expect" in args or "expect_exit" in args
     if verb == "host_clipboard":
-        return args.get("action") == "assert"
+        return args.get("action") in {"assert", "quiet"}
     return False
 
 

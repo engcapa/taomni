@@ -222,6 +222,16 @@ impl HostContent {
 /// Another process holds the OS clipboard; retry on the next tick.
 struct HostBusy;
 
+/// `text/uri-list` lines end in CRLF (RFC 2483; GTK file managers write it
+/// that way) but arboard splits the list on LF only, which leaves a `\r` on
+/// every Linux path.
+fn without_uri_list_cr(path: PathBuf) -> PathBuf {
+    match path.to_str().and_then(|value| value.strip_suffix('\r')) {
+        Some(trimmed) => PathBuf::from(trimmed),
+        None => path,
+    }
+}
+
 /// `Ok(None)` when a format is simply absent.
 fn available<T>(result: Result<T, arboard::Error>) -> Result<Option<T>, HostBusy> {
     match result {
@@ -245,7 +255,7 @@ fn read_host(
         && let Some(files) = available(clipboard.get().file_list())?
         && !files.is_empty()
     {
-        content.files = files;
+        content.files = files.into_iter().map(without_uri_list_cr).collect();
         return Ok(content);
     }
     content.text = available(clipboard.get_text())?
@@ -1521,6 +1531,18 @@ mod tests {
         assert_eq!(image(0).identity(), image(255).identity());
         let _ = std::fs::remove_dir_all(&a);
         let _ = std::fs::remove_dir_all(&b);
+    }
+
+    #[test]
+    fn uri_list_carriage_returns_are_not_part_of_host_paths() {
+        assert_eq!(
+            without_uri_list_cr(PathBuf::from("/tmp/宿主样本\r")),
+            PathBuf::from("/tmp/宿主样本")
+        );
+        assert_eq!(
+            without_uri_list_cr(PathBuf::from("/tmp/report.txt")),
+            PathBuf::from("/tmp/report.txt")
+        );
     }
 
     #[test]

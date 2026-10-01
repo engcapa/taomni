@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import {
   SERVER_ORDER,
+  clearServerLog,
   defaultConfig,
   loadServerConfigs,
+  listServerLogs,
   listServerStatuses,
   openServersWindow,
   saveServerConfig,
@@ -65,6 +67,17 @@ function initialRuntimes(): Record<ServerType, ServerRuntime> {
   return out;
 }
 
+/**
+ * Backend history first, then lines this window already holds that the
+ * history does not end with (they arrived while it was fetched, or were
+ * written by this window).
+ */
+export function mergeLogHistory(history: string[], live: string[]): string[] {
+  const tail = new Set(history.slice(-live.length));
+  const fresh = live.filter((line) => !tail.has(line));
+  return [...history, ...fresh].slice(-MAX_LOG_LINES);
+}
+
 function timestampLine(line: string): string {
   // Mirror the design's "[YYYY-MM-DD HH:MM:SS] message" log format.
   const now = new Date();
@@ -124,10 +137,12 @@ export const useServersStore = create<ServersStore>((set, get) => ({
       };
     }),
 
-  clearLog: (t) =>
+  clearLog: (t) => {
+    void clearServerLog(t).catch(() => {});
     set((s) => ({
       runtimes: { ...s.runtimes, [t]: { ...s.runtimes[t], logLines: [] } },
-    })),
+    }));
+  },
 
   markDirty: () => set({ dirty: true }),
   clearDirty: () => set({ dirty: false }),
@@ -160,6 +175,18 @@ export const useServersStore = create<ServersStore>((set, get) => ({
       }
     } catch {
       // Backend not ready — keep stopped defaults.
+    }
+
+    // Lines logged while no Local servers window listened.
+    let history: Partial<Record<ServerType, string[]>> = {};
+    try {
+      history = (await listServerLogs()) ?? {};
+    } catch {
+      // Backend not ready — start with the lines this window receives.
+    }
+    const live = get().runtimes;
+    for (const t of SERVER_ORDER) {
+      runtimes[t].logLines = mergeLogHistory(history[t] ?? [], live[t]?.logLines ?? []);
     }
 
     set({ configs, runtimes, loaded: true, dirty: false });

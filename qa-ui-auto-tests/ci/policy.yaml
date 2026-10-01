@@ -372,8 +372,10 @@ cases:
 - TC-RDPS-NAT-04-audio-playback
 - TC-RDPS-NAT-05-microphone
 - TC-RDPS-NAT-06-windows-system-rdp-taomni
+- TC-RDPS-NAT-07-autodetect
 - TC-RDPS-PERF-01-performance-budget
 - TC-RDPS-PERF-02-windows-termservice-baseline
 - TC-RDPS-UI-01-windows-system-rdp-running
 - TC-RDPS-UI-02-windows-system-rdp-states
 - TC-RDPJ-01-client-server-loopback
+- TC-RDPJ-02-joint-clipboard-no-echo

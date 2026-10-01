@@ -48,6 +48,7 @@ use x509_cert::der::Decode;
 use crate::audio::ProbeRdpsnd;
 use crate::audio_input::AudioInputClient;
 use crate::clipboard::ProbeClipboard;
+use crate::rfx_stats::RfxStats;
 use crate::{Args, ProbeError};
 
 pub(crate) type Stream = TlsStream<TcpStream>;
@@ -158,6 +159,8 @@ pub(crate) struct ProbeSession {
     snapshot: Option<PathBuf>,
     /// Bitmap codec ids offered in the client capability set.
     advertised_codecs: Vec<u8>,
+    /// RemoteFX wire statistics (quantization, tiles, bytes per frame).
+    rfx: RfxStats,
 }
 
 #[derive(Debug)]
@@ -445,6 +448,7 @@ impl ProbeSession {
             empty_updates: 0,
             snapshot: opts.snapshot.clone(),
             advertised_codecs,
+            rfx: RfxStats::default(),
         })
     }
 
@@ -454,6 +458,11 @@ impl ProbeSession {
 
     pub fn height(&self) -> u16 {
         self.image.height()
+    }
+
+    /// Start the RemoteFX statistics over (a scenario's measured window).
+    pub fn reset_rfx_stats(&mut self) {
+        self.rfx = RfxStats::default();
     }
 
     /// RGBA of one desktop pixel, or `None` outside the framebuffer.
@@ -545,6 +554,9 @@ impl ProbeSession {
                     .step_no_input(&mut output)
                     .map_err(|e| ProbeError::connection(format!("reactivation step: {e}")))?;
             }
+        }
+        if matches!(action, Action::FastPath) {
+            self.rfx.inspect_fast_path(&payload);
         }
         let outputs = self
             .active_stage
@@ -798,6 +810,7 @@ impl ProbeSession {
             "snapshot": self.write_snapshot(),
             "server_cert_sha256": self.fingerprint,
             "advertised_codecs": self.advertised_codecs.iter().map(|id| codec_name(*id)).collect::<Vec<_>>(),
+            "rfx": self.rfx.report(),
             "requested_channels": self.channels,
             "negotiated": {
                 "cliprdr": self.active_stage.get_svc_processor::<CliprdrClient>().is_some(),

@@ -17,6 +17,7 @@ mod clipboard;
 mod host_audio;
 #[cfg(target_os = "linux")]
 mod pw_record;
+mod rfx_stats;
 mod scenarios;
 mod session;
 mod stats;

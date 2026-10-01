@@ -1,0 +1,216 @@
+id: TC-RDPJ-02-joint-clipboard-no-echo
+title: Taomni RDP client and server on one computer share the clipboard without an echo loop
+description: |
+  V-19 (docs-feature/rdp-server-parity-design.md §4.2, AC-19, DEC-15). One
+  QA build starts the RDP server and connects its own RDP client to it over
+  127.0.0.1, so both ends share the same OS clipboard: every server
+  announcement makes the client write the text back, which the server sees
+  as a new host change. DEC-15 says the server recognises content it already
+  holds (or wrote) and announces it only once.
+
+  The host clipboard is cleared before the client connects. Once connected,
+  the host copies a Unicode text with the platform's own tools. The text must
+  stay on the clipboard, the clipboard must then stay unchanged for six
+  seconds (Windows sequence number, macOS change count, X11 XFixes owner
+  changes), and the server log, read back from the Local servers window
+  after the session ends, must show the text announced to the client at
+  least once and at most twice. On Windows platform_choice picks Taomni over
+  the runner's system Remote Desktop.
+covers:
+- F-RdpServer-1
+- F9.7
+tags:
+- rdp
+- rdp-server
+- rdp-client
+- joint
+- clipboard
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- rdp_server_required
+- system_rdp_running
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-rdp"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${env.QA_RDP_PORT}
+- click: '[data-testid="session-specify-username"]'
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${env.QA_RDP_USER}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-rdp-joint-clipboard
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-rdp-joint-clipboard"]'
+- open_route: '?servers=main'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- host_clipboard:
+    action: clear
+- open_route: /
+- wait_for:
+    selector: '[data-testid="sidebar"]'
+    timeout_sec: 30
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-rdp-joint-clipboard"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="confirm-dialog"]'
+    timeout_sec: 60
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_text:
+    selector: '[data-testid="rdp-status"]'
+    contains: Connected
+    timeout_sec: 60
+- wait: 2
+- host_clipboard:
+    action: set
+    kind: text
+    text: joint-clipboard 联合 ✓ no-echo
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: joint-clipboard 联合 ✓ no-echo
+    timeout_sec: 10
+- wait: 3
+- host_clipboard:
+    action: quiet
+    seconds: 6
+    max_changes: 0
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: joint-clipboard 联合 ✓ no-echo
+- open_route: '?servers=main'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: 'this computer -> client: text (28 chars)'
+    timeout_sec: 15
+- assert_pattern:
+    selector: '[data-testid="server-log"]'
+    # At least one announcement of the copied text, and no third one.
+    regex: '^(?!(?:[\s\S]*?this computer -> client: text \(28 chars\)){3})[\s\S]*?this computer -> client: text \(28 chars\)'
+    timeout_sec: 5
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: disconnected after
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: The product client completes NLA against the product server on the same computer.
+    actions:
+    - 24
+    - 34
+    - 37
+    - 39
+    checkpoints:
+    - step: 30
+      expectation: The RDP server runs on the case port.
+    - step: 40
+      expectation: The client reports the session as connected.
+    results:
+    - 40
+  - id: R2
+    requirement: A host copy reaches the shared clipboard once and does not bounce between client and server.
+    actions:
+    - 31
+    - 42
+    checkpoints:
+    - step: 43
+      expectation: The host clipboard holds the copied Unicode text.
+    - step: 45
+      expectation: After the exchange settles, the OS clipboard does not change for six seconds.
+    - step: 46
+      expectation: The copied text is still on the host clipboard.
+    results:
+    - 45
+    - 46
+  - id: R3
+    requirement: The server announced the copied text to the client a bounded number of times and noticed the client leave.
+    actions:
+    - 47
+    checkpoints:
+    - step: 50
+      expectation: The server log, kept while the Local servers window was closed, shows the text announced to the client.
+    - step: 51
+      expectation: The text was announced at least once and at most twice.
+    - step: 52
+      expectation: The server logged the client disconnecting when the client page closed.
+    results:
+    - 50
+    - 51
+    - 52
+  native:
+  - check: Real OS clipboard shared by the product RDP client and server in one QA build, observed with platform tools and the OS change counters.
+    method: automated
+    reason: Browser mode has neither the RDP client transport nor the server, and the stub clipboard is not shared.
+  visual:
+  - check: Not a visual check; clipboard state and log lines are asserted.
+    method: not-applicable
+    reason: The case asserts clipboard protocol behaviour.

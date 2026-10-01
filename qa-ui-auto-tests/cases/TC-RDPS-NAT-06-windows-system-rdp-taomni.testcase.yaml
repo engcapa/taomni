@@ -1,7 +1,7 @@
 id: TC-RDPS-NAT-06-windows-system-rdp-taomni
 title: Windows with system Remote Desktop running - real probe recommends it, Taomni starts only after an explicit choice, then serves NLA, frames and input
 description: |
-  V-06/V-14 on Windows (docs-feature/rdp-server-parity-design.md §4.1,
+  V-03/V-14 on Windows (docs-feature/rdp-server-parity-design.md §4.1,
   AC-01..AC-03, AC-17). system_rdp_running makes the runner's Remote Desktop
   host deterministic (connections allowed, TermService running), so the RDP
   settings card shows the real probe result rather than a stub.

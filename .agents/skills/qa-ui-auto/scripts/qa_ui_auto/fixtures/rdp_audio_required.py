@@ -10,7 +10,9 @@ provides a virtual output and makes it the default:
 * Windows: the Windows Audio services are started and an audio device is
   required. The fixture never installs drivers; the workflow installs the
   VB-CABLE virtual device for the ``audio`` capability (pinned
-  LABSN/sound-ci-helpers), local runs need a real or virtual output.
+  LABSN/sound-ci-helpers), local runs need a real or virtual output. On CI
+  runners it also allows desktop apps to use the microphone (privacy
+  consent), which recording from the virtual cable requires.
 * macOS: a default output device is required (the server captures system
   audio with ScreenCaptureKit, which needs something to render to); the
   workflow installs the Background Music virtual device for ``audio``.
@@ -103,6 +105,65 @@ $devices = @(Get-CimInstance -ClassName Win32_SoundDevice | Where-Object { $_.St
 """
 
 
+# Recording from an input (VB-CABLE's "CABLE Output") needs the microphone
+# privacy consent for desktop apps; hosted runners deny it, so WASAPI fails
+# with E_ACCESSDENIED. Only CI runners are changed; the previous values are
+# printed so teardown can restore them.
+_WINDOWS_MIC_CONSENT = r"""
+$ErrorActionPreference = 'Stop'
+$keys = @(
+  'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone',
+  'HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone',
+  'HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone\NonPackaged'
+)
+$previous = [ordered]@{}
+foreach ($key in $keys) {
+  if (Test-Path $key) {
+    $previous[$key] = (Get-ItemProperty -Path $key -Name Value -ErrorAction SilentlyContinue).Value
+  } else {
+    New-Item -Path $key -Force | Out-Null
+    $previous[$key] = $null
+  }
+  Set-ItemProperty -Path $key -Name Value -Value 'Allow' -Type String
+}
+$policy = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy'
+$forced = (Get-ItemProperty -Path $policy -Name LetAppsAccessMicrophone -ErrorAction SilentlyContinue).LetAppsAccessMicrophone
+[pscustomobject]@{ previous = $previous; policy = $forced } | ConvertTo-Json -Compress
+"""
+
+_MIC_CONSENT_PREVIOUS: dict[str, Any] = {}
+
+
+def _windows_microphone_consent() -> str:
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        return "microphone consent unchanged (local run)"
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", _WINDOWS_MIC_CONSENT],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode:
+        return "microphone consent not granted: " + (result.stderr or result.stdout)[-300:]
+    state = json.loads(result.stdout.strip().splitlines()[-1])
+    _MIC_CONSENT_PREVIOUS.update(state.get("previous") or {})
+    policy = state.get("policy")
+    return "microphone consent allowed" + (f" (policy LetAppsAccessMicrophone={policy})" if policy else "")
+
+
+def _restore_windows_microphone_consent() -> None:
+    if not _MIC_CONSENT_PREVIOUS:
+        return
+    lines = ["$ErrorActionPreference = 'Continue'"]
+    for key, value in _MIC_CONSENT_PREVIOUS.items():
+        quoted = key.replace("'", "''")
+        if value is None:
+            lines.append(f"Remove-ItemProperty -Path '{quoted}' -Name Value -ErrorAction SilentlyContinue")
+        else:
+            lines.append(f"Set-ItemProperty -Path '{quoted}' -Name Value -Value '{str(value).replace(chr(39), chr(39) * 2)}' -Type String")
+    subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", "\n".join(lines)],
+                   capture_output=True, text=True, timeout=60)
+    _MIC_CONSENT_PREVIOUS.clear()
+
+
 def _windows(ctx: Any) -> str:
     from . import FixtureSkip
 
@@ -119,7 +180,7 @@ def _windows(ctx: Any) -> str:
     if not devices:
         raise FixtureSkip("no audio output device; CI installs VB-CABLE for the audio capability "
                           "(LABSN/sound-ci-helpers), local runs need a real or virtual output")
-    return "windows " + ", ".join(devices)
+    return "windows " + ", ".join(devices) + "; " + _windows_microphone_consent()
 
 
 def _macos(ctx: Any) -> str:
@@ -155,6 +216,8 @@ def setup(ctx: Any) -> None:
 
 
 def teardown(ctx: Any) -> None:
+    if platform.system() == "Windows":
+        _restore_windows_microphone_consent()
     if platform.system() == "Linux" and shutil.which("pactl"):
         previous = os.environ.pop("QA_AUDIO_PREVIOUS_SINK", "")
         if previous:

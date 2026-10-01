@@ -1,7 +1,7 @@
 id: TC-RDPS-NAT-04-audio-playback
 title: RDP server sound - a tone played on this computer reaches the RDP client through RDPSND
 description: |
-  V-07 (docs-feature/rdp-server-parity-design.md §4.3, AC-09). The server runs
+  V-08 (docs-feature/rdp-server-parity-design.md §4.3, AC-12). The server runs
   with audio playback on (the default). rdp_audio_required provides a default
   host output (Linux: PipeWire null sink; Windows: VB-CABLE; macOS: the
   Background Music device, installed by the workflow), so the oracle does
@@ -14,7 +14,8 @@ description: |
   so the server must resample its 48 kHz capture. Each time the dominant
   frequency must be the played tone (within 2 %), loud enough to rule out
   silence, and the server log must name
-  the loopback source (WASAPI loopback, PipeWire sink monitor or
+  the loopback source (WASAPI loopback, PipeWire sink monitor, the input
+  side of a loopback virtual device such as Background Music, or
   ScreenCaptureKit system audio). On Windows platform_choice picks Taomni
   over the runner's system Remote Desktop.
 covers:
@@ -165,7 +166,7 @@ verification:
     - 21
     - 22
   native:
-  - check: Real host audio output (PipeWire graph on Linux, WASAPI loopback of VB-CABLE on Windows, ScreenCaptureKit system audio on macOS), RDPSND over NLA, tone analysis on received PCM.
+  - check: Real host audio output (PipeWire graph on Linux, WASAPI loopback of VB-CABLE on Windows, Background Music input loopback or ScreenCaptureKit system audio on macOS), RDPSND over NLA, tone analysis on received PCM.
     method: automated
     reason: Browser stubs have no RDP server or host audio.
   visual:
