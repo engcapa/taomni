@@ -1,0 +1,26 @@
+id: TC-SHOT-N6
+title: Native MP4 recording produces a valid MP4 file
+covers:
+- F27.2
+tags:
+- screenshot
+- recording
+- native
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+# Ensure the main window (and Tauri API) is ready before invoking backends.
+- wait_for: '[data-testid="system-screenshot"]'
+- wait: 5
+# Record a 3-second MP4 clip and verify the file header contains the ftyp
+# box (hex 66747970 = "ftyp"). Requires ffmpeg on PATH.
+- eval_readonly:
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_recording", {format: "mp4", secs: 3}).then(JSON.stringify)'
+    contains: '66747970'

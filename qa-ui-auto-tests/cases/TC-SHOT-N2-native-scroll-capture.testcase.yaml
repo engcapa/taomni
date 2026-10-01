@@ -24,3 +24,8 @@ steps:
 - eval_readonly:
     expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_scroll_capture", {displayId: null, x: 0, y: 0, width: 200, height: 200}).then(JSON.stringify)'
     contains: '"path"'
+# Verify multiple frames were captured (frames>1) and the stitched height
+# exceeds the requested height, proving real scroll + stitch.
+- eval_readonly:
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_scroll_capture", {width: 200, height: 200}).then(JSON.stringify)'
+    contains: 'OK frames='

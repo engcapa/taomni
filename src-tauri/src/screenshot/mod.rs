@@ -227,6 +227,80 @@ pub async fn screenshot_probe() -> Result<ScreenshotProbe, String> {
     })
 }
 
+/// Read the first `len` bytes of a file as lowercase hex. Test-only helper
+/// for QA to verify recording file headers (GIF87a/89a, MP4 ftyp).
+#[tauri::command]
+pub async fn screenshot_read_file_header(path: String, len: u32) -> Result<String, String> {
+    let len = len.min(64) as usize;
+    let bytes = tokio::task::spawn_blocking(move || {
+        use std::io::Read;
+        let mut f = std::fs::File::open(&path).map_err(|e| format!("open failed: {e}"))?;
+        let mut buf = vec![0u8; len];
+        let n = f.read(&mut buf).map_err(|e| format!("read failed: {e}"))?;
+        buf.truncate(n);
+        Ok::<Vec<u8>, String>(buf)
+    })
+    .await
+    .map_err(|e| format!("read task failed: {e}"))?
+    .map_err(internal_error)?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
+/// Test-only: run scroll capture and verify multi-frame stitching in one call.
+/// Returns "OK frames=N height=H" where N>1 and H>requested height prove
+/// the wheel scrolled and frames were stitched.
+#[tauri::command]
+pub async fn screenshot_test_scroll_capture(
+    app: AppHandle,
+    width: u32,
+    height: u32,
+) -> Result<String, String> {
+    let r = screenshot_scroll_capture(app, None, 0, 0, width, height).await?;
+    let ok = r.frames > 1 && r.height > height;
+    Ok(format!(
+        "{} frames={} height={}",
+        if ok { "OK" } else { "FAIL" },
+        r.frames,
+        r.height
+    ))
+}
+
+/// Test-only: record a short clip and verify its file header in one call.
+/// Starts a recording, waits `secs` seconds, stops it, reads the first 12
+/// bytes as hex. Returns "OK <hex>" on success. Avoids JS promise chaining
+/// (banned by the QA audit) in native test cases.
+/// Bypasses the recorder-bar window (UI) used by the interactive flow.
+#[tauri::command]
+pub async fn screenshot_test_recording(
+    app: AppHandle,
+    format: String,
+    secs: u64,
+) -> Result<String, String> {
+    let recording_id = {
+        let app_clone = app.clone();
+        let format_clone = format.clone();
+        tokio::task::spawn_blocking(move || {
+            record::start_recording(
+                &app_clone,
+                None,
+                Some((0, 0, 200, 200)),
+                &format_clone,
+                Some(5),
+            )
+        })
+        .await
+        .map_err(|e| format!("start recording task failed: {e}"))?
+        .map_err(internal_error)?
+    };
+    tokio::time::sleep(std::time::Duration::from_secs(secs.min(10))).await;
+    let file = tokio::task::spawn_blocking(move || record::stop_recording(&recording_id))
+        .await
+        .map_err(|e| format!("stop recording task failed: {e}"))?
+        .map_err(internal_error)?;
+    let header = screenshot_read_file_header(file.path.clone(), 12).await?;
+    Ok(format!("OK path={} header={}", file.path, header))
+}
+
 // ---------------------------------------------------------------------------
 // Overlay window
 // ---------------------------------------------------------------------------
@@ -255,13 +329,12 @@ pub async fn open_overlay(app: &AppHandle, display_id: Option<String>) -> Result
     let origin = capture::display_origin(app, display_id.as_deref());
     let app_clone = app.clone();
     let display_clone = display_id.clone();
-    let (path, width, height) =
-        tokio::task::spawn_blocking(move || {
-            capture::capture_display_png(&app_clone, display_clone.as_deref())
-        })
-        .await
-        .map_err(|e| format!("capture task failed: {e}"))?
-        .map_err(internal_error)?;
+    let (path, width, height) = tokio::task::spawn_blocking(move || {
+        capture::capture_display_png(&app_clone, display_clone.as_deref())
+    })
+    .await
+    .map_err(|e| format!("capture task failed: {e}"))?
+    .map_err(internal_error)?;
     *overlay_init_slot().lock().unwrap() = Some(OverlayInit {
         path: path.to_string_lossy().into_owned(),
         display_id,

@@ -1,0 +1,26 @@
+id: TC-SHOT-N5
+title: Native GIF recording produces a valid GIF file
+covers:
+- F27.2
+tags:
+- screenshot
+- recording
+- native
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+# Ensure the main window (and Tauri API) is ready before invoking backends.
+- wait_for: '[data-testid="system-screenshot"]'
+- wait: 5
+# Record a 3-second GIF clip and verify the file header starts with
+# GIF87a or GIF89a (hex 47494638 = "GIF8").
+- eval_readonly:
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_recording", {format: "gif", secs: 3}).then(JSON.stringify)'
+    contains: '47494638'

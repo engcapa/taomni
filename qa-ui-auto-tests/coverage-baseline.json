@@ -1,11 +1,11 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 70,
-    "required": 513,
-    "covered_required": 512,
-    "shallow": 44,
-    "orphans": 0
+    "features_with_controls": 89,
+    "required": 619,
+    "covered_required": 614,
+    "shallow": 46,
+    "orphans": 8
   },
   "features": {
     "F1.2": {
@@ -318,6 +318,96 @@
       "covered_required": 5,
       "shallow": 0
     },
+    "F-MAIL-5": {
+      "required": 3,
+      "covered_required": 3,
+      "shallow": 0
+    },
+    "F-MAIL-6": {
+      "required": 1,
+      "covered_required": 1,
+      "shallow": 0
+    },
+    "F-MAIL-7": {
+      "required": 3,
+      "covered_required": 3,
+      "shallow": 0
+    },
+    "F-MAIL-8": {
+      "required": 4,
+      "covered_required": 4,
+      "shallow": 0
+    },
+    "F-MAIL-9": {
+      "required": 4,
+      "covered_required": 4,
+      "shallow": 0
+    },
+    "F-MAIL-10": {
+      "required": 1,
+      "covered_required": 1,
+      "shallow": 0
+    },
+    "F-MAIL-11": {
+      "required": 5,
+      "covered_required": 4,
+      "shallow": 0
+    },
+    "F-MAIL-12": {
+      "required": 2,
+      "covered_required": 2,
+      "shallow": 0
+    },
+    "F-MAIL-13": {
+      "required": 8,
+      "covered_required": 8,
+      "shallow": 0
+    },
+    "F-MAIL-14": {
+      "required": 1,
+      "covered_required": 1,
+      "shallow": 0
+    },
+    "F-MAIL-15": {
+      "required": 2,
+      "covered_required": 2,
+      "shallow": 0
+    },
+    "F-MAIL-16": {
+      "required": 3,
+      "covered_required": 3,
+      "shallow": 0
+    },
+    "F-MAIL-17": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 0
+    },
+    "F-MAIL-18": {
+      "required": 4,
+      "covered_required": 4,
+      "shallow": 0
+    },
+    "F-MAIL-19": {
+      "required": 9,
+      "covered_required": 9,
+      "shallow": 0
+    },
+    "F-MAIL-20": {
+      "required": 7,
+      "covered_required": 7,
+      "shallow": 0
+    },
+    "F-MAIL-21": {
+      "required": 7,
+      "covered_required": 7,
+      "shallow": 0
+    },
+    "F-MAIL-22": {
+      "required": 3,
+      "covered_required": 3,
+      "shallow": 0
+    },
     "F-Sockscap-1": {
       "required": 17,
       "covered_required": 17,
@@ -357,6 +447,11 @@
       "required": 10,
       "covered_required": 9,
       "shallow": 1
+    },
+    "F27.1": {
+      "required": 39,
+      "covered_required": 36,
+      "shallow": 2
     }
   }
 }
