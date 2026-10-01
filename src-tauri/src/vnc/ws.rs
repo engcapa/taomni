@@ -626,6 +626,9 @@ async fn spawn_vnc_relay_inner(
         security_policy,
         VNC_AUTH_TIMEOUT,
         options.allow_unencrypted,
+        username
+            .as_deref()
+            .is_some_and(|name| !name.trim().is_empty()),
     )
     .await?;
     let mut tls_guard = ForwardTaskGuard(prepared.tls_task);

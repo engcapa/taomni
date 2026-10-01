@@ -25,6 +25,13 @@ const SEC_TYPE_RA2NE_128: u8 = 6;
 pub(crate) const SEC_TYPE_ANONYMOUS_TLS: u8 = 18;
 const SEC_TYPE_RA2_256: u8 = 129;
 const SEC_TYPE_RA2NE_256: u8 = 130;
+/// Apple Remote Desktop (macOS Screen Sharing).
+const SEC_TYPE_ARD: u8 = 30;
+/// Diffie-Hellman modulus sizes accepted for ARD (macOS sends 128 bytes).
+const ARD_MIN_KEY_BYTES: usize = 64;
+const ARD_MAX_KEY_BYTES: usize = 1024;
+/// Username and password are NUL-terminated in 64-byte fields.
+const ARD_FIELD_BYTES: usize = 64;
 
 const RA2_SUBTYPE_USER_PASS: u8 = 1;
 const RA2_SUBTYPE_PASS: u8 = 2;
@@ -320,10 +327,11 @@ impl RfbConnection {
             return self.authenticate_v33_with_policy(password, policy, None);
         }
 
+        let has_username = username.is_some_and(|name| !name.trim().is_empty());
         let (chosen, write_selection) = match self.pending_security.take() {
             Some(PendingSecurity::Selected(chosen)) => (chosen, false),
             Some(PendingSecurity::V33(_)) => unreachable!(),
-            None => (self.read_and_choose_security_type()?, true),
+            None => (self.read_and_choose_security_type(has_username)?, true),
         };
         self.security_type = Some(chosen);
 
@@ -342,6 +350,9 @@ impl RfbConnection {
             SEC_TYPE_RA2_128 | SEC_TYPE_RA2NE_128 | SEC_TYPE_RA2_256 | SEC_TYPE_RA2NE_256 => {
                 let pwd = password.unwrap_or("");
                 self.vnc_auth_ra2(chosen, username.unwrap_or(""), pwd)?;
+            }
+            SEC_TYPE_ARD => {
+                self.vnc_auth_ard(username.unwrap_or("").trim(), password.unwrap_or(""))?;
             }
             _ => unreachable!(),
         }
@@ -386,7 +397,7 @@ impl RfbConnection {
         self.read_server_init()
     }
 
-    fn read_and_choose_security_type(&mut self) -> Result<u8, String> {
+    fn read_and_choose_security_type(&mut self, has_username: bool) -> Result<u8, String> {
         let mut sec_buf = [0u8; 1];
         self.read_exact(&mut sec_buf)
             .map_err(|e| authentication_read_error("reading the security type count", e))?;
@@ -412,7 +423,9 @@ impl RfbConnection {
         let mut types = vec![0u8; num_types];
         self.read_exact(&mut types)
             .map_err(|e| authentication_read_error("reading the security types", e))?;
-        self.security_policy.choose(&types).map_err(|e| e.0)
+        self.security_policy
+            .choose_with_username(&types, has_username)
+            .map_err(|e| e.0)
     }
 
     /// RFB 3.3 security handshake: server sends a u32 security type, no client choice.
@@ -484,6 +497,52 @@ impl RfbConnection {
             .map_err(|e| format!("write VNC response: {}", e))?;
         self.flush().map_err(|e| format!("flush: {}", e))?;
 
+        Ok(())
+    }
+
+    /// Apple Remote Desktop authentication (security type 30, macOS Screen
+    /// Sharing): the server sends a Diffie-Hellman generator, key length,
+    /// prime and public key; the client answers with the macOS account name
+    /// and password encrypted under MD5(shared secret) and its public key.
+    fn vnc_auth_ard(&mut self, username: &str, password: &str) -> Result<(), String> {
+        use rsa::rand_core::OsRng;
+
+        if username.is_empty() {
+            return Err(
+                "ARD authentication requires the macOS account name: no VNC username was provided"
+                    .into(),
+            );
+        }
+        let mut head = [0u8; 4];
+        self.read_exact(&mut head)
+            .map_err(|e| authentication_read_error("reading the ARD key parameters", e))?;
+        let generator = u16::from_be_bytes([head[0], head[1]]);
+        let key_len = u16::from_be_bytes([head[2], head[3]]) as usize;
+        if !(ARD_MIN_KEY_BYTES..=ARD_MAX_KEY_BYTES).contains(&key_len) {
+            return Err(format!(
+                "ARD authentication: unsupported Diffie-Hellman key length {key_len} bytes"
+            ));
+        }
+        let mut prime = vec![0u8; key_len];
+        self.read_exact(&mut prime)
+            .map_err(|e| authentication_read_error("reading the ARD prime", e))?;
+        let mut server_public = vec![0u8; key_len];
+        self.read_exact(&mut server_public)
+            .map_err(|e| authentication_read_error("reading the ARD server key", e))?;
+
+        let (credentials, client_public) = ard_response(
+            generator,
+            &prime,
+            &server_public,
+            username,
+            password,
+            &mut OsRng,
+        )?;
+        self.write_all(&credentials)
+            .map_err(|e| format!("ARD authentication: write credentials: {e}"))?;
+        self.write_all(&client_public)
+            .map_err(|e| format!("ARD authentication: write public key: {e}"))?;
+        self.flush().map_err(|e| format!("flush: {}", e))?;
         Ok(())
     }
 
@@ -1747,6 +1806,60 @@ fn ra2_public_key_hash(
     }
 }
 
+/// The ARD reply: `{username[64], password[64]}` (NUL-terminated UTF-8, the
+/// rest random) encrypted with AES-128-ECB under MD5 of the fixed-width DH
+/// shared secret, and the client's public key in the server's key width.
+pub(crate) fn ard_response(
+    generator: u16,
+    prime: &[u8],
+    server_public: &[u8],
+    username: &str,
+    password: &str,
+    rng: &mut impl rsa::rand_core::RngCore,
+) -> Result<([u8; 2 * ARD_FIELD_BYTES], Vec<u8>), String> {
+    use aes::cipher::{Array, BlockCipherEncrypt, KeyInit};
+    use md5::Digest;
+    use rsa::BigUint;
+
+    for (field, value) in [("username", username), ("password", password)] {
+        if value.len() >= ARD_FIELD_BYTES || value.as_bytes().contains(&0) {
+            return Err(format!(
+                "ARD authentication: the {field} must be under {ARD_FIELD_BYTES} bytes without NUL characters"
+            ));
+        }
+    }
+    let key_len = prime.len();
+    let p = BigUint::from_bytes_be(prime);
+    let one = BigUint::from(1u32);
+    let two = BigUint::from(2u32);
+    let server_key = BigUint::from_bytes_be(server_public);
+    if generator < 2 || p <= BigUint::from(3u32) || server_key <= one || server_key >= &p - &one {
+        return Err("ARD authentication: invalid Diffie-Hellman parameters from the server".into());
+    }
+    let mut secret = vec![0u8; key_len];
+    rng.fill_bytes(&mut secret);
+    // Private exponent in [1, p - 2].
+    let private = BigUint::from_bytes_be(&secret) % (&p - &two) + &one;
+    let client_public = BigUint::from(generator).modpow(&private, &p);
+    let shared = server_key.modpow(&private, &p);
+    let client_public = left_pad(&client_public.to_bytes_be(), key_len, "ARD public key")?;
+    let shared = left_pad(&shared.to_bytes_be(), key_len, "ARD shared secret")?;
+    let key = md5::Md5::digest(&shared);
+
+    let mut block = [0u8; 2 * ARD_FIELD_BYTES];
+    rng.fill_bytes(&mut block);
+    for (offset, value) in [(0, username), (ARD_FIELD_BYTES, password)] {
+        block[offset..offset + value.len()].copy_from_slice(value.as_bytes());
+        block[offset + value.len()] = 0;
+    }
+    let cipher = aes::Aes128::new_from_slice(&key)
+        .map_err(|e| format!("ARD authentication: AES key: {e}"))?;
+    for chunk in block.chunks_exact_mut(16) {
+        cipher.encrypt_block(Array::from_mut_slice(chunk));
+    }
+    Ok((block, client_public))
+}
+
 fn biguint_to_fixed_bytes(value: &rsa::BigUint, len: usize) -> Result<Vec<u8>, String> {
     let bytes = value.to_bytes_be();
     left_pad(&bytes, len, "RSA integer")
@@ -1992,6 +2105,217 @@ mod tests {
         );
         assert!(result.unwrap_err().contains("allow-none"));
         server.join().unwrap();
+    }
+
+    /// RFC 2409 Oakley group 2 (1024-bit MODP), the size macOS uses for ARD.
+    const OAKLEY_GROUP_2: &str = "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74\
+        020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F1437\
+        4FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED\
+        EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF";
+
+    /// Deterministic bytes for reproducible tests.
+    struct CountingRng(u8);
+
+    impl rsa::rand_core::RngCore for CountingRng {
+        fn next_u32(&mut self) -> u32 {
+            let mut bytes = [0u8; 4];
+            self.fill_bytes(&mut bytes);
+            u32::from_le_bytes(bytes)
+        }
+        fn next_u64(&mut self) -> u64 {
+            let mut bytes = [0u8; 8];
+            self.fill_bytes(&mut bytes);
+            u64::from_le_bytes(bytes)
+        }
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            for byte in dest {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(17);
+                *byte = self.0;
+            }
+        }
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rsa::rand_core::Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
+    }
+
+    fn hex_bytes(hex: &str) -> Vec<u8> {
+        let hex: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
+        (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    /// The server half of ARD: decrypt the credentials the client sent.
+    fn ard_server_decrypt(
+        prime: &[u8],
+        server_private: &rsa::BigUint,
+        credentials: &[u8],
+        client_public: &[u8],
+    ) -> (String, String) {
+        use aes::cipher::{Array, BlockCipherDecrypt, KeyInit};
+        use md5::Digest;
+
+        let p = rsa::BigUint::from_bytes_be(prime);
+        let shared = rsa::BigUint::from_bytes_be(client_public).modpow(server_private, &p);
+        let shared = left_pad(&shared.to_bytes_be(), prime.len(), "shared").unwrap();
+        let cipher = aes::Aes128::new_from_slice(&md5::Md5::digest(&shared)).unwrap();
+        let mut plain = credentials.to_vec();
+        for chunk in plain.chunks_exact_mut(16) {
+            cipher.decrypt_block(Array::from_mut_slice(chunk));
+        }
+        let field = |range: std::ops::Range<usize>| {
+            let bytes = &plain[range];
+            let end = bytes.iter().position(|b| *b == 0).unwrap();
+            String::from_utf8(bytes[..end].to_vec()).unwrap()
+        };
+        (field(0..64), field(64..128))
+    }
+
+    #[test]
+    fn ard_response_encrypts_credentials_under_the_dh_secret() {
+        let prime = hex_bytes(OAKLEY_GROUP_2);
+        let p = rsa::BigUint::from_bytes_be(&prime);
+        let server_private = rsa::BigUint::from(0x1234_5678_9abc_def1u64);
+        let server_public = rsa::BigUint::from(2u32).modpow(&server_private, &p);
+        let server_public = left_pad(&server_public.to_bytes_be(), 128, "public").unwrap();
+        let (credentials, client_public) = ard_response(
+            2,
+            &prime,
+            &server_public,
+            "runner",
+            "pässwörd",
+            &mut CountingRng(1),
+        )
+        .unwrap();
+        assert_eq!(client_public.len(), 128);
+        assert_eq!(
+            ard_server_decrypt(&prime, &server_private, &credentials, &client_public),
+            ("runner".to_string(), "pässwörd".to_string())
+        );
+        // Fresh randomness gives a different key pair and ciphertext.
+        let (other, other_public) = ard_response(
+            2,
+            &prime,
+            &server_public,
+            "runner",
+            "pässwörd",
+            &mut CountingRng(2),
+        )
+        .unwrap();
+        assert_ne!(other, credentials);
+        assert_ne!(other_public, client_public);
+    }
+
+    #[test]
+    fn ard_response_rejects_bad_parameters_and_long_credentials() {
+        let prime = hex_bytes(OAKLEY_GROUP_2);
+        let mut rng = CountingRng(3);
+        let one = left_pad(&[1], 128, "one").unwrap();
+        assert!(ard_response(2, &prime, &one, "u", "p", &mut rng).is_err());
+        assert!(ard_response(2, &prime, &prime, "u", "p", &mut rng).is_err());
+        let public = left_pad(&[5], 128, "five").unwrap();
+        assert!(ard_response(1, &prime, &public, "u", "p", &mut rng).is_err());
+        let long = "x".repeat(64);
+        assert!(ard_response(2, &prime, &public, &long, "p", &mut rng).is_err());
+        assert!(ard_response(2, &prime, &public, "u", &long, &mut rng).is_err());
+        assert!(ard_response(2, &prime, &public, "u", "p\0q", &mut rng).is_err());
+        assert!(ard_response(2, &prime, &public, &"x".repeat(63), "p", &mut rng).is_ok());
+    }
+
+    /// macOS-style server: RFB 003.889, offers [30, 2], checks ARD credentials.
+    fn start_ard_fixture(expected: (&'static str, &'static str)) -> (u16, thread::JoinHandle<u8>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            stream.write_all(b"RFB 003.889\n").unwrap();
+            let mut client_banner = [0u8; 12];
+            stream.read_exact(&mut client_banner).unwrap();
+            assert_eq!(&client_banner, b"RFB 003.008\n");
+            stream.write_all(&[2, 30, 2]).unwrap();
+            let mut chosen = [0u8; 1];
+            stream.read_exact(&mut chosen).unwrap();
+            if chosen[0] != 30 {
+                return chosen[0];
+            }
+            let prime = hex_bytes(OAKLEY_GROUP_2);
+            let p = rsa::BigUint::from_bytes_be(&prime);
+            let server_private = rsa::BigUint::from(0xfeed_beef_u64);
+            let server_public = rsa::BigUint::from(2u32).modpow(&server_private, &p);
+            let mut parameters = vec![0, 2, 0, 128];
+            parameters.extend_from_slice(&prime);
+            parameters
+                .extend_from_slice(&left_pad(&server_public.to_bytes_be(), 128, "pub").unwrap());
+            stream.write_all(&parameters).unwrap();
+            let mut credentials = [0u8; 128];
+            stream.read_exact(&mut credentials).unwrap();
+            let mut client_public = [0u8; 128];
+            stream.read_exact(&mut client_public).unwrap();
+            let (user, password) =
+                ard_server_decrypt(&prime, &server_private, &credentials, &client_public);
+            if (user.as_str(), password.as_str()) != expected {
+                let reason = b"Authentication failed";
+                stream.write_all(&1u32.to_be_bytes()).unwrap();
+                stream
+                    .write_all(&(reason.len() as u32).to_be_bytes())
+                    .unwrap();
+                stream.write_all(reason).unwrap();
+                return chosen[0];
+            }
+            stream.write_all(&0u32.to_be_bytes()).unwrap();
+            let mut client_init = [0u8; 1];
+            stream.read_exact(&mut client_init).unwrap();
+            write_server_init(&mut stream, 1440, 900, b"Mac mini");
+            chosen[0]
+        });
+        (port, handle)
+    }
+
+    fn connect_ard(
+        port: u16,
+        username: Option<&str>,
+        password: &str,
+    ) -> Result<ServerInit, String> {
+        let stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let mut connection = RfbConnection::from_stream(
+            stream,
+            Duration::from_secs(5),
+            VncSecurityPolicy::PreferEncryption,
+            DecodeLimits::default(),
+        )?;
+        let init = connection.authenticate(username, Some(password))?;
+        assert_eq!(connection.protocol_version(), "3.8");
+        Ok(init)
+    }
+
+    #[test]
+    fn authenticates_mac_screen_sharing_with_ard_when_a_username_is_given() {
+        let (port, server) = start_ard_fixture(("runner", "Qa1-secret"));
+        let init = connect_ard(port, Some("runner"), "Qa1-secret").unwrap();
+        assert_eq!(
+            (init.width, init.height, init.name.as_str()),
+            (1440, 900, "Mac mini")
+        );
+        assert_eq!(server.join().unwrap(), 30);
+
+        let (port, server) = start_ard_fixture(("runner", "Qa1-secret"));
+        let error = connect_ard(port, Some("runner"), "wrong").unwrap_err();
+        assert!(error.contains("authentication failed"), "{error}");
+        assert_eq!(server.join().unwrap(), 30);
+    }
+
+    #[test]
+    fn mac_server_without_a_username_falls_back_to_vncauth() {
+        let (port, server) = start_ard_fixture(("runner", "Qa1-secret"));
+        // The fixture stops after the choice; the client then fails reading
+        // the VNCAuth challenge, which is all this test needs.
+        let _ = connect_ard(port, None, "Qa1-secret");
+        assert_eq!(server.join().unwrap(), 2);
     }
 
     #[test]

@@ -150,6 +150,8 @@ generic-array = "1"
 rsa = "0.9"
 sha2 = "0.11"
 sha1 = "0.11"
+# VNC Apple Remote Desktop authentication (MD5 of the DH secret is the AES key).
+md-5 = "0.11"
 rand = "0.10"
 pbkdf2 = "0.13"
 hex = "0.4"

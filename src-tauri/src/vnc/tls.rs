@@ -18,19 +18,21 @@ pub(crate) struct PreparedRfbTransport {
     pub tls_task: Option<tokio::task::JoinHandle<()>>,
 }
 
+/// `has_username` steers the security choice (ARD needs the macOS account).
 pub(crate) async fn prepare_rfb_transport(
     socket: TcpStream,
     host: &str,
     policy: VncSecurityPolicy,
     timeout: Duration,
     allow_unencrypted: bool,
+    has_username: bool,
 ) -> Result<PreparedRfbTransport, String> {
     socket
         .set_nodelay(true)
         .map_err(|e| format!("configure VNC upstream TCP_NODELAY: {e}"))?;
     tokio::time::timeout(
         timeout,
-        negotiate_outer_security(socket, host, policy, allow_unencrypted),
+        negotiate_outer_security(socket, host, policy, allow_unencrypted, has_username),
     )
     .await
     .map_err(|_| "VNC security negotiation timed out".to_string())?
@@ -38,7 +40,7 @@ pub(crate) async fn prepare_rfb_transport(
 
 /// Security types whose session data travels in the clear.
 fn unencrypted_security_type(sec_type: u8) -> bool {
-    matches!(sec_type, 1 | 2 | 6 | 130)
+    matches!(sec_type, 1 | 2 | 6 | 30 | 130)
 }
 
 const UNENCRYPTED_CONFIRMATION: &str =
@@ -49,6 +51,7 @@ async fn negotiate_outer_security(
     host: &str,
     policy: VncSecurityPolicy,
     allow_unencrypted: bool,
+    has_username: bool,
 ) -> Result<PreparedRfbTransport, String> {
     let mut banner = [0u8; 12];
     socket
@@ -73,7 +76,9 @@ async fn negotiate_outer_security(
         if sec_type > u8::MAX as u32 {
             return Err(format!("unsupported v3.3 security type: {sec_type}"));
         }
-        let chosen = policy.choose_outer(&[sec_type as u8]).map_err(|e| e.0)?;
+        let chosen = policy
+            .choose_outer_with_username(&[sec_type as u8], has_username)
+            .map_err(|e| e.0)?;
         if chosen == SEC_TYPE_ANONYMOUS_TLS {
             return Err("RFB 3.3 anonymous TLS negotiation is not supported".into());
         }
@@ -112,7 +117,9 @@ async fn negotiate_outer_security(
         .read_exact(&mut types)
         .await
         .map_err(|e| format!("read security types: {e}"))?;
-    let chosen = policy.choose_outer(&types).map_err(|e| e.0)?;
+    let chosen = policy
+        .choose_outer_with_username(&types, has_username)
+        .map_err(|e| e.0)?;
     // RealVNC warns before any credential is exchanged; stop here so the
     // viewer can ask (VNC-SESS-003, DEC-VNC-19).
     if !allow_unencrypted && unencrypted_security_type(chosen) {
@@ -299,8 +306,7 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.unwrap();
-            stream.write_all(b"RFB 003.008
-").await.unwrap();
+            stream.write_all(b"RFB 003.008\n").await.unwrap();
             let mut banner = [0u8; 12];
             stream.read_exact(&mut banner).await.unwrap();
             stream.write_all(&[1, 2]).await.unwrap();
@@ -315,6 +321,7 @@ mod tests {
             "127.0.0.1",
             VncSecurityPolicy::PreferEncryption,
             Duration::from_secs(5),
+            false,
             false,
         )
         .await
@@ -361,6 +368,7 @@ mod tests {
             VncSecurityPolicy::LegacyCompatible,
             Duration::from_secs(1),
             true,
+            false,
         )
         .await
         .unwrap();
@@ -419,6 +427,7 @@ mod tests {
             VncSecurityPolicy::PreferEncryption,
             Duration::from_secs(5),
             true,
+            false,
         )
         .await
         .unwrap();
@@ -468,6 +477,7 @@ mod tests {
             VncSecurityPolicy::PreferEncryption,
             Duration::from_secs(45),
             true,
+            false,
         )
         .await
         .unwrap();

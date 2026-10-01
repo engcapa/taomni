@@ -48,6 +48,10 @@ pub enum VncSecurityType {
     /// RFB security type 18. It encrypts the transport but does not
     /// authenticate the server certificate.
     AnonymousTls,
+    /// Apple Remote Desktop (RFB security type 30, macOS Screen Sharing):
+    /// macOS account name and password sent under a Diffie-Hellman AES key;
+    /// the session itself is not encrypted.
+    Ard,
 }
 
 impl VncSecurityType {
@@ -66,6 +70,7 @@ impl VncSecurityType {
             Self::Ra2 => "RA2",
             Self::Ra2ne => "RA2ne",
             Self::AnonymousTls => "TLS (anonymous)",
+            Self::Ard => "ARD (Apple Remote Desktop)",
         }
     }
 }
@@ -74,13 +79,27 @@ impl VncSecurityType {
 pub struct SecurityPolicyError(pub String);
 
 impl VncSecurityPolicy {
+    /// Choose without a session username (see [`Self::choose_with_username`]).
     pub fn choose(self, offered: &[u8]) -> Result<u8, SecurityPolicyError> {
-        // The ordering is deliberate: encrypted RA2, then RA2ne, then VNCAuth.
-        // None is considered only for the explicit allow-none policy.
+        self.choose_with_username(offered, false)
+    }
+
+    pub fn choose_with_username(
+        self,
+        offered: &[u8],
+        has_username: bool,
+    ) -> Result<u8, SecurityPolicyError> {
+        // The ordering is deliberate: encrypted RA2, then RA2ne, then ARD when
+        // a username is known, then VNCAuth. ARD without a username is still
+        // chosen when nothing else fits, so the viewer asks for the macOS
+        // account instead of failing with "no supported type". None is
+        // considered only for the explicit allow-none policy.
         const NONE: u8 = 1;
         const AUTH: u8 = 2;
+        const ARD: u8 = 30;
         const RA2: [u8; 2] = [5, 129];
         const RA2NE: [u8; 2] = [6, 130];
+        let ard = offered.contains(&ARD);
 
         if matches!(self, Self::RequireEncryption) {
             return Err(SecurityPolicyError(
@@ -88,6 +107,9 @@ impl VncSecurityPolicy {
             ));
         }
         if matches!(self, Self::PreferOff) {
+            if ard && has_username {
+                return Ok(ARD);
+            }
             if offered.contains(&AUTH) {
                 return Ok(AUTH);
             }
@@ -101,8 +123,14 @@ impl VncSecurityPolicy {
         if let Some(kind) = RA2NE.iter().find(|kind| offered.contains(kind)) {
             return Ok(*kind);
         }
+        if ard && has_username {
+            return Ok(ARD);
+        }
         if offered.contains(&AUTH) {
             return Ok(AUTH);
+        }
+        if ard {
+            return Ok(ARD);
         }
         if offered.contains(&NONE) && matches!(self, Self::AllowNone) {
             return Ok(NONE);
@@ -119,6 +147,14 @@ impl VncSecurityPolicy {
     /// Choose an outer security type when the caller can upgrade type 18 to
     /// TLS before handing the decrypted stream to the RFB engine.
     pub fn choose_outer(self, offered: &[u8]) -> Result<u8, SecurityPolicyError> {
+        self.choose_outer_with_username(offered, false)
+    }
+
+    pub fn choose_outer_with_username(
+        self,
+        offered: &[u8],
+        has_username: bool,
+    ) -> Result<u8, SecurityPolicyError> {
         const ANONYMOUS_TLS: u8 = 18;
 
         if matches!(self, Self::RequireEncryption) {
@@ -127,15 +163,15 @@ impl VncSecurityPolicy {
             ));
         }
         if matches!(self, Self::PreferOff)
-            && let Ok(kind) = self.choose(offered)
-            && matches!(kind, 2 | 6 | 130)
+            && let Ok(kind) = self.choose_with_username(offered, has_username)
+            && matches!(kind, 2 | 6 | 30 | 130)
         {
             return Ok(kind);
         }
         if offered.contains(&ANONYMOUS_TLS) {
             return Ok(ANONYMOUS_TLS);
         }
-        self.choose(offered)
+        self.choose_with_username(offered, has_username)
     }
 
     pub fn allows_v33_none(self) -> bool {
@@ -150,6 +186,7 @@ pub fn security_type_kind(value: u8) -> Option<VncSecurityType> {
         5 | 129 => Some(VncSecurityType::Ra2),
         6 | 130 => Some(VncSecurityType::Ra2ne),
         18 => Some(VncSecurityType::AnonymousTls),
+        30 => Some(VncSecurityType::Ard),
         _ => None,
     }
 }
@@ -197,6 +234,42 @@ mod tests {
         assert_eq!(VncSecurityPolicy::PreferOff.choose_outer(&[18, 5]), Ok(18));
         assert_eq!(VncSecurityPolicy::PreferOff.choose(&[5, 6]), Ok(6));
         assert!(VncSecurityPolicy::PreferOff.choose(&[1]).is_err());
+    }
+
+    #[test]
+    fn ard_is_chosen_for_mac_servers_by_username() {
+        // macOS Screen Sharing with "VNC viewers may control screen" offers
+        // VNCAuth next to ARD; a username selects the macOS account login.
+        let mac = [30, 33, 36, 35, 2];
+        assert_eq!(
+            VncSecurityPolicy::PreferEncryption.choose_with_username(&mac, true),
+            Ok(30)
+        );
+        assert_eq!(
+            VncSecurityPolicy::PreferEncryption.choose_with_username(&mac, false),
+            Ok(2)
+        );
+        assert_eq!(
+            VncSecurityPolicy::PreferOff.choose_outer_with_username(&mac, true),
+            Ok(30)
+        );
+        // ARD only: still chosen, so the viewer asks for the macOS account.
+        assert_eq!(
+            VncSecurityPolicy::PreferEncryption.choose(&[30, 33]),
+            Ok(30)
+        );
+        // Encrypted RA2 stays ahead of ARD.
+        assert_eq!(
+            VncSecurityPolicy::PreferEncryption.choose_with_username(&[30, 5], true),
+            Ok(5)
+        );
+        assert!(
+            VncSecurityPolicy::RequireEncryption
+                .choose_with_username(&[30], true)
+                .is_err()
+        );
+        assert!(!security_type_kind(30).unwrap().encrypted());
+        assert!(security_type_kind(30).unwrap().authenticated());
     }
 
     #[test]

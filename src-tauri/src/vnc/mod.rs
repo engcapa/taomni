@@ -375,6 +375,9 @@ pub async fn vnc_test_connection(
             policy,
             crate::vnc::ws::VNC_AUTH_TIMEOUT,
             true,
+            username
+                .as_deref()
+                .is_some_and(|name| !name.trim().is_empty()),
         )
         .await
         {
