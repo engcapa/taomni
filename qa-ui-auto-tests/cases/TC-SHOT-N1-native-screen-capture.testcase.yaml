@@ -8,6 +8,9 @@ tags:
 - p1
 modes:
 - native
+native_platforms:
+- Linux
+- Windows
 fixtures:
 - reset_db
 steps:
@@ -19,9 +22,6 @@ steps:
 # runner cannot address; verify the real backend directly. WebDriver waits
 # for the returned promise to resolve; JSON.stringify + contains avoids the
 # audit's ban on assignment and arrow functions in eval_readonly.
-- eval_readonly:
-    expression: 'typeof window.__TAURI_INTERNALS__'
-    contains: 'object'
 - eval_readonly:
     expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_list_displays").then(JSON.stringify)'
     contains: '"width"'

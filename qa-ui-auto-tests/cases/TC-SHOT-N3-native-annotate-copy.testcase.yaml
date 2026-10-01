@@ -8,6 +8,9 @@ tags:
 - p1
 modes:
 - native
+native_platforms:
+- Linux
+- Windows
 fixtures:
 - reset_db
 steps:

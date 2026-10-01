@@ -1,0 +1,25 @@
+id: TC-SHOT-N4
+title: macOS screenshot backend smoke test via UI trigger
+covers:
+- F27.1
+tags:
+- screenshot
+- native
+- p1
+modes:
+- native
+native_platforms:
+- macOS
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+# The JS invoke bridge is not accessible to the runner on macOS; trigger the
+# real Rust backend through the UI button instead. If screenshot_open_overlay
+# is not registered or crashes, an error dialog appears.
+- click: '[data-testid="system-screenshot"]'
+- wait: 3
+# Main window still functional and no error dialog surfaced.
+- assert_visible: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="app-dialog"]'

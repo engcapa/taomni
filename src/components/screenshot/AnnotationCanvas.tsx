@@ -421,9 +421,13 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     const handleMouseDown = (e: ReactMouseEvent) => {
       if (e.button !== 0 || tool === "select") return;
       const p = localPos(e);
-      if (selection && !inRect(p, selection)) {
-        onRequestReselect?.();
-        return;
+      // Point tools (text, number) place at the click point; skip the
+      // selection-boundary check which is meant for drag tools.
+      if (tool !== "text" && tool !== "number") {
+        if (selection && !inRect(p, selection)) {
+          onRequestReselect?.();
+          return;
+        }
       }
       if (tool === "text") {
         setTextAt(p);
