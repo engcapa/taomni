@@ -22908,6 +22908,9 @@ export function CodeWorkspaceTab({
             panelRef={projectPanelRef}
             id="project"
             defaultSize={initialProjectPanelSize}
+            // IDEA tool windows keep their width when the frame resizes, e.g.
+            // when the main sidebar collapses into its rail (ED-PARITY-027).
+            groupResizeBehavior="preserve-pixel-size"
             minSize={0}
             collapsible
             collapsedSize={0}
@@ -22951,6 +22954,7 @@ export function CodeWorkspaceTab({
             panelRef={rightPanelRef}
             id="documentation"
             defaultSize="20%"
+            groupResizeBehavior="preserve-pixel-size"
             minSize="12%"
             maxSize="40%"
             collapsible
