@@ -6,7 +6,10 @@ description: 'Native macOS check for F9.2 against the real Screen Sharing server
   unencrypted-connection warning, connects, and Session Information reports ARD
   and the desktop size the Mac announced. The ARD login of a second account makes
   macOS switch the console to that account, so the app''s own (now background)
-  session stops painting frames; frame pixels are covered by TC-151.
+  session stops painting frames; frame pixels are covered by TC-151. The
+  backgrounded app also answers the WebDriver bridge slowly: on the hosted runner
+  the wait for the connected toolbar plus the next click took 26-50 s and once
+  more than 45 s for the wait alone, so the waits after the login allow 120 s.
 
   '
 covers:
@@ -24,7 +27,7 @@ native_platforms:
 fixtures:
 - reset_db
 - ard_required
-timeout_sec: 150
+timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="session-new"]'
@@ -61,10 +64,12 @@ steps:
 - click: '[data-testid="vnc-unencrypted-continue"]'
 - wait_for:
     selector: '[data-testid="vnc-session-menu"]'
-    timeout_sec: 45
+    timeout_sec: 120
 - click: '[data-testid="vnc-session-menu"]'
 - click: '[data-testid="vnc-menu-info"]'
-- wait_for: '[data-testid="vnc-session-info"]'
+- wait_for:
+    selector: '[data-testid="vnc-session-info"]'
+    timeout_sec: 120
 - assert_text:
     selector: '[data-testid="vnc-session-info"]'
     contains: ARD (Apple Remote Desktop)
