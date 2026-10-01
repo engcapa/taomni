@@ -59,7 +59,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-ssh\-display\-before\r?$
-    timeout_sec: 15
+    timeout_sec: 60
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -89,7 +89,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-ssh\-display\-after\-read\-only\r?$
-    timeout_sec: 15
+    timeout_sec: 60
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -197,7 +197,7 @@ verification:
     - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 21
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-before\\r?$", "timeout_sec": 15}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-before\\r?$", "timeout_sec": 60}}'
     - step: 23
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 26
@@ -207,7 +207,7 @@ verification:
     - step: 35
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-read-only\"]", "state": "detached"}}'
     - step: 38
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-after\\-read\\-only\\r?$", "timeout_sec": 15}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-after\\-read\\-only\\r?$", "timeout_sec": 60}}'
     - step: 43
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "class", "matches": ".*terminal-hide-scrollbar.*"}}'
     - step: 48

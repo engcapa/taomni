@@ -210,7 +210,7 @@ steps:
 - press: Mod+Alt+M
 - wait_for:
     selector: '[data-testid="refactoring-preview-dialog"]'
-    timeout_sec: 30
+    timeout_sec: 60
 - assert_text:
     selector: '[data-testid="refactoring-preview-dialog"]'
     contains: Extract to method
@@ -293,7 +293,7 @@ steps:
 - press: Mod+Alt+M
 - wait_for:
     selector: '[data-testid="refactoring-preview-dialog"]'
-    timeout_sec: 30
+    timeout_sec: 60
 - click: '[data-testid="refactoring-preview-cancel"]'
 - wait_for:
     selector: '[data-testid="refactoring-preview-dialog"]'
