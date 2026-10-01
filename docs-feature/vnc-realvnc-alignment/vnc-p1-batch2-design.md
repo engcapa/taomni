@@ -44,7 +44,7 @@
 <a id="input-003"></a>
 ## 3. VNC-INPUT-003 特殊键直通、键盘布局与输入法
 
-- DEC-VNC-16：Windows 用进程内 `WH_KEYBOARD_LL` 钩子实现 “Pass special keys directly”（RealVNC `SendSpecialKeys=True` 默认）：仅在 VNC 画布持有焦点、本应用窗口在前台且会话选项开启时安装；拦截 Win、Alt+Tab、Alt+Esc、Ctrl+Esc、PrtScn，吞掉本机处理并通过事件交给持有焦点的会话按 keysym 发送；失焦、切标签、关闭连接时卸载。macOS（需要辅助功能权限的 CGEventTap）与 Linux（X11 键盘抓取 / Wayland 不可行）不实现，记录实际去向。
+- DEC-VNC-16：Windows 用 `WH_KEYBOARD_LL` 钩子实现 “Pass special keys directly”（RealVNC `SendSpecialKeys=True` 默认）：仅在 VNC 画布持有焦点、本应用窗口在前台且会话选项开启时生效；拦截 Win、Alt+Tab、Alt+Esc、Ctrl+Esc、PrtScn，吞掉本机处理并通过事件交给持有焦点的会话按 keysym 发送；失焦、切标签、关闭连接时停止。钩子运行在辅助进程（`taomni --vnc-special-key-hook <父进程 pid>`，stdin 收 on/off，stdout 回传按键与调用计数，父进程退出即结束）：2026-10-01 实测，钩子挂在 WebView2 宿主进程（工作线程或主线程）时，只要本应用窗口在前台就收不到任何回调。转发前先补发为 AltGr 检测暂存的 Ctrl，保证 Ctrl+Esc 的顺序。macOS（需要辅助功能权限的 CGEventTap）与 Linux（X11 键盘抓取 / Wayland 不可行）不实现，记录实际去向。
 - DEC-VNC-17：AltGr——Windows 为 AltGr 合成的左 Ctrl（同一时间戳紧跟 AltGraph）不发送，远端只收到 ISO_Level3_Shift 与字符 keysym；死键——不发送 Dead，组合出的字符按 keysym 发送；输入法——画布不是可编辑元素，本机 IME 不参与组合，按键以原始字符发送、由远端输入法组合。三者都以 RealVNC 连 fixture 的实测为对照（补采）。
 - 验收映射：A1 = Windows native（钩子开/关两种状态下 fixture 收到 Super/Tab/Escape/Print）+ macOS/Linux 未验证记录；A2 = 德语布局（仅对被测窗口临时加载 KLID 00000407，测后卸载）下 AltGr+Q、死键 ^+e、中文输入法开启时按键在 RealVNC 与 Taomni 的 fixture 日志对照结论。
 - 测试：`keyboardHook` 纯函数单测（哪些组合被拦截）；`VncPanel` 单测（special-key 事件转 keysym、AltGr 合成 Ctrl 过滤）。
@@ -52,8 +52,8 @@
 <a id="view-002"></a>
 ## 4. VNC-VIEW-002 屏幕级全屏、自动隐藏工具栏与多显示器
 
-- DEC-VNC-18（取代 DEC-VNC-10 的标签页部分）：全屏 = Tauri 窗口 OS 全屏 + VNC 容器以 `position: fixed; inset: 0` 覆盖整个 WebView（不用 Fullscreen API，因此 Esc 与其他按键照常转发到远端，与 RealVNC 一致）；退出通过顶端工具栏、F8 菜单或再次切换。退出时恢复进入前的窗口全屏/最大化状态。独立窗口沿用 OS 全屏，同样启用顶端工具栏。
-- 顶端工具栏（RealVNC 全屏工具栏）：全屏时指针进入顶端 4 px 内滑出，离开 1.5 s 后收起，可钉住；按钮：退出全屏、缩放 100%/自动、Send Ctrl+Alt+Del、会话菜单、结束会话。
+- DEC-VNC-18（取代 DEC-VNC-10 的标签页部分）：全屏 = Tauri 窗口 OS 全屏 + VNC 容器以 `position: fixed; inset: 0` 覆盖整个 WebView（不用 Fullscreen API，因此 Esc 与其他按键照常转发到远端，与 RealVNC 一致）；退出通过顶端工具栏、F8 菜单或再次切换。进入前先退出最大化并关闭窗口缩放：Tauri 无边框窗口的缩放边框子窗口在全屏时仍盖住屏幕顶端（96 DPI 下 4 px），会吃掉工具栏触发区的指针。退出时恢复进入前的窗口全屏/最大化/可缩放状态。独立窗口沿用 OS 全屏，同样启用顶端工具栏。
+- 顶端工具栏（RealVNC 全屏工具栏）：全屏时指针进入顶端 3 个设备像素滑出（RealVNC 第 0–2 行），离开即收起（50 ms 只覆盖从边缘条移到滑入工具栏的间隙），滑动 250 ms，可钉住；按钮：退出全屏、缩放 100%/自动、Send Ctrl+Alt+Del、会话菜单、结束会话。时机对照见 [2026-10-01 fixture 对照 §4](references/realvnc-fixture-comparison-20261001.md#fullscreen-toolbar)。
 - 多显示器：与 RealVNC 默认 `UseAllMonitors=False` 一致，全屏只覆盖窗口所在显示器；跨屏全屏记录为未实现。
 - 验收映射：A1 = native 进入/退出、Esc 转发、F8 打开菜单、焦点回画布（Windows；其他端未验证）；A2 = 工具栏出现/隐藏时机与 RealVNC 参照 §4 对照。
 

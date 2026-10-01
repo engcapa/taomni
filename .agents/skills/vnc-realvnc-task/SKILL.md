@@ -45,11 +45,13 @@ $tb update VNC-PERF-003 --owner <owner> --status done --evidence-file <evidence.
 - 指针延迟：客户端窗口前台且指针在远端画面内时运行 `scripts/vnc_pointer_latency.py --up-log up.log --x <x> --y <y>`（只移动指针，不点击、不按键）。
 - RealVNC Viewer：`C:\software\realvnc-viewer\VNC-Viewer-7.15.1-Windows-64bit.exe`（先核对 Authenticode 与 SHA-256）。命令行 `-PasswordFile=<混淆口令文件> -WarnUnencrypted=0 <host>::<port>` 可免交互连接；口令文件放 `qa-ui-auto-report/` 并在采集后删除。RealVNC 会话在独立子进程中，桌面驱动需按进程/窗口标题定位；图像无法直接查看时依赖 OCR 与像素差分。F8 菜单是第三方服务器下最可靠的功能清单来源；全屏工具栏只在全屏模式出现。
 - 服务器对正确的 VNCAuth 约 25 s 才返回结果，每次实测连接都要预留该时间，尽量合并批次。
+- 系统级输入（`vnc_native.py` / `vnc_realvnc_probe.py` 的 OS 场景）只在借用的交互式 Windows 桌面上跑：扫描码 `SendInput` 带前台守卫，输入只落到被测窗口；测前备份剪贴板与 RealVNC 设置、测后恢复，临时键盘布局测后卸载。
+- 三端托管 CI：用例声明 `vnc_required` 即获得同一个 fixture（qa-ui-auto `vnc` 能力，见 qa-ui-auto SKILL “Local VNC fixture”）；TC-151 在 browser 与 native 两种模式覆盖连接、输入到达与 DesktopSize。
 
 ## 边界
 
 - 一个 agent 一张卡；发现的新差距写入报告交 P0。
-- browser 模式没有 VNC stub，不能证明连接后的 UI；用 jsdom 单测 + native。
+- browser 模式经 dev server VNC bridge（`vite-plugins/vncProxy.ts`：None/VNCAuth、Raw、DesktopSize、剪贴板）连真实 RFB 服务器，只证明面板工作流，不证明原生 relay、编码、系统级输入与系统剪贴板；后者用 jsdom 单测 + native。
 - 不把 RealVNC Server 专属能力算入对齐分母（DEC-VNC-05）。
 - 仅在用户要求时提交：只 stage 本卡文件，提交信息含卡 ID，如 `perf(vnc): VNC-PERF-003 ...`。
 
