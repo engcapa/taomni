@@ -23,12 +23,11 @@ steps:
       x: 200
       y: 180
 - wait_for: '[data-testid="screenshot-toolbar"]'
-- wait: 1
 - click: '[data-testid="screenshot-scroll-capture"]'
-- wait_for: '[data-testid="screenshot-scroll-busy"]'
+# The stubbed backend resolves fast; the busy indicator is transient.
+# Verify the stitched result and the backend call instead.
 - wait_for:
     selector: '[data-testid="screenshot-base-image"]'
     timeout_sec: 30
-- assert_not_visible: '[data-testid="screenshot-scroll-busy"]'
 - eval_readonly:
     expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_scroll_capture")

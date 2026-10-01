@@ -17,5 +17,5 @@ steps:
 # Capture a real screenshot, then route its path through the copy backend.
 # The nested invoke is chained via .then without arrow functions.
 - eval_readonly:
-    expression: 'window.__TAURI__.core.invoke("screenshot_capture_full", {displayId: null}).then(JSON.stringify)'
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_capture_full", {displayId: null}).then(JSON.stringify)'
     contains: '"path"'

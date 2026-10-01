@@ -71,7 +71,7 @@ steps:
 - click: '[data-testid="screenshot-tool-text"]'
 # Let React propagate the tool change to the canvas before clicking.
 - wait: 1
-- click: '[data-testid="screenshot-annotation-canvas"]'
+- click: '[data-testid="screenshot-annotation-layer"]'
 - wait_for: '[data-testid="annotation-text-input"]'
 - fill:
     selector: '[data-testid="annotation-text-input"]'

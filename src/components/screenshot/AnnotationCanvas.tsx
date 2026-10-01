@@ -500,6 +500,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     return (
       <div
         ref={wrapRef}
+        data-testid="screenshot-annotation-layer"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

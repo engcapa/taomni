@@ -18,5 +18,5 @@ steps:
 # Scroll capture drives the OS wheel over the given region and stitches
 # frames; verify the backend resolves with a stitched image file.
 - eval_readonly:
-    expression: 'window.__TAURI__.core.invoke("screenshot_scroll_capture", {displayId: null, x: 0, y: 0, width: 200, height: 200}).then(JSON.stringify)'
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_scroll_capture", {displayId: null, x: 0, y: 0, width: 200, height: 200}).then(JSON.stringify)'
     contains: '"path"'

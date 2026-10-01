@@ -19,11 +19,11 @@ steps:
 # for the returned promise to resolve; JSON.stringify + contains avoids the
 # audit's ban on assignment and arrow functions in eval_readonly.
 - eval_readonly:
-    expression: 'window.__TAURI__.core.invoke("screenshot_list_displays").then(JSON.stringify)'
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_list_displays").then(JSON.stringify)'
     contains: '"width"'
 - eval_readonly:
-    expression: 'window.__TAURI__.core.invoke("screenshot_capture_full", {displayId: null}).then(JSON.stringify)'
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_capture_full", {displayId: null}).then(JSON.stringify)'
     contains: '"path"'
 - eval_readonly:
-    expression: 'window.__TAURI__.core.invoke("screenshot_probe").then(JSON.stringify)'
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_probe").then(JSON.stringify)'
     contains: '"permission"'
