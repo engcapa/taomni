@@ -137,10 +137,10 @@ steps:
     expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] input').value === ''
     expect_truthy: true
 - assert_attribute:
-    selector: '[data-testid="search-everywhere-tab-classes"]'
+    selector: '[data-testid="search-everywhere-tab-files"]'
     name: aria-selected
     equals: 'true'
-- assert_visible: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to class"]'
+- assert_visible: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
 - screenshot: tc-ide-parity-026-01-reopened.png
 - press: Escape
 verification:
@@ -238,7 +238,7 @@ verification:
     - 47
     - 49
   - id: R4
-    requirement: A1：输入查询后 Esc 关闭，再用 Ctrl+N 打开时进入 Classes 页签且查询为空（修复 013-04 macOS 重开保留旧查询）。
+    requirement: A1：输入查询后 Esc 关闭，再用 Ctrl+N 打开时查询为空（无符号提供方时 Go to Class 回落到 Files 页签）（修复 013-04 macOS 重开保留旧查询）。
     actions:
     - 50
     - 52
@@ -253,9 +253,9 @@ verification:
     - step: 56
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] input'').value === ''''", "expect_truthy": true}}'
     - step: 57
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-classes\"]", "name": "aria-selected", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
     - step: 58
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Go to class\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Go to file\"]"}'
     results:
     - 51
     - 53
