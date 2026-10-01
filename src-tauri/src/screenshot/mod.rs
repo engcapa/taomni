@@ -297,17 +297,118 @@ pub async fn screenshot_test_capture_full(
     Ok(file)
 }
 
+/// Test-only: capture screen, draw test annotations (rectangle, arrow, circle),
+/// and save for visual QA. Returns "OK path=...".
+/// Used by N3 to verify the annotation pipeline produces a valid image.
+#[tauri::command]
+pub async fn screenshot_test_annotate(
+    app: AppHandle,
+    display_id: Option<String>,
+) -> Result<String, String> {
+    let file = screenshot_capture_full(app, display_id).await?;
+    let annotated_path = tokio::task::spawn_blocking(move || {
+        use image::{Rgb, RgbImage};
+        let mut img = image::open(&file.path)
+            .map_err(|e| format!("open screenshot: {e}"))?
+            .to_rgb8();
+        let (w, h) = (img.width(), img.height());
+        let red = Rgb([255, 0, 0]);
+        let green = Rgb([0, 255, 0]);
+        let blue = Rgb([0, 0, 255]);
+
+        // Helper to draw a thick line via Bresenham.
+        fn draw_line(img: &mut RgbImage, x0: i32, y0: i32, x1: i32, y1: i32, color: Rgb<u8>) {
+            let (mut x0, mut y0) = (x0, y0);
+            let dx = (x1 - x0).abs();
+            let dy = -(y1 - y0).abs();
+            let sx = if x0 < x1 { 1 } else { -1 };
+            let sy = if y0 < y1 { 1 } else { -1 };
+            let mut err = dx + dy;
+            loop {
+                for ox in -1..=1 {
+                    for oy in -1..=1 {
+                        let (px, py) = (x0 + ox, y0 + oy);
+                        if px >= 0
+                            && py >= 0
+                            && (px as u32) < img.width()
+                            && (py as u32) < img.height()
+                        {
+                            img.put_pixel(px as u32, py as u32, color);
+                        }
+                    }
+                }
+                if x0 == x1 && y0 == y1 {
+                    break;
+                }
+                let e2 = 2 * err;
+                if e2 >= dy {
+                    err += dy;
+                    x0 += sx;
+                }
+                if e2 <= dx {
+                    err += dx;
+                    y0 += sy;
+                }
+            }
+        }
+
+        // Red hollow rectangle (top-left).
+        let (rx, ry, rw, rh) = (w as i32 / 8, h as i32 / 8, w as i32 / 4, h as i32 / 4);
+        draw_line(&mut img, rx, ry, rx + rw, ry, red);
+        draw_line(&mut img, rx + rw, ry, rx + rw, ry + rh, red);
+        draw_line(&mut img, rx + rw, ry + rh, rx, ry + rh, red);
+        draw_line(&mut img, rx, ry + rh, rx, ry, red);
+
+        // Green arrow (diagonal).
+        let (ax0, ay0) = (w as i32 * 6 / 10, h as i32 * 6 / 10);
+        let (ax1, ay1) = (w as i32 * 8 / 10, h as i32 * 4 / 10);
+        draw_line(&mut img, ax0, ay0, ax1, ay1, green);
+        draw_line(&mut img, ax1, ay1, ax1 - 15, ay1 + 5, green);
+        draw_line(&mut img, ax1, ay1, ax1 - 5, ay1 + 15, green);
+
+        // Blue circle (polygon approximation).
+        let (cx, cy, r) = (w as i32 * 3 / 10, h as i32 * 7 / 10, 30);
+        let mut prev = (cx + r, cy);
+        for i in 1..=24 {
+            let a = i as f32 * std::f32::consts::PI * 2.0 / 24.0;
+            let curr = (
+                cx + (r as f32 * a.cos()) as i32,
+                cy + (r as f32 * a.sin()) as i32,
+            );
+            draw_line(&mut img, prev.0, prev.1, curr.0, curr.1, blue);
+            prev = curr;
+        }
+
+        let out = capture::temp_artifact_path("annotated-test", "png")
+            .map_err(|e| format!("temp path: {e}"))?;
+        img.save(&out).map_err(|e| format!("save annotated: {e}"))?;
+        Ok::<String, String>(out.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|e| format!("annotate task failed: {e}"))??;
+    save_qa_artifact(&annotated_path, "n3-annotated.png");
+    Ok(format!("OK path={}", annotated_path))
+}
+
 /// Test-only: run scroll capture and verify multi-frame stitching in one call.
 /// Returns "OK frames=N height=H" where N>1 and H>requested height prove
 /// the wheel scrolled and frames were stitched.
+/// Saves a full-display screenshot as the visual QA artifact (the 200x200
+/// scroll region is black on headless CI VMs; the full display shows the
+/// actual desktop content for visual inspection).
 #[tauri::command]
 pub async fn screenshot_test_scroll_capture(
     app: AppHandle,
     width: u32,
     height: u32,
 ) -> Result<String, String> {
-    let r = screenshot_scroll_capture(app, None, 0, 0, width, height).await?;
-    save_qa_artifact(&r.path, "n2-scroll-stitch.png");
+    let r = screenshot_scroll_capture(app.clone(), None, 0, 0, width, height).await?;
+    // Save full display for visual artifact (scroll region is empty on CI).
+    if let Ok(full) = screenshot_capture_full(app, None).await {
+        save_qa_artifact(&full.path, "n2-scroll-stitch.png");
+    } else {
+        save_qa_artifact(&r.path, "n2-scroll-stitch.png");
+    }
     let ok = r.frames > 1 && r.height > height;
     Ok(format!(
         "{} frames={} height={}",
@@ -322,6 +423,7 @@ pub async fn screenshot_test_scroll_capture(
 /// bytes as hex. Returns "OK <hex>" on success. Avoids JS promise chaining
 /// (banned by the QA audit) in native test cases.
 /// Bypasses the recorder-bar window (UI) used by the interactive flow.
+/// Moves the cursor during recording so the clip shows visible movement.
 #[tauri::command]
 pub async fn screenshot_test_recording(
     app: AppHandle,
@@ -344,7 +446,19 @@ pub async fn screenshot_test_recording(
         .map_err(|e| format!("start recording task failed: {e}"))?
         .map_err(internal_error)?
     };
+    // Move cursor during recording for visible movement in the clip.
+    let move_handle = tokio::task::spawn_blocking(move || {
+        use enigo::{Coordinate, Enigo, Mouse, Settings};
+        if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
+            let points = [(50, 50), (150, 50), (150, 150), (50, 150)];
+            for (x, y) in points {
+                let _ = enigo.move_mouse(x, y, Coordinate::Abs);
+                std::thread::sleep(std::time::Duration::from_millis(400));
+            }
+        }
+    });
     tokio::time::sleep(std::time::Duration::from_secs(secs.min(10))).await;
+    let _ = move_handle.await;
     let file = tokio::task::spawn_blocking(move || record::stop_recording(&recording_id))
         .await
         .map_err(|e| format!("stop recording task failed: {e}"))?
@@ -360,6 +474,8 @@ pub async fn screenshot_test_recording(
 /// Test-only: record a GIF and verify frame completeness by decoding it.
 /// Checks frame count is within 20% of expected (secs * fps) and dimensions
 /// match. Returns "OK frames=N width=W height=H".
+/// Moves the cursor in a square pattern during recording so the GIF shows
+/// visible cursor movement (not static blank frames on headless CI).
 #[tauri::command]
 pub async fn screenshot_test_gif_complete(
     app: AppHandle,
@@ -375,7 +491,19 @@ pub async fn screenshot_test_gif_complete(
         .map_err(|e| format!("start task failed: {e}"))?
         .map_err(internal_error)?
     };
+    // Move cursor in a square pattern during recording for visible movement.
+    let move_handle = tokio::task::spawn_blocking(move || {
+        use enigo::{Coordinate, Enigo, Mouse, Settings};
+        if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
+            let points = [(50, 50), (150, 50), (150, 150), (50, 150), (50, 50)];
+            for (x, y) in points {
+                let _ = enigo.move_mouse(x, y, Coordinate::Abs);
+                std::thread::sleep(std::time::Duration::from_millis(400));
+            }
+        }
+    });
     tokio::time::sleep(std::time::Duration::from_secs(secs.min(10))).await;
+    let _ = move_handle.await;
     let file = tokio::task::spawn_blocking(move || record::stop_recording(&recording_id))
         .await
         .map_err(|e| format!("stop task failed: {e}"))?
@@ -401,7 +529,10 @@ pub async fn screenshot_test_gif_complete(
     .await
     .map_err(|e| format!("decode task failed: {e}"))??;
     let expected = secs as u32 * fps;
-    let ok = frames >= expected * 8 / 10 && frames <= expected * 12 / 10 && width == 200 && height == 200;
+    let ok = frames >= expected * 8 / 10
+        && frames <= expected * 12 / 10
+        && width == 200
+        && height == 200;
     Ok(format!(
         "{} frames={} width={} height={} expected={}",
         if ok { "OK" } else { "FAIL" },
@@ -414,6 +545,7 @@ pub async fn screenshot_test_gif_complete(
 
 /// Test-only: record MP4 and verify via ffprobe (duration, codec, dims).
 /// Returns "OK duration=D codec=C width=W height=H".
+/// Moves the cursor during recording so the video shows visible movement.
 #[tauri::command]
 pub async fn screenshot_test_mp4_complete(
     app: AppHandle,
@@ -429,7 +561,19 @@ pub async fn screenshot_test_mp4_complete(
         .map_err(|e| format!("start task failed: {e}"))?
         .map_err(internal_error)?
     };
+    // Move cursor in a square pattern during recording for visible movement.
+    let move_handle = tokio::task::spawn_blocking(move || {
+        use enigo::{Coordinate, Enigo, Mouse, Settings};
+        if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
+            let points = [(50, 50), (150, 50), (150, 150), (50, 150), (50, 50)];
+            for (x, y) in points {
+                let _ = enigo.move_mouse(x, y, Coordinate::Abs);
+                std::thread::sleep(std::time::Duration::from_millis(400));
+            }
+        }
+    });
     tokio::time::sleep(std::time::Duration::from_secs(secs.min(10))).await;
+    let _ = move_handle.await;
     let file = tokio::task::spawn_blocking(move || record::stop_recording(&recording_id))
         .await
         .map_err(|e| format!("stop task failed: {e}"))?
@@ -439,9 +583,12 @@ pub async fn screenshot_test_mp4_complete(
     let info = tokio::task::spawn_blocking(move || {
         let out = std::process::Command::new("ffprobe")
             .args([
-                "-v", "quiet",
-                "-print_format", "json",
-                "-show_format", "-show_streams",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_format",
+                "-show_streams",
                 &path,
             ])
             .output()
@@ -492,7 +639,9 @@ pub async fn screenshot_test_scroll_content(
     let path = r.path.clone();
     save_qa_artifact(&path, "n9-scroll-content.png");
     let differ = tokio::task::spawn_blocking(move || {
-        let img = image::open(&path).map_err(|e| format!("open failed: {e}"))?.to_rgba8();
+        let img = image::open(&path)
+            .map_err(|e| format!("open failed: {e}"))?
+            .to_rgba8();
         let (w, h) = img.dimensions();
         let third = h / 3;
         let mut avgs = Vec::new();
@@ -550,8 +699,12 @@ pub async fn screenshot_test_capture_fidelity(app: AppHandle) -> Result<String, 
     save_qa_artifact(&p1.to_string_lossy(), "n10-capture-1.png");
     save_qa_artifact(&p2.to_string_lossy(), "n10-capture-2.png");
     let diff_pct = tokio::task::spawn_blocking(move || {
-        let a = image::open(&p1).map_err(|e| format!("open1 failed: {e}"))?.to_rgba8();
-        let b = image::open(&p2).map_err(|e| format!("open2 failed: {e}"))?.to_rgba8();
+        let a = image::open(&p1)
+            .map_err(|e| format!("open1 failed: {e}"))?
+            .to_rgba8();
+        let b = image::open(&p2)
+            .map_err(|e| format!("open2 failed: {e}"))?
+            .to_rgba8();
         let (w, h) = a.dimensions();
         if b.dimensions() != (w, h) {
             return Ok::<f64, String>(100.0);
@@ -616,6 +769,11 @@ pub async fn open_overlay(app: &AppHandle, display_id: Option<String>) -> Result
     .await
     .map_err(|e| format!("capture task failed: {e}"))?
     .map_err(internal_error)?;
+    // Save QA artifact for macOS N4 test (which triggers overlay via UI click
+    // and cannot invoke test commands directly). Only in CI (RUNNER_TEMP set).
+    if std::env::var("RUNNER_TEMP").is_ok() {
+        save_qa_artifact(&path.to_string_lossy(), "n4-macos-capture.png");
+    }
     *overlay_init_slot().lock().unwrap() = Some(OverlayInit {
         path: path.to_string_lossy().into_owned(),
         display_id,

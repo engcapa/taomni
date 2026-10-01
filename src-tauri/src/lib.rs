@@ -30,13 +30,14 @@ pub mod perf;
 mod proxy;
 mod qa_driver;
 mod rdp;
-mod sdk;
 mod screenshot;
+mod sdk;
 mod serial;
 mod servers;
 pub mod session;
 pub mod sockscap;
 mod state;
+mod structural_search;
 mod tab;
 pub mod terminal;
 mod test_results;
@@ -50,7 +51,6 @@ mod workspace;
 mod workspace_execution;
 mod workspace_fs;
 mod workspace_search;
-mod structural_search;
 pub mod workspace_tooling;
 mod wsl;
 
@@ -139,7 +139,9 @@ async fn exit_app(app_handle: AppHandle, state: State<'_, AppState>) -> Result<(
 /// shortcut as the fallback.
 #[cfg(desktop)]
 fn register_screenshot_global_shortcut(app: &AppHandle) {
-    use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+    use tauri_plugin_global_shortcut::{
+        Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
+    };
 
     #[cfg(target_os = "macos")]
     let modifiers = Modifiers::SUPER | Modifiers::SHIFT;
@@ -147,16 +149,19 @@ fn register_screenshot_global_shortcut(app: &AppHandle) {
     let modifiers = Modifiers::CONTROL | Modifiers::SHIFT;
     let shortcut = Shortcut::new(Some(modifiers), Code::KeyA);
 
-    if let Err(e) = app.global_shortcut().on_shortcut(shortcut, |app_handle, _shortcut, event| {
-        if event.state == ShortcutState::Pressed {
-            let app = app_handle.clone();
-            tauri::async_runtime::spawn(async move {
-                if let Err(e) = crate::screenshot::open_overlay(&app, None).await {
-                    log::warn!("global screenshot shortcut failed: {e}");
-                }
-            });
-        }
-    }) {
+    if let Err(e) = app
+        .global_shortcut()
+        .on_shortcut(shortcut, |app_handle, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                let app = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = crate::screenshot::open_overlay(&app, None).await {
+                        log::warn!("global screenshot shortcut failed: {e}");
+                    }
+                });
+            }
+        })
+    {
         log::warn!("could not register global screenshot shortcut (Ctrl+Shift+A): {e}");
     }
 }
@@ -1097,6 +1102,7 @@ pub fn run() {
             screenshot::screenshot_test_scroll_content,
             screenshot::screenshot_test_capture_fidelity,
             screenshot::screenshot_test_capture_full,
+            screenshot::screenshot_test_annotate,
             screenshot::screenshot_open_overlay,
             screenshot::screenshot_overlay_init,
             screenshot::screenshot_close_overlay,

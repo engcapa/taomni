@@ -23,3 +23,7 @@ steps:
 - eval_readonly:
     expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_capture_full", {displayId: null}).then(JSON.stringify)'
     contains: '"path"'
+# Draw test annotations (rectangle, arrow, circle) and save for visual QA.
+- eval_readonly:
+    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_annotate", {displayId: null}).then(JSON.stringify)'
+    contains: 'OK path='
