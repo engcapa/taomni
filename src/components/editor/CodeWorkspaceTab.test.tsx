@@ -7002,6 +7002,45 @@ describe("CodeWorkspaceTab", () => {
     expect(document.activeElement).toBe(otherRow);
   });
 
+  it("ED-TREEOPEN-001 / DEC-TOF-04: a WebView focus reset after the menu unmounts still returns the tree row", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-ctx-esc-reset",
+      workspaceInstanceId: "instance-ctx-esc-reset",
+      name: "Context Escape Reset",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "README.md" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([
+      entry("README.md", "README.md"),
+      entry("other.txt", "other.txt"),
+    ]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("README.md", "# Readme\n"));
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / README.md");
+
+    const otherRow = (await screen.findAllByTestId("code-workspace-tree-file")).find((r) => r.dataset.path === "other.txt")!;
+    fireEvent.contextMenu(otherRow);
+
+    expect(await screen.findByRole("button", { name: "Open" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+    });
+
+    // WebView2 drops DOM focus to the body when the focused menu node leaves
+    // the document, after the restore that ran before the unmount commit.
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(otherRow);
+    });
+  });
+
   it("ED-TREEOPEN-001 / DEC-TOF-04: context menu Open opens file and grants focus to editor", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

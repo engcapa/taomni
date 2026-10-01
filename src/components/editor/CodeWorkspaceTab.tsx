@@ -4331,18 +4331,34 @@ export function CodeWorkspaceTab({
     if (!session || session.consumed) {
       return;
     }
-    if (reason === "escape") {
+    if (reason !== "escape") return;
+    // ED-TREEOPEN-001 / DEC-TOF-04: Esc gives focus back to the tree row the
+    // menu acted on. The menu owns focus while it is mounted; a WebView that
+    // resets focus to the document body when that focused node leaves the DOM
+    // (WebView2 does, WebKitGTK keeps the new owner) would drop the restore
+    // that ran before the unmount commit. Claim the row again after the commit
+    // and after the next paint; each retry runs only while no other surface
+    // owns focus, so a popup opened by the close keeps it.
+    const claimTreeFocus = (own: boolean) => {
       const pane = treePaneRef.current;
-      if (pane) {
-        const item = pane.querySelector<HTMLElement>("[role='treeitem'][data-selected='true']");
-        if (item) {
-          item.focus({ preventScroll: true });
-        } else {
-          const tree = pane.querySelector<HTMLElement>("[data-testid='code-workspace-tree']");
-          tree?.focus({ preventScroll: true });
-        }
-      }
-    }
+      if (!pane) return;
+      const active = document.activeElement;
+      const menuOwnsFocus = active instanceof HTMLElement
+        && !!active.closest("[data-taomni-context-menu]");
+      const focusLost = !(active instanceof HTMLElement)
+        || active === document.body
+        || active === document.documentElement
+        || !active.isConnected;
+      // The closing menu hands the row back unconditionally; the retries only
+      // fill a focus vacuum so they never steal from another surface.
+      if (!own && !menuOwnsFocus && !focusLost) return;
+      const target = pane.querySelector<HTMLElement>("[role='treeitem'][data-selected='true']")
+        ?? pane.querySelector<HTMLElement>("[data-testid='code-workspace-tree']");
+      target?.focus({ preventScroll: true });
+    };
+    claimTreeFocus(true);
+    if (typeof queueMicrotask === "function") queueMicrotask(() => claimTreeFocus(false));
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => claimTreeFocus(false));
   }, []);
 
   const {
