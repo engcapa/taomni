@@ -1,10 +1,12 @@
 id: TC-152
-title: VNC session logs in to macOS Screen Sharing with ARD and shows the remote desktop
+title: VNC session logs in to macOS Screen Sharing with ARD and reports it in Session Information
 description: 'Native macOS check for F9.2 against the real Screen Sharing server of the
   runner (ard_required): a saved VNC session with the macOS account name uses Apple
   Remote Desktop authentication (RFB security type 30), passes the per-attempt
-  unencrypted-connection warning, paints the remote desktop and reports ARD in
-  Session Information.
+  unencrypted-connection warning, connects, and Session Information reports ARD
+  and the desktop size the Mac announced. The ARD login of a second account makes
+  macOS switch the console to that account, so the app''s own (now background)
+  session stops painting frames; frame pixels are covered by TC-151.
 
   '
 covers:
@@ -58,7 +60,7 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="vnc-unencrypted-continue"]'
 - wait_for:
-    selector: '[data-testid="vnc-canvas"][width]:not([width="300"])'
+    selector: '[data-testid="vnc-session-menu"]'
     timeout_sec: 45
 - click: '[data-testid="vnc-session-menu"]'
 - click: '[data-testid="vnc-menu-info"]'
@@ -66,12 +68,15 @@ steps:
 - assert_text:
     selector: '[data-testid="vnc-session-info"]'
     contains: ARD (Apple Remote Desktop)
+- assert_pattern:
+    selector: '[data-testid="vnc-session-info"]'
+    regex: '[1-9][0-9]* x [1-9][0-9]*'
 - screenshot: 152-vnc-macos-ard.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A VNC session with the macOS account name logs in to Screen Sharing with ARD after the unencrypted-connection confirmation and paints the remote desktop.
+    requirement: A VNC session with the macOS account name logs in to Screen Sharing with ARD after the unencrypted-connection confirmation and connects.
     actions:
     - 1
     - 2
@@ -99,12 +104,12 @@ verification:
     - step: 18
       expectation: Screen Sharing is reached and the connection stops for the unencrypted-connection warning.
     - step: 20
-      expectation: The frame painter sizes the canvas to the Mac's framebuffer when the first frame arrives.
+      expectation: The ARD login succeeds and the in-session toolbar of a connected session appears.
     results:
     - 18
     - 20
   - id: R2
-    requirement: Session Information names the ARD security method.
+    requirement: Session Information names the ARD security method and the desktop size from the Mac's ServerInit.
     actions:
     - 21
     - 22
@@ -113,14 +118,17 @@ verification:
       expectation: The Session Information dialog opens.
     - step: 24
       expectation: The security row reads ARD (Apple Remote Desktop).
+    - step: 25
+      expectation: The size row shows the width and height the Mac announced.
     results:
     - 23
     - 24
+    - 25
   visual:
-  - check: The macOS desktop is visible in the session without overlays or clipping.
+  - check: The Session Information dialog is readable over the session without clipping.
     method: manual
-    reason: Pixel content of the real Mac desktop is judged from the screenshot.
+    reason: Layout of the dialog over a real session is judged from the screenshot.
   native:
-  - check: Runs only on the hosted macOS runner (Screen Sharing on the same Mac, console account with a disposable password); Windows and Linux have no ARD server.
+  - check: Runs only on the hosted macOS runner (Screen Sharing on the same Mac, disposable admin account); Windows and Linux have no ARD server.
     method: automated
     reason: Proves the Rust ARD client against Apple's server; keyboard layouts and pointer input on macOS are not part of this case.
