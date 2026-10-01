@@ -1,6 +1,6 @@
 # VNC RealVNC 对齐能力矩阵
 
-本矩阵只描述本批次 16 个工作包和追加的 AUTH-001，不计算总体完成百分比，也不记录开发状态（状态以 [backlog](backlog.md) 为准）。“基线” 列来自 2026-09-30 实测（HEAD `383aa4f2`），“本批次后” 列只写有证据的结论；RealVNC 列来自[实机参照](references/realvnc-live-audit-20260930.md)与 [2026-10-01 同 fixture 对照](references/realvnc-fixture-comparison-20261001.md)（RealVNC 7.0.0，第二台 Windows 主机）。
+本矩阵只描述本批次 16 个工作包、追加的 AUTH-001 和 VMware 实测后追加的 AUTH-002 / PERF-006 / CONN-002，不计算总体完成百分比，也不记录开发状态（状态以 [backlog](backlog.md) 为准）。“基线” 列来自 2026-09-30 实测（HEAD `383aa4f2`），“本批次后” 列只写有证据的结论；RealVNC 列来自[实机参照](references/realvnc-live-audit-20260930.md)与 [2026-10-01 同 fixture 对照](references/realvnc-fixture-comparison-20261001.md)（RealVNC 7.0.0，第二台 Windows 主机）。
 
 | 卡 | 功能 | 交互 | 鼠标/键盘 | 性能 | 基线 | 本批次后 |
 |---|---|---|---|---|---|---|
@@ -20,6 +20,9 @@
 | CONN-001 连接属性 | 部分已有 | 确认差异 | — | — | different | 会话内 Properties：画质、菜单键、view-only 等持久化并按需重连生效（native fixture）；独立窗口 detach 只有单测 |
 | CLIP-001 剪贴板策略 | 已有 | 确认差异：连接即推送、750 ms 轮询 | — | 轮询开销未测 | different | 四个时机行为与 RealVNC same：连接不推送、指针进入与焦点返回发送本地变化、远端剪贴板写入本机且不回送；无轮询；以按键发送剪贴板。时延 different：三次运行指针进入 15–35 ms / 焦点返回 14–23 ms（RealVNC 4–9 / 3–10 ms，WebView 事件按刷新投递）；ExtendedClipboard 中文与 HTML 双向通过（RealVNC 只用 legacy） |
 | AUTH-001 macOS ARD（追加） | 缺失（无安全类型 30） | — | — | — | different | ARD 登录（DH + AES-128）、有用户名时优先、未加密警告、会话信息显示 ARD；GitHub macOS runner 真实屏幕共享 TC-152 通过；不在 RealVNC 分母内 |
+| AUTH-002 凭据按需询问（追加） | 确认缺陷：没保存密码时连接前必弹密码框、不能空提交 | 同左 | — | — | different | 没保存密码的会话与 `vnc://` 快速连接直接连接；服务器选定 VNCAuth / RA2 / ARD 而没有密码时不回应挑战、以 `credentials-required` 打开会话内表单（同 RealVNC 只在需要时询问），重连沿用已确认的未加密警告；VMware None 不输入任何内容 1.66 s 连上，TC-151 fixture 与 TC-152 屏幕共享经会话内表单登录 |
+| PERF-006 首选编码被忽略（追加） | — | — | — | 确认缺陷：只看第一项的服务器上 High/Automatic 拿到 Raw（整帧 7.44 MB） | different | 大块 Raw 回应首选编码时依次改用 Tight（JPEG 质量 9）、Hextile；VMware 上首帧后为 Tight，整帧约 1.26 MB，各档切换不断线；RealVNC 同服务器未对照 |
+| CONN-002 会话编辑器翻译（追加） | 确认缺陷：VNC 安全策略等选项写死英文 | — | — | — | same | 会话编辑器 VNC 区全部经语言包，中英文单测覆盖 |
 | QA-001 三端收口 | 未执行 | 未执行 | 未执行 | 未执行 | unverified | 各行的 RealVNC 对比都追溯到 09-30 实机参照或 10-01 同 fixture 对照；Windows native 组合回归通过；托管 CI 上 TC-151 三端 browser + native、TC-153 三端 native 通过，TC-152 在 macOS runner 上 ARD 登录通过；macOS/Linux 的系统级输入、剪贴板、全屏与绘制成本 unverified（见下节） |
 
 RealVNC 专属或第三方服务器上不可用的能力（音频、录制、文件传输、聊天、云、SSO）不在分母内（DEC-VNC-05）。
@@ -32,5 +35,5 @@ RealVNC 专属或第三方服务器上不可用的能力（音频、录制、文
 | macOS（WKWebView，hosted macos-15） | TC-151（连接、点击、按键、Ctrl+Alt+Del、DesktopSize）browser + native；TC-153 native（F8 菜单、画质 Low 的 Tight/JPEG 请求与之后的绘制、Send F8）；TC-152 真实屏幕共享 ARD 登录 | 系统级指针/键盘、剪贴板、全屏、绘制成本：在 Mac 上用平台输入 API 跑 `vnc_native.py` 对应场景；原生光标采样只在 Windows |
 | Linux（WebKitGTK，hosted ubuntu-24.04） | TC-151 browser + native；TC-153 native | 同上；WebKitGTK 绘制成本与 X11 系统级输入 |
 
-托管运行（`qa-ui-auto-platforms.yml`，`scope=selected`）：36823635412（`0c7746b9`，TC-151 六组合 + TC-152）、36828540657（`37b83c09`，TC-151 六组合 + TC-153 三端 native；TC-152 这次在登录后的等待超时，见 [ARD 设计 §7](vnc-ard-macos-design.md#7-证据)）、36830413420 与 36830421897（`a209dfa6`，macOS native 的 TC-151/152/153 两次都全部通过）。服务器侧覆盖一台第三方 RFB 3.7 服务器、合成 fixture、macOS 屏幕共享与 VMware Workstation 内置 VNC 服务器。
+托管运行（`qa-ui-auto-platforms.yml`，`scope=selected`）：36823635412（`0c7746b9`，TC-151 六组合 + TC-152）、36828540657（`37b83c09`，TC-151 六组合 + TC-153 三端 native；TC-152 这次在登录后的等待超时，见 [ARD 设计 §7](vnc-ard-macos-design.md#7-证据)）、36830413420 与 36830421897（`a209dfa6`，macOS native 的 TC-151/152/153 两次都全部通过）、36841431236（`9b1f4198`，凭据按需询问后 TC-107/TC-151 三端 browser、TC-151/TC-153 三端 native、TC-152 全部通过）、36851171876（`77aab1c4`，画质回退修正后 TC-151/TC-153 三端 native、TC-152 通过）。服务器侧覆盖一台第三方 RFB 3.7 服务器、合成 fixture、macOS 屏幕共享与 VMware Workstation 内置 VNC 服务器。
 
