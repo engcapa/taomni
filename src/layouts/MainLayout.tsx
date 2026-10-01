@@ -4155,11 +4155,15 @@ export function MainLayout() {
             maxSize="40%"
             collapsible
             collapsedSize={0}
-            onResize={(size: PanelSize) => {
+            onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
               const percentage = size.asPercentage;
               if (percentage > 2) {
                 lastSidebarSizeRef.current = percentage;
               }
+              // The first report is the restored layout, which may carry another
+              // tab group's collapsed sidebar (ED-PARITY-027); the store's state
+              // wins and the sync effect resizes the panel to it.
+              if (!prevSize) return;
               setSidebarCollapsed(percentage <= 2);
             }}
           >

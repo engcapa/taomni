@@ -10,7 +10,10 @@
  *   buttons into the rail instead of a second stripe of its own.
  *
  * Both are per-viewer preferences kept in browser storage; failures fall back
- * to the defaults.
+ * to the defaults. The "other" state is the legacy `taomni.sidebarCollapsed`
+ * key and nothing else: only a manual change made in that group writes it, so
+ * quitting while a terminal or Code Workspace tab has collapsed the sidebar
+ * does not start the next launch (Welcome) collapsed.
  */
 
 import type { TabKind } from "../types";
@@ -49,6 +52,7 @@ export function defaultSidebarCollapsedByGroup(otherCollapsed: boolean): Sidebar
   return { "code-workspace": true, terminal: true, other: otherCollapsed };
 }
 
+/** `otherCollapsed` is the legacy key; a stored "other" entry is ignored. */
 export function readSidebarCollapsedByGroup(otherCollapsed: boolean): SidebarCollapsedByGroup {
   const defaults = defaultSidebarCollapsedByGroup(otherCollapsed);
   try {
@@ -56,15 +60,19 @@ export function readSidebarCollapsedByGroup(otherCollapsed: boolean): SidebarCol
     if (!raw) return defaults;
     const parsed = JSON.parse(raw) as Partial<Record<SidebarRailGroup, unknown>>;
     const pick = (group: SidebarRailGroup) => (typeof parsed[group] === "boolean" ? parsed[group] as boolean : defaults[group]);
-    return { "code-workspace": pick("code-workspace"), terminal: pick("terminal"), other: pick("other") };
+    return { "code-workspace": pick("code-workspace"), terminal: pick("terminal"), other: otherCollapsed };
   } catch {
     return defaults;
   }
 }
 
+/** Stores the tool-window groups only; "other" lives in the legacy key. */
 export function writeSidebarCollapsedByGroup(value: SidebarCollapsedByGroup): void {
   try {
-    window.localStorage.setItem(SIDEBAR_COLLAPSED_BY_GROUP_KEY, JSON.stringify(value));
+    window.localStorage.setItem(
+      SIDEBAR_COLLAPSED_BY_GROUP_KEY,
+      JSON.stringify({ "code-workspace": value["code-workspace"], terminal: value.terminal }),
+    );
   } catch {
     // Storage unavailable: the session keeps the in-memory map.
   }

@@ -91,11 +91,22 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@tauri-apps/api/event", () => import("../stubs/tauri-event"));
 
+type MockPanelSize = { asPercentage: number; inPixels: number };
+const panelResizeMock = vi.hoisted(() => ({
+  handlers: new Map<string, (size: MockPanelSize, id: string | undefined, prev: MockPanelSize | undefined) => void>(),
+}));
+
 vi.mock("react-resizable-panels", () => {
   const Group = ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div className={className} data-testid="panel-group">{children}</div>
   );
-  const Panel = forwardRef<unknown, { children: React.ReactNode; panelRef?: React.Ref<unknown> }>(({ children, panelRef }, ref) => {
+  const Panel = forwardRef<unknown, {
+    children: React.ReactNode;
+    panelRef?: React.Ref<unknown>;
+    id?: string;
+    onResize?: (size: MockPanelSize, id: string | undefined, prev: MockPanelSize | undefined) => void;
+  }>(({ children, panelRef, id, onResize }, ref) => {
+    if (id && onResize) panelResizeMock.handlers.set(id, onResize);
     const handle = {
       collapse: vi.fn(),
       resize: vi.fn(),
@@ -1836,6 +1847,22 @@ describe("MainLayout ED-PARITY-027 single tool window bar", () => {
     await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
     act(() => useAppStore.getState().setActiveTab("welcome"));
     await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
+  });
+
+  it("keeps the store's state over a restored collapsed layout and syncs later drags", async () => {
+    render(<MainLayout />);
+    const onResize = panelResizeMock.handlers.get("sidebar");
+    expect(onResize).toBeDefined();
+    // First report = the restored layout of a session that quit in a terminal.
+    act(() => onResize?.({ asPercentage: 0, inPixels: 0 }, "sidebar", undefined));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(false);
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBeNull();
+    // A later report is a drag on the divider: a manual change for Welcome.
+    act(() => onResize?.({ asPercentage: 0, inPixels: 0 }, "sidebar", { asPercentage: 22, inPixels: 220 }));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(true);
+    expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("true");
   });
 
   it("remembers a manual expand for terminal tabs only", async () => {

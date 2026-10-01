@@ -889,18 +889,24 @@ function terminalAutoTitleBase(tab: Tab, cwdPrefix: string): string {
 
 /**
  * ED-PARITY-027 A: a manual sidebar change is remembered for the active tab's
- * group, so returning to that kind of tab restores it.
+ * group, so returning to that kind of tab restores it. With the merged rail the
+ * legacy key keeps only the "other" group's state, which is what a new launch
+ * (Welcome) starts from.
  */
 function rememberSidebarForActiveGroup(
   s: Pick<AppState, "mergeToolWindowRail" | "sidebarCollapsedByGroup" | "tabs" | "activeTabId">,
   collapsed: boolean,
 ): Partial<Pick<AppState, "sidebarCollapsedByGroup">> {
-  if (!s.mergeToolWindowRail) return {};
+  if (!s.mergeToolWindowRail) {
+    writeSidebarCollapsed(collapsed);
+    return {};
+  }
   const active = s.tabs.find((tab) => tab.id === s.activeTabId);
   const group = sidebarRailGroup(active?.type);
+  if (group === "other") writeSidebarCollapsed(collapsed);
   if (s.sidebarCollapsedByGroup[group] === collapsed) return {};
   const sidebarCollapsedByGroup = { ...s.sidebarCollapsedByGroup, [group]: collapsed };
-  writeSidebarCollapsedByGroup(sidebarCollapsedByGroup);
+  if (group !== "other") writeSidebarCollapsedByGroup(sidebarCollapsedByGroup);
   return { sidebarCollapsedByGroup };
 }
 
@@ -1231,15 +1237,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleSidebar: () =>
     set((s) => {
       const sidebarCollapsed = !s.sidebarCollapsed;
-      writeSidebarCollapsed(sidebarCollapsed);
       return { sidebarCollapsed, ...rememberSidebarForActiveGroup(s, sidebarCollapsed) };
     }),
   setSidebarCollapsed: (collapsed) => {
-    writeSidebarCollapsed(collapsed);
     set((s) => ({ sidebarCollapsed: collapsed, ...rememberSidebarForActiveGroup(s, collapsed) }));
   },
   setActiveSideTab: (tab) => {
-    writeSidebarCollapsed(false);
     set((s) => ({ activeSideTab: tab, sidebarCollapsed: false, ...rememberSidebarForActiveGroup(s, false) }));
   },
   setMergeToolWindowRail: (value) => {
@@ -1252,7 +1255,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const active = s.tabs.find((tab) => tab.id === s.activeTabId);
     const collapsed = s.sidebarCollapsedByGroup[sidebarRailGroup(active?.type)];
     if (collapsed === s.sidebarCollapsed) return;
-    writeSidebarCollapsed(collapsed);
+    // Applying a group's state is not a manual change: the legacy key keeps
+    // the "other" group's state for the next launch.
     set({ sidebarCollapsed: collapsed });
   },
 
