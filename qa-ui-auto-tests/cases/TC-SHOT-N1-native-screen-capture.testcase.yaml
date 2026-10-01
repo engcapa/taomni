@@ -20,6 +20,9 @@ steps:
 # for the returned promise to resolve; JSON.stringify + contains avoids the
 # audit's ban on assignment and arrow functions in eval_readonly.
 - eval_readonly:
+    expression: 'typeof window.__TAURI_INTERNALS__'
+    contains: 'object'
+- eval_readonly:
     expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_list_displays").then(JSON.stringify)'
     contains: '"width"'
 - eval_readonly:

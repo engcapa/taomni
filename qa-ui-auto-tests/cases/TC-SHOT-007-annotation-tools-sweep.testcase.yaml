@@ -79,8 +79,8 @@ steps:
       x: 120
       y: 220
     to_position:
-      x: 121
-      y: 221
+      x: 150
+      y: 250
 - wait_for: '[data-testid="annotation-text-input"]'
 - fill:
     selector: '[data-testid="annotation-text-input"]'
