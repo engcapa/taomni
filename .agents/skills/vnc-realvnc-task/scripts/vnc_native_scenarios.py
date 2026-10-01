@@ -366,7 +366,9 @@ def scenario_clipboard_keys(app: App, args) -> None:
 
 def scenario_ext_clipboard(app: App, args) -> None:
     """VNC-CLIP-001-A2: ExtendedClipboard with Chinese text both ways."""
-    text = "中文剪贴板 ✓"
+    # Unique per run: a clipboard that already holds the text when the session
+    # connects is the baseline, which is correctly not sent again.
+    text = f"中文剪贴板 ✓ {time.strftime('%H%M%S')}"
     app.session.install_console_hook()
     # The QA window must be in front, or the cursor re-enters whatever covers it.
     app.focus_canvas()
