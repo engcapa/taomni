@@ -1,0 +1,122 @@
+{
+  "generator": "generate.mjs",
+  "fixtures": [
+    {
+      "file": "hotp-qa-bank.png",
+      "text": "otpauth://hotp/QA%20Bank:qa.hotp%40example.com?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=QA%20Bank&counter=0",
+      "accounts": [
+        {
+          "issuer": "QA Bank",
+          "account": "qa.hotp@example.com",
+          "kind": "hotp",
+          "secret": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
+          "codes": [
+            "755224",
+            "287082",
+            "359152"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "hotp-qa-paste.png",
+      "text": "otpauth://hotp/QA%20Paste:paste%40example.com?secret=OFQS24DBON2GKLLTMVRXEZLUFUYDAMBR&issuer=QA%20Paste&counter=0",
+      "accounts": [
+        {
+          "issuer": "QA Paste",
+          "account": "paste@example.com",
+          "kind": "hotp",
+          "secret": "OFQS24DBON2GKLLTMVRXEZLUFUYDAMBR",
+          "codes": [
+            "295272",
+            "313866",
+            "301553"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "not-otp.png",
+      "text": "https://example.com/qa-not-an-otp",
+      "accounts": []
+    },
+    {
+      "file": "migration-two.png",
+      "text": "otpauth-migration://offline?data=CjkKFHFhLW1pZ3JhdGlvbi1tYWlsLTAxEhBtYWlsQGV4YW1wbGUuY29tGgdRQSBNYWlsIAEoATACOAAKNwoUcWEtbWlncmF0aW9uLWdpdC0wMDESD2RldkBleGFtcGxlLmNvbRoGUUEgR2l0IAEoATABOAAQARgBIAAokiE%3D",
+      "accounts": [
+        {
+          "issuer": "QA Mail",
+          "account": "mail@example.com",
+          "kind": "totp",
+          "secret": "OFQS23LJM5ZGC5DJN5XC23LBNFWC2MBR"
+        },
+        {
+          "issuer": "QA Git",
+          "account": "dev@example.com",
+          "kind": "hotp",
+          "secret": "OFQS23LJM5ZGC5DJN5XC2Z3JOQWTAMBR",
+          "codes": [
+            "691157",
+            "179395",
+            "745628"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "migration-four.png",
+      "text": "otpauth-migration://offline?data=CjsKFHFhLXNvcnQtemV0YS1zZWNyZXQxEg9hbXlAZXhhbXBsZS5jb20aClpldGEgQ2xvdWQgASgBMAE4AAo7ChRxYS1zb3J0LWFscGhhLXNlY3JldBIPem9lQGV4YW1wbGUuY29tGgpBbHBoYSBNYWlsIAEoATABOAAKOQoUcWEtc29ydC1taWQtc2VjcmV0MDESD2tpbUBleGFtcGxlLmNvbRoITWlkIEJhbmsgASgBMAE4AAo5ChRxYS1zb3J0LWJldGEtc2VjcmV0MRIPZGFuQGV4YW1wbGUuY29tGghCZXRhIEdpdCABKAEwATgAEAEYASAAKJIh",
+      "accounts": [
+        {
+          "issuer": "Zeta Cloud",
+          "account": "amy@example.com",
+          "kind": "hotp",
+          "secret": "OFQS243POJ2C26TFORQS243FMNZGK5BR",
+          "codes": [
+            "630196",
+            "359356",
+            "470892"
+          ]
+        },
+        {
+          "issuer": "Alpha Mail",
+          "account": "zoe@example.com",
+          "kind": "hotp",
+          "secret": "OFQS243POJ2C2YLMOBUGCLLTMVRXEZLU",
+          "codes": [
+            "436092",
+            "562008",
+            "012994"
+          ]
+        },
+        {
+          "issuer": "Mid Bank",
+          "account": "kim@example.com",
+          "kind": "hotp",
+          "secret": "OFQS243POJ2C23LJMQWXGZLDOJSXIMBR",
+          "codes": [
+            "885398",
+            "511014",
+            "325868"
+          ]
+        },
+        {
+          "issuer": "Beta Git",
+          "account": "dan@example.com",
+          "kind": "hotp",
+          "secret": "OFQS243POJ2C2YTFORQS243FMNZGK5BR",
+          "codes": [
+            "187073",
+            "812996",
+            "885208"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "no-qr.png",
+      "text": null,
+      "accounts": []
+    }
+  ]
+}

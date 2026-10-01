@@ -1,0 +1,73 @@
+id: TC-MFA-103
+title: A native backup archive contains mfa.db together with the vault that holds its key
+description: >-
+  V-21 (AC-15). Isolated native profile. After an MFA account exists, Settings
+  → Backup & Restore → Backup Now creates a core backup in the profile's backup
+  directory. Inspecting it from the history list (the real archive reader)
+  lists databases/mfa.db and databases/vault.db; the restore is cancelled so
+  nothing is staged.
+covers: [F-MFA-3]
+tags: [mfa, backup, native-boundary, p1]
+modes: [native]
+fixtures: [reset_db]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill: {selector: '[data-testid="vault-setup-pw1"]', value: qa-mfa-native-103}
+- fill: {selector: '[data-testid="vault-setup-pw2"]', value: qa-mfa-native-103}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: {selector: '[data-testid="mfa-empty"]', timeout_sec: 30}
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill: {selector: '[data-testid="mfa-add-issuer"]', value: QA Backup}
+- fill: {selector: '[data-testid="mfa-add-secret"]', value: JBSWY3DPEHPK3PXP}
+- click: '[data-testid="mfa-add-submit"]'
+- wait_for: '[data-testid="mfa-account-row"][data-issuer="QA Backup"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-create-now"]'
+- click: '[data-testid="backup-create-now"]'
+- wait_for: {selector: '[data-testid="backup-action-success"]', timeout_sec: 90}
+- wait_for: {selector: '[data-testid="backup-history-row"]', timeout_sec: 30}
+- click: '[data-testid="backup-history-restore"]'
+- wait_for: {selector: '[data-testid="backup-restore-files"]', timeout_sec: 60}
+- assert_text: {selector: '[data-testid="backup-restore-files"]', contains: databases/mfa.db}
+- assert_text: {selector: '[data-testid="backup-restore-files"]', contains: databases/vault.db}
+- click: '[data-testid="backup-restore-cancel"]'
+- assert_not_visible: '[data-testid="backup-restore-files"]'
+- screenshot: mfa-103-backup-history.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A core backup taken after MFA use contains mfa.db and vault.db, as read back from the archive (AC-15).
+    actions: [3, 5, 7, 8, 9, 11, 13, 14, 15, 17, 19, 21, 24]
+    checkpoints:
+    - {step: 16, expectation: MFA account stored}
+    - {step: 20, expectation: backup panel open}
+    - {step: 22, expectation: backup created}
+    - {step: 23, expectation: archive listed in history}
+    - {step: 25, expectation: archive inspected}
+    - {step: 26, expectation: databases/mfa.db included}
+    - {step: 27, expectation: databases/vault.db included}
+    results: [26, 27]
+  - id: R2
+    requirement: Cancelling the restore closes the confirmation without staging (AC-15).
+    actions: [28]
+    checkpoints:
+    - {step: 29, expectation: restore confirmation closed}
+    results: [29]
+  visual:
+  - check: Backup history and restore confirmation are legible.
+    method: manual
+    reason: Screenshot needs human review.
+  native:
+  - check: Applying a restore and restarting into the restored mfa.db is covered by Rust backup tests (V-06/V-07), not by this UI case.
+    method: external
+    reason: A real restore restarts the app, which the WebDriver session cannot follow.

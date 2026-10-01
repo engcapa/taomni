@@ -65,6 +65,22 @@ class NativeStepContext:
         self._clipboard_owner_text: str | None = None
         self._host_clipboard_before: str | None = None
         self._host_clipboard_captured = False
+        # MFA fixtures: xclip serving an image/png CLIPBOARD and the Tk window
+        # showing a QR code for the screen scan, keyed by helper role.
+        self._mfa_helpers: dict[str, subprocess.Popen[str]] = {}
+
+    def stop_mfa_helper(self, role: str) -> bool:
+        proc = self._mfa_helpers.pop(role, None)
+        if proc is None:
+            return False
+        with suppress(OSError, subprocess.TimeoutExpired):
+            proc.kill()
+            proc.wait(timeout=5)
+        for stream in (proc.stdout, proc.stderr):
+            with suppress(Exception):
+                if stream is not None:
+                    stream.close()
+        return True
 
     def restore_host_permissions(self) -> None:
         """Best-effort rollback for report-scoped fault injection.
@@ -79,6 +95,8 @@ class NativeStepContext:
             except OSError:
                 pass
         self._permission_restores.clear()
+        for role in list(self._mfa_helpers):
+            self.stop_mfa_helper(role)
         self._release_clipboard_owner()
         self._restore_host_clipboard()
 
@@ -2840,6 +2858,126 @@ def _do_mail_server_assert_list_matches(ctx: NativeStepContext, args: Any) -> st
     raise StepError(
         f"mail_server_assert_list_matches: server={server} unread={server_unread} ui={observed!r}"
     )
+
+
+# -- MFA authenticator fixtures (docs-feature/mfa-authenticator-design.md) ----
+
+@_verb("assert_totp_code")
+def _do_assert_totp_code(ctx: NativeStepContext, args: Any) -> str:
+    from .mfa_support import assert_totp_code
+
+    return assert_totp_code(lambda expression: ctx.session.execute(f"return ({expression});"), args)
+
+
+def _mfa_helper_line(proc: subprocess.Popen[str], timeout: float) -> str:
+    """First stdout line of a helper, or "" if it exits or stays silent (pipes cannot select() on Windows)."""
+    import threading
+
+    lines: list[str] = []
+    reader = threading.Thread(target=lambda: lines.append(proc.stdout.readline() if proc.stdout else ""), daemon=True)
+    reader.start()
+    reader.join(timeout)
+    return lines[0] if lines else ""
+
+
+# Topmost Tk window showing the fixture image, so a real screen capture of the
+# desktop (with Taomni hidden) contains a QR code. Prints its geometry once mapped.
+_MFA_IMAGE_WINDOW_SOURCE = r'''
+import sys
+import tkinter as tk
+
+path, x, y = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+root = tk.Tk()
+root.title("Taomni QA MFA QR")
+root.configure(background="white")
+image = tk.PhotoImage(file=path)
+tk.Label(root, image=image, background="white", borderwidth=0).pack(padx=24, pady=24)
+root.geometry(f"+{x}+{y}")
+root.attributes("-topmost", True)
+
+def ready():
+    root.update_idletasks()
+    print("WINDOW-READY", root.winfo_rootx(), root.winfo_rooty(), root.winfo_width(), root.winfo_height(), flush=True)
+
+root.after(300, ready)
+root.mainloop()
+'''
+
+
+@_verb("native_show_image_window")
+def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
+    from .mfa_support import png_fixture
+
+    args = args if isinstance(args, dict) else {"path": args}
+    if args.get("action", "show") == "close":
+        return "image window closed" if ctx.stop_mfa_helper("image-window") else "no image window was open"
+    if platform.system() not in {"Linux", "Windows"} or (platform.system() == "Linux" and not os.environ.get("DISPLAY")):
+        raise StepError("native_show_image_window: requires a Linux X11 display or a Windows desktop")
+    target, data = png_fixture(args.get("path"), "native_show_image_window")
+    ctx.stop_mfa_helper("image-window")
+    proc = subprocess.Popen(
+        [sys.executable, "-c", _MFA_IMAGE_WINDOW_SOURCE, str(target), str(int(args.get("x", 40))), str(int(args.get("y", 40)))],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    ctx._mfa_helpers["image-window"] = proc
+    line = _mfa_helper_line(proc, timeout=20)
+    if not line.startswith("WINDOW-READY"):
+        exited = proc.poll() is not None
+        err = ""
+        if exited and proc.stderr is not None:
+            with suppress(Exception):
+                err = proc.stderr.read().strip()
+        ctx.stop_mfa_helper("image-window")
+        detail = line.strip() or err or (f"exit {proc.returncode}" if exited else "no ready signal within 20s")
+        raise StepError(f"native_show_image_window: window did not appear: {detail}")
+    x, y, width, height = (int(v) for v in line.split()[1:5])
+    observation = {"path": str(target), "sha256": hashlib.sha256(data).hexdigest(), "pid": proc.pid,
+                   "geometry": {"x": x, "y": y, "width": width, "height": height}, "platform": platform.system()}
+    (ctx.case_dir / "native-image-window.json").write_text(json.dumps(observation, indent=1), encoding="utf-8")
+    return f"image window mapped at {x},{y} {width}x{height}"
+
+
+@_verb("native_clipboard_image")
+def _do_native_clipboard_image(ctx: NativeStepContext, args: Any) -> str:
+    """Make an external xclip process own the X11 CLIPBOARD as image/png.
+
+    The app must then read the image through its own OS clipboard path
+    (arboard); a separate TARGETS read proves the selection really changed.
+    """
+    import shutil
+
+    from .mfa_support import png_fixture
+
+    target, data = png_fixture(args.get("path") if isinstance(args, dict) else args, "native_clipboard_image")
+    if platform.system() != "Linux" or not os.environ.get("DISPLAY"):
+        raise StepError("native_clipboard_image: requires a Linux X11 display")
+    xclip = shutil.which("xclip")
+    if xclip is None:
+        raise StepError("native_clipboard_image: xclip is not installed")
+    ctx.stop_mfa_helper("clipboard-image")
+    proc = subprocess.Popen(
+        [xclip, "-quiet", "-selection", "clipboard", "-t", "image/png", "-i", str(target)],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True,
+    )
+    ctx._mfa_helpers["clipboard-image"] = proc
+    targets = ""
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            raise StepError(f"native_clipboard_image: xclip exited with {proc.returncode}")
+        with suppress(subprocess.TimeoutExpired):
+            targets = subprocess.run([xclip, "-selection", "clipboard", "-t", "TARGETS", "-o"],
+                                     capture_output=True, text=True, timeout=5, check=False).stdout
+        if "image/png" in targets.split():
+            break
+        time.sleep(0.2)
+    else:
+        raise StepError(f"native_clipboard_image: CLIPBOARD never advertised image/png (targets {targets.split()})")
+    observation = {"path": str(target), "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data),
+                   "owner": "xclip", "pid": proc.pid, "targets": targets.split(),
+                   "display": os.environ.get("DISPLAY"), "hostSelectionReplaced": True}
+    (ctx.case_dir / "native-clipboard-image.json").write_text(json.dumps(observation, indent=1), encoding="utf-8")
+    return f"X11 CLIPBOARD owns image/png from {target.name}"
 
 
 def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:

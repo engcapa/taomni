@@ -157,6 +157,15 @@ describe("buildAppMenuSpec", () => {
     expect(toolActions).not.toContain("macros");
   });
 
+  it("opens the MFA authenticator from Tools, next to the other tool tabs", () => {
+    const tools = submenu(buildAppMenuSpec(baseParams), "tools");
+    const toolActions = actions(tools.items);
+    expect(toolActions).toContain("mfa");
+    expect(toolActions.indexOf("mfa")).toBe(toolActions.indexOf("lan-chat") + 1);
+    const item = tools.items.find((node) => node.type === "item" && node.id === "mfa");
+    expect(item).toMatchObject({ label: "menu.mfa", action: "mfa" });
+  });
+
   it("adds active Code Workspace commands as a dynamic Tools submenu", () => {
     const spec = buildAppMenuSpec({
       ...baseParams,

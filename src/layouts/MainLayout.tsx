@@ -55,6 +55,7 @@ import { CallOverlay } from "../components/lanchat/CallOverlay";
 import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";
 import { TunnelManager } from "../components/tunnel/TunnelManager";
 import { SocksCapPanel } from "../components/sockscap/SocksCapPanel";
+import { MfaTab } from "../components/mfa/MfaTab";
 import { FileBrowser, type SftpPendingUploadRequest } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
@@ -3531,6 +3532,21 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
+  /** MFA authenticator: one tab per window (docs-feature/mfa-authenticator-design.md). */
+  const openMfaTab = useCallback(() => {
+    const existing = tabsRef.current.find((tab) => tab.type === "mfa");
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    addTab({
+      id: "mfa",
+      type: "mfa",
+      title: t("tabs.mfa"),
+      closable: true,
+    });
+  }, [addTab, setActiveTab]);
+
   /** Unified mail across every saved mail account (TASK-16, DEC-12). */
   const openUnifiedMailTab = useCallback(() => {
     const existing = tabsRef.current.find((tab) => tab.type === "mail-unified");
@@ -3702,6 +3718,9 @@ export function MainLayout() {
       case "mail-unified":
         openUnifiedMailTab();
         break;
+      case "mfa":
+        openMfaTab();
+        break;
       case "help":
         setShowAbout(true);
         break;
@@ -3719,6 +3738,7 @@ export function MainLayout() {
     openPlaceholderTab,
     openSettingsTab,
     openLanChatTab,
+    openMfaTab,
     removeTab,
     requestAppExit,
     setActiveTab,
@@ -4871,6 +4891,8 @@ export function MainLayout() {
                   />
                 )}
 
+                {activeTab?.type === "mfa" && <MfaTab onStatusMessage={setStatusMessage} />}
+
                 {activeTab?.type === "proxy-test" && activeTab.proxyTest && (
                   <Suspense fallback={null}>
                     <ProxyTestTab info={activeTab.proxyTest} />
@@ -4895,6 +4917,7 @@ export function MainLayout() {
                   activeTab.type !== "nettools" &&
                   activeTab.type !== "sockscap" &&
                   activeTab.type !== "lan-chat" &&
+                  activeTab.type !== "mfa" &&
                   activeTab.type !== "proxy-test" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />
                 )}

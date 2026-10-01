@@ -19,6 +19,16 @@ pub const ERR_VAULT_EMPTY: &str = "VAULT_EMPTY";
 pub const ERR_VAULT_BAD_PASSWORD: &str = "VAULT_BAD_PASSWORD";
 pub const ERR_VAULT_PASSWORD_REQUIRED: &str = "VAULT_PASSWORD_REQUIRED";
 pub const ERR_VAULT_NOT_FOUND: &str = "VAULT_NOT_FOUND";
+pub const ERR_VAULT_ENTRY_PROTECTED: &str = "VAULT_ENTRY_PROTECTED";
+
+/// Fixed entry holding the data key that seals `mfa.db` secrets. Deleting it
+/// would make every stored MFA account permanently undecryptable.
+pub const MFA_DATA_KEY_ENTRY_ID: &str = "mfa.data-key-v1";
+
+/// Entries other stores depend on; the entry manager must not delete them.
+pub fn is_protected_entry(id: &str) -> bool {
+    id == MFA_DATA_KEY_ENTRY_ID
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -612,6 +622,9 @@ pub async fn vault_update(
 
 #[tauri::command]
 pub async fn vault_delete(id: String, state: State<'_, AppState>) -> Result<(), String> {
+    if is_protected_entry(&id) {
+        return Err(ERR_VAULT_ENTRY_PROTECTED.to_string());
+    }
     state.vault.delete(&id)
 }
 
