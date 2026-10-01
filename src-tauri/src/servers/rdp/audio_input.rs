@@ -406,7 +406,7 @@ impl DvcServerFactory for MicFactory {
     all(any(target_os = "windows", target_os = "macos"), feature = "rdp-server-audio"),
     test
 ))]
-const AUTO_DEVICES: [&str; 3] = ["CABLE Input", "BlackHole", "Background Music"];
+const AUTO_DEVICES: [&str; 4] = ["CABLE Input", "VB-Audio", "BlackHole", "Background Music"];
 
 #[cfg(all(any(target_os = "windows", target_os = "macos"), feature = "rdp-server-audio"))]
 mod platform {
@@ -416,11 +416,20 @@ mod platform {
 
     use super::{AUTO_DEVICES, ReadySender, Ring, StopReceiver};
 
+    /// "Endpoint (device)": WASAPI names only the endpoint ("Speakers");
+    /// the driver field carries the device ("VB-Audio Virtual Cable").
     fn name(device: &cpal::Device) -> String {
-        device
-            .description()
-            .map(|d| d.name().to_string())
-            .unwrap_or_default()
+        let Ok(description) = device.description() else {
+            return String::new();
+        };
+        let name = description.name().to_string();
+        match description
+            .driver()
+            .filter(|driver| !driver.is_empty() && !name.contains(driver))
+        {
+            Some(driver) => format!("{name} ({driver})"),
+            None => name,
+        }
     }
 
     fn find(wanted: Option<&str>) -> Result<cpal::Device, String> {

@@ -128,9 +128,12 @@ def get_text() -> str:
 
 def set_html(fragment: str, plain: str) -> None:
     if SYSTEM == "Windows":
+        # CF_HTML is UTF-8. A .NET string would be stored in the ANSI code
+        # page by Windows PowerShell's .NET Framework, so hand it the bytes.
         payload = json.dumps({"html": _cf_html(fragment), "text": plain})
         _ps("$p = $arg | ConvertFrom-Json; $d = New-Object System.Windows.Forms.DataObject;"
-            "$d.SetData('HTML Format', $p.html); $d.SetText($p.text);"
+            "$bytes = [Text.Encoding]::UTF8.GetBytes($p.html + [char]0);"
+            "$d.SetData('HTML Format', (New-Object System.IO.MemoryStream(,$bytes))); $d.SetText($p.text);"
             "[System.Windows.Forms.Clipboard]::SetDataObject($d, $true)", payload)
     elif SYSTEM == "Darwin":
         payload = json.dumps({"html": fragment, "text": plain})
@@ -142,12 +145,40 @@ def set_html(fragment: str, plain: str) -> None:
         _xclip_set("text/html", fragment.encode("utf-8"))
 
 
+_WIN32_CLIPBOARD = r"""
+Add-Type -Namespace QaClip -Name Native -MemberDefinition @'
+[DllImport("user32.dll", SetLastError = true)] public static extern bool OpenClipboard(IntPtr owner);
+[DllImport("user32.dll")] public static extern bool CloseClipboard();
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern uint RegisterClipboardFormat(string name);
+[DllImport("user32.dll")] public static extern IntPtr GetClipboardData(uint format);
+[DllImport("kernel32.dll")] public static extern IntPtr GlobalLock(IntPtr handle);
+[DllImport("kernel32.dll")] public static extern bool GlobalUnlock(IntPtr handle);
+[DllImport("kernel32.dll")] public static extern UIntPtr GlobalSize(IntPtr handle);
+'@
+"""
+
+
 def get_html() -> str:
     if SYSTEM == "Windows":
-        raw = _ps("[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
-                  "$d=[System.Windows.Forms.Clipboard]::GetData('HTML Format');"
-                  "if ($d -is [System.IO.Stream]) { $r = New-Object System.IO.StreamReader($d); $d = $r.ReadToEnd() };"
-                  "[Console]::Out.Write($d)")
+        # Read the CF_HTML bytes and decode them as UTF-8 ourselves: .NET
+        # Framework decodes another application's "HTML Format" with the ANSI
+        # code page, which garbles every non-ASCII character.
+        raw = _ps(_WIN32_CLIPBOARD +
+                  "[Console]::OutputEncoding=[Text.Encoding]::UTF8;"
+                  "$format = [QaClip.Native]::RegisterClipboardFormat('HTML Format');"
+                  "$open = $false; for ($i = 0; $i -lt 40 -and -not $open; $i++) {"
+                  " $open = [QaClip.Native]::OpenClipboard([IntPtr]::Zero);"
+                  " if (-not $open) { Start-Sleep -Milliseconds 50 } };"
+                  "if (-not $open) { throw 'clipboard is busy' };"
+                  "try { $h = [QaClip.Native]::GetClipboardData($format);"
+                  " if ($h -ne [IntPtr]::Zero) {"
+                  "  $ptr = [QaClip.Native]::GlobalLock($h);"
+                  "  $size = [int][QaClip.Native]::GlobalSize($h).ToUInt64();"
+                  "  $bytes = New-Object byte[] $size;"
+                  "  [Runtime.InteropServices.Marshal]::Copy($ptr, $bytes, 0, $size);"
+                  "  [void][QaClip.Native]::GlobalUnlock($h);"
+                  "  [Console]::Out.Write([Text.Encoding]::UTF8.GetString($bytes).TrimEnd([char]0)) } }"
+                  " finally { [void][QaClip.Native]::CloseClipboard() }")
         start = raw.find("<!--StartFragment-->")
         end = raw.find("<!--EndFragment-->")
         return raw[start + len("<!--StartFragment-->"):end] if start >= 0 and end > start else raw

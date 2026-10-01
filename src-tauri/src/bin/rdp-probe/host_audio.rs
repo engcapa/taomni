@@ -13,11 +13,20 @@ mod imp {
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     use serde_json::{Value, json};
 
+    /// "Endpoint (device)": WASAPI names only the endpoint ("Speakers");
+    /// the driver field carries the device ("VB-Audio Virtual Cable").
     fn device_name(device: &cpal::Device) -> String {
-        device
-            .description()
-            .map(|d| d.name().to_string())
-            .unwrap_or_else(|_| "<unnamed>".to_string())
+        let Ok(description) = device.description() else {
+            return "<unnamed>".to_string();
+        };
+        let name = description.name().to_string();
+        match description
+            .driver()
+            .filter(|driver| !driver.is_empty() && !name.contains(driver))
+        {
+            Some(driver) => format!("{name} ({driver})"),
+            None => name,
+        }
     }
 
     fn pick(output: bool, contains: Option<&str>) -> Result<cpal::Device, String> {
@@ -209,7 +218,7 @@ pub(crate) fn play(freq: f64, seconds: f64, device: Option<&str>) -> Result<Valu
 /// Capture side of the virtual cables the RDP server's microphone plays into
 /// on Windows (VB-CABLE) and macOS (BlackHole, Background Music).
 #[cfg_attr(not(feature = "rdp-server-audio"), allow(dead_code))]
-const MIC_CAPTURE_DEVICES: [&str; 3] = ["CABLE Output", "BlackHole", "Background Music"];
+const MIC_CAPTURE_DEVICES: [&str; 4] = ["CABLE Output", "VB-Audio", "BlackHole", "Background Music"];
 /// `node.name` of the RDP server's PipeWire microphone source on Linux.
 #[cfg(target_os = "linux")]
 const MIC_NODE: &str = "taomni-rdp-microphone";

@@ -7,6 +7,7 @@
 
 use std::ptr::{NonNull, null_mut};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use dispatch2::DispatchQueue;
 use objc2::rc::Retained;
@@ -56,6 +57,9 @@ struct AudioOutputIvars {
     sink: WaveSink,
     out_rate: u32,
     out_channels: u16,
+    /// Audio sample buffers received / not convertible, for the stop note.
+    buffers: AtomicU64,
+    rejected: AtomicU64,
 }
 
 define_class!(
@@ -75,11 +79,25 @@ define_class!(
             if output_type != SCStreamOutputType::Audio {
                 return;
             }
-            let Some((samples, rate, channels)) = (unsafe { interleaved_f32(sample_buffer) })
-            else {
-                return;
-            };
             let ivars = self.ivars();
+            let index = ivars.buffers.fetch_add(1, Ordering::Relaxed);
+            let (samples, rate, channels) = match unsafe { interleaved_f32(sample_buffer) } {
+                Ok(converted) => converted,
+                Err(reason) => {
+                    if ivars.rejected.fetch_add(1, Ordering::Relaxed) == 0 {
+                        ivars
+                            .sink
+                            .note(format!("RDP audio: unusable ScreenCaptureKit audio buffer: {reason}"));
+                    }
+                    return;
+                }
+            };
+            if index == 0 {
+                ivars.sink.note(format!(
+                    "RDP audio: first ScreenCaptureKit audio buffer: {rate} Hz, {channels} channel(s), {} frame(s)",
+                    samples.len() / usize::from(channels.max(1))
+                ));
+            }
             let Ok(mut state) = ivars.pump.lock() else {
                 return;
             };
@@ -117,18 +135,25 @@ impl AudioOutput {
             sink,
             out_rate,
             out_channels,
+            buffers: AtomicU64::new(0),
+            rejected: AtomicU64::new(0),
         });
         unsafe { msg_send![super(this), init] }
     }
 }
 
 /// Copy one audio sample (32-bit float PCM, usually planar) into interleaved
-/// frames. `None` for any other format or an unreadable buffer.
-unsafe fn interleaved_f32(sample: &CMSampleBuffer) -> Option<(Vec<f32>, u32, u16)> {
-    let description = unsafe { sample.format_description() }?;
-    let asbd = unsafe { CMAudioFormatDescriptionGetStreamBasicDescription(&description).as_ref() }?;
+/// frames; the error says why a buffer is unusable.
+unsafe fn interleaved_f32(sample: &CMSampleBuffer) -> Result<(Vec<f32>, u32, u16), String> {
+    let description =
+        unsafe { sample.format_description() }.ok_or("no format description")?;
+    let asbd = unsafe { CMAudioFormatDescriptionGetStreamBasicDescription(&description).as_ref() }
+        .ok_or("not an audio format description")?;
     if asbd.mFormatFlags & kAudioFormatFlagIsFloat == 0 || asbd.mBitsPerChannel != 32 {
-        return None;
+        return Err(format!(
+            "unsupported PCM (flags 0x{:x}, {} bits)",
+            asbd.mFormatFlags, asbd.mBitsPerChannel
+        ));
     }
     let empty = AudioBuffer {
         mNumberChannels: 0,
@@ -154,7 +179,7 @@ unsafe fn interleaved_f32(sample: &CMSampleBuffer) -> Option<(Vec<f32>, u32, u16
     // The retained block buffer owns the memory the list points into.
     let _block = NonNull::new(block).map(|block| unsafe { CFRetained::from_raw(block) });
     if status != 0 {
-        return None;
+        return Err(format!("audio buffer list unavailable (OSStatus {status})"));
     }
     let count = (list.number_buffers as usize).min(MAX_BUFFERS);
     let planes: Vec<&[f32]> = list.buffers[..count]
@@ -174,15 +199,22 @@ unsafe fn interleaved_f32(sample: &CMSampleBuffer) -> Option<(Vec<f32>, u32, u16
         .collect();
     let rate = asbd.mSampleRate as u32;
     if asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved != 0 {
-        let frames = planes.iter().map(|plane| plane.len()).min()?;
+        let frames = planes
+            .iter()
+            .map(|plane| plane.len())
+            .min()
+            .ok_or("no audio buffers")?;
         let mut out = Vec::with_capacity(frames * planes.len());
         for frame in 0..frames {
             out.extend(planes.iter().map(|plane| plane[frame]));
         }
-        Some((out, rate, u16::try_from(planes.len()).ok()?))
+        let channels = u16::try_from(planes.len()).map_err(|_| "too many channels")?;
+        Ok((out, rate, channels))
     } else {
-        let channels = u16::try_from(asbd.mChannelsPerFrame).ok()?;
-        Some((planes.first()?.to_vec(), rate, channels))
+        let channels =
+            u16::try_from(asbd.mChannelsPerFrame).map_err(|_| "too many channels")?;
+        let samples = planes.first().ok_or("no audio buffers")?.to_vec();
+        Ok((samples, rate, channels))
     }
 }
 
@@ -243,14 +275,60 @@ fn start(rate: u32, channels: u16, sink: WaveSink) -> Result<Running, String> {
     Ok((stream, output, queue))
 }
 
+/// Default outputs whose input side returns what is played to them.
+#[cfg(feature = "rdp-server-audio")]
+const LOOPBACK_DEVICES: [&str; 2] = ["BlackHole", "Background Music"];
+
+/// When the default output is a loopback virtual device, its input side
+/// carries exactly what every process plays — including command-line tools
+/// ScreenCaptureKit may attribute to no application — so it is preferred.
+#[cfg(feature = "rdp-server-audio")]
+fn virtual_loopback() -> Option<(cpal::Device, cpal::SupportedStreamConfig)> {
+    use cpal::traits::{DeviceTrait, HostTrait};
+
+    let host = cpal::default_host();
+    let output = host.default_output_device()?;
+    let name = super::cpal_capture::device_name(&output);
+    if !LOOPBACK_DEVICES.iter().any(|known| name.contains(known)) {
+        return None;
+    }
+    let input = host
+        .input_devices()
+        .ok()?
+        .find(|device| super::cpal_capture::device_name(device) == name)?;
+    let config = input.default_input_config().ok()?;
+    Some((input, config))
+}
+
 pub(super) fn run(rate: u32, channels: u16, sink: WaveSink, stop: Stop, ready: Ready) {
+    #[cfg(feature = "rdp-server-audio")]
+    if let Some((device, config)) = virtual_loopback() {
+        super::cpal_capture::run(
+            device,
+            config,
+            |name, in_rate| format!("{name} input (loopback virtual device, {in_rate} Hz)"),
+            rate,
+            channels,
+            sink,
+            stop,
+            ready,
+        );
+        return;
+    }
+    let diagnostics = sink.clone();
     match start(rate, channels, sink) {
-        Ok((stream, _output, _queue)) => {
+        Ok((stream, output, _queue)) => {
             let _ = ready.send(Ok(format!(
                 "ScreenCaptureKit system audio ({RATE} Hz)"
             )));
             let _ = stop.recv();
             sck::stop_stream(&stream);
+            let ivars = output.ivars();
+            diagnostics.note(format!(
+                "RDP audio: ScreenCaptureKit delivered {} audio buffer(s), {} unusable",
+                ivars.buffers.load(Ordering::Relaxed),
+                ivars.rejected.load(Ordering::Relaxed)
+            ));
         }
         Err(error) => {
             let _ = ready.send(Err(error));

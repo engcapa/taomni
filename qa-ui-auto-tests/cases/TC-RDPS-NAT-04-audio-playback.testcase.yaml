@@ -77,6 +77,15 @@ steps:
     timeout_sec: 90
 - rdp_probe:
     scenario: host-play
+    artifact: host-tone-check
+    args:
+      freq: 880
+      seconds: 1
+    expect:
+      device:
+        exists: true
+- rdp_probe:
+    scenario: host-play
     artifact: host-tone
     background: tone
     args:
@@ -136,22 +145,25 @@ verification:
     - 17
     - 18
     - 19
+    - 20
     checkpoints:
     - step: 16
       expectation: The RDP server runs with audio playback on.
-    - step: 18
-      expectation: RDPSND is negotiated at 48 kHz, at least 100 wave PDUs arrive in five seconds, the dominant frequency is 880 Hz within 2 % and the level is above -30 dBFS.
+    - step: 17
+      expectation: The host plays a tone on its default output outside RDP.
     - step: 19
-      expectation: A client offering only 44.1 kHz receives the same tone, resampled by the server.
+      expectation: RDPSND is negotiated at 48 kHz, at least 100 wave PDUs arrive in five seconds, the dominant frequency is 880 Hz within 2 % and the level is above -30 dBFS.
     - step: 20
-      expectation: The host tone played on the default output for both captures.
+      expectation: A client offering only 44.1 kHz receives the same tone, resampled by the server.
     - step: 21
+      expectation: The host tone played on the default output for both captures.
+    - step: 22
       expectation: The server log names the loopback source it streams.
     results:
-    - 18
     - 19
     - 20
     - 21
+    - 22
   native:
   - check: Real host audio output (PipeWire graph on Linux, WASAPI loopback of VB-CABLE on Windows, ScreenCaptureKit system audio on macOS), RDPSND over NLA, tone analysis on received PCM.
     method: automated

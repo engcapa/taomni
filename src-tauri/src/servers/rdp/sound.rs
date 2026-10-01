@@ -138,9 +138,17 @@ type SharedSender = Arc<Mutex<Option<UnboundedSender<ServerEvent>>>>;
 pub(crate) struct WaveSink {
     sender: SharedSender,
     started: Instant,
+    log: LogEmitter,
 }
 
 impl WaveSink {
+    /// One-off capture diagnostics for the server log (format of the first
+    /// buffer, why buffers were unusable, totals at stop). Never per packet.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub(crate) fn note(&self, message: impl Into<String>) {
+        self.log.line(message);
+    }
+
     pub(crate) fn send(&self, packet: Vec<u8>) {
         // wTimeStamp is a wrapping millisecond clock.
         let timestamp = self.started.elapsed().as_millis() as u32;
@@ -219,6 +227,7 @@ impl RdpsndServerHandler for SoundBackend {
         let sink = WaveSink {
             sender: Arc::clone(&self.sender),
             started: Instant::now(),
+            log: self.log.clone(),
         };
         match capture::Loopback::start(format.n_samples_per_sec, format.n_channels, sink) {
             Ok((loopback, source)) => {
@@ -294,27 +303,47 @@ mod capture {
     pub(crate) type Stop = Receiver<()>;
 }
 
-#[cfg(all(target_os = "windows", feature = "rdp-server-audio"))]
-mod platform {
-    use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+/// cpal capture into a [`WavePump`]: WASAPI loopback of the default output on
+/// Windows, the input side of a loopback virtual device on macOS.
+#[cfg(all(any(target_os = "windows", target_os = "macos"), feature = "rdp-server-audio"))]
+mod cpal_capture {
+    use cpal::traits::{DeviceTrait, StreamTrait};
 
     use super::capture::{Ready, Stop};
     use super::{WavePump, WaveSink};
 
-    /// WASAPI loopback: cpal opens an input stream on an output device with
-    /// AUDCLNT_STREAMFLAGS_LOOPBACK, i.e. "what this computer plays".
-    pub(super) fn run(rate: u32, channels: u16, sink: WaveSink, stop: Stop, ready: Ready) {
+    /// "Endpoint (device)" — on WASAPI the name is only the endpoint (for
+    /// example "Speakers"); the driver field names the device behind it.
+    pub(super) fn device_name(device: &cpal::Device) -> String {
+        let Ok(description) = device.description() else {
+            return "default output".to_string();
+        };
+        let name = description.name().to_string();
+        match description
+            .driver()
+            .filter(|driver| !driver.is_empty() && !name.contains(driver))
+        {
+            Some(driver) => format!("{name} ({driver})"),
+            None => name,
+        }
+    }
+
+    /// Capture `device` with `config` (an output config for WASAPI
+    /// loopback, an input config otherwise) until the session stops.
+    /// `describe` names the source for the server log.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn run(
+        device: cpal::Device,
+        config: cpal::SupportedStreamConfig,
+        describe: impl FnOnce(&str, u32) -> String,
+        rate: u32,
+        channels: u16,
+        sink: WaveSink,
+        stop: Stop,
+        ready: Ready,
+    ) {
+        let name = device_name(&device);
         let result = (|| -> Result<(cpal::Stream, String), String> {
-            let device = cpal::default_host()
-                .default_output_device()
-                .ok_or_else(|| "no default audio output device".to_string())?;
-            let name = device
-                .description()
-                .map(|d| d.name().to_string())
-                .unwrap_or_else(|_| "default output".to_string());
-            let config = device
-                .default_output_config()
-                .map_err(|e| format!("output format of {name}: {e}"))?;
             let (in_rate, in_channels) = (config.sample_rate(), config.channels());
             let stream_config: cpal::StreamConfig = config.config();
             let on_error = |error: cpal::StreamError| {
@@ -353,7 +382,7 @@ mod platform {
             stream
                 .play()
                 .map_err(|e| format!("start loopback on {name}: {e}"))?;
-            Ok((stream, format!("{name} (WASAPI loopback, {in_rate} Hz)")))
+            Ok((stream, describe(&name, in_rate)))
         })();
         match result {
             Ok((stream, source)) => {
@@ -366,6 +395,41 @@ mod platform {
                 let _ = ready.send(Err(error));
             }
         }
+    }
+}
+
+#[cfg(all(target_os = "windows", feature = "rdp-server-audio"))]
+mod platform {
+    use cpal::traits::{DeviceTrait, HostTrait};
+
+    use super::WaveSink;
+    use super::capture::{Ready, Stop};
+
+    /// WASAPI loopback: cpal opens an input stream on an output device with
+    /// AUDCLNT_STREAMFLAGS_LOOPBACK, i.e. "what this computer plays".
+    pub(super) fn run(rate: u32, channels: u16, sink: WaveSink, stop: Stop, ready: Ready) {
+        let Some(device) = cpal::default_host().default_output_device() else {
+            let _ = ready.send(Err("no default audio output device".to_string()));
+            return;
+        };
+        let config = match device.default_output_config() {
+            Ok(config) => config,
+            Err(error) => {
+                let name = super::cpal_capture::device_name(&device);
+                let _ = ready.send(Err(format!("output format of {name}: {error}")));
+                return;
+            }
+        };
+        super::cpal_capture::run(
+            device,
+            config,
+            |name, in_rate| format!("{name} (WASAPI loopback, {in_rate} Hz)"),
+            rate,
+            channels,
+            sink,
+            stop,
+            ready,
+        );
     }
 }
 

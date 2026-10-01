@@ -78,6 +78,8 @@ Write-Output ("port:" + (Get-ItemProperty -Path "$ts\WinStations\RDP-Tcp" -Name 
 # Explorer then runs the target from the machine Run key (see _LAUNCHER).
 $run = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run'
 Set-ItemProperty -Path $run -Name TaomniRdpBaselineTarget -Value $env:QA_BASELINE_RUN
+# Proves Explorer processed the Run key even if Python could not start.
+Set-ItemProperty -Path $run -Name TaomniRdpBaselineMarker -Value $env:QA_BASELINE_MARKER
 # A fresh profile's first sign-in animation delays the shell by tens of seconds.
 $system = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
 $previous = (Get-ItemProperty -Path $system -Name EnableFirstLogonAnimation -ErrorAction SilentlyContinue).EnableFirstLogonAnimation
@@ -89,15 +91,24 @@ Set-ItemProperty -Path $system -Name EnableFirstLogonAnimation -Value 0 -Type DW
 # target by account so each session hosts the scenario it measures. Without
 # an account match it exits, so the runner's own logons are untouched.
 _LAUNCHER = r'''
-import os, runpy, sys
+import os, runpy, sys, time, traceback
 from pathlib import Path
 here = Path(__file__).resolve().parent
+user = os.environ.get("USERNAME", "").lower()
 targets = {"qa-rdp-base1": ("flip", "480x320+40+80"), "qa-rdp-base2": ("animate", "640x360+40+80")}
-mode = targets.get(os.environ.get("USERNAME", "").lower())
+mode = targets.get(user)
 if mode:
-    sys.argv = [str(here / "rdp_target.py"), "--state", str(here / f"{mode[0]}-state.json"),
-                "--mode", mode[0], "--geometry", mode[1], "--lifetime-sec", "1800"]
-    runpy.run_path(str(here / "rdp_target.py"), run_name="__main__")
+    log = here / f"{user}-launch.log"
+    with log.open("a", encoding="utf-8") as out:
+        out.write(f"{time.strftime('%H:%M:%S')} start {mode[0]} pid={os.getpid()} python={sys.executable}\n")
+    try:
+        sys.argv = [str(here / "rdp_target.py"), "--state", str(here / f"{mode[0]}-state.json"),
+                    "--mode", mode[0], "--geometry", mode[1], "--lifetime-sec", "1800"]
+        runpy.run_path(str(here / "rdp_target.py"), run_name="__main__")
+    except BaseException:
+        with log.open("a", encoding="utf-8") as out:
+            out.write(traceback.format_exc())
+        raise
 '''
 _ANIMATION: list[str] = []
 
@@ -123,7 +134,7 @@ def setup(ctx: Any) -> None:
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     shutil.copy2(Path(__file__).resolve().parents[1] / "rdp_helpers" / "rdp_target.py", WORK_DIR / "rdp_target.py")
     (WORK_DIR / "launch_target.pyw").write_text(_LAUNCHER, encoding="utf-8")
-    for stale in WORK_DIR.glob("*-state.json"):
+    for stale in [*WORK_DIR.glob("*-state.json"), *WORK_DIR.glob("*.log")]:
         stale.unlink(missing_ok=True)
     # Everyone (S-1-1-0) may write the target state from the baseline sessions.
     subprocess.run(["icacls", str(WORK_DIR), "/grant", "*S-1-1-0:(OI)(CI)M"],
@@ -136,8 +147,14 @@ def setup(ctx: Any) -> None:
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", _HOST_SCRIPT],
         capture_output=True, text=True, timeout=180,
         env={**os.environ, "QA_BASELINE_PW": password, "QA_BASELINE_USERS": ",".join(USERS),
-             "QA_BASELINE_RUN": f'"{python}" "{WORK_DIR / "launch_target.pyw"}"'},
+             "QA_BASELINE_RUN": f'"{python}" "{WORK_DIR / "launch_target.pyw"}"',
+             "QA_BASELINE_MARKER": f'cmd.exe /c echo %USERNAME% %TIME%>>"{WORK_DIR / "run-key.log"}"'},
     )
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        # The baseline accounts run the runner's Python; make sure plain
+        # Users may read and execute it (CI only, never on a workstation).
+        subprocess.run(["icacls", str(python.parent), "/grant", "*S-1-5-32-545:(OI)(CI)RX", "/T", "/C", "/Q"],
+                       capture_output=True, text=True, timeout=300)
     if result.returncode:
         raise FixtureSkip("could not prepare the TermService baseline (elevation required?): "
                           + (result.stderr or result.stdout)[-500:])
@@ -171,8 +188,9 @@ foreach ($line in (quser 2>$null | Select-Object -Skip 1)) {
 """.replace("$env:QA_BASELINE_USERS", f"'{names}'"), check=False)
     while _CREATED:
         _ps(f"Remove-LocalUser -Name '{_CREATED.pop()}'", check=False)
-    _ps(r"Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' "
-        r"-Name TaomniRdpBaselineTarget -ErrorAction SilentlyContinue", check=False)
+    for value in ("TaomniRdpBaselineTarget", "TaomniRdpBaselineMarker"):
+        _ps(r"Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' "
+            f"-Name {value} -ErrorAction SilentlyContinue", check=False)
     system = r"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
     while _ANIMATION:
         previous = _ANIMATION.pop()
