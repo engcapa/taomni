@@ -26,7 +26,7 @@ use crate::vnc::encodings::DecodedCursor;
 use crate::vnc::framebuffer::{Damage, FbRect, SharedFramebuffer};
 use crate::vnc::native_pointer::{NativePointerSampler, NativePointerTarget};
 use crate::vnc::policy::{VncClipboardPolicy, VncSecurityPolicy};
-use crate::vnc::quality::{QualityController, VncPictureQuality};
+use crate::vnc::quality::{QualityController, UpdateSummary, VncPictureQuality};
 use crate::vnc::queue::{FrameQueueReceiver, FrameQueueSender, QueuedWsOutgoing};
 use crate::vnc::rfb::{RfbConnection, RfbWriter, RuntimeStats, ServerMessage, encoding_name};
 
@@ -1028,10 +1028,12 @@ async fn run_relay(
                         let _ = ws_out.send_critical_control(json);
                     }
                     if let Ok(mut quality) = quality_read.lock() {
-                        quality.observe_update(
-                            stats.last_update_pixel_rects > 0,
-                            stats.last_update_tight_rects > 0,
-                        );
+                        quality.observe_update(UpdateSummary {
+                            pixel_rects: stats.last_update_pixel_rects,
+                            tight_rects: stats.last_update_tight_rects,
+                            compressed_rects: stats.last_update_compressed_rects,
+                            raw_pixels: stats.last_update_raw_pixels,
+                        });
                     }
                     let request_now = {
                         match flow_read.lock() {

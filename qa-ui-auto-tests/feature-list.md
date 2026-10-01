@@ -2611,6 +2611,7 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 - ZRLE 单 zlib 状态贯穿整个 session，已修复历史的 "zrle: eof cpixel" 间歇性断连
 - 像素格式 `set_pixel_format_rgba()` 协商成 little-endian RGBA，前端按位图直接渲染；服务器静止时不调度绘制（VNC-PERF-003）
 - Tight（7，含 JPEG 质量与 zlib 级别伪编码）与画质 Automatic / High / Medium / Low：Medium/Low 优先 Tight + JPEG，服务器不支持 Tight 时改用降色深像素格式；Automatic 按线路速度升降档；切换像素格式前等待在途更新（VNC-PERF-004，TC-153 native 验证 Low 的编码请求与之后的绘制）
+- 首选编码自适应：只认客户端第一个编码的服务器（如 VMware 内置 VNC）用 Raw 回应大块更新时，High/Automatic 依次把 Tight（无损）、Hextile 移到首位，降色深档改用 Hextile；服务器已按首选编码压缩时不再试探（VNC-PERF-006，DEC-VNC-22）
 
 ### 9.4 ExtendedClipboard 互通 ✅
 - 实现 ExtendedClipboard 伪编码（`0xC0A1E5CE` + 旧 draft 值 `-1063` 双广告兼容）

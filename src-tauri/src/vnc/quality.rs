@@ -86,12 +86,17 @@ pub struct EncodingProfile {
 }
 
 impl EncodingProfile {
-    /// Name of the preferred pixel encoding, for Session Information.
-    pub fn requested_label(&self) -> &'static str {
+    /// The preferred pixel encoding (first entry that is not a pseudo-encoding).
+    pub fn first_pixel_encoding(&self) -> Option<i32> {
         self.encodings
             .iter()
             .copied()
             .find(|encoding| *encoding >= 0)
+    }
+
+    /// Name of the preferred pixel encoding, for Session Information.
+    pub fn requested_label(&self) -> &'static str {
+        self.first_pixel_encoding()
             .map(encoding_name)
             .unwrap_or("-")
     }
@@ -113,22 +118,84 @@ const TIGHT_LOW: (i32, i32) = (2, 9);
 pub const MEDIUM_COLOUR: PixelFormat = PixelFormat::RGB222;
 pub const LOW_COLOUR: PixelFormat = PixelFormat::RGB111;
 
+const ENCODING_ZRLE: i32 = 16;
+const ENCODING_HEXTILE: i32 = 5;
+/// Lossless encodings High may list first, tried in this order when the
+/// server ignores the current first choice (DEC-VNC-22). Tight without JPEG
+/// quality pseudo-encodings is lossless.
+const HIGH_FIRST: [i32; 3] = [ENCODING_ZRLE, ENCODING_TIGHT, ENCODING_HEXTILE];
+/// The same for the reduced-colour tiers of a server without Tight.
+const PLAIN_FIRST: [i32; 2] = [ENCODING_ZRLE, ENCODING_HEXTILE];
+/// A Raw-only update at least this large while a compressed encoding is listed
+/// first means the server ignored the preference. Compliant servers pick the
+/// first listed encoding they support; some (VMware Workstation's built-in
+/// VNC) only look at the first entry and answer anything else with Raw.
+pub const IGNORED_PREFERENCE_RAW_PIXELS: u64 = 64 * 64;
+
+/// What one FramebufferUpdate carried, for the quality controller.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct UpdateSummary {
+    pub pixel_rects: u16,
+    pub tight_rects: u16,
+    /// ZRLE, Hextile and Tight rectangles.
+    pub compressed_rects: u16,
+    pub raw_pixels: u64,
+}
+
+/// First choice among `candidates`: the first one the server has not ignored
+/// (and, for Tight, not shown to lack). Once every candidate was ignored the
+/// last one tried stays, so the order stops changing.
+fn first_choice(candidates: &[i32], ignored: &[i32], tight: Option<bool>) -> i32 {
+    candidates
+        .iter()
+        .copied()
+        .find(|encoding| {
+            !ignored.contains(encoding) && !(*encoding == ENCODING_TIGHT && tight == Some(false))
+        })
+        .or_else(|| {
+            ignored
+                .iter()
+                .rev()
+                .copied()
+                .find(|encoding| candidates.contains(encoding))
+        })
+        .unwrap_or(candidates[0])
+}
+
+/// `order` with `first` moved to the front.
+fn with_first(first: i32, order: &[i32]) -> Vec<i32> {
+    let mut encodings = vec![first];
+    encodings.extend(order.iter().copied().filter(|encoding| *encoding != first));
+    encodings
+}
+
 /// Encoding profile for a tier. `tight` is `Some(false)` once the server has
-/// shown it does not implement Tight.
-pub fn profile_for(level: QualityLevel, tight: Option<bool>) -> EncodingProfile {
+/// shown it does not implement Tight; `ignored` lists first choices the server
+/// answered with Raw.
+pub fn profile_for(level: QualityLevel, tight: Option<bool>, ignored: &[i32]) -> EncodingProfile {
     let with_pseudo = |mut encodings: Vec<i32>| {
         encodings.extend_from_slice(&PSEUDO_ENCODINGS);
         encodings
     };
     match (level, tight) {
-        (QualityLevel::High, _) => EncodingProfile {
-            // ZRLE (bandwidth) > Hextile > Tight (lossless) > CopyRect > Raw.
-            encodings: with_pseudo(vec![16, 5, ENCODING_TIGHT, 1, 0]),
-            pixel_format: PixelFormat::RGB888,
-            tight_first: false,
-        },
+        (QualityLevel::High, _) => {
+            // ZRLE (bandwidth) > Hextile > Tight (lossless) > CopyRect > Raw,
+            // with the first choice moved up when the server ignored ZRLE.
+            let first = first_choice(&HIGH_FIRST, ignored, tight);
+            EncodingProfile {
+                encodings: with_pseudo(with_first(
+                    first,
+                    &[ENCODING_ZRLE, ENCODING_HEXTILE, ENCODING_TIGHT, 1, 0],
+                )),
+                pixel_format: PixelFormat::RGB888,
+                tight_first: first == ENCODING_TIGHT,
+            }
+        }
         (level, Some(false)) => EncodingProfile {
-            encodings: with_pseudo(vec![16, 5, 1, 0]),
+            encodings: with_pseudo(with_first(
+                first_choice(&PLAIN_FIRST, ignored, tight),
+                &[ENCODING_ZRLE, ENCODING_HEXTILE, 1, 0],
+            )),
             pixel_format: if level == QualityLevel::Medium {
                 MEDIUM_COLOUR
             } else {
@@ -173,6 +240,11 @@ pub struct QualityController {
     preset: VncPictureQuality,
     level: QualityLevel,
     tight: Option<bool>,
+    /// First choices the server answered with Raw (DEC-VNC-22), in order.
+    ignored: Vec<i32>,
+    /// The server sent compressed rectangles since the profile was applied,
+    /// so it honours the current list.
+    honoured: bool,
     applied: EncodingProfile,
     pending: Option<EncodingProfile>,
     pending_since: Option<Instant>,
@@ -187,7 +259,9 @@ impl QualityController {
             preset,
             level,
             tight: None,
-            applied: profile_for(level, None),
+            ignored: Vec::new(),
+            honoured: false,
+            applied: profile_for(level, None, &[]),
             pending: None,
             pending_since: None,
             down_votes: 0,
@@ -223,7 +297,7 @@ impl QualityController {
     }
 
     fn retarget(&mut self) {
-        let target = profile_for(self.level, self.tight);
+        let target = profile_for(self.level, self.tight, &self.ignored);
         if target == self.applied {
             self.pending = None;
             self.pending_since = None;
@@ -233,13 +307,41 @@ impl QualityController {
         }
     }
 
-    /// Learn Tight support from the first pixel update after asking for it.
-    pub fn observe_update(&mut self, pixel_rects: bool, tight_rects: bool) {
-        if !pixel_rects || !self.applied.tight_first || self.tight.is_some() {
+    /// Learn what the server does from a pixel update: Tight support from the
+    /// first one after asking for it, and whether it ignores the first choice.
+    pub fn observe_update(&mut self, update: UpdateSummary) {
+        if update.pixel_rects == 0 {
             return;
         }
-        self.tight = Some(tight_rects);
-        if !tight_rects {
+        let large_raw_only =
+            update.compressed_rects == 0 && update.raw_pixels >= IGNORED_PREFERENCE_RAW_PIXELS;
+        let mut changed = false;
+        if self.applied.tight_first && self.tight.is_none() {
+            if update.tight_rects > 0 {
+                self.tight = Some(true);
+            } else if self.level != QualityLevel::High || large_raw_only {
+                // Medium/Low list Tight first from the start, so the first pixel
+                // update without it shows the server lacks Tight. High lists it
+                // first only after ZRLE was ignored, and a small update may
+                // still answer a request sent before that switch.
+                self.tight = Some(false);
+                changed = true;
+            }
+        }
+        if update.compressed_rects > 0 {
+            self.honoured = true;
+        }
+        if let Some(first) = self
+            .applied
+            .first_pixel_encoding()
+            .filter(|encoding| *encoding != 0)
+        {
+            if large_raw_only && !self.honoured && !self.ignored.contains(&first) {
+                self.ignored.push(first);
+                changed = true;
+            }
+        }
+        if changed {
             self.retarget();
         }
     }
@@ -323,6 +425,7 @@ impl QualityController {
     pub fn take_pending(&mut self) -> Option<(EncodingProfile, bool)> {
         let profile = self.pending.take()?;
         self.pending_since = None;
+        self.honoured = false;
         let format_changed = profile.pixel_format != self.applied.pixel_format;
         self.applied = profile.clone();
         Some((profile, format_changed))
@@ -333,15 +436,27 @@ impl QualityController {
 mod tests {
     use super::*;
 
+    /// One update: `zrle` ZRLE rectangles, `tight` Tight ones, `raw` pixels as Raw.
+    fn update(zrle: u16, tight: u16, raw: u64) -> UpdateSummary {
+        UpdateSummary {
+            pixel_rects: zrle + tight + u16::from(raw > 0),
+            tight_rects: tight,
+            compressed_rects: zrle + tight,
+            raw_pixels: raw,
+        }
+    }
+
+    const FULL_FRAME: u64 = 1918 * 970;
+
     #[test]
     fn presets_map_to_realvnc_tiers() {
-        let high = profile_for(QualityLevel::High, None);
+        let high = profile_for(QualityLevel::High, None, &[]);
         assert_eq!(high.encodings[..2], [16, 5]);
         assert_eq!(high.pixel_format, PixelFormat::RGB888);
-        let medium = profile_for(QualityLevel::Medium, None);
+        let medium = profile_for(QualityLevel::Medium, None, &[]);
         assert_eq!(medium.encodings[0], ENCODING_TIGHT);
         assert!(medium.encodings.contains(&(ENCODING_JPEG_QUALITY_0 + 6)));
-        let low_plain = profile_for(QualityLevel::Low, Some(false));
+        let low_plain = profile_for(QualityLevel::Low, Some(false), &[]);
         assert_eq!(low_plain.pixel_format, LOW_COLOUR);
         assert!(!low_plain.encodings.contains(&ENCODING_TIGHT));
         assert_eq!(low_plain.requested_label(), "ZRLE");
@@ -353,21 +468,94 @@ mod tests {
         let mut quality = QualityController::new(VncPictureQuality::Medium);
         assert!(quality.applied().tight_first);
         // A pixel update without Tight rectangles: the server lacks Tight.
-        quality.observe_update(true, false);
+        quality.observe_update(update(1, 0, 0));
         assert!(quality.has_pending());
         assert!(quality.pending_needs_sync());
         let (profile, changed) = quality.take_pending().unwrap();
         assert!(changed);
         assert_eq!(profile.pixel_format, MEDIUM_COLOUR);
         // Learned once; later updates do not flip it back.
-        quality.observe_update(true, true);
+        quality.observe_update(update(0, 1, 0));
         assert!(!quality.has_pending());
+    }
+
+    #[test]
+    fn high_moves_tight_first_when_the_server_answers_zrle_with_raw() {
+        let mut quality = QualityController::new(VncPictureQuality::High);
+        // VMware's built-in VNC: the first full update comes back as Raw.
+        quality.observe_update(update(0, 0, FULL_FRAME));
+        assert!(quality.has_pending());
+        assert!(
+            !quality.pending_needs_sync(),
+            "same pixel format: no sync needed"
+        );
+        let (profile, changed) = quality.take_pending().unwrap();
+        assert!(!changed);
+        assert_eq!(profile.first_pixel_encoding(), Some(ENCODING_TIGHT));
+        assert_eq!(profile.requested_label(), "Tight");
+        assert!(profile.tight_first);
+        assert_eq!(profile.pixel_format, PixelFormat::RGB888);
+        // Lossless: no JPEG quality or compression level pseudo-encodings.
+        assert!(!profile.encodings.iter().any(|encoding| {
+            (ENCODING_JPEG_QUALITY_0..ENCODING_JPEG_QUALITY_0 + 10).contains(encoding)
+                || (ENCODING_COMPRESS_LEVEL_0..ENCODING_COMPRESS_LEVEL_0 + 10).contains(encoding)
+        }));
+        // A small update requested before the switch is inconclusive...
+        quality.observe_update(update(0, 0, 1548));
+        assert!(!quality.has_pending());
+        // ...and Tight rectangles settle it: a later Raw update keeps Tight.
+        quality.observe_update(update(0, 3, 0));
+        quality.observe_update(update(0, 0, FULL_FRAME));
+        assert!(!quality.has_pending());
+        assert_eq!(
+            quality.applied().first_pixel_encoding(),
+            Some(ENCODING_TIGHT)
+        );
+    }
+
+    #[test]
+    fn high_tries_hextile_after_tight_and_then_keeps_the_last_choice() {
+        let mut quality = QualityController::new(VncPictureQuality::High);
+        quality.observe_update(update(0, 0, FULL_FRAME));
+        quality.take_pending();
+        quality.observe_update(update(0, 0, FULL_FRAME));
+        let (profile, _) = quality.take_pending().unwrap();
+        assert_eq!(profile.first_pixel_encoding(), Some(5));
+        assert!(!profile.tight_first);
+        // Raw for Hextile as well: nothing is left, the order stays.
+        quality.observe_update(update(0, 0, FULL_FRAME));
+        assert!(!quality.has_pending());
+        assert_eq!(quality.applied().first_pixel_encoding(), Some(5));
+    }
+
+    #[test]
+    fn small_or_mixed_raw_updates_keep_the_order() {
+        let mut quality = QualityController::new(VncPictureQuality::High);
+        // A cursor-sized Raw rectangle, then Raw beside ZRLE rectangles.
+        quality.observe_update(update(0, 0, 32 * 32));
+        quality.observe_update(update(4, 0, FULL_FRAME));
+        assert!(!quality.has_pending());
+        assert_eq!(quality.applied().first_pixel_encoding(), Some(16));
+    }
+
+    #[test]
+    fn reduced_colour_tiers_move_hextile_first_when_zrle_is_ignored() {
+        let mut quality = QualityController::new(VncPictureQuality::Low);
+        // No Tight: falls back to the colour-depth profile with ZRLE first.
+        quality.observe_update(update(0, 0, 0x100));
+        let (profile, _) = quality.take_pending().unwrap();
+        assert_eq!(profile.first_pixel_encoding(), Some(16));
+        quality.observe_update(update(0, 0, FULL_FRAME));
+        let (profile, changed) = quality.take_pending().unwrap();
+        assert!(!changed);
+        assert_eq!(profile.first_pixel_encoding(), Some(5));
+        assert_eq!(profile.pixel_format, LOW_COLOUR);
     }
 
     #[test]
     fn switching_between_tight_tiers_keeps_the_pixel_format() {
         let mut quality = QualityController::new(VncPictureQuality::Medium);
-        quality.observe_update(true, true);
+        quality.observe_update(update(0, 1, 0));
         quality.set_preset(VncPictureQuality::Low);
         assert!(quality.has_pending());
         assert!(!quality.pending_needs_sync());

@@ -958,6 +958,8 @@ impl RfbConnection {
         let wire_before = self.read_buffer.total;
         let mut pixel_rects = 0u16;
         let mut tight_rects = 0u16;
+        let mut compressed_rects = 0u16;
+        let mut raw_pixels = 0u64;
         let mut damage: Vec<FbRect> = Vec::with_capacity(num_rects.min(64));
         let mut cursor = None;
         let mut pointer_pos = None;
@@ -1001,6 +1003,11 @@ impl RfbConnection {
                     pixel_rects = pixel_rects.saturating_add(1);
                     if encoding == ENCODING_TIGHT {
                         tight_rects = tight_rects.saturating_add(1);
+                    }
+                    if encoding == 0 {
+                        raw_pixels += u64::from(w) * u64::from(h);
+                    } else {
+                        compressed_rects = compressed_rects.saturating_add(1);
                     }
                     self.decode_pixels(encoding, w, h)?;
                     self.lock_framebuffer()?.blit(rect, &self.scratch)?;
@@ -1049,6 +1056,8 @@ impl RfbConnection {
         self.stats.updates += 1;
         self.stats.last_update_pixel_rects = pixel_rects;
         self.stats.last_update_tight_rects = tight_rects;
+        self.stats.last_update_compressed_rects = compressed_rects;
+        self.stats.last_update_raw_pixels = raw_pixels;
         self.stats.last_update_wire_bytes = self.read_buffer.total - wire_before;
         self.stats.last_update_micros = update_started.elapsed().as_micros() as u64;
         self.stats.last_update_started_at = Some(update_started);
@@ -1184,6 +1193,11 @@ pub struct RuntimeStats {
     /// Pixel rectangles (and Tight ones among them) in the latest update.
     pub last_update_pixel_rects: u16,
     pub last_update_tight_rects: u16,
+    /// ZRLE / Hextile / Tight rectangles, and pixels sent as Raw, in the
+    /// latest update (DEC-VNC-22: a large Raw-only update means the server
+    /// ignored the first encoding).
+    pub last_update_compressed_rects: u16,
+    pub last_update_raw_pixels: u64,
     /// Bytes and time from the first rectangle header to the end of the last
     /// FramebufferUpdate; large updates approximate the line speed.
     pub last_update_wire_bytes: u64,
@@ -1201,6 +1215,8 @@ impl Default for RuntimeStats {
             pixel_format: PixelFormat::RGB888,
             last_update_pixel_rects: 0,
             last_update_tight_rects: 0,
+            last_update_compressed_rects: 0,
+            last_update_raw_pixels: 0,
             last_update_wire_bytes: 0,
             last_update_micros: 0,
             last_update_started_at: None,
