@@ -43,6 +43,7 @@ export function ServerRow({
       role="option"
       aria-selected={selected}
       data-testid={`server-row-${def.type}`}
+      data-status={status}
       className="flex items-center gap-2 h-10 px-2 cursor-pointer select-none"
       style={{
         background: selected ? "var(--taomni-selected)" : "transparent",

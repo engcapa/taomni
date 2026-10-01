@@ -85,7 +85,8 @@
           "parity008_git",
           "parity009_ssr",
           "parity007_extract",
-          "mail_server"
+          "mail_server",
+          "rdp_server_required"
         ]
       },
       "uniqueItems": true
@@ -1231,6 +1232,27 @@
               "minimum": 1
             }
           }
+        },
+        "open_route": {
+          "$ref": "#/$defs/open_route_arg"
+        },
+        "host_helper": {
+          "$ref": "#/$defs/host_helper_arg"
+        },
+        "rdp_probe": {
+          "$ref": "#/$defs/rdp_probe_arg"
+        },
+        "rdp_probe_wait": {
+          "$ref": "#/$defs/rdp_probe_wait_arg"
+        },
+        "host_clipboard": {
+          "$ref": "#/$defs/host_clipboard_arg"
+        },
+        "assert_json_file": {
+          "$ref": "#/$defs/assert_json_file_arg"
+        },
+        "rdp_canvas_click": {
+          "$ref": "#/$defs/rdp_canvas_click_arg"
         }
       }
     },
@@ -2449,6 +2471,252 @@
           "maximum": 60
         },
         "attribute": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "rdp_expect": {
+      "type": "object",
+      "description": "Dotted JSON paths -> literal (equals) or {equals|min|max|exists|contains|length_min}.",
+      "additionalProperties": {}
+    },
+    "open_route_arg": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[?/#]"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "route"
+          ],
+          "properties": {
+            "route": {
+              "type": "string",
+              "pattern": "^[?/#]"
+            }
+          }
+        }
+      ],
+      "description": "Navigate to an app route (browser: base_url+route; native: same-origin navigation of the main WebView)."
+    },
+    "host_helper_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "description": "Native-only: start/stop the stdlib-Tk visual target used by RDP latency/throughput cases.",
+      "properties": {
+        "action": {
+          "enum": [
+            "start",
+            "stop"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "flip",
+            "animate"
+          ]
+        },
+        "geometry": {
+          "type": "string",
+          "pattern": "^[0-9]+x[0-9]+\\+[0-9]+\\+[0-9]+$"
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "rdp_probe_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario"
+      ],
+      "description": "Native-only: run one rdp-probe scenario and assert its JSON report.",
+      "properties": {
+        "scenario": {
+          "enum": [
+            "connect",
+            "latency",
+            "throughput",
+            "clipboard-send",
+            "clipboard-receive",
+            "audio-capture",
+            "mic-send",
+            "autodetect",
+            "host-play",
+            "host-record",
+            "image-digest"
+          ]
+        },
+        "args": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect": {
+          "$ref": "#/$defs/rdp_expect"
+        },
+        "expect_exit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "background": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "rdp_probe_wait_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect": {
+          "$ref": "#/$defs/rdp_expect"
+        },
+        "expect_exit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "host_clipboard_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "description": "Native-only: set/assert the real OS clipboard with platform tools (PowerShell/.NET, AppKit JXA, xclip).",
+      "properties": {
+        "action": {
+          "enum": [
+            "set",
+            "assert",
+            "clear"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "html",
+            "image",
+            "files"
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "html": {
+          "type": "string"
+        },
+        "png": {
+          "type": "string"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "equals": {
+          "type": "string"
+        },
+        "contains": {
+          "type": "string"
+        },
+        "png_equals": {
+          "type": "string"
+        },
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "assert_json_file_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "expect"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect": {
+          "$ref": "#/$defs/rdp_expect"
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "rdp_canvas_click_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": 0
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0
+        },
+        "selector": {
           "type": "string",
           "minLength": 1
         }

@@ -185,6 +185,20 @@ verbs fail loudly.
 | `save_race_release` | `{reason?}` or null | Releases the held delivery point; the production transaction continues. Fails when nothing is held. |
 | `save_race_trace` | `{artifact?, expect_contains?, expect_events?, require_ack_hashes?, require_settled_kind?}` | Fetches the in-page timeline and writes it under the case directory (default `save-race-trace.json`). `expect_contains` checks an ordered subsequence, `expect_events` an exact sequence; `require_ack_hashes` proves `ack-delivered` carries the real native `writtenHash`; `require_settled_kind` asserts the last `commit-settled` production result kind. |
 
+## RDP server / client (docs-feature/rdp-server-parity-design.md)
+
+Native verbs live in `scripts/qa_ui_auto/rdp_steps.py`. Connection defaults come from the `rdp_server_required` fixture (`QA_RDP_PORT`, `QA_RDP_USER`, `QA_RDP_PASSWORD`, `QA_RDP_BAD_PASSWORD`, `QA_VAULT_PASSWORD`). `rdp-probe` is the QA-only client binary produced next to the QA app by `native_build.py`; it never receives a password on its command line.
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `open_route` | route string **or** `{route}` (starts with `?`, `/` or `#`) | Browser: navigates to `app.base_url` + route. Native: same-origin navigation of the packaged main WebView (e.g. `?servers=main` renders the Local servers component tree in the main window) and re-installs the console hook. |
+| `host_helper` | `{action: start\|stop, name?, mode?: flip\|animate, geometry?: WxH+X+Y, state?, timeout_sec?}` | Native only. Starts/stops `rdp_helpers/rdp_target.py`, a borderless top-most Tk window at exact desktop pixels. `flip` inverts black/white per click or key and writes `flips` to `<name>-state.json` in the case dir; `animate` scrolls bars at ~60 Hz. Waits for the helper's ready record. Stopped automatically at case teardown. |
+| `rdp_probe` | `{scenario, args?, artifact?, expect?, expect_exit?=0, background?, timeout_sec?}` | Native only. Runs `rdp-probe <scenario>` against `127.0.0.1:$QA_RDP_PORT` with `--password-env QA_RDP_PASSWORD` (override any option through `args`; `true` becomes a bare flag). Saves `<artifact>.json` (+ `.log`) in the case dir, requires the exit code and checks `expect`: dotted JSON paths → literal (equals) or `{equals\|min\|max\|exists\|contains\|length_min}`. `background: name` returns immediately; collect with `rdp_probe_wait`. |
+| `rdp_probe_wait` | `{name, expect?, expect_exit?, timeout_sec?}` | Waits for a background probe and applies the same report checks. |
+| `host_clipboard` | `{action: set\|assert\|clear, kind: text\|html\|image\|files, ...}` | Native only, three platforms. Independent OS oracle (PowerShell/.NET on Windows, AppKit via JXA on macOS, xclip on Linux/X11) — never the product's arboard. `set` takes `text`, `html` (+`text` fallback), `png` or `paths` (inside the report root); `assert` takes `equals`/`contains` (text/html), `png_equals` (RGB pixel digest via `rdp-probe image-digest`) or `names` (file list). Records `host-clipboard-observations.json`. |
+| `assert_json_file` | `{path, expect, timeout_sec?}` | Native only. Polls a JSON file inside the report root (e.g. the helper state) with the `rdp_probe` expectation syntax. |
+| `rdp_canvas_click` | `{x, y, selector?='[data-testid="rdp-canvas"]'}` | Native only. Maps a remote desktop coordinate to the Taomni RDP client canvas (CSS scale from its bounding box and intrinsic size) and clicks with W3C pointer actions; used by joint client↔server cases. |
+
 ## Last-resort escape hatch
 
 | Verb | Args | Notes |

@@ -92,6 +92,7 @@ export function RdpSettings({ config, onChange }: Props) {
       {supportsDisplaySelection ? (
         <SelectField
           label={t("servers.fields.rdpDisplay")}
+          testId="rdp-field-display"
           value={displayId}
           onChange={(value) => onChange({ displayId: value })}
           options={displayOptions}
@@ -150,17 +151,20 @@ export function RdpSettings({ config, onChange }: Props) {
       ) : null}
       <TextField
         label={t("servers.fields.rdpUsername")}
+        testId="rdp-field-username"
         value={username}
         onChange={(v) => onChange({ username: v })}
       />
       <PasswordField
         label={t("servers.fields.password")}
+        testId="rdp-field-password"
         value={password}
         onChange={(v) => onChange({ password: v })}
         placeholder={passwordStored ? t("servers.fields.rdpPasswordStored") : undefined}
       />
       <TextField
         label={t("servers.fields.rdpDomain")}
+        testId="rdp-field-domain"
         value={domain}
         onChange={(v) => onChange({ domain: v })}
         placeholder={t("servers.fields.optional")}
@@ -168,6 +172,7 @@ export function RdpSettings({ config, onChange }: Props) {
       <FieldNote>{t("servers.notes.rdpHybridOnly")}</FieldNote>
       <CheckboxField
         label={t("servers.fields.viewOnly")}
+        testId="rdp-field-view-only"
         checkboxLabel={t("servers.fields.viewOnly")}
         value={viewOnly}
         onChange={(v) => onChange({ viewOnly: v })}
@@ -175,6 +180,7 @@ export function RdpSettings({ config, onChange }: Props) {
       {!viewOnly ? (
         <CheckboxField
           label={t("servers.fields.rdpControlApproval")}
+          testId="rdp-field-control-approval"
           checkboxLabel={t("servers.fields.rdpControlApproval")}
           value={requireControlApproval}
           onChange={(value) => onChange({ requireControlApproval: value })}
@@ -185,6 +191,7 @@ export function RdpSettings({ config, onChange }: Props) {
       ) : null}
       <CheckboxField
         label={t("servers.fields.rdpPublicBind")}
+        testId="rdp-field-public-bind"
         checkboxLabel={t("servers.fields.rdpPublicBind")}
         value={allowPublicBind}
         onChange={(v) => onChange({ allowPublicBind: v })}

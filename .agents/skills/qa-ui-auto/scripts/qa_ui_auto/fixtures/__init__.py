@@ -30,6 +30,8 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
 * mail_server     - native: in-process fake IMAP/SMTP on 127.0.0.1 (seeded
                     INBOX); browser: stub server model. Exposes
                     ${fixture.mail_quick_connect}
+* rdp_server_required - native-only: disposable RDP/vault credentials and a
+                    free loopback port (QA_RDP_*), plus rdp-probe/Tk checks
 
 Custom fixtures live here, register in REGISTRY, and declare their name in
 schema/testcase.schema.json. There is no runtime register() API.
@@ -49,6 +51,7 @@ from . import parity009_ssr
 from . import parity007_extract
 from . import editor_save_race
 from . import mail_server
+from . import rdp_server_required
 
 
 class FixtureContext(Protocol):
@@ -92,6 +95,7 @@ REGISTRY: dict[str, Fixture] = {
     "parity009_ssr": Fixture("parity009_ssr", parity009_ssr.setup, parity009_ssr.teardown),
     "parity007_extract": Fixture("parity007_extract", parity007_extract.setup, parity007_extract.teardown),
     "mail_server": Fixture("mail_server", mail_server.setup, mail_server.teardown),
+    "rdp_server_required": Fixture("rdp_server_required", rdp_server_required.setup),
 }
 
 

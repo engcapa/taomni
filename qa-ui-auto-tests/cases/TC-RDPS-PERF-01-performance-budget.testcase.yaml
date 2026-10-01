@@ -1,0 +1,140 @@
+id: TC-RDPS-PERF-01-performance-budget
+title: RDP server performance - connect time, input-to-frame latency and animation throughput
+description: |
+  V-13 (docs-feature/rdp-server-parity-design.md §4.7, AC-16). Measures the
+  Taomni RDP server with rdp-probe over loopback on the runner desktop:
+  M1 connect/first-graphics time, M2 input-to-frame latency (40 clicks on a
+  host Tk target that inverts colour per click) and M3/M4 visible-change
+  rate and bandwidth while a 640x360 host animation runs.
+
+  Round 1 records the baseline: expectations only guard that measurement
+  happened (enough samples, non-zero throughput). The budgets derived from
+  the Windows TermService baseline replace these guards once measured; they
+  may only be tightened afterwards (DEC-04).
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- performance
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- rdp_server_required
+timeout_sec: 600
+steps:
+- open_route: '?servers=main'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- click: '[data-testid="server-row-rdp-start"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- rdp_probe:
+    scenario: connect
+    artifact: perf-connect
+    args:
+      seconds: 2
+    expect:
+      first_graphics_ms:
+        exists: true
+- host_helper:
+    action: start
+    name: target
+    mode: flip
+    geometry: 480x320+40+80
+- rdp_probe:
+    scenario: latency
+    artifact: perf-latency
+    args:
+      x: 280
+      y: 240
+      samples: 40
+    expect:
+      timeouts:
+        max: 4
+      latency_ms.count:
+        min: 36
+- host_helper:
+    action: stop
+    name: target
+- host_helper:
+    action: start
+    name: animation
+    mode: animate
+    geometry: 640x360+40+80
+- rdp_probe:
+    scenario: throughput
+    artifact: perf-throughput
+    args:
+      seconds: 10
+      rect: 40,80,640,360
+    expect:
+      visible_changes:
+        min: 10
+- host_helper:
+    action: stop
+    name: animation
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Connect time, input-to-frame latency samples and animation throughput are measured on the real server.
+    actions:
+    - 10
+    - 17
+    - 20
+    checkpoints:
+    - step: 16
+      expectation: The connect report includes first_graphics_ms.
+    - step: 18
+      expectation: At least 36 of 40 latency samples were observed.
+    - step: 21
+      expectation: At least 10 visible changes were received during 10 s of animation.
+    results:
+    - 18
+    - 21
+  native:
+  - check: Real capture, encoder, network loopback and input injection timings on the hosted runner.
+    method: automated
+    reason: Browser stubs have no RDP server; only the packaged app exercises the measured path.
+  visual:
+  - check: Not a visual check.
+    method: not-applicable
+    reason: Metrics come from the probe's decoded framebuffer.

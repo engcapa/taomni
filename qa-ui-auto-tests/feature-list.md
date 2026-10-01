@@ -4293,6 +4293,87 @@ controls:
 - i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`
 - **e2e 测试限制**：真正 start/stop 一个服务器会绑定真实端口 / 拉起系统二进制，属带副作用操作；浏览器冒烟只验证对话框 chrome（打开 → 选行 → 设置面板/输出控制台挂载 → Cancel 关闭），实际启停留待 native/手动回归
 
+### 22.2 RDP Server（与 Windows 远程桌面对齐）🚧
+
+<!-- feature
+id: F-RdpServer-1
+status: in-progress
+area: servers/rdp
+components: [RdpSettings, CommonSettings, ServerRow, fields, RdpServerApprovalBridge]
+files:
+  - src/components/servers/settings/RdpSettings.tsx
+  - src/components/servers/CommonSettings.tsx
+  - src/components/servers/ServerRow.tsx
+  - src/components/servers/fields.tsx
+  - src/components/servers/RdpServerApprovalBridge.tsx
+  - src-tauri/src/servers/rdp.rs
+  - src-tauri/src/servers/rdp/
+  - src-tauri/src/bin/rdp-probe/
+  - src-tauri/vendor/ironrdp-server/
+controls:
+  - id: server-field-port
+    selector: '[data-testid="server-field-port"]'
+    kind: interactive
+    optional: true
+  - id: server-field-bind-address
+    selector: '[data-testid="server-field-bind-address"]'
+    kind: interactive
+    optional: true
+  - id: server-field-auto-stop
+    selector: '[data-testid="server-field-auto-stop"]'
+    kind: interactive
+    optional: true
+  - id: server-field-auto-stop-seconds
+    selector: '[data-testid="server-field-auto-stop-seconds"]'
+    kind: interactive
+    optional: true
+  - id: server-field-start-on-launch
+    selector: '[data-testid="server-field-start-on-launch"]'
+    kind: interactive
+    optional: true
+  - id: server-row-rdp-start
+    selector: '[data-testid="server-row-rdp-start"]'
+    kind: interactive
+    optional: true
+  - id: server-row-rdp-stop
+    selector: '[data-testid="server-row-rdp-stop"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-username
+    selector: '[data-testid="rdp-field-username"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-password
+    selector: '[data-testid="rdp-field-password"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-domain
+    selector: '[data-testid="rdp-field-domain"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-view-only
+    selector: '[data-testid="rdp-field-view-only"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-control-approval
+    selector: '[data-testid="rdp-field-control-approval"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-public-bind
+    selector: '[data-testid="rdp-field-public-bind"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-display
+    selector: '[data-testid="rdp-field-display"]'
+    kind: interactive
+    optional: true
+-->
+
+- 设计：[`docs-feature/rdp-server-parity-design.md`](../docs-feature/rdp-server-parity-design.md)（AC-01~AC-20、TASK-01~12、V-01~V-21）
+- 本地服务器窗口 RDP 行：通用字段（端口/绑定地址/自动停止/随应用启动）+ RDP 字段（用户名/密码（vault）/域/仅查看/本机确认控制/公网绑定/显示器）；行 `data-status` 反映 stopped/starting/running/error
+- Native 用例经 `open_route: '?servers=main'` 在主窗口打开同一组件树，通过 `rdp-probe`（QA 专用探针客户端，随 QA 构建产出）做协议级判定与性能测量，`rdp_target.py`（Tk）提供宿主可见目标，`host_clipboard` 用系统工具判定宿主剪贴板
+- CI：`rdp_server_required` → capability `rdp`；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
+
 ---
 
 ## 23. 数据库客户端 — SQL（MySQL / PostgreSQL / PanWeiDB / Oracle / SQLServer / StarRocks / ClickHouse / Presto）

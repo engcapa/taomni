@@ -2802,6 +2802,11 @@ def _do_mail_server_assert_list_matches(ctx: NativeStepContext, args: Any) -> st
     )
 
 
+# RDP server/client verbs live in their own module; importing it registers
+# them in VERBS (it imports `_verb`/`NativeStepContext` defined above).
+from . import rdp_steps  # noqa: E402,F401
+
+
 def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:
     fn = VERBS.get(verb)
     if fn is None:

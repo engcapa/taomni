@@ -1478,6 +1478,23 @@
 - `[data-testid="server-log-autoscroll"]` — interactive [optional] — F-Servers-1.server-log-autoscroll
 - `[data-testid="server-log-clear"]` — display [optional] — F-Servers-1.server-log-clear
 
+## servers/rdp (F-RdpServer-1)
+
+- `[data-testid="server-field-port"]` — interactive [optional] — F-RdpServer-1.server-field-port
+- `[data-testid="server-field-bind-address"]` — interactive [optional] — F-RdpServer-1.server-field-bind-address
+- `[data-testid="server-field-auto-stop"]` — interactive [optional] — F-RdpServer-1.server-field-auto-stop
+- `[data-testid="server-field-auto-stop-seconds"]` — interactive [optional] — F-RdpServer-1.server-field-auto-stop-seconds
+- `[data-testid="server-field-start-on-launch"]` — interactive [optional] — F-RdpServer-1.server-field-start-on-launch
+- `[data-testid="server-row-rdp-start"]` — interactive [optional] — F-RdpServer-1.server-row-rdp-start
+- `[data-testid="server-row-rdp-stop"]` — interactive [optional] — F-RdpServer-1.server-row-rdp-stop
+- `[data-testid="rdp-field-username"]` — interactive [optional] — F-RdpServer-1.rdp-field-username
+- `[data-testid="rdp-field-password"]` — interactive [optional] — F-RdpServer-1.rdp-field-password
+- `[data-testid="rdp-field-domain"]` — interactive [optional] — F-RdpServer-1.rdp-field-domain
+- `[data-testid="rdp-field-view-only"]` — interactive [optional] — F-RdpServer-1.rdp-field-view-only
+- `[data-testid="rdp-field-control-approval"]` — interactive [optional] — F-RdpServer-1.rdp-field-control-approval
+- `[data-testid="rdp-field-public-bind"]` — interactive [optional] — F-RdpServer-1.rdp-field-public-bind
+- `[data-testid="rdp-field-display"]` — interactive [optional] — F-RdpServer-1.rdp-field-display
+
 ## sessions (F6.2)
 
 - `[data-testid="sidebar"]` — display — F6.2.sidebar
