@@ -231,21 +231,53 @@ def set_files(paths: list[Path]) -> None:
         # data is written now. Writing NSURL objects lets AppKit provide it
         # lazily, which can vanish when osascript exits (an empty pasteboard
         # on CI, run 36859698190). The write is read back before returning.
-        _jxa(_JXA_PRELUDE + "var paths = JSON.parse(arg);"
-             "for (var attempt = 0; attempt < 3; attempt++) {"
-             " var items = paths.map(function(p){"
-             "  var item = $.NSPasteboardItem.alloc.init;"
-             "  item.setStringForType($.NSURL.fileURLWithPath($(p)).absoluteString, $('public.file-url'));"
-             "  return item; });"
-             " pb.clearContents;"
-             " if (!pb.writeObjects($(items))) continue;"
-             " var back = pb.readObjectsForClassesOptions($([$.NSURL]), $());"
-             " if (!back.isNil() && back.count === paths.length) { 'ok'; break; }"
-             " delay(0.2); }"
-             "var check = pb.readObjectsForClassesOptions($([$.NSURL]), $());"
-             "(!check.isNil() && check.count === paths.length) ? 'ok'"
-             " : (function(){ throw new Error('file list did not stick on the pasteboard') })()",
-             json.dumps(resolved))
+        # Several writers, each checked by reading the file list back the way
+        # applications do; the first that sticks wins. NSURL objects worked
+        # on some runs and left an empty pasteboard on others, so the error
+        # names what each attempt left behind.
+        script = _JXA_PRELUDE + r"""
+var paths = JSON.parse(arg);
+function urls() { return paths.map(function (p) { return $.NSURL.fileURLWithPath($(p)); }); }
+function stuck() {
+  var back = pb.readObjectsForClassesOptions($([$.NSURL]), $());
+  return !back.isNil() && Number(back.count) >= paths.length;
+}
+function types() {
+  var t = pb.types;
+  return t.isNil() ? '[]' : JSON.stringify(ObjC.deepUnwrap(t));
+}
+var writers = {
+  'nsurl-objects': function () { pb.clearContents; return pb.writeObjects($(urls())); },
+  'file-url-items': function () {
+    var items = urls().map(function (u) {
+      var item = $.NSPasteboardItem.alloc.init;
+      item.setStringForType(u.absoluteString, $('public.file-url'));
+      return item;
+    });
+    pb.clearContents;
+    return pb.writeObjects($(items));
+  },
+  'filenames-plist': function () {
+    pb.clearContents;
+    pb.declareTypesOwner($(['NSFilenamesPboardType']), $());
+    return pb.setPropertyListForType($(paths), $('NSFilenamesPboardType'));
+  }
+};
+var tried = [];
+var winner = null;
+for (var name in writers) {
+  for (var attempt = 0; attempt < 3 && !winner; attempt++) {
+    var wrote = writers[name]();
+    delay(0.2);
+    if (wrote && stuck()) { winner = name; }
+    else { tried.push(name + '#' + attempt + ' wrote=' + wrote + ' types=' + types()); }
+  }
+  if (winner) { break; }
+}
+if (!winner) { throw new Error('file list did not stick on the pasteboard: ' + tried.join('; ')); }
+winner;
+"""
+        _jxa(script, json.dumps(resolved))
     else:
         uris = "".join(Path(p).as_uri() + "\r\n" for p in resolved)
         _xclip_set("text/uri-list", uris.encode("utf-8"))
