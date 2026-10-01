@@ -1712,7 +1712,7 @@ export const zhCN: DeepPartial<typeof en> = {
     restartForPort: "重启服务器以应用端口更改",
     rdpApprovalTitle: "允许远程控制？",
     rdpApprovalMessage:
-      "RDP 客户端 {peer} 正在请求控制这台 Mac。是否允许此连接注入键盘和鼠标输入？请求将在 {seconds} 秒后失效。",
+      "RDP 客户端 {peer} 正在请求控制这台电脑。是否允许此连接注入键盘和鼠标输入？请求将在 {seconds} 秒后失效。",
     rdpApprovalAllow: "允许控制",
     rdpApprovalDeny: "拒绝",
     fields: {
@@ -1789,7 +1789,7 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpCaptureRequired: "启动服务器前必须授予权限",
       rdpControlGranted: "键盘和鼠标控制已启用",
       rdpControlRequired: "键盘和鼠标控制需要此权限",
-      rdpUnattendedControl: "通过认证的客户端无需本机确认即可控制这台 Mac。",
+      rdpUnattendedControl: "通过认证的客户端无需本机确认即可控制这台电脑。",
       rdpCapWindows:
         "桌面采集：Windows 使用 Windows Graphics Capture（WGC），并提供有界的 GDI 兼容回退。请选择要共享的显示器；键盘和鼠标输入使用原生 SendInput。",
       rdpCapUnknown:
@@ -1798,6 +1798,34 @@ export const zhCN: DeepPartial<typeof en> = {
         "已启用端口转发：客户端可使用 -L（本地）、-R（远程）与 -D（动态 SOCKS）。远程转发若监听非本机回环地址，会在日志中给出警告。",
       sshAuthHint:
         "密码与此处配置值比对（不是操作系统/PAM 账号）。密钥文件支持多行 OpenSSH 公钥（authorized_keys 格式）。主机密钥保存在应用数据目录并跨重启复用。",
+    },
+    systemRdp: {
+      title: "Windows 远程桌面",
+      checking: "正在检测系统远程桌面……",
+      stateRunning: "系统远程桌面已启用，正在端口 {port} 运行（{nla}）。可以直接用 Windows 账号连接本机。",
+      nlaOn: "要求 NLA",
+      nlaOff: "未要求 NLA",
+      stateCanEnable: "系统远程桌面未启用。当前账号可以在“设置 → 系统 → 远程桌面”中开启（需要管理员确认）。",
+      stateNeedsAdmin: "系统远程桌面未启用，开启需要管理员权限。可以改用 Taomni RDP Server。",
+      stateUnsupported: "此 Windows 版本（{edition}）不能作为远程桌面主机，请使用 Taomni RDP Server。",
+      probeFailed: "无法检测系统远程桌面：{error}",
+      refresh: "重新检测",
+      openSettingsAction: "打开系统设置",
+      useSystemAction: "使用系统远程桌面",
+      useTaomniAction: "仍使用 Taomni",
+      dialogTitle: "Windows 远程桌面",
+      useSystemMessage: "系统远程桌面已在端口 {port} 运行。建议直接使用它（用 Windows 账号连接）。仍要启动 Taomni RDP Server 吗？",
+      enableSystemMessage: "系统远程桌面未启用。你可以打开系统设置开启它（需要管理员确认），或者改用 Taomni RDP Server。",
+      needsAdminMessage: "系统远程桌面未启用，开启需要管理员权限。要改用 Taomni RDP Server 吗？",
+      keptSystem: "已保留系统远程桌面，未启动 Taomni RDP Server。",
+      settingsOpened: "已打开系统远程桌面设置；开启后可直接使用系统远程桌面。",
+      cancelled: "已取消启动 Taomni RDP Server。",
+      choseTaomni: "已确认使用 Taomni RDP Server（之后不再询问）。",
+      portMoved: "端口 {from} 已被系统远程桌面占用，Taomni RDP Server 改用端口 {to}。",
+      choiceTaomni: "已选择使用 Taomni RDP Server。",
+      choiceReset: "重新选择",
+      recommendSystem: "建议直接使用系统远程桌面；Taomni RDP Server 适合需要 Taomni 功能或系统不支持的情况。",
+      secureDesktopNote: "Taomni RDP Server 以当前用户运行：无法显示或操作 UAC 提示和锁屏界面（系统远程桌面可以）。",
     },
     types: {
       ssh: { label: "SSH / SFTP", desc: "安全外壳与 SFTP 文件服务器" },

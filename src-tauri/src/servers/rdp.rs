@@ -64,8 +64,11 @@ mod gfx;
 mod input;
 #[cfg(target_os = "macos")]
 pub(crate) use input::{control_permission_granted, request_control_permission};
+#[cfg(test)]
+mod loopback_tests;
 mod metrics;
 mod session;
+pub(crate) mod system_rdp;
 mod tls;
 
 use auth::AuthConfig;
@@ -478,7 +481,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     }
     if !view_only && !require_control_approval {
         ctx.log.line(
-            "RDP unattended control is enabled: authenticated clients can control this Mac without a local confirmation prompt.",
+            "RDP unattended control is enabled: authenticated clients can control this computer without a local confirmation prompt.",
         );
     }
 

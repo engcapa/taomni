@@ -178,7 +178,44 @@ def _probe_command(ctx: NativeStepContext, args: dict) -> tuple[list[str], Path]
         else:
             command += [f"--{key}", str(value)]
     command += ["--out", str(artifact)]
+    if scenario not in OFFLINE_SCENARIOS and "snapshot" not in extra:
+        # What the RDP client decoded, saved next to the report as evidence.
+        command += ["--snapshot", str(artifact.with_suffix(".png"))]
     return command, artifact
+
+
+OFFLINE_SCENARIOS = {"host-play", "host-record", "image-digest"}
+
+
+def host_screenshot(path: Path) -> str:
+    """Best-effort full-desktop screenshot with platform tools (diagnostics only)."""
+    system = platform.system()
+    try:
+        if system == "Darwin":
+            result = subprocess.run(["screencapture", "-x", "-t", "png", str(path)],
+                                    capture_output=True, text=True, timeout=30)
+        elif system == "Windows":
+            script = (
+                "Add-Type -AssemblyName System.Windows.Forms,System.Drawing;"
+                "Add-Type -Namespace W -Name D -MemberDefinition "
+                "'[DllImport(\"user32.dll\")] public static extern bool SetProcessDPIAware();';"
+                "[void][W.D]::SetProcessDPIAware();"
+                "$b=[System.Windows.Forms.SystemInformation]::VirtualScreen;"
+                "$bmp=New-Object System.Drawing.Bitmap $b.Width,$b.Height;"
+                "$g=[System.Drawing.Graphics]::FromImage($bmp);"
+                "$g.CopyFromScreen($b.Left,$b.Top,0,0,$bmp.Size);"
+                f"$bmp.Save('{path}',[System.Drawing.Imaging.ImageFormat]::Png)"
+            )
+            result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                                    capture_output=True, text=True, timeout=60)
+        else:
+            result = subprocess.run(["import", "-window", "root", str(path)],
+                                    capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"host screenshot unavailable: {exc}"
+    if result.returncode or not path.is_file():
+        return f"host screenshot failed ({result.returncode}): {(result.stderr or result.stdout)[-300:]}"
+    return f"host screenshot {path.name}"
 
 
 def _lookup(report: Any, dotted: str) -> Any:
@@ -239,6 +276,8 @@ def _finish_probe(ctx: NativeStepContext, process: subprocess.Popen, artifact: P
                         f"{error.get('kind')}: {error.get('message')}")
     problems += _check_expectations(report, args.get("expect") or {}, label)
     if problems:
+        # Pair the client's decoded framebuffer with what the host shows.
+        problems.append(host_screenshot(artifact.with_name(artifact.stem + "-host.png")))
         raise StepError("; ".join(problems))
     return f"{label}: {report.get('scenario')} ok in {report.get('elapsed_ms')} ms ({artifact.name})"
 

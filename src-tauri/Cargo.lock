@@ -4449,6 +4449,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f910b8dc8e7b8e001c61fd742be442e8604fb2499ded713cadf911e7645ade4"
 dependencies = [
  "ironrdp-acceptor",
+ "ironrdp-client",
  "ironrdp-cliprdr",
  "ironrdp-connector",
  "ironrdp-core",
@@ -4509,6 +4510,45 @@ name = "ironrdp-bulk"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e548d9fd162558a5a8aaed72e528556ce88e77773634e3722b8d01d6f170388"
+
+[[package]]
+name = "ironrdp-cfg"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebbd21a7fb8d7c034550c515a11c861621f135493a0f81a015472bdf769a6d4f"
+dependencies = [
+ "ironrdp-propertyset",
+]
+
+[[package]]
+name = "ironrdp-client"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2a3b44f8af101cf5a8cc5bf80470d64099c95c553d5597dec55ff38a821243e"
+dependencies = [
+ "anyhow",
+ "futures-util",
+ "ironrdp-cfg",
+ "ironrdp-connector",
+ "ironrdp-core",
+ "ironrdp-displaycontrol",
+ "ironrdp-dvc",
+ "ironrdp-echo",
+ "ironrdp-graphics",
+ "ironrdp-pdu",
+ "ironrdp-propertyset",
+ "ironrdp-rdcleanpath",
+ "ironrdp-session",
+ "ironrdp-svc",
+ "ironrdp-tls",
+ "ironrdp-tokio",
+ "smallvec",
+ "tokio",
+ "tokio-tungstenite",
+ "tracing",
+ "url",
+ "x509-cert",
+]
 
 [[package]]
 name = "ironrdp-cliprdr"
@@ -4659,6 +4699,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ironrdp-propertyset"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07427e5b1c1ef2cc72cc8be68e1c9816a40923f39d26377d497fa14079120d34"
+
+[[package]]
+name = "ironrdp-rdcleanpath"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6c2ce7c76797b5eeca9f5cca4410e2748f9458c5a11cc41e1e6d5ba475da947"
+dependencies = [
+ "der 0.7.10",
+]
+
+[[package]]
 name = "ironrdp-rdpdr"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4730,7 +4785,9 @@ dependencies = [
  "ironrdp-graphics",
  "ironrdp-pdu",
  "ironrdp-svc",
+ "qoicoubeh",
  "tracing",
+ "zstd-safe",
 ]
 
 [[package]]
@@ -4742,6 +4799,15 @@ dependencies = [
  "bitflags 2.13.2",
  "ironrdp-core",
  "ironrdp-pdu",
+]
+
+[[package]]
+name = "ironrdp-tls"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea5f0bb732e33159834f06a687f5415dae1a82c71c123c1c3a3689d41ed47645"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]

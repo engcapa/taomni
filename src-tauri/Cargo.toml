@@ -131,7 +131,11 @@ tokio-native-tls = "0.3"
 # SDK. Building the vendored source requires a complete Perl distribution.
 openssl = { version = "0.10.81", features = ["vendored"] }
 tokio-openssl = "0.6.5"
-ironrdp = { version = "0.17.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "server", "acceptor"] }
+# `qoi`/`qoiz` must stay enabled together with `session`: the server's default
+# features turn them on in ironrdp-pdu, so `client_codecs_capabilities`
+# advertises QOI/QOIZ, and an IronRDP-based server (Taomni's own included)
+# then sends surface bits the client could not decode — a black desktop.
+ironrdp = { version = "0.17.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "server", "acceptor", "qoi", "qoiz"] }
 ironrdp-tokio = { version = "0.10.0", features = ["reqwest-rustls-ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 rustls-native-certs = "0.8"
@@ -275,6 +279,13 @@ windows = { version = "0.62", features = [
   "Win32_Graphics_Gdi",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
+  # RDP server: built-in Remote Desktop detection (TermService state and
+  # administrator/UAC elevation type) and clipboard change sequence numbers.
+  "Win32_System_Services",
+  "Win32_Security",
+  "Win32_System_Threading",
+  "Win32_UI_Shell",
+  "Win32_System_DataExchange",
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]

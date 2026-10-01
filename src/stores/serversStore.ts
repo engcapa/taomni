@@ -14,6 +14,7 @@ import {
   type ServerType,
 } from "../lib/servers";
 import { ensureVaultReady } from "../lib/vaultGate";
+import { decideRdpStart } from "../lib/systemRdpChoice";
 
 const MAX_LOG_LINES = 500;
 
@@ -174,6 +175,22 @@ export const useServersStore = create<ServersStore>((set, get) => ({
       },
     }));
     try {
+      if (t === "rdp") {
+        // Windows: prefer an available system Remote Desktop unless the user
+        // explicitly chooses Taomni (remembered in the config).
+        const decision = await decideRdpStart(cfg);
+        for (const note of decision.notes) get().appendLog(t, timestampLine(note));
+        if (!decision.proceed) {
+          set((s) => ({
+            runtimes: { ...s.runtimes, [t]: { ...s.runtimes[t], status: "stopped", error: undefined } },
+          }));
+          return;
+        }
+        if (decision.patch && Object.keys(decision.patch).length > 0) {
+          cfg = { ...cfg, ...decision.patch };
+          get().setConfig(t, cfg);
+        }
+      }
       if (t === "rdp" && !(await ensureVaultReady("Store the RDP server password securely"))) {
         throw new Error("RDP server start cancelled: credential vault is not ready");
       }

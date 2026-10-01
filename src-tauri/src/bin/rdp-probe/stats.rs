@@ -90,8 +90,11 @@ pub(crate) fn rms_dbfs(samples: &[f32]) -> Option<f64> {
     if samples.is_empty() {
         return None;
     }
-    let mean_square =
-        samples.iter().map(|s| f64::from(*s) * f64::from(*s)).sum::<f64>() / samples.len() as f64;
+    let mean_square = samples
+        .iter()
+        .map(|s| f64::from(*s) * f64::from(*s))
+        .sum::<f64>()
+        / samples.len() as f64;
     Some(10.0 * mean_square.max(1e-12).log10())
 }
 
@@ -100,14 +103,18 @@ pub(crate) fn mono_from_i16(interleaved: &[i16], channels: u16) -> Vec<f32> {
     let channels = usize::from(channels.max(1));
     interleaved
         .chunks_exact(channels)
-        .map(|frame| {
-            frame.iter().map(|s| f32::from(*s) / 32768.0).sum::<f32>() / channels as f32
-        })
+        .map(|frame| frame.iter().map(|s| f32::from(*s) / 32768.0).sum::<f32>() / channels as f32)
         .collect()
 }
 
 /// Generate interleaved 16-bit PCM for a sine tone at -6 dBFS.
-pub(crate) fn sine_pcm(freq: f64, rate: u32, channels: u16, frames: usize, phase: &mut f64) -> Vec<u8> {
+pub(crate) fn sine_pcm(
+    freq: f64,
+    rate: u32,
+    channels: u16,
+    frames: usize,
+    phase: &mut f64,
+) -> Vec<u8> {
     let step = 2.0 * std::f64::consts::PI * freq / f64::from(rate);
     let mut out = Vec::with_capacity(frames * usize::from(channels) * 2);
     for _ in 0..frames {

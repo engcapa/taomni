@@ -787,6 +787,8 @@ pub fn run() {
             servers::list_server_statuses,
             servers::probe_rdp_capture,
             servers::resolve_rdp_connection_request,
+            servers::probe_system_rdp,
+            servers::open_system_rdp_settings,
             servers::save_server_config,
             servers::load_server_configs,
             vnc::vnc_connect,

@@ -627,12 +627,19 @@ impl Capturer for X11Capturer {
     }
 
     fn next_updates(&mut self, first: bool) -> anyhow::Result<Vec<Frame>> {
+        // DAMAGE uses ReportLevel::NON_EMPTY: the X server notifies only when
+        // the damage region goes from empty to non-empty. A notify drained
+        // here must therefore be honoured (not discarded), otherwise the
+        // region stays non-empty without a subtract and no further notify is
+        // ever sent — capture would stall after the first frame.
+        let mut pending_damage = false;
         if self.randr {
-            let (_, resize_event) = self.drain_damage_events()?;
+            let (damage_event, resize_event) = self.drain_damage_events()?;
             if resize_event && self.refresh_geometry()? {
                 self.clear_damage()?;
                 return Ok(vec![self.capture()?]);
             }
+            pending_damage = damage_event;
         } else if self.refresh_geometry()? {
             self.clear_damage()?;
             return Ok(vec![self.capture()?]);
@@ -659,21 +666,20 @@ impl Capturer for X11Capturer {
         }
 
         // Wait (sleeping, no readback) until the X server reports damage or the
-        // budget elapses. Idle ⇒ we return an empty vec so the caller can check
-        // for shutdown.
+        // budget elapses. When the budget elapses we still fall through to one
+        // cheap subtract: it returns no rectangles when idle, and it re-arms the
+        // NON_EMPTY notify if a notify was ever missed, so capture self-heals
+        // instead of stalling.
         let deadline = Instant::now() + DAMAGE_WAIT_BUDGET;
-        loop {
+        while !pending_damage {
             self.conn.flush().context("flush")?;
             let (damage_event, resize_event) = self.drain_damage_events()?;
             if resize_event && self.refresh_geometry()? {
                 self.clear_damage()?;
                 return Ok(vec![self.capture()?]);
             }
-            if damage_event {
+            if damage_event || Instant::now() >= deadline {
                 break;
-            }
-            if Instant::now() >= deadline {
-                return Ok(vec![]);
             }
             std::thread::sleep(DAMAGE_POLL_STEP);
         }

@@ -4367,6 +4367,31 @@ controls:
     selector: '[data-testid="rdp-field-display"]'
     kind: interactive
     optional: true
+  # Windows built-in Remote Desktop card (design §4.1); absent off Windows.
+  - id: rdp-system-card
+    selector: '[data-testid="rdp-system-card"]'
+    kind: display
+    optional: true
+  - id: rdp-system-message
+    selector: '[data-testid="rdp-system-message"]'
+    kind: display
+    optional: true
+  - id: rdp-system-open-settings
+    selector: '[data-testid="rdp-system-open-settings"]'
+    kind: interactive
+    optional: true
+  - id: rdp-system-refresh
+    selector: '[data-testid="rdp-system-refresh"]'
+    kind: interactive
+    optional: true
+  - id: rdp-system-choice
+    selector: '[data-testid="rdp-system-choice"]'
+    kind: display
+    optional: true
+  - id: rdp-system-choice-reset
+    selector: '[data-testid="rdp-system-choice-reset"]'
+    kind: interactive
+    optional: true
 -->
 
 - 设计：[`docs-feature/rdp-server-parity-design.md`](../docs-feature/rdp-server-parity-design.md)（AC-01~AC-20、TASK-01~12、V-01~V-21）

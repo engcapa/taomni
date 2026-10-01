@@ -78,10 +78,26 @@ steps:
       seconds: 3
     expect:
       negotiated.drdynvc: true
+      advertised_codecs:
+        equals:
+        - remotefx
       graphics_updates:
         min: 1
       desktop.width:
         min: 640
+      framebuffer.painted_share:
+        min: 0.95
+- rdp_probe:
+    scenario: connect
+    artifact: probe-connect-qoiz
+    args:
+      seconds: 3
+      codecs: remotefx,qoi,qoiz
+    expect:
+      advertised_codecs:
+        contains: qoiz
+      framebuffer.painted_share:
+        min: 0.95
 - rdp_probe:
     scenario: latency
     artifact: probe-latency
@@ -133,7 +149,7 @@ verification:
   review: pending
   requirements:
   - id: R1
-    requirement: Start launches the RDP listener, NLA with the configured account succeeds and the probe receives desktop graphics.
+    requirement: Start launches the RDP listener, NLA with the configured account succeeds and the probe decodes the desktop with both the mstsc codec set and the Taomni client codec set.
     actions:
     - 10
     - 14
@@ -141,40 +157,43 @@ verification:
     - step: 15
       expectation: The RDP row reports data-status=running after the vault master password is set.
     - step: 17
-      expectation: The probe report shows drdynvc negotiated, at least one graphics update and a desktop at least 640 px wide.
+      expectation: With RemoteFX only (mstsc-like) drdynvc is negotiated, graphics arrive and at least 95% of the framebuffer grid is painted.
+    - step: 18
+      expectation: With RemoteFX, QOI and QOIZ offered (Taomni client) at least 95% of the framebuffer grid is painted.
     results:
     - 17
+    - 18
   - id: R2
     requirement: Mouse input sent over RDP reaches a host window and the frame change is observed by the client.
     actions:
-    - 18
+    - 19
     checkpoints:
-    - step: 18
-      expectation: At least 8 of 10 clicks produce an observed pixel change, at most 2 time out.
     - step: 19
+      expectation: At least 8 of 10 clicks produce an observed pixel change, at most 2 time out.
+    - step: 20
       expectation: The host Tk target counted at least 10 flips in its own state file.
     results:
-    - 19
+    - 20
   - id: R3
     requirement: A wrong password is rejected at authentication.
     actions:
-    - 20
+    - 21
     checkpoints:
-    - step: 21
+    - step: 22
       expectation: The probe exits with code 3 and error kind auth.
     results:
-    - 21
+    - 22
   - id: R4
     requirement: Stop closes the listener.
     actions:
-    - 23
+    - 24
     checkpoints:
-    - step: 24
-      expectation: The RDP row reports data-status=stopped.
     - step: 25
+      expectation: The RDP row reports data-status=stopped.
+    - step: 26
       expectation: A new connection fails at the transport (exit 4, kind connection).
     results:
-    - 25
+    - 26
   native:
   - check: Real Tauri IPC, vault-backed credential storage, OS screen capture and OS input injection on the runner desktop.
     method: automated

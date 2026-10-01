@@ -6,7 +6,9 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use ironrdp::cliprdr::CliprdrClient;
-use ironrdp::cliprdr::pdu::{ClipboardFormatId, FileContentsFlags, FileContentsRequest, FormatDataResponse};
+use ironrdp::cliprdr::pdu::{
+    ClipboardFormatId, FileContentsFlags, FileContentsRequest, FormatDataResponse,
+};
 use ironrdp::dvc::DrdynvcClient;
 use ironrdp::pdu::rdp::autodetect::AutoDetectRequest;
 use serde_json::{Value, json};
@@ -90,7 +92,9 @@ fn grid_colors(session: &ProbeSession) -> usize {
 
 async fn connect(args: &Args) -> ScenarioResult {
     let plan = ChannelPlan {
-        clipboard: args.flag("clipboard").then(|| ProbeClipboard::new(LocalContent::default())),
+        clipboard: args
+            .flag("clipboard")
+            .then(|| ProbeClipboard::new(LocalContent::default())),
         audio: args.flag("audio").then(ProbeRdpsnd::new),
         audio_input: args.flag("audio-input").then(AudioInputClient::default),
     };
@@ -138,6 +142,7 @@ async fn latency(args: &Args) -> ScenarioResult {
     let mut samples = Vec::with_capacity(count);
     let mut timeouts = 0usize;
     let mut transitions = Vec::new();
+    let initial_pixel = session.pixel(sx, sy);
     for index in 0..warmup + count {
         let base = session.pixel(sx, sy).unwrap_or([0; 4]);
         let started = Instant::now();
@@ -169,7 +174,14 @@ async fn latency(args: &Args) -> ScenarioResult {
                 }
             }
             Some(_) => {}
-            None if index >= warmup => timeouts += 1,
+            None if index >= warmup => {
+                timeouts += 1;
+                // The verdict below is already failed; stop spending the
+                // scenario budget so the partial report is still written.
+                if timeouts * 4 > count {
+                    break;
+                }
+            }
             None => {}
         }
         // Spacing keeps the target from coalescing two flips into one frame.
@@ -183,7 +195,14 @@ async fn latency(args: &Args) -> ScenarioResult {
     report["samples_ms"] = json!(samples);
     report["timeouts"] = json!(timeouts);
     report["mode"] = json!(mode);
-    report["target"] = json!({ "x": x, "y": y, "sample_x": sx, "sample_y": sy });
+    report["target"] = json!({
+        "x": x,
+        "y": y,
+        "sample_x": sx,
+        "sample_y": sy,
+        "initial_pixel": initial_pixel,
+        "final_pixel": session.pixel(sx, sy),
+    });
     report["transitions"] = json!(transitions);
     if samples.is_empty() || timeouts * 4 > count {
         return Err((
@@ -205,7 +224,9 @@ fn parse_rect(text: &str) -> Result<(u16, u16, u16, u16), String> {
         .map_err(|_| format!("--rect expects x,y,w,h, got {text:?}"))?;
     match parts.as_slice() {
         [x, y, w, h] if *w > 0 && *h > 0 => Ok((*x, *y, *w, *h)),
-        _ => Err(format!("--rect expects x,y,w,h with positive size, got {text:?}")),
+        _ => Err(format!(
+            "--rect expects x,y,w,h with positive size, got {text:?}"
+        )),
     }
 }
 
@@ -296,11 +317,17 @@ fn walk(path: &Path, name: &str, out: &mut Vec<LocalFile>) -> Result<(), String>
     Ok(())
 }
 
-async fn drain_clipboard(session: &mut ProbeSession, clip: &ProbeClipboard) -> Result<(), ProbeError> {
+async fn drain_clipboard(
+    session: &mut ProbeSession,
+    clip: &ProbeClipboard,
+) -> Result<(), ProbeError> {
     let actions: Vec<ClipAction> = clip.with(|s| s.actions.drain(..).collect());
     for action in actions {
         let messages = {
-            let Some(cliprdr) = session.active_stage.get_svc_processor_mut::<CliprdrClient>() else {
+            let Some(cliprdr) = session
+                .active_stage
+                .get_svc_processor_mut::<CliprdrClient>()
+            else {
                 return Err(ProbeError::unmet("CLIPRDR channel was not negotiated"));
             };
             match action {
@@ -315,7 +342,11 @@ async fn drain_clipboard(session: &mut ProbeSession, clip: &ProbeClipboard) -> R
     Ok(())
 }
 
-async fn pump_clipboard(session: &mut ProbeSession, clip: &ProbeClipboard, wait: Duration) -> Result<(), ProbeError> {
+async fn pump_clipboard(
+    session: &mut ProbeSession,
+    clip: &ProbeClipboard,
+    wait: Duration,
+) -> Result<(), ProbeError> {
     session.pump(wait).await?;
     drain_clipboard(session, clip).await
 }
@@ -328,7 +359,11 @@ async fn clipboard_send(args: &Args) -> ScenarioResult {
         let image = image::open(&png)
             .map_err(|e| usage(format!("--image-png {png}: {e}")))?
             .to_rgba8();
-        local.dib = Some(clipboard::rgba_to_dib(image.width(), image.height(), image.as_raw()));
+        local.dib = Some(clipboard::rgba_to_dib(
+            image.width(),
+            image.height(),
+            image.as_raw(),
+        ));
     }
     if let Some(files) = args.opt("files") {
         local.files = collect_files(&files).map_err(usage)?;
@@ -342,12 +377,21 @@ async fn clipboard_send(args: &Args) -> ScenarioResult {
     } else if local.text.is_some() {
         vec![13]
     } else {
-        return Err(usage("clipboard-send needs --text, --html, --image-png or --files".into()));
+        return Err(usage(
+            "clipboard-send needs --text, --html, --image-png or --files".into(),
+        ));
     };
     let total_file_bytes: u64 = local.files.iter().map(|f| f.size).sum();
     let wait = Duration::from_secs(args.u64("wait-sec", 20).map_err(usage)?);
     let clip = ProbeClipboard::new(local.clone());
-    let mut session = open(args, ChannelPlan { clipboard: Some(clip.clone()), ..ChannelPlan::default() }).await?;
+    let mut session = open(
+        args,
+        ChannelPlan {
+            clipboard: Some(clip.clone()),
+            ..ChannelPlan::default()
+        },
+    )
+    .await?;
     let deadline = Instant::now() + wait;
     let mut advertised = false;
     let mut last_activity = Instant::now();
@@ -360,8 +404,13 @@ async fn clipboard_send(args: &Args) -> ScenarioResult {
             clip.with(|s| s.actions.push_back(ClipAction::Advertise(local.formats())));
             advertised = true;
         }
-        let (requested, file_requests, served) =
-            clip.with(|s| (s.requested_formats.clone(), s.file_requests, s.file_bytes_served));
+        let (requested, file_requests, served) = clip.with(|s| {
+            (
+                s.requested_formats.clone(),
+                s.file_requests,
+                s.file_bytes_served,
+            )
+        });
         if file_requests != last_requests {
             last_requests = file_requests;
             last_activity = Instant::now();
@@ -370,7 +419,9 @@ async fn clipboard_send(args: &Args) -> ScenarioResult {
         let done = if local.files.is_empty() {
             got_format
         } else {
-            got_format && served >= total_file_bytes && last_activity.elapsed() > Duration::from_millis(800)
+            got_format
+                && served >= total_file_bytes
+                && last_activity.elapsed() > Duration::from_millis(800)
         };
         if done || Instant::now() >= deadline {
             let mut report = clipboard_report(&mut session, &clip);
@@ -383,7 +434,9 @@ async fn clipboard_send(args: &Args) -> ScenarioResult {
                 ));
             }
             // Give the server a moment to apply the data to the host clipboard.
-            let _ = session.pump_until(Instant::now() + Duration::from_millis(800)).await;
+            let _ = session
+                .pump_until(Instant::now() + Duration::from_millis(800))
+                .await;
             return Ok(report);
         }
     }
@@ -428,10 +481,18 @@ fn find_format(clip: &ProbeClipboard, kind: &str) -> Option<u32> {
     })
 }
 
-async fn paste(session: &mut ProbeSession, clip: &ProbeClipboard, format: u32, wait: Duration) -> Result<Vec<u8>, ProbeError> {
+async fn paste(
+    session: &mut ProbeSession,
+    clip: &ProbeClipboard,
+    format: u32,
+    wait: Duration,
+) -> Result<Vec<u8>, ProbeError> {
     clip.with(|s| s.pending_paste = Some(format));
     let messages = {
-        let Some(cliprdr) = session.active_stage.get_svc_processor_mut::<CliprdrClient>() else {
+        let Some(cliprdr) = session
+            .active_stage
+            .get_svc_processor_mut::<CliprdrClient>()
+        else {
             return Err(ProbeError::unmet("CLIPRDR channel was not negotiated"));
         };
         cliprdr
@@ -442,11 +503,19 @@ async fn paste(session: &mut ProbeSession, clip: &ProbeClipboard, format: u32, w
     let deadline = Instant::now() + wait;
     loop {
         pump_clipboard(session, clip, Duration::from_millis(50)).await?;
-        if let Some((_, result)) = clip.with(|s| s.responses.iter().rev().find(|(id, _)| *id == format).cloned()) {
+        if let Some((_, result)) = clip.with(|s| {
+            s.responses
+                .iter()
+                .rev()
+                .find(|(id, _)| *id == format)
+                .cloned()
+        }) {
             return result.map_err(ProbeError::unmet);
         }
         if Instant::now() >= deadline {
-            return Err(ProbeError::unmet(format!("no data response for format {format}")));
+            return Err(ProbeError::unmet(format!(
+                "no data response for format {format}"
+            )));
         }
     }
 }
@@ -466,7 +535,10 @@ async fn fetch_file(
     ) -> Result<Vec<u8>, ProbeError> {
         let id = request.stream_id;
         let messages = {
-            let Some(cliprdr) = session.active_stage.get_svc_processor_mut::<CliprdrClient>() else {
+            let Some(cliprdr) = session
+                .active_stage
+                .get_svc_processor_mut::<CliprdrClient>()
+            else {
                 return Err(ProbeError::unmet("CLIPRDR channel was not negotiated"));
             };
             cliprdr
@@ -483,12 +555,16 @@ async fn fetch_file(
             });
             if let Some(response) = found {
                 if response.is_error() {
-                    return Err(ProbeError::unmet(format!("server failed file contents stream {id}")));
+                    return Err(ProbeError::unmet(format!(
+                        "server failed file contents stream {id}"
+                    )));
                 }
                 return Ok(response.data().to_vec());
             }
             if Instant::now() >= deadline {
-                return Err(ProbeError::unmet(format!("no file contents response for stream {id}")));
+                return Err(ProbeError::unmet(format!(
+                    "no file contents response for stream {id}"
+                )));
             }
         }
     }
@@ -531,7 +607,9 @@ async fn fetch_file(
         )
         .await?;
         if bytes.is_empty() {
-            return Err(ProbeError::unmet("server returned an empty RANGE before EOF"));
+            return Err(ProbeError::unmet(
+                "server returned an empty RANGE before EOF",
+            ));
         }
         data.extend_from_slice(&bytes);
     }
@@ -547,7 +625,14 @@ async fn clipboard_receive(args: &Args) -> ScenarioResult {
     let out_dir = args.opt("out-dir").map(PathBuf::from);
     let wait = Duration::from_secs(args.u64("wait-sec", 20).map_err(usage)?);
     let clip = ProbeClipboard::new(LocalContent::default());
-    let mut session = open(args, ChannelPlan { clipboard: Some(clip.clone()), ..ChannelPlan::default() }).await?;
+    let mut session = open(
+        args,
+        ChannelPlan {
+            clipboard: Some(clip.clone()),
+            ..ChannelPlan::default()
+        },
+    )
+    .await?;
     let deadline = Instant::now() + wait;
     let format = loop {
         if let Err(error) = pump_clipboard(&mut session, &clip, Duration::from_millis(50)).await {
@@ -614,14 +699,16 @@ async fn clipboard_receive(args: &Args) -> ScenarioResult {
                     let mut files = Vec::new();
                     let mut failure = None;
                     for (index, descriptor) in list.files.iter().enumerate() {
-                        let is_dir = descriptor
-                            .attributes
-                            .is_some_and(|a| a.contains(ironrdp::cliprdr::pdu::ClipboardFileAttributes::DIRECTORY));
+                        let is_dir = descriptor.attributes.is_some_and(|a| {
+                            a.contains(ironrdp::cliprdr::pdu::ClipboardFileAttributes::DIRECTORY)
+                        });
                         if is_dir {
                             files.push(json!({ "name": descriptor.name, "dir": true }));
                             continue;
                         }
-                        match fetch_file(&mut session, &clip, index as i32, &mut stream_id, wait).await {
+                        match fetch_file(&mut session, &clip, index as i32, &mut stream_id, wait)
+                            .await
+                        {
                             Ok(bytes) => {
                                 if let Some(dir) = &out_dir {
                                     let relative = descriptor.name.replace('\\', "/");
@@ -649,7 +736,9 @@ async fn clipboard_receive(args: &Args) -> ScenarioResult {
                 }
             }
         }
-        other => Err(ProbeError::usage(format!("--expect must be text|html|image|files, got {other}"))),
+        other => Err(ProbeError::usage(format!(
+            "--expect must be text|html|image|files, got {other}"
+        ))),
     };
     match result {
         Ok(value) => {
@@ -666,7 +755,14 @@ async fn audio_capture(args: &Args) -> ScenarioResult {
     let audio = ProbeRdpsnd::new();
     let capture = audio.capture.clone();
     let formats: Vec<_> = (0..3).filter_map(|i| audio.format(i).cloned()).collect();
-    let mut session = open(args, ChannelPlan { audio: Some(audio), ..ChannelPlan::default() }).await?;
+    let mut session = open(
+        args,
+        ChannelPlan {
+            audio: Some(audio),
+            ..ChannelPlan::default()
+        },
+    )
+    .await?;
     settle(&mut session, Duration::from_secs_f64(seconds)).await?;
     let mut report = session.summary();
     let captured = capture.lock().expect("audio capture");
@@ -687,12 +783,20 @@ async fn audio_capture(args: &Args) -> ScenarioResult {
     };
     let mono = stats::mono_from_i16(&captured.samples, format.n_channels);
     if let Some(path) = args.opt("wav-out") {
-        let _ = write_wav(Path::new(&path), &captured.samples, format.n_samples_per_sec, format.n_channels);
+        let _ = write_wav(
+            Path::new(&path),
+            &captured.samples,
+            format.n_samples_per_sec,
+            format.n_channels,
+        );
     }
     report["tone"] = stats::tone_report(&mono, format.n_samples_per_sec, expected);
     if expected.is_some() && report["tone"]["frequency_matches"] != json!(true) {
         drop(captured);
-        return Err((ProbeError::unmet("received audio does not contain the expected tone"), report));
+        return Err((
+            ProbeError::unmet("received audio does not contain the expected tone"),
+            report,
+        ));
     }
     Ok(report)
 }
@@ -723,8 +827,16 @@ async fn mic_send(args: &Args) -> ScenarioResult {
     let freq = args.f64("freq", 440.0).map_err(usage)?;
     let client = AudioInputClient::default();
     let state = client.state.clone();
-    let mut session = open(args, ChannelPlan { audio_input: Some(client), ..ChannelPlan::default() }).await?;
-    let open_deadline = Instant::now() + Duration::from_secs(args.u64("open-wait-sec", 15).map_err(usage)?);
+    let mut session = open(
+        args,
+        ChannelPlan {
+            audio_input: Some(client),
+            ..ChannelPlan::default()
+        },
+    )
+    .await?;
+    let open_deadline =
+        Instant::now() + Duration::from_secs(args.u64("open-wait-sec", 15).map_err(usage)?);
     loop {
         if let Err(error) = session.pump(Duration::from_millis(50)).await {
             return Err((error, mic_report(&mut session, &state, 0, 0)));
@@ -758,7 +870,13 @@ async fn mic_send(args: &Args) -> ScenarioResult {
     let mut bytes_sent = 0usize;
     let started = Instant::now();
     for index in 0..packets {
-        let pcm = stats::sine_pcm(freq, format.rate, format.channels, frames_per_packet, &mut phase);
+        let pcm = stats::sine_pcm(
+            freq,
+            format.rate,
+            format.channels,
+            frames_per_packet,
+            &mut phase,
+        );
         bytes_sent += pcm.len();
         if let Err(error) = session
             .send_dvc_messages(channel_id, audio_input::data_pdus(&pcm))
@@ -771,7 +889,9 @@ async fn mic_send(args: &Args) -> ScenarioResult {
             return Err((error, mic_report(&mut session, &state, index, bytes_sent)));
         }
     }
-    let _ = session.pump_until(Instant::now() + Duration::from_millis(300)).await;
+    let _ = session
+        .pump_until(Instant::now() + Duration::from_millis(300))
+        .await;
     Ok(mic_report(&mut session, &state, packets, bytes_sent))
 }
 
@@ -842,11 +962,17 @@ async fn autodetect(args: &Args) -> ScenarioResult {
 /// Pixel digest of a PNG (RGB only, so an alpha-dropping clipboard path still
 /// compares equal for opaque reference images).
 fn image_digest(args: &Args) -> ScenarioResult {
-    let path = args.opt("png").ok_or_else(|| usage("--png is required".into()))?;
+    let path = args
+        .opt("png")
+        .ok_or_else(|| usage("--png is required".into()))?;
     let image = image::open(&path)
         .map_err(|e| plain(ProbeError::unmet(format!("{path}: {e}"))))?
         .to_rgba8();
-    let rgb: Vec<u8> = image.as_raw().chunks_exact(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
+    let rgb: Vec<u8> = image
+        .as_raw()
+        .chunks_exact(4)
+        .flat_map(|p| [p[0], p[1], p[2]])
+        .collect();
     Ok(json!({
         "width": image.width(),
         "height": image.height(),
@@ -865,10 +991,18 @@ fn host_play(args: &Args) -> ScenarioResult {
 fn host_record(args: &Args) -> ScenarioResult {
     let seconds = args.f64("seconds", 3.0).map_err(usage)?;
     let expected = args.opt("freq").and_then(|f| f.parse::<f64>().ok());
-    let report = host_audio::record(seconds, args.opt("device").as_deref(), args.flag("loopback"), expected)
-        .map_err(|e| plain(ProbeError::unmet(e)))?;
+    let report = host_audio::record(
+        seconds,
+        args.opt("device").as_deref(),
+        args.flag("loopback"),
+        expected,
+    )
+    .map_err(|e| plain(ProbeError::unmet(e)))?;
     if expected.is_some() && report["frequency_matches"] != json!(true) {
-        return Err((ProbeError::unmet("recorded audio does not contain the expected tone"), report));
+        return Err((
+            ProbeError::unmet("recorded audio does not contain the expected tone"),
+            report,
+        ));
     }
     Ok(report)
 }

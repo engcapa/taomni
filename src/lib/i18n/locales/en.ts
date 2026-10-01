@@ -1721,7 +1721,7 @@ const dict = {
     restartForPort: "Restart server to apply port change",
     rdpApprovalTitle: "Allow remote control?",
     rdpApprovalMessage:
-      "RDP client {peer} is requesting control of this Mac. Allow input for this connection? This request expires in {seconds} seconds.",
+      "RDP client {peer} is requesting control of this computer. Allow input for this connection? This request expires in {seconds} seconds.",
     rdpApprovalAllow: "Allow control",
     rdpApprovalDeny: "Deny",
     fields: {
@@ -1792,7 +1792,7 @@ const dict = {
       rdpVaultReason: "Unlock the credential vault to protect the RDP server password.",
       rdpVaultCancelled: "RDP server settings were not saved because the credential vault is locked.",
       rdpPublicBind:
-        "This exposes the RDP listener beyond this Mac. Restrict it with a firewall and use only trusted networks.",
+        "This exposes the RDP listener beyond this computer. Restrict it with a firewall and use only trusted networks.",
       rdpInsecure:
         "No security means traffic is unencrypted and, without credentials, anyone who can reach the port gets full control. Use only on an isolated network.",
       rdpCapLinux:
@@ -1804,7 +1804,7 @@ const dict = {
       rdpControlGranted: "Keyboard and mouse control enabled",
       rdpControlRequired: "Required for keyboard and mouse control",
       rdpUnattendedControl:
-        "Authenticated clients can control this Mac without a local confirmation prompt.",
+        "Authenticated clients can control this computer without a local confirmation prompt.",
       rdpCapWindows:
         "Desktop capture: Windows uses Windows Graphics Capture (WGC) with a bounded GDI compatibility fallback. Select the display to share; keyboard and pointer input use native SendInput.",
       rdpCapUnknown:
@@ -1813,6 +1813,42 @@ const dict = {
         "Port forwarding is enabled: clients may use -L (local), -R (remote), and -D (dynamic SOCKS). Remote (-R) listeners bound off-loopback are logged as a warning.",
       sshAuthHint:
         "Password is checked against the value configured here (not OS/PAM accounts). Key file may contain multiple OpenSSH public keys (authorized_keys format). Host key is stored under app data and reused across restarts.",
+    },
+    systemRdp: {
+      title: "Windows Remote Desktop",
+      checking: "Checking the system Remote Desktop…",
+      stateRunning:
+        "System Remote Desktop is enabled and running on port {port} ({nla}). You can connect to this PC with a Windows account directly.",
+      nlaOn: "NLA required",
+      nlaOff: "NLA not required",
+      stateCanEnable:
+        "System Remote Desktop is off. This account can turn it on in Settings → System → Remote Desktop (administrator confirmation required).",
+      stateNeedsAdmin:
+        "System Remote Desktop is off and turning it on requires an administrator. You can use the Taomni RDP server instead.",
+      stateUnsupported: "This Windows edition ({edition}) cannot host Remote Desktop. Use the Taomni RDP server.",
+      probeFailed: "Could not check the system Remote Desktop: {error}",
+      refresh: "Check again",
+      openSettingsAction: "Open system settings",
+      useSystemAction: "Use system Remote Desktop",
+      useTaomniAction: "Use Taomni anyway",
+      dialogTitle: "Windows Remote Desktop",
+      useSystemMessage:
+        "System Remote Desktop is already running on port {port}. We recommend using it directly (sign in with a Windows account). Start the Taomni RDP server anyway?",
+      enableSystemMessage:
+        "System Remote Desktop is off. You can open the system settings to turn it on (administrator confirmation required), or use the Taomni RDP server instead.",
+      needsAdminMessage:
+        "System Remote Desktop is off and turning it on requires an administrator. Use the Taomni RDP server instead?",
+      keptSystem: "Kept the system Remote Desktop; the Taomni RDP server was not started.",
+      settingsOpened: "Opened the system Remote Desktop settings; once it is on you can use it directly.",
+      cancelled: "Starting the Taomni RDP server was cancelled.",
+      choseTaomni: "Confirmed using the Taomni RDP server (you will not be asked again).",
+      portMoved: "Port {from} is used by the system Remote Desktop; the Taomni RDP server uses port {to} instead.",
+      choiceTaomni: "You chose the Taomni RDP server.",
+      choiceReset: "Choose again",
+      recommendSystem:
+        "Prefer the system Remote Desktop; the Taomni RDP server is for Taomni features or editions without a Remote Desktop host.",
+      secureDesktopNote:
+        "The Taomni RDP server runs as the current user: it cannot show or control UAC prompts or the lock screen (the system Remote Desktop can).",
     },
     types: {
       ssh: { label: "SSH / SFTP", desc: "Secure shell and SFTP file server" },

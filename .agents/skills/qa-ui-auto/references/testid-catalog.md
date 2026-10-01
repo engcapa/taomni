@@ -1494,6 +1494,12 @@
 - `[data-testid="rdp-field-control-approval"]` — interactive [optional] — F-RdpServer-1.rdp-field-control-approval
 - `[data-testid="rdp-field-public-bind"]` — interactive [optional] — F-RdpServer-1.rdp-field-public-bind
 - `[data-testid="rdp-field-display"]` — interactive [optional] — F-RdpServer-1.rdp-field-display
+- `[data-testid="rdp-system-card"]` — display [optional] — F-RdpServer-1.rdp-system-card
+- `[data-testid="rdp-system-message"]` — display [optional] — F-RdpServer-1.rdp-system-message
+- `[data-testid="rdp-system-open-settings"]` — interactive [optional] — F-RdpServer-1.rdp-system-open-settings
+- `[data-testid="rdp-system-refresh"]` — interactive [optional] — F-RdpServer-1.rdp-system-refresh
+- `[data-testid="rdp-system-choice"]` — display [optional] — F-RdpServer-1.rdp-system-choice
+- `[data-testid="rdp-system-choice-reset"]` — interactive [optional] — F-RdpServer-1.rdp-system-choice-reset
 
 ## sessions (F6.2)
 

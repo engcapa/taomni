@@ -199,7 +199,8 @@ Connection options:
   --domain DOMAIN --width 1280 --height 720 --timeout-sec 60
   --alternate-shell CMD --work-dir DIR   (reference-server initial program)
 Output:
-  --out report.json   also write the JSON report to this path";
+  --out report.json   also write the JSON report to this path
+  --snapshot fb.png   save the decoded framebuffer whenever the report is built";
 
 fn main() {
     let args = match Args::parse(std::env::args().skip(1)) {

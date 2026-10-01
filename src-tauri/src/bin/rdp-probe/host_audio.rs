@@ -33,14 +33,24 @@ mod imp {
             return devices
                 .into_iter()
                 .find(|d| device_name(d).to_lowercase().contains(&needle))
-                .ok_or_else(|| format!("no {} device matching {needle:?}; have {names:?}", if output { "output" } else { "input" }));
+                .ok_or_else(|| {
+                    format!(
+                        "no {} device matching {needle:?}; have {names:?}",
+                        if output { "output" } else { "input" }
+                    )
+                });
         }
         if output {
             host.default_output_device()
         } else {
             host.default_input_device()
         }
-        .ok_or_else(|| format!("no default {} device", if output { "output" } else { "input" }))
+        .ok_or_else(|| {
+            format!(
+                "no default {} device",
+                if output { "output" } else { "input" }
+            )
+        })
     }
 
     pub fn play(freq: f64, seconds: f64, device: Option<&str>) -> Result<Value, String> {
@@ -93,12 +103,18 @@ mod imp {
         stream.play().map_err(|e| e.to_string())?;
         std::thread::sleep(Duration::from_secs_f64(seconds));
         drop(stream);
-        Ok(json!({ "device": name, "rate": rate, "channels": channels, "freq": freq, "seconds": seconds }))
+        Ok(
+            json!({ "device": name, "rate": rate, "channels": channels, "freq": freq, "seconds": seconds }),
+        )
     }
 
     /// Record mono f32 samples. `loopback` records what an output device
     /// plays (WASAPI loopback on Windows) instead of an input device.
-    pub fn record(seconds: f64, device: Option<&str>, loopback: bool) -> Result<(Vec<f32>, u32, String), String> {
+    pub fn record(
+        seconds: f64,
+        device: Option<&str>,
+        loopback: bool,
+    ) -> Result<(Vec<f32>, u32, String), String> {
         let device = pick(loopback, device)?;
         let name = device_name(&device);
         let config = if loopback {
@@ -120,7 +136,10 @@ mod imp {
                     &stream_config,
                     move |data: &[f32], _| {
                         let mut out = samples.lock().unwrap();
-                        out.extend(data.chunks(channels).map(|f| f.iter().sum::<f32>() / channels as f32));
+                        out.extend(
+                            data.chunks(channels)
+                                .map(|f| f.iter().sum::<f32>() / channels as f32),
+                        );
                     },
                     err,
                     None,
@@ -163,7 +182,12 @@ pub(crate) fn play(freq: f64, seconds: f64, device: Option<&str>) -> Result<Valu
     }
 }
 
-pub(crate) fn record(seconds: f64, device: Option<&str>, loopback: bool, expected: Option<f64>) -> Result<Value, String> {
+pub(crate) fn record(
+    seconds: f64,
+    device: Option<&str>,
+    loopback: bool,
+    expected: Option<f64>,
+) -> Result<Value, String> {
     #[cfg(feature = "rdp-server-audio")]
     {
         let (samples, rate, name) = imp::record(seconds, device, loopback)?;

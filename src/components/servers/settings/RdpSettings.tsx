@@ -14,6 +14,7 @@ import {
   SelectField,
   TextField,
 } from "../fields";
+import { SystemRdpCard } from "./SystemRdpCard";
 
 interface Props {
   config: ServerConfig;
@@ -88,6 +89,7 @@ export function RdpSettings({ config, onChange }: Props) {
 
   return (
     <div className="flex flex-col">
+      <SystemRdpCard config={config} onChange={onChange} />
       <FieldNote>{capabilityNote}</FieldNote>
       {supportsDisplaySelection ? (
         <SelectField

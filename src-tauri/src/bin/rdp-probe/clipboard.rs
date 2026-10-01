@@ -12,9 +12,9 @@ use std::sync::{Arc, Mutex};
 use ironrdp::cliprdr::backend::CliprdrBackend;
 use ironrdp::cliprdr::pdu::{
     ClipboardFileAttributes, ClipboardFormat, ClipboardFormatId, ClipboardFormatName,
-    ClipboardGeneralCapabilityFlags, FileContentsFlags, FileContentsRequest,
-    FileContentsResponse, FileDescriptor, FormatDataRequest, FormatDataResponse, LockDataId,
-    OwnedFormatDataResponse, PackedFileList,
+    ClipboardGeneralCapabilityFlags, FileContentsFlags, FileContentsRequest, FileContentsResponse,
+    FileDescriptor, FormatDataRequest, FormatDataResponse, LockDataId, OwnedFormatDataResponse,
+    PackedFileList,
 };
 use ironrdp::core::AsAny;
 
@@ -190,7 +190,10 @@ impl CliprdrBackend for ProbeClipboard {
         self.with(|s| s.format_list_acks.push(ok));
     }
 
-    fn on_process_negotiated_capabilities(&mut self, capabilities: ClipboardGeneralCapabilityFlags) {
+    fn on_process_negotiated_capabilities(
+        &mut self,
+        capabilities: ClipboardGeneralCapabilityFlags,
+    ) {
         self.with(|s| s.negotiated = Some(capabilities.bits()));
     }
 
@@ -235,7 +238,8 @@ impl CliprdrBackend for ProbeClipboard {
             if !response.is_error() && request.flags.contains(FileContentsFlags::RANGE) {
                 s.file_bytes_served += response.data().len() as u64;
             }
-            s.actions.push_back(ClipAction::SubmitFileContents(response));
+            s.actions
+                .push_back(ClipAction::SubmitFileContents(response));
         });
     }
 
@@ -277,7 +281,10 @@ fn local_format_data(local: &LocalContent, id: u32) -> OwnedFormatDataResponse {
     }
 }
 
-fn serve_file_contents(local: &LocalContent, request: &FileContentsRequest) -> FileContentsResponse<'static> {
+fn serve_file_contents(
+    local: &LocalContent,
+    request: &FileContentsRequest,
+) -> FileContentsResponse<'static> {
     let Some(file) = usize::try_from(request.index)
         .ok()
         .and_then(|index| local.files.get(index))
@@ -341,7 +348,10 @@ pub(crate) fn cf_html_fragment(data: &[u8]) -> Option<String> {
     let text = String::from_utf8_lossy(data);
     let field = |name: &str| -> Option<usize> {
         let start = text.find(name)? + name.len();
-        let digits: String = text[start..].chars().take_while(|c| c.is_ascii_digit()).collect();
+        let digits: String = text[start..]
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
         digits.parse().ok()
     };
     let start = field("StartFragment:")?;
@@ -396,7 +406,11 @@ pub(crate) fn dib_to_rgba(dib: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
         return Err(format!("unsupported DIB depth {bpp}"));
     }
     // BI_BITFIELDS with a plain BITMAPINFOHEADER stores three masks after it.
-    let masks = if compression == 3 && header_size == 40 { 12 } else { 0 };
+    let masks = if compression == 3 && header_size == 40 {
+        12
+    } else {
+        0
+    };
     let pixels = header_size + masks;
     let (w, h) = (width as usize, height.unsigned_abs() as usize);
     let stride = (w * usize::from(bpp) / 8).div_ceil(4) * 4;

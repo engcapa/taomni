@@ -491,6 +491,23 @@ pub async fn probe_rdp_capture(
     rdp::capture::probe().map_err(|e| e.to_string())
 }
 
+/// Windows built-in Remote Desktop state for the RDP settings card and the
+/// start confirmation (non-Windows: `applicable = false`).
+#[tauri::command]
+pub async fn probe_system_rdp() -> Result<rdp::system_rdp::SystemRdpStatus, String> {
+    tokio::task::spawn_blocking(rdp::system_rdp::probe)
+        .await
+        .map_err(|e| format!("system Remote Desktop probe failed: {e}"))
+}
+
+/// Open the operating system's Remote Desktop settings page (Windows only).
+#[tauri::command]
+pub async fn open_system_rdp_settings() -> Result<(), String> {
+    tokio::task::spawn_blocking(rdp::system_rdp::open_settings)
+        .await
+        .map_err(|e| format!("failed to open Remote Desktop settings: {e}"))?
+}
+
 #[tauri::command]
 pub async fn save_server_config(
     state: State<'_, AppState>,
@@ -652,6 +669,19 @@ fn resolve_rdp_password(state: &AppState, config: &mut ServerConfig) -> Result<(
     Ok(())
 }
 
+/// On Windows, Taomni's RDP server only autostarts after the user explicitly
+/// chose it over an available system Remote Desktop (design AC-04).
+fn rdp_autostart_allowed(config: &serde_json::Value) -> bool {
+    use rdp::system_rdp::Recommendation;
+    if config.get("systemRdpChoice").and_then(|v| v.as_str()) == Some("taomni") {
+        return true;
+    }
+    !matches!(
+        rdp::system_rdp::probe().recommendation,
+        Some(Recommendation::UseSystem | Recommendation::EnableSystem | Recommendation::NeedsAdmin)
+    )
+}
+
 /// Called once at startup to start any servers whose persisted config has
 /// `startOnLaunch=true`. Errors are logged but never abort startup; each
 /// failure still surfaces via the normal `server://status/<type>` event.
@@ -681,6 +711,13 @@ pub async fn autostart_servers(app: AppHandle) {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
         if !should {
+            continue;
+        }
+        if type_str == ServerType::Rdp.as_str() && !rdp_autostart_allowed(&value) {
+            tracing::warn!(
+                "autostart server rdp skipped: Windows Remote Desktop is available and the \
+                 user has not confirmed using Taomni's RDP server"
+            );
             continue;
         }
         let state: State<AppState> = app.state();

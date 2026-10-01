@@ -70,6 +70,8 @@ steps:
     expect:
       first_graphics_ms:
         exists: true
+      framebuffer.painted_share:
+        min: 0.95
 - host_helper:
     action: start
     name: target
@@ -78,10 +80,12 @@ steps:
 - rdp_probe:
     scenario: latency
     artifact: perf-latency
+    timeout_sec: 330
     args:
       x: 280
       y: 240
       samples: 40
+      timeout-sec: 300
     expect:
       timeouts:
         max: 4
@@ -122,7 +126,7 @@ verification:
     - 20
     checkpoints:
     - step: 16
-      expectation: The connect report includes first_graphics_ms.
+      expectation: The connect report includes first_graphics_ms and at least 95% of the framebuffer grid is painted.
     - step: 18
       expectation: At least 36 of 40 latency samples were observed.
     - step: 21

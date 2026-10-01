@@ -6,7 +6,9 @@
 //! accepts any server certificate (it targets disposable local servers) but
 //! records the SHA-256 fingerprint so a report can still identify the server.
 
+use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -24,7 +26,9 @@ use ironrdp::pdu::Action;
 use ironrdp::pdu::gcc::KeyboardType;
 use ironrdp::pdu::geometry::InclusiveRectangle;
 use ironrdp::pdu::rdp::autodetect::AutoDetectRequest;
-use ironrdp::pdu::rdp::capability_sets::MajorPlatformType;
+use ironrdp::pdu::rdp::capability_sets::{
+    BitmapCodecs, MajorPlatformType, client_codecs_capabilities,
+};
 use ironrdp::pdu::rdp::client_info::{PerformanceFlags, TimezoneInfo};
 use ironrdp::pdu::rdp::headers::ShareDataPdu;
 use ironrdp::pdu::rdp::refresh_rectangle::RefreshRectanglePdu;
@@ -68,7 +72,15 @@ pub(crate) struct ConnectOptions {
     pub alternate_shell: String,
     pub work_dir: String,
     pub timeout: Duration,
+    /// Where to save the decoded framebuffer as PNG whenever a report is built,
+    /// so a red run shows exactly what the client saw.
+    pub snapshot: Option<PathBuf>,
+    /// `client_codecs_capabilities` configuration. The default mimics mstsc,
+    /// which offers RemoteFX but none of IronRDP's QOI codecs.
+    pub codecs: Vec<String>,
 }
+
+const MSTSC_LIKE_CODECS: &str = "remotefx,qoi:off,qoiz:off";
 
 impl ConnectOptions {
     pub fn from_args(args: &Args) -> Result<Self, ProbeError> {
@@ -98,6 +110,13 @@ impl ConnectOptions {
             alternate_shell: args.str("alternate-shell", ""),
             work_dir: args.str("work-dir", ""),
             timeout: Duration::from_secs(args.u64("connect-timeout-sec", 30)?),
+            snapshot: args.opt("snapshot").map(PathBuf::from),
+            codecs: args
+                .str("codecs", MSTSC_LIKE_CODECS)
+                .split(',')
+                .map(|codec| codec.trim().to_string())
+                .filter(|codec| !codec.is_empty())
+                .collect(),
         })
     }
 }
@@ -132,6 +151,13 @@ pub(crate) struct ProbeSession {
     pub fingerprint: String,
     pub channels: Vec<&'static str>,
     pub terminated: Option<String>,
+    /// Updates whose union rectangle was empty: frame markers or surface
+    /// commands without pixels. Counted apart so "graphics_updates" is not
+    /// mistaken for painted content.
+    pub empty_updates: u64,
+    snapshot: Option<PathBuf>,
+    /// Bitmap codec ids offered in the client capability set.
+    advertised_codecs: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -216,9 +242,30 @@ async fn tls_upgrade(stream: TcpStream, host: &str) -> Result<(Stream, Vec<u8>, 
     Ok((tls, public_key, fingerprint))
 }
 
-fn connector_config(opts: &ConnectOptions, audio_playback: bool) -> connector::Config {
-    let codecs = ironrdp::pdu::rdp::capability_sets::client_codecs_capabilities(&["remotefx"])
-        .unwrap_or_default();
+/// Resolve `--codecs`. `qoi`/`qoiz` are only known to ironrdp-pdu builds with
+/// those features, so `name:off` for an absent codec is dropped instead of
+/// failing the whole list.
+fn client_codecs(config: &[String]) -> Result<BitmapCodecs, ProbeError> {
+    let refs: Vec<&str> = config.iter().map(String::as_str).collect();
+    match client_codecs_capabilities(&refs) {
+        Ok(codecs) => Ok(codecs),
+        Err(first) => {
+            let enabled: Vec<&str> = refs
+                .iter()
+                .copied()
+                .filter(|c| !c.ends_with(":off"))
+                .collect();
+            client_codecs_capabilities(&enabled)
+                .map_err(|_| ProbeError::usage(format!("--codecs {}: {first}", config.join(","))))
+        }
+    }
+}
+
+fn connector_config(
+    opts: &ConnectOptions,
+    codecs: BitmapCodecs,
+    audio_playback: bool,
+) -> connector::Config {
     connector::Config {
         credentials: Credentials::UsernamePassword {
             username: opts.user.clone(),
@@ -298,8 +345,12 @@ impl ProbeSession {
             .map_err(|e| ProbeError::connection(format!("local address: {e}")))?;
 
         let mut channels = Vec::new();
-        let mut connector =
-            connector::ClientConnector::new(connector_config(opts, plan.audio.is_some()), local_addr);
+        let codecs = client_codecs(&opts.codecs)?;
+        let advertised_codecs = codecs.0.iter().map(|codec| codec.id).collect();
+        let mut connector = connector::ClientConnector::new(
+            connector_config(opts, codecs, plan.audio.is_some()),
+            local_addr,
+        );
         if let Some(clipboard) = plan.clipboard {
             connector.attach_static_channel(CliprdrClient::new(Box::new(clipboard)));
             channels.push("cliprdr");
@@ -391,6 +442,9 @@ impl ProbeSession {
             fingerprint,
             channels,
             terminated: None,
+            empty_updates: 0,
+            snapshot: opts.snapshot.clone(),
+            advertised_codecs,
         })
     }
 
@@ -516,6 +570,13 @@ impl ProbeSession {
                 }
                 ActiveStageOutput::GraphicsUpdate(rect) => {
                     self.graphics_updates += 1;
+                    // ironrdp reports a pixel-less surface update as the
+                    // all-zero rectangle.
+                    let zero =
+                        rect.left == 0 && rect.top == 0 && rect.right == 0 && rect.bottom == 0;
+                    if zero || rect.right < rect.left || rect.bottom < rect.top {
+                        self.empty_updates += 1;
+                    }
                     if self.first_graphics_ms.is_none() {
                         self.first_graphics_ms =
                             Some(self.connected_at.elapsed().as_millis() as u64 + self.connect_ms);
@@ -674,6 +735,54 @@ impl ProbeSession {
         Ok(())
     }
 
+    /// Coarse statistics of the decoded framebuffer on a 32x24 grid. Untouched
+    /// pixels keep alpha 0 (the buffer starts zeroed), so `painted_share`
+    /// separates "the server sent a black desktop" from "nothing was decoded".
+    pub fn framebuffer_stats(&self) -> serde_json::Value {
+        let (w, h) = (self.width(), self.height());
+        let mut counts: HashMap<[u8; 3], usize> = HashMap::new();
+        let (mut samples, mut painted) = (0usize, 0usize);
+        for gy in 0..24u32 {
+            for gx in 0..32u32 {
+                let x = (u32::from(w) * gx / 32) as u16;
+                let y = (u32::from(h) * gy / 24) as u16;
+                if let Some(px) = self.pixel(x, y) {
+                    samples += 1;
+                    if px[3] != 0 {
+                        painted += 1;
+                    }
+                    *counts.entry([px[0], px[1], px[2]]).or_default() += 1;
+                }
+            }
+        }
+        let dominant = counts.iter().max_by_key(|(_, n)| **n);
+        serde_json::json!({
+            "distinct_colors": counts.len(),
+            "dominant_rgb": dominant.map(|(rgb, _)| rgb.to_vec()),
+            "dominant_share": dominant.map(|(_, n)| *n as f64 / samples.max(1) as f64),
+            "painted_share": painted as f64 / samples.max(1) as f64,
+        })
+    }
+
+    /// Save the framebuffer (alpha dropped) to the `--snapshot` path.
+    fn write_snapshot(&self) -> Option<serde_json::Value> {
+        let path = self.snapshot.as_ref()?;
+        let (w, h) = (u32::from(self.width()), u32::from(self.height()));
+        let rgb: Vec<u8> = self
+            .image
+            .data()
+            .chunks_exact(4)
+            .flat_map(|px| [px[0], px[1], px[2]])
+            .collect();
+        let result = image::RgbImage::from_raw(w, h, rgb)
+            .ok_or_else(|| "framebuffer size does not match its dimensions".to_string())
+            .and_then(|img| img.save(path).map_err(|e| e.to_string()));
+        Some(match result {
+            Ok(()) => serde_json::json!({ "path": path.display().to_string() }),
+            Err(error) => serde_json::json!({ "path": path.display().to_string(), "error": error }),
+        })
+    }
+
     /// Common facts every report includes.
     pub fn summary(&mut self) -> serde_json::Value {
         serde_json::json!({
@@ -683,8 +792,12 @@ impl ProbeSession {
             "bytes_in": self.bytes_in,
             "pdus_in": self.pdus_in,
             "graphics_updates": self.graphics_updates,
+            "empty_graphics_updates": self.empty_updates,
             "pointer_updates": self.pointer_updates,
+            "framebuffer": self.framebuffer_stats(),
+            "snapshot": self.write_snapshot(),
             "server_cert_sha256": self.fingerprint,
+            "advertised_codecs": self.advertised_codecs.iter().map(|id| codec_name(*id)).collect::<Vec<_>>(),
             "requested_channels": self.channels,
             "negotiated": {
                 "cliprdr": self.active_stage.get_svc_processor::<CliprdrClient>().is_some(),
@@ -697,3 +810,37 @@ impl ProbeSession {
 }
 
 pub(crate) type SvcMessagesOf<C> = ironrdp::svc::SvcProcessorMessages<C>;
+
+fn codec_name(id: u8) -> String {
+    match id {
+        3 => "remotefx".to_string(),
+        0x0A => "qoi".to_string(),
+        0x0B => "qoiz".to_string(),
+        other => format!("codec-{other}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MSTSC_LIKE_CODECS, client_codecs};
+
+    fn ids(config: &str) -> Vec<u8> {
+        let config: Vec<String> = config.split(',').map(str::to_string).collect();
+        client_codecs(&config)
+            .unwrap()
+            .0
+            .iter()
+            .map(|c| c.id)
+            .collect()
+    }
+
+    #[test]
+    fn default_codecs_match_what_mstsc_offers() {
+        assert_eq!(ids(MSTSC_LIKE_CODECS), vec![3]);
+    }
+
+    #[test]
+    fn qoiz_can_be_requested_for_taomni_client_parity() {
+        assert!(ids("remotefx,qoiz").contains(&0x0B));
+    }
+}
