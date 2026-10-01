@@ -8,7 +8,8 @@ import zipfile
 
 
 def redact_report(root: Path):
-    values = [os.environ[key] for key in ("QA_SSH_PASSWORD", "TAOMNI_TEST_MYSQL_PASSWORD", "QA_MYSQL_ROOT_PASSWORD")
+    values = [os.environ[key] for key in ("QA_SSH_PASSWORD", "TAOMNI_TEST_MYSQL_PASSWORD", "QA_MYSQL_ROOT_PASSWORD",
+                                          "QA_VNC_PASSWORD")
               if os.environ.get(key)]
     if not values:
         return

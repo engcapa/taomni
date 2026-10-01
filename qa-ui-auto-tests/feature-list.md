@@ -2633,6 +2633,12 @@ components: [VncPanel, FloatingToolbar, CaptureToolbar, SessionEditor]
 files:
   - src/components/vnc/VncPanel.tsx
   - src/components/session/SessionEditor.tsx
+  # Browser-preview VNC bridge and the scriptable RFB fixture behind vnc_required.
+  - vite-plugins/vncProxy.ts
+  - vite-plugins/vncBridge.ts
+  - vite-plugins/vncDes.ts
+  - src/stubs/vncClient.ts
+  - .agents/skills/vnc-realvnc-task/scripts/vnc_fixture_server.py
 controls:
   # Detach/reattach/fullscreen controls rendered by VncPanel are owned by
   # F-Detach-1 to avoid duplicate selector ownership.
@@ -2642,8 +2648,7 @@ controls:
   - id: canvas
     selector: '[data-testid="vnc-canvas"]'
     kind: display       # pointer / wheel / context-menu handlers fire only after a live RFB session;
-                        # without a configured VNC fixture we can only verify the canvas is attached.
-                        # Driving it is left to feature-flagged conformance tests.
+                        # TC-151 drives it against the hosted vnc_required fixture (both modes).
   - id: scale-toggle
     selector: '[data-testid="vnc-scale-toggle"]'
     kind: interactive
@@ -2668,6 +2673,10 @@ controls:
     selector: '[data-testid="vnc-reconnect"]'
     kind: interactive
     optional: true          # only on disconnected/error state
+  - id: unencrypted-continue
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    kind: interactive
+    optional: true          # per-attempt unencrypted-connection warning (VNC-SESS-003, DEC-VNC-19)
   - id: policy-settings
     selector: '[data-testid="session-vnc-policies"]'
     kind: display
@@ -2694,6 +2703,7 @@ controls:
 - 内嵌 `CaptureToolbar`：可见区域 PNG / 全帧 PNG / GIF 录制（与终端共用截图链路）
 - 断开提示 + Reconnect、错误分类（区分用户主动断开 / 服务端断开 / 网络异常）
 - 保存的 VNC 会话可从会话树双击连接，密码场景复用 `AuthPrompt`
+- 浏览器预览（`pnpm dev`）经 dev server VNC bridge 连接真实 RFB 服务器：None/VNCAuth、Raw、DesktopSize、Bell、legacy 与 ExtendedClipboard；不含原生 relay 的编码、OS 输入和系统剪贴板（TC-151 双模式）
 - VNC tab 常驻挂载，切换标签时连接不主动销毁
 - 已修复 VNC 剪贴板与输入延迟、Windows 11 上的 client→server 文本粘贴
 - view-only 与剪贴板方向（disabled / client→server / server→client / bidirectional）由前后端同时执行；None 默认拒绝

@@ -10,7 +10,9 @@ import platform
 import secrets
 import shutil
 import socket
+import struct
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
@@ -18,6 +20,11 @@ import zipfile
 import yaml
 
 from qa_ui_auto.ci import write_json
+
+# Scriptable RFB server shared with the VNC skill: it logs every client message
+# and takes control commands, so cases can prove what reached "the remote".
+VNC_FIXTURE = Path(".agents/skills/vnc-realvnc-task/scripts/vnc_fixture_server.py")
+VNC_FIXTURE_PACKAGES = ["numpy==2.4.4", "Pillow==12.1.1"]
 
 
 def command(argv, **kwargs):
@@ -34,8 +41,8 @@ def powershell(script):
                     "$ErrorActionPreference='Stop'; " + script])
 
 
-def secret(name):
-    value = "Qa1_" + secrets.token_hex(16)
+def secret(name, value=None):
+    value = value or "Qa1_" + secrets.token_hex(16)
     os.environ[name] = value
     if os.environ.get("GITHUB_ACTIONS") == "true":
         print(f"::add-mask::{value}", flush=True)
@@ -59,6 +66,54 @@ def sshd_forwarding_policy(private: Path) -> tuple[Path, str]:
     return config, "/config/sshd/sshd_config.d/qa-forwarding.conf:ro"
 
 
+def rfb_probe(port, password):
+    """Authenticate to the VNC fixture with VNCAuth and read its ServerInit."""
+    sys.path.insert(0, str(VNC_FIXTURE.parent.resolve()))
+    try:
+        from vnc_des import vnc_auth_response
+    finally:
+        sys.path.pop(0)
+
+    def exact(sock, size):
+        data = b""
+        while len(data) < size:
+            chunk = sock.recv(size - len(data))
+            if not chunk:
+                raise ConnectionError("VNC fixture closed the probe connection")
+            data += chunk
+        return data
+
+    with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+        sock.settimeout(5)
+        if not exact(sock, 12).startswith(b"RFB 003."):
+            raise RuntimeError("VNC fixture did not announce RFB")
+        sock.sendall(b"RFB 003.008\n")
+        offered = exact(sock, exact(sock, 1)[0])
+        if 2 not in offered:
+            raise RuntimeError(f"VNC fixture does not offer VNCAuth: {list(offered)}")
+        sock.sendall(b"\x02")
+        sock.sendall(vnc_auth_response(password, exact(sock, 16)))
+        if struct.unpack(">I", exact(sock, 4))[0] != 0:
+            raise RuntimeError("VNC fixture rejected the probe password")
+        sock.sendall(b"\x01")
+        width, height = struct.unpack(">HH", exact(sock, 4))
+        exact(sock, 16)
+        name = exact(sock, struct.unpack(">I", exact(sock, 4))[0]).decode()
+    return width, height, name
+
+
+def vnc_control(port, *commands):
+    with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+        sock.sendall(("\n".join(commands) + "\n").encode())
+        sock.shutdown(socket.SHUT_WR)
+        sock.settimeout(5)
+        reply = b""
+        # The fixture answers every line, then closes the connection.
+        while chunk := sock.recv(65536):
+            reply += chunk
+    return reply.decode().splitlines()
+
+
 def retry(probe, seconds=120):
     end = time.monotonic() + seconds
     while True:
@@ -73,6 +128,8 @@ def retry(probe, seconds=120):
 def install(capabilities):
     if os.environ.get("GITHUB_ACTIONS") != "true":
         raise RuntimeError("package/account installation is restricted to GitHub hosted jobs")
+    if "vnc" in capabilities:
+        command([sys.executable, "-m", "pip", "install", *VNC_FIXTURE_PACKAGES])
     system = platform.system()
     if system == "Linux":
         command(["docker", "info", "--format", "{{.ServerVersion}}"])
@@ -381,8 +438,32 @@ class Services:
         self.config.update(database=cfg.copy(), mysql=cfg.copy())
         return {"authentication": True, "dml_roundtrip": True, "port": port}
 
+    def vnc(self):
+        # VNCAuth keys only the first 8 password bytes.
+        password = secret("QA_VNC_PASSWORD", "Qv" + secrets.token_urlsafe(6)[:6])
+        port, control_port = free_port(), free_port()
+        events = self.root / "vnc-events.jsonl"
+        process = self.start_process([sys.executable, VNC_FIXTURE.resolve(), "--port", port,
+                                      "--control-port", control_port, "--log", events,
+                                      "--security", "vncauth", "--password-env", "QA_VNC_PASSWORD",
+                                      "--ext-clipboard", "--clip-formats", "text,html"], "vnc-fixture")
+        def probe():
+            if process.poll() is not None:
+                raise RuntimeError(f"VNC fixture exited ({process.returncode}); see vnc-fixture.log")
+            return rfb_probe(port, password)
+        width, height, name = retry(probe, 60)
+        reply = vnc_control(control_port, "stats")
+        if len(reply) != 1 or not isinstance(json.loads(reply[0]), list):
+            raise RuntimeError("VNC fixture control port did not answer")
+        self.resources.append(f"vnc-fixture:{port}")
+        self.config["vnc"] = {"host": "127.0.0.1", "port": port, "password": "${env.QA_VNC_PASSWORD}",
+                              "control_port": control_port}
+        return {"authentication": True, "server_init": [width, height, name], "port": port,
+                "control_port": control_port}
+
     def __enter__(self):
-        if platform.system() != "Linux" and os.environ.get("GITHUB_ACTIONS") != "true":
+        accounts = self.capabilities & {"ssh", "mysql"}
+        if accounts and platform.system() != "Linux" and os.environ.get("GITHUB_ACTIONS") != "true":
             raise RuntimeError("native service account setup is restricted to hosted CI")
         self.root.mkdir(parents=True, exist_ok=True)
         self.private = Path(self.stack.enter_context(tempfile.TemporaryDirectory(prefix=self.namespace)))
@@ -393,6 +474,8 @@ class Services:
                 facts["ssh"] = self.ssh()
             if "mysql" in self.capabilities:
                 facts["mysql"] = self.mysql()
+            if "vnc" in self.capabilities:
+                facts["vnc"] = self.vnc()
             write_json(self.root / "lease.json", facts)
             return self
         except BaseException:
@@ -412,7 +495,7 @@ def main():
         install(caps)
     else:
         with Services(Path("qa-ui-auto-report/service-probe"), caps, {}):
-            print("SSH/SFTP/MySQL protocol probes passed")
+            print(f"service protocol probes passed: {', '.join(sorted(caps))}")
 
 
 if __name__ == "__main__":

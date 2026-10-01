@@ -1,10 +1,12 @@
 """Failure cleanup and credential boundaries in hosted service provisioning."""
+import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from ci_services import Services, install, jump_target_endpoint, sshd_forwarding_policy
+from ci_services import VNC_FIXTURE_PACKAGES, Services, install, jump_target_endpoint, sshd_forwarding_policy
 from qa_ui_auto.__main__ import main
 
 
@@ -77,6 +79,41 @@ class HostedServicesTest(unittest.TestCase):
             self.assertNotIn('secret-value', (root / 'summary.json').read_text())
             with zipfile.ZipFile(root / 'trace.zip') as trace:
                 self.assertNotIn(b'secret-value', trace.read('trace.trace'))
+
+    def test_vnc_fixture_is_provisioned_without_account_setup(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.dict('os.environ', {'GITHUB_ACTIONS': ''}), \
+                patch('ci_services.platform.system', return_value='Windows'), \
+                patch('ci_services.rfb_probe', return_value=(1280, 720, 'taomni-vnc-fixture')) as probe, \
+                patch('ci_services.vnc_control', return_value=['[]']):
+            config = {}
+            service = Services(Path(directory), ['vnc'], config)
+            process = Mock()
+            process.poll.return_value = None
+            with patch.object(service, 'start_process', return_value=process) as start:
+                with service:
+                    password = os.environ['QA_VNC_PASSWORD']
+            argv = [str(a) for a in start.call_args.args[0]]
+            self.assertEqual(argv[argv.index('--password-env') + 1], 'QA_VNC_PASSWORD')
+            self.assertNotIn(password, argv)
+            self.assertEqual(len(password), 8)
+            self.assertEqual(probe.call_args.args[1], password)
+            self.assertEqual(config['vnc']['password'], '${env.QA_VNC_PASSWORD}')
+            self.assertEqual(set(config['vnc']), {'host', 'port', 'password', 'control_port'})
+            lease = json.loads((Path(directory) / 'lease.json').read_text(encoding='utf-8'))
+            self.assertEqual(lease['vnc']['server_init'], [1280, 720, 'taomni-vnc-fixture'])
+            self.assertNotIn(password, json.dumps(lease))
+
+    def test_vnc_packages_install_only_for_the_vnc_capability(self):
+        with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+                patch('ci_services.platform.system', return_value='Linux'), \
+                patch('ci_services.command') as execute:
+            install(['ssh'])
+            self.assertFalse(any('pip' in call.args[0] for call in execute.call_args_list))
+            install(['vnc'])
+            pip = next(call.args[0] for call in execute.call_args_list if 'pip' in call.args[0])
+            self.assertEqual(pip[-2:], VNC_FIXTURE_PACKAGES)
+            self.assertTrue(all('==' in package for package in VNC_FIXTURE_PACKAGES))
 
     def test_package_install_is_never_implicit_on_developer_host(self):
         with patch.dict('os.environ', {'GITHUB_ACTIONS': ''}), patch('ci_services.command') as execute:
