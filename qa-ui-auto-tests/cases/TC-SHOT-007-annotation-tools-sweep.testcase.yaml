@@ -69,6 +69,8 @@ steps:
       y: 140
 # Text tool opens an inline editor; Enter commits the text.
 - click: '[data-testid="screenshot-tool-text"]'
+# Let React propagate the tool change to the canvas before clicking.
+- wait: 1
 - click:
     selector: '[data-testid="screenshot-annotation-canvas"]'
     position:

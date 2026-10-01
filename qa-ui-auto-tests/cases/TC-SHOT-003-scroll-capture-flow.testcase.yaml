@@ -23,6 +23,7 @@ steps:
       x: 360
       y: 260
 - wait_for: '[data-testid="screenshot-toolbar"]'
+- wait: 1
 - click: '[data-testid="screenshot-scroll-capture"]'
 - wait_for: '[data-testid="screenshot-scroll-busy"]'
 - wait_for:

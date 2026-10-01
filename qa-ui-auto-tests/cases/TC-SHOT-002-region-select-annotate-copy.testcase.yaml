@@ -43,10 +43,14 @@ steps:
 # Undo becomes enabled after drawing, redo after undoing.
 - assert_enabled: '[data-testid="screenshot-undo"]'
 - click: '[data-testid="screenshot-undo"]'
+- wait: 1
 - assert_enabled: '[data-testid="screenshot-redo"]'
 - click: '[data-testid="screenshot-redo"]'
-# Copy routes through the real copy pipeline (stubbed backend).
+# Copy routes through the real copy pipeline (stubbed backend). On success
+# the overlay closes immediately, so the toast is ephemeral; assert the
+# return to the main window plus the stubbed backend call instead.
 - click: '[data-testid="screenshot-copy"]'
-- wait_for: '[data-testid="screenshot-toast"]'
+- wait_for:
+    selector: '[data-testid="system-screenshot"]'
 - eval_readonly:
     expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_copy_image")

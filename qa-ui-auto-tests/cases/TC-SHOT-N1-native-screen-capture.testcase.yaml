@@ -11,7 +11,8 @@ modes:
 fixtures:
 - reset_db
 steps:
-- open: "#screenshot-overlay"
+- open: ${cfg.app.base_url}
+- eval: 'window.location.hash = "screenshot-overlay"'
 # No overlay-init payload exists on the hash route, so the overlay falls
 # back to the real screenshot_capture_full backend on the runner OS.
 - wait_for:

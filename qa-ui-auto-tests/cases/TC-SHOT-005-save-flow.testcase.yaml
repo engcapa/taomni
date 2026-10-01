@@ -29,6 +29,9 @@ steps:
     selector: '[data-testid="text-input-dialog-input"]'
     value: qa-ui-auto-shot.png
 - click: '[data-testid="text-input-dialog-confirm"]'
-- wait_for: '[data-testid="screenshot-toast"]'
+# Save closes the overlay on success; assert the return to the main window
+# plus the stubbed backend call instead of the ephemeral toast.
+- wait_for:
+    selector: '[data-testid="system-screenshot"]'
 - eval_readonly:
     expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("qa-ui-auto-shot.png")
