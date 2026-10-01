@@ -58,6 +58,17 @@ steps:
     selector: '[data-testid="rdp-field-microphone"]'
     checked: false
 - click: '[data-testid="servers-dialog-apply"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-browser-vault-3
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-browser-vault-3
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    state: detached
 - assert_localstorage:
     key: taomni.stub.serverConfigs.v1
     contains: '"clipboardServerToClient":"text"'
@@ -116,7 +127,7 @@ verification:
     - 6
     - 7
   - id: R2
-    requirement: Apply saves the per-direction clipboard levels, the file limit, sound and microphone choices.
+    requirement: Apply (which first creates the credential vault for the RDP password) saves the per-direction clipboard levels, the file limit, sound and microphone choices.
     actions:
     - 8
     - 9
@@ -124,49 +135,52 @@ verification:
     - 11
     - 12
     - 13
+    - 17
     checkpoints:
     - step: 14
+      expectation: Apply asks for the vault master password before storing the RDP configuration.
+    - step: 19
       expectation: The saved config holds text only towards the client.
-    - step: 15
+    - step: 20
       expectation: The saved config holds off from the client.
-    - step: 16
+    - step: 21
       expectation: The saved config holds the 512 MB file limit.
-    - step: 17
+    - step: 22
       expectation: The saved config turns sound playback off.
-    - step: 18
+    - step: 23
       expectation: The saved config turns microphone redirection off.
     results:
-    - 14
-    - 15
-    - 16
-    - 17
-    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
   - id: R3
     requirement: A reopened window shows the saved choices, and the file limit only while a direction allows files.
     actions:
-    - 19
-    - 21
-    - 27
+    - 24
+    - 26
+    - 32
     checkpoints:
-    - step: 22
+    - step: 27
       expectation: Clipboard to the client reads text only.
-    - step: 23
-      expectation: Clipboard from the client reads off.
-    - step: 24
-      expectation: Sound playback reads off.
-    - step: 25
-      expectation: Microphone redirection reads off.
-    - step: 26
-      expectation: With no direction allowing files the file limit is hidden.
     - step: 28
+      expectation: Clipboard from the client reads off.
+    - step: 29
+      expectation: Sound playback reads off.
+    - step: 30
+      expectation: Microphone redirection reads off.
+    - step: 31
+      expectation: With no direction allowing files the file limit is hidden.
+    - step: 33
       expectation: Allowing files again shows the saved 512 MB limit.
     results:
-    - 22
-    - 23
-    - 24
-    - 25
-    - 26
+    - 27
     - 28
+    - 29
+    - 30
+    - 31
+    - 33
   native:
   - check: The saved configuration reaching the real server is covered by TC-RDPS-NAT-09 (levels) and TC-RDPS-NAT-04/05 (sound, microphone).
     method: automated

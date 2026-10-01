@@ -227,8 +227,24 @@ def set_files(paths: list[Path]) -> None:
             "foreach ($p in ($arg | ConvertFrom-Json)) { [void]$c.Add($p) };"
             "[System.Windows.Forms.Clipboard]::SetFileDropList($c)", json.dumps(resolved))
     elif SYSTEM == "Darwin":
-        _jxa(_JXA_PRELUDE + "var urls = JSON.parse(arg).map(function(p){ return $.NSURL.fileURLWithPath($(p)); });"
-             "pb.clearContents; pb.writeObjects($(urls)) ? 'ok' : (function(){throw new Error('writeObjects failed')})()",
+        # One pasteboard item per file with its public.file-url string: the
+        # data is written now. Writing NSURL objects lets AppKit provide it
+        # lazily, which can vanish when osascript exits (an empty pasteboard
+        # on CI, run 36859698190). The write is read back before returning.
+        _jxa(_JXA_PRELUDE + "var paths = JSON.parse(arg);"
+             "for (var attempt = 0; attempt < 3; attempt++) {"
+             " var items = paths.map(function(p){"
+             "  var item = $.NSPasteboardItem.alloc.init;"
+             "  item.setStringForType($.NSURL.fileURLWithPath($(p)).absoluteString, $('public.file-url'));"
+             "  return item; });"
+             " pb.clearContents;"
+             " if (!pb.writeObjects($(items))) continue;"
+             " var back = pb.readObjectsForClassesOptions($([$.NSURL]), $());"
+             " if (!back.isNil() && back.count === paths.length) { 'ok'; break; }"
+             " delay(0.2); }"
+             "var check = pb.readObjectsForClassesOptions($([$.NSURL]), $());"
+             "(!check.isNil() && check.count === paths.length) ? 'ok'"
+             " : (function(){ throw new Error('file list did not stick on the pasteboard') })()",
              json.dumps(resolved))
     else:
         uris = "".join(Path(p).as_uri() + "\r\n" for p in resolved)
