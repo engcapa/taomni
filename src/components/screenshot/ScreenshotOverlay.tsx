@@ -8,6 +8,7 @@ import {
   Clipboard,
   Download,
   LayoutGrid,
+  ListOrdered,
   Maximize,
   Minus,
   Pencil,
@@ -63,6 +64,7 @@ const TOOLS: { tool: AnnotationTool; testid: string; titleKey: string; Icon: Luc
   { tool: "pen", testid: "screenshot-tool-pen", titleKey: "screenshot.toolPen", Icon: Pencil },
   { tool: "text", testid: "screenshot-tool-text", titleKey: "screenshot.toolText", Icon: Type },
   { tool: "mosaic", testid: "screenshot-tool-mosaic", titleKey: "screenshot.toolMosaic", Icon: LayoutGrid },
+  { tool: "number", testid: "screenshot-tool-number", titleKey: "screenshot.toolNumber", Icon: ListOrdered },
 ];
 
 const LINE_WIDTHS = [2, 4, 8];

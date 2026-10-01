@@ -1,0 +1,31 @@
+id: TC-SHOT-010
+title: Delayed screenshot counts down then opens the overlay
+covers:
+- F27.1
+tags:
+- screenshot
+- delayed-capture
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+# Open the delay menu and pick 3 seconds.
+- click: '[data-testid="system-screenshot-delay-toggle"]'
+- wait_for: '[data-testid="system-screenshot-delay-menu"]'
+- click: '[data-testid="system-screenshot-delay-3"]'
+# Countdown is visible on the button.
+- wait_for: '[data-testid="system-screenshot-countdown"]'
+- assert_text:
+    selector: '[data-testid="system-screenshot-countdown"]'
+    contains: "3"
+# After the countdown the overlay opens for capture (stubbed backend).
+- wait_for:
+    selector: '[data-testid="screenshot-base-image"]'
+    timeout_sec: 10
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for:
+    selector: '[data-testid="system-screenshot"]'

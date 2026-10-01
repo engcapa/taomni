@@ -1,0 +1,48 @@
+id: TC-SHOT-009
+title: Number markers place incrementing circled numbers and support undo
+covers:
+- F27.1
+tags:
+- screenshot
+- annotate
+- p2
+modes:
+- browser
+fixtures:
+- reset_db
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- wait_for: '[data-testid="screenshot-base-image"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- wait_for: '[data-testid="screenshot-toolbar"]'
+# Number tool (Flameshot-style): each click places the next circled number.
+- click: '[data-testid="screenshot-tool-number"]'
+- wait: 1
+- click:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    position:
+      x: 100
+      y: 100
+- click:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    position:
+      x: 200
+      y: 150
+- click:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    position:
+      x: 300
+      y: 200
+# Three markers placed: undo is enabled and removes them one by one.
+- assert_enabled: '[data-testid="screenshot-undo"]'
+- click: '[data-testid="screenshot-undo"]'
+- assert_enabled: '[data-testid="screenshot-undo"]'
+- click: '[data-testid="screenshot-undo"]'
+- click: '[data-testid="screenshot-undo"]'
+- assert_disabled: '[data-testid="screenshot-undo"]'
+# Redo restores the markers.
+- click: '[data-testid="screenshot-redo"]'
+- assert_enabled: '[data-testid="screenshot-undo"]'
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for:
+    selector: '[data-testid="system-screenshot"]'

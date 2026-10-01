@@ -12,6 +12,8 @@ fixtures:
 - reset_db
 steps:
 - open: ${cfg.app.base_url}
+# Ensure the main window (and Tauri API) is ready before invoking backends.
+- wait_for: '[data-testid="system-screenshot"]'
 # The overlay opens in a separate WebviewWindow in native mode, which the
 # runner cannot address; verify the real backend directly. WebDriver waits
 # for the returned promise to resolve; JSON.stringify + contains avoids the

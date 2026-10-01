@@ -20,8 +20,8 @@ steps:
       x: 40
       y: 40
     to_position:
-      x: 360
-      y: 260
+      x: 200
+      y: 180
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - wait: 1
 - click: '[data-testid="screenshot-scroll-capture"]'

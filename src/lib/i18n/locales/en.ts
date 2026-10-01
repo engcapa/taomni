@@ -2808,6 +2808,8 @@ const dict = {
   },
   screenshot: {
     tooltip: "System screenshot",
+    delayedCapture: "Delayed capture",
+    delaySeconds: "Capture in {count}s",
     openFailed: "Failed to open screenshot: {error}",
     toolRect: "Rectangle",
     toolEllipse: "Ellipse",
@@ -2816,6 +2818,7 @@ const dict = {
     toolPen: "Pen",
     toolText: "Text",
     toolMosaic: "Mosaic",
+    toolNumber: "Number marker",
     undo: "Undo",
     redo: "Redo",
     scrollCapture: "Scroll capture",

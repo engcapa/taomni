@@ -16,7 +16,8 @@ export type AnnotationTool =
   | "line"
   | "pen"
   | "text"
-  | "mosaic";
+  | "mosaic"
+  | "number";
 
 export interface CssRect {
   x: number;
@@ -65,7 +66,14 @@ export interface TextShape extends ShapeBase {
   fontSize: number;
 }
 
-export type Shape = RectLikeShape | LineLikeShape | PenShape | TextShape;
+export interface NumberShape extends ShapeBase {
+  kind: "number";
+  x: number;
+  y: number;
+  num: number;
+}
+
+export type Shape = RectLikeShape | LineLikeShape | PenShape | TextShape | NumberShape;
 
 export interface AnnotationCanvasHandle {
   undo: () => void;
@@ -237,6 +245,21 @@ function paintShape(
         );
       }
       break;
+    case "number": {
+      // Flameshot-style numbered marker: filled circle with a white number.
+      const r = Math.max(12, 9 + shape.lineWidth * 1.5) * s;
+      const cx = shape.x * s;
+      const cy = shape.y * s;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `600 ${Math.max(10, r * 1.1)}px Inter, -apple-system, "Segoe UI", sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(shape.num), cx, cy + r * 0.06);
+      break;
+    }
   }
   ctx.restore();
 }
@@ -284,6 +307,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
     const [textAt, setTextAt] = useState<Point | null>(null);
     const [textValue, setTextValue] = useState("");
     const idRef = useRef(1);
+    const numberRef = useRef(1);
     const drawingRef = useRef<{ start: Point; pts: Point[] } | null>(null);
     const shapesRef = useRef<Shape[]>([]);
 
@@ -326,6 +350,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       setDraft(null);
       setTextAt(null);
       setTextValue("");
+      numberRef.current = 1;
     }, []);
 
     const exportDataUrl = useCallback((base: HTMLImageElement, scale: number): string => {
@@ -403,6 +428,11 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       if (tool === "text") {
         setTextAt(p);
         setTextValue("");
+        return;
+      }
+      if (tool === "number") {
+        const num = numberRef.current++;
+        addShape({ id: idRef.current++, kind: "number", x: p.x, y: p.y, num, color, lineWidth });
         return;
       }
       drawingRef.current = { start: p, pts: [p] };

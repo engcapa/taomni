@@ -2793,6 +2793,8 @@ export const zhCN: DeepPartial<typeof en> = {
   },
   screenshot: {
     tooltip: "系统截图",
+    delayedCapture: "定时截图",
+    delaySeconds: "{count} 秒后截图",
     openFailed: "打开截图失败：{error}",
     toolRect: "矩形",
     toolEllipse: "椭圆",
@@ -2801,6 +2803,7 @@ export const zhCN: DeepPartial<typeof en> = {
     toolPen: "画笔",
     toolText: "文字",
     toolMosaic: "马赛克",
+    toolNumber: "序号标注",
     undo: "撤销",
     redo: "重做",
     scrollCapture: "滚动截图",

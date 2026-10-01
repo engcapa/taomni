@@ -12,6 +12,8 @@ fixtures:
 - reset_db
 steps:
 - open: ${cfg.app.base_url}
+# Ensure the main window (and Tauri API) is ready before invoking backends.
+- wait_for: '[data-testid="system-screenshot"]'
 # Capture a real screenshot, then route its path through the copy backend.
 # The nested invoke is chained via .then without arrow functions.
 - eval_readonly:

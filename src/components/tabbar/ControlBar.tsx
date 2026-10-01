@@ -6,6 +6,7 @@ import {
   Menu,
   MessageSquare,
   Camera,
+  ChevronDown,
   Inbox,
   Monitor,
   MoreHorizontal,
@@ -29,7 +30,7 @@ import {
   GitBranch,
   Braces,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { TabBar } from "./TabBar";
 import { OpenTabsMenu } from "./OpenTabsMenu";
@@ -97,6 +98,23 @@ export function ControlBar({
   const dialogs = useAppDialogs();
   const [detailsRevealHovered, setDetailsRevealHovered] = useState(false);
   const [screenshotBusy, setScreenshotBusy] = useState(false);
+  const [screenshotDelayMenu, setScreenshotDelayMenu] = useState(false);
+  const [screenshotCountdown, setScreenshotCountdown] = useState<number | null>(null);
+  const countdownTimer = useRef<number | null>(null);
+
+  const clearScreenshotCountdown = () => {
+    if (countdownTimer.current !== null) {
+      window.clearInterval(countdownTimer.current);
+      countdownTimer.current = null;
+    }
+    setScreenshotCountdown(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (countdownTimer.current !== null) window.clearInterval(countdownTimer.current);
+    };
+  }, []);
 
   const handleScreenshot = async () => {
     if (screenshotBusy) return;
@@ -112,6 +130,28 @@ export function ControlBar({
     } finally {
       setScreenshotBusy(false);
     }
+  };
+
+  /** Timed screenshot: count down, then open the overlay for capture. */
+  const handleDelayedScreenshot = (seconds: number) => {
+    setScreenshotDelayMenu(false);
+    if (screenshotBusy || screenshotCountdown !== null) return;
+    clearScreenshotCountdown();
+    setScreenshotCountdown(seconds);
+    countdownTimer.current = window.setInterval(() => {
+      setScreenshotCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          if (countdownTimer.current !== null) {
+            window.clearInterval(countdownTimer.current);
+            countdownTimer.current = null;
+          }
+          // Fire the real capture on the next tick so state settles.
+          window.setTimeout(() => void handleScreenshot(), 0);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
   const {
     hasSessions,
@@ -294,18 +334,60 @@ export function ControlBar({
       <div className={IS_MAC ? "w-2 self-stretch shrink-0" : "w-3 self-stretch shrink-0"} />
       {/* Divider between the tab-related buttons and the main-window controls. */}
       <div aria-hidden="true" className="taomni-control-divider self-stretch shrink-0" />
-      {/* System screenshot: independent of any tab — global window chrome. */}
-      <button
-        type="button"
-        data-testid="system-screenshot"
-        aria-label={t("screenshot.tooltip")}
-        title={`${t("screenshot.tooltip")} (${IS_MAC ? "Cmd" : "Ctrl"}+Shift+A)`}
-        disabled={screenshotBusy}
-        onClick={() => void handleScreenshot()}
-        className="h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50 self-center"
-      >
-        <Camera className="w-4 h-4" />
-      </button>
+      {/* System screenshot: independent of any tab — global window chrome.
+          Click captures immediately; the chevron offers timed (delayed) capture
+          Flameshot-style. Clicking during a countdown cancels it. */}
+      <div className="relative shrink-0 self-center flex items-center">
+        <button
+          type="button"
+          data-testid="system-screenshot"
+          aria-label={t("screenshot.tooltip")}
+          title={`${t("screenshot.tooltip")} (${IS_MAC ? "Cmd" : "Ctrl"}+Shift+A)`}
+          disabled={screenshotBusy && screenshotCountdown === null}
+          onClick={() => {
+            if (screenshotCountdown !== null) clearScreenshotCountdown();
+            else void handleScreenshot();
+          }}
+          className="h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50 self-center"
+        >
+          {screenshotCountdown !== null ? (
+            <span className="text-[12px] font-semibold tabular-nums" data-testid="system-screenshot-countdown">
+              {screenshotCountdown}
+            </span>
+          ) : (
+            <Camera className="w-4 h-4" />
+          )}
+        </button>
+        <button
+          type="button"
+          data-testid="system-screenshot-delay-toggle"
+          aria-label={t("screenshot.delayedCapture")}
+          title={t("screenshot.delayedCapture")}
+          disabled={screenshotBusy || screenshotCountdown !== null}
+          onClick={() => setScreenshotDelayMenu((v) => !v)}
+          className="h-6 w-4 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50"
+        >
+          <ChevronDown className="w-3 h-3" />
+        </button>
+        {screenshotDelayMenu && (
+          <div
+            data-testid="system-screenshot-delay-menu"
+            className="absolute right-0 top-7 z-50 min-w-28 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] py-1 shadow-xl"
+          >
+            {[3, 5, 10].map((s) => (
+              <button
+                key={s}
+                type="button"
+                data-testid={`system-screenshot-delay-${s}`}
+                onClick={() => handleDelayedScreenshot(s)}
+                className="block w-full px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]"
+              >
+                {t("screenshot.delaySeconds", { count: s })}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <TitleBarTrayControls />
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
     </div>
