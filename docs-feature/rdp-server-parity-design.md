@@ -42,15 +42,15 @@
 | AC-09 | 同上，级别为 all | 客户端复制文件/文件夹（含嵌套与 Unicode 名） | 传输完成后被控端剪贴板为暂存目录中的文件列表，SHA-256 一致；超过总量上限拒绝并记录；断开时清理未完成暂存 | 三端 |
 | AC-10 | 同上 | 被控端复制文件/文件夹 | 客户端可获取大小与任意区间内容，SHA-256 一致；仅能读取已公告文件 | 三端 |
 | AC-11 | 剪贴板方向级别为 off/text/rich | 复制被禁止的格式 | 该格式不公告、不传输；允许的格式仍可用 | 三端 |
-| AC-12 | 声音播放开启，客户端请求 RDPSND | 被控端播放声音 | 客户端收到 PCM，主频与源一致；无客户端或关闭时不采集 | 三端（macOS 需 13+） |
-| AC-13 | 麦克风开启，被控端存在可用虚拟输入 | 客户端经 AUDIO_INPUT 发送声音 | 被控端应用从虚拟麦克风录到相同主频；缺设备时拒绝通道并在设置页给出安装指引 | Linux 原生；Windows 需 VB-CABLE 类驱动；macOS 需 BlackHole 类驱动 |
-| AC-14 | 客户端支持网络自动检测 | 连接建立及会话期间 | 服务端发送 RTT/带宽测量与 Network Characteristics Result；探针和 mstsc 可得到连接质量 | 三端 |
-| AC-15 | Taomni 客户端全屏连接 | 鼠标靠近顶端/快捷键；固定、最小化、还原、断开、Ctrl+Alt+Del | 出现顶部居中连接栏：固定后常驻、未固定 2.5 s 后隐藏；质量指示与 RTT 提示；各按钮生效且键盘可达 | 三端 |
-| AC-16 | 同一 Windows runner，同一探针 | 分别连接 TermService 与 Taomni，执行性能场景 | 指标满足 §4.7 预算（相对 TermService 与绝对值）；其他两端满足绝对预算 | 三端 |
-| AC-17 | 既有行为 | 启停、NLA/vault、控制授权、仅查看、单客户端、绑定安全、客户端既有工具栏 | 全部保持 | 三端 |
-| AC-18 | 设置持久化 | 修改剪贴板/声音/麦克风/系统远程桌面选择并 Apply | 重开窗口后保持；默认值安全 | 三端 |
-| AC-19 | 联合：同一 QA 应用内启动 Taomni Server，再用 Taomni 客户端会话连接 127.0.0.1 | 连接、在客户端画布点击宿主目标、全屏、断开 | 客户端显示远端画面；点击经 RDP 注入宿主（目标窗口翻色并写状态文件）；全屏连接栏显示 Taomni Server 下发的连接质量；客户端与服务端共用系统剪贴板时 5 s 内公告次数有界、不形成循环；断开后服务端回到等待状态 | 三端 |
-| AC-20 | 客户端 ↔ 参考服务器（Windows runner TermService、Linux runner xrdp） | 连接、全屏 | 画面与输入正常；连接栏与质量指示可用（服务器提供数据时显示等级，否则显示未知） | Windows、Linux |
+| AC-12 | §4.3 | TASK-07 | V-07、08 | 运行 36864121715 | 已实现并验证 |
+| AC-13 | §4.4 | TASK-08 | V-07、09 | 运行 36864121715 | 已实现并验证 |
+| AC-14 | §4.5 | TASK-09 | V-10 | 运行 36864121715 | RTT 与 Network Characteristics 已验证；连续带宽测量为缺口 |
+| AC-15 | §4.6 | TASK-10 | V-11、12、20 | 运行 36864121715、Vitest | 已实现；V-20 联合用例与 Vitest 通过，V-11 browser 夹具未建 |
+| AC-16 | §4.7 | TASK-03、11 | V-13 | 运行 36864121715、36871090675 | 未达标：M4 三端超预算，macOS M3/M2 贴线 |
+| AC-17 | 全部 | TASK-12 | V-14、15、17 | 运行 36864121715 | V-14 通过；V-15 保留回归与 V-17 mstsc 互通待执行 |
+| AC-18 | §4.1~4.4 | TASK-04~08 | V-02、16 | 运行 36864121715 | 已实现并验证 |
+| AC-19 | §4.8、DEC-14/15 | TASK-02、05、10、12 | V-18、19、20 | 运行 36864121715 | 已实现并验证 |
+| AC-20 | §4.9 | TASK-02、10、12 | V-21 | — | 未实现：参考服务器用例待建 |
 
 失败与恢复：音频/麦克风/剪贴板子系统初始化失败只降级该通道并写日志，不得让 RDP 监听失败；客户端断开时取消所有采集、传输与暂存。
 ## 4. 方案与关键决策
@@ -220,16 +220,16 @@ workflow 改动：`Prepare local service packages` 的条件扩展到上述 capa
 |---|---|---|---|
 | TASK-01 | `rdp-probe` 探针（连接/画面/输入/剪贴板/声音/麦克风/autodetect/宿主播放录音） | — | 已实现：另加 `--codecs`（默认仿 mstsc 仅 RemoteFX）、`--snapshot`、framebuffer 统计、`image-make`、文件列表经锁下载 |
 | TASK-02 | qa-ui-auto：fixture、verb、helper、CI 供给 | TASK-01 | 已实现：`system_rdp_running`、`release_build_required`（CI `release` 能力→release QA 构建）、`rdp_baseline_required`；verb `platform_choice`、`host_make_tree`、`host_clipboard same_tree_as` |
-| TASK-03 | 基线用例 TC-RDPS-NAT-01、TC-RDPS-PERF-01 首轮三端运行，回填 §4.7 | TASK-01、02 | 进行中：NAT-01/PERF-01 三端 release 构建通过（运行 36828182584）；TermService 基线 PERF-02 的会话内目标改由 Explorer Run 项启动，复测中 |
+| TASK-03 | 基线用例 TC-RDPS-NAT-01、TC-RDPS-PERF-01 首轮三端运行，回填 §4.7 | TASK-01、02 | 已完成：TermService 基线由 PERF-02 采集（运行 36835206663），§4.7 预算已回填，PERF-01 按预算断言 |
 | TASK-04 | Windows 系统远程桌面分支 | — | 已实现并验证：UI-01/02 三端 browser、NAT-06 Windows native 通过（运行 36815659477、36828182584） |
-| TASK-05 | 剪贴板 HTML/图片与方向分级 | TASK-01 | 已实现：NAT-02 macOS 通过；修复“新复制覆盖未完成请求”导致 HTML 存成文本（RequestGate）；Linux xclip 与 Windows CF_HTML 判定修正后复测中 |
-| TASK-06 | 剪贴板文件双向 | TASK-05 | 已实现：探针改用 initiate_file_copy（Ready 后第二次复制发送文件）后 NAT-03 三端复测中 |
-| TASK-07 | RDPSND 播放三端 | TASK-01 | 已实现：Windows WASAPI 回环、Linux PipeWire sink monitor 的 NAT-04 通过（48 kHz 与重采样 44.1 kHz 均为 880 Hz）；macOS 优先回采环回虚拟设备输入，否则 ScreenCaptureKit，复测中 |
-| TASK-08 | AUDIO_INPUT 麦克风三端 | TASK-01、07 | 已实现：vendored `DvcServerFactory` + `audio_input.rs`；NAT-05 Linux（PipeWire 音源）与 macOS（Background Music）通过；Windows VB-CABLE 设备名匹配修正后复测中 |
-| TASK-09 | autodetect 与 Network Characteristics Result | TASK-01 | 已实现：每 2 s RTT 探测、每 4 次下发 RTT 型 Network Characteristics Result，按连接重置；连续带宽测量需客户端字节计数，ironrdp 客户端不支持，记为缺口 |
-| TASK-10 | Taomni 客户端连接栏与质量事件 | TASK-09 | 已实现：`RdpConnectionBar`（Vitest 8 项通过）+ 窗口工具栏 Ctrl+Alt+Del；联合用例 TC-RDPJ-01 复测中；browser 预览夹具（V-11）未建 |
-| TASK-11 | 性能调优至预算 | TASK-03 | 待开始 |
-| TASK-12 | 集成：三端全量 RDP 用例（含联合与参考服务器 V-18~V-21）+ 保留行为回归，交付报告 | 全部 | 进行中：TC-RDPJ-01（V-18+V-20）已加入；V-19、V-21 待建 |
+| TASK-05 | 剪贴板 HTML/图片与方向分级 | TASK-01 | 已实现并验证：NAT-02、NAT-09（分级策略）三端通过（运行 36864121715、36871090675） |
+| TASK-06 | 剪贴板文件双向 | TASK-05 | 已实现并验证：NAT-03 三端通过；修复 Linux uri-list 路径残留 CR、连接时宿主剪贴板读空即视为已公告（运行 36864121715、36871090675） |
+| TASK-07 | RDPSND 播放三端 | TASK-01 | 已实现并验证：NAT-04 三端通过；macOS 以环回虚拟设备作默认输出（运行 36850382615 起） |
+| TASK-08 | AUDIO_INPUT 麦克风三端 | TASK-01、07 | 已实现并验证：NAT-05 三端通过（运行 36855295948 起；Windows 失败为探针音调分析窗口落在 VB-CABLE 起始瞬态上，已修） |
+| TASK-09 | autodetect 与 Network Characteristics Result | TASK-01 | 已实现并验证：NAT-07 三端通过；连续带宽测量需客户端字节计数，ironrdp 客户端不支持，记为缺口 |
+| TASK-10 | Taomni 客户端连接栏与质量事件 | TASK-09 | 已实现并验证：TC-RDPJ-01 三端通过（运行 36850382615 起），Vitest 10 项通过 |
+| TASK-11 | 性能调优至预算 | TASK-03 | 进行中：M1/M2/M3 Linux、Windows 达标；M4 三端约 11 Mbps 超预算 4905 kbps，macOS M2 p95 贴线、M3 约 19.6 fps 未达标；需内容自适应编码（见 §4.7） |
+| TASK-12 | 集成：三端全量 RDP 用例（含联合与参考服务器 V-18~V-21）+ 保留行为回归，交付报告 | 全部 | 进行中：联合用例 TC-RDPJ-01/02 三端通过；V-17 mstsc 互通、V-21 xrdp 参考服务器待建 |
 
 ### TASK-01 `rdp-probe`
 
@@ -262,27 +262,27 @@ workflow 改动：`Prepare local service packages` 的条件扩展到上述 capa
 
 | V ID | AC / 用途 | 层级与文件 / case（* 拟新增） | 前置与操作 | 核心断言 | 执行方式 | 状态 |
 |---|---|---|---|---|---|---|
-| V-01 | AC-01~04 | Rust `servers::rdp::system_rdp` 单元* | 注册表/服务值组合 | 状态推导、端口冲突建议、autostart 判定 | `cargo test --lib servers::rdp::system_rdp` | 待执行 |
-| V-02 | AC-01~05、18 | browser `TC-RDPS-UI-01-windows-system-rdp`* | stub 返回各系统状态 | 状态卡文案、确认/取消、打开系统设置调用、选择持久化 | qa-ui-auto browser 三端 | 待执行 |
-| V-03 | AC-01、04 | native Windows `TC-RDPS-NAT-06-windows-system-rdp`* | runner 真实 TermService | 状态卡与真实注册表一致；确认后在不冲突端口启动 | qa-ui-auto native windows | 待执行 |
-| V-04 | AC-06~11 | Rust `clipboard_formats` 单元* | CF_HTML/DIB/FILEDESCRIPTORW 样本 | 编解码往返、路径清洗、级别过滤 | `cargo test --lib servers::rdp::clipboard` | 待执行 |
-| V-05 | AC-06~08、11 | native `TC-RDPS-NAT-02-clipboard-rich`* | 服务端运行、探针连接 | 文本/HTML/图片双向一致（`host_clipboard` 判定），禁止级别不传 | native 三端 | 待执行 |
-| V-06 | AC-09、10 | native `TC-RDPS-NAT-03-clipboard-files`* | 含嵌套与 Unicode 名的样本树 | 双向 SHA-256 一致；超限拒绝 | native 三端 | 待执行 |
-| V-07 | AC-12、13 | Rust `sound`/`audio_input` 单元* + 探针单元 | PDU 样本 | 协商、分包、PDU 往返 | `cargo test --lib servers::rdp` / `--bin rdp-probe` | 待执行 |
-| V-08 | AC-12 | native `TC-RDPS-NAT-04-audio-playback`* | 宿主播放 1 kHz 音 | 探针收到 PCM 主频 1 kHz±2% 且 RMS 高于阈值 | native 三端 | 待执行 |
-| V-09 | AC-13 | native `TC-RDPS-NAT-05-microphone`* | 探针经 AUDIO_INPUT 发 440 Hz | 宿主从虚拟麦克风录到 440 Hz±2% | native 三端 | 待执行 |
-| V-10 | AC-14 | native `TC-RDPS-NAT-07-autodetect`* | 探针声明 netchar 支持 | 收到 RTT 请求、带宽测量与 Network Characteristics Result | native 三端 | 待执行 |
+| V-01 | AC-01~04 | Rust `servers::rdp::system_rdp` 单元* | 注册表/服务值组合 | 状态推导、端口冲突建议、autostart 判定 | `cargo test --lib servers::rdp::system_rdp` | 通过（本地 Windows，cargo test --lib servers::rdp 63 项、--bin rdp-probe 10 项，2026-10-01） |
+| V-02 | AC-01~05、18 | browser `TC-RDPS-UI-01-windows-system-rdp`* | stub 返回各系统状态 | 状态卡文案、确认/取消、打开系统设置调用、选择持久化 | qa-ui-auto browser 三端 | 通过（UI-01/02 三端 browser） |
+| V-03 | AC-01、04 | native Windows `TC-RDPS-NAT-06-windows-system-rdp`* | runner 真实 TermService | 状态卡与真实注册表一致；确认后在不冲突端口启动 | qa-ui-auto native windows | 通过（NAT-06 Windows） |
+| V-04 | AC-06~11 | Rust `clipboard_formats` 单元* | CF_HTML/DIB/FILEDESCRIPTORW 样本 | 编解码往返、路径清洗、级别过滤 | `cargo test --lib servers::rdp::clipboard` | 通过（本地 Windows，cargo test --lib servers::rdp 63 项、--bin rdp-probe 10 项，2026-10-01） |
+| V-05 | AC-06~08、11 | native `TC-RDPS-NAT-02-clipboard-rich`* | 服务端运行、探针连接 | 文本/HTML/图片双向一致（`host_clipboard` 判定），禁止级别不传 | native 三端 | 通过（NAT-02、NAT-09 三端） |
+| V-06 | AC-09、10 | native `TC-RDPS-NAT-03-clipboard-files`* | 含嵌套与 Unicode 名的样本树 | 双向 SHA-256 一致；超限拒绝 | native 三端 | 通过（NAT-03 三端） |
+| V-07 | AC-12、13 | Rust `sound`/`audio_input` 单元* + 探针单元 | PDU 样本 | 协商、分包、PDU 往返 | `cargo test --lib servers::rdp` / `--bin rdp-probe` | 通过（本地 Windows，cargo test --lib servers::rdp 63 项、--bin rdp-probe 10 项，2026-10-01） |
+| V-08 | AC-12 | native `TC-RDPS-NAT-04-audio-playback`* | 宿主播放 1 kHz 音 | 探针收到 PCM 主频 1 kHz±2% 且 RMS 高于阈值 | native 三端 | 通过（NAT-04 三端） |
+| V-09 | AC-13 | native `TC-RDPS-NAT-05-microphone`* | 探针经 AUDIO_INPUT 发 440 Hz | 宿主从虚拟麦克风录到 440 Hz±2% | native 三端 | 通过（NAT-05 三端） |
+| V-10 | AC-14 | native `TC-RDPS-NAT-07-autodetect`* | 探针声明 netchar 支持 | 收到 RTT 请求、带宽测量与 Network Characteristics Result | native 三端 | 通过（NAT-07 三端） |
 | V-11 | AC-15 | browser `TC-RDPC-BAR-01-connection-bar`* | 受控 browser RDP 预览夹具 | 显示/隐藏/固定、各按钮动作与键盘可达 | browser 三端 | 待执行 |
-| V-12 | AC-15 | Vitest `RdpConnectionBar.test.tsx`* | 组件挂载 | 计时隐藏、热区、快捷键、质量映射 | `pnpm test src/components/rdp` | 待执行 |
-| V-13 | AC-16 | native `TC-RDPS-PERF-01-performance-budget`* | `rdp_target.py`、Windows 基线账号 | M1~M6 满足 §4.7 | native 三端 | 待执行 |
-| V-14 | AC-17 | native `TC-RDPS-NAT-01-start-connect-display`* | 设置页配置并启动 | NLA 成功、收到画面、点击生效、授权弹窗、停止后不可连接、错误口令被拒 | native 三端 | 待执行 |
+| V-12 | AC-15 | Vitest `RdpConnectionBar.test.tsx`* | 组件挂载 | 计时隐藏、热区、快捷键、质量映射 | `pnpm test src/components/rdp` | 通过（Vitest） |
+| V-13 | AC-16 | native `TC-RDPS-PERF-01-performance-budget`* | `rdp_target.py`、Windows 基线账号 | M1~M6 满足 §4.7 | native 三端 | 未达标（M4 三端、macOS M3） |
+| V-14 | AC-17 | native `TC-RDPS-NAT-01-start-connect-display`* | 设置页配置并启动 | NLA 成功、收到画面、点击生效、授权弹窗、停止后不可连接、错误口令被拒 | native 三端 | 通过（NAT-01 Linux/macOS，NAT-06 Windows） |
 | V-15 | AC-17 保留 | `TC-auto-F-Servers-1`、`TC-111`、`RdpSettings.test.tsx`、`RdpServerApprovalBridge.test.tsx`、`cargo test --lib servers::` | 现有 | 现有断言不变 | browser 三端 + 本地 | 待执行 |
-| V-16 | AC-11~13、18 | browser `TC-RDPS-UI-02-rdp-media-clipboard-settings`* | stub `probe_rdp_audio` 各状态 | 设置项显示/持久化、缺驱动指引 | browser 三端 | 待执行 |
+| V-16 | AC-11~13、18 | browser `TC-RDPS-UI-02-rdp-media-clipboard-settings`* | stub `probe_rdp_audio` 各状态 | 设置项显示/持久化、缺驱动指引 | browser 三端 | 通过（UI-03 三端 browser） |
 | V-17 | AC-17 兼容 | native Windows `TC-RDPS-NAT-08-mstsc-interop`* | `cmdkey` 凭据、证书警告抑制 | mstsc 完成 NLA 并协商 cliprdr/rdpsnd/drdynvc，服务端日志与截图为证 | native windows | 待执行 |
 
-| V-18 | AC-19 | native `TC-RDPJ-01-client-server-loopback`*（联合） | 同一 QA 应用启动 Server，新建会话连 127.0.0.1 | 客户端连接状态与画面；画布点击使宿主目标翻色（状态文件）；断开后服务端仍运行 | native 三端 | 待执行 |
-| V-19 | AC-19、DEC-15 | native `TC-RDPJ-02-joint-clipboard-no-echo`*（联合） | 联合连接后宿主写入文本 | 剪贴板内容保持一致且服务端公告计数有界（探针并行旁路观察日志） | native 三端 | 待执行 |
-| V-20 | AC-15、AC-19 | native `TC-RDPJ-03-joint-connection-bar`*（联合） | 联合连接后切 OS 全屏 | 连接栏出现、质量等级来自服务端 netchar、固定/还原/断开生效 | native 三端 | 待执行 |
+| V-18 | AC-19 | native `TC-RDPJ-01-client-server-loopback`*（联合） | 同一 QA 应用启动 Server，新建会话连 127.0.0.1 | 客户端连接状态与画面；画布点击使宿主目标翻色（状态文件）；断开后服务端仍运行 | native 三端 | 通过（TC-RDPJ-01 三端） |
+| V-19 | AC-19、DEC-15 | native `TC-RDPJ-02-joint-clipboard-no-echo`*（联合） | 联合连接后宿主写入文本 | 剪贴板内容保持一致且服务端公告计数有界（探针并行旁路观察日志） | native 三端 | 通过（TC-RDPJ-02 三端） |
+| V-20 | AC-15、AC-19 | native `TC-RDPJ-03-joint-connection-bar`*（联合） | 联合连接后切 OS 全屏 | 连接栏出现、质量等级来自服务端 netchar、固定/还原/断开生效 | native 三端 | 通过（TC-RDPJ-01 三端） |
 | V-21 | AC-20 | native `TC-RDPC-REF-01-reference-servers`* | Windows TermService / Linux xrdp | 客户端连接、画面、点击、连接栏 | native windows、linux | 待执行 |
 
 限制：browser 夹具只证明渲染与状态逻辑；宿主剪贴板/音频/输入/采集必须用 native；macOS runner 若缺屏幕录制或辅助功能授权，相关 native 断言记为能力缺口并附证据，不算通过。
@@ -310,17 +310,17 @@ workflow 改动：`Prepare local service packages` 的条件扩展到上述 capa
 
 | AC | 方案 | 任务 | 验证 | 实际证据 | 当前缺口 |
 |---|---|---|---|---|---|
-| AC-01~05 | §4.1 | TASK-04 | V-01、02、03 | 待生成 | 未实现 |
-| AC-06~11 | §4.2 | TASK-05、06 | V-04、05、06 | 待生成 | 未实现 |
-| AC-12 | §4.3 | TASK-07 | V-07、08 | 待生成 | 未实现 |
-| AC-13 | §4.4 | TASK-08 | V-07、09 | 待生成 | 未实现 |
-| AC-14 | §4.5 | TASK-09 | V-10 | 待生成 | 未实现 |
-| AC-15 | §4.6 | TASK-10 | V-11、12 | 待生成 | 未实现 |
-| AC-16 | §4.7 | TASK-03、11 | V-13 | 待生成 | 预算待基线 |
-| AC-17 | 全部 | TASK-12 | V-14、15、17 | 待生成 | 待执行 |
-| AC-18 | §4.1~4.4 | TASK-04~08 | V-02、16 | 待生成 | 未实现 |
-| AC-19 | §4.8、DEC-14/15 | TASK-02、05、10、12 | V-18、19、20 | 待生成 | 未实现 |
-| AC-20 | §4.9 | TASK-02、10、12 | V-21 | 待生成 | 未实现 |
+| AC-01~05 | §4.1 | TASK-04 | V-01、02、03 | 运行 36828182584、36864121715 | 已实现并验证 |
+| AC-06~11 | §4.2 | TASK-05、06 | V-04、05、06 | 运行 36864121715、36871090675 | 已实现并验证 |
+| AC-12 | §4.3 | TASK-07 | V-07、08 | 运行 36864121715 | 已实现并验证 |
+| AC-13 | §4.4 | TASK-08 | V-07、09 | 运行 36864121715 | 已实现并验证 |
+| AC-14 | §4.5 | TASK-09 | V-10 | 运行 36864121715 | RTT 与 Network Characteristics 已验证；连续带宽测量为缺口 |
+| AC-15 | §4.6 | TASK-10 | V-11、12、20 | 运行 36864121715、Vitest | 已实现；V-20 联合用例与 Vitest 通过，V-11 browser 夹具未建 |
+| AC-16 | §4.7 | TASK-03、11 | V-13 | 运行 36864121715、36871090675 | 未达标：M4 三端超预算，macOS M3/M2 贴线 |
+| AC-17 | 全部 | TASK-12 | V-14、15、17 | 运行 36864121715 | V-14 通过；V-15 保留回归与 V-17 mstsc 互通待执行 |
+| AC-18 | §4.1~4.4 | TASK-04~08 | V-02、16 | 运行 36864121715 | 已实现并验证 |
+| AC-19 | §4.8、DEC-14/15 | TASK-02、05、10、12 | V-18、19、20 | 运行 36864121715 | 已实现并验证 |
+| AC-20 | §4.9 | TASK-02、10、12 | V-21 | — | 未实现：参考服务器用例待建 |
 
 交付条件：三端 CI 上本设计全部 V 通过（能力缺口须有证据并单列），保留回归通过，§4.7 预算满足；未在某端执行的项不从其他端推断。
 
