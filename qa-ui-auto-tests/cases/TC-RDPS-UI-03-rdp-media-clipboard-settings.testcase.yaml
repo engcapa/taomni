@@ -8,7 +8,9 @@ description: |
   saves them through save_server_config (the stub keeps them in
   localStorage); a reloaded window reads them back into the same controls.
   Defaults are the safe Windows-like ones: both directions "everything",
-  2048 MB, sound and microphone on.
+  2048 MB, sound and microphone on. The file limit is only shown while a
+  direction allows files, so it is set first and checked again after
+  switching one direction back to "everything".
 
   Native boundary: whether the server honours the levels is TC-RDPS-NAT-09;
   sound and microphone are TC-RDPS-NAT-04/05.
@@ -40,15 +42,15 @@ steps:
     state: attached
 - wait_for: '[data-testid="rdp-field-audio-playback"]:checked'
 - wait_for: '[data-testid="rdp-field-microphone"]:checked'
+- fill:
+    selector: '[data-testid="rdp-field-clipboard-file-max-mb"]'
+    value: '512'
 - select_option:
     selector: '[data-testid="rdp-field-clipboard-to-client"]'
     value: text
 - select_option:
     selector: '[data-testid="rdp-field-clipboard-to-server"]'
     value: 'off'
-- fill:
-    selector: '[data-testid="rdp-field-clipboard-file-max-mb"]'
-    value: '512'
 - set_check:
     selector: '[data-testid="rdp-field-audio-playback"]'
     checked: false
@@ -84,6 +86,10 @@ steps:
     state: attached
 - wait_for: '[data-testid="rdp-field-audio-playback"]:not(:checked)'
 - wait_for: '[data-testid="rdp-field-microphone"]:not(:checked)'
+- assert_not_visible: '[data-testid="rdp-field-clipboard-file-max-mb"]'
+- select_option:
+    selector: '[data-testid="rdp-field-clipboard-to-server"]'
+    value: all
 - assert_attribute:
     selector: '[data-testid="rdp-field-clipboard-file-max-mb"]'
     name: value
@@ -136,10 +142,11 @@ verification:
     - 17
     - 18
   - id: R3
-    requirement: A reopened window shows the saved choices.
+    requirement: A reopened window shows the saved choices, and the file limit only while a direction allows files.
     actions:
     - 19
     - 21
+    - 27
     checkpoints:
     - step: 22
       expectation: Clipboard to the client reads text only.
@@ -150,13 +157,16 @@ verification:
     - step: 25
       expectation: Microphone redirection reads off.
     - step: 26
-      expectation: The file limit reads 512.
+      expectation: With no direction allowing files the file limit is hidden.
+    - step: 28
+      expectation: Allowing files again shows the saved 512 MB limit.
     results:
     - 22
     - 23
     - 24
     - 25
     - 26
+    - 28
   native:
   - check: The saved configuration reaching the real server is covered by TC-RDPS-NAT-09 (levels) and TC-RDPS-NAT-04/05 (sound, microphone).
     method: automated

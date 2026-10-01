@@ -717,6 +717,9 @@ fn run_worker(shared: Arc<Shared>, commands: Receiver<Command>) {
                     // tick reads the host again instead of treating this
                     // state as already announced.
                     Ok(content) => {
+                        shared
+                            .log
+                            .line("clipboard: nothing to offer on this computer's clipboard yet");
                         known = Some(content.identity());
                         shared.set_snapshot(content);
                     }

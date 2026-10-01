@@ -101,6 +101,12 @@ steps:
     kind: files
     paths:
     - 宿主样本
+- host_clipboard:
+    action: assert
+    kind: files
+    names:
+    - 宿主样本
+    timeout_sec: 10
 - rdp_probe:
     scenario: clipboard-receive
     artifact: receive-files
@@ -147,18 +153,20 @@ verification:
     - 21
     checkpoints:
     - step: 22
+      expectation: The host clipboard holds the tree before the client connects (platform tools read it back).
+    - step: 23
       expectation: The probe received six entries; the three files keep their nested names and SHA-256.
     results:
-    - 22
+    - 23
   - id: R3
     requirement: Stop closes the listener after the transfers.
     actions:
-    - 23
+    - 24
     checkpoints:
-    - step: 24
+    - step: 25
       expectation: The RDP row reports data-status=stopped.
     results:
-    - 24
+    - 25
   native:
   - check: Real OS file clipboards on the runner, the packaged app's staging directory, CLIPRDR FileContents over NLA.
     method: automated
