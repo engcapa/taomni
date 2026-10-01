@@ -2034,12 +2034,20 @@ mod tests {
 
     /// Minimal RFB 3.8 server for relay tests: None security, 4x2 desktop.
     /// Sends one Raw update, then waits for the client's *next* update request
-    /// (proving the relay pipelines requests without a WebView ACK), then
-    /// resizes to 2x2 with a DesktopSize rect followed by a Raw rect.
-    fn start_pipeline_fixture() -> (u16, std::thread::JoinHandle<Vec<u8>>) {
+    /// (proving the relay pipelines requests without a WebView ACK), then —
+    /// once the test has received the first frame (`delivered`) — resizes to
+    /// 2x2 with a DesktopSize rect followed by a Raw rect. Without that wait
+    /// the resize can arrive while the first frame is still queued, and the
+    /// relay rightly drops frames of the old geometry.
+    fn start_pipeline_fixture() -> (
+        u16,
+        std::thread::JoinHandle<Vec<u8>>,
+        std::sync::mpsc::Sender<()>,
+    ) {
         use std::io::{Read as _, Write as _};
         let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
+        let (delivered, first_frame_delivered) = std::sync::mpsc::channel::<()>();
         let handle = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
             stream
@@ -2091,6 +2099,9 @@ mod tests {
             // The relay must ask for the next incremental update on its own.
             let mut next_request = [0u8; 10];
             stream.read_exact(&mut next_request).unwrap();
+            first_frame_delivered
+                .recv_timeout(std::time::Duration::from_secs(10))
+                .expect("first frame delivered to the WebSocket");
 
             let mut resized = vec![0, 0, 0, 2];
             for field in [0u16, 0, 2, 2] {
@@ -2104,12 +2115,12 @@ mod tests {
             let _ = stream.read_to_end(&mut rest);
             next_request.to_vec()
         });
-        (port, handle)
+        (port, handle, delivered)
     }
 
     #[tokio::test]
     async fn relay_pipelines_requests_and_repaints_after_desktop_size() {
-        let (port, server) = start_pipeline_fixture();
+        let (port, server, delivered) = start_pipeline_fixture();
         let session = spawn_vnc_relay(
             "127.0.0.1".into(),
             port,
@@ -2144,7 +2155,12 @@ mod tests {
                 .expect("valid message");
             match message {
                 Message::Text(text) => texts.push(text.to_string()),
-                Message::Binary(bytes) if bytes.is_empty() => frames.push(Vec::new()),
+                Message::Binary(bytes) if bytes.is_empty() => {
+                    if !frames.last().unwrap().is_empty() {
+                        let _ = delivered.send(());
+                    }
+                    frames.push(Vec::new());
+                }
                 Message::Binary(bytes) => frames.last_mut().unwrap().push(bytes.to_vec()),
                 _ => {}
             }
