@@ -2253,6 +2253,43 @@ describe("CodeWorkspaceTab", () => {
     fireEvent.click(within(outline).getByText("render"));
   });
 
+  it("renders its left tool window bar into the collapsed sidebar rail (ED-PARITY-027)", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-rail",
+      workspaceInstanceId: "instance-rail",
+      name: "Rail",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const { useMainRailHostStore } = await import("../../stores/mainRailHostStore");
+    useMainRailHostStore.setState({ host });
+    useAppStore.setState({ mergeToolWindowRail: true, sidebarCollapsed: true });
+    try {
+      const { rerender } = renderWorkspace(workspace);
+      await waitFor(() => expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).not.toBeNull());
+      expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).toHaveAttribute("data-embedded", "true");
+      expect(host.querySelector('[data-tool-window-id="project"]')).not.toBeNull();
+      // The right bar stays inside the workspace.
+      expect(host.querySelector('[data-testid="code-workspace-tool-rail-right"]')).toBeNull();
+      // Expanding the sidebar returns the bar to the workspace.
+      act(() => useAppStore.setState({ sidebarCollapsed: false }));
+      await waitFor(() => expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).toBeNull());
+      expect(screen.getByTestId("code-workspace-tool-rail-left")).not.toHaveAttribute("data-embedded");
+      // An inactive workspace never claims the rail.
+      act(() => useAppStore.setState({ sidebarCollapsed: true }));
+      rerender(<CodeWorkspaceTab tabId="tab-code" workspace={workspace} visible={false} />);
+      expect(host.querySelector('[data-testid="code-workspace-tool-rail-left"]')).toBeNull();
+    } finally {
+      useMainRailHostStore.setState({ host: null });
+      useAppStore.setState({ sidebarCollapsed: false });
+      host.remove();
+    }
+  });
+
   it("opens quick documentation with Ctrl+Q, navigates to its exact source, and pins it", async () => {
     const { EditorView } = await import("@codemirror/view");
     const workspace: CodeWorkspaceTabInfo = {

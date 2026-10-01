@@ -85,7 +85,13 @@ import {
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { redactVncHandoff, vncConsumeDetachClaim, vncCreateDetachClaim } from "../lib/vnc";
-import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
+import { Bot, Columns2, FolderOpen, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ToolWindowRail, type ToolWindowRailItem } from "../components/editor/workspace/panels/ToolWindowRail";
+import { effectiveStripeWidth } from "../components/editor/workspace/toolWindowLayout";
+import { useToolWindowStripeStore } from "../components/editor/workspace/toolWindowStripeStore";
+import { useMainRailHostStore } from "../stores/mainRailHostStore";
+import { sidebarRailGroup } from "../stores/sidebarRailPolicy";
 import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, MailAuthMode, MailProvider, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
 import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { normalizeLocalStartCwd, terminalCwdTitlePrefix } from "../lib/terminalCwd";
@@ -721,6 +727,7 @@ export function MainLayout() {
     tabs,
     activeTabId,
     sidebarCollapsed,
+    mergeToolWindowRail,
     xServerEnabled,
     refreshXServer,
     addTab,
@@ -758,6 +765,12 @@ export function MainLayout() {
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  // ED-PARITY-027 A: every tab group restores its own sidebar state (tool
+  // window tabs start collapsed to the rail).
+  const activeRailGroup = sidebarRailGroup(activeTab?.type);
+  useEffect(() => {
+    useAppStore.getState().applySidebarForActiveTab();
+  }, [activeRailGroup, mergeToolWindowRail]);
   const terminalProfilesBySessionId = useMemo(() => {
     const profiles = new Map<string, TerminalProfile | undefined>();
     for (const session of sessions) {
@@ -921,6 +934,10 @@ export function MainLayout() {
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
+  const mainRailHost = useMainRailHostStore((s) => s.host);
+  const stripeSettings = useToolWindowStripeStore((s) => s.settings);
+  const toggleStripeNames = useToolWindowStripeStore((s) => s.toggleShowNames);
+  const setStripeWidth = useToolWindowStripeStore((s) => s.setWidth);
   const toggleTabChat = useChatStore((s) => s.toggleTabChat);
   const syncTabChatWithActiveTab = useChatStore((s) => s.syncTabChatWithActiveTab);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
@@ -3856,6 +3873,56 @@ export function MainLayout() {
   const mailTabs = tabs.filter((t) => t.type === "mail" && t.mail);
   const terminalSplitVisible =
     terminalSplitActive && terminalTabs.length > 0 && activeTab?.type === "terminal";
+  // ED-PARITY-027 B: a terminal's tool windows (attached SFTP, Chat) move from
+  // its floating actions into the collapsed sidebar rail.
+  const terminalRailMerged = mergeToolWindowRail && sidebarCollapsed && !!mainRailHost
+    && activeTab?.type === "terminal" && !terminalSplitVisible;
+  const toggleTerminalSftp = (tab: Tab) => {
+    if (sftpDetachedTabs[tab.id] && tab.ssh) {
+      openDetachedSftp(
+        {
+          sessionId: `attached-${tab.id}`,
+          host: tab.ssh.host,
+          port: tab.ssh.port,
+          username: tab.ssh.username,
+          authMethod: tab.ssh.authMethod,
+          authData: tab.ssh.authData,
+          networkSettingsJson: JSON.stringify(
+            toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
+          ),
+          initialPath: terminalCwds[tab.id],
+          attachedToTerminal: true,
+        },
+        `${tab.title} — SFTP`,
+      );
+    } else {
+      toggleAttachedSidebar(tab.id);
+    }
+  };
+  const terminalRailItems: ToolWindowRailItem[] = [];
+  if (terminalRailMerged && activeTab) {
+    const railTab = activeTab;
+    if (railTab.ssh) {
+      terminalRailItems.push({
+        id: "sftp",
+        label: t("terminal.sftpFloatingButtonLabel"),
+        icon: <FolderOpen />,
+        active: !!attachedSidebars[railTab.id],
+        testId: "attached-sftp-toggle",
+        onSelect: () => toggleTerminalSftp(railTab),
+      });
+    }
+    if (!aiFullyDisabled) {
+      terminalRailItems.push({
+        id: "chat",
+        label: t("terminal.chatFloatingButtonLabel"),
+        icon: <Bot />,
+        active: chatDrawerOpen && activeTabId === railTab.id,
+        testId: "tab-chat-toggle",
+        onSelect: () => void toggleTabChat(railTab.id),
+      });
+    }
+  }
   const effectiveMultiExecSelectedCount = terminalSplitActive
     ? [...multiExecSelectedTabIds].filter((id) => !terminalSplitInputLockedTabIds.has(id)).length
     : multiExecSelectedTabIds.size;
@@ -4043,8 +4110,21 @@ export function MainLayout() {
       {chatDrawerTopPinned && <ChatDrawer />}
 
       <div className="flex-1 flex min-h-0">
+        {terminalRailMerged && mainRailHost && terminalRailItems.length > 0 && createPortal(
+          <ToolWindowRail
+            side="left"
+            embedded
+            top={terminalRailItems}
+            width={effectiveStripeWidth(stripeSettings, "left")}
+            showNames={stripeSettings.showNames}
+            onToggleShowNames={toggleStripeNames}
+            onResize={(width) => setStripeWidth("left", width)}
+            onHide={(id) => terminalRailItems.find((item) => item.id === id)?.onSelect()}
+          />,
+          mainRailHost,
+        )}
         {sidebarCollapsed && (
-          <div data-testid="collapsed-sidebar-rail" className="h-full w-[30px] shrink-0 overflow-visible">
+          <div data-testid="collapsed-sidebar-rail" className="h-full min-w-[30px] shrink-0 overflow-visible">
             <Sidebar
               compact
               onNewSession={handleNewSession}
@@ -4249,34 +4329,13 @@ export function MainLayout() {
                             detachToggle={!terminalSplitVisible ? {
                               onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
                             } : undefined}
-                            chatToggle={!aiFullyDisabled ? {
+                            chatToggle={!aiFullyDisabled && !(terminalRailMerged && isActive) ? {
                               open: chatDrawerOpen && activeTabId === tab.id,
                               onToggle: () => void toggleTabChat(tab.id),
                             } : undefined}
-                            sftpToggle={!terminalSplitVisible && tab.ssh ? {
+                            sftpToggle={!terminalSplitVisible && tab.ssh && !(terminalRailMerged && isActive) ? {
                               open: sidebarOpen,
-                              onToggle: () => {
-                                if (sftpDetachedTabs[tab.id] && tab.ssh) {
-                                  openDetachedSftp(
-                                    {
-                                      sessionId: `attached-${tab.id}`,
-                                      host: tab.ssh.host,
-                                      port: tab.ssh.port,
-                                      username: tab.ssh.username,
-                                      authMethod: tab.ssh.authMethod,
-                                      authData: tab.ssh.authData,
-                                      networkSettingsJson: JSON.stringify(
-                                        toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
-                                      ),
-                                      initialPath: terminalCwds[tab.id],
-                                      attachedToTerminal: true,
-                                    },
-                                    `${tab.title} — SFTP`,
-                                  );
-                                } else {
-                                  toggleAttachedSidebar(tab.id);
-                                }
-                              }
+                              onToggle: () => toggleTerminalSftp(tab),
                             } : undefined}
                             gitToggle={!tab.ssh && !tab.commandTerminal ? {
                               cwd: terminalCwds[tab.id] ?? null,

@@ -2270,6 +2270,8 @@ export const zhCN: DeepPartial<typeof en> = {
     globalUiSubtitle: "自定义界面字体与字号（不影响终端 / 代码块）",
     resetUiFont: "重置界面字体",
     resetUiFontTitle: "将界面字体恢复为默认值",
+    mergeToolWindowRailLabel: "单一工具窗口条",
+    mergeToolWindowRailHint: "Code Workspace 与终端标签会把侧栏折叠成工具条，并把各自的工具窗口按钮放进这条工具条；每种标签分别记住你是否展开过侧栏。",
     fontFamilyLabel: "界面字体",
     fontFamilyCurated: "推荐界面字体",
     fontFamilySystem: "全部系统字体",

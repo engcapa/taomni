@@ -156,6 +156,7 @@ import { selectFilePath } from "../../lib/ipc";
 import { loadCodeViewProfile } from "../../lib/codeViewProfile";
 import { registerShellKeyClaim } from "../../lib/shellKeyClaims";
 import { useAppStore } from "../../stores/appStore";
+import { useMainRailHostStore } from "../../stores/mainRailHostStore";
 import {
   createEditorGroup,
   selectCodeWorkspaceUi,
@@ -1442,6 +1443,10 @@ export function CodeWorkspaceTab({
 }: CodeWorkspaceTabProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setTabCodeWorkspaceContext = useAppStore((s) => s.setTabCodeWorkspaceContext);
+  // ED-PARITY-027 B: while the main sidebar is collapsed to its rail, the
+  // active workspace renders its left tool window bar into that rail.
+  const mainRailHost = useMainRailHostStore((s) => s.host);
+  const mainRailMergeActive = useAppStore((s) => s.mergeToolWindowRail && s.sidebarCollapsed);
   const setWorkspaceStatusSegments = useCodeWorkspaceStatusStore((s) => s.setStatus);
   const setWorkspaceStatusActions = useCodeWorkspaceStatusStore((s) => s.setActions);
   const clearWorkspaceStatus = useCodeWorkspaceStatusStore((s) => s.clearForTab);
@@ -22867,15 +22872,22 @@ export function CodeWorkspaceTab({
       )}
 
       <div className="flex-1 min-h-0 flex">
-        <ToolWindowRail
-          side="left"
-          top={leftStripeTop}
-          bottom={stripeItemsAt("bottom-left")}
-          footer={moreToolWindowsButton}
-          width={toolWindowLayout.stripeWidth("left")}
-          onResize={(width) => toolWindowLayout.setStripeWidth("left", width)}
-          {...stripeCallbacks}
-        />
+        {(() => {
+          const merged = visible && mainRailMergeActive && !!mainRailHost;
+          const leftStripe = (
+            <ToolWindowRail
+              side="left"
+              embedded={merged}
+              top={leftStripeTop}
+              bottom={stripeItemsAt("bottom-left")}
+              footer={moreToolWindowsButton}
+              width={toolWindowLayout.stripeWidth("left")}
+              onResize={(width) => toolWindowLayout.setStripeWidth("left", width)}
+              {...stripeCallbacks}
+            />
+          );
+          return merged && mainRailHost ? createPortal(leftStripe, mainRailHost) : leftStripe;
+        })()}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex-1 min-h-0 flex">
         <PanelGroup

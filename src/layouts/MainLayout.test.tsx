@@ -6,6 +6,7 @@ import { emit } from "@tauri-apps/api/event";
 import { MainLayout } from "./MainLayout";
 import { useAppStore, recentWorkspaceIdFromParts } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { useMainRailHostStore } from "../stores/mainRailHostStore";
 import { commitWelcomeRunSnapshot, exitApp, listSessions, markSessionConnected, writeTerminal, type SessionConfig } from "../lib/ipc";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../lib/terminalProfile";
 
@@ -21,6 +22,8 @@ const terminalPanelMock = vi.hoisted(() => ({
     onTerminalProfileChange?: (profile: TerminalProfile) => void;
     onUploadLocalPaths?: (request: { paths: string[]; cwd: string | null }) => Promise<void>;
     onCwdChange?: (cwd: string) => void;
+    sftpToggle?: unknown;
+    chatToggle?: unknown;
   }>,
 }));
 
@@ -226,7 +229,7 @@ vi.mock("../components/terminal/TerminalPanel", () => ({
     onUploadLocalPaths?: (request: { paths: string[]; cwd: string | null }) => Promise<void>;
     onCwdChange?: (cwd: string) => void;
   }) => {
-    terminalPanelMock.props.push({ tabId, terminalProfile, onTerminalProfileChange, onUploadLocalPaths, onCwdChange });
+    terminalPanelMock.props.push({ tabId, terminalProfile, onTerminalProfileChange, onUploadLocalPaths, onCwdChange, sftpToggle, chatToggle });
     useEffect(() => {
       terminalLifecycle.mounted();
       onSessionReady?.(`session-${tabId ?? "terminal"}`);
@@ -475,6 +478,9 @@ describe("MainLayout attached SFTP sidebar", () => {
       ],
       activeTabId: "ssh-tab",
       sidebarCollapsed: false,
+      // These cases cover the legacy layout; ED-PARITY-027 has its own block.
+      mergeToolWindowRail: false,
+      sidebarCollapsedByGroup: { "code-workspace": true, terminal: true, other: false },
       terminalSplitActive: false,
       terminalSplitLayout: "horizontal",
       terminalSplitInputLockedTabIds: new Set(),
@@ -482,6 +488,7 @@ describe("MainLayout attached SFTP sidebar", () => {
       multiExecSelectedTabIds: new Set(),
       statusMessage: "Ready",
     });
+    useMainRailHostStore.setState({ host: null });
   });
 
   afterEach(() => {
@@ -1783,6 +1790,89 @@ function setNavigatorPlatform(platform: string): () => void {
     });
   };
 }
+
+describe("MainLayout ED-PARITY-027 single tool window bar", () => {
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    window.localStorage.clear();
+    terminalPanelMock.props = [];
+    sidebarMock.props = [];
+    vi.mocked(listSessions).mockResolvedValue([]);
+    host = document.createElement("div");
+    host.setAttribute("data-testid", "rail-host-under-test");
+    document.body.appendChild(host);
+    useMainRailHostStore.setState({ host });
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        {
+          id: "ssh-tab",
+          type: "terminal",
+          title: "root@example.test",
+          closable: true,
+          ssh: { host: "example.test", port: 22, username: "root", authMethod: "Password", authData: "secret", optionsJson: undefined },
+        },
+      ],
+      activeTabId: "welcome",
+      sidebarCollapsed: false,
+      mergeToolWindowRail: true,
+      sidebarCollapsedByGroup: { "code-workspace": true, terminal: true, other: false },
+      terminalSplitActive: false,
+      multiExecActive: false,
+      multiExecSelectedTabIds: new Set(),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    host.remove();
+    useMainRailHostStore.setState({ host: null });
+  });
+
+  it("collapses the sidebar for a terminal tab and restores it for other tabs", async () => {
+    render(<MainLayout />);
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+    act(() => useAppStore.getState().setActiveTab("welcome"));
+    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
+  });
+
+  it("remembers a manual expand for terminal tabs only", async () => {
+    render(<MainLayout />);
+    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+    act(() => useAppStore.getState().toggleSidebar());
+    expect(useAppStore.getState().sidebarCollapsedByGroup.terminal).toBe(false);
+    act(() => useAppStore.getState().setActiveTab("welcome"));
+    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
+    expect(useAppStore.getState().sidebarCollapsedByGroup["code-workspace"]).toBe(true);
+  });
+
+  it("moves the terminal's SFTP and Chat toggles into the collapsed rail", async () => {
+    render(<MainLayout />);
+    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    await waitFor(() => expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).not.toBeNull());
+    expect(host.querySelector('[data-testid="tab-chat-toggle"]')).not.toBeNull();
+    const active = terminalPanelMock.props.filter((props) => props.tabId === "ssh-tab").at(-1);
+    expect(active?.sftpToggle).toBeUndefined();
+    expect(active?.chatToggle).toBeUndefined();
+    fireEvent.click(host.querySelector('[data-testid="attached-sftp-toggle"]')!);
+    expect(screen.getByTestId("sftp-sidebar")).toBeInTheDocument();
+    expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps the floating toggles when the bar merge is turned off", async () => {
+    useAppStore.setState({ mergeToolWindowRail: false });
+    render(<MainLayout />);
+    act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).toBeNull();
+    const active = terminalPanelMock.props.filter((props) => props.tabId === "ssh-tab").at(-1);
+    expect(active?.sftpToggle).toBeDefined();
+  });
+});
 
 describe("MainLayout run-snapshot collector (V-06)", () => {
   let originalPlatform: string;

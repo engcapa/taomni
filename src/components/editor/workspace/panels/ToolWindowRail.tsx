@@ -44,6 +44,11 @@ export interface ToolWindowRailProps {
   onMove?: (id: string, anchor: ToolWindowAnchor) => void;
   onHide?: (id: string) => void;
   onRemoveFromSidebar?: (id: string) => void;
+  /**
+   * ED-PARITY-027: rendered inside the main sidebar rail, which owns the
+   * background and border; the stripe fills the rail's free height.
+   */
+  embedded?: boolean;
 }
 
 /**
@@ -67,6 +72,7 @@ export function ToolWindowRail({
   onMove,
   onHide,
   onRemoveFromSidebar,
+  embedded = false,
 }: ToolWindowRailProps) {
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -164,10 +170,13 @@ export function ToolWindowRail({
       aria-label={side === "left" ? "Left tool windows" : "Right tool windows"}
       data-testid={`code-workspace-tool-rail-${side}`}
       data-show-names={showNames || undefined}
+      data-embedded={embedded || undefined}
       style={{ width }}
-      className={`relative flex h-full shrink-0 flex-col items-stretch overflow-y-auto overflow-x-hidden bg-[var(--taomni-code-gutter-bg)] py-1 [scrollbar-width:none] ${side === "left"
-        ? "border-r border-[var(--taomni-code-border)]"
-        : "border-l border-[var(--taomni-code-border)]"}`}
+      className={embedded
+        ? "relative flex min-h-0 flex-1 shrink-0 flex-col items-stretch overflow-y-auto overflow-x-hidden border-t border-[var(--taomni-sidebar-border)] py-1 [scrollbar-width:none]"
+        : `relative flex h-full shrink-0 flex-col items-stretch overflow-y-auto overflow-x-hidden bg-[var(--taomni-code-gutter-bg)] py-1 [scrollbar-width:none] ${side === "left"
+          ? "border-r border-[var(--taomni-code-border)]"
+          : "border-l border-[var(--taomni-code-border)]"}`}
       onContextMenu={openStripeMenu}
     >
       <div className="flex flex-col items-stretch gap-1 px-1">

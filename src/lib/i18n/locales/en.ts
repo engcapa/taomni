@@ -2285,6 +2285,8 @@ const dict = {
     globalUiSubtitle: "Customize the typography and layout font scaling (excluding terminal / code blocks)",
     resetUiFont: "Reset UI Font",
     resetUiFontTitle: "Reset UI typography to defaults",
+    mergeToolWindowRailLabel: "Single tool window bar",
+    mergeToolWindowRailHint: "Code Workspace and terminal tabs collapse the sidebar to its rail and show their tool windows there; each tab kind remembers whether you expanded the sidebar.",
     fontFamilyLabel: "UI Font Family",
     fontFamilyCurated: "Curated UI Fonts",
     fontFamilySystem: "All System Fonts",

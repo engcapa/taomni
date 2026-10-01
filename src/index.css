@@ -436,6 +436,9 @@ body.notes-detached-document,
 .taomni-side-tab {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
+  /* Centred when the rail widens to host a tab's tool window bar (ED-PARITY-027). */
+  display: flex;
+  align-items: center;
   padding: 12px 4px;
   font-size: calc(var(--taomni-ui-font-size) - 1px);
   letter-spacing: 0.04em;

@@ -5,18 +5,17 @@ import {
   effectiveStripeWidth,
   markToolWindowUsed,
   moveToolWindow,
-  readStripeSettings,
   readToolWindowLayout,
   removeToolWindowFromSidebar,
   restoreToolWindowToSidebar,
   resolveToolWindowAnchor,
-  writeStripeSettings,
   writeToolWindowLayout,
   type ToolWindowAnchor,
   type ToolWindowLayoutV1,
   type ToolWindowSide,
   type ToolWindowStripeSettings,
 } from "./toolWindowLayout";
+import { useToolWindowStripeStore } from "./toolWindowStripeStore";
 
 /** Tool windows whose visibility lives in legacy workspace state. */
 export interface LegacyToolWindowState {
@@ -77,7 +76,7 @@ export function useToolWindowLayout(
   initiallyVisible: readonly string[] = [],
 ): ToolWindowLayoutController {
   const [layout, setLayout] = useState<ToolWindowLayoutV1>(() => readToolWindowLayout(workspaceKey));
-  const [stripes, setStripes] = useState<ToolWindowStripeSettings>(readStripeSettings);
+  const stripes = useToolWindowStripeStore((state) => state.settings);
   const [slots, setSlots] = useState<Partial<Record<ToolWindowAnchor, string | null>>>(() => {
     const restored = readToolWindowLayout(workspaceKey);
     const initial: Partial<Record<ToolWindowAnchor, string | null>> = {};
@@ -247,20 +246,8 @@ export function useToolWindowLayout(
     persist({ version: 1, anchors: {}, removed: [], used: layoutRef.current.used ?? [] });
   }, [anchorOf, entries, hideNow, isVisibleWith, persist]);
 
-  const setStripeWidth = useCallback((side: "left" | "right", width: number) => {
-    setStripes((current) => {
-      const next = side === "left" ? { ...current, leftWidth: width } : { ...current, rightWidth: width };
-      writeStripeSettings(next);
-      return next;
-    });
-  }, []);
-  const toggleShowNames = useCallback(() => {
-    setStripes((current) => {
-      const next = { ...current, showNames: !current.showNames };
-      writeStripeSettings(next);
-      return next;
-    });
-  }, []);
+  const setStripeWidth = useToolWindowStripeStore((state) => state.setWidth);
+  const toggleShowNames = useToolWindowStripeStore((state) => state.toggleShowNames);
 
   const stripeWidth = useCallback((side: "left" | "right") => effectiveStripeWidth(stripes, side), [stripes]);
 
