@@ -110,5 +110,5 @@ VNC-QA-001 收口回归（同一构建，只跑 Taomni）再测一次：指针�
 ## 7. 验证边界
 
 - 只覆盖这台 Windows 11（100% 缩放）与本机 fixture；fixture 画面是合成的，不代表真实服务器的编码与负载。
-- macOS、Linux 未执行。托管 CI 的 `vnc` 能力给三端提供同一个 fixture，TC-151（browser + native）覆盖连接、输入到达与 DesktopSize，不含系统级输入与系统剪贴板；本次只在这台 Windows 上以两种模式执行。
+- RealVNC 对照只在这台 Windows 上执行，macOS、Linux 没有 RealVNC 对照。托管 CI 的 `vnc` 能力给三端提供同一个 fixture：TC-151（browser + native）覆盖连接、输入到达与 DesktopSize，TC-153（native）覆盖 F8 菜单、画质 Low 与 Send F8，两者在三端都通过（run 36828540657）；这些用例不含系统级输入与系统剪贴板。
 - RA2 服务器（2026-09-30 共享服务器）需要用户名，本次未连接；RealVNC 与 Taomni 在该服务器上的对照仍以 09-30 参照为准。

@@ -20,7 +20,7 @@
 | CONN-001 连接属性 | 部分已有 | 确认差异 | — | — | different | 会话内 Properties：画质、菜单键、view-only 等持久化并按需重连生效（native fixture）；独立窗口 detach 只有单测 |
 | CLIP-001 剪贴板策略 | 已有 | 确认差异：连接即推送、750 ms 轮询 | — | 轮询开销未测 | different | 四个时机行为与 RealVNC same：连接不推送、指针进入与焦点返回发送本地变化、远端剪贴板写入本机且不回送；无轮询；以按键发送剪贴板。时延 different：三次运行指针进入 15–35 ms / 焦点返回 14–23 ms（RealVNC 4–9 / 3–10 ms，WebView 事件按刷新投递）；ExtendedClipboard 中文与 HTML 双向通过（RealVNC 只用 legacy） |
 | AUTH-001 macOS ARD（追加） | 缺失（无安全类型 30） | — | — | — | different | ARD 登录（DH + AES-128）、有用户名时优先、未加密警告、会话信息显示 ARD；GitHub macOS runner 真实屏幕共享 TC-152 通过；不在 RealVNC 分母内 |
-| QA-001 三端收口 | 未执行 | 未执行 | 未执行 | 未执行 | unverified | 见下节 |
+| QA-001 三端收口 | 未执行 | 未执行 | 未执行 | 未执行 | unverified | 各行的 RealVNC 对比都追溯到 09-30 实机参照或 10-01 同 fixture 对照；Windows native 组合回归通过；托管 CI 上 TC-151 三端 browser + native、TC-153 三端 native 通过，TC-152 在 macOS runner 上 ARD 登录通过；macOS/Linux 的系统级输入、剪贴板、全屏与绘制成本 unverified（见下节） |
 
 RealVNC 专属或第三方服务器上不可用的能力（音频、录制、文件传输、聊天、云、SSO）不在分母内（DEC-VNC-05）。
 
@@ -28,7 +28,9 @@ RealVNC 专属或第三方服务器上不可用的能力（音频、录制、文
 
 | 端 | 已验证 | 未验证与后续步骤 |
 |---|---|---|
-| Windows（WebView2，本机 1920×1080 @ 100%） | 全部卡的 native 场景（`vnc_native.py`，系统级输入）与 RealVNC 7.0.0 同 fixture 对照；hosted TC-151 browser + native | 125% 以外 DPI、多显示器全屏；Windows 服务器安全屏（Ctrl+Alt+Del） |
-| macOS（WKWebView，hosted macos-15） | TC-151（连接、点击、按键、Ctrl+Alt+Del、DesktopSize）browser + native；TC-152 真实屏幕共享 ARD 登录 | 系统级指针/键盘、剪贴板、全屏、绘制成本：在 Mac 上用平台输入 API 跑 `vnc_native.py` 对应场景 |
-| Linux（WebKitGTK，hosted ubuntu-24.04） | TC-151 browser + native | 同上；WebKitGTK 绘制成本与 X11 系统级输入 |
+| Windows（WebView2，本机 1920×1080 @ 100%） | 全部卡的 native 场景（`vnc_native.py`，系统级输入）与 RealVNC 7.0.0 同 fixture 对照；收口回归（release QA 构建，系统级输入）：连接、DesktopSize、Ctrl+Alt+Del、鼠标、菜单键、画质、Properties、断线重连、Stop、KeepAlive、认证失败、扩展剪贴板、绘制、剪贴板时机、以按键发送剪贴板、特殊键直通开/关、全屏、指针延迟全部通过；qa-ui-auto native TC-151 + TC-153（本机与 hosted windows-2025），TC-151 browser；真实服务器：VMware Workstation 内置 VNC 上的 macOS 14 客户机（None、锁屏与桌面的指针和键盘、画质切换，[实测记录](references/vmware-vnc-live-20261001.md)） | 125% 以外 DPI、多显示器全屏；Windows 服务器安全屏（Ctrl+Alt+Del）；键盘布局与输入法未在收口回归重跑（INPUT-003 实测后键盘路径未改） |
+| macOS（WKWebView，hosted macos-15） | TC-151（连接、点击、按键、Ctrl+Alt+Del、DesktopSize）browser + native；TC-153 native（F8 菜单、画质 Low 的 Tight/JPEG 请求与之后的绘制、Send F8）；TC-152 真实屏幕共享 ARD 登录 | 系统级指针/键盘、剪贴板、全屏、绘制成本：在 Mac 上用平台输入 API 跑 `vnc_native.py` 对应场景；原生光标采样只在 Windows |
+| Linux（WebKitGTK，hosted ubuntu-24.04） | TC-151 browser + native；TC-153 native | 同上；WebKitGTK 绘制成本与 X11 系统级输入 |
+
+托管运行（`qa-ui-auto-platforms.yml`，`scope=selected`）：36823635412（`0c7746b9`，TC-151 六组合 + TC-152）、36828540657（`37b83c09`，TC-151 六组合 + TC-153 三端 native；TC-152 这次在登录后的等待超时，见 [ARD 设计 §7](vnc-ard-macos-design.md#7-证据)）、36830413420 与 36830421897（`a209dfa6`，macOS native 的 TC-151/152/153 两次都全部通过）。服务器侧覆盖一台第三方 RFB 3.7 服务器、合成 fixture、macOS 屏幕共享与 VMware Workstation 内置 VNC 服务器。
 
