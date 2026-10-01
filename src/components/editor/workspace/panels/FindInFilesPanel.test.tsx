@@ -167,6 +167,14 @@ describe("FindInFilesPanel", () => {
     expect(screen.getByText("Invalid search pattern: boom")).toBeInTheDocument();
   });
 
+  it("focuses the query in the same commit that requests it (typing right after Ctrl+Shift+F)", () => {
+    const { rerender } = render(<FindInFilesPanel roots={roots} onOpenMatch={vi.fn()} />);
+    const query = screen.getByLabelText("Search query");
+    expect(query).not.toHaveFocus();
+    rerender(<FindInFilesPanel roots={roots} onOpenMatch={vi.fn()} focusNonce={1} />);
+    expect(query).toHaveFocus();
+  });
+
   it("explains when there are no roots to search", () => {
     render(<FindInFilesPanel roots={[]} onOpenMatch={vi.fn()} />);
     expect(screen.getByText("Add a folder to the workspace to search its files")).toBeInTheDocument();

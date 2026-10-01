@@ -120,6 +120,37 @@ describe("SearchEverywhere", () => {
     expect(selectedIndex()).toBe(0);
   });
 
+  it("owns the keyboard from its first paint: input focused without waiting for timers", () => {
+    vi.useFakeTimers();
+    try {
+      const { onClose } = renderPopup({ initialMode: "files" });
+      expect(screen.getByLabelText("Go to file")).toHaveFocus();
+      // Esc pressed outside the popup right after it appears still closes it.
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      fireEvent.keyDown(outside, { key: "Escape" });
+      expect(onClose).toHaveBeenCalledTimes(1);
+      outside.remove();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("selects a row only when the pointer really moves over it (IDEA ListPopup)", () => {
+    renderPopup({ initialMode: "files" });
+    const input = screen.getByLabelText("Go to file");
+    const rows = () => Array.from(document.querySelectorAll("[data-testid='code-workspace-search-everywhere'] [data-index]"));
+    const selectedIndex = () => rows().findIndex((row) => row.getAttribute("data-selected") === "true");
+    fireEvent.keyDown(input, { key: "PageDown" });
+    expect(selectedIndex()).toBe(2);
+    // The list scrolled or opened under a resting pointer: same coordinates.
+    fireEvent.mouseMove(rows()[1]!, { clientX: 40, clientY: 60 });
+    fireEvent.mouseMove(rows()[1]!, { clientX: 40, clientY: 60 });
+    expect(selectedIndex()).toBe(2);
+    fireEvent.mouseMove(rows()[1]!, { clientX: 44, clientY: 61 });
+    expect(selectedIndex()).toBe(1);
+  });
+
   it("reopens with an empty query even when the previous query was typed", () => {
     const props = {
       items,

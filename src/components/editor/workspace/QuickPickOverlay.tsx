@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Loader2, Search } from "lucide-react";
 import { useFocusReturn } from "./useFocusReturn";
 import { detectKeymapPlatform, type KeymapPlatform } from "./workspaceKeymapPlatform";
@@ -133,13 +133,33 @@ export function QuickPickOverlay<T>({
     }
   }
 
+  // The popup owns the keyboard from the frame it first paints, as in IDEA:
+  // Esc, arrows or Tab pressed right after it appears must reach it, so focus
+  // and the Esc listener are installed before paint. The deferred focus stays
+  // as a retry for a WebView that drops the first one.
+  // IDEA ListPopupImpl: only a pointer that really moved selects a row. Rows
+  // that appear or scroll under a resting pointer (the list opening, PageDown
+  // scrolling to the last row) fire mouse events without a move and must not
+  // take the keyboard selection.
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const pointerMoved = (event: React.MouseEvent) => {
+    const last = lastPointerRef.current;
+    lastPointerRef.current = { x: event.clientX, y: event.clientY };
+    return !!last && (last.x !== event.clientX || last.y !== event.clientY);
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    lastPointerRef.current = null;
+    inputRef.current?.focus();
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     setQuery("");
     onQueryChangeRef.current?.("");
     setSelectedIndex(initialIndexRef.current);
     setAsideIndex(null);
-    // Focus after the overlay is painted.
     const id = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(id);
   }, [open]);
@@ -150,7 +170,7 @@ export function QuickPickOverlay<T>({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const overlayRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
@@ -317,7 +337,9 @@ export function QuickPickOverlay<T>({
               data-index={index}
               data-selected={(!asideActive && index === selected) || undefined}
               className="h-7 w-full min-w-0 flex items-center gap-2 px-3 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-selection-match-bg)]"
-              onMouseEnter={() => setSelectedIndex(index)}
+              onMouseMove={(event) => {
+                if (pointerMoved(event) && index !== selected) setSelectedIndex(index);
+              }}
               onClick={() => onPick(item)}
             >
               {renderItem(item)}
