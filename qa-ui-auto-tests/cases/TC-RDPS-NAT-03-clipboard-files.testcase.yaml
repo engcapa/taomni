@@ -1,0 +1,169 @@
+id: TC-RDPS-NAT-03-clipboard-files
+title: RDP server clipboard files - nested folders with Unicode names copied in both directions with identical bytes
+description: |
+  V-06 (docs-feature/rdp-server-parity-design.md §4.2, AC-09/AC-10, DEC-11).
+  client -> host: rdp-probe offers a nested sample tree through
+  FileGroupDescriptorW + FileContents; the server downloads it into its
+  private staging directory and publishes it on the host clipboard, which
+  platform tools must report with identical relative paths and SHA-256.
+  host -> client: a second tree is placed on the host clipboard as a file
+  list; the probe pastes FileGroupDescriptorW and downloads every file with
+  SIZE/RANGE requests under the lock ironrdp takes, and the bytes must match.
+  On Windows platform_choice picks Taomni over the system Remote Desktop.
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- clipboard
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- rdp_server_required
+- system_rdp_running
+timeout_sec: 480
+steps:
+- open_route: '?servers=main'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- host_make_tree:
+    root: 客户端样本
+    files:
+      readme.txt: "Taomni RDP 文件传输\n"
+      子目录/data.csv: "a,b\n1,2\n"
+      子目录/深层/notes.md: "# 笔记 ✓\n"
+- rdp_probe:
+    scenario: clipboard-send
+    artifact: send-files
+    args:
+      files: 客户端样本
+      wait-sec: 30
+    expect:
+      negotiated.cliprdr: true
+      clipboard.file_bytes_served:
+        min: 40
+- host_clipboard:
+    action: assert
+    kind: files
+    names:
+    - 客户端样本
+    same_tree_as: 客户端样本
+    timeout_sec: 20
+- host_make_tree:
+    root: 宿主样本
+    files:
+      first.txt: "宿主文件 1\n"
+      目录/second.csv: "x,y\n3,4\n"
+      目录/深层/third.md: "Taomni ✓ 深层\n"
+- host_clipboard:
+    action: set
+    kind: files
+    paths:
+    - 宿主样本
+- rdp_probe:
+    scenario: clipboard-receive
+    artifact: receive-files
+    args:
+      expect: files
+      out-dir: received-files
+      wait-sec: 30
+    expect:
+      received.files:
+        length_min: 6
+      received.files.0.dir: true
+      received.files.1.name: 宿主样本\first.txt
+      received.files.1.sha256: 35de176655b106f17b2814831dc77698e8154a2e00382282bd087d792be9a726
+      received.files.3.name: 宿主样本\目录\second.csv
+      received.files.3.sha256: f2c863cb01af6905bf817e5fb5989ab7239fe88cd81c4e11246acd573197e900
+      received.files.5.name: 宿主样本\目录\深层\third.md
+      received.files.5.sha256: 401c18b2ad5423cd5bdadce5d36a92466467daaa2263420fd33a572d5d9a863a
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: A nested Unicode-named tree copied on the RDP client is published on the host clipboard with identical paths and bytes.
+    actions:
+    - 15
+    - 17
+    - 18
+    checkpoints:
+    - step: 16
+      expectation: The RDP server runs with file transfer allowed in both directions (default).
+    - step: 18
+      expectation: CLIPRDR is negotiated and the server pulled at least the tree's 40+ bytes.
+    - step: 19
+      expectation: The host clipboard file list names the tree and its staged copy matches every relative path and SHA-256.
+    results:
+    - 19
+  - id: R2
+    requirement: A tree on the host clipboard is downloaded by the RDP client with identical nesting and bytes.
+    actions:
+    - 20
+    - 21
+    checkpoints:
+    - step: 22
+      expectation: The probe received six entries; the three files keep their nested names and SHA-256.
+    results:
+    - 22
+  - id: R3
+    requirement: Stop closes the listener after the transfers.
+    actions:
+    - 23
+    checkpoints:
+    - step: 24
+      expectation: The RDP row reports data-status=stopped.
+    results:
+    - 24
+  native:
+  - check: Real OS file clipboards on the runner, the packaged app's staging directory, CLIPRDR FileContents over NLA.
+    method: automated
+    reason: Browser stubs have no RDP server, host clipboard or file system staging.
+  visual:
+  - check: Not a visual check.
+    method: not-applicable
+    reason: The case asserts file fidelity by SHA-256.

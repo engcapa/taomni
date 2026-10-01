@@ -175,6 +175,11 @@ def _probe_command(ctx: NativeStepContext, args: dict) -> tuple[list[str], Path]
             continue
         if value is True:
             command.append(f"--{key}")
+        elif key in PATH_ARGS:
+            # Relative paths name files in the case directory; ``files`` is a
+            # comma-separated list.
+            paths = [str(_within_report(ctx, part.strip())) for part in str(value).split(",") if part.strip()]
+            command += [f"--{key}", ",".join(paths)]
         else:
             command += [f"--{key}", str(value)]
     command += ["--out", str(artifact)]
@@ -184,7 +189,9 @@ def _probe_command(ctx: NativeStepContext, args: dict) -> tuple[list[str], Path]
     return command, artifact
 
 
-OFFLINE_SCENARIOS = {"host-play", "host-record", "image-digest"}
+OFFLINE_SCENARIOS = {"host-play", "host-record", "image-digest", "image-make"}
+# Probe options that name host files; resolved inside the report root.
+PATH_ARGS = {"png", "out-png", "image-png", "files", "out-dir", "wav-out", "snapshot"}
 
 
 def host_screenshot(path: Path) -> str:
@@ -389,13 +396,26 @@ def _do_host_clipboard(ctx: NativeStepContext, args: Any) -> str:
             record["reference"] = want
         elif kind == "files":
             names = [str(n) for n in args.get("names") or []]
+            # Optional content oracle: the clipboard entry with the same name
+            # as this local tree must hold identical relative paths and bytes.
+            reference = _within_report(ctx, str(args["same_tree_as"])) if args.get("same_tree_as") else None
+            expected_tree = _tree_digest(reference) if reference else None
 
             def check_files() -> tuple[bool, Any]:
                 files = host_clipboard.get_files()
-                found = {Path(f).name for f in files}
-                return all(n in found for n in names) and bool(files), files
+                found = {Path(f).name: Path(f) for f in files}
+                ok = all(n in found for n in names) and bool(files)
+                observed: Any = files
+                if ok and reference is not None:
+                    candidate = found.get(reference.name)
+                    actual = _tree_digest(candidate) if candidate and candidate.exists() else None
+                    observed = {"files": files, "tree": actual}
+                    ok = actual == expected_tree
+                return ok, observed
 
             record["value"] = _poll(check_files, timeout, f"file list with {names}")
+            if expected_tree is not None:
+                record["expected_tree"] = expected_tree
         else:
             raise StepError(f"host_clipboard: unknown kind {kind}")
     history = []
@@ -407,6 +427,76 @@ def _do_host_clipboard(ctx: NativeStepContext, args: Any) -> str:
     history.append(record)
     observations.write_text(json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8")
     return f"host_clipboard {action} {kind} ok"
+
+
+# --------------------------------------------------------------- host_make_tree
+
+def _tree_digest(root: Path) -> dict[str, str | None]:
+    """Relative ``/`` path → SHA-256 (``None`` for directories), root included."""
+    import hashlib
+
+    entries: dict[str, str | None] = {}
+    base = root.parent
+    for path in sorted([root, *root.rglob("*")] if root.is_dir() else [root]):
+        relative = path.relative_to(base).as_posix()
+        entries[relative] = None if path.is_dir() else hashlib.sha256(path.read_bytes()).hexdigest()
+    return entries
+
+
+@_verb("host_make_tree")
+def _do_host_make_tree(ctx: NativeStepContext, args: Any) -> str:
+    """Create ``root`` with ``files`` ({relative path: UTF-8 text}) inside the
+    case directory and record every entry's SHA-256 in ``<root>-tree.json``."""
+    if not isinstance(args, dict) or "root" not in args or not isinstance(args.get("files"), dict):
+        raise StepError("host_make_tree: expected {root, files: {relative path: text}}")
+    root = _within_report(ctx, str(args["root"]))
+    if root.exists():
+        raise StepError(f"host_make_tree: {root} already exists")
+    root.mkdir(parents=True)
+    for relative, text in args["files"].items():
+        target = _within_report(ctx, str(root / str(relative)))
+        if not target.is_relative_to(root):
+            raise StepError(f"host_make_tree: {relative} escapes {root}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(str(text).encode("utf-8"))
+    digest = _tree_digest(root)
+    (root.parent / f"{root.name}-tree.json").write_text(json.dumps(digest, indent=2, ensure_ascii=False),
+                                                         encoding="utf-8")
+    return f"created {len(digest)} entries under {root.name}"
+
+
+# ------------------------------------------------------------- platform_choice
+
+_PLATFORM_NAMES = {"Windows": "Windows", "Darwin": "macOS", "Linux": "Linux"}
+
+
+@_verb("platform_choice")
+def _do_platform_choice(ctx: NativeStepContext, args: Any) -> str:
+    """Answer a dialog that exists only on some platforms.
+
+    On ``platforms`` the ``dialog`` must become visible within ``timeout_sec``
+    and ``click`` is pressed; elsewhere it must stay absent for ``absent_sec``.
+    Both branches assert, so the prompt appearing on the wrong platform, or
+    not appearing where it belongs, fails the step.
+    """
+    from .native_steps import _element_has_layout, _find_quiet, _wait_for
+
+    if not isinstance(args, dict) or not {"platforms", "dialog", "click"} <= set(args):
+        raise StepError("platform_choice: expected {platforms, dialog, click, timeout_sec?, absent_sec?}")
+    platforms = {str(name) for name in args["platforms"]}
+    current = _PLATFORM_NAMES.get(platform.system(), platform.system())
+    dialog, button = str(args["dialog"]), str(args["click"])
+    if current in platforms:
+        _wait_for(ctx, {"selector": dialog, "timeout_sec": float(args.get("timeout_sec") or 30)})
+        ctx.session.click(button)
+        return f"{current}: answered {dialog} with {button}"
+    deadline = time.time() + float(args.get("absent_sec") or 3)
+    while time.time() < deadline:
+        if _find_quiet(ctx, dialog) and _element_has_layout(ctx, dialog):
+            raise StepError(f"platform_choice: {dialog} appeared on {current}; "
+                            f"expected only on {sorted(platforms)}")
+        time.sleep(0.25)
+    return f"{current}: {dialog} stayed absent"
 
 
 # ------------------------------------------------------------ assert_json_file

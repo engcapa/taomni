@@ -12,8 +12,9 @@ description: |
   the Windows TermService baseline replace these guards once measured; they
   may only be tightened afterwards (DEC-04).
 
-  Measured on a release QA build (release_build_required). Linux and macOS
-  only; TC-RDPS-PERF-02 measures Windows next to the TermService baseline.
+  Measured on a release QA build (release_build_required) on all three
+  platforms; on Windows platform_choice picks Taomni over the running system
+  Remote Desktop. TC-RDPS-PERF-02 measures the TermService reference.
 covers:
 - F-RdpServer-1
 tags:
@@ -23,12 +24,10 @@ tags:
 - p1
 modes:
 - native
-native_platforms:
-- Linux
-- macOS
 fixtures:
 - reset_db
 - rdp_server_required
+- system_rdp_running
 - release_build_required
 timeout_sec: 600
 steps:
@@ -56,6 +55,11 @@ steps:
     selector: '[data-testid="rdp-field-control-approval"]'
     checked: false
 - click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
 - wait_for:
     selector: '[data-testid="vault-setup-dialog"]'
     timeout_sec: 30
@@ -129,18 +133,18 @@ verification:
     requirement: Connect time, input-to-frame latency samples and animation throughput are measured on the real server.
     actions:
     - 10
-    - 17
-    - 20
-    checkpoints:
-    - step: 16
-      expectation: The connect report includes first_graphics_ms and at least 95% of the framebuffer grid is painted.
-    - step: 18
-      expectation: At least 36 of 40 latency samples were observed.
-    - step: 21
-      expectation: At least 10 visible changes were received during 10 s of animation.
-    results:
     - 18
     - 21
+    checkpoints:
+    - step: 17
+      expectation: The connect report includes first_graphics_ms and at least 95% of the framebuffer grid is painted.
+    - step: 19
+      expectation: At least 36 of 40 latency samples were observed.
+    - step: 22
+      expectation: At least 10 visible changes were received during 10 s of animation.
+    results:
+    - 19
+    - 22
   native:
   - check: Real capture, encoder, network loopback and input injection timings on the hosted runner.
     method: automated

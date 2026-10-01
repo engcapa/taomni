@@ -1,0 +1,137 @@
+id: TC-RDPS-PERF-02-windows-termservice-baseline
+title: Windows TermService reference - connect time, input-to-frame latency and animation throughput with the same probe scenarios
+description: |
+  V-21 / DEC-04 (docs-feature/rdp-server-parity-design.md §4.7): the system
+  Remote Desktop on the Windows runner is the performance reference for
+  Taomni's RDP server (TC-RDPS-PERF-01). rdp_baseline_required prepares
+  TermService and two disposable accounts. TermService gives each account
+  its own session, so the Tk target from PERF-01 runs inside that session as
+  the client-requested initial program, at the same geometry.
+
+  The first connection of each account creates its session (first logon) and
+  is only a warm-up; the measured connections reconnect to the running
+  session. The results are reference numbers for the budgets, not a pass
+  verdict on TermService: expectations only guard that measurement happened.
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- performance
+- windows
+- p2
+modes:
+- native
+native_platforms:
+- Windows
+fixtures:
+- rdp_server_required
+- release_build_required
+- rdp_baseline_required
+timeout_sec: 600
+steps:
+- rdp_probe:
+    scenario: connect
+    artifact: baseline-flip-logon
+    timeout_sec: 240
+    args:
+      port: ${env.QA_RDP_BASELINE_PORT}
+      user: ${env.QA_RDP_BASELINE_USER1}
+      password-env: QA_RDP_BASELINE_PASSWORD
+      alternate-shell: ${env.QA_RDP_BASELINE_FLIP_SHELL}
+      work-dir: ${env.QA_RDP_BASELINE_DIR}
+      connect-timeout-sec: 120
+      first-frame-ms: 120000
+      timeout-sec: 220
+      seconds: 5
+    expect:
+      first_graphics_ms:
+        exists: true
+- wait: 20
+- rdp_probe:
+    scenario: connect
+    artifact: baseline-connect
+    args:
+      port: ${env.QA_RDP_BASELINE_PORT}
+      user: ${env.QA_RDP_BASELINE_USER1}
+      password-env: QA_RDP_BASELINE_PASSWORD
+      seconds: 2
+    expect:
+      first_graphics_ms:
+        exists: true
+      framebuffer.painted_share:
+        min: 0.95
+- rdp_probe:
+    scenario: latency
+    artifact: baseline-latency
+    timeout_sec: 330
+    args:
+      port: ${env.QA_RDP_BASELINE_PORT}
+      user: ${env.QA_RDP_BASELINE_USER1}
+      password-env: QA_RDP_BASELINE_PASSWORD
+      x: 280
+      y: 240
+      samples: 40
+      warmup: 5
+      timeout-sec: 300
+    expect:
+      timeouts:
+        max: 4
+      latency_ms.count:
+        min: 36
+- rdp_probe:
+    scenario: connect
+    artifact: baseline-animate-logon
+    timeout_sec: 240
+    args:
+      port: ${env.QA_RDP_BASELINE_PORT}
+      user: ${env.QA_RDP_BASELINE_USER2}
+      password-env: QA_RDP_BASELINE_PASSWORD
+      alternate-shell: ${env.QA_RDP_BASELINE_ANIMATE_SHELL}
+      work-dir: ${env.QA_RDP_BASELINE_DIR}
+      connect-timeout-sec: 120
+      first-frame-ms: 120000
+      timeout-sec: 220
+      seconds: 5
+    expect:
+      first_graphics_ms:
+        exists: true
+- wait: 20
+- rdp_probe:
+    scenario: throughput
+    artifact: baseline-throughput
+    args:
+      port: ${env.QA_RDP_BASELINE_PORT}
+      user: ${env.QA_RDP_BASELINE_USER2}
+      password-env: QA_RDP_BASELINE_PASSWORD
+      seconds: 10
+      rect: 40,80,640,360
+    expect:
+      visible_changes:
+        min: 10
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: TermService connect time, input-to-frame latency and animation throughput are measured with the PERF-01 probe scenarios and target geometry.
+    actions:
+    - 1
+    - 5
+    checkpoints:
+    - step: 3
+      expectation: A reconnect to the warm session reports first_graphics_ms with at least 95% of the framebuffer grid painted.
+    - step: 4
+      expectation: At least 36 of 40 clicks on the in-session flip target produce an observed pixel change.
+    - step: 7
+      expectation: At least 10 visible changes arrive during 10 s of the in-session animation.
+    results:
+    - 4
+    - 7
+  native:
+  - check: Real Windows TermService sessions, NLA with local accounts and in-session initial programs on the runner.
+    method: automated
+    reason: Only a Windows host provides the system Remote Desktop reference.
+  visual:
+  - check: Not a visual check.
+    method: not-applicable
+    reason: Metrics come from the probe's decoded framebuffer.

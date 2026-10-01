@@ -117,6 +117,10 @@ pub(crate) struct ClipState {
     pub format_list_acks: Vec<bool>,
     pub locks: Vec<u32>,
     pub log: Vec<String>,
+    /// File list the server answered our FileGroupDescriptorW paste with
+    /// (ironrdp delivers it sanitised, outside `on_format_data_response`),
+    /// plus the clipDataId of the lock taken on it.
+    pub remote_file_list: Option<(Vec<FileDescriptor>, Option<u32>)>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -253,6 +257,22 @@ impl CliprdrBackend for ProbeClipboard {
     }
 
     fn on_unlock(&mut self, _data_id: LockDataId) {}
+
+    fn on_remote_file_list(&mut self, files: &[FileDescriptor], clip_data_id: Option<u32>) {
+        self.record(format!("remote file list: {} item(s)", files.len()));
+        self.with(|s| {
+            s.pending_paste = None;
+            s.remote_file_list = Some((files.to_vec(), clip_data_id));
+        });
+    }
+}
+
+/// `relative_path\name` as listed on the wire.
+pub(crate) fn wire_name(descriptor: &FileDescriptor) -> String {
+    match &descriptor.relative_path {
+        Some(directory) if !directory.is_empty() => format!("{directory}\\{}", descriptor.name),
+        _ => descriptor.name.clone(),
+    }
 }
 
 fn local_format_data(local: &LocalContent, id: u32) -> OwnedFormatDataResponse {

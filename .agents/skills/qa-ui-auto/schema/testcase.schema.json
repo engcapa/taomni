@@ -88,7 +88,8 @@
           "mail_server",
           "rdp_server_required",
           "system_rdp_running",
-          "release_build_required"
+          "release_build_required",
+          "rdp_baseline_required"
         ]
       },
       "uniqueItems": true
@@ -1246,6 +1247,68 @@
         },
         "rdp_probe_wait": {
           "$ref": "#/$defs/rdp_probe_wait_arg"
+        },
+        "platform_choice": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "platforms",
+            "dialog",
+            "click"
+          ],
+          "description": "Native-only: on the listed platforms the dialog must appear and `click` answers it; elsewhere it must stay absent.",
+          "properties": {
+            "platforms": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "Linux",
+                  "Windows",
+                  "macOS"
+                ]
+              }
+            },
+            "dialog": {
+              "type": "string",
+              "minLength": 1
+            },
+            "click": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeout_sec": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "absent_sec": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "host_make_tree": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "files"
+          ],
+          "description": "Native-only: create a sample tree inside the case directory and record SHA-256 per entry in <root>-tree.json.",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "files": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
         },
         "host_clipboard": {
           "$ref": "#/$defs/host_clipboard_arg"
@@ -2563,7 +2626,8 @@
             "autodetect",
             "host-play",
             "host-record",
-            "image-digest"
+            "image-digest",
+            "image-make"
           ]
         },
         "args": {
@@ -2678,6 +2742,11 @@
         "timeout_sec": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "same_tree_as": {
+          "type": "string",
+          "minLength": 1,
+          "description": "files assert: the clipboard entry named like this report-root tree has identical relative paths and SHA-256."
         }
       }
     },

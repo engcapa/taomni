@@ -1,0 +1,140 @@
+"""rdp_baseline_required: Windows TermService as the RDP performance reference.
+
+DEC-04 (docs-feature/rdp-server-parity-design.md) measures the system Remote
+Desktop with the same rdp-probe scenarios as Taomni's server. TermService
+starts a separate session per user instead of mirroring the console, so the
+visual target must run inside that session: the probe passes it as the
+client-requested initial program (alternate shell).
+
+Setup (Windows, elevated runner):
+* system Remote Desktop enabled, TermService running, client initial program
+  honoured (``fInheritInitialProgram=1`` on RDP-Tcp);
+* two disposable local accounts in Remote Desktop Users — one session hosts a
+  ``flip`` target (latency), the other an ``animate`` target (throughput);
+* a world-writable work directory holding a copy of the Tk target.
+
+Exports ``QA_RDP_BASELINE_PORT``, ``QA_RDP_BASELINE_USER1/2``,
+``QA_RDP_BASELINE_PASSWORD`` (masked), ``QA_RDP_BASELINE_DIR`` and the two
+initial-program command lines ``QA_RDP_BASELINE_FLIP_SHELL`` /
+``QA_RDP_BASELINE_ANIMATE_SHELL``. Teardown logs the accounts off and deletes
+only the accounts this fixture created.
+"""
+
+from __future__ import annotations
+
+import os
+import platform
+import secrets
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+USERS = ("qa-rdp-base1", "qa-rdp-base2")
+WORK_DIR = Path(os.environ.get("PUBLIC", r"C:\Users\Public")) / "taomni-rdp-baseline"
+_CREATED: list[str] = []
+
+
+def _ps(script: str, *, check: bool = True) -> subprocess.CompletedProcess:
+    result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                            capture_output=True, text=True, timeout=180)
+    if check and result.returncode:
+        raise RuntimeError((result.stderr or result.stdout)[-600:])
+    return result
+
+
+def _export(ctx: Any, name: str, value: str) -> None:
+    os.environ[name] = value
+    env = getattr(ctx, "env", None)
+    if isinstance(env, dict):
+        env[name] = value
+
+_HOST_SCRIPT = r"""
+$ErrorActionPreference = 'Stop'
+$ts = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server'
+Set-ItemProperty -Path $ts -Name fDenyTSConnections -Value 0
+Set-ItemProperty -Path "$ts\WinStations\RDP-Tcp" -Name fInheritInitialProgram -Value 1
+$service = Get-Service -Name TermService
+if ($service.StartType -eq 'Disabled') { Set-Service -Name TermService -StartupType Manual }
+if ($service.Status -ne 'Running') { Start-Service -Name TermService }
+$secure = ConvertTo-SecureString $env:QA_BASELINE_PW -AsPlainText -Force
+foreach ($name in $env:QA_BASELINE_USERS.Split(',')) {
+  if (Get-LocalUser -Name $name -ErrorAction SilentlyContinue) {
+    Set-LocalUser -Name $name -Password $secure
+  } else {
+    New-LocalUser -Name $name -Password $secure -PasswordNeverExpires -AccountNeverExpires | Out-Null
+    Write-Output "created:$name"
+  }
+  # S-1-5-32-555 = Remote Desktop Users, independent of the display language.
+  Add-LocalGroupMember -SID 'S-1-5-32-555' -Member $name -ErrorAction SilentlyContinue
+}
+Write-Output ("port:" + (Get-ItemProperty -Path "$ts\WinStations\RDP-Tcp" -Name PortNumber).PortNumber)
+"""
+
+
+def _shell(python: Path, mode: str, geometry: str) -> str:
+    command = (f'"{python}" "{WORK_DIR / "rdp_target.py"}" --state "{WORK_DIR / f"{mode}-state.json"}" '
+               f"--mode {mode} --geometry {geometry} --lifetime-sec 1800")
+    # MS-RDPBCGR caps the alternate shell at 256 UTF-16 code units.
+    if len(command) >= 256:
+        raise RuntimeError(f"initial program command exceeds 255 characters: {command}")
+    return command
+
+
+def setup(ctx: Any) -> None:
+    from . import FixtureSkip
+
+    if platform.system() != "Windows":
+        raise FixtureSkip("the TermService baseline exists only on Windows")
+    password = os.environ.get("QA_RDP_BASELINE_PASSWORD") or ("Qa1_" + secrets.token_hex(12))
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"::add-mask::{password}", flush=True)
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", _HOST_SCRIPT],
+        capture_output=True, text=True, timeout=180,
+        env={**os.environ, "QA_BASELINE_PW": password, "QA_BASELINE_USERS": ",".join(USERS)},
+    )
+    if result.returncode:
+        raise FixtureSkip("could not prepare the TermService baseline (elevation required?): "
+                          + (result.stderr or result.stdout)[-500:])
+    lines = result.stdout.split()
+    _CREATED.extend(line.split(":", 1)[1] for line in lines if line.startswith("created:"))
+    port = next((line.split(":", 1)[1] for line in lines if line.startswith("port:")), "3389")
+
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(Path(__file__).resolve().parents[1] / "rdp_helpers" / "rdp_target.py", WORK_DIR / "rdp_target.py")
+    for stale in WORK_DIR.glob("*-state.json"):
+        stale.unlink(missing_ok=True)
+    # Everyone (S-1-1-0) may write the target state from the baseline sessions.
+    subprocess.run(["icacls", str(WORK_DIR), "/grant", "*S-1-1-0:(OI)(CI)M"],
+                   capture_output=True, text=True, timeout=60, check=True)
+    executable = Path(sys.executable)
+    windowed = executable.with_name("pythonw.exe")
+    python = windowed if windowed.is_file() else executable
+
+    _export(ctx, "QA_RDP_BASELINE_PORT", port)
+    _export(ctx, "QA_RDP_BASELINE_USER1", USERS[0])
+    _export(ctx, "QA_RDP_BASELINE_USER2", USERS[1])
+    _export(ctx, "QA_RDP_BASELINE_PASSWORD", password)
+    _export(ctx, "QA_RDP_BASELINE_DIR", str(WORK_DIR))
+    _export(ctx, "QA_RDP_BASELINE_FLIP_SHELL", _shell(python, "flip", "480x320+40+80"))
+    _export(ctx, "QA_RDP_BASELINE_ANIMATE_SHELL", _shell(python, "animate", "640x360+40+80"))
+
+
+def teardown(ctx: Any) -> None:
+    if platform.system() != "Windows":
+        return
+    names = ",".join(USERS)
+    _ps(r"""
+$names = $env:QA_BASELINE_USERS.Split(',')
+foreach ($line in (quser 2>$null | Select-Object -Skip 1)) {
+  $parts = $line.Trim().TrimStart('>') -split '\s+'
+  if ($names -contains $parts[0]) {
+    $id = $parts | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1
+    if ($id) { logoff $id }
+  }
+}
+""".replace("$env:QA_BASELINE_USERS", f"'{names}'"), check=False)
+    while _CREATED:
+        _ps(f"Remove-LocalUser -Name '{_CREATED.pop()}'", check=False)

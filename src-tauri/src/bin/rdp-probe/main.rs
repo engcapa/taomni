@@ -64,6 +64,16 @@ impl Args {
         Ok(Self { scenario, values })
     }
 
+    /// Arguments carrying a single option, for scenarios composed of others.
+    pub fn with_value(key: &str, value: &str) -> Self {
+        let mut values = HashMap::new();
+        values.insert(key.to_string(), value.to_string());
+        Self {
+            scenario: String::new(),
+            values,
+        }
+    }
+
     pub fn str(&self, key: &str, default: &str) -> String {
         self.values
             .get(key)
@@ -193,6 +203,7 @@ Scenarios:
   host-play          play a --freq tone on a local output device (no RDP)
   host-record        record a local input device and analyse the tone (no RDP)
   image-digest       print size and RGB/RGBA SHA-256 of --png (no RDP)
+  image-make         write a deterministic test picture to --out-png (no RDP)
 
 Connection options:
   --host 127.0.0.1 --port 3389 --user NAME --password-env QA_RDP_PASSWORD

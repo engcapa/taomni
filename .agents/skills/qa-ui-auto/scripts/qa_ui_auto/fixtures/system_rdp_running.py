@@ -9,8 +9,10 @@ untouched.
 
 Exports ``QA_SYSTEM_RDP_PORT`` (the configured RDP-Tcp port).
 
-Windows only; other platforms and non-elevated hosts that cannot provide the
-state raise FixtureSkip with the reason.
+A no-op on Linux and macOS, so cross-platform cases can declare it and
+answer the Windows-only prompt with ``platform_choice``. A Windows host that
+cannot provide the state (no elevation, no Remote Desktop host) raises
+FixtureSkip with the reason.
 """
 
 from __future__ import annotations
@@ -43,7 +45,7 @@ def setup(ctx: Any) -> None:
     from . import FixtureSkip
 
     if platform.system() != "Windows":
-        raise FixtureSkip("system Remote Desktop host state exists only on Windows")
+        return
     result = subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", _SCRIPT],
         capture_output=True, text=True, timeout=120,

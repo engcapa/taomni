@@ -145,6 +145,13 @@ Windows 基线：CI fixture 创建一次性本地账号，临时启用系统远�
 | M4 | 待测 | 待定 | P0 基线运行 |
 | M5 | 待测 | 待定 | P0 基线运行 |
 
+首轮记录（2026-10-01）：
+
+- 运行 36803718420 三端探针都只看到未绘制的帧缓冲。根因：`ironrdp-server` 默认特性给 ironrdp-pdu 打开了 `qoi`/`qoiz`，`client_codecs_capabilities` 因而公告 QOIZ，但 ironrdp-session 未启用对应特性、无法解码，服务端选了 QOIZ 后客户端黑屏。产品 Taomni 客户端连 IronRDP 系服务器（含自家服务端）同样受影响。修复：`ironrdp` 依赖启用 `qoi`/`qoiz`；`servers/rdp/loopback_tests.rs` 用真实服务端 + 客户端栈回归 QOIZ 与仅 RemoteFX 两条路径（去掉特性时测试失败，已验证）。探针默认改为仿 mstsc 的编码集（仅 RemoteFX）。
+- 同一运行 Linux 另有 X11 捕获停滞：RandR 预检查已排空的 DamageNotify（NON_EMPTY 只报一次）被丢弃。已修复。
+- 运行 36809758793（debug 构建）：Linux/macOS 的 NAT-01、PERF-01 通过。RemoteFX 下 M2 p50 约 130–170 ms、M3 7–12 fps，首帧 0.6–1.4 s；QOIZ 首帧 80–230 ms。CI 默认是 debug 构建，这些数值不能作为预算依据；性能用例改为 `release_build_required`（release + 保留 debug 断言以维持 QA 隔离钩子），TermService 基线由 TC-RDPS-PERF-02 采集。
+- Windows runner 默认启用并运行系统远程桌面（3389），因此 Windows 上的启动流程先弹出选择；跨平台用例以 `platform_choice` 在 Windows 回答“仍使用 Taomni”，其它平台断言不出现。
+
 ### 4.8 测试基础设施（TASK-01、TASK-02）
 
 - `rdp-probe`（拟新增 `src-tauri/src/bin/rdp-probe/`，与应用同一次 `tauri build` 产出到 `target/qa-ui-auto/<profile>/`）：基于 ironrdp connector/session，NLA 认证；子命令 `connect`、`latency`、`throughput`、`clipboard-send`、`clipboard-receive`、`audio-capture`、`mic-send`、`autodetect`、`host-play`、`host-record`；输出 JSON（指标、原始样本、观察到的通道与 PDU），密码只从环境变量读取。
@@ -206,12 +213,12 @@ workflow 改动：`Prepare local service packages` 的条件扩展到上述 capa
 
 | TASK | 目标 | 依赖 | 状态 |
 |---|---|---|---|
-| TASK-01 | `rdp-probe` 探针（连接/画面/输入/剪贴板/声音/麦克风/autodetect/宿主播放录音） | — | 待开始 |
-| TASK-02 | qa-ui-auto：fixture、verb、helper、CI 供给 | TASK-01 | 待开始 |
-| TASK-03 | 基线用例 TC-RDPS-NAT-01、TC-RDPS-PERF-01 首轮三端运行，回填 §4.7 | TASK-01、02 | 待开始 |
-| TASK-04 | Windows 系统远程桌面分支 | — | 待开始 |
-| TASK-05 | 剪贴板 HTML/图片与方向分级 | TASK-01 | 待开始 |
-| TASK-06 | 剪贴板文件双向 | TASK-05 | 待开始 |
+| TASK-01 | `rdp-probe` 探针（连接/画面/输入/剪贴板/声音/麦克风/autodetect/宿主播放录音） | — | 已实现：另加 `--codecs`（默认仿 mstsc 仅 RemoteFX）、`--snapshot`、framebuffer 统计、`image-make`、文件列表经锁下载 |
+| TASK-02 | qa-ui-auto：fixture、verb、helper、CI 供给 | TASK-01 | 已实现：`system_rdp_running`、`release_build_required`（CI `release` 能力→release QA 构建）、`rdp_baseline_required`；verb `platform_choice`、`host_make_tree`、`host_clipboard same_tree_as` |
+| TASK-03 | 基线用例 TC-RDPS-NAT-01、TC-RDPS-PERF-01 首轮三端运行，回填 §4.7 | TASK-01、02 | 进行中：Linux/macOS 首轮通过（debug 构建，数值不作预算）；release 构建与 TermService 基线（PERF-02）运行中 |
+| TASK-04 | Windows 系统远程桌面分支 | — | 已实现：UI-01/02 三端 browser 通过；native NAT-06 待 CI |
+| TASK-05 | 剪贴板 HTML/图片与方向分级 | TASK-01 | 已实现（单元测试通过）；NAT-02 待 CI |
+| TASK-06 | 剪贴板文件双向 | TASK-05 | 已实现（单元测试通过）；NAT-03 待 CI |
 | TASK-07 | RDPSND 播放三端 | TASK-01 | 待开始 |
 | TASK-08 | AUDIO_INPUT 麦克风三端 | TASK-01、07 | 待开始 |
 | TASK-09 | autodetect 与 Network Characteristics Result | TASK-01 | 待开始 |

@@ -15,9 +15,10 @@ description: |
   longer accepts connections. Control approval is disabled here; the
   approval gate itself is covered by a dedicated case.
 
-  Linux and macOS only: on Windows a running system Remote Desktop changes
-  the Start flow (explicit choice first), so TC-RDPS-NAT-06 covers the same
-  server contract there together with the Windows branch.
+  On Windows the runner's system Remote Desktop is running, so Start first
+  offers it; platform_choice answers "Use Taomni anyway" there and asserts the
+  prompt never appears on Linux/macOS. TC-RDPS-NAT-06 covers the rest of the
+  Windows branch (system choice, remembered choice).
 covers:
 - F-RdpServer-1
 - F-Servers-1
@@ -28,12 +29,10 @@ tags:
 - p1
 modes:
 - native
-native_platforms:
-- Linux
-- macOS
 fixtures:
 - reset_db
 - rdp_server_required
+- system_rdp_running
 timeout_sec: 420
 steps:
 - open_route: '?servers=main'
@@ -60,6 +59,11 @@ steps:
     selector: '[data-testid="rdp-field-control-approval"]'
     checked: false
 - click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
 - wait_for:
     selector: '[data-testid="vault-setup-dialog"]'
     timeout_sec: 30
@@ -159,48 +163,48 @@ verification:
     requirement: Start launches the RDP listener, NLA with the configured account succeeds and the probe decodes the desktop with both the mstsc codec set and the Taomni client codec set.
     actions:
     - 10
-    - 14
+    - 15
     checkpoints:
-    - step: 15
+    - step: 16
       expectation: The RDP row reports data-status=running after the vault master password is set.
-    - step: 17
-      expectation: With RemoteFX only (mstsc-like) drdynvc is negotiated, graphics arrive and at least 95% of the framebuffer grid is painted.
     - step: 18
+      expectation: With RemoteFX only (mstsc-like) drdynvc is negotiated, graphics arrive and at least 95% of the framebuffer grid is painted.
+    - step: 19
       expectation: With RemoteFX, QOI and QOIZ offered (Taomni client) at least 95% of the framebuffer grid is painted.
     results:
-    - 17
     - 18
+    - 19
   - id: R2
     requirement: Mouse input sent over RDP reaches a host window and the frame change is observed by the client.
     actions:
-    - 19
+    - 20
     checkpoints:
-    - step: 19
-      expectation: At least 8 of 10 clicks produce an observed pixel change, at most 2 time out.
     - step: 20
+      expectation: At least 8 of 10 clicks produce an observed pixel change, at most 2 time out.
+    - step: 21
       expectation: The host Tk target counted at least 10 flips in its own state file.
     results:
-    - 20
+    - 21
   - id: R3
     requirement: A wrong password is rejected at authentication.
     actions:
-    - 21
+    - 22
     checkpoints:
-    - step: 22
+    - step: 23
       expectation: The probe exits with code 3 and error kind auth.
     results:
-    - 22
+    - 23
   - id: R4
     requirement: Stop closes the listener.
     actions:
-    - 24
+    - 25
     checkpoints:
-    - step: 25
-      expectation: The RDP row reports data-status=stopped.
     - step: 26
+      expectation: The RDP row reports data-status=stopped.
+    - step: 27
       expectation: A new connection fails at the transport (exit 4, kind connection).
     results:
-    - 26
+    - 27
   native:
   - check: Real Tauri IPC, vault-backed credential storage, OS screen capture and OS input injection on the runner desktop.
     method: automated

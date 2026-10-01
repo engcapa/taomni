@@ -43,6 +43,7 @@ pub(crate) async fn run(args: &Args) -> ScenarioResult {
             "host-play" => host_play(args),
             "host-record" => host_record(args),
             "image-digest" => image_digest(args),
+            "image-make" => image_make(args),
             other => Err(usage(format!("unknown scenario {other:?}"))),
         }
     };
@@ -520,10 +521,95 @@ async fn paste(
     }
 }
 
+/// Paste the server's FileGroupDescriptorW, then download every file with
+/// SIZE + RANGE requests against the lock ironrdp took for the list.
+async fn receive_files(
+    session: &mut ProbeSession,
+    clip: &ProbeClipboard,
+    format: u32,
+    wait: Duration,
+    out_dir: Option<&Path>,
+) -> ScenarioResult {
+    clip.with(|s| s.remote_file_list = None);
+    let messages = {
+        let Some(cliprdr) = session
+            .active_stage
+            .get_svc_processor_mut::<CliprdrClient>()
+        else {
+            return Err((
+                ProbeError::unmet("CLIPRDR channel was not negotiated"),
+                clipboard_report(session, clip),
+            ));
+        };
+        match cliprdr.initiate_paste(ClipboardFormatId::new(format)) {
+            Ok(messages) => messages,
+            Err(e) => {
+                return Err((
+                    ProbeError::connection(format!("CLIPRDR paste: {e}")),
+                    clipboard_report(session, clip),
+                ));
+            }
+        }
+    };
+    if let Err(error) = session.send_svc_messages(messages).await {
+        return Err((error, clipboard_report(session, clip)));
+    }
+    let deadline = Instant::now() + wait;
+    let (descriptors, data_id) = loop {
+        if let Err(error) = pump_clipboard(session, clip, Duration::from_millis(50)).await {
+            return Err((error, clipboard_report(session, clip)));
+        }
+        if let Some(list) = clip.with(|s| s.remote_file_list.clone()) {
+            break list;
+        }
+        if Instant::now() >= deadline {
+            return Err((
+                ProbeError::unmet("server never answered the file list request"),
+                clipboard_report(session, clip),
+            ));
+        }
+    };
+    let mut stream_id = 0u32;
+    let mut files = Vec::new();
+    for (index, descriptor) in descriptors.iter().enumerate() {
+        let name = clipboard::wire_name(descriptor);
+        let is_dir = descriptor.attributes.is_some_and(|a| {
+            a.contains(ironrdp::cliprdr::pdu::ClipboardFileAttributes::DIRECTORY)
+        });
+        if is_dir {
+            files.push(json!({ "name": name, "dir": true }));
+            continue;
+        }
+        match fetch_file(session, clip, index as i32, data_id, &mut stream_id, wait).await {
+            Ok(bytes) => {
+                if let Some(dir) = out_dir {
+                    let target = dir.join(name.replace('\\', "/"));
+                    if let Some(parent) = target.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    let _ = std::fs::write(&target, &bytes);
+                }
+                files.push(json!({ "name": name, "size": bytes.len(), "sha256": sha256_hex(&bytes) }));
+            }
+            Err(error) => {
+                let mut report = clipboard_report(session, clip);
+                report["files"] = json!(files);
+                return Err((error, report));
+            }
+        }
+    }
+    let mut report = clipboard_report(session, clip);
+    report["format"] = json!(format);
+    report["lock_id"] = json!(data_id);
+    report["received"] = json!({ "files": files });
+    Ok(report)
+}
+
 async fn fetch_file(
     session: &mut ProbeSession,
     clip: &ProbeClipboard,
     index: i32,
+    data_id: Option<u32>,
     stream_id: &mut u32,
     wait: Duration,
 ) -> Result<Vec<u8>, ProbeError> {
@@ -579,7 +665,7 @@ async fn fetch_file(
             flags: FileContentsFlags::SIZE,
             position: 0,
             requested_size: 8,
-            data_id: None,
+            data_id,
         },
         wait,
     )
@@ -601,7 +687,7 @@ async fn fetch_file(
                 flags: FileContentsFlags::RANGE,
                 position: data.len() as u64,
                 requested_size: chunk,
-                data_id: None,
+                data_id,
             },
             wait,
         )
@@ -648,15 +734,18 @@ async fn clipboard_receive(args: &Args) -> ScenarioResult {
             ));
         }
     };
+    if let Some(dir) = &out_dir {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if kind == "files" {
+        return receive_files(&mut session, &clip, format, wait, out_dir.as_deref()).await;
+    }
     let data = match paste(&mut session, &clip, format, wait).await {
         Ok(data) => data,
         Err(error) => return Err((error, clipboard_report(&mut session, &clip))),
     };
     let mut report = clipboard_report(&mut session, &clip);
     report["format"] = json!(format);
-    if let Some(dir) = &out_dir {
-        let _ = std::fs::create_dir_all(dir);
-    }
     let result = match kind.as_str() {
         "text" => {
             let text = FormatDataResponse::new_data(data.clone())
@@ -688,54 +777,6 @@ async fn clipboard_receive(args: &Args) -> ScenarioResult {
                 }
                 json!({ "width": w, "height": h, "rgba_sha256": sha256_hex(&rgba) })
             }),
-        "files" => {
-            let list = FormatDataResponse::new_data(data.clone())
-                .to_file_list()
-                .map_err(|e| ProbeError::unmet(format!("file list decode: {e}")));
-            match list {
-                Err(error) => Err(error),
-                Ok(list) => {
-                    let mut stream_id = 0u32;
-                    let mut files = Vec::new();
-                    let mut failure = None;
-                    for (index, descriptor) in list.files.iter().enumerate() {
-                        let is_dir = descriptor.attributes.is_some_and(|a| {
-                            a.contains(ironrdp::cliprdr::pdu::ClipboardFileAttributes::DIRECTORY)
-                        });
-                        if is_dir {
-                            files.push(json!({ "name": descriptor.name, "dir": true }));
-                            continue;
-                        }
-                        match fetch_file(&mut session, &clip, index as i32, &mut stream_id, wait)
-                            .await
-                        {
-                            Ok(bytes) => {
-                                if let Some(dir) = &out_dir {
-                                    let relative = descriptor.name.replace('\\', "/");
-                                    let target = dir.join(&relative);
-                                    if let Some(parent) = target.parent() {
-                                        let _ = std::fs::create_dir_all(parent);
-                                    }
-                                    let _ = std::fs::write(&target, &bytes);
-                                }
-                                files.push(json!({ "name": descriptor.name, "size": bytes.len(), "sha256": sha256_hex(&bytes) }));
-                            }
-                            Err(error) => {
-                                failure = Some(error);
-                                break;
-                            }
-                        }
-                    }
-                    match failure {
-                        Some(error) => {
-                            report["files"] = json!(files);
-                            Err(error)
-                        }
-                        None => Ok(json!({ "files": files })),
-                    }
-                }
-            }
-        }
         other => Err(ProbeError::usage(format!(
             "--expect must be text|html|image|files, got {other}"
         ))),
@@ -979,6 +1020,38 @@ fn image_digest(args: &Args) -> ScenarioResult {
         "rgb_sha256": sha256_hex(&rgb),
         "rgba_sha256": sha256_hex(image.as_raw()),
     }))
+}
+
+/// Write a deterministic, opaque test picture (RGB gradient with a bright
+/// diagonal) for clipboard image cases, then report its digest. Opaque on
+/// purpose: CF_DIB carries no alpha, so only RGB is compared across formats.
+fn image_make(args: &Args) -> ScenarioResult {
+    let path = args
+        .opt("out-png")
+        .ok_or_else(|| usage("--out-png is required".into()))?;
+    let width = args.u64("width", 96).map_err(usage)?.clamp(1, 4096) as u32;
+    let height = args.u64("height", 64).map_err(usage)?.clamp(1, 4096) as u32;
+    let image = image::RgbaImage::from_fn(width, height, |x, y| {
+        if x * height / width.max(1) == y {
+            image::Rgba([255, 255, 255, 255])
+        } else {
+            image::Rgba([
+                (x * 255 / width.max(1)) as u8,
+                (y * 255 / height.max(1)) as u8,
+                ((x + y) % 256) as u8,
+                255,
+            ])
+        }
+    });
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    image
+        .save(&path)
+        .map_err(|e| plain(ProbeError::unmet(format!("{path}: {e}"))))?;
+    let mut digest = image_digest(&Args::with_value("png", &path))?;
+    digest["path"] = json!(path);
+    Ok(digest)
 }
 
 fn host_play(args: &Args) -> ScenarioResult {

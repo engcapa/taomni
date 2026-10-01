@@ -1,0 +1,217 @@
+id: TC-RDPS-NAT-02-clipboard-rich
+title: RDP server clipboard - Unicode text, HTML and images in both directions between the real host clipboard and an RDP client
+description: |
+  V-05 (docs-feature/rdp-server-parity-design.md §4.2, AC-06..AC-08). The
+  server runs with the default clipboard levels (all, both directions).
+  rdp-probe acts as the RDP client and never touches the OS clipboard; the
+  host side is set and read with platform tools (host_clipboard: PowerShell
+  .NET, AppKit JXA, xclip), so neither end verifies itself with arboard.
+
+  client -> host: the probe advertises text, HTML (CF_HTML) and a CF_DIB
+  picture in turn; the host clipboard must then hold the same text, the HTML
+  fragment, and identical RGB pixels. host -> client: text, HTML and the same
+  picture are placed on the host clipboard; the probe must receive the same
+  text, the HTML fragment through CF_HTML and identical pixels through
+  CF_DIBV5. On Windows platform_choice picks Taomni over the runner's system
+  Remote Desktop.
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- clipboard
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- rdp_server_required
+- system_rdp_running
+timeout_sec: 480
+steps:
+- open_route: '?servers=main'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- rdp_probe:
+    scenario: image-make
+    artifact: clip-image
+    args:
+      out-png: clip-image.png
+    expect:
+      width: 96
+      height: 64
+- rdp_probe:
+    scenario: clipboard-send
+    artifact: send-text
+    args:
+      text: Taomni 剪贴板 ❄ 雪 ✓
+    expect:
+      negotiated.cliprdr: true
+      clipboard.requested_formats:
+        contains: '13'
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: Taomni 剪贴板 ❄ 雪 ✓
+- rdp_probe:
+    scenario: clipboard-send
+    artifact: send-html
+    args:
+      html: <b>粗体 RDP</b> <i>Taomni</i>
+    expect:
+      clipboard.requested_formats:
+        contains: '49392'
+- host_clipboard:
+    action: assert
+    kind: html
+    contains: <b>粗体 RDP</b>
+- rdp_probe:
+    scenario: clipboard-send
+    artifact: send-image
+    args:
+      image-png: clip-image.png
+    expect:
+      clipboard.requested_formats:
+        contains: '8'
+- host_clipboard:
+    action: assert
+    kind: image
+    png_equals: clip-image.png
+- host_clipboard:
+    action: set
+    kind: text
+    text: 宿主文本 → 客户端 ✓
+- rdp_probe:
+    scenario: clipboard-receive
+    artifact: receive-text
+    args:
+      expect: text
+    expect:
+      received.text: 宿主文本 → 客户端 ✓
+- host_clipboard:
+    action: set
+    kind: html
+    html: <u>宿主 HTML</u> fragment
+    text: 宿主 HTML fragment
+- rdp_probe:
+    scenario: clipboard-receive
+    artifact: receive-html
+    args:
+      expect: html
+    expect:
+      received.fragment:
+        contains: <u>宿主 HTML</u>
+- host_clipboard:
+    action: set
+    kind: image
+    png: clip-image.png
+- rdp_probe:
+    scenario: clipboard-receive
+    artifact: receive-image
+    args:
+      expect: image
+      out-dir: received-image
+    expect:
+      received.width: 96
+      received.height: 64
+      received.rgba_sha256: c6dae8738dfe1eb184ea20523d6989efbb41c92a58208466865a3e728917ea76
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: 'clipboard: client -> this computer'
+    timeout_sec: 15
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+verification:
+  review: pending
+  requirements:
+  - id: R1
+    requirement: Text, HTML and a picture copied on the RDP client reach the real host clipboard unchanged.
+    actions:
+    - 15
+    - 18
+    - 20
+    - 22
+    checkpoints:
+    - step: 16
+      expectation: The RDP server runs with the default clipboard levels.
+    - step: 18
+      expectation: CLIPRDR is negotiated and the server requested CF_UNICODETEXT.
+    - step: 19
+      expectation: The host clipboard read by platform tools equals the sent Unicode text.
+    - step: 21
+      expectation: The host HTML clipboard contains the sent fragment.
+    - step: 23
+      expectation: The host clipboard image has the same size and RGB pixels as the sent PNG.
+    results:
+    - 19
+    - 21
+    - 23
+  - id: R2
+    requirement: Text, HTML and a picture placed on the host clipboard are received by the RDP client unchanged.
+    actions:
+    - 24
+    - 26
+    - 28
+    checkpoints:
+    - step: 25
+      expectation: The received CF_UNICODETEXT equals the host text.
+    - step: 27
+      expectation: The CF_HTML fragment contains the host HTML.
+    - step: 29
+      expectation: The received image is 96x64 with the reference RGBA SHA-256.
+    - step: 30
+      expectation: The server log records the client -> this computer transfer without content.
+    results:
+    - 25
+    - 27
+    - 29
+    - 30
+  native:
+  - check: Real OS clipboards (Win32, NSPasteboard, X11 CLIPBOARD) on the runner, arboard inside the packaged app, CLIPRDR over NLA.
+    method: automated
+    reason: Browser stubs have no RDP server or host clipboard.
+  visual:
+  - check: Not a visual check; pixels are compared by digest.
+    method: not-applicable
+    reason: The case asserts data fidelity, not rendering.
