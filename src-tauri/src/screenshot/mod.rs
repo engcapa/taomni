@@ -241,8 +241,8 @@ pub async fn screenshot_read_file_header(path: String, len: u32) -> Result<Strin
         Ok::<Vec<u8>, String>(buf)
     })
     .await
-    .map_err(|e| format!("read task failed: {e}"))?;
-    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+    .map_err(|e| format!("read task failed: {e}"))??;
+    Ok(bytes.iter().map(|b| format!("{:02x}", *b)).collect())
 }
 
 /// Test-only: run scroll capture and verify multi-frame stitching in one call.
