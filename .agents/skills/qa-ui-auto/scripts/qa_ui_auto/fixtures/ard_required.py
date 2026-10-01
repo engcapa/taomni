@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import socket
+import subprocess
 from typing import Any
 
 
@@ -56,3 +57,13 @@ def setup(ctx: Any) -> None:
     if not banner.startswith(b"RFB 003."):
         raise FixtureSkip(f"{host}:{port} is not an RFB server (banner {banner[:12]!r}).")
     ctx.values.update(ard_host=str(host), ard_port=str(port), ard_user=str(user).strip())
+
+
+def teardown(ctx: Any) -> None:
+    """Hosted CI: log the disposable account out after the case, so its macOS
+    login session does not keep loading the runner for later cases."""
+    section = (getattr(ctx, "cfg", {}) or {}).get("ard") or {}
+    user = str(section.get("user") or "").strip()
+    if not section.get("end_session") or not user or os.environ.get("GITHUB_ACTIONS") != "true":
+        return
+    subprocess.run(["sudo", "-n", "pkill", "-KILL", "-u", user], capture_output=True)

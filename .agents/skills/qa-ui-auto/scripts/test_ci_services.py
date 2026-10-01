@@ -131,8 +131,12 @@ class HostedServicesTest(unittest.TestCase):
             self.assertIn('/System/Library/LaunchDaemons/com.apple.screensharing.plist',
                           [call.args[0][-1] for call in best_effort.call_args_list])
             self.assertEqual(probe.call_args.args, (5900, 'qaard', password))
+            # The probe's login session is ended before the desktop is used.
+            self.assertIn(['sudo', '-n', 'pkill', '-KILL', '-u', 'qaard'],
+                          [call.args[0] for call in best_effort.call_args_list])
+            self.assertTrue((Path(directory) / 'screensharing-sessions.txt').is_file())
             self.assertEqual(config['ard'], {'host': '127.0.0.1', 'port': 5900, 'user': 'qaard',
-                                             'password': '${env.QA_ARD_PASSWORD}'})
+                                             'password': '${env.QA_ARD_PASSWORD}', 'end_session': True})
             lease = (Path(directory) / 'lease.json').read_text(encoding='utf-8')
             self.assertIn('RFB 003.889', lease)
             self.assertNotIn(password, lease)

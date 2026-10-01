@@ -72,7 +72,7 @@ REGISTRY: dict[str, Fixture] = {
     "sftp_required": Fixture("sftp_required", sftp_required.setup),
     "mysql_required": Fixture("mysql_required", mysql_required.setup),
     "vnc_required": Fixture("vnc_required", vnc_required.setup),
-    "ard_required": Fixture("ard_required", ard_required.setup),
+    "ard_required": Fixture("ard_required", ard_required.setup, ard_required.teardown),
     "jdtls_required": Fixture("jdtls_required", jdtls_required.setup),
     "java_test_bundle": Fixture("java_test_bundle", java_test_bundle.setup),
     "linux_x11_required": Fixture("linux_x11_required", linux_x11_required.setup),

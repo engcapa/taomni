@@ -98,6 +98,18 @@ class ArdRequiredTest(unittest.TestCase):
             with self.assertRaisesRegex(FixtureSkip, "ard.host"):
                 ard_required.setup(context(Path(directory), {"ard": {"host": "127.0.0.1", "port": 5900}}))
 
+    def test_teardown_logs_the_hosted_account_out(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch("qa_ui_auto.fixtures.ard_required.subprocess.run") as run:
+            hosted = {"ard": {"user": "qaard", "end_session": True}}
+            with patch.dict("os.environ", {"GITHUB_ACTIONS": "true"}):
+                ard_required.teardown(context(Path(directory), hosted))
+                ard_required.teardown(context(Path(directory), {"ard": {"user": "me"}}))
+            with patch.dict("os.environ", {"GITHUB_ACTIONS": ""}):
+                ard_required.teardown(context(Path(directory), hosted))
+            self.assertEqual([call.args[0] for call in run.call_args_list],
+                             [["sudo", "-n", "pkill", "-KILL", "-u", "qaard"]])
+
     def test_fails_when_hosted_provisioning_failed(self):
         with tempfile.TemporaryDirectory() as directory:
             ctx = context(Path(directory), {"ard": {"unavailable": "RuntimeError: readiness timed out"}})

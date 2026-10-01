@@ -89,6 +89,14 @@ def aes128_ecb(key, data, decrypt=False):
     return result.stdout
 
 
+def end_ard_session(user=None):
+    """Log the ARD account out. A third-party viewer gets its own login
+    session, and an account's first one is a full GUI login (Setup Assistant
+    included) that otherwise keeps competing with the runner's desktop."""
+    subprocess.run(["sudo", "-n", "pkill", "-KILL", "-u", user or ARD_USER], capture_output=True)
+    time.sleep(3)
+
+
 def ard_probe(port, user, password):
     """Log in to macOS Screen Sharing with ARD (RFB security type 30): DH key
     agreement, MD5 of the secret as AES-128 key, {user[64], password[64]}."""
@@ -546,12 +554,31 @@ class Services:
         # Fails harmlessly when the service is already loaded.
         subprocess.run(["sudo", "-n", "launchctl", "bootstrap", "system", plist], capture_output=True)
         self.cleanup_command(["sudo", "-n", "launchctl", "bootout", "system/com.apple.screensharing"])
+        self.ard_session_facts("before the ARD login")
         banner, offered, width, height = retry(lambda: ard_probe(5900, user, password), 150)
+        self.ard_session_facts("after the ARD login")
+        end_ard_session(user)
+        self.ard_session_facts("after ending the ARD session")
         self.resources.append("screensharing:5900")
+        # end_session: ard_required logs the account out again after each case.
         self.config["ard"] = {"host": "127.0.0.1", "port": 5900, "user": user,
-                              "password": "${env.QA_ARD_PASSWORD}"}
+                              "password": "${env.QA_ARD_PASSWORD}", "end_session": True}
         return {"authentication": True, "banner": banner, "security_types": offered,
                 "server_init": [width, height]}
+
+    def ard_session_facts(self, label):
+        """Who owns the console and which GUI sessions run (no credentials)."""
+        report = [f"## {label} ({time.strftime('%H:%M:%S')})"]
+        for argv in (["stat", "-f", "%Su", "/dev/console"], ["who"],
+                     ["ps", "-axo", "user,pid,%cpu,rss,etime,comm", "-r"]):
+            try:
+                result = subprocess.run(argv, capture_output=True, text=True, errors="replace", timeout=30)
+                output = "\n".join(result.stdout.splitlines()[:25]) + result.stderr[-500:]
+            except (OSError, subprocess.SubprocessError) as exc:
+                output = f"{type(exc).__name__}: {exc}"
+            report.append(f"$ {' '.join(argv)}\n{output}")
+        with (self.root / "screensharing-sessions.txt").open("a", encoding="utf-8") as log:
+            log.write("\n".join(report) + "\n\n")
 
     def ard_diagnostics(self):
         report = []
