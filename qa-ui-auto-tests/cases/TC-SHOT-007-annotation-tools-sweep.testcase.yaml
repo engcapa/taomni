@@ -67,20 +67,11 @@ steps:
     to_position:
       x: 340
       y: 140
-# Text tool opens an inline editor; Enter commits the text.
-# Use a 1px drag: plain click does not reliably fire mousedown on the layer,
-# while drag_to does.
+# Text tool opens an inline editor on click (handled in onClick so a drag's
+# mouseup does not blur it away); Enter commits the text.
 - click: '[data-testid="screenshot-tool-text"]'
 - wait: 1
-- drag_to:
-    from: '[data-testid="screenshot-annotation-layer"]'
-    to: '[data-testid="screenshot-annotation-layer"]'
-    from_position:
-      x: 120
-      y: 220
-    to_position:
-      x: 150
-      y: 250
+- click: '[data-testid="screenshot-annotation-layer"]'
 - wait_for: '[data-testid="annotation-text-input"]'
 - fill:
     selector: '[data-testid="annotation-text-input"]'

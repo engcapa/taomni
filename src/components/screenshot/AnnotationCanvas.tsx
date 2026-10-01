@@ -420,23 +420,11 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
 
     const handleMouseDown = (e: ReactMouseEvent) => {
       if (e.button !== 0 || tool === "select") return;
+      // Point tools (text, number) are handled onClick (below), not here.
+      if (tool === "text" || tool === "number") return;
       const p = localPos(e);
-      // Point tools (text, number) place at the click point; skip the
-      // selection-boundary check which is meant for drag tools.
-      if (tool !== "text" && tool !== "number") {
-        if (selection && !inRect(p, selection)) {
-          onRequestReselect?.();
-          return;
-        }
-      }
-      if (tool === "text") {
-        setTextAt(p);
-        setTextValue("");
-        return;
-      }
-      if (tool === "number") {
-        const num = numberRef.current++;
-        addShape({ id: idRef.current++, kind: "number", x: p.x, y: p.y, num, color, lineWidth });
+      if (selection && !inRect(p, selection)) {
+        onRequestReselect?.();
         return;
       }
       drawingRef.current = { start: p, pts: [p] };
@@ -501,6 +489,20 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
 
     const interactive = tool !== "select";
 
+    const handleClick = (e: React.MouseEvent) => {
+      if (tool !== "text" && tool !== "number") return;
+      const p = localPos(e);
+      if (tool === "text") {
+        // Handled onClick (not mousedown): a drag's mouseup would blur the
+        // freshly opened input via onBlur=commitText before it can be used.
+        setTextAt(p);
+        setTextValue("");
+      } else {
+        const num = numberRef.current++;
+        addShape({ id: idRef.current++, kind: "number", x: p.x, y: p.y, num, color, lineWidth });
+      }
+    };
+
     return (
       <div
         ref={wrapRef}
@@ -508,6 +510,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onClick={handleClick}
         style={{
           position: "absolute",
           left: 0,
