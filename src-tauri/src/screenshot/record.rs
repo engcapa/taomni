@@ -306,19 +306,16 @@ fn capture_loop(
                     let r = (w.min(h) as f32 / 3.0).max(20.0);
                     let dot_x = (cx + r * (t * 2.0).cos()) as u32;
                     let dot_y = (cy + r * (t * 2.0).sin()) as u32;
-                    // Draw 8x8 red square
-                    let rgb = frame.to_rgb8();
-                    let mut rgb = rgb;
+                    // Draw 8x8 red square directly on RGBA buffer
                     for ox in 0..8 {
                         for oy in 0..8 {
                             let px = dot_x.saturating_sub(4) + ox;
                             let py = dot_y.saturating_sub(4) + oy;
                             if px < w && py < h {
-                                rgb.put_pixel(px, py, image::Rgb([255, 0, 0]));
+                                frame.put_pixel(px, py, image::Rgba([255, 0, 0, 255]));
                             }
                         }
                     }
-                    frame = image::DynamicImage::ImageRgb8(rgb);
                 }
                 let (fw, fh) = sink.push(frame)?;
                 out_w = fw;
