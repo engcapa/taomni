@@ -450,6 +450,47 @@ def mutate_task(doc: Path, task_id: str, mutation: Any) -> dict[str, Any]:
         return metadata
 
 
+def command_add(doc: Path, args: argparse.Namespace) -> None:
+    """Append a new card (heading, metadata line, short body) before a heading."""
+    with board_lock(doc):
+        repo_root = find_repo_root(doc.parent.resolve())
+        text = doc.read_text(encoding="utf-8")
+        cards = parse_cards(text)
+        errors = validate_cards(cards, repo_root)
+        if errors:
+            raise TaskBoardError("Task board is invalid before add:\n- " + "\n- ".join(errors))
+        if args.task_id in card_map(cards):
+            raise TaskBoardError(f"Task already exists: {args.task_id}")
+        metadata = {
+            "id": args.task_id,
+            "status": args.status,
+            "priority": args.priority,
+            "size": args.size,
+            "depends_on": args.depends_on or [],
+            "spec": args.spec,
+            "acceptance": args.acceptance,
+            "required_evidence": args.required_evidence,
+            "audit": {"date": utc_now()[:10], "head": git_head(repo_root)[:8], "finding": args.finding},
+            "prior_completion": {"kind": "new-task", "completed": False},
+            "p0": {"audit_id": args.audit_id, "planning_required": False},
+            "updated_at": utc_now(),
+        }
+        body = args.body.strip() if args.body else ""
+        section = f"### {args.task_id} {args.title}\n<!-- vnc-task {compact_metadata(metadata)} -->\n\n"
+        if body:
+            section += f"{body}\n\n"
+        marker = f"\n{args.before}\n"
+        position = text.find(marker)
+        if position == -1:
+            raise TaskBoardError(f"Heading not found: {args.before}")
+        next_text = text[: position + 1] + section + text[position + 1 :]
+        next_errors = validate_cards(parse_cards(next_text), repo_root)
+        if next_errors:
+            raise TaskBoardError("Task board would be invalid:\n- " + "\n- ".join(next_errors))
+        write_atomic(doc, next_text)
+    print(json.dumps(metadata, ensure_ascii=False, indent=2))
+
+
 def command_validate(doc: Path, _args: argparse.Namespace) -> None:
     cards = parse_cards(doc.read_text(encoding="utf-8"))
     errors = validate_cards(cards, find_repo_root(doc.parent.resolve()))
@@ -669,6 +710,22 @@ def build_parser() -> argparse.ArgumentParser:
     update_parser.add_argument("--evidence-json")
     update_parser.add_argument("--evidence-file", type=Path)
     update_parser.add_argument("--note")
+
+    add_parser = subparsers.add_parser("add", help="Add a new ready/implemented/deferred card (P0 output)")
+    add_parser.add_argument("task_id")
+    add_parser.add_argument("--title", required=True)
+    add_parser.add_argument("--status", default="ready", choices=["ready", "implemented", "deferred"])
+    add_parser.add_argument("--priority", required=True, choices=sorted(ALLOWED_PRIORITIES))
+    add_parser.add_argument("--size", required=True, choices=["S", "M", "L"])
+    add_parser.add_argument("--spec", required=True, help="repository path plus #<lowercase task id>")
+    add_parser.add_argument("--acceptance", nargs="+", required=True)
+    add_parser.add_argument("--required-evidence", nargs="+", required=True,
+                            choices=sorted(ALLOWED_EVIDENCE_KINDS))
+    add_parser.add_argument("--depends-on", nargs="*")
+    add_parser.add_argument("--finding", required=True, help="audit finding that motivates the card")
+    add_parser.add_argument("--audit-id", required=True, help="P0 audit or request the card came from")
+    add_parser.add_argument("--body", help="short card body (goal and reference links)")
+    add_parser.add_argument("--before", default="## 当前批次边界", help="insert before this exact heading line")
     return parser
 
 
@@ -689,6 +746,8 @@ def main() -> int:
             command_claim(doc, args)
         elif args.command == "update":
             command_update(doc, args)
+        elif args.command == "add":
+            command_add(doc, args)
         else:
             parser.error(f"Unknown command: {args.command}")
         return 0

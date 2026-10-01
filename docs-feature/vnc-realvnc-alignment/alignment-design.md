@@ -64,6 +64,7 @@
 | DEC-VNC-17 | AltGr 合成的左 Ctrl 不发送；死键发组合结果；本机 IME 不参与。 | agent 自决 | 与 RealVNC fixture 实测对照。 |
 | DEC-VNC-18 | 全屏 = OS 窗口全屏 + 固定定位覆盖，不用 Fullscreen API，Esc 转发远端。 | agent 自决 | 与 RealVNC 全屏按键行为一致。 |
 | DEC-VNC-19 | 未加密警告在认证前出现；自动重连持续退避；KeepAlive 30/30 s。 | agent 自决 | RealVNC `WarnUnencrypted` / `AutoReconnect` / `KeepAlive*` 默认值。 |
+| DEC-VNC-20 | Windows 上指针停在已连接画布上且无按键时，relay 线程每 1–4 ms 读光标位置直接发 PointerEvent；WebView 照常发自己的事件，relay 丢弃采样后 50 ms 内的无按键移动副本；按键、滚轮、拖拽仍走 WebView；macOS/Linux 不启用；`TAOMNI_VNC_NATIVE_POINTER=0` 关闭。 | agent 自决（[PERF-005 §指针](references/realvnc-fixture-comparison-20261001.md#pointer-latency)） | 逐段测量表明 WebView/JS/relay 合计 < 1 ms，延迟与尾部来自 Windows 按显示刷新投递 `WM_MOUSEMOVE`（裸 Win32 窗口同样 p95 ≈ 31 ms）；RealVNC 走同一机制，只有读光标才能稳定低于它。 |
 
 ## 5. 交互与 UI 总体合同
 
@@ -242,6 +243,17 @@
 - 验收：
   - **VNC-QA-001-A1**：所有 done 卡的功能、交互、鼠标键盘、性能对比可追溯到同一参照与方法，`different`/`unverified` 单独保留。
   - **VNC-QA-001-A2**：当前端 native 组合回归通过；其他端未执行项有后续步骤。
+
+<a id="vnc-auth-001"></a>
+### VNC-AUTH-001 macOS 屏幕共享 ARD 认证
+
+- 来源：2026-10-01 用户追加需求（不在 RealVNC 对比分母内：RealVNC Viewer 对 Mac 的同类能力未作参照）。
+- 交付：RFB 安全类型 30（Apple Remote Desktop）客户端；有用户名时优先于 VNCAuth；会话不加密，走未加密警告；hosted macOS runner 上的真实屏幕共享用例。
+- 设计：[vnc-ard-macos-design.md](vnc-ard-macos-design.md)（DEC-ARD-1…6、AC-ARD-1…7、V-ARD-1…5）。
+- 验收：
+  - **VNC-AUTH-001-A1**：协议与选择（AC-ARD-1、2、4、6）：DH/MD5/AES-128-ECB 凭据经独立服务器实现解出原文；选择顺序按 DEC-ARD-1；`RequireEncryption` 拒绝；`RFB 003.889` 按 3.8 协商。
+  - **VNC-AUTH-001-A2**：交互（AC-ARD-3、5）：缺用户名时归类为认证失败并重开带用户名的认证浮层；会话信息显示 `ARD (Apple Remote Desktop)`。
+  - **VNC-AUTH-001-A3**：真机（AC-ARD-7）：GitHub macOS runner 上 TC-152 通过；Windows/Linux 客户端连真实 Mac 记为未验证并给出步骤。
 
 ## 7. 验证计划
 

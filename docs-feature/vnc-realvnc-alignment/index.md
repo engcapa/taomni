@@ -10,6 +10,7 @@
 - [RealVNC 实机参照](references/realvnc-live-audit-20260930.md)：参照身份、连接流程、属性与默认值、F8 菜单、工具栏、会话信息、性能实测。
 - [2026-10-01 同 fixture 对照](references/realvnc-fixture-comparison-20261001.md)：RealVNC 7.0.0 与 Taomni 的特殊键、键盘布局与输入法、全屏工具栏时机、剪贴板时机、指针延迟（系统级输入）。
 - P1 设计：[解码与更新流水线](vnc-perf-001-002-pipeline-design.md)、[鼠标/特殊键/缩放/会话菜单/会话信息](vnc-input-view-session-design.md)。
+- [macOS 屏幕共享 ARD 认证](vnc-ard-macos-design.md)：RFB 安全类型 30、选择顺序、hosted macOS runner 真机用例 TC-152（任务板外的追加需求）。
 - [P1 交接提示词](handoff-p1.md)：细化 deferred 卡的固定入口。
 - [现场证据清单](evidence/live-audit-20260930.json)：采样身份、命令与数字。
 - 操作技能：`.agents/skills/vnc-realvnc-task/SKILL.md`（任务板、参照采集、性能测量工具）。
