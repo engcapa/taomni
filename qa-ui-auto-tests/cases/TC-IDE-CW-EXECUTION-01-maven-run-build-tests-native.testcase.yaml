@@ -51,19 +51,13 @@ steps:
     value: '[{"id":"qa-cw-execution","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1789259400000,"isGitRepo":false}]'
 - host_write_file:
     path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
-    text: "package com.example.single;\n\nimport java.util.Arrays;\nimport java.util.List;\n\npublic class App {\n\
-      \    public static void main(String[] args) {\n        List<String> names = Arrays.asList(\"alpha\", \"beta\"\
-      );\n        System.out.println(names.size());\n    }\n}\n"
+    text: "package com.example.single;\n\nimport java.util.Arrays;\nimport java.util.List;\n\npublic class App {\n    public static void main(String[] args) {\n        List<String> names = Arrays.asList(\"alpha\", \"beta\");\n        System.out.println(names.size());\n    }\n}\n"
 - host_write_file:
     path: ${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java
-    text: "package com.example.single;\n\npublic class QuickFixTarget {\n    void quickFixTargets() {\n        //\
-      \ Execution uses a clean source set; diagnostic behavior has\n        // dedicated provider fixtures in the\
-      \ Analysis cases.\n    }\n}\n"
+    text: "package com.example.single;\n\npublic class QuickFixTarget {\n    void quickFixTargets() {\n        // Execution uses a clean source set; diagnostic behavior has\n        // dedicated provider fixtures in the Analysis cases.\n    }\n}\n"
 - host_write_file:
     path: ${fixture.maven_single_root}/src/test/java/com/example/single/AppTest.java
-    text: "package com.example.single;\n\nimport org.junit.Test;\nimport org.junit.Assert;\n\npublic class AppTest\
-      \ {\n    @Test\n    public void appHasMain() {\n        Assert.assertTrue(App.class.getDeclaredMethods().length\
-      \ > 0);\n    }\n}\n"
+    text: "package com.example.single;\n\nimport org.junit.Test;\nimport org.junit.Assert;\n\npublic class AppTest {\n    @Test\n    public void appHasMain() {\n        Assert.assertTrue(App.class.getDeclaredMethods().length > 0);\n    }\n}\n"
 - reload_window: null
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
@@ -126,14 +120,12 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="run-configuration-reset"]'
 - eval_readonly:
-    expression: '!String(document.evaluate("//*[contains(@data-testid,''run-configuration-name'')]", document, null,
-      XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes(''QA Maven Main'')'
+    expression: '!String(document.evaluate("//*[contains(@data-testid,''run-configuration-name'')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes(''QA Maven Main'')'
     expect_truthy: true
 - click: '[data-testid^="run-panel-configuration-copy-java-main:"]'
 - wait_for: '[data-testid="run-configuration-editor"]'
 - eval_readonly:
-    expression: String(document.evaluate("//*[contains(@data-testid,'run-configuration-name')]", document, null,
-      XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes('copy')
+    expression: String(document.evaluate("//*[contains(@data-testid,'run-configuration-name')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes('copy')
     expect_truthy: true
 - fill:
     selector: '[data-testid="run-configuration-name"]'
@@ -201,6 +193,9 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     regex: (?s).*Java version:\s+21(?:[.,\s]|$).*BUILD SUCCESS.*
     timeout_sec: 60
+- press:
+    key: s
+    selector: '[data-testid="code-workspace-tree-pane"]'
 - fill:
     selector: '[data-testid="code-workspace-tree-filter"]'
     value: AppTest.java
@@ -251,8 +246,7 @@ steps:
     timeout_sec: 60
 - host_write_file:
     path: ${fixture.maven_single_root}/src/test/java/com/example/single/AppTest.java
-    text: "package com.example.single;\n\nimport org.junit.Test;\nimport org.junit.Assert;\n\npublic class AppTest\
-      \ {\n    @Test\n    public void appHasMain() {\n        Assert.fail(\"qa-execution-failure\");\n    }\n}\n"
+    text: "package com.example.single;\n\nimport org.junit.Test;\nimport org.junit.Assert;\n\npublic class AppTest {\n    @Test\n    public void appHasMain() {\n        Assert.fail(\"qa-execution-failure\");\n    }\n}\n"
 - click: '[data-testid="tests-refresh"]'
 - wait_for:
     selector: '[data-testid^="tests-item-"]'
@@ -322,43 +316,39 @@ verification:
     - 70
     - 72
     - 75
-    - 79
-    - 81
-    - 83
-    - 85
-    - 87
+    - 80
+    - 82
+    - 84
+    - 86
     - 88
-    - 90
-    - 93
-    - 95
-    - 99
-    - 101
-    - 103
-    - 106
+    - 89
+    - 91
+    - 94
+    - 96
+    - 100
+    - 102
+    - 104
     - 107
-    - 109
-    - 112
-    - 114
-    - 117
+    - 108
+    - 110
+    - 113
+    - 115
+    - 118
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 12
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tab\"]", "timeout_sec": 60}}'
     - step: 13
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec":
-        60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec": 60}}'
     - step: 14
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println(names.size());",
-        "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println(names.size());", "timeout_sec": 60}}'
     - step: 15
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
-        "Java", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains": "Java", "timeout_sec": 60}}'
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"code-workspace-run-panel\"]"}'
     - step: 18
-      expectation: '{"wait_for": {"selector": "[data-testid^=\"run-panel-configuration-java-main:\"]", "timeout_sec":
-        90}}'
+      expectation: '{"wait_for": {"selector": "[data-testid^=\"run-panel-configuration-java-main:\"]", "timeout_sec": 90}}'
     - step: 19
       expectation: '{"assert_visible": "[data-testid^=\"run-panel-configuration-source-\"]"}'
     - step: 21
@@ -378,34 +368,25 @@ verification:
     - step: 28
       expectation: '{"assert_visible": "[data-testid=\"run-configuration-env\"]"}'
     - step: 36
-      expectation: '{"wait_for": {"selector": "[data-testid^=\"run-panel-configuration-java-main:\"]", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid^=\"run-panel-configuration-java-main:\"]", "timeout_sec": 30}}'
     - step: 37
-      expectation: '{"assert_text": {"selector": "[data-testid^=\"run-panel-configuration-java-main:\"]", "contains":
-        "QA Maven Main", "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid^=\"run-panel-configuration-java-main:\"]", "contains": "QA Maven Main", "timeout_sec": 30}}'
     - step: 39
-      expectation: '{"eval_readonly": {"expression": "!String(document.evaluate(\"//*[contains(@data-testid,''run-configuration-name'')]\",
-        document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes(''QA Maven Main'')",
-        "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "!String(document.evaluate(\"//*[contains(@data-testid,''run-configuration-name'')]\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes(''QA Maven Main'')", "expect_truthy": true}}'
     - step: 41
       expectation: '{"wait_for": "[data-testid=\"run-configuration-editor\"]"}'
     - step: 42
-      expectation: '{"eval_readonly": {"expression": "String(document.evaluate(\"//*[contains(@data-testid,''run-configuration-name'')]\",
-        document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes(''copy'')",
-        "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "String(document.evaluate(\"//*[contains(@data-testid,''run-configuration-name'')]\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue?.value).includes(''copy'')", "expect_truthy": true}}'
     - step: 45
-      expectation: '{"assert_text": {"selector": "[data-testid^=\"run-panel-configurations-\"]", "contains": "QA
-        Maven Copy", "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid^=\"run-panel-configurations-\"]", "contains": "QA Maven Copy", "timeout_sec": 30}}'
     - step: 47
       expectation: '{"assert_not_visible": "[data-testid=\"run-configuration-editor\"]"}'
     - step: 48
       expectation: '{"assert_not_visible": "[data-testid^=\"run-panel-configuration-java-main:\"][data-configuration-kind=\"missing\"]"}'
     - step: 50
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
-        "timeout_sec": 120}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "timeout_sec": 120}}'
     - step: 51
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
-        "regex": "(?s).*\\b2\\b.*", "timeout_sec": 60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?s).*\\b2\\b.*", "timeout_sec": 60}}'
     - step: 53
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
     - step: 55
@@ -415,11 +396,9 @@ verification:
     - step: 58
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
     - step: 59
-      expectation: '{"wait_for": {"selector": "[data-testid=\"build-panel-build-project\"]:not(:disabled)", "state":
-        "attached", "timeout_sec": 90}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"build-panel-build-project\"]:not(:disabled)", "state": "attached", "timeout_sec": 90}}'
     - step: 60
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
-        "regex": "(?s).*Java version:\\s+21(?:[.,\\s]|$).*BUILD SUCCESS.*", "timeout_sec": 60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?s).*Java version:\\s+21(?:[.,\\s]|$).*BUILD SUCCESS.*", "timeout_sec": 60}}'
     - step: 62
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
     - step: 64
@@ -429,11 +408,9 @@ verification:
     - step: 67
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
     - step: 68
-      expectation: '{"wait_for": {"selector": "[data-testid=\"build-panel-rebuild-project\"]:not(:disabled)", "state":
-        "attached", "timeout_sec": 120}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"build-panel-rebuild-project\"]:not(:disabled)", "state": "attached", "timeout_sec": 120}}'
     - step: 69
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
-        "regex": "(?s).*Java version:\\s+21(?:[.,\\s]|$).*BUILD SUCCESS.*", "timeout_sec": 60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?s).*Java version:\\s+21(?:[.,\\s]|$).*BUILD SUCCESS.*", "timeout_sec": 60}}'
     - step: 71
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
     - step: 73
@@ -443,69 +420,58 @@ verification:
     - step: 76
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
     - step: 77
-      expectation: '{"wait_for": {"selector": "[data-testid=\"build-panel-build-project\"]:not(:disabled)", "state":
-        "attached", "timeout_sec": 90}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"build-panel-build-project\"]:not(:disabled)", "state": "attached", "timeout_sec": 90}}'
     - step: 78
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
-        "regex": "(?s).*Java version:\\s+21(?:[.,\\s]|$).*BUILD SUCCESS.*", "timeout_sec": 60}}'
-    - step: 80
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-flat-file\"][data-path=\"src/test/java/com/example/single/AppTest.java\"]",
-        "timeout_sec": 30}}'
-    - step: 82
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec":
-        60}}'
-    - step: 84
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?s).*Java version:\\s+21(?:[.,\\s]|$).*BUILD SUCCESS.*", "timeout_sec": 60}}'
+    - step: 81
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-flat-file\"][data-path=\"src/test/java/com/example/single/AppTest.java\"]", "timeout_sec": 30}}'
+    - step: 83
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec": 60}}'
+    - step: 85
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
-    - step: 86
+    - step: 87
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tests-panel\"]"}'
-    - step: 89
+    - step: 90
       expectation: '{"wait_for": {"selector": "[data-testid^=\"tests-item-\"]", "timeout_sec": 60}}'
-    - step: 91
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
     - step: 92
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
-        "regex": "(?s).*BUILD SUCCESS.*", "timeout_sec": 60}}'
-    - step: 94
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 93
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?s).*BUILD SUCCESS.*", "timeout_sec": 60}}'
+    - step: 95
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
-    - step: 96
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tests-result-summary\"]", "timeout_sec": 120}}'
     - step: 97
-      expectation: '{"assert_text": {"selector": "[data-testid=\"tests-result-summary\"]", "contains": "1 passed",
-        "timeout_sec": 60}}'
-    - step: 98
-      expectation: '{"assert_visible": "[data-testid^=\"tests-result-\"]"}'
-    - step: 100
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
-    - step: 102
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
-    - step: 104
       expectation: '{"wait_for": {"selector": "[data-testid=\"tests-result-summary\"]", "timeout_sec": 120}}'
-    - step: 105
-      expectation: '{"assert_text": {"selector": "[data-testid=\"tests-result-summary\"]", "contains": "1 passed",
-        "timeout_sec": 60}}'
-    - step: 108
-      expectation: '{"wait_for": {"selector": "[data-testid^=\"tests-item-\"]", "timeout_sec": 120}}'
-    - step: 110
+    - step: 98
+      expectation: '{"assert_text": {"selector": "[data-testid=\"tests-result-summary\"]", "contains": "1 passed", "timeout_sec": 60}}'
+    - step: 99
+      expectation: '{"assert_visible": "[data-testid^=\"tests-result-\"]"}'
+    - step: 101
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
-    - step: 111
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]",
-        "regex": "(?s).*BUILD FAILURE.*", "timeout_sec": 60}}'
-    - step: 113
+    - step: 103
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
-    - step: 115
-      expectation: '{"wait_for": {"selector": "[data-testid^=\"tests-failure-details-\"]", "timeout_sec": 120}}'
+    - step: 105
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tests-result-summary\"]", "timeout_sec": 120}}'
+    - step: 106
+      expectation: '{"assert_text": {"selector": "[data-testid=\"tests-result-summary\"]", "contains": "1 passed", "timeout_sec": 60}}'
+    - step: 109
+      expectation: '{"wait_for": {"selector": "[data-testid^=\"tests-item-\"]", "timeout_sec": 120}}'
+    - step: 111
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 112
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?s).*BUILD FAILURE.*", "timeout_sec": 60}}'
+    - step: 114
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
     - step: 116
-      expectation: '{"assert_text": {"selector": "[data-testid=\"tests-result-summary\"]", "contains": "1 failed",
-        "timeout_sec": 60}}'
-    - step: 118
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec":
-        30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid^=\"tests-failure-details-\"]", "timeout_sec": 120}}'
+    - step: 117
+      expectation: '{"assert_text": {"selector": "[data-testid=\"tests-result-summary\"]", "contains": "1 failed", "timeout_sec": 60}}'
     - step: 119
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "qa-execution-failure",
-        "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "timeout_sec": 30}}'
+    - step: 120
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "qa-execution-failure", "timeout_sec": 30}}'
     results:
-    - 118
     - 119
+    - 120
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

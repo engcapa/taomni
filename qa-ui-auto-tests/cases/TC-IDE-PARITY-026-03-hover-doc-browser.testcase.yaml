@@ -1,0 +1,239 @@
+id: TC-IDE-PARITY-026-03
+title: Hover documentation stays while the pointer moves onto it, like IDEA
+description: "ED-PARITY-026 A2 browser case on the B-005 controlled Java provider (hover advertised through taomni.qa.parity005.hover). Hovering a class name opens the documentation popup; moving the pointer across neighbouring characters towards the popup and resting inside it keeps it open (CodeMirror's hover closed it on the first move off the character), moving away closes it after the grace period, Esc closes it from the editor, a popup the user clicked into stays until Esc returns focus to the editor, and Pin moves it to the Documentation tool window.\n\n  Mode: browser.\n"
+covers:
+- F25.5
+tags:
+- code-workspace
+- quick-documentation
+- ed-parity-026
+- parity005
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- parity005_completion
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.qa.parity005.hover
+    value: 'true'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    contains: Stri;
+- hover: '[data-testid="code-workspace-editor"] .cm-content > .cm-line:nth-child(3) span:text-is("Main")'
+- wait_for:
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    contains: parity005.Main
+- mouse_path:
+    points:
+    - selector: '[data-testid="code-workspace-editor"] .cm-content > .cm-line:nth-child(3) span:text-is("Main")'
+      dx: 14
+      dy: 3
+      steps: 4
+    - selector: '[data-testid="code-workspace-editor"] .cm-content > .cm-line:nth-child(3) span:text-is("Main")'
+      dx: 46
+      dy: 8
+      steps: 5
+- wait: 0.8
+- assert_visible: '[data-testid="code-workspace-hover-doc"]'
+- mouse_path:
+    points:
+    - selector: '[data-testid="code-workspace-hover-doc"]'
+      dx: 0
+      dy: 0
+      steps: 8
+      pause_ms: 1000
+- assert_visible: '[data-testid="code-workspace-hover-doc"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    contains: Browser B-005 documentation
+- screenshot: tc-ide-parity-026-03-hover-kept.png
+- mouse_path:
+    points:
+    - selector: '[data-editor-tab-key][data-active="true"]'
+      dx: 0
+      dy: 0
+      steps: 6
+- wait_for:
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- hover: '[data-testid="code-workspace-editor"] .cm-content > .cm-line:nth-child(3) span:text-is("Main")'
+- wait_for:
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    timeout_sec: 10
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    state: detached
+    timeout_sec: 5
+- mouse_path:
+    points:
+    - selector: '[data-editor-tab-key][data-active="true"]'
+      dx: 0
+      dy: 0
+      steps: 2
+- hover: '[data-testid="code-workspace-editor"] .cm-content > .cm-line:nth-child(3) span:text-is("Main")'
+- wait_for:
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    timeout_sec: 10
+- mouse_path:
+    points:
+    - selector: '[data-testid="code-workspace-hover-doc"]'
+      dx: 0
+      dy: 0
+      steps: 6
+- click: '[data-testid="code-workspace-hover-doc"] .cm-lsp-hover'
+- mouse_path:
+    points:
+    - selector: '[data-testid="status-bar"]'
+      dx: 0
+      dy: 0
+      steps: 6
+      pause_ms: 1000
+- assert_visible: '[data-testid="code-workspace-hover-doc"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    state: detached
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.activeElement?.closest('.cm-editor') !== null
+    expect_truthy: true
+- mouse_path:
+    points:
+    - selector: '[data-editor-tab-key][data-active="true"]'
+      dx: 0
+      dy: 0
+      steps: 2
+- hover: '[data-testid="code-workspace-editor"] .cm-content > .cm-line:nth-child(3) span:text-is("Main")'
+- wait_for:
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    timeout_sec: 10
+- mouse_path:
+    points:
+    - selector: '[data-testid="code-workspace-hover-doc"]'
+      dx: 0
+      dy: 0
+      steps: 6
+- click: '[data-testid="code-workspace-hover-doc-pin"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    state: detached
+    timeout_sec: 5
+- wait_for:
+    selector: '[data-testid="code-workspace-documentation-pane"]'
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="code-workspace-documentation-pane"]'
+    contains: parity005.Main
+- screenshot: tc-ide-parity-026-03-pinned.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A2：悬停类名 Main 弹出文档；指针跨过相邻字符朝弹窗移动并停在弹窗内 1 秒，弹窗保持显示（CodeMirror 默认悬停会在指针离开字符时立即关闭）。
+    actions:
+    - 9
+    - 12
+    - 13
+    - 15
+    checkpoints:
+    - step: 10
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
+    - step: 11
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "contains": "parity005.Main"}}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-hover-doc\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-hover-doc\"]"}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "contains": "Browser B-005 documentation"}}'
+    results:
+    - 10
+    - 11
+    - 14
+    - 16
+    - 17
+  - id: R2
+    requirement: A2：指针移向相反方向（编辑器页签）后在宽限期内关闭；编辑器聚焦时 Esc 关闭悬停文档。
+    actions:
+    - 19
+    - 21
+    - 22
+    - 24
+    checkpoints:
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
+    - step: 25
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "state": "detached", "timeout_sec": 5}}'
+    results:
+    - 20
+    - 23
+    - 25
+  - id: R3
+    requirement: A2：点进弹窗后（焦点在弹窗内）指针移走也保持显示；Esc 关闭并把焦点还给编辑器。
+    actions:
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 33
+    checkpoints:
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-hover-doc\"]"}'
+    - step: 34
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 35
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.closest(''.cm-editor'') !== null", "expect_truthy": true}}'
+    results:
+    - 28
+    - 32
+    - 34
+    - 35
+  - id: R4
+    requirement: A2：弹窗 Pin 把内容固定到 Documentation 工具窗口，悬停弹窗关闭。
+    actions:
+    - 36
+    - 37
+    - 39
+    - 40
+    checkpoints:
+    - step: 38
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "timeout_sec": 10}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-hover-doc\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-documentation-pane\"]", "timeout_sec": 10}}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-documentation-pane\"]", "contains": "parity005.Main"}}'
+    results:
+    - 38
+    - 41
+    - 42
+    - 43
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

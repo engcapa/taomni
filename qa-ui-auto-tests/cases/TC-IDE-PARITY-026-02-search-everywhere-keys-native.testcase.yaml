@@ -1,0 +1,203 @@
+id: TC-IDE-PARITY-026-02-search-everywhere-keys-native
+title: Native Search Everywhere tab and group keys match IDEA and reopen empty
+description: 'ED-PARITY-026 A1 native case in the isolated QA app: Search Everywhere opened with Ctrl+Shift+N switches tabs with the platform NextTab/PreviousTab chords (Alt+Right/Alt+Left; macOS Ctrl+Right/Ctrl+Left), Ctrl+Tab / Ctrl+Shift+Tab and Tab / Shift+Tab, jumps to the last/first file result with PageDown/PageUp and Ctrl+Down/Ctrl+Up, and reopens with an empty query.
+
+  '
+covers:
+- F25.5
+tags:
+- code-workspace
+- search-everywhere
+- ed-parity-026
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- workspace_root
+timeout_sec: 300
+native_platforms:
+- Linux
+- macOS
+- Windows
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-gate-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-ed026","name":"qa-ed026","roots":[{"id":"qa-ed026","name":"qa-ed026","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-ed026","path":"notes.txt"},"lastOpenedAt":1756500000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-pane"]'
+    timeout_sec: 60
+- click: '[data-testid="code-workspace-editor"] .cm-content'
+- press: Control+Shift+N
+- wait_for: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+- assert_attribute:
+    selector: '[data-testid="search-everywhere-tab-files"]'
+    name: aria-selected
+    equals: 'true'
+- press:
+    key: Alt+ArrowRight
+    macos_key: Control+ArrowRight
+- assert_attribute:
+    selector: '[data-testid="search-everywhere-tab-symbols"]'
+    name: aria-selected
+    equals: 'true'
+- press:
+    key: Alt+ArrowLeft
+    macos_key: Control+ArrowLeft
+- assert_attribute:
+    selector: '[data-testid="search-everywhere-tab-files"]'
+    name: aria-selected
+    equals: 'true'
+- press:
+    key: Alt+ArrowLeft
+    macos_key: Control+ArrowLeft
+- assert_attribute:
+    selector: '[data-testid="search-everywhere-tab-classes"]'
+    name: aria-selected
+    equals: 'true'
+- press: Control+Tab
+- assert_attribute:
+    selector: '[data-testid="search-everywhere-tab-files"]'
+    name: aria-selected
+    equals: 'true'
+- press: Control+Shift+Tab
+- assert_attribute:
+    selector: '[data-testid="search-everywhere-tab-classes"]'
+    name: aria-selected
+    equals: 'true'
+- press: Tab
+- assert_attribute:
+    selector: '[data-testid="search-everywhere-tab-files"]'
+    name: aria-selected
+    equals: 'true'
+- screenshot: tc-ide-parity-026-02-files-tab.png
+- eval_readonly:
+    expression: document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] [data-index]').length > 1
+    expect_truthy: true
+- press: PageDown
+- eval_readonly:
+    expression: document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] [data-index]')[document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] [data-index]').length - 1].getAttribute('data-selected') === 'true'
+    expect_truthy: true
+- press: PageUp
+- eval_readonly:
+    expression: document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] [data-index]')[0].getAttribute('data-selected') === 'true'
+    expect_truthy: true
+- press: Control+ArrowDown
+- eval_readonly:
+    expression: document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] [data-index]')[document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] [data-index]').length - 1].getAttribute('data-selected') === 'true'
+    expect_truthy: true
+- press: Control+ArrowUp
+- eval_readonly:
+    expression: document.querySelectorAll('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] [data-index]')[0].getAttribute('data-selected') === 'true'
+    expect_truthy: true
+- type:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+    text: zzqq
+- assert_attribute:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+    name: value
+    equals: zzqq
+- press: Escape
+- wait_for:
+    selector: '[data-testid="code-workspace-search-everywhere"]'
+    state: detached
+    timeout_sec: 5
+- press: Control+Shift+N
+- wait_for: '[data-testid="code-workspace-search-everywhere"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-search-everywhere"] input').value === ''
+    expect_truthy: true
+- press: Escape
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A1：原生 WebView 中 Ctrl+Shift+N 打开 Search Everywhere（Files）；Alt+Right/Alt+Left（macOS Ctrl+Right/Ctrl+Left）、Ctrl+Tab/Ctrl+Shift+Tab、Tab 按 IDEA SearchEverywhereUI 注册的动作切换页签。
+    actions:
+    - 11
+    - 14
+    - 16
+    - 18
+    - 20
+    - 22
+    - 24
+    checkpoints:
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Go to file\"]"}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-classes\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-classes\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-tab-files\"]", "name": "aria-selected", "equals": "true"}}'
+    results:
+    - 12
+    - 13
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
+    - 25
+  - id: R2
+    requirement: A1：PageDown/Ctrl+Down 选中最后一个文件结果、PageUp/Ctrl+Up 回到第一个；输入查询后 Esc 关闭，再次打开时查询为空。
+    actions:
+    - 28
+    - 30
+    - 32
+    - 34
+    - 36
+    - 38
+    - 40
+    checkpoints:
+    - step: 27
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length > 1", "expect_truthy": true}}'
+    - step: 29
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length - 1].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+    - step: 31
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[0].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+    - step: 33
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length - 1].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+    - step: 35
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[0].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Go to file\"]", "name": "value", "equals": "zzqq"}}'
+    - step: 39
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] input'').value === ''''", "expect_truthy": true}}'
+    results:
+    - 27
+    - 29
+    - 31
+    - 33
+    - 35
+    - 37
+    - 39
+    - 41
+    - 42
+  visual:
+  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+    method: manual
+    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+  native:
+  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+    method: automated
+    reason: 明确记录执行边界和未验证平台。

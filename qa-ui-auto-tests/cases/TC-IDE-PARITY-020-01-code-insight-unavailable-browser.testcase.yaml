@@ -31,6 +31,7 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tree-new"]'
 - click: '[data-testid="code-workspace-tree-new-file"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
@@ -127,92 +128,92 @@ verification:
   - id: R1
     requirement: A2/DEC-020-04：服务不可用时成员位置 calculator.le 不出现缓冲区单词列表，而弹出原因 notice；Esc 关闭后焦点与 caret 不变。
     actions:
-    - 21
-    - 25
+    - 22
+    - 26
     checkpoints:
-    - step: 22
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
     - step: 23
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "contains": "Member completion unavailable"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
     - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "contains": "Member completion unavailable"}}'
+    - step: 25
       expectation: '{"assert_count": {"selector": ".cm-tooltip-autocomplete", "equal": 0}}'
-    - step: 26
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 27
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 28
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    - step: 29
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "1:60"}}'
     results:
-    - 23
     - 24
-    - 27
+    - 25
     - 28
+    - 29
   - id: R2
     requirement: A2/DEC-020-02/03：Quick Doc (Ctrl+Q) 在服务不可用时弹出含原因的 notice（不只写状态栏）；Esc 后焦点与 caret 不变。
     actions:
-    - 29
+    - 30
     checkpoints:
-    - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
     - step: 31
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
+    - step: 32
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "contains": "Documentation unavailable"}}'
-    - step: 33
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 34
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 35
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    - step: 36
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "1:60"}}'
     results:
-    - 31
-    - 34
+    - 32
     - 35
+    - 36
   - id: R3
     requirement: A2/DEC-020-02/03：Parameter Info (Ctrl+P) 在服务不可用时弹出含原因的 notice（不只写状态栏）；Esc 后焦点与 caret 不变。
     actions:
-    - 36
+    - 37
     checkpoints:
-    - step: 37
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
     - step: 38
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
+    - step: 39
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "contains": "Parameter info unavailable"}}'
-    - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 41
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 42
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    - step: 43
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "1:60"}}'
     results:
-    - 38
-    - 41
+    - 39
     - 42
+    - 43
   - id: R4
     requirement: A2/DEC-020-02/03：Alt+Enter 在服务不可用时弹出含原因的 notice（不只写状态栏）；Esc 后焦点与 caret 不变。
     actions:
-    - 43
+    - 44
     checkpoints:
-    - step: 44
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
     - step: 45
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "timeout_sec": 10}}'
+    - step: 46
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "contains": "Context actions unavailable"}}'
-    - step: 47
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 48
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-code-insight-notice\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 49
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    - step: 50
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "1:60"}}'
     results:
-    - 45
-    - 48
+    - 46
     - 49
+    - 50
   - id: R5
     requirement: DEC-020-01：notice 的 Configure 打开 Language Servers 设置。
     actions:
-    - 52
+    - 53
     checkpoints:
-    - step: 53
+    - step: 54
       expectation: '{"wait_for": {"selector": "[data-testid=\"language-servers-settings\"]", "timeout_sec": 15}}'
     results:
-    - 53
+    - 54
   visual:
   - check: 对照 IDEA 的 “No documentation found.” 弹层位置与样式。
     method: manual

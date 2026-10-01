@@ -264,6 +264,12 @@ cases:
 - TC-IDE-PARITY-024-03-tool-window-move-native
 - TC-IDE-PARITY-025-01
 - TC-IDE-PARITY-025-02-debugger-native
+- TC-IDE-PARITY-026-01
+- TC-IDE-PARITY-026-02-search-everywhere-keys-native
+- TC-IDE-PARITY-026-03
+- TC-IDE-PARITY-026-04-hover-doc-native
+- TC-IDE-PARITY-026-05
+- TC-IDE-PARITY-026-06-project-header-native
 - TC-IDE-PARITY-007-01
 - TC-IDE-PARITY-007-02
 - TC-IDE-PARITY-007-03

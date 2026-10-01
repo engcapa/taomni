@@ -306,6 +306,41 @@ def _hover(ctx: NativeStepContext, args: Any) -> str:
     return f"hovered {selector}"
 
 
+def _mouse_path(ctx: NativeStepContext, args: Any) -> str:
+    """Move the pointer through element-relative points (see steps.mouse)."""
+    from .steps.mouse import mouse_path_points
+
+    points = mouse_path_points(args)
+    for point in points:
+        element = ctx.session.find(point["selector"], interactive=False)
+        # W3C element origin: integer offsets from the element's in-view
+        # centre, the same convention as the browser runner. A duration lets
+        # the driver interpolate intermediate moves like `steps` does.
+        ctx.session.request(
+            "POST",
+            ctx.session.endpoint("/actions"),
+            {
+                "actions": [
+                    {
+                        "type": "pointer",
+                        "id": "mouse",
+                        "parameters": {"pointerType": "mouse"},
+                        "actions": [{
+                            "type": "pointerMove",
+                            "duration": 16 * point["steps"],
+                            "x": int(round(point["dx"])),
+                            "y": int(round(point["dy"])),
+                            "origin": {"element-6066-11e4-a52e-4f735466cecf": element},
+                        }],
+                    }
+                ]
+            },
+        )
+        if point["pause_ms"]:
+            time.sleep(point["pause_ms"] / 1000)
+    return f"moved through {len(points)} point(s)"
+
+
 def _select_option(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(args, dict) or "selector" not in args:
         raise StepError("select_option: expected {selector, value?|label?}")
@@ -1526,6 +1561,11 @@ def _do_blur(ctx: NativeStepContext, args: Any) -> str:
 @_verb("hover")
 def _do_hover(ctx: NativeStepContext, args: Any) -> str:
     return _hover(ctx, args)
+
+
+@_verb("mouse_path")
+def _do_mouse_path(ctx: NativeStepContext, args: Any) -> str:
+    return _mouse_path(ctx, args)
 
 
 @_verb("select_option")

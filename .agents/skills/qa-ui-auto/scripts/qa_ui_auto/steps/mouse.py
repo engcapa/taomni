@@ -69,6 +69,48 @@ def step_hover(ctx: StepContext, args: Any) -> None:
     loc.hover()
 
 
+def mouse_path_points(args: Any) -> list[dict[str, Any]]:
+    """Validate `mouse_path: {points: [{selector, dx?, dy?, steps?, pause_ms?}]}`.
+
+    dx/dy are CSS-pixel offsets from the element's centre (the W3C element
+    origin used by the native runner too); `steps` interpolates intermediate
+    moves; `pause_ms` rests after reaching the point.
+    """
+    points = args.get("points") if isinstance(args, dict) else None
+    if not isinstance(points, list) or not points:
+        raise StepError("mouse_path: expected {points: [{selector, dx?, dy?, steps?, pause_ms?}, ...]}")
+    out: list[dict[str, Any]] = []
+    for point in points:
+        if not isinstance(point, dict) or not isinstance(point.get("selector"), str):
+            raise StepError(f"mouse_path: every point needs a selector, got {point!r}")
+        out.append({
+            "selector": point["selector"],
+            "dx": float(point.get("dx", 0)),
+            "dy": float(point.get("dy", 0)),
+            "steps": max(1, int(point.get("steps", 1))),
+            "pause_ms": max(0, int(point.get("pause_ms", 0))),
+        })
+    return out
+
+
+@verb("mouse_path")
+def step_mouse_path(ctx: StepContext, args: Any) -> None:
+    """Move the pointer through element-relative points without clicking."""
+    points = mouse_path_points(args)
+    if ctx.dry_run:
+        return
+    page = ctx.page  # type: ignore[attr-defined]
+    for point in points:
+        box = page.locator(point["selector"]).first.bounding_box()
+        if not box:
+            raise StepError(f"mouse_path: {point['selector']} has no layout box")
+        x = box["x"] + box["width"] / 2 + point["dx"]
+        y = box["y"] + box["height"] / 2 + point["dy"]
+        page.mouse.move(x, y, steps=point["steps"])
+        if point["pause_ms"]:
+            page.wait_for_timeout(point["pause_ms"])
+
+
 @verb("middle_click")
 def step_middle_click(ctx: StepContext, args: Any) -> None:
     selector = args if isinstance(args, str) else args["selector"]

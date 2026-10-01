@@ -7437,10 +7437,53 @@ controls:
     selector: '[data-testid="code-workspace-tree-dir"]'
     kind: interactive
     optional: true       # directory rows; cases refine with [data-path="..."] (C8-07)
-  - id: tree-view
-    selector: '[data-testid="code-workspace-view-tree"]'
+  - id: tree-view                     # IDEA "Project ▾" view selector (Project / Project Files)
+    selector: '[data-testid="code-workspace-tree-view-selector"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-view-project"]'
+      - '[data-testid="code-workspace-tree-view-project-files"]'
+  - id: tree-new-menu                 # IDEA title action New (+): File, Directory, Open File…, Add Folder…
+    selector: '[data-testid="code-workspace-tree-new"]'
+    kind: interactive
+    optional: true
+  - id: tree-open-file
+    selector: '[data-testid="code-workspace-tree-open-file"]'
+    kind: interactive
+    optional: true       # New (+) menu item and empty-workspace entry point
+  - id: tree-options-appearance       # ⋮ Options › Appearance: Details, Compact Directories, zoom
+    selector: '[data-testid="code-workspace-tree-menu-appearance"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-menu-details"]'
+      - '[data-testid="code-workspace-tree-menu-compact"]'
+      - '[data-testid="code-workspace-tree-zoom-in"]'
+      - '[data-testid="code-workspace-tree-zoom-out"]'
+      - '[data-testid="code-workspace-tree-zoom-reset"]'
+  - id: tree-options                  # IDEA ⋮ Options and − Hide title actions
+    selector: '[data-testid="code-workspace-tree-toolbar-more"]'
+    kind: interactive
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-collapse"]'
+      - '[data-testid="code-workspace-tree-menu-expand-all"]'
+  - id: tree-speed-search             # IDEA speed search: typing in the tree opens it
+    selector: '[data-testid="code-workspace-tree-speed-search"]'
     kind: display
-    optional: true       # tree view container used by template flows
+    optional: true
+  - id: tree-speed-search-close
+    selector: '[data-testid="code-workspace-tree-speed-search-close"]'
+    kind: interactive
+    optional: true
+  - id: tree-row-details              # root location and Appearance › Details (time, size)
+    selector: '[data-testid="code-workspace-tree-root-path"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="code-workspace-tree-file-details"]'
+      - '[data-testid="code-workspace-tree-empty"]'
   - id: new-java-class-package
     selector: '[data-testid="new-java-class-package"]'
     kind: display
@@ -8488,6 +8531,18 @@ controls:
     selector: '[data-testid="code-workspace-quick-doc"]'
     kind: display
     optional: true       # explicit Quick Documentation popup
+  - id: hover-doc-popup
+    selector: '[data-testid="code-workspace-hover-doc"]'
+    kind: display
+    optional: true       # IDEA hover documentation; stays while the pointer heads into it
+  - id: hover-doc-pin
+    selector: '[data-testid="code-workspace-hover-doc-pin"]'
+    kind: interactive
+    optional: true       # pins the hover documentation to the Documentation tool window
+  - id: documentation-pane
+    selector: '[data-testid="code-workspace-documentation-pane"]'
+    kind: display
+    optional: true       # Documentation tool window (pinned quick documentation)
   # §8.20.2 W1 actionable editor conditions and retryable actions.
   - id: editor-banners
     selector: '[data-testid="code-workspace-editor-banners"]'

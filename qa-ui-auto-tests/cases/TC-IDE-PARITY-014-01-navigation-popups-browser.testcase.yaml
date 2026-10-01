@@ -31,6 +31,7 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tree-new"]'
 - click: '[data-testid="code-workspace-tree-new-file"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
@@ -138,65 +139,65 @@ verification:
   - id: R1
     requirement: A4/DEC-014-04：无 provider 时 File Structure 以文件名为标题，给出标注 syntax only 的 Java 大纲（字段、方法）。
     actions:
-    - 22
+    - 23
     checkpoints:
-    - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-structure-syntax-only\"]", "timeout_sec": 10}}'
     - step: 25
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-structure-title\"]", "contains": "Totals.java"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-structure-syntax-only\"]", "timeout_sec": 10}}'
     - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-structure-popup\"]", "contains": "sum"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-structure-title\"]", "contains": "Totals.java"}}'
     - step: 27
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-structure-popup\"]", "contains": "sum"}}'
+    - step: 28
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-structure-popup\"]", "contains": "total"}}'
     results:
-    - 24
     - 25
     - 26
+    - 27
   - id: R2
     requirement: A4/DEC-014-01/02：Search Everywhere All 查询 total 时首项为相关文件，不含 Move to Line Start 等无关动作，底栏为选中项路径且无 generation/provider 诊断文字（诊断在 tooltip）。
     actions:
-    - 32
-    - 34
+    - 33
+    - 35
     checkpoints:
-    - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"search-everywhere-selected-path\"]", "contains": "Totals.java", "timeout_sec": 10}}'
     - step: 36
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "regex": "(?s)\\A(?!.*Move to Line Start)"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"search-everywhere-selected-path\"]", "contains": "Totals.java", "timeout_sec": 10}}'
     - step: 37
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "regex": "(?s)\\A(?!.*generation)"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "regex": "(?s)\\A(?!.*Move to Line Start)"}}'
     - step: 38
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "regex": "(?s)\\A(?!.*generation)"}}'
+    - step: 39
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"search-everywhere-symbol-provider-status\"]", "name": "role", "equals": "img"}}'
     results:
-    - 35
     - 36
     - 37
+    - 38
   - id: R3
     requirement: A4/DEC-014-03：Recent Files 为双列：左侧工具窗、右侧文件，底栏完整路径；再按 Ctrl+E 切换 Show edited only；点击工具窗激活它并关闭弹层。
     actions:
-    - 42
-    - 47
-    - 49
-    - 51
+    - 43
+    - 48
+    - 50
+    - 52
     checkpoints:
-    - step: 44
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-recent-files-tool-window-problems\"]"}'
     - step: 45
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-recent-files-path\"]", "contains": "README.txt"}}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-recent-files-tool-window-problems\"]"}'
     - step: 46
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-recent-files-path\"]", "contains": "README.txt"}}'
+    - step: 47
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-recent-files-edited-only\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 48
+    - step: 49
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files-edited-only\"][data-checked=\"true\"]", "timeout_sec": 5}}'
-    - step: 50
+    - step: 51
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files-edited-only\"][data-checked=\"false\"]", "timeout_sec": 5}}'
-    - step: 52
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-recent-files\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 54
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-problems-panel\"]", "timeout_sec": 10}}'
     results:
-    - 44
     - 45
-    - 48
-    - 53
+    - 46
+    - 49
+    - 54
   visual:
   - check: 对照 IDEA idea-02/Recent Files/File Structure 截图检查列布局与宽度。
     method: manual
