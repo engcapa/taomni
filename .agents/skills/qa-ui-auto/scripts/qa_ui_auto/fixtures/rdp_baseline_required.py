@@ -8,10 +8,14 @@ client-requested initial program (alternate shell).
 
 Setup (Windows, elevated runner):
 * system Remote Desktop enabled, TermService running, client initial program
-  honoured (``fInheritInitialProgram=1`` on RDP-Tcp);
+  allowed (``fInheritInitialProgram=1`` on RDP-Tcp);
 * two disposable local accounts in Remote Desktop Users — one session hosts a
   ``flip`` target (latency), the other an ``animate`` target (throughput);
-* a world-writable work directory holding a copy of the Tk target.
+* a world-writable work directory holding a copy of the Tk target and a
+  launcher registered in the machine Run key: Server 2025 starts Explorer
+  despite the initial program (run 36821068478), and Explorer then starts
+  the account's target; the first sign-in animation is turned off for the
+  run. Cases wait for the target's state file (``rdp-probe --wait-ready``).
 
 Exports ``QA_RDP_BASELINE_PORT``, ``QA_RDP_BASELINE_USER1/2``,
 ``QA_RDP_BASELINE_PASSWORD`` (masked), ``QA_RDP_BASELINE_DIR`` and the two
@@ -70,7 +74,32 @@ foreach ($name in $env:QA_BASELINE_USERS.Split(',')) {
   Add-LocalGroupMember -SID 'S-1-5-32-555' -Member $name -ErrorAction SilentlyContinue
 }
 Write-Output ("port:" + (Get-ItemProperty -Path "$ts\WinStations\RDP-Tcp" -Name PortNumber).PortNumber)
+# Server 2025 may ignore the client's initial program and start Explorer;
+# Explorer then runs the target from the machine Run key (see _LAUNCHER).
+$run = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run'
+Set-ItemProperty -Path $run -Name TaomniRdpBaselineTarget -Value $env:QA_BASELINE_RUN
+# A fresh profile's first sign-in animation delays the shell by tens of seconds.
+$system = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+$previous = (Get-ItemProperty -Path $system -Name EnableFirstLogonAnimation -ErrorAction SilentlyContinue).EnableFirstLogonAnimation
+Write-Output ("animation:" + $(if ($null -eq $previous) { 'unset' } else { $previous }))
+Set-ItemProperty -Path $system -Name EnableFirstLogonAnimation -Value 0 -Type DWord
 """
+
+# Started by Explorer (machine Run key) in every baseline session; picks the
+# target by account so each session hosts the scenario it measures. Without
+# an account match it exits, so the runner's own logons are untouched.
+_LAUNCHER = r'''
+import os, runpy, sys
+from pathlib import Path
+here = Path(__file__).resolve().parent
+targets = {"qa-rdp-base1": ("flip", "480x320+40+80"), "qa-rdp-base2": ("animate", "640x360+40+80")}
+mode = targets.get(os.environ.get("USERNAME", "").lower())
+if mode:
+    sys.argv = [str(here / "rdp_target.py"), "--state", str(here / f"{mode[0]}-state.json"),
+                "--mode", mode[0], "--geometry", mode[1], "--lifetime-sec", "1800"]
+    runpy.run_path(str(here / "rdp_target.py"), run_name="__main__")
+'''
+_ANIMATION: list[str] = []
 
 
 def _shell(python: Path, mode: str, geometry: str) -> str:
@@ -90,20 +119,10 @@ def setup(ctx: Any) -> None:
     password = os.environ.get("QA_RDP_BASELINE_PASSWORD") or ("Qa1_" + secrets.token_hex(12))
     if os.environ.get("GITHUB_ACTIONS") == "true":
         print(f"::add-mask::{password}", flush=True)
-    result = subprocess.run(
-        ["powershell", "-NoProfile", "-NonInteractive", "-Command", _HOST_SCRIPT],
-        capture_output=True, text=True, timeout=180,
-        env={**os.environ, "QA_BASELINE_PW": password, "QA_BASELINE_USERS": ",".join(USERS)},
-    )
-    if result.returncode:
-        raise FixtureSkip("could not prepare the TermService baseline (elevation required?): "
-                          + (result.stderr or result.stdout)[-500:])
-    lines = result.stdout.split()
-    _CREATED.extend(line.split(":", 1)[1] for line in lines if line.startswith("created:"))
-    port = next((line.split(":", 1)[1] for line in lines if line.startswith("port:")), "3389")
 
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     shutil.copy2(Path(__file__).resolve().parents[1] / "rdp_helpers" / "rdp_target.py", WORK_DIR / "rdp_target.py")
+    (WORK_DIR / "launch_target.pyw").write_text(_LAUNCHER, encoding="utf-8")
     for stale in WORK_DIR.glob("*-state.json"):
         stale.unlink(missing_ok=True)
     # Everyone (S-1-1-0) may write the target state from the baseline sessions.
@@ -112,6 +131,20 @@ def setup(ctx: Any) -> None:
     executable = Path(sys.executable)
     windowed = executable.with_name("pythonw.exe")
     python = windowed if windowed.is_file() else executable
+
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", _HOST_SCRIPT],
+        capture_output=True, text=True, timeout=180,
+        env={**os.environ, "QA_BASELINE_PW": password, "QA_BASELINE_USERS": ",".join(USERS),
+             "QA_BASELINE_RUN": f'"{python}" "{WORK_DIR / "launch_target.pyw"}"'},
+    )
+    if result.returncode:
+        raise FixtureSkip("could not prepare the TermService baseline (elevation required?): "
+                          + (result.stderr or result.stdout)[-500:])
+    lines = result.stdout.split()
+    _CREATED.extend(line.split(":", 1)[1] for line in lines if line.startswith("created:"))
+    _ANIMATION.extend(line.split(":", 1)[1] for line in lines if line.startswith("animation:"))
+    port = next((line.split(":", 1)[1] for line in lines if line.startswith("port:")), "3389")
 
     _export(ctx, "QA_RDP_BASELINE_PORT", port)
     _export(ctx, "QA_RDP_BASELINE_USER1", USERS[0])
@@ -138,3 +171,14 @@ foreach ($line in (quser 2>$null | Select-Object -Skip 1)) {
 """.replace("$env:QA_BASELINE_USERS", f"'{names}'"), check=False)
     while _CREATED:
         _ps(f"Remove-LocalUser -Name '{_CREATED.pop()}'", check=False)
+    _ps(r"Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' "
+        r"-Name TaomniRdpBaselineTarget -ErrorAction SilentlyContinue", check=False)
+    system = r"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
+    while _ANIMATION:
+        previous = _ANIMATION.pop()
+        if previous == "unset":
+            _ps(f"Remove-ItemProperty -Path '{system}' -Name EnableFirstLogonAnimation "
+                "-ErrorAction SilentlyContinue", check=False)
+        elif previous.isdigit():
+            _ps(f"Set-ItemProperty -Path '{system}' -Name EnableFirstLogonAnimation "
+                f"-Value {previous} -Type DWord", check=False)

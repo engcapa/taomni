@@ -53,6 +53,10 @@ export function RdpSettings({ config, onChange }: Props) {
     typeof config.clipboardFileMaxMb === "number" && config.clipboardFileMaxMb > 0
       ? config.clipboardFileMaxMb
       : DEFAULT_CLIPBOARD_FILE_MAX_MB;
+  const audioPlayback = config.audioPlayback !== false;
+  const microphone = config.microphone !== false;
+  const microphoneDevice =
+    typeof config.microphoneDevice === "string" ? config.microphoneDevice : "";
   const clipboardOptions = CLIPBOARD_LEVELS.map((level) => ({
     value: level,
     label: t(`servers.fields.rdpClipboardLevel.${level}`),
@@ -241,6 +245,30 @@ export function RdpSettings({ config, onChange }: Props) {
         />
       ) : null}
       <FieldNote>{t("servers.notes.rdpClipboardPolicy")}</FieldNote>
+      <CheckboxField
+        label={t("servers.fields.rdpAudioPlayback")}
+        testId="rdp-field-audio-playback"
+        checkboxLabel={t("servers.fields.rdpAudioPlayback")}
+        value={audioPlayback}
+        onChange={(value) => onChange({ audioPlayback: value })}
+      />
+      <CheckboxField
+        label={t("servers.fields.rdpMicrophone")}
+        testId="rdp-field-microphone"
+        checkboxLabel={t("servers.fields.rdpMicrophone")}
+        value={microphone}
+        onChange={(value) => onChange({ microphone: value })}
+      />
+      {microphone && platform !== "linux" ? (
+        <TextField
+          label={t("servers.fields.rdpMicrophoneDevice")}
+          testId="rdp-field-microphone-device"
+          value={microphoneDevice}
+          onChange={(value) => onChange({ microphoneDevice: value })}
+          placeholder={t("servers.fields.rdpMicrophoneDeviceAuto")}
+        />
+      ) : null}
+      <FieldNote>{t("servers.notes.rdpAudioDevices")}</FieldNote>
       <CheckboxField
         label={t("servers.fields.rdpPublicBind")}
         testId="rdp-field-public-bind"

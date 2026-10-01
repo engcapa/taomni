@@ -5,12 +5,13 @@ description: |
   Remote Desktop on the Windows runner is the performance reference for
   Taomni's RDP server (TC-RDPS-PERF-01). rdp_baseline_required prepares
   TermService and two disposable accounts. TermService gives each account
-  its own session, so the Tk target from PERF-01 runs inside that session as
-  the client-requested initial program, at the same geometry.
+  its own session, so the Tk target from PERF-01 runs inside that session at
+  the same geometry: as the client-requested initial program when the host
+  honours it, otherwise started by Explorer from the fixture's Run entry.
 
   The first connection of each account creates its session (first logon) and
-  is only a warm-up; the measured connections reconnect to the running
-  session. The results are reference numbers for the budgets, not a pass
+  is only a warm-up; the measured connections wait until the in-session
+  target reports ready, then reconnect to the running session. The results are reference numbers for the budgets, not a pass
   verdict on TermService: expectations only guard that measurement happened.
 covers:
 - F-RdpServer-1
@@ -47,14 +48,16 @@ steps:
     expect:
       first_graphics_ms:
         exists: true
-- wait: 20
 - rdp_probe:
     scenario: connect
     artifact: baseline-connect
+    timeout_sec: 330
     args:
       port: ${env.QA_RDP_BASELINE_PORT}
       user: ${env.QA_RDP_BASELINE_USER1}
       password-env: QA_RDP_BASELINE_PASSWORD
+      wait-ready: ${env.QA_RDP_BASELINE_DIR}\flip-state.json
+      wait-ready-sec: 240
       seconds: 2
     expect:
       first_graphics_ms:
@@ -96,14 +99,16 @@ steps:
     expect:
       first_graphics_ms:
         exists: true
-- wait: 20
 - rdp_probe:
     scenario: throughput
     artifact: baseline-throughput
+    timeout_sec: 330
     args:
       port: ${env.QA_RDP_BASELINE_PORT}
       user: ${env.QA_RDP_BASELINE_USER2}
       password-env: QA_RDP_BASELINE_PASSWORD
+      wait-ready: ${env.QA_RDP_BASELINE_DIR}\animate-state.json
+      wait-ready-sec: 240
       seconds: 10
       rect: 40,80,640,360
       marker: 56,96
@@ -119,17 +124,17 @@ verification:
     requirement: TermService connect time, input-to-frame latency and animation throughput are measured with the PERF-01 probe scenarios and target geometry.
     actions:
     - 1
-    - 5
+    - 4
     checkpoints:
+    - step: 2
+      expectation: Once the in-session flip target reports ready, a reconnect to the warm session reports first_graphics_ms with at least 95% of the framebuffer grid painted.
     - step: 3
-      expectation: A reconnect to the warm session reports first_graphics_ms with at least 95% of the framebuffer grid painted.
-    - step: 4
       expectation: At least 36 of 40 clicks on the in-session flip target produce an observed pixel change.
-    - step: 7
+    - step: 5
       expectation: At least 10 visible changes and 100 marker-counted animation frames arrive during 10 s of the in-session animation.
     results:
-    - 4
-    - 7
+    - 3
+    - 5
   native:
   - check: Real Windows TermService sessions, NLA with local accounts and in-session initial programs on the runner.
     method: automated

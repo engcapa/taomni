@@ -338,7 +338,9 @@ x11rb = { version = "0.13", features = ["shm", "damage", "randr"] }
 # permissions in one session is required on GNOME/KDE and avoids accidentally
 # capturing or controlling only XWayland surfaces.
 ashpd = { version = "0.12", default-features = false, features = ["tokio"] }
-pipewire = "0.9"
+# `v0_3_49` exposes pw_buffer.requested, which the RDP microphone source uses
+# to produce exactly one graph quantum per cycle (headers are >= 1.0 in CI).
+pipewire = { version = "0.9", features = ["v0_3_49"] }
 # The SOCKS/process capture test harness still enumerates X11 windows through
 # xcap. RDP screen sharing does not use this crate on Linux; its Wayland path
 # is the portal/PipeWire backend above.

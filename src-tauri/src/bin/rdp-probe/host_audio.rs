@@ -108,14 +108,38 @@ mod imp {
         )
     }
 
+    /// First input device whose name contains one of `names`, in order.
+    fn pick_input(names: &[&str]) -> Result<cpal::Device, String> {
+        let devices: Vec<cpal::Device> = cpal::default_host()
+            .input_devices()
+            .map_err(|e| e.to_string())?
+            .collect();
+        let found: Vec<String> = devices.iter().map(device_name).collect();
+        let index = names.iter().find_map(|needle| {
+            let needle = needle.to_lowercase();
+            found.iter().position(|n| n.to_lowercase().contains(&needle))
+        });
+        match index {
+            Some(index) => Ok(devices.into_iter().nth(index).expect("index into names")),
+            None => Err(format!("no input device matching {names:?}; have {found:?}")),
+        }
+    }
+
     /// Record mono f32 samples. `loopback` records what an output device
-    /// plays (WASAPI loopback on Windows) instead of an input device.
+    /// plays (WASAPI loopback on Windows) instead of an input device;
+    /// `taomni_mic` records the capture side of the virtual cable the RDP
+    /// server plays client microphones into.
     pub fn record(
         seconds: f64,
         device: Option<&str>,
         loopback: bool,
+        taomni_mic: bool,
     ) -> Result<(Vec<f32>, u32, String), String> {
-        let device = pick(loopback, device)?;
+        let device = if taomni_mic {
+            pick_input(&super::MIC_CAPTURE_DEVICES)?
+        } else {
+            pick(loopback, device)?
+        };
         let name = device_name(&device);
         let config = if loopback {
             device.default_output_config()
@@ -182,15 +206,32 @@ pub(crate) fn play(freq: f64, seconds: f64, device: Option<&str>) -> Result<Valu
     }
 }
 
+/// Capture side of the virtual cables the RDP server's microphone plays into
+/// on Windows (VB-CABLE) and macOS (BlackHole, Background Music).
+#[cfg_attr(not(feature = "rdp-server-audio"), allow(dead_code))]
+const MIC_CAPTURE_DEVICES: [&str; 3] = ["CABLE Output", "BlackHole", "Background Music"];
+/// `node.name` of the RDP server's PipeWire microphone source on Linux.
+#[cfg(target_os = "linux")]
+const MIC_NODE: &str = "taomni-rdp-microphone";
+
 pub(crate) fn record(
     seconds: f64,
     device: Option<&str>,
     loopback: bool,
+    taomni_mic: bool,
     expected: Option<f64>,
 ) -> Result<Value, String> {
+    #[cfg(target_os = "linux")]
+    if taomni_mic {
+        let (samples, rate, name) = crate::pw_record::record(seconds, MIC_NODE)?;
+        let mut report = crate::stats::tone_report(&samples, rate, expected);
+        report["device"] = json!(name);
+        report["loopback"] = json!(false);
+        return Ok(report);
+    }
     #[cfg(feature = "rdp-server-audio")]
     {
-        let (samples, rate, name) = imp::record(seconds, device, loopback)?;
+        let (samples, rate, name) = imp::record(seconds, device, loopback, taomni_mic)?;
         let mut report = crate::stats::tone_report(&samples, rate, expected);
         report["device"] = json!(name);
         report["loopback"] = json!(loopback);
@@ -198,7 +239,7 @@ pub(crate) fn record(
     }
     #[cfg(not(feature = "rdp-server-audio"))]
     {
-        let _ = (seconds, device, loopback, expected, json!(null));
+        let _ = (seconds, device, loopback, taomni_mic, expected, json!(null));
         Err("rdp-probe was built without the rdp-server-audio feature".to_string())
     }
 }

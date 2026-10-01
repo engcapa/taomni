@@ -1786,6 +1786,10 @@ const dict = {
         rich: "Text, HTML and images",
         all: "Everything, including files",
       },
+      rdpAudioPlayback: "Play this computer's sound on the client",
+      rdpMicrophone: "Redirect client microphones",
+      rdpMicrophoneDevice: "Microphone output device",
+      rdpMicrophoneDeviceAuto: "Detect a virtual audio cable",
       optional: "optional",
     },
     notes: {
@@ -1804,6 +1808,8 @@ const dict = {
         "This exposes the RDP listener beyond this computer. Restrict it with a firewall and use only trusted networks.",
       rdpClipboardPolicy:
         "Like Windows clipboard redirection policy, each direction is limited separately. Files copied from the client are staged in a private temporary folder; turning both directions off removes the clipboard channel.",
+      rdpAudioDevices:
+        "Sound is captured from this computer's output (Windows WASAPI loopback, Linux PipeWire, macOS 13+ through the Screen Recording permission). Client microphones appear on Linux as the PipeWire source \"Taomni RDP Microphone\"; on Windows and macOS they play into a virtual audio cable (VB-CABLE, BlackHole) that applications record from. Without one, the server does not offer the microphone channel.",
       rdpInsecure:
         "No security means traffic is unencrypted and, without credentials, anyone who can reach the port gets full control. Use only on an isolated network.",
       rdpCapLinux:

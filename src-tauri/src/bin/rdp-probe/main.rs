@@ -15,6 +15,8 @@ mod audio;
 mod audio_input;
 mod clipboard;
 mod host_audio;
+#[cfg(target_os = "linux")]
+mod pw_record;
 mod scenarios;
 mod session;
 mod stats;
@@ -198,10 +200,12 @@ Scenarios:
   clipboard-send     announce --text/--html/--image-png/--files to the server
   clipboard-receive  fetch the server clipboard (--expect text|html|image|files)
   audio-capture      record RDPSND audio for --seconds and analyse the tone
+                     (offers one PCM16 stereo format, --rdpsnd-rate 48000)
   mic-send           send a --freq tone through the AUDIO_INPUT channel
   autodetect         record auto-detect requests and network characteristics
   host-play          play a --freq tone on a local output device (no RDP)
-  host-record        record a local input device and analyse the tone (no RDP)
+  host-record        record a local input device and analyse the tone (no RDP;
+                     --taomni-mic records the RDP server's microphone input)
   image-digest       print size and RGB/RGBA SHA-256 of --png (no RDP)
   image-make         write a deterministic test picture to --out-png (no RDP)
 

@@ -493,6 +493,17 @@ pub struct RdpServer {
     /// so display backends can read a fresh, frame-traffic-independent network
     /// RTT for flow control.
     autodetect_rtt: Arc<AtomicU32>,
+
+    /// Application DVCs added to every connection (for example AUDIO_INPUT).
+    dvc_factory: Option<Box<dyn DvcServerFactory>>,
+}
+
+/// Adds application-defined server dynamic virtual channels to the DRDYNVC
+/// channel of each new connection. The server offers every registered DVC
+/// after the DRDYNVC capability exchange; a client without a matching
+/// listener declines it.
+pub trait DvcServerFactory: Send {
+    fn attach(&self, drdynvc: dvc::DrdynvcServer) -> dvc::DrdynvcServer;
 }
 
 #[derive(Debug)]
@@ -580,7 +591,14 @@ impl RdpServer {
                 handle.store(u32::MAX, Ordering::Relaxed);
                 handle
             },
+            dvc_factory: None,
         }
+    }
+
+    /// Set or clear the factory that adds application DVCs to each
+    /// connection's DRDYNVC channel (see [`DvcServerFactory`]).
+    pub fn set_dvc_factory(&mut self, factory: Option<Box<dyn DvcServerFactory>>) {
+        self.dvc_factory = factory;
     }
 
     pub fn builder() -> builder::RdpServerBuilder<builder::WantsAddr> {
@@ -730,6 +748,11 @@ impl RdpServer {
                 }
             }
             dvc
+        };
+
+        let dvc = match self.dvc_factory.as_deref() {
+            Some(factory) => factory.attach(dvc),
+            None => dvc,
         };
 
         acceptor.attach_static_channel(dvc);

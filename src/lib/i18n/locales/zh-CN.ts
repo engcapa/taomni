@@ -1777,6 +1777,10 @@ export const zhCN: DeepPartial<typeof en> = {
         rich: "文本、HTML 和图片",
         all: "全部（含文件）",
       },
+      rdpAudioPlayback: "在客户端播放本机声音",
+      rdpMicrophone: "重定向客户端麦克风",
+      rdpMicrophoneDevice: "麦克风输出设备",
+      rdpMicrophoneDeviceAuto: "自动检测虚拟声卡",
       optional: "可选",
     },
     notes: {
@@ -1790,6 +1794,8 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpPublicBind: "这会把 RDP 监听器暴露到本机之外；请使用防火墙限制范围，并仅用于可信网络。",
       rdpClipboardPolicy:
         "与 Windows 剪贴板重定向策略相同，两个方向分别限制。从客户端复制的文件会暂存到私有临时目录；两个方向都关闭时不提供剪贴板通道。",
+      rdpAudioDevices:
+        "声音取自本机输出（Windows WASAPI 回环、Linux PipeWire、macOS 13+ 经屏幕录制权限）。客户端麦克风在 Linux 上显示为 PipeWire 音源“Taomni RDP Microphone”；在 Windows 和 macOS 上播放到虚拟声卡（VB-CABLE、BlackHole），应用从其录音端录音。没有虚拟声卡时服务器不提供麦克风通道。",
       rdpInsecure:
         "无安全模式意味着流量不加密；若未设置凭据，任何能访问该端口的人都可完全控制本机桌面。请仅在隔离网络中使用。",
       rdpCapLinux:

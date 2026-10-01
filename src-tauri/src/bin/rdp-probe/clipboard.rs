@@ -14,7 +14,6 @@ use ironrdp::cliprdr::pdu::{
     ClipboardFileAttributes, ClipboardFormat, ClipboardFormatId, ClipboardFormatName,
     ClipboardGeneralCapabilityFlags, FileContentsFlags, FileContentsRequest, FileContentsResponse,
     FileDescriptor, FormatDataRequest, FormatDataResponse, LockDataId, OwnedFormatDataResponse,
-    PackedFileList,
 };
 use ironrdp::core::AsAny;
 
@@ -22,7 +21,6 @@ pub(crate) const HTML_FORMAT_NAME: &str = "HTML Format";
 pub(crate) const FILE_LIST_FORMAT_NAME: &str = "FileGroupDescriptorW";
 /// Registered-format ids are chosen by the sender; the receiver maps by name.
 pub(crate) const HTML_FORMAT_ID: u32 = 0xC0F0;
-pub(crate) const FILE_LIST_FORMAT_ID: u32 = 0xC0F1;
 
 /// One local file offered by `clipboard-send --files`.
 #[derive(Clone, Debug)]
@@ -58,42 +56,58 @@ impl LocalContent {
         if self.dib.is_some() {
             formats.push(ClipboardFormat::new(ClipboardFormatId::CF_DIB));
         }
-        if !self.files.is_empty() {
-            formats.push(
-                ClipboardFormat::new(ClipboardFormatId::new(FILE_LIST_FORMAT_ID))
-                    .with_name(ClipboardFormatName::new(FILE_LIST_FORMAT_NAME)),
-            );
-        }
         formats
     }
 
-    fn file_list(&self) -> PackedFileList {
-        PackedFileList {
-            files: self
-                .files
-                .iter()
-                .map(|file| {
-                    let attributes = if file.is_dir {
-                        ClipboardFileAttributes::DIRECTORY
-                    } else {
-                        ClipboardFileAttributes::ARCHIVE
-                    };
-                    let mut descriptor =
-                        FileDescriptor::new(file.name.clone()).with_attributes(attributes);
-                    if !file.is_dir {
-                        descriptor = descriptor.with_file_size(file.size);
-                    }
-                    descriptor
-                })
-                .collect(),
+    /// FILEDESCRIPTORW entries: `relative_path` holds the `\`-separated
+    /// parent folders, `name` the last component.
+    fn descriptors(&self) -> Vec<FileDescriptor> {
+        self.files
+            .iter()
+            .map(|file| {
+                let attributes = if file.is_dir {
+                    ClipboardFileAttributes::DIRECTORY
+                } else {
+                    ClipboardFileAttributes::ARCHIVE
+                };
+                let (parent, leaf) = match file.name.rsplit_once('\\') {
+                    Some((parent, leaf)) => (Some(parent), leaf),
+                    None => (None, file.name.as_str()),
+                };
+                let mut descriptor = FileDescriptor::new(leaf).with_attributes(attributes);
+                if let Some(parent) = parent {
+                    descriptor = descriptor.with_relative_path(parent);
+                }
+                if !file.is_dir {
+                    descriptor = descriptor.with_file_size(file.size);
+                }
+                descriptor
+            })
+            .collect()
+    }
+
+    /// What one client "copy" announces. Files go through
+    /// `initiate_file_copy` so ironrdp-cliprdr keeps the list it validates
+    /// file-contents requests against (and answers the list request itself).
+    pub fn advert(&self) -> Advert {
+        if self.files.is_empty() {
+            Advert::Formats(self.formats())
+        } else {
+            Advert::Files(self.descriptors())
         }
     }
+}
+
+#[derive(Debug)]
+pub(crate) enum Advert {
+    Formats(Vec<ClipboardFormat>),
+    Files(Vec<FileDescriptor>),
 }
 
 /// Replies queued by callbacks for the scenario loop to transmit.
 #[derive(Debug)]
 pub(crate) enum ClipAction {
-    Advertise(Vec<ClipboardFormat>),
+    Advertise(Advert),
     SubmitFormatData(OwnedFormatDataResponse),
     SubmitFileContents(FileContentsResponse<'static>),
 }
@@ -101,6 +115,8 @@ pub(crate) enum ClipAction {
 #[derive(Debug, Default)]
 pub(crate) struct ClipState {
     pub ready: bool,
+    /// The local clipboard was announced at Monitor Ready.
+    pub announced: bool,
     pub negotiated: Option<u32>,
     pub local: LocalContent,
     pub actions: VecDeque<ClipAction>,
@@ -182,11 +198,13 @@ impl CliprdrBackend for ProbeClipboard {
         self.with(|s| s.ready = true);
     }
 
+    /// Monitor Ready: like mstsc, announce the current clipboard once.
     fn on_request_format_list(&mut self) {
         self.record("request-format-list");
         self.with(|s| {
-            let formats = s.local.formats();
-            s.actions.push_back(ClipAction::Advertise(formats));
+            let advert = s.local.advert();
+            s.actions.push_back(ClipAction::Advertise(advert));
+            s.announced = true;
         });
     }
 
@@ -292,10 +310,6 @@ fn local_format_data(local: &LocalContent, id: u32) -> OwnedFormatDataResponse {
         8 => match &local.dib {
             Some(dib) => FormatDataResponse::new_data(dib.clone()),
             None => FormatDataResponse::new_error(),
-        },
-        FILE_LIST_FORMAT_ID => match FormatDataResponse::new_file_list(&local.file_list()) {
-            Ok(response) => response,
-            Err(_) => FormatDataResponse::new_error(),
         },
         _ => FormatDataResponse::new_error(),
     }

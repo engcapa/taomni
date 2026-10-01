@@ -4404,6 +4404,18 @@ controls:
     selector: '[data-testid="rdp-field-clipboard-file-max-mb"]'
     kind: interactive
     optional: true
+  - id: rdp-field-audio-playback
+    selector: '[data-testid="rdp-field-audio-playback"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-microphone
+    selector: '[data-testid="rdp-field-microphone"]'
+    kind: interactive
+    optional: true
+  - id: rdp-field-microphone-device
+    selector: '[data-testid="rdp-field-microphone-device"]'
+    kind: interactive
+    optional: true
 -->
 
 - 设计：[`docs-feature/rdp-server-parity-design.md`](../docs-feature/rdp-server-parity-design.md)（AC-01~AC-20、TASK-01~12、V-01~V-21）

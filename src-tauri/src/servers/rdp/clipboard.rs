@@ -833,6 +833,44 @@ struct Incoming {
     content: HostContent,
 }
 
+/// Format data responses carry no format id; they answer requests in order.
+/// A new client format list supersedes the fetch in progress, yet answers to
+/// requests already sent still arrive. They must not be taken for the new
+/// copy: a client announcing twice in a row (its clipboard at Monitor Ready,
+/// then a copy) would otherwise get its text stored as HTML or its file
+/// list dropped. One request is outstanding at a time, so the file-list
+/// correlation inside ironrdp-cliprdr stays aligned as well.
+#[derive(Debug, Default)]
+struct RequestGate {
+    in_flight: usize,
+    stale: usize,
+}
+
+impl RequestGate {
+    fn sent(&mut self) {
+        self.in_flight += 1;
+    }
+
+    /// The client clipboard changed: everything still unanswered is stale.
+    fn supersede(&mut self) {
+        self.stale = self.in_flight;
+    }
+
+    /// A response arrived; `false` when it answers a superseded request.
+    fn answered(&mut self) -> bool {
+        self.in_flight = self.in_flight.saturating_sub(1);
+        if self.stale > 0 {
+            self.stale -= 1;
+            return false;
+        }
+        true
+    }
+
+    fn idle(&self) -> bool {
+        self.in_flight == 0
+    }
+}
+
 #[derive(Debug)]
 struct DownloadEntry {
     path: PathBuf,
@@ -1055,6 +1093,7 @@ struct ClipboardBackend {
     shared: Arc<Shared>,
     temp_dir: String,
     incoming: Incoming,
+    requests: RequestGate,
     download: Option<FileDownload>,
 }
 
@@ -1083,6 +1122,7 @@ impl ClipboardBackend {
             shared,
             temp_dir: process_staging_root().to_string_lossy().into_owned(),
             incoming: Incoming::default(),
+            requests: RequestGate::default(),
             download: None,
         }
     }
@@ -1092,10 +1132,15 @@ impl ClipboardBackend {
     }
 
     /// Ask for the next queued format; publish what arrived once none is left.
+    /// Waits while an earlier request is unanswered (see [`RequestGate`]).
     fn request_next_format(&mut self) {
+        if !self.requests.idle() {
+            return;
+        }
         match self.incoming.queue.pop_front() {
             Some((fetch, format)) => {
                 self.incoming.pending = Some(fetch);
+                self.requests.sent();
                 self.shared
                     .send(ClipboardMessage::SendInitiatePaste(format));
             }
@@ -1197,6 +1242,7 @@ impl CliprdrBackend for ClipboardBackend {
     fn on_remote_copy(&mut self, available_formats: &[ClipboardFormat]) {
         // A new client clipboard supersedes anything still being fetched.
         self.incoming = Incoming::default();
+        self.requests.supersede();
         self.download = None;
         let level = self.shared.policy.client_to_server;
         if !level.allows_text() {
@@ -1271,6 +1317,11 @@ impl CliprdrBackend for ClipboardBackend {
     }
 
     fn on_format_data_response(&mut self, response: FormatDataResponse<'_>) {
+        if !self.requests.answered() {
+            // Answer to a request of a superseded copy.
+            self.request_next_format();
+            return;
+        }
         let Some(fetch) = self.incoming.pending.take() else {
             return;
         };
@@ -1314,6 +1365,12 @@ impl CliprdrBackend for ClipboardBackend {
     }
 
     fn on_remote_file_list(&mut self, files: &[FileDescriptor], clip_data_id: Option<u32>) {
+        // ironrdp-cliprdr decodes file-list answers itself; this is still
+        // the response to our request.
+        if !self.requests.answered() {
+            self.request_next_format();
+            return;
+        }
         if self.incoming.pending == Some(Fetch::FileList) {
             self.incoming.pending = None;
         }
@@ -1413,6 +1470,25 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn request_gate_discards_answers_to_a_superseded_copy() {
+        // Copy #1 asks for text; copy #2 arrives before the answer.
+        let mut gate = RequestGate::default();
+        assert!(gate.idle());
+        gate.sent();
+        gate.supersede();
+        assert!(!gate.idle(), "copy #2 waits for the outstanding answer");
+        assert!(!gate.answered(), "the answer belongs to copy #1");
+        assert!(gate.idle());
+        // Copy #2's own request and answer.
+        gate.sent();
+        assert!(gate.answered());
+        // A new copy with nothing in flight has nothing to discard.
+        gate.supersede();
+        gate.sent();
+        assert!(gate.answered());
     }
 
     #[test]

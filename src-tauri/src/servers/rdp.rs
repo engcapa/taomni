@@ -52,6 +52,7 @@ use tokio_util::sync::CancellationToken;
 use super::ServerConfig;
 use super::engine::{LogEmitter, ServerCtx, ServerStarted};
 
+mod audio_input;
 mod auth;
 /// Screen-capture backends (X11 / Wayland). Exposed crate-wide so the LanChat
 /// native A/V stack can reuse the X11 capturer for screen sharing.
@@ -464,6 +465,9 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     let view_only = config.bool_field("viewOnly", false);
     let require_control_approval = config.bool_field("requireControlApproval", true);
     let audio_playback = config.bool_field("audioPlayback", true);
+    let microphone = config.bool_field("microphone", true);
+    let microphone_device = config.str_field("microphoneDevice", "").trim().to_string();
+    let microphone_device = (!microphone_device.is_empty()).then_some(microphone_device);
     let display_id = config.str_field("displayId", "").trim().to_string();
     let display_id = (!display_id.is_empty()).then_some(display_id);
     let security = SecurityMode::parse(config.str_field("securityMode", "hybrid"))?;
@@ -570,6 +574,8 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
         require_control_approval,
         clipboard,
         audio_playback,
+        microphone,
+        microphone_device,
     };
     let task = spawn_server(params, ctx.cancel.clone(), ctx.log.clone()).await?;
     Ok(ServerStarted { pid: None, task })
@@ -589,6 +595,10 @@ struct ServerParams {
     clipboard: ClipboardPolicy,
     /// Stream this computer's audio output to the client (RDPSND).
     audio_playback: bool,
+    /// Play client microphones into a host input (AUDIO_INPUT).
+    microphone: bool,
+    /// Output device name the microphone plays into (empty: auto-detect).
+    microphone_device: Option<String>,
 }
 
 /// Drive `RdpServer::run()` and bridge `cancel` → clean shutdown.
@@ -786,6 +796,14 @@ fn build_server(
                 as Box<dyn ironrdp::server::SoundServerFactory>
         });
 
+    // Not offered when this computer has nothing to play the microphone
+    // into; the factory logs the reason.
+    let microphone: Option<Box<dyn ironrdp::server::DvcServerFactory>> = params
+        .microphone
+        .then(|| audio_input::MicFactory::new(log.clone(), params.microphone_device.clone()))
+        .flatten()
+        .map(|factory| Box::new(factory) as Box<dyn ironrdp::server::DvcServerFactory>);
+
     let base = RdpServer::builder().with_addr(params.addr);
     let connection_handler: Box<dyn ConnectionHandler> = Box::new(ConnectionPolicy {
         app: params.app.clone(),
@@ -804,7 +822,8 @@ fn build_server(
                 .with_input_handler(input)
                 .with_display_handler(display)
                 .with_cliprdr_factory(cliprdr)
-                .with_sound_factory(sound);
+                .with_sound_factory(sound)
+                .with_dvc_factory(microphone);
             #[cfg(target_os = "macos")]
             let builder = builder.with_honor_client_desktop_size(honor_client_desktop_size);
             #[cfg(target_os = "macos")]

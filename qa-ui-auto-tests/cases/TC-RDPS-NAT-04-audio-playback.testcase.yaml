@@ -10,8 +10,10 @@ description: |
   rdp-probe host-play plays an 880 Hz tone on the host's default output in the
   background, outside any RDP session. A second probe connects as an RDP
   client advertising RDPSND, records the waves the server sends for five
-  seconds and analyses them: the dominant frequency must be the played tone
-  (within 2 %), loud enough to rule out silence, and the server log must name
+  seconds and analyses them; a third does the same offering only 44.1 kHz,
+  so the server must resample its 48 kHz capture. Each time the dominant
+  frequency must be the played tone (within 2 %), loud enough to rule out
+  silence, and the server log must name
   the loopback source (WASAPI loopback, PipeWire sink monitor or
   ScreenCaptureKit system audio). On Windows platform_choice picks Taomni
   over the runner's system Remote Desktop.
@@ -79,7 +81,7 @@ steps:
     background: tone
     args:
       freq: 880
-      seconds: 25
+      seconds: 35
 - rdp_probe:
     scenario: audio-capture
     artifact: rdpsnd
@@ -92,8 +94,23 @@ steps:
       negotiated.rdpsnd: true
       audio.waves:
         min: 100
-      audio.rate:
-        min: 22050
+      audio.rate: 48000
+      tone.frequency_matches: true
+      tone.rms_dbfs:
+        min: -30
+- rdp_probe:
+    scenario: audio-capture
+    artifact: rdpsnd-44k
+    timeout_sec: 120
+    args:
+      freq: 880
+      seconds: 5
+      rdpsnd-rate: 44100
+      wav-out: rdpsnd-44k.wav
+    expect:
+      audio.waves:
+        min: 100
+      audio.rate: 44100
       tone.frequency_matches: true
       tone.rms_dbfs:
         min: -30
@@ -118,19 +135,23 @@ verification:
     actions:
     - 17
     - 18
+    - 19
     checkpoints:
     - step: 16
       expectation: The RDP server runs with audio playback on.
     - step: 18
-      expectation: RDPSND is negotiated, at least 100 wave PDUs arrive in five seconds at 22.05 kHz or more, the dominant frequency is 880 Hz within 2 % and the level is above -30 dBFS.
+      expectation: RDPSND is negotiated at 48 kHz, at least 100 wave PDUs arrive in five seconds, the dominant frequency is 880 Hz within 2 % and the level is above -30 dBFS.
     - step: 19
-      expectation: The host tone played on the default output for the whole capture.
+      expectation: A client offering only 44.1 kHz receives the same tone, resampled by the server.
     - step: 20
+      expectation: The host tone played on the default output for both captures.
+    - step: 21
       expectation: The server log names the loopback source it streams.
     results:
     - 18
     - 19
     - 20
+    - 21
   native:
   - check: Real host audio output (PipeWire graph on Linux, WASAPI loopback of VB-CABLE on Windows, ScreenCaptureKit system audio on macOS), RDPSND over NLA, tone analysis on received PCM.
     method: automated

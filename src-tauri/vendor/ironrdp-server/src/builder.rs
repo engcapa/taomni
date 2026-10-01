@@ -11,7 +11,9 @@ use super::display::{DesktopSize, RdpServerDisplay};
 #[cfg(feature = "egfx")]
 use super::gfx::GfxServerFactory;
 use super::handler::{KeyboardEvent, MouseEvent, RdpServerInputHandler};
-use super::server::{ConnectionHandler, CredentialValidator, RdpServer, RdpServerOptions, RdpServerSecurity};
+use super::server::{
+    ConnectionHandler, CredentialValidator, DvcServerFactory, RdpServer, RdpServerOptions, RdpServerSecurity,
+};
 use crate::{DisplayUpdate, RdpServerDisplayUpdates, SoundServerFactory};
 
 pub struct WantsAddr {}
@@ -43,6 +45,7 @@ pub struct BuilderDone {
     display_suppressed: Option<Arc<AtomicBool>>,
     autodetect_rtt: Option<Arc<AtomicU32>>,
     honor_client_desktop_size: bool,
+    dvc_factory: Option<Box<dyn DvcServerFactory>>,
 }
 
 pub struct RdpServerBuilder<State> {
@@ -144,6 +147,7 @@ impl RdpServerBuilder<WantsDisplay> {
                 display_suppressed: None,
                 autodetect_rtt: None,
                 honor_client_desktop_size: false,
+                dvc_factory: None,
             },
         }
     }
@@ -166,6 +170,7 @@ impl RdpServerBuilder<WantsDisplay> {
                 display_suppressed: None,
                 autodetect_rtt: None,
                 honor_client_desktop_size: false,
+                dvc_factory: None,
             },
         }
     }
@@ -179,6 +184,12 @@ impl RdpServerBuilder<BuilderDone> {
 
     pub fn with_sound_factory(mut self, sound: Option<Box<dyn SoundServerFactory>>) -> Self {
         self.state.sound_factory = sound;
+        self
+    }
+
+    /// Add application DVCs (for example AUDIO_INPUT) to every connection.
+    pub fn with_dvc_factory(mut self, factory: Option<Box<dyn DvcServerFactory>>) -> Self {
+        self.state.dvc_factory = factory;
         self
     }
 
@@ -309,6 +320,7 @@ impl RdpServerBuilder<BuilderDone> {
             self.state.autodetect_rtt,
         );
         server.set_credential_validator(self.state.credential_validator);
+        server.set_dvc_factory(self.state.dvc_factory);
         server
     }
 }

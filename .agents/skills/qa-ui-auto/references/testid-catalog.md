@@ -1503,6 +1503,9 @@
 - `[data-testid="rdp-field-clipboard-to-client"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-to-client
 - `[data-testid="rdp-field-clipboard-to-server"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-to-server
 - `[data-testid="rdp-field-clipboard-file-max-mb"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-file-max-mb
+- `[data-testid="rdp-field-audio-playback"]` — interactive [optional] — F-RdpServer-1.rdp-field-audio-playback
+- `[data-testid="rdp-field-microphone"]` — interactive [optional] — F-RdpServer-1.rdp-field-microphone
+- `[data-testid="rdp-field-microphone-device"]` — interactive [optional] — F-RdpServer-1.rdp-field-microphone-device
 
 ## sessions (F6.2)
 

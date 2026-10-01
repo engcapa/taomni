@@ -39,9 +39,13 @@ pub(crate) struct ProbeRdpsnd {
 }
 
 impl ProbeRdpsnd {
-    pub fn new() -> Self {
+    /// Offers exactly one stereo PCM16 format. wFormatNo indexes the list the
+    /// client sent, and ironrdp-rdpsnd builds that list from a HashSet (the
+    /// order is not ours), so a single entry is the only unambiguous index —
+    /// the same choice Taomni's own client makes.
+    pub fn new(rate: u32) -> Self {
         Self {
-            formats: vec![pcm(48_000, 2), pcm(44_100, 2), pcm(22_050, 2)],
+            formats: vec![pcm(rate, 2)],
             capture: Arc::new(Mutex::new(AudioCapture::default())),
         }
     }

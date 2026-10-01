@@ -45,9 +45,9 @@ fn server_formats() -> Vec<AudioFormat> {
     vec![pcm16(48_000, 2), pcm16(44_100, 2), pcm16(22_050, 2)]
 }
 
-/// Converts captured interleaved `f32` frames to the negotiated PCM16 format
-/// (channel mapping + linear resampling) and cuts them into waves.
-pub(crate) struct WavePump {
+/// Channel mapping + linear resampling of interleaved `f32` frames. Shared by
+/// playback ([`WavePump`]) and microphone redirection (`audio_input.rs`).
+pub(crate) struct Resampler {
     in_channels: usize,
     out_channels: usize,
     /// Input frames advanced per output frame.
@@ -56,21 +56,16 @@ pub(crate) struct WavePump {
     /// incoming frame (1).
     phase: f64,
     prev: Option<Vec<f32>>,
-    pending: Vec<u8>,
-    packet_bytes: usize,
 }
 
-impl WavePump {
+impl Resampler {
     pub(crate) fn new(in_rate: u32, in_channels: u16, out_rate: u32, out_channels: u16) -> Self {
-        let out_channels = usize::from(out_channels.max(1));
         Self {
             in_channels: usize::from(in_channels.max(1)),
-            out_channels,
+            out_channels: usize::from(out_channels.max(1)),
             step: f64::from(in_rate.max(1)) / f64::from(out_rate.max(1)),
             phase: 0.0,
             prev: None,
-            pending: Vec::new(),
-            packet_bytes: (out_rate as usize * WAVE_MS as usize / 1000) * out_channels * 2,
         }
     }
 
@@ -81,8 +76,8 @@ impl WavePump {
             .collect()
     }
 
-    /// Feed interleaved input; returns every completed wave packet.
-    pub(crate) fn push(&mut self, samples: &[f32]) -> Vec<Vec<u8>> {
+    /// Feed interleaved input; `emit` receives every interleaved output sample.
+    pub(crate) fn process(&mut self, samples: &[f32], mut emit: impl FnMut(f32)) {
         for frame in samples.chunks_exact(self.in_channels) {
             let current = self.map(frame);
             let Some(prev) = self.prev.take() else {
@@ -91,15 +86,43 @@ impl WavePump {
             };
             while self.phase < 1.0 {
                 for (a, b) in prev.iter().zip(&current) {
-                    let value = a + (b - a) * self.phase as f32;
-                    let sample = (value.clamp(-1.0, 1.0) * 32767.0).round() as i16;
-                    self.pending.extend_from_slice(&sample.to_le_bytes());
+                    emit(a + (b - a) * self.phase as f32);
                 }
                 self.phase += self.step;
             }
             self.phase -= 1.0;
             self.prev = Some(current);
         }
+    }
+}
+
+/// Converts captured interleaved `f32` frames to the negotiated PCM16 format
+/// and cuts them into waves.
+pub(crate) struct WavePump {
+    resampler: Resampler,
+    pending: Vec<u8>,
+    packet_bytes: usize,
+}
+
+impl WavePump {
+    pub(crate) fn new(in_rate: u32, in_channels: u16, out_rate: u32, out_channels: u16) -> Self {
+        let out_channels = out_channels.max(1);
+        Self {
+            resampler: Resampler::new(in_rate, in_channels, out_rate, out_channels),
+            pending: Vec::new(),
+            packet_bytes: (out_rate as usize * WAVE_MS as usize / 1000)
+                * usize::from(out_channels)
+                * 2,
+        }
+    }
+
+    /// Feed interleaved input; returns every completed wave packet.
+    pub(crate) fn push(&mut self, samples: &[f32]) -> Vec<Vec<u8>> {
+        let pending = &mut self.pending;
+        self.resampler.process(samples, |value| {
+            let sample = (value.clamp(-1.0, 1.0) * 32767.0).round() as i16;
+            pending.extend_from_slice(&sample.to_le_bytes());
+        });
         let mut packets = Vec::new();
         while self.packet_bytes > 0 && self.pending.len() >= self.packet_bytes {
             packets.push(self.pending.drain(..self.packet_bytes).collect());
