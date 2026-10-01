@@ -2563,7 +2563,7 @@
     },
     "rdp_expect": {
       "type": "object",
-      "description": "Dotted JSON paths -> literal (equals) or {equals|min|max|exists|contains|length_min}.",
+      "description": "Dotted JSON paths -> literal (equals) or {equals|min|max|exists|contains|excludes|length_min}.",
       "additionalProperties": {}
     },
     "open_route_arg": {

@@ -183,9 +183,126 @@ def _windows(ctx: Any) -> str:
     return "windows " + ", ".join(devices) + "; " + _windows_microphone_consent()
 
 
+def _fourcc(code: str) -> int:
+    return int.from_bytes(code.encode("ascii"), "big")
+
+
+class _CoreAudio:
+    """Just enough CoreAudio (ctypes) to list output devices and switch the
+    default output; macOS has no command-line tool for it."""
+
+    def __init__(self) -> None:
+        import ctypes
+        import ctypes.util
+
+        self.c = ctypes
+        self.ca = ctypes.CDLL(ctypes.util.find_library("CoreAudio"))
+        self.cf = ctypes.CDLL(ctypes.util.find_library("CoreFoundation"))
+        self.cf.CFStringGetCString.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long,
+                                               ctypes.c_uint32]
+        self.cf.CFRelease.argtypes = [ctypes.c_void_p]
+
+        class Address(ctypes.Structure):
+            _fields_ = [("selector", ctypes.c_uint32), ("scope", ctypes.c_uint32),
+                        ("element", ctypes.c_uint32)]
+
+        self.Address = Address
+
+    def _address(self, selector: str, scope: str = "glob"):
+        return self.Address(_fourcc(selector), _fourcc(scope), 0)
+
+    def _size(self, obj: int, address) -> int:
+        size = self.c.c_uint32(0)
+        status = self.ca.AudioObjectGetPropertyDataSize(obj, self.c.byref(address), 0, None,
+                                                        self.c.byref(size))
+        return size.value if status == 0 else 0
+
+    def devices(self) -> list[int]:
+        address = self._address("dev#")
+        count = self._size(1, address) // 4
+        ids = (self.c.c_uint32 * count)()
+        size = self.c.c_uint32(count * 4)
+        if count and self.ca.AudioObjectGetPropertyData(1, self.c.byref(address), 0, None,
+                                                        self.c.byref(size), ids) == 0:
+            return list(ids)
+        return []
+
+    def name(self, device: int) -> str:
+        address = self._address("lnam")
+        ref = self.c.c_void_p()
+        size = self.c.c_uint32(self.c.sizeof(ref))
+        if self.ca.AudioObjectGetPropertyData(device, self.c.byref(address), 0, None,
+                                              self.c.byref(size), self.c.byref(ref)) or not ref:
+            return ""
+        buffer = self.c.create_string_buffer(512)
+        ok = self.cf.CFStringGetCString(ref, buffer, len(buffer), 0x08000100)
+        self.cf.CFRelease(ref)
+        return buffer.value.decode("utf-8", "replace") if ok else ""
+
+    def has_output(self, device: int) -> bool:
+        return self._size(device, self._address("stm#", "outp")) > 0
+
+    def get_default(self, selector: str) -> int:
+        address = self._address(selector)
+        value = self.c.c_uint32(0)
+        size = self.c.c_uint32(4)
+        self.ca.AudioObjectGetPropertyData(1, self.c.byref(address), 0, None, self.c.byref(size),
+                                           self.c.byref(value))
+        return value.value
+
+    def set_default(self, selector: str, device: int) -> bool:
+        address = self._address(selector)
+        value = self.c.c_uint32(device)
+        return self.ca.AudioObjectSetPropertyData(1, self.c.byref(address), 0, None, 4,
+                                                  self.c.byref(value)) == 0
+
+
+# Default output ('dOut') and system-sound output ('sOut') before setup.
+_MAC_PREVIOUS: dict[str, int] = {}
+# Virtual devices that loop what is played back to their own input, so the
+# RDP server can capture system sound from that input (sound_macos.rs).
+_MAC_LOOPBACK = ("Background Music", "BlackHole")
+
+
+def _macos_loopback_default() -> str:
+    """Make an installed loopback virtual device the default output.
+
+    ScreenCaptureKit delivers only silence for audio played by command-line
+    processes on hosted runners (run 36841872978), so the case plays its tone
+    into a loopback device instead; the previous defaults are restored in
+    teardown."""
+    try:
+        audio = _CoreAudio()
+        outputs = [(device, audio.name(device)) for device in audio.devices() if audio.has_output(device)]
+    except (OSError, AttributeError) as exc:
+        return f"default output unchanged (CoreAudio unavailable: {exc})"
+    target = next(((device, name) for wanted in _MAC_LOOPBACK for device, name in outputs
+                   if wanted.lower() in name.lower()), None)
+    if target is None:
+        return "default output unchanged (no loopback virtual device)"
+    for selector in ("dOut", "sOut"):
+        previous = audio.get_default(selector)
+        if previous and previous != target[0] and audio.set_default(selector, target[0]):
+            _MAC_PREVIOUS.setdefault(selector, previous)
+    return f"default output {target[1]} (loopback)"
+
+
+def _restore_macos_default() -> None:
+    if not _MAC_PREVIOUS:
+        return
+    try:
+        audio = _CoreAudio()
+        for selector, device in _MAC_PREVIOUS.items():
+            audio.set_default(selector, device)
+    except (OSError, AttributeError):
+        pass
+    _MAC_PREVIOUS.clear()
+
+
 def _macos(ctx: Any) -> str:
     from . import FixtureSkip
 
+    loopback = _macos_loopback_default()
     result = subprocess.run(["system_profiler", "SPAudioDataType", "-json"],
                             capture_output=True, text=True, timeout=120)
     try:
@@ -197,7 +314,7 @@ def _macos(ctx: Any) -> str:
     if not outputs:
         raise FixtureSkip("no default audio output device; CI installs Background Music for the "
                           "audio capability (LABSN/sound-ci-helpers), local runs need an output")
-    return "macos " + ", ".join(outputs)
+    return "macos " + ", ".join(outputs) + "; " + loopback
 
 
 def setup(ctx: Any) -> None:
@@ -218,6 +335,8 @@ def setup(ctx: Any) -> None:
 def teardown(ctx: Any) -> None:
     if platform.system() == "Windows":
         _restore_windows_microphone_consent()
+    if platform.system() == "Darwin":
+        _restore_macos_default()
     if platform.system() == "Linux" and shutil.which("pactl"):
         previous = os.environ.pop("QA_AUDIO_PREVIOUS_SINK", "")
         if previous:

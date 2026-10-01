@@ -1014,7 +1014,12 @@ async fn audio_capture(args: &Args) -> ScenarioResult {
     Ok(report)
 }
 
-fn write_wav(path: &Path, samples: &[i16], rate: u32, channels: u16) -> std::io::Result<()> {
+pub(crate) fn write_wav(
+    path: &Path,
+    samples: &[i16],
+    rate: u32,
+    channels: u16,
+) -> std::io::Result<()> {
     let data_len = (samples.len() * 2) as u32;
     let mut out = Vec::with_capacity(44 + data_len as usize);
     out.extend_from_slice(b"RIFF");
@@ -1242,6 +1247,7 @@ fn host_record(args: &Args) -> ScenarioResult {
         args.flag("loopback"),
         args.flag("taomni-mic"),
         expected,
+        args.opt("wav-out").map(PathBuf::from).as_deref(),
     )
     .map_err(|e| plain(ProbeError::unmet(e)))?;
     if expected.is_some() && report["frequency_matches"] != json!(true) {

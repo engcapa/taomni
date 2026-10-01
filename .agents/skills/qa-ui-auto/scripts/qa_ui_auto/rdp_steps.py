@@ -256,6 +256,11 @@ def _check_expectations(report: Any, expect: dict, label: str) -> list[str]:
                 ok = (value is not None) == bool(wanted)
             elif op == "contains":
                 ok = value is not None and str(wanted) in (json.dumps(value) if not isinstance(value, str) else value)
+            elif op == "excludes":
+                # Absent counts as excluded: a format that was never listed.
+                text = "" if value is None else (value if isinstance(value, str)
+                                                 else json.dumps(value, ensure_ascii=False))
+                ok = str(wanted) not in text
             elif op == "length_min":
                 ok = isinstance(value, (list, dict, str)) and len(value) >= wanted
             else:

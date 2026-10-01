@@ -96,6 +96,7 @@ steps:
       taomni-mic: true
       seconds: 4
       freq: 440
+      wav-out: host-mic.wav
     expect:
       frequency_matches: true
       rms_dbfs:

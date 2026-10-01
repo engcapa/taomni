@@ -3,6 +3,8 @@
 //! AUDIO_INPUT microphone redirection on Windows/macOS; Linux cases may use
 //! PipeWire's own `pw-play`/`pw-record` instead.
 
+use std::path::Path;
+
 use serde_json::{Value, json};
 
 #[cfg(feature = "rdp-server-audio")]
@@ -234,26 +236,35 @@ pub(crate) fn record(
     loopback: bool,
     taomni_mic: bool,
     expected: Option<f64>,
+    wav_out: Option<&Path>,
 ) -> Result<Value, String> {
+    // The recording itself is the evidence when the tone does not match.
+    let finish = |samples: Vec<f32>, rate: u32, name: String, loopback: bool| {
+        if let Some(path) = wav_out {
+            let pcm: Vec<i16> = samples
+                .iter()
+                .map(|s| (s.clamp(-1.0, 1.0) * 32767.0) as i16)
+                .collect();
+            let _ = crate::scenarios::write_wav(path, &pcm, rate, 1);
+        }
+        let mut report = crate::stats::tone_report(&samples, rate, expected);
+        report["device"] = json!(name);
+        report["loopback"] = json!(loopback);
+        report
+    };
     #[cfg(target_os = "linux")]
     if taomni_mic {
         let (samples, rate, name) = crate::pw_record::record(seconds, MIC_NODE)?;
-        let mut report = crate::stats::tone_report(&samples, rate, expected);
-        report["device"] = json!(name);
-        report["loopback"] = json!(false);
-        return Ok(report);
+        return Ok(finish(samples, rate, name, false));
     }
     #[cfg(feature = "rdp-server-audio")]
     {
         let (samples, rate, name) = imp::record(seconds, device, loopback, taomni_mic)?;
-        let mut report = crate::stats::tone_report(&samples, rate, expected);
-        report["device"] = json!(name);
-        report["loopback"] = json!(loopback);
-        Ok(report)
+        Ok(finish(samples, rate, name, loopback))
     }
     #[cfg(not(feature = "rdp-server-audio"))]
     {
-        let _ = (seconds, device, loopback, taomni_mic, expected, json!(null));
+        let _ = (seconds, device, loopback, taomni_mic, finish);
         Err("rdp-probe was built without the rdp-server-audio feature".to_string())
     }
 }

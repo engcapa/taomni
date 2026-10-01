@@ -206,7 +206,8 @@ Scenarios:
   autodetect         record auto-detect requests and network characteristics
   host-play          play a --freq tone on a local output device (no RDP)
   host-record        record a local input device and analyse the tone (no RDP;
-                     --taomni-mic records the RDP server's microphone input)
+                     --taomni-mic records the RDP server's microphone input,
+                     --wav-out keeps the mono recording)
   image-digest       print size and RGB/RGBA SHA-256 of --png (no RDP)
   image-make         write a deterministic test picture to --out-png (no RDP)
 

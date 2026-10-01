@@ -45,6 +45,19 @@ describe("RdpConnectionBar", () => {
     expect(bar().dataset.visible).toBe("true");
     act(() => vi.advanceTimersByTime(CONNECTION_BAR_REVEAL_MS + 10));
     expect(bar().dataset.visible).toBe("false");
+
+    // A plain mouse move over the edge reveals it too.
+    fireEvent.mouseMove(screen.getByTestId("rdp-bar-hotzone"));
+    expect(bar().dataset.visible).toBe("true");
+    act(() => vi.advanceTimersByTime(CONNECTION_BAR_REVEAL_MS + 10));
+    expect(bar().dataset.visible).toBe("false");
+
+    // So does pointing at the hidden bar's edge with mouse events only.
+    fireEvent.mouseOver(bar());
+    expect(bar().dataset.visible).toBe("true");
+    fireEvent.mouseOut(bar());
+    act(() => vi.advanceTimersByTime(CONNECTION_BAR_REVEAL_MS + 10));
+    expect(bar().dataset.visible).toBe("false");
   });
 
   it("reappears when the reveal signal changes (Ctrl+Alt+Home)", () => {

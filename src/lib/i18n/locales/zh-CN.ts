@@ -1917,7 +1917,6 @@ export const zhCN: DeepPartial<typeof en> = {
       minimize: "最小化",
       restore: "向下还原（退出全屏）",
       disconnect: "断开连接",
-      disconnected: "已从连接栏断开",
       qualityUnknown: "连接质量：尚未测量",
       quality: "连接质量 {level}/4 · RTT {rtt} ms",
       qualityBandwidth: "连接质量 {level}/4 · RTT {rtt} ms · {bandwidth} Mbit/s",

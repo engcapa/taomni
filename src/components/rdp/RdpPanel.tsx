@@ -785,7 +785,8 @@ export default function RdpPanel({
   }, [clearReconnectTimer, closeAudio, doConnect, store, tabId]);
 
   // Connection bar "disconnect": end the session without an automatic
-  // reconnect; the tab stays open and Reconnect starts a new session.
+  // reconnect; the tab stays open and Reconnect starts a new session. A
+  // user-chosen disconnect is not an error, so no reason is recorded.
   const disconnectSession = useCallback(() => {
     clearReconnectTimer();
     retryAllowedRef.current = false;
@@ -800,8 +801,8 @@ export default function RdpPanel({
       heartbeatRef.current = null;
     }
     closeAudio();
-    store.setDisconnected(tabId, t("rdp.bar.disconnected"));
-  }, [clearReconnectTimer, closeAudio, store, t, tabId]);
+    store.setDisconnected(tabId);
+  }, [clearReconnectTimer, closeAudio, store, tabId]);
 
   /* ── Render ──────────────────────────────────────────────────────── */
 

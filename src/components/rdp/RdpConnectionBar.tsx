@@ -139,6 +139,10 @@ export function RdpConnectionBar({
         data-testid="rdp-bar-hotzone"
         aria-hidden="true"
         onPointerEnter={reveal}
+        // Pointer-enter is not synthesized everywhere (e.g. WebKit for some
+        // input paths); mouse enter or any move over the edge shows the bar.
+        onMouseEnter={reveal}
+        onMouseMove={shown ? undefined : reveal}
         style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, zIndex: 30 }}
       />
       <div
@@ -147,8 +151,16 @@ export function RdpConnectionBar({
         data-testid="rdp-connection-bar"
         data-visible={visible ? "true" : "false"}
         data-pinned={pinned ? "true" : "false"}
+        // Mouse and pointer enter/leave both count: WebKit does not always
+        // derive pointerover from its input, and the hidden bar's 3 px edge
+        // sits above the hot zone in the middle of the screen.
         onPointerEnter={() => setHovered(true)}
+        onMouseEnter={() => setHovered(true)}
         onPointerLeave={() => {
+          setHovered(false);
+          scheduleHide();
+        }}
+        onMouseLeave={() => {
           setHovered(false);
           scheduleHide();
         }}

@@ -1940,7 +1940,6 @@ const dict = {
       minimize: "Minimize",
       restore: "Restore down (leave full screen)",
       disconnect: "Disconnect",
-      disconnected: "Disconnected from the connection bar",
       qualityUnknown: "Connection quality: not measured yet",
       quality: "Connection quality {level}/4 · RTT {rtt} ms",
       qualityBandwidth: "Connection quality {level}/4 · RTT {rtt} ms · {bandwidth} Mbit/s",
