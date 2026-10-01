@@ -33,6 +33,12 @@ controls:
     selector: '[data-testid="collapsed-sidebar-rail"]'
     kind: interactive
     optional: true       # only when sidebar collapsed
+  - id: sidebar-tool-window-rail      # ED-PARITY-027: the active tab's tool window bar inside the collapsed rail
+    selector: '[data-testid="sidebar-tool-window-rail"]'
+    kind: display
+    optional: true
+    aliases:
+      - '[data-testid="sidebar-rail"]'
   - id: sidebar-resize-handle
     selector: '[data-testid="main-sidebar-resize-handle"]'
     kind: display    # drag handle — meaningless to click; existence is the assertion
@@ -69,6 +75,10 @@ controls:
   - id: control-bar
     selector: '[data-testid="control-bar"]'
     kind: display
+  - id: tab-action-slot               # active tab's actions (Capture, Detach, …) in the control bar
+    selector: '[data-testid="tab-action-slot"]'
+    kind: display
+    optional: true
   - id: window-drag-handle
     selector: '[data-testid="window-drag-handle"]'
     kind: display    # dedicated native window-move target; presence is asserted in browser mode
@@ -2846,6 +2856,10 @@ controls:
   - id: welcome-recent-session-limit
     selector: '[data-testid="settings-welcome-recent-session-limit"]'
     kind: interactive
+  - id: settings-merge-tool-window-rail   # ED-PARITY-027 single tool window bar toggle
+    selector: '[data-testid="settings-merge-tool-window-rail"]'
+    kind: interactive
+    optional: true
   - id: search-input
     selector: '[data-testid="settings-search-input"]'
     kind: interactive

@@ -1288,6 +1288,8 @@
 ## main (F1.2)
 
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail
+- `[data-testid="sidebar-tool-window-rail"]` — display [optional] — F1.2.sidebar-tool-window-rail
+  ↳ `[data-testid="sidebar-rail"]` — alias
 - `[data-testid="main-sidebar-resize-handle"]` — display — F1.2.sidebar-resize-handle
 
 ## main/commands (F1.9)
@@ -1424,6 +1426,7 @@
 - `[data-testid="app-titlebar"]` — display — F1.3.titlebar
 - `[data-testid="titlebar-tray"]` — display — F1.3.tray
 - `[data-testid="control-bar"]` — display — F1.3.control-bar
+- `[data-testid="tab-action-slot"]` — display [optional] — F1.3.tab-action-slot
 - `[data-testid="window-drag-handle"]` — display — F1.3.window-drag-handle
 - `[data-testid="titlebar-actions-more"]` — interactive [optional] — F1.3.titlebar-actions-more
 - `[data-testid="theme-cycle"]` — interactive — F1.3.theme-cycle
@@ -1772,6 +1775,7 @@
 
 - `[data-testid="settings-panel"]` — display — F11.1.panel-root
 - `[data-testid="settings-welcome-recent-session-limit"]` — interactive — F11.1.welcome-recent-session-limit
+- `[data-testid="settings-merge-tool-window-rail"]` — interactive [optional] — F11.1.settings-merge-tool-window-rail
 - `[data-testid="settings-search-input"]` — interactive — F11.1.search-input
 - `[data-testid="settings-search-count"]` — display — F11.1.search-count
 - `[data-testid="settings-search-empty"]` — display — F11.1.search-empty

@@ -270,6 +270,9 @@ cases:
 - TC-IDE-PARITY-026-04-hover-doc-native
 - TC-IDE-PARITY-026-05
 - TC-IDE-PARITY-026-06-project-header-native
+- TC-IDE-PARITY-027-01
+- TC-IDE-PARITY-027-02
+- TC-IDE-PARITY-027-03-merged-rail-workspace-native
 - TC-IDE-PARITY-007-01
 - TC-IDE-PARITY-007-02
 - TC-IDE-PARITY-007-03
