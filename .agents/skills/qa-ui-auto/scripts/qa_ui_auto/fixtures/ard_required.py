@@ -1,8 +1,9 @@
 """ard_required: macOS Screen Sharing answers with ARD (Apple Remote Desktop)
 login for a known account; skip the case otherwise (FixtureSkip).
 
-Hosted CI enables Screen Sharing on macOS runners and gives the console
-account a disposable password (ci_services.Services.ard), filling `ard.*`.
+Hosted CI enables Screen Sharing on macOS runners and creates a disposable
+admin account (ci_services.Services.ard), filling `ard.*`; when that fails,
+`ard.unavailable` carries the reason and the case fails.
 Locally: enable Sharing > Screen Sharing on a Mac and set, in the uncommitted
 config, `ard.host`, `ard.port` (5900), `ard.user` (the macOS account) and
 `ard.password: ${env.QA_ARD_PASSWORD}`.
@@ -22,6 +23,11 @@ def setup(ctx: Any) -> None:
     from . import FixtureSkip
 
     section = (getattr(ctx, "cfg", {}) or {}).get("ard") or {}
+    if section.get("unavailable"):
+        # Hosted CI asked for Screen Sharing and could not provide it: that is
+        # a failed precondition, not a configuration gap to skip over.
+        raise RuntimeError(f"macOS Screen Sharing provisioning failed: {section['unavailable']} "
+                           "(see services/screensharing-diagnostics.txt)")
     host, port, user = section.get("host"), section.get("port"), section.get("user")
     if not host or not port or not user or not str(user).strip():
         raise FixtureSkip(

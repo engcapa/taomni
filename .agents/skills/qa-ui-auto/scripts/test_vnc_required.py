@@ -98,6 +98,14 @@ class ArdRequiredTest(unittest.TestCase):
             with self.assertRaisesRegex(FixtureSkip, "ard.host"):
                 ard_required.setup(context(Path(directory), {"ard": {"host": "127.0.0.1", "port": 5900}}))
 
+    def test_fails_when_hosted_provisioning_failed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = context(Path(directory), {"ard": {"unavailable": "RuntimeError: readiness timed out"}})
+            with self.assertRaises(RuntimeError) as raised:
+                ard_required.setup(ctx)
+            self.assertNotIsInstance(raised.exception, FixtureSkip)
+            self.assertIn("readiness timed out", str(raised.exception))
+
     def test_exposes_the_account_when_screen_sharing_answers(self):
         server = socket.create_server(("127.0.0.1", 0))
         def answer():

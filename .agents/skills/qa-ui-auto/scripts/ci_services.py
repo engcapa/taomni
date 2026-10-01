@@ -25,6 +25,8 @@ from qa_ui_auto.ci import write_json
 # and takes control commands, so cases can prove what reached "the remote".
 VNC_FIXTURE = Path(".agents/skills/vnc-realvnc-task/scripts/vnc_fixture_server.py")
 VNC_FIXTURE_PACKAGES = ["numpy==2.4.4", "Pillow==12.1.1"]
+# Disposable macOS admin account for the Screen Sharing (ARD) login.
+ARD_USER = "qaard"
 
 
 def command(argv, **kwargs):
@@ -76,14 +78,25 @@ def exact(sock, size):
     return data
 
 
+def aes128_ecb(key, data, decrypt=False):
+    """AES-128-ECB through the system LibreSSL/OpenSSL CLI, so the probe needs
+    no extra wheel on the runner's Python."""
+    openssl = "/usr/bin/openssl" if Path("/usr/bin/openssl").is_file() else (shutil.which("openssl") or "openssl")
+    argv = [openssl, "enc", "-aes-128-ecb", "-nopad", "-K", key.hex()] + (["-d"] if decrypt else [])
+    result = subprocess.run(argv, input=data, capture_output=True, timeout=30)
+    if result.returncode or len(result.stdout) != len(data):
+        raise RuntimeError(f"openssl AES-128-ECB failed: {result.stderr.decode(errors='replace')[-500:]}")
+    return result.stdout
+
+
 def ard_probe(port, user, password):
     """Log in to macOS Screen Sharing with ARD (RFB security type 30): DH key
     agreement, MD5 of the secret as AES-128 key, {user[64], password[64]}."""
     import hashlib
-    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+    # Logging in a fresh account can take a while before ServerInit.
     with socket.create_connection(("127.0.0.1", port), timeout=10) as sock:
-        sock.settimeout(10)
+        sock.settimeout(30)
         banner = exact(sock, 12)
         if not banner.startswith(b"RFB 003."):
             raise RuntimeError(f"not an RFB server: {banner!r}")
@@ -102,8 +115,7 @@ def ard_probe(port, user, password):
         for offset, value in ((0, user), (64, password)):
             data = value.encode() + b"\0"
             block[offset:offset + len(data)] = data
-        encryptor = Cipher(algorithms.AES(hashlib.md5(shared).digest()), modes.ECB()).encryptor()
-        sock.sendall(encryptor.update(bytes(block)) + encryptor.finalize() + public)
+        sock.sendall(aes128_ecb(hashlib.md5(shared).digest(), bytes(block)) + public)
         if struct.unpack(">I", exact(sock, 4))[0] != 0:
             raise RuntimeError("Screen Sharing rejected the ARD credentials")
         sock.sendall(b"\x01")
@@ -500,34 +512,59 @@ class Services:
                 "control_port": control_port}
 
     def ard(self):
-        """macOS Screen Sharing with ARD login for the console account."""
+        """macOS Screen Sharing with an ARD login for a disposable admin account.
+
+        Screen Sharing is new on hosted runners and shares the job with every
+        other macOS case, so a provisioning failure is recorded for the
+        ard_required cases instead of aborting the job."""
         if platform.system() != "Darwin":
             raise RuntimeError("macOS Screen Sharing (ARD) needs a macOS runner")
-        user = os.environ.get("USER") or command(["id", "-un"])
-        # ARD logs in with the macOS account; give the job's console account a
-        # disposable password (the VM is discarded after the job).
+        try:
+            return self.provision_ard()
+        except Exception as exc:
+            reason = f"{type(exc).__name__}: {exc}"
+            self.ard_diagnostics()
+            self.config["ard"] = {"unavailable": reason}
+            return {"authentication": False, "error": reason}
+
+    def provision_ard(self):
+        # The console account holds a SecureToken: even root cannot set its
+        # password without the old one, so log in as a new admin account.
+        user = ARD_USER
         password = secret("QA_ARD_PASSWORD", "Qa1-" + secrets.token_hex(8))
-        command(["sudo", "-n", "dscl", ".", "-passwd", f"/Users/{user}", password])
+        command(["sudo", "-n", "sysadminctl", "-addUser", user, "-fullName", "Taomni QA ARD",
+                 "-password", password, "-admin"])
+        self.cleanup_command(["sudo", "-n", "sysadminctl", "-deleteUser", user])
+        command(["id", "-u", user])
+        # Best effort: a home folder avoids a broken first session, and an
+        # existing Screen Sharing access list must include the account.
+        subprocess.run(["sudo", "-n", "createhomedir", "-c", "-u", user], capture_output=True)
+        subprocess.run(["sudo", "-n", "dseditgroup", "-o", "edit", "-a", user, "-t", "user",
+                        "com.apple.access_screensharing"], capture_output=True)
         plist = "/System/Library/LaunchDaemons/com.apple.screensharing.plist"
         command(["sudo", "-n", "launchctl", "enable", "system/com.apple.screensharing"])
         # Fails harmlessly when the service is already loaded.
         subprocess.run(["sudo", "-n", "launchctl", "bootstrap", "system", plist], capture_output=True)
         self.cleanup_command(["sudo", "-n", "launchctl", "bootout", "system/com.apple.screensharing"])
-        try:
-            banner, offered, width, height = retry(lambda: ard_probe(5900, user, password), 90)
-        except Exception:
-            report = []
-            for argv in (["sudo", "-n", "launchctl", "print", "system/com.apple.screensharing"],
-                         ["netstat", "-an", "-p", "tcp"], ["sw_vers"]):
-                result = subprocess.run(argv, capture_output=True, text=True, errors="replace")
-                report.append(f"$ {' '.join(argv)}\n{result.stdout[-4000:]}{result.stderr[-1000:]}")
-            (self.root / "screensharing-diagnostics.txt").write_text("\n".join(report), encoding="utf-8")
-            raise
+        banner, offered, width, height = retry(lambda: ard_probe(5900, user, password), 150)
         self.resources.append("screensharing:5900")
         self.config["ard"] = {"host": "127.0.0.1", "port": 5900, "user": user,
                               "password": "${env.QA_ARD_PASSWORD}"}
         return {"authentication": True, "banner": banner, "security_types": offered,
                 "server_init": [width, height]}
+
+    def ard_diagnostics(self):
+        report = []
+        for argv in (["sudo", "-n", "launchctl", "print", "system/com.apple.screensharing"],
+                     ["netstat", "-an", "-p", "tcp"], ["dscl", ".", "-read", f"/Users/{ARD_USER}", "UniqueID"],
+                     ["dscl", ".", "-read", "/Groups/com.apple.access_screensharing"], ["sw_vers"]):
+            try:
+                result = subprocess.run(argv, capture_output=True, text=True, errors="replace", timeout=60)
+                output = f"{result.stdout[-4000:]}{result.stderr[-1000:]}"
+            except (OSError, subprocess.SubprocessError) as exc:
+                output = f"{type(exc).__name__}: {exc}"
+            report.append(f"$ {' '.join(argv)}\n{output}")
+        (self.root / "screensharing-diagnostics.txt").write_text("\n".join(report), encoding="utf-8")
 
     def __enter__(self):
         accounts = self.capabilities & {"ssh", "mysql", "ard"}

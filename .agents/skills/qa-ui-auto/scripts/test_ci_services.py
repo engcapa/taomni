@@ -1,8 +1,13 @@
 """Failure cleanup and credential boundaries in hosted service provisioning."""
+import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
+import socket
+import struct
 import tempfile
+import threading
 import unittest
 from unittest.mock import Mock, patch
 
@@ -104,27 +109,47 @@ class HostedServicesTest(unittest.TestCase):
             self.assertEqual(lease['vnc']['server_init'], [1280, 720, 'taomni-vnc-fixture'])
             self.assertNotIn(password, json.dumps(lease))
 
-    def test_screen_sharing_is_enabled_for_the_console_account_on_macos(self):
+    def test_screen_sharing_logs_in_a_disposable_admin_account_on_macos(self):
         with tempfile.TemporaryDirectory() as directory, \
                 patch.dict('os.environ', {'GITHUB_ACTIONS': 'true', 'USER': 'runner'}), \
                 patch('ci_services.platform.system', return_value='Darwin'), \
                 patch('ci_services.command') as run, \
-                patch('ci_services.subprocess.run') as bootstrap, \
+                patch('ci_services.subprocess.run') as best_effort, \
                 patch('ci_services.ard_probe', return_value=('RFB 003.889', [30, 33, 36, 35], 1920, 1080)) as probe:
             config = {}
             with Services(Path(directory), ['ard'], config):
                 password = os.environ['QA_ARD_PASSWORD']
             calls = [call.args[0] for call in run.call_args_list]
-            self.assertIn(['sudo', '-n', 'dscl', '.', '-passwd', '/Users/runner', password], calls)
+            # The SecureToken console account is never touched.
+            self.assertFalse([argv for argv in calls if 'dscl' in argv or 'runner' in argv])
+            self.assertIn(['sudo', '-n', 'sysadminctl', '-addUser', 'qaard', '-fullName', 'Taomni QA ARD',
+                           '-password', password, '-admin'], calls)
             self.assertIn(['sudo', '-n', 'launchctl', 'enable', 'system/com.apple.screensharing'], calls)
-            self.assertIn(['sudo', '-n', 'launchctl', 'bootout', 'system/com.apple.screensharing'], calls)
-            self.assertEqual(bootstrap.call_args.args[0][-1], '/System/Library/LaunchDaemons/com.apple.screensharing.plist')
-            self.assertEqual(probe.call_args.args, (5900, 'runner', password))
-            self.assertEqual(config['ard'], {'host': '127.0.0.1', 'port': 5900, 'user': 'runner',
+            # Cleanup stops Screen Sharing before deleting the account.
+            self.assertLess(calls.index(['sudo', '-n', 'launchctl', 'bootout', 'system/com.apple.screensharing']),
+                            calls.index(['sudo', '-n', 'sysadminctl', '-deleteUser', 'qaard']))
+            self.assertIn('/System/Library/LaunchDaemons/com.apple.screensharing.plist',
+                          [call.args[0][-1] for call in best_effort.call_args_list])
+            self.assertEqual(probe.call_args.args, (5900, 'qaard', password))
+            self.assertEqual(config['ard'], {'host': '127.0.0.1', 'port': 5900, 'user': 'qaard',
                                              'password': '${env.QA_ARD_PASSWORD}'})
             lease = (Path(directory) / 'lease.json').read_text(encoding='utf-8')
             self.assertIn('RFB 003.889', lease)
             self.assertNotIn(password, lease)
+
+    def test_screen_sharing_failure_is_left_to_the_ard_cases(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+                patch('ci_services.platform.system', return_value='Darwin'), \
+                patch('ci_services.command'), \
+                patch('ci_services.subprocess.run'), \
+                patch('ci_services.retry', side_effect=RuntimeError('service protocol readiness timed out')):
+            config = {}
+            with Services(Path(directory), ['ard'], config):
+                self.assertEqual(config['ard'], {'unavailable': 'RuntimeError: service protocol readiness timed out'})
+            self.assertTrue((Path(directory) / 'screensharing-diagnostics.txt').is_file())
+            lease = json.loads((Path(directory) / 'lease.json').read_text(encoding='utf-8'))
+            self.assertFalse(lease['ard']['authentication'])
 
     def test_screen_sharing_needs_a_macos_runner(self):
         with tempfile.TemporaryDirectory() as directory, \
@@ -156,6 +181,59 @@ class HostedServicesTest(unittest.TestCase):
             self.assertNotIn('--mode', run.call_args.args[0])
             main(['run', '--filter', 'TC-001'])
             self.assertEqual(run.call_args.args[0][-2:], ['--mode', 'browser'])
+
+
+# RFC 2409 Oakley group 2, the 1024-bit modulus macOS Screen Sharing uses.
+OAKLEY_GROUP_2 = int(
+    "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74"
+    "020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F1437"
+    "4FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED"
+    "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF", 16)
+
+
+@unittest.skipUnless(shutil.which("openssl"), "the ARD probe encrypts with the openssl CLI")
+class ArdProbeTest(unittest.TestCase):
+    def serve(self, listener, result):
+        """macOS-like server half: RFB 003.889, ARD offered, credentials checked."""
+        from ci_services import aes128_ecb, exact
+        connection, _ = listener.accept()
+        with connection:
+            connection.settimeout(10)
+            connection.sendall(b"RFB 003.889\n")
+            result["version"] = exact(connection, 12)
+            connection.sendall(bytes([2, 30, 2]))
+            result["chosen"] = exact(connection, 1)[0]
+            private = 0x1234_5678_9ABC_DEF1
+            public = pow(2, private, OAKLEY_GROUP_2)
+            connection.sendall(struct.pack(">HH", 2, 128) + OAKLEY_GROUP_2.to_bytes(128, "big")
+                               + public.to_bytes(128, "big"))
+            credentials = exact(connection, 128)
+            client_public = int.from_bytes(exact(connection, 128), "big")
+            shared = pow(client_public, private, OAKLEY_GROUP_2).to_bytes(128, "big")
+            plain = aes128_ecb(hashlib.md5(shared).digest(), credentials, decrypt=True)
+            result["user"] = plain[:64].split(b"\0")[0].decode()
+            result["password"] = plain[64:].split(b"\0")[0].decode()
+            ok = result["user"] == "qaard" and result["password"] == "Qa1-pässwörd"
+            connection.sendall(struct.pack(">I", 0 if ok else 1))
+            if ok:
+                exact(connection, 1)
+                connection.sendall(struct.pack(">HH", 1920, 1080) + bytes(16) + struct.pack(">I", 3) + b"mac")
+
+    def test_probe_logs_in_with_ard(self):
+        from ci_services import ard_probe
+        listener = socket.create_server(("127.0.0.1", 0))
+        result = {}
+        server = threading.Thread(target=self.serve, args=(listener, result))
+        server.start()
+        try:
+            probed = ard_probe(listener.getsockname()[1], "qaard", "Qa1-pässwörd")
+        finally:
+            server.join(10)
+            listener.close()
+        self.assertEqual(probed, ("RFB 003.889", [30, 2], 1920, 1080))
+        self.assertEqual(result["version"], b"RFB 003.008\n")
+        self.assertEqual(result["chosen"], 30)
+        self.assertEqual((result["user"], result["password"]), ("qaard", "Qa1-pässwörd"))
 
 
 if __name__ == '__main__':
