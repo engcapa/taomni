@@ -746,10 +746,13 @@ mod tests {
         );
         let description =
             unsafe { CFRetained::from_raw(NonNull::new(description.cast_mut()).unwrap()) };
-        let mut timing = CMSampleTimingInfo {
-            duration: CMTime::new(1, 60),
-            presentationTimeStamp: CMTime::new(0, 1),
-            decodeTimeStamp: CMTime::new(0, 1),
+        // These fixed, nonzero timescales satisfy CoreMedia's constructor.
+        let mut timing = unsafe {
+            CMSampleTimingInfo {
+                duration: CMTime::new(1, 60),
+                presentationTimeStamp: CMTime::new(0, 1),
+                decodeTimeStamp: CMTime::new(0, 1),
+            }
         };
         let mut sample = std::ptr::null_mut();
         assert_eq!(
