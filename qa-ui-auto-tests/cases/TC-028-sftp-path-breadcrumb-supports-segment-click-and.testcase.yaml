@@ -16,6 +16,9 @@ fixtures:
 - sftp_required
 steps:
 - open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="app-main-menu"]'
+    timeout_sec: 60
 - click: '[data-testid="app-main-menu"]'
 - hover: '[data-testid="context-menu-item-view"]'
 - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
@@ -116,91 +119,94 @@ verification:
     requirement: SFTP path breadcrumb supports segment click and inline editing：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
-    - 2
     - 3
     - 4
-    - 6
+    - 5
     - 7
-    - 9
+    - 8
     - 10
-    - 14
-    - 16
-    - 18
+    - 11
+    - 15
+    - 17
     - 19
     - 20
     - 21
-    - 23
-    - 25
+    - 22
+    - 24
     - 26
-    - 28
-    - 30
+    - 27
+    - 29
     - 31
-    - 33
-    - 35
+    - 32
+    - 34
     - 36
-    - 38
-    - 40
+    - 37
+    - 39
     - 41
-    - 43
-    - 45
+    - 42
+    - 44
     - 46
-    - 48
-    - 50
+    - 47
+    - 49
     - 51
     - 52
     - 53
-    - 55
+    - 54
+    - 56
     checkpoints:
-    - step: 5
+    - step: 2
+      expectation: '{"wait_for": {"selector": "[data-testid=\"app-main-menu\"]", "timeout_sec": 60}}'
+    - step: 6
       expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
-    - step: 8
+    - step: 9
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 11
+    - step: 12
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
-    - step: 13
+    - step: 14
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec":
         60}}'
-    - step: 15
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_PATH_READY\\r?$", "timeout_sec": 60}}'
-    - step: 17
+    - step: 16
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_PATH_READY\\r?$",
+        "timeout_sec": 60}}'
+    - step: 18
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-path\"] button[data-path=\"/\"]"}'
-    - step: 22
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b"}}'
-    - step: 24
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
+        "${cfg.sftp.remote_test_dir}/qa-path-TC028/a/b"}}'
+    - step: 25
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 27
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "${cfg.sftp.remote_test_dir}/qa-path-TC028/a"}}'
-    - step: 29
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
+        "${cfg.sftp.remote_test_dir}/qa-path-TC028/a"}}'
+    - step: 30
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 32
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "${cfg.sftp.remote_test_dir}/qa-path-TC028"}}'
-    - step: 34
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
+        "${cfg.sftp.remote_test_dir}/qa-path-TC028"}}'
+    - step: 35
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 37
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "${cfg.sftp.remote_test_dir}/qa-path-TC028/a"}}'
-    - step: 39
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
+        "${cfg.sftp.remote_test_dir}/qa-path-TC028/a"}}'
+    - step: 40
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 42
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "${cfg.sftp.remote_test_dir}/qa-path-TC028"}}'
-    - step: 44
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
+        "${cfg.sftp.remote_test_dir}/qa-path-TC028"}}'
+    - step: 45
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 47
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "${fixture.sftp_sync_test_dir}"}}'
-    - step: 49
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
+        "${fixture.sftp_sync_test_dir}"}}'
+    - step: 50
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 54
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "/"}}'
-    - step: 56
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
+        "/"}}'
+    - step: 57
       expectation: '{"assert_not_visible": "input[data-testid=\"sftp-remote-path\"]"}'
     results:
-    - 56
+    - 57
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

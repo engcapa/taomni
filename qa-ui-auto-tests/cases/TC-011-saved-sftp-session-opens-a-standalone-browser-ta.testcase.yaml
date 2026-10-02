@@ -16,6 +16,9 @@ fixtures:
 - sftp_required
 steps:
 - open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="session-new"]'
+    timeout_sec: 60
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-sftp"]'
@@ -71,50 +74,52 @@ verification:
     requirement: 保存 SFTP 会话后双击并认证，独立 SFTP 双栏和队列就绪，导航到精确目标路径。
     actions:
     - 1
-    - 2
-    - 4
-    - 6
+    - 3
+    - 5
     - 7
     - 8
-    - 10
+    - 9
     - 11
-    - 13
+    - 12
     - 14
-    - 16
-    - 18
+    - 15
+    - 17
     - 19
-    - 23
+    - 20
     - 24
     - 25
-    - 30
-    checkpoints:
-    - step: 3
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 5
-      expectation: '{"assert_visible": "[data-testid=\"session-proto-sftp\"]"}'
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 15
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-sftp-session\"]"}'
-    - step: 17
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 20
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
-    - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
-    - step: 22
-      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
-    - step: 27
-      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"] >> text=\"REMOTE\""}'
-    - step: 28
-      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"] >> text=\"LOCAL\""}'
-    - step: 29
-      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
-    - step: 31
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value",
-        "equals": "${cfg.sftp.remote_test_dir}"}}'
-    results:
+    - 26
     - 31
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec": 60}}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"session-proto-sftp\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-sftp-session\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"] >> text=\"REMOTE\""}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"] >> text=\"LOCAL\""}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals":
+        "${cfg.sftp.remote_test_dir}"}}'
+    results:
+    - 32
   visual:
   - check: 独立标签和双栏目录显示清晰。
     method: manual
