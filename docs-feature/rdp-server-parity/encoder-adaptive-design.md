@@ -145,7 +145,7 @@ EncoderIter::next(rect)
 要点：
 
 - **只有真正发出去的字节进入连接的压缩历史。** 连接的 `BulkCompressor` 每调用一次 `compress` 就推进历史，客户端则只会看到发出去的数据。如果拿连接压缩器去“试压”一个最终没发的矩形，双方历史就会错位，后面的画面会解错。所以判断只用 `scratch_mppc64k`：一个当次新建、用完即弃的 MPPC-64K 压缩器，≤1024 字节直接试压；更大的候选在完整 planar 范围取四段均匀分离的 256 字节数据，再按比例估算整个矩形，不带跨帧历史。第五轮先采用四段共 4 KiB 的采样；第六轮照片仍未达帧率比后，将采样上限降至 1 KiB。平坦前缀与噪声主体的专门 unit 保护误判边界。V-E01 的完整自适应耗时与原 RemoteFX 分开记录；实际输入延迟与帧率以 CI native PERF-01/03 为准。
-- **位图更新的约束。** bulk 路径的 `TS_CD_HEADER.cbScanWidth` 为每行字节数 `width * 4`，因此任意 32bpp 像素宽度都对齐；只有该值超出 u16 时回退 RemoteFX。奇数宽 XDamage 与保留父 stride 的裁剪由逐像素 unit 覆盖。非 bulk 路径保持原头部字节。
+- **位图更新的约束。** [MS-RDPBCGR 2.2.9.1.1.3.1.2.3](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/3d1ccc49-51e2-4a2c-b300-3da9fb931d0e) 明确规定 `TS_CD_HEADER.cbScanWidth` 是像素宽度、必须为 4 的倍数，`cbUncompressedSize` 才是字节数。第十七轮前错误地把 cbScanWidth 写成 `width * 4`，现已纠正。bulk 路径按客户端 General `NO_BITMAP_COMPRESSION_HDR` 能力省略压缩头，因此支持奇数宽；未声明该能力时保留头并写像素宽度，奇数宽自适应矩形回退 RemoteFX。每行字节数超出 u16 时仍回退 RemoteFX。原非 bulk 字节保持不变。两种头格式的独立协议字段断言、奇数宽 XDamage 和父 stride 的逐像素 unit 均覆盖。
 - **照片的 CPU 成本。** 第三轮 CI 的实际画面帧率证明完整 planar RLE 与 RemoteFX 重复编码、再尝试 bulk，会拖慢照片。在矩形全范围采样 256 个邻域，超过一半有重复色或一致的垂直增量时使用 RLE，否则使用标准 raw planar。raw 候选现直接从像素读取与完整编码完全相同的四段采样，并计算精确长度，只有选中 planar 时才生成全部 R/G/B 平面；RLE 候选仍完整编码。八种像素布局、父 stride、部分尾行及跨 bitmap 分块的 unit 校验长度、采样字节和估算结果完全一致。采样只选择 planar 内部表示，不直接决定最终 wire codec；选择阈值未改。大小估算只分配独立 MPPC 上下文，候选输出缓冲按 bulk 的 4 B/pixel 与头部预留，避免原 8 B/pixel 清零。选中 RemoteFX 时直接发送，因为照片 unit 中额外 bulk 5.07 ms/frame 没有节省字节；未压缩更新不进入两端历史，四种级别的混发测试验证这一点。
 - **两种更新混发。** 同一帧里可能有的矩形是位图更新（`UpdateCode::Bitmap`），有的是 surface bits。mstsc、FreeRDP 和 ironrdp-session 都能处理混发，各自直接绘制到同一个 framebuffer；TASK-E3 的回环测试要覆盖混发的帧。
 - **RemoteFX 首帧头。** `RemoteFxHandler` 在第一次编码时附带 Sync/Context/Channels（`desktop_size.take()`）。自适应路径下，第一个矩形可能是位图，所以这个“首帧”标志必须挂在 RemoteFX 编码器自己身上，不能按“第一个更新”判断。现有实现已经是挂在 `RemoteFxHandler` 上的，保持不变即可。
@@ -199,7 +199,7 @@ EncoderIter::next(rect)
 | `vendor/ironrdp-server/Cargo.toml` | 加依赖 `ironrdp-bulk = "=0.1.1"`（已在 lockfile 中，由 ironrdp-session 引入） | — | TASK-E1 |
 | `vendor/ironrdp-server/src/builder.rs`、`server.rs` | `with_bulk_compression`、`with_encoder_stats_handle`；`RdpServerOptions` 加对应字段；`run_connection_with` 构建 `UpdateEncoder` 时传入 `client_compression` 与开关 | AC-E01/E03/E09 | TASK-E1 |
 | `vendor/ironrdp-server/src/encoder/fast_path.rs`、`bulk.rs` | `UpdateFragmenter::next` 接受 `Option<&mut BulkEncoder>`，按 §4.3 写压缩字段；wrapper 管理首次 FLUSHED、四级映射、K8 分片限制与故障禁用；没有压缩器时逐字节与改造前相同 | AC-E01/E03/E05 | TASK-E1 |
-| `vendor/ironrdp-server/src/encoder/mod.rs`、`bitmap.rs` | `UpdateEncoder` 加 `bulk: Option<BulkEncoder>`、共享统计；新增 `AdaptiveHandler`、raw/RLE planar 候选及 §4.2 的选择逻辑；resize 重置；奇数宽裁剪按每行字节填写 scan width；仅实际发出的 RemoteFX 推进自身帧状态 | AC-E01/E02/E05 | TASK-E1、TASK-E2 |
+| `vendor/ironrdp-server/src/encoder/mod.rs`、`bitmap.rs` | `UpdateEncoder` 加 `bulk: Option<BulkEncoder>`、共享统计；新增 `AdaptiveHandler`、raw/RLE planar 候选及 §4.2 的选择逻辑；resize 重置；按客户端能力省略 TS_CD_HEADER，否则写对齐的像素 scan width；仅实际发出的 RemoteFX 推进自身帧状态 | AC-E01/E02/E05 | TASK-E1、TASK-E2 |
 | `vendor/ironrdp-server/src/server.rs` `dispatch_display_update` 约 1160–1188 行 | `fragmenter.next(buffer)` 改为带压缩器的版本；写入顺序不变 | AC-E05 | TASK-E1 |
 | `src-tauri/src/servers/rdp.rs` `build_server` 约 825–872 行 | `.with_bulk_compression(env TAOMNI_RDP_BULK_COMPRESSION != "0")`、`.with_encoder_stats_handle(...)`；启动日志写一行“RDP display encoding: adaptive planar+bulk / RemoteFX” | AC-E09 | TASK-E2 |
 | `src-tauri/src/servers/rdp/metrics.rs` `report_if_due` | “RDP latency:” 行尾追加 `encode=planar:N/rfx:M bulk=XX%` | AC-E09 | TASK-E2 |
@@ -259,7 +259,7 @@ EncoderIter::next(rect)
 - 依赖：TASK-E1
 - 实施内容：
   1. `UpdateEncoder::new` 中，当协商出 RemoteFX、且连接有批量压缩器时，构建 `BitmapUpdater::Adaptive(AdaptiveHandler { bitmap: BitmapHandler, rfx: RemoteFxHandler })`；其他情况保持原有选择，不改动。
-  2. `AdaptiveHandler::handle` 按 §4.2 的伪代码实现。`PLANAR_BULK_GIVE_UP_RATIO = 0.25`；支持任意宽度，仅每行字节数超出 u16 时走 RemoteFX。每次选择后更新 `EncoderStats`。照片开销优化与 raw/bulk 混发规则见 §4.2。
+  2. `AdaptiveHandler::handle` 按 §4.2 的伪代码实现。`PLANAR_BULK_GIVE_UP_RATIO = 0.25`；客户端声明省略 bitmap 压缩头时支持任意宽度，未声明时奇数宽走 RemoteFX；每行字节数超出 u16 时也走 RemoteFX。每次选择后更新 `EncoderStats`。照片开销优化与 raw/bulk 混发规则见 §4.2。
   3. `servers/rdp.rs`：builder 上 `.with_bulk_compression(...)`、`.with_encoder_stats_handle(...)`，并加启动日志；`metrics.rs` 在 “RDP latency:” 行尾追加编码分布与压缩比。
   4. 在离线实验中按最终实现补一个 EXP-06 行（scratch MPPC 估算 + 选择），运行 V-E01，把数字和耗时回填到 §4.1、§4.2。
 - 对应验收：AC-E01、AC-E02、AC-E09
@@ -525,7 +525,12 @@ EncoderIter::next(rect)
 - 第十二轮 [36989986976](https://github.com/engcapa/taomni/actions/runs/36989986976)，源码 `351cbe48`：三端 browser 各 5/0/0；Linux native 11/1/0、macOS 11/0/0、Windows 14/1/0。UI 分别为 Linux 116 ms / 35.779 ms p95 / 54.854 实际 fps / 173.613 kbps，macOS 106 ms / 58.067 ms / 33.588 fps / 515.892 kbps，Windows 50 ms / 49.760 ms / 33.077 fps / 443.193 kbps。照片帧率/带宽比依次为 0.918293/0.922676、0.993767/0.986528、0.978430/0.962941；Linux 帧率失败。Windows 唯一失败仍是 PrintWindow 两种图案颜色均为 0，协议、音频和 TermService 通过。全部原始 receipt 哈希与源码/runner/case/build 身份已核验。
 - 照片候选延迟构造的本地 release unit：vendor 24 passed / 1 CPU-only ignored（另行执行通过），lazy sample 与完整候选逐字节一致。CPU-only profiler 的独立采样为 0.067/0.079 ms/frame，完整 planar 加估算为 0.445/0.481 ms/frame；旧/自适应完整编码在无裁剪为 3.656/3.671 ms、裁剪为 3.637/3.414 ms。该定位数据不替代三端实际帧率验收。mstsc 图案截图改为 owned PID 窗口的可见 compositor crop，强制 x≥680，与宿主图案/动画不重叠，并裁剪到桌面边界；两种颜色各至少 200 pixels 的门槛保持，33 个 mocked 工具 unit 通过。两项改动仍须新 CI 验证。
 
+- 第十四轮 Windows 定位 [36992369697](https://github.com/engcapa/taomni/actions/runs/36992369697)，源码 `e7a9d0fc`：文件剪贴板与 PERF-01 通过，mstsc 唯一失败为旧 PrintWindow 图案 magenta=886/cyan=0；owned PID 7384 仍响应，Application Error 列表为空、没有 dump。此结果不能证明旧崩溃根因已解除。
+- 第十五轮 [36996131431](https://github.com/engcapa/taomni/actions/runs/36996131431)，源码 `da369bca`：三端 browser 各 5/0/0；Linux native 12/0/0，UI 140 ms / 36.308 ms p95 / 55.488 实际 fps / 174.858 kbps，照片帧率/带宽比 1.017722/1.027244。Windows native 14/1/0，UI 42 ms / 37.941 ms / 32.592 fps / 429.333 kbps，照片比 0.990468/0.980601；mstsc 的 owned 可见 compositor crop（x=700、314×235）仍近乎全黑、两种颜色为 0，协议/音频先通过，Application Error 为空。这证明改变截图 API 未解决显示问题。macOS native 待报告；已完成的原始 receipt 与身份均核验。
+- 协议头纠正：Microsoft TS_CD_HEADER 定义要求 `cbScanWidth` 为像素且能被 4 整除；先前将其解释为行字节数的注释、unit 和设计正文均错误。FreeRDP 的 shadow 设置虽然写字节数，但 `update_write_bitmap_data` 在协商允许时设置 NO_BITMAP_COMPRESSION_HDR 并不发送这 8 B 头，因此不能以 shadow 字段作为格式正确的依据。当前按真实客户端 General 能力省略压缩头；否则写对齐的像素宽度，奇数宽自适应矩形发送 RemoteFX。26 个 vendor unit 通过，覆盖两种实际头格式、未声明省略能力的回退、160 组布局/裁剪采样一致性；CPU-only unit 默认 ignored，由 CI 另跑。真实 mstsc 画面及三端性能仍须修正后新 CI 证明，不将这个协议问题直接认定为旧 AV 的全部原因。
+
 ## 9. 验收追踪与交付条件
+
 
 | AC | 方案位置 | 开发任务 | 验证项与平台 | 所需证据 | 当前缺口 |
 |---|---|---|---|---|---|

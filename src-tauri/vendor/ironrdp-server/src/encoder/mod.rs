@@ -233,6 +233,7 @@ impl UpdateEncoder {
         mut self,
         compression: Option<CompressionType>,
         stats: Option<Arc<EncoderStats>>,
+        omit_bitmap_compression_header: bool,
     ) -> Result<Self> {
         self.stats = stats;
         if let Some(compression) = compression {
@@ -245,12 +246,14 @@ impl UpdateEncoder {
                 let rfx = rfx.clone();
                 self.bulk = Some(bulk::BulkEncoder::new(compression)?);
                 *updater = BitmapUpdater::Adaptive(AdaptiveHandler {
-                    bitmap: BitmapHandler::for_bulk_compression(),
+                    bitmap: BitmapHandler::for_bulk_compression(omit_bitmap_compression_header),
                     rfx,
                 });
             } else if matches!(updater, BitmapUpdater::Bitmap(_)) {
                 self.bulk = Some(bulk::BulkEncoder::new(compression)?);
-                *updater = BitmapUpdater::Bitmap(BitmapHandler::for_bulk_compression());
+                *updater = BitmapUpdater::Bitmap(BitmapHandler::for_bulk_compression(
+                    omit_bitmap_compression_header,
+                ));
             }
         }
         Ok(self)
@@ -662,7 +665,9 @@ struct AdaptiveHandler {
 
 impl BitmapUpdateHandler for AdaptiveHandler {
     fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
-        if bitmap.width.get() > u16::MAX / 4 {
+        if bitmap.width.get() > u16::MAX / 4
+            || !self.bitmap.bitmap.supports_width(bitmap.width.get())
+        {
             return self
                 .rfx
                 .handle_compact(bitmap)
@@ -733,9 +738,9 @@ impl BitmapHandler {
         }
     }
 
-    fn for_bulk_compression() -> Self {
+    fn for_bulk_compression(omit_compression_header: bool) -> Self {
         Self {
-            bitmap: BitmapEncoder::for_bulk_compression(),
+            bitmap: BitmapEncoder::for_bulk_compression(omit_compression_header),
         }
     }
 }
@@ -1052,7 +1057,7 @@ mod bulk_tests {
             8 * 1024 * 1024,
         )
         .unwrap()
-        .with_bulk_compression(Some(CompressionType::Rdp61), None)
+        .with_bulk_compression(Some(CompressionType::Rdp61), None, true)
         .unwrap()
     }
 
@@ -1146,6 +1151,43 @@ mod bulk_tests {
     }
 
     #[test]
+    fn peers_without_header_omission_get_pixel_scan_width_and_odd_width_remotefx() {
+        let mut handler = AdaptiveHandler {
+            bitmap: BitmapHandler::for_bulk_compression(false),
+            rfx: RemoteFxHandler::new(
+                EntropyBits::Rlgr3,
+                3,
+                DesktopSize {
+                    width: 128,
+                    height: 128,
+                },
+            ),
+        };
+        for width in [64u16, 65] {
+            let bitmap = BitmapUpdate {
+                x: 0,
+                y: 0,
+                width: NonZeroU16::new(width).unwrap(),
+                height: NonZeroU16::new(128).unwrap(),
+                format: ironrdp_graphics::image_processing::PixelFormat::BgrA32,
+                data: vec![42; usize::from(width) * 128 * 4].into(),
+                stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
+            };
+            let encoded = handler.handle(&bitmap).unwrap();
+            if width == 64 {
+                assert_eq!(encoded.code, UpdateCode::Bitmap);
+                let bitmap: ironrdp_pdu::bitmap::BitmapUpdateData<'_> =
+                    ironrdp_core::decode(&encoded.data).unwrap();
+                for rectangle in bitmap.rectangles {
+                    assert_eq!(rectangle.compressed_data_header.unwrap().scan_width, width);
+                }
+            } else {
+                assert_eq!(encoded.code, UpdateCode::SurfaceCommands);
+            }
+        }
+    }
+
+    #[test]
     fn photo_after_a_plain_planar_prefix_uses_remotefx() {
         let (width, height) = (704u16, 384u16);
         let mut pixels = vec![48; usize::from(width) * usize::from(height) * 4];
@@ -1174,7 +1216,7 @@ mod bulk_tests {
             stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
         };
         let mut handler = AdaptiveHandler {
-            bitmap: BitmapHandler::for_bulk_compression(),
+            bitmap: BitmapHandler::for_bulk_compression(true),
             rfx: RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height }),
         };
         assert_eq!(
@@ -1233,7 +1275,7 @@ mod bulk_tests {
                     }
                 })
                 .collect();
-            let mut planar = BitmapHandler::for_bulk_compression();
+            let mut planar = BitmapHandler::for_bulk_compression(true);
             let mut planar_time = Duration::ZERO;
             let mut estimate_time = Duration::ZERO;
             let mut sample_time = Duration::ZERO;
@@ -1259,7 +1301,7 @@ mod bulk_tests {
                 let mut rfx =
                     RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height });
                 let mut handler = AdaptiveHandler {
-                    bitmap: BitmapHandler::for_bulk_compression(),
+                    bitmap: BitmapHandler::for_bulk_compression(true),
                     rfx: rfx.clone(),
                 };
                 let mut bulk = bulk::BulkEncoder::new(CompressionType::Rdp61).unwrap();

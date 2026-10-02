@@ -17,27 +17,34 @@ use crate::BitmapUpdate;
 #[derive(Clone)]
 pub(crate) struct BitmapEncoder {
     buffer: Vec<u8>,
-    byte_scan_width: bool,
+    bulk_mode: bool,
+    omit_compression_header: bool,
 }
 
 impl BitmapEncoder {
     pub(crate) fn new() -> Self {
         Self {
             buffer: vec![0; usize::from(u16::MAX)],
-            byte_scan_width: false,
+            bulk_mode: false,
+            omit_compression_header: false,
         }
     }
 
-    pub(crate) fn for_bulk_compression() -> Self {
+    pub(crate) fn for_bulk_compression(omit_compression_header: bool) -> Self {
         Self {
-            byte_scan_width: true,
+            bulk_mode: true,
+            omit_compression_header,
             ..Self::new()
         }
     }
 
+    pub(crate) fn supports_width(&self, width: u16) -> bool {
+        self.omit_compression_header || width.is_multiple_of(4)
+    }
+
     pub(crate) fn output_size_hint(&self, bitmap: &BitmapUpdate) -> usize {
         let pixels = usize::from(bitmap.width.get()) * usize::from(bitmap.height.get());
-        if self.byte_scan_width {
+        if self.bulk_mode {
             // Raw RGB planes need 3 B/pixel; RLE's literal overhead fits in
             // 4 B/pixel. Allow bitmap/planar headers even for one-row chunks.
             pixels * 4 + usize::from(bitmap.height.get()) * 32
@@ -50,8 +57,14 @@ impl BitmapEncoder {
         &self,
         bitmap: &BitmapUpdate,
     ) -> Result<Option<(usize, Vec<u8>)>, BitmapEncodeError> {
-        if !self.byte_scan_width || has_repeated_pixels(bitmap) {
+        if !self.bulk_mode || has_repeated_pixels(bitmap) {
             return Ok(None);
+        }
+        if !self.supports_width(bitmap.width.get()) {
+            return Err(BitmapEncodeError::Encode(invalid_field_err!(
+                "bitmap",
+                "Width must be a multiple of 4"
+            )));
         }
         // Raw planar has an exact size and byte layout. Read the same four
         // strips as the materialized candidate without allocating/writing all
@@ -90,15 +103,27 @@ impl BitmapEncoder {
             cursor.write_u16(bitmap.width.get());
             cursor.write_u16(height as u16);
             cursor.write_u16(32);
-            cursor.write_u16(Compression::BITMAP_COMPRESSION.bits());
-            cursor.write_u16((body_size + bitmap::CompressedDataHeader::ENCODED_SIZE) as u16);
-            bitmap::CompressedDataHeader {
-                main_body_size: body_size as u16,
-                scan_width: row_len,
-                uncompressed_size: height as u16 * row_len,
+            let extra_header = if self.omit_compression_header {
+                0
+            } else {
+                bitmap::CompressedDataHeader::ENCODED_SIZE
+            };
+            let flags = if self.omit_compression_header {
+                Compression::BITMAP_COMPRESSION | Compression::NO_BITMAP_COMPRESSION_HDR
+            } else {
+                Compression::BITMAP_COMPRESSION
+            };
+            cursor.write_u16(flags.bits());
+            cursor.write_u16((body_size + extra_header) as u16);
+            if !self.omit_compression_header {
+                bitmap::CompressedDataHeader {
+                    main_body_size: body_size as u16,
+                    scan_width: bitmap.width.get(),
+                    uncompressed_size: height as u16 * row_len,
+                }
+                .encode(&mut cursor)
+                .map_err(BitmapEncodeError::Encode)?;
             }
-            .encode(&mut cursor)
-            .map_err(BitmapEncodeError::Encode)?;
             BitmapStreamHeader {
                 enable_rle_compression: false,
                 use_alpha: false,
@@ -108,7 +133,7 @@ impl BitmapEncoder {
             .map_err(BitmapEncodeError::Encode)?;
             let header_len = cursor.pos();
             headers.push((header, header_len, height));
-            length += 28 + width * height * 3;
+            length += header_len + 1 + width * height * 3;
         }
         let channels = match bitmap.format {
             PixelFormat::ARgb32 | PixelFormat::XRgb32 => [1, 2, 3],
@@ -121,7 +146,7 @@ impl BitmapEncoder {
                 return update_header[position];
             }
             let position = position - update_header.len();
-            let full_chunk_size = 28 + width * chunk_height * 3;
+            let full_chunk_size = headers[0].1 + 1 + width * chunk_height * 3;
             let index = position / full_chunk_size;
             let position = position % full_chunk_size;
             let (header, header_len, height) = &headers[index];
@@ -157,11 +182,11 @@ impl BitmapEncoder {
         bitmap: &BitmapUpdate,
         output: &mut [u8],
     ) -> Result<usize, BitmapEncodeError> {
-        // cbScanWidth is the uncompressed row size in bytes, not pixels
-        // (MS-RDPBCGR 2.2.9.1.1.3.1.2.3). Every 32-bpp row is aligned,
-        // including odd-width XDamage rectangles. Keep the legacy header
-        // only on the unchanged, non-bulk path.
-        if !self.byte_scan_width && !bitmap.width.get().is_multiple_of(4) {
+        // TS_CD_HEADER.cbScanWidth is pixels and must be divisible by four
+        // (MS-RDPBCGR 2.2.9.1.1.3.1.2.3). Peers advertising the General
+        // NO_BITMAP_COMPRESSION_HDR capability can receive odd-width planar
+        // bitmaps without that header; retain legacy bytes for other peers.
+        if !self.supports_width(bitmap.width.get()) {
             return Err(BitmapEncodeError::Encode(invalid_field_err!(
                 "bitmap",
                 "Width must be a multiple of 4"
@@ -174,7 +199,7 @@ impl BitmapEncoder {
         // itself. Use the standard lossless raw planar representation for
         // those pixels; the adaptive selector still compares compressed sizes.
         // This choice is restricted to the new bulk path.
-        let rle = !self.byte_scan_width || has_repeated_pixels(bitmap);
+        let rle = !self.bulk_mode || has_repeated_pixels(bitmap);
         let row_len = bitmap
             .width
             .get()
@@ -195,7 +220,7 @@ impl BitmapEncoder {
         for (i, chunk) in chunks.enumerate() {
             // A cropped dirty rectangle keeps its parent stride, but its last
             // row ends at the crop's width. That partial stride is a full row.
-            let rows = if self.byte_scan_width {
+            let rows = if self.bulk_mode {
                 chunk.len().div_ceil(stride)
             } else {
                 chunk.len() / stride
@@ -244,17 +269,19 @@ impl BitmapEncoder {
                 width: u16::from(bitmap.width),
                 height,
                 bits_per_pixel: u16::from(bitmap.format.bytes_per_pixel()) * 8,
-                compression_flags: Compression::BITMAP_COMPRESSION,
-                compressed_data_header: Some(bitmap::CompressedDataHeader {
-                    main_body_size: cast_length!("main body size", len)
-                        .map_err(BitmapEncodeError::Encode)?,
-                    scan_width: if self.byte_scan_width {
-                        row_len
-                    } else {
-                        u16::from(bitmap.width)
+                compression_flags: if self.omit_compression_header {
+                    Compression::BITMAP_COMPRESSION | Compression::NO_BITMAP_COMPRESSION_HDR
+                } else {
+                    Compression::BITMAP_COMPRESSION
+                },
+                compressed_data_header: (!self.omit_compression_header).then_some(
+                    bitmap::CompressedDataHeader {
+                        main_body_size: cast_length!("main body size", len)
+                            .map_err(BitmapEncodeError::Encode)?,
+                        scan_width: u16::from(bitmap.width),
+                        uncompressed_size: height * row_len,
                     },
-                    uncompressed_size: height * row_len,
-                }),
+                ),
                 bitmap_data: &self.buffer[..len],
             };
 
@@ -432,7 +459,7 @@ mod tests {
             PixelFormat::BgrA32,
             PixelFormat::BgrX32,
         ] {
-            for width in [2u16, 3, 17, 253, 704] {
+            for width in [2u16, 3, 4, 17, 252, 253, 704] {
                 for height in [3u16, 131] {
                     let stride = usize::from(width + 11) * 4;
                     let mut seed = 0x9e3779b9u32;
@@ -454,28 +481,33 @@ mod tests {
                         data: data.into(),
                         stride: NonZeroUsize::new(stride).unwrap(),
                     };
-                    let mut encoder = BitmapEncoder::for_bulk_compression();
-                    let (length, sample) = encoder.raw_planar_sample(&bitmap).unwrap().unwrap();
-                    let mut output = vec![0; encoder.output_size_hint(&bitmap)];
-                    let written = encoder.encode(&bitmap, &mut output).unwrap();
-                    output.truncate(written);
-                    assert_eq!(length, output.len(), "{width}x{height} {format:?}");
-                    let expected = if length <= sample.len() {
-                        output.clone()
-                    } else {
-                        let strip = sample.len() / 4;
-                        (0..4)
-                            .flat_map(|index| {
-                                let start = index * (length - strip) / 3;
-                                output[start..start + strip].iter().copied()
-                            })
-                            .collect()
-                    };
-                    assert_eq!(sample, expected, "{width}x{height} {format:?}");
-                    assert_eq!(
-                        super::super::estimate_bulk_sample(length, &sample).unwrap(),
-                        super::super::estimate_bulk_size(&output).unwrap(),
-                    );
+                    for omit_header in [false, true] {
+                        if !omit_header && !width.is_multiple_of(4) {
+                            continue;
+                        }
+                        let mut encoder = BitmapEncoder::for_bulk_compression(omit_header);
+                        let (length, sample) = encoder.raw_planar_sample(&bitmap).unwrap().unwrap();
+                        let mut output = vec![0; encoder.output_size_hint(&bitmap)];
+                        let written = encoder.encode(&bitmap, &mut output).unwrap();
+                        output.truncate(written);
+                        assert_eq!(length, output.len(), "{width}x{height} {format:?}");
+                        let expected = if length <= sample.len() {
+                            output.clone()
+                        } else {
+                            let strip = sample.len() / 4;
+                            (0..4)
+                                .flat_map(|index| {
+                                    let start = index * (length - strip) / 3;
+                                    output[start..start + strip].iter().copied()
+                                })
+                                .collect()
+                        };
+                        assert_eq!(sample, expected, "{width}x{height} {format:?}");
+                        assert_eq!(
+                            super::super::estimate_bulk_sample(length, &sample).unwrap(),
+                            super::super::estimate_bulk_size(&output).unwrap(),
+                        );
+                    }
                 }
             }
         }
@@ -570,7 +602,7 @@ mod tests {
                 stride: NonZeroUsize::new(stride).unwrap(),
             };
             assert!(!has_repeated_pixels(&bitmap));
-            let mut encoder = BitmapEncoder::for_bulk_compression();
+            let mut encoder = BitmapEncoder::for_bulk_compression(true);
             let mut output = vec![0; usize::from(width) * usize::from(height) * 8 + 4096];
             let length = encoder.encode(&bitmap, &mut output).unwrap();
             let update: BitmapUpdateData<'_> = decode(&output[..length]).unwrap();
@@ -623,7 +655,7 @@ mod tests {
                 data: pixels.into(),
                 stride: NonZeroUsize::new(stride).unwrap(),
             };
-            let mut encoder = BitmapEncoder::for_bulk_compression();
+            let mut encoder = BitmapEncoder::for_bulk_compression(true);
             let mut output = vec![0; usize::from(width) * usize::from(height) * 8 + 4096];
             let length = encoder.encode(&bitmap, &mut output).unwrap();
             let update: BitmapUpdateData<'_> = decode(&output[..length]).unwrap();
@@ -633,9 +665,11 @@ mod tests {
                 assert_eq!(rectangle.rectangle.left, 7);
                 assert_eq!(rectangle.rectangle.right, 7 + width - 1);
                 assert_eq!(rectangle.rectangle.top, 13 + rows);
-                assert_eq!(
-                    rectangle.compressed_data_header.unwrap().scan_width,
-                    width * 4
+                assert!(rectangle.compressed_data_header.is_none());
+                assert!(
+                    rectangle
+                        .compression_flags
+                        .contains(Compression::NO_BITMAP_COMPRESSION_HDR)
                 );
                 let mut rgb = Vec::new();
                 decoder
@@ -659,6 +693,40 @@ mod tests {
             }
             assert_eq!(rows, height);
         }
+    }
+
+    #[test]
+    fn compression_header_negotiation_preserves_pixels_and_enforces_scan_width() {
+        let mut bitmap = BitmapUpdate {
+            x: 0,
+            y: 0,
+            width: NonZeroU16::new(4).unwrap(),
+            height: NonZeroU16::new(2).unwrap(),
+            format: PixelFormat::BgrA32,
+            data: vec![42; 32].into(),
+            stride: NonZeroUsize::new(16).unwrap(),
+        };
+        let mut with_header = BitmapEncoder::for_bulk_compression(false);
+        let mut without_header = BitmapEncoder::for_bulk_compression(true);
+        let mut first = vec![0; 1024];
+        let mut second = vec![0; 1024];
+        let first_len = with_header.encode(&bitmap, &mut first).unwrap();
+        let second_len = without_header.encode(&bitmap, &mut second).unwrap();
+        let first_update: BitmapUpdateData<'_> = decode(&first[..first_len]).unwrap();
+        let second_update: BitmapUpdateData<'_> = decode(&second[..second_len]).unwrap();
+        let first_rectangle = &first_update.rectangles[0];
+        let second_rectangle = &second_update.rectangles[0];
+        let header = first_rectangle.compressed_data_header.as_ref().unwrap();
+        assert_eq!(header.scan_width, 4); // MS-RDPBCGR: pixels, divisible by 4
+        assert_eq!(header.uncompressed_size, 32); // bytes
+        assert_eq!(first_rectangle.compression_flags.bits(), 0x0001);
+        assert_eq!(second_rectangle.compression_flags.bits(), 0x0401);
+        assert!(second_rectangle.compressed_data_header.is_none());
+        assert_eq!(first_rectangle.bitmap_data, second_rectangle.bitmap_data);
+        assert_eq!(first_len, second_len + 8);
+        bitmap.width = NonZeroU16::new(3).unwrap();
+        assert!(with_header.encode(&bitmap, &mut first).is_err());
+        assert!(without_header.encode(&bitmap, &mut second).is_ok());
     }
 
     #[test]

@@ -21,9 +21,11 @@ Encoder-adaptive patch (`docs-feature/rdp-server-parity/encoder-adaptive-design.
 - In the adaptive path, allocate bitmap and RemoteFX output for the actual
   cropped pixels rather than clearing a retained parent framebuffer tail.
   Legacy RemoteFX retains its original reserve and retry behavior byte for byte.
-- In the bulk path, write the bitmap header scan width in bytes. This permits
-  odd-width damage rectangles without a forced RemoteFX fallback; legacy
-  non-bulk headers retain their original bytes.
+- Honor the peer's General NO_BITMAP_COMPRESSION_HDR capability in the bulk
+  path. Omit TS_CD_HEADER for peers supporting it, including odd-width damage;
+  otherwise cbScanWidth is pixels divisible by four, and odd-width adaptive
+  rectangles use RemoteFX. Legacy non-bulk headers retain their original bytes.
+  See MS-RDPBCGR 2.2.9.1.1.3.1.2.3 and the capability/byte-layout unit contracts.
 - Optional aggregate encoding counters and observation of static channels
   actually joined by the peer. Proprietary codec paths keep their wire format.
 - Unit contracts enabled as Cargo workspace members alongside acceptor/bulk.

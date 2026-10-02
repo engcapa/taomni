@@ -1,6 +1,6 @@
 id: TC-RDPS-NAT-08-mstsc-interop
 title: Windows mstsc renders bulk-compressed Taomni desktop with clipboard, audio and dynamic channels
-description: 'AC-E06/V-E13: launch the Windows native reference client against Taomni. A known magenta/cyan target
+description: 'AC-E06/V-E13: launch the Windows native reference client against Taomni, honoring its negotiated bitmap compression header capability. A known magenta/cyan target
   must appear inside the mstsc window; save its screenshot and server negotiation/encoding/lifecycle log. Credentials
   and owned processes are removed on failure and teardown.'
 covers:
