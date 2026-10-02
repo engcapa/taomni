@@ -815,7 +815,24 @@ class NativeSession:
         self.request("POST", self.element_path(element, "/click"), {})
         self.press_combo("Mod+a")
         self.press_combo("Backspace")
-        self.type_text(text)
+        password_input = platform.system() == "Linux" and self.execute(
+            f"const el = document.querySelector({json.dumps(selector)});"
+            "return el instanceof HTMLInputElement && el.type === 'password';"
+        ) is True
+        if password_input:
+            # WebKit /actions has delivered shifted punctuation as unshifted
+            # keys on hosted runners. Its element string-input endpoint avoids
+            # that mapping while retaining the focused select/replace flow.
+            self.request("POST", self.element_path(element, "/value"), {"text": text})
+            exact = self.execute(
+                f"const el = document.querySelector({json.dumps(selector)});"
+                f"return el instanceof HTMLInputElement && el.value === {json.dumps(text)};"
+            )
+            if exact is not True:
+                # Do not expose credential bytes in driver diagnostics.
+                raise WebDriverError(f"password input did not retain the requested value: {selector}")
+        else:
+            self.type_text(text)
         return f"filled {selector}"
 
     def send_keys(self, text: str) -> str:

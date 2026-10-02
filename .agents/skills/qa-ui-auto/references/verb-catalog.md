@@ -46,7 +46,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 
 | Verb | Args | Notes |
 |------|------|-------|
-| `fill` | `{selector, value}` | Replaces field content. |
+| `fill` | `{selector, value}` | Replaces field content. Native Linux password fields use WebDriver string input and require exact value retention before returning, avoiding shifted-punctuation mapping in key actions. |
 | `type` | string or `{selector, text}` | Types into the current focus, or focuses `selector` immediately before typing. Prefer `fill` for ordinary inputs. |
 | `send_keys` | string or `{selector, text}` | Same as `type`. |
 | `terminal_input` | `{selector, text, submit?}` | Dispatches standards-based text input to xterm's helper textarea, then optionally submits with a separate Enter key. A text-free Shift key cycle first resets xterm’s stale keypress suppression state. This exercises xterm `onData`, the product input path, and the real PTY while avoiding hidden-textarea key synthesis differences in Windows Chromium/WebView2. It is renderer/WebView automation, not physical OS keyboard evidence. Wait for `data-terminal-ready="true"` first. `verify` (`{selector, regex, timeout_sec?=10, attempts?=2}`) polls that selector's text / `data-terminal-text` after each dispatch and re-sends the whole input while it does not match — Windows OpenSSH/ConPTY intermittently drops part of a pty write, and re-sending the probe is the only recovery. The testcase's own assertion still owns the outcome. |

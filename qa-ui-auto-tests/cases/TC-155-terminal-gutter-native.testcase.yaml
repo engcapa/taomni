@@ -236,6 +236,10 @@ steps:
 - fill:
     selector: '[data-testid="auth-password"]'
     value: ${env.QA_SSH_PASSWORD}
+- assert_attribute:
+    selector: '[data-testid="auth-password"]'
+    name: value
+    equals: ${env.QA_SSH_PASSWORD}
 - click: '[data-testid="auth-submit"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
@@ -380,20 +384,20 @@ verification:
     - 90
     - 92
     - 94
-    - 95
-    - 99
-    - 102
-    - 104
+    - 96
+    - 100
+    - 103
     - 105
-    - 109
-    - 111
-    - 113
-    - 116
-    - 118
-    - 120
-    - 123
-    - 125
-    - 129
+    - 106
+    - 110
+    - 112
+    - 114
+    - 117
+    - 119
+    - 121
+    - 124
+    - 126
+    - 130
     checkpoints:
     - step: 5
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
@@ -443,23 +447,25 @@ verification:
       expectation: '{wait_for: ''[data-testid="bookmark-settings"]''}'
     - step: 91
       expectation: '{wait_for: ''[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-terminal-gutter"]''}'
-    - step: 97
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
+    - step: 95
+      expectation: '{assert_attribute: {equals: ''${env.QA_SSH_PASSWORD}'', name: value, selector: ''[data-testid="auth-password"]''}}'
     - step: 98
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
+    - step: 99
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
-    - step: 100
+    - step: 101
       expectation: '{assert_pattern: {regex: ''(?m)^QA-LEFT-GUTTER\r?$'', selector: ''[data-testid="terminal-pane"][data-terminal-active="true"]'', timeout_sec: 20}}'
-    - step: 107
+    - step: 108
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
-    - step: 114
+    - step: 115
       expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
-    - step: 121
+    - step: 122
       expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
-    - step: 127
-      expectation: '{assert_visible: ''[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-block-selection''}'
     - step: 128
+      expectation: '{assert_visible: ''[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-block-selection''}'
+    - step: 129
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-block-selection").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
-    - step: 130
+    - step: 131
       expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
     results:
     - 5
@@ -486,15 +492,16 @@ verification:
     - 82
     - 88
     - 91
-    - 97
+    - 95
     - 98
-    - 100
-    - 107
-    - 114
-    - 121
-    - 127
+    - 99
+    - 101
+    - 108
+    - 115
+    - 122
     - 128
-    - 130
+    - 129
+    - 131
   visual:
   - check: Inspect first-column spacing, selected text and highlight alignment in normal and fullscreen screenshots.
     method: manual
