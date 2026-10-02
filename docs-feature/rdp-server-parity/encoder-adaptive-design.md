@@ -94,7 +94,7 @@ EXP-05（RemoteFX 量化与画质，单个条纹块的亮度 PSNR）：默认 35
 
 **结论。** 能在 mstsc 兼容前提下达到预算的只有“位图 + 批量压缩”。照片类内容必须保留 RemoteFX。因此按矩形选择编码，选择依据是实际压缩后的字节数，而不是颜色数之类的启发式（EXP-02 的 ≤16 色、≤256 色启发式试过，效果与不选一样）。
 
-V-E01 已在仓库执行并通过。原型条件（16352 字节分片、模拟位图头在尾部）的 E/F 仍为 314/292 B/frame，与历史值完全一致；生产条件使用 16374 字节分片与头部，E/F 为 323/312 B/frame。EXP-06 与生产代码一样仅用 planar 首个分片估算，结果如下（Windows 本地 release unit，所有 bulk 结果均完成解压往返；耗时只代表此离线场景）：
+V-E01 已在仓库执行并通过。原型条件（16352 字节分片、模拟位图头在尾部）的 E/F 仍为 314/292 B/frame，与历史值完全一致；生产条件使用 16374 字节分片与头部，E/F 为 323/312 B/frame。下表是初版 EXP-06 的首分片估算结果（Windows 本地 release unit，所有 bulk 结果均完成解压往返；耗时只代表此离线场景）。当前 EXP-06 与生产实现均采用四段均匀分离的 256 字节、共 1 KiB 采样；最新结果另列于本节末尾。
 
 | 场景 | EXP-01 A（现状） | EXP-01 B（合并 RemoteFX） | EXP-06 H（自适应） | H 编码耗时 |
 |---|---|---|---|---|
@@ -104,6 +104,8 @@ V-E01 已在仓库执行并通过。原型条件（16352 字节分片、模拟�
 证据为 `qa-ui-auto-report/_local/encoder-experiment-sampled.log`。照片带宽已保持 RemoteFX 基线；额外 planar 编码的 CPU 成本仍需 PERF-03 的 native 帧率比证明不造成实际退化。
 
 实施后的 `cargo test --release --features production-vendor -- --nocapture` 另核对当前 vendor 与 raw/RLE planar 候选（`encoder-production-experiment.log`，1 passed）。UI 的 H 仍为 312 B/frame、照片 H 仍为 188169 B/frame；修复 XCRUSH 历史后，照片的纯 planar+XCRUSH 为 464355 B/frame（118875 kbps），不能沿用旧 registry 的 187824 kbps 作为当前实现数据。实际并行编码器的 CPU-only unit 在同一组合成帧上测得：旧路径约 4.492 ms/frame 编码，自适应约 11.907 ms 加 5.069 ms bulk；优化后为 3.809/5.083 ms 编码、0.023/0.026 ms 分片，二者均为 315117 wire B/frame。该离线成本用于定位 CPU 开销，native 帧率仍由 §8.2 的 CI 报告验收。
+
+当前采样与 vendor 的最终离线复测（`encoder-round7-experiment.log`，原型和 production-vendor 各 1 passed）：生产 UI H=312 B/frame / 80 kbps，5.04 ms/frame（RemoteFX A 4.68 ms）；照片 H=188169 B/frame / 48171 kbps，22.53 ms/frame（A 20.85 ms）。原型 E/F 仍为 314/292 B/frame，历史复现偏差 0%；全部压缩分片逐字节解压校验。生产编码器自身另有 cropped/uncropped CPU unit：裁剪照片旧/新 encode 为 6.347/7.027 ms，bulk 为 0.030/0.033 ms，双方 wire 均为 188168 B/frame（`encoder-round7-photo-sample.log`）。这些 CPU-only 耗时不替代 M5/M6 系统 CPU 测量或 native 性能验收。
 
 ### 决策记录
 
@@ -192,26 +194,30 @@ EncoderIter::next(rect)
 | 路径 / 模块（拟新增标 *） | 具体变更与保持的约束 | 相关 AC | 任务 |
 |---|---|---|---|
 | `src-tauri/vendor/ironrdp-acceptor/`* | 从 crates.io `ironrdp-acceptor 0.10.0` 原样复制；`AcceptorResult` 加 `client_compression`；`SecureSettingsExchange` 分支在 HYBRID 与 TLS 两种模式下都填写；其余代码不改。在 crate 根放 `VENDORED.md`，写明来源版本与改动点，方便以后升级时对照 | AC-E03/E04 | TASK-E1 |
-| `src-tauri/Cargo.toml` `[patch.crates-io]` | 加 `ironrdp-acceptor = { path = "vendor/ironrdp-acceptor" }`；`Cargo.lock` 随之更新 | — | TASK-E1 |
+| `src-tauri/Cargo.toml` `[patch.crates-io]` | 加 `ironrdp-acceptor`、`ironrdp-bulk` 的 vendor path；`Cargo.lock` 随之更新 | — | TASK-E1 |
+| `src-tauri/vendor/ironrdp-bulk/` | XCRUSH 内层 MPPC FLUSHED 的收发历史修复；提供只分配 MPPC 的大小估算接口；保留来源与改动说明 | AC-E04/E05 | TASK-E1、TASK-E2 |
 | `vendor/ironrdp-server/Cargo.toml` | 加依赖 `ironrdp-bulk = "=0.1.1"`（已在 lockfile 中，由 ironrdp-session 引入） | — | TASK-E1 |
 | `vendor/ironrdp-server/src/builder.rs`、`server.rs` | `with_bulk_compression`、`with_encoder_stats_handle`；`RdpServerOptions` 加对应字段；`run_connection_with` 构建 `UpdateEncoder` 时传入 `client_compression` 与开关 | AC-E01/E03/E09 | TASK-E1 |
-| `vendor/ironrdp-server/src/encoder/fast_path.rs` | `UpdateFragmenter::next` 接受 `Option<&mut BulkCompressor>`，按 §4.3 写 `compression_flags`/`compression_type`；没有压缩器时逐字节与改造前相同 | AC-E01/E03/E05 | TASK-E1 |
-| `vendor/ironrdp-server/src/encoder/mod.rs` | `UpdateEncoder` 加 `bulk: Option<BulkCompressor>`、`stats: Option<Arc<EncoderStats>>`；新增 `AdaptiveHandler`（同时持有 `BitmapHandler` 与 `RemoteFxHandler`）及 §4.2 的选择逻辑；`set_desktop_size` 重建压缩器；`EncoderIter` 把压缩器交给分片器 | AC-E01/E02/E05 | TASK-E1、TASK-E2 |
+| `vendor/ironrdp-server/src/encoder/fast_path.rs`、`bulk.rs` | `UpdateFragmenter::next` 接受 `Option<&mut BulkEncoder>`，按 §4.3 写压缩字段；wrapper 管理首次 FLUSHED、四级映射、K8 分片限制与故障禁用；没有压缩器时逐字节与改造前相同 | AC-E01/E03/E05 | TASK-E1 |
+| `vendor/ironrdp-server/src/encoder/mod.rs`、`bitmap.rs` | `UpdateEncoder` 加 `bulk: Option<BulkEncoder>`、共享统计；新增 `AdaptiveHandler`、raw/RLE planar 候选及 §4.2 的选择逻辑；resize 重置；奇数宽裁剪按每行字节填写 scan width；仅实际发出的 RemoteFX 推进自身帧状态 | AC-E01/E02/E05 | TASK-E1、TASK-E2 |
 | `vendor/ironrdp-server/src/server.rs` `dispatch_display_update` 约 1160–1188 行 | `fragmenter.next(buffer)` 改为带压缩器的版本；写入顺序不变 | AC-E05 | TASK-E1 |
 | `src-tauri/src/servers/rdp.rs` `build_server` 约 825–872 行 | `.with_bulk_compression(env TAOMNI_RDP_BULK_COMPRESSION != "0")`、`.with_encoder_stats_handle(...)`；启动日志写一行“RDP display encoding: adaptive planar+bulk / RemoteFX” | AC-E09 | TASK-E2 |
 | `src-tauri/src/servers/rdp/metrics.rs` `report_if_due` | “RDP latency:” 行尾追加 `encode=planar:N/rfx:M bulk=XX%` | AC-E09 | TASK-E2 |
-| `src-tauri/src/servers/rdp/loopback_tests.rs` | `client_config` 加 `compression_type` 参数；新增用例见 §7 V-E03~V-E06；先核实现有 `taomni_client_decodes_the_codec_the_server_picks_for_it` 的状态（§10） | AC-E03~E05 | TASK-E3 |
+| `src-tauri/src/servers/rdp/loopback_tests.rs`、`bulk_loopback_tests.rs` | 保留两个原回环测试；新增四级压缩、无压缩字节兼容、混发、奇数宽裁剪、重激活与重连正确性用例 | AC-E03~E05 | TASK-E3 |
 | `src-tauri/src/bin/rdp-probe/session.rs` | `ConnectOptions` 加 `compression`（默认 `rdp61`）；`connector_config` 写入；报告 `negotiated.compression` | AC-E01/E03 | TASK-E4 |
 | `src-tauri/src/bin/rdp-probe/rfx_stats.rs`、`session.rs` `pump` | `pump` 在 `active_stage.process` 之前把原始快速路径 PDU 交给 `RfxStats::inspect_fast_path`（现有，约 558 行）。这里拿到的是**压缩后**的数据。`RfxStats` 自己持有一个同级别的 `BulkCompressor` 作为解压器，按 PDU 顺序解压，解压后的数据再走现有的 surface bits / 位图解析。这个解压器与 ironrdp-session 内部那个相互独立，两者看到同一条流、历史一致。报告新增 `bulk.{compressed_updates, bytes_on_wire, bytes_decompressed}` | AC-E09 | TASK-E4 |
 | `src-tauri/src/rdp/session.rs` `build_ironrdp_config` 约 2524 行 | `compression_type: Some(CompressionType::Rdp61)` | AC-E07/E08 | TASK-E4 |
+| `src-tauri/src/rdp/tls.rs`、`ws.rs` | 用户确认的精确证书 pin 豁免链/主机名匹配，保持 TLS 签名验证；晚到输入不覆盖原始连接错误；对应纯 unit | AC-E07/E08 | TASK-E7 |
+| `src-tauri/src/servers/rdp/display.rs`、`capture/mac/sck.rs` | macOS 浅队列持久 ScreenCaptureKit、静态 idle 不退出、自定速源不重复休眠、按 Complete 状态过滤无变化帧；真实 CoreMedia 与 mailbox unit | AC-E01、保留行为 | TASK-E5 |
 | `qa-ui-auto-tests/cases/TC-RDPS-PERF-01-performance-budget.testcase.yaml` | 不改断言；在描述里注明探针按 mstsc 方式声明批量压缩 | AC-E01 | TASK-E5 |
 | `qa-ui-auto-tests/cases/TC-RDPS-PERF-03-photo-content.testcase.yaml`* | 照片类内容的 M4 不回退（AC-E02）；需要 `rdp_target.py` 新增 `--mode photo` | AC-E02 | TASK-E5 |
-| `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/rdp_helpers/rdp_target.py` | 新增 `photo` 模式：640×360 区域显示带噪声的平移渐变（与实验 `photo_desktop` 同算法），帧标记同 `animate` | AC-E02 | TASK-E5 |
+| `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/rdp_helpers/rdp_target.py` | 新增同算法 photo；固定时钟调度真实绘制与逐秒源遥测；照片两次测量从匹配的初始场景启动 | AC-E01/E02 | TASK-E5 |
 | `qa-ui-auto-tests/cases/TC-RDPS-NAT-08-mstsc-interop.testcase.yaml`* | V-17，见 §6 TASK-E6 | AC-E06 | TASK-E6 |
-| `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/rdp_steps.py`（新 verb `host_mstsc`） | 写入临时 `.rdp` 文件，用 `cmdkey` 存测试凭据，启动 `mstsc.exe`；等待服务端日志出现连接，截取 mstsc 窗口；结束时 `taskkill` 并 `cmdkey /delete` | AC-E06 | TASK-E6 |
+| `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/rdp_steps.py`、`rdp_helpers/mstsc.py` | `host_mstsc` 使用 Win32 交互桌面与 owned handles；hosted loopback 文件授权临时恢复；PrintWindow 校验已知图案；失败同样清理进程、cmdkey 和授权 | AC-E06 | TASK-E6 |
 | `qa-ui-auto-tests/cases/TC-RDPC-REF-01-termservice.testcase.yaml`*、`TC-RDPC-REF-02-xrdp.testcase.yaml`* | V-21，见 §6 TASK-E7 | AC-E07/E08 | TASK-E7 |
 | `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/rdp_steps.py`（新 verb `host_copy_file`）、`rdp_steps.py` `PATH_ARGS` 加 `baseline-report` | 把基线目录里的状态文件复制进用例目录；探针基线报告路径在报告根目录内解析 | AC-E02/E07 | TASK-E4、TASK-E7 |
 | `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/fixtures/xrdp_server_required.py`*、`fixtures/__init__.py`、`schema/testcase.schema.json` | xrdp fixture（受 DEC-07 影响） | AC-E08 | TASK-E7 |
+| `fixtures/rdp_baseline_required.py`、`test_rdp_encoder_tools.py`、`test_native_fixture_cleanup.py` | TermService 首次目标就绪与脱敏启动日志；xrdp 配置、一次性账号与服务恢复；失败/部分 setup 后的 cleanup unit | AC-E06/E07/E08 | TASK-E6、TASK-E7 |
 | `.github/workflows/qa-ui-auto-platforms.yml`、`scripts/ci_services.py` | `xrdp` capability 的 apt 安装（受 DEC-07 影响） | AC-E08 | TASK-E7 |
 | `qa-ui-auto-tests/ci/policy.yaml`、`qa-ui-auto-tests/feature-list.md`、`.agents/skills/qa-ui-auto/references/verb-catalog.md` | 登记新 case 与 verb；用 `python -m qa_ui_auto.gen_testid_catalog` 重新生成目录 | — | TASK-E5~E7 |
 | `docs-feature/rdp-server-parity-design.md` | TASK-11/12、V-13/V-17/V-21、§4.7、§9 回填 | — | TASK-E8 |
@@ -358,7 +364,7 @@ EncoderIter::next(rect)
 ### TASK-E8 上游设计回填与交付
 
 - 职责与文件范围：`docs-feature/rdp-server-parity-design.md`、本设计 §4.1/§4.2/§9、记忆文件（agent 本地）
-- 依赖：E1~E7（E7 的 xrdp 部分可以以“DEC-07 待决”状态交付）
+- 依赖：E1~E7；DEC-07 已批准，xrdp 实测纳入完成条件
 - 实施内容：
   - 上游 TASK-11、TASK-12、V-13、V-17、V-21、§4.7 首轮记录、§9 AC-16/17/20 写入实际运行号与结论；
   - 本设计 §9 填实际证据；
@@ -484,6 +490,7 @@ EncoderIter::next(rect)
 - Windows 单卡启动诊断 [36982670416](https://github.com/engcapa/taomni/actions/runs/36982670416)（`abb50fb4`）已取得 initial TCP=false / fixture TCP=true；owned 窗口截图显示诊断监听器关闭后的预期连接错误。这证明 hosted loopback 预授权有效，完整 NAT-08 的协议与像素验收继续执行。
 - 第八轮 native 最终原始报告核验完成：Linux 12/0/0，Windows 14/1/0（仅旧 mstsc 资源提示），macOS 9/2/0。macOS UI 为 70 ms / 58.011 ms p95 / 24.387 实际 fps / 393.728 kbps，M3 未达标；照片 baseline/adaptive 为 19.893/20.568 fps，帧率比 1.033912、带宽比 1.041303，匹配初始场景后的照片验收通过。另一失败为 J-02 无 host→client 文本公告，原始主机内容和六秒稳定性断言均通过，继续在当前 CI 验证。全部 receipt 文件哈希和选单 identity 已验证，不用 workflow success 隐藏失败。
 - UI 源调度定位：macOS capture/forward 约 56 fps，而探针 marker 只前进约 25 fps；宿主 Tk 动画在绘制后再等待固定 16 ms，累计绘制与事件循环耗时。目标现在显式完成 Tk redraw，按单调时钟的 60 Hz deadline 调度；超过 deadline 时跳过时钟 tick，marker 只计真实绘制，不推算丢帧。新增逐秒 `animation_samples`，保留实际源速率供分析。24 个全 mocked 工具 unit 通过；M1~M4 和照片比值门槛未改，修正后的三端实测仍须后续 CI。
+- mstsc 单卡 [36982670416](https://github.com/engcapa/taomni/actions/runs/36982670416) 的 debug QA 原始报告为 0/1/0，receipt、选单和 debug 构建身份均核验。NLA 与 cliprdr/rdpsnd/drdynvc 已通过，`encode=planar:9/rfx:1 bulk=48%`；唯一失败在 PrintWindow 图案校验（magenta=0/cyan=127）。截图是已连接的桌面与条纹动画，连接前创建的图案被本机回环 mstsc 窗口遮挡；用例改为在通道握手后创建并抬起目标。仍只从 owned mstsc 窗口检查两种已知颜色，不能用整个宿主桌面代替客户端画面。
 
 ## 9. 验收追踪与交付条件
 

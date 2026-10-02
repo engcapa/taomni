@@ -64,12 +64,6 @@ steps:
 - wait_for:
     selector: '[data-testid="server-row-rdp"][data-status="running"]'
     timeout_sec: 90
-- host_helper:
-    action: start
-    name: target
-    mode: flip
-    pattern: true
-    geometry: 480x320+40+80
 - rdp_probe:
     scenario: host-play
     artifact: mstsc-tone
@@ -91,6 +85,12 @@ steps:
     selector: '[data-testid="server-log"]'
     contains: drdynvc channel negotiated
     timeout_sec: 30
+- host_helper:
+    action: start
+    name: target
+    mode: flip
+    pattern: true
+    geometry: 480x320+40+80
 - host_helper:
     action: start
     name: animation
@@ -136,23 +136,23 @@ verification:
     actions:
     - 17
     - 18
-    - 19
+    - 22
     - 23
     checkpoints:
-    - step: 20
+    - step: 19
       expectation: Clipboard handshake completed.
-    - step: 21
+    - step: 20
       expectation: Real host sound is streamed.
-    - step: 22
+    - step: 21
       expectation: The client's actual static channel join includes drdynvc.
     - step: 24
       expectation: At least one planar rectangle is sent.
     - step: 25
       expectation: PrintWindow captures the owned mstsc client window and finds both known remote target colors.
     results:
+    - 19
     - 20
     - 21
-    - 22
     - 24
     - 25
   - id: R2
