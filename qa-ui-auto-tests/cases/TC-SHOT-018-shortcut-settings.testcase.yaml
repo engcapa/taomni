@@ -1,0 +1,186 @@
+id: TC-SHOT-018
+title: Screenshot shortcut settings record validate disable reset and route the configured chord
+description: Browser shortcut changes are in-memory app-local state, not persisted OS-global registration; the capability probe is native-only.
+covers: [F27.1, F27.2]
+tags: [screenshot, settings, shortcut, p1]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: screenshot
+- wait_for: '[data-testid="settings-screenshot-shortcut"]'
+- assert_text_equals:
+    selector: '[data-testid="settings-screenshot-shortcut-status"]'
+    equals: Works while this window is focused.
+- assert_attribute:
+    selector: '[data-testid="system-screenshot"]'
+    name: title
+    matches: '.*(?:Ctrl\+Alt\+A|⌃⌘A).*'
+- assert_not_visible: '[data-testid="settings-screenshot-probe"]'
+- click: '[data-testid="settings-screenshot-shortcut"]'
+- assert_attribute:
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+    name: aria-pressed
+    equals: 'true'
+- press:
+    key: a
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+- assert_text_equals:
+    selector: '[data-testid="settings-screenshot-shortcut-error"]'
+    equals: Use at least one of Ctrl, Alt or Cmd (or a function key)
+- assert_attribute:
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+    name: aria-pressed
+    equals: 'true'
+- press:
+    key: Escape
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+- assert_attribute:
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+    name: aria-pressed
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="system-screenshot"]'
+    name: title
+    matches: '.*(?:Ctrl\+Alt\+A|⌃⌘A).*'
+- click: '[data-testid="settings-screenshot-shortcut"]'
+- assert_not_visible: '[data-testid="settings-screenshot-shortcut-error"]'
+- press:
+    key: Control+Alt+k
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+- assert_attribute:
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+    name: aria-pressed
+    equals: 'false'
+- assert_pattern:
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+    regex: '^(?:Ctrl\+Alt\+K|⌃⌥K)$'
+- assert_attribute:
+    selector: '[data-testid="system-screenshot"]'
+    name: title
+    matches: '.*(?:Ctrl\+Alt\+K|⌃⌥K).*'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: >-
+      !JSON.stringify(window.__taomniStubScreenshotCalls || []).includes('"cmd":"screenshot_open_overlay"')
+- press:
+    key: Control+Alt+A
+    macos_key: Control+Meta+A
+    selector: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: >-
+      !JSON.stringify(window.__taomniStubScreenshotCalls || []).includes('"cmd":"screenshot_open_overlay"')
+- press:
+    key: Control+Alt+k
+    selector: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: screenshot
+- click: '[data-testid="settings-screenshot-shortcut-disable"]'
+- assert_text_equals:
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+    equals: Disabled
+- assert_disabled: '[data-testid="settings-screenshot-shortcut-disable"]'
+- assert_text_equals:
+    selector: '[data-testid="settings-screenshot-shortcut-status"]'
+    equals: The hotkey is off; use the camera button in the title bar.
+- assert_attribute:
+    selector: '[data-testid="system-screenshot"]'
+    name: title
+    equals: System screenshot
+- press:
+    key: Control+Alt+k
+    selector: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).split('"cmd":"screenshot_open_overlay"').length === 2
+# The camera remains a usable entry while the shortcut is disabled.
+- click: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: screenshot
+- click: '[data-testid="settings-screenshot-shortcut-reset"]'
+- assert_text_equals:
+    selector: '[data-testid="settings-screenshot-shortcut-status"]'
+    equals: Works while this window is focused.
+- assert_enabled: '[data-testid="settings-screenshot-shortcut-disable"]'
+- assert_attribute:
+    selector: '[data-testid="system-screenshot"]'
+    name: title
+    matches: '.*(?:Ctrl\+Alt\+A|⌃⌘A).*'
+- press:
+    key: Control+Alt+A
+    macos_key: Control+Meta+A
+    selector: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).split('"cmd":"screenshot_open_overlay"').length === 4
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Settings exposes app-local status and current default; recording rejects a bare letter, Escape preserves the prior chord, and a valid chord updates tooltip without triggering capture during recording.
+    actions: [1, 3, 5, 10, 12, 15, 18, 20]
+    checkpoints:
+    - {step: 7, expectation: 'Status explicitly says app-local, not registered system-wide.'}
+    - {step: 8, expectation: The camera shows the platform default.}
+    - {step: 9, expectation: Browser does not pretend to expose native capability probes.}
+    - {step: 11, expectation: Clicking the recorder enters recording mode.}
+    - {step: 13, expectation: A bare letter reports the concrete modifier requirement.}
+    - {step: 14, expectation: Invalid input keeps recording active.}
+    - {step: 16, expectation: Escape ends recording.}
+    - {step: 17, expectation: Cancel did not change the prior shortcut.}
+    - {step: 19, expectation: Restarting recording clears validation feedback.}
+    - {step: 21, expectation: A valid chord ends recording.}
+    - {step: 22, expectation: The button displays the recorded Ctrl+Alt+K chord.}
+    - {step: 23, expectation: Shared camera tooltip updates to the same chord.}
+    - {step: 24, expectation: Recording the chord did not open capture.}
+    - {step: 25, expectation: Recording sent no capture request.}
+    results: [7, 8, 9, 13, 14, 16, 17, 19, 21, 22, 23, 24, 25]
+  - id: R2
+    requirement: The old chord stops routing, the recorded chord opens capture, disabling it blocks the chord but not the camera, and Reset restores the default routing.
+    actions: [26, 29, 31, 33, 35, 36, 41, 44, 46, 48, 50, 51, 55, 58]
+    checkpoints:
+    - {step: 27, expectation: The default chord is inactive after rebinding.}
+    - {step: 28, expectation: The retired binding sent no request.}
+    - {step: 30, expectation: The recorded chord opens a ready overlay.}
+    - {step: 37, expectation: Disabled state replaces the chord label.}
+    - {step: 38, expectation: Disable becomes unavailable when already disabled.}
+    - {step: 39, expectation: Status explains the camera fallback.}
+    - {step: 40, expectation: Disabled tooltip omits the shortcut.}
+    - {step: 42, expectation: The disabled chord does not open capture.}
+    - {step: 43, expectation: Only the earlier valid chord has sent a request.}
+    - {step: 45, expectation: Camera still opens capture while disabled.}
+    - {step: 52, expectation: Reset returns to app-local enabled status.}
+    - {step: 53, expectation: Disable is available again.}
+    - {step: 54, expectation: The tooltip shows the restored default.}
+    - {step: 56, expectation: The restored chord opens capture.}
+    - {step: 57, expectation: Three valid entries dispatched exactly three requests.}
+    - {step: 59, expectation: The reset capture can be closed.}
+    results: [27, 28, 30, 37, 38, 39, 40, 42, 43, 45, 52, 53, 54, 56, 57, 59]
+  visual:
+  - check: Shortcut recording, validation, configured label, disabled label and status.
+    method: automated
+    reason: Labels and shared tooltip state are asserted rather than assuming button clicks applied settings.
+  native:
+  - check: Global shortcut persistence, OS conflict feedback and actual capability probe.
+    method: external
+    reason: Browser update is intentionally in-memory and app-local; native registration and permissions are not verified here.

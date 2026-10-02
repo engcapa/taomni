@@ -30,6 +30,7 @@ import {
 } from "../../lib/codeViewProfile";
 import { AppThemeSwitcher } from "./AppThemeSwitcher";
 import { LanguageSection } from "./LanguageSection";
+import { ScreenshotSettings } from "./ScreenshotSettings";
 import { VaultSettings } from "../vault/VaultSettings";
 import { BackupSettingsPanel } from "./BackupSettingsPanel";
 import { AppProxyPanel } from "./AppProxyPanel";
@@ -657,6 +658,9 @@ export function SettingsPanel() {
                   </span>
                 </label>
               </section>
+            </SettingsAnchor>
+            <SettingsAnchor id="screenshot">
+              <ScreenshotSettings />
             </SettingsAnchor>
           </SettingsGroup>
 

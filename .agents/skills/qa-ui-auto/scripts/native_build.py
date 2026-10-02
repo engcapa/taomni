@@ -39,6 +39,36 @@ def binary_digest(binary: Path) -> str:
     return digest.hexdigest()
 
 
+def ensure_linux_link_deps() -> None:
+    """Install system link libraries the Rust graph needs but the base image
+    may not provide.
+
+    xcap -> libwayshot-xcap -> gbm emits an unconditional #[link(name="gbm")]
+    on Linux, so the final link needs libgbm.so. Some ubuntu-24.04 runner
+    images (e.g. 20260920.314.1) ship only libgbm1 (runtime) without the
+    libgbm-dev symlink, failing the link with "unable to find library -lgbm".
+    The workflow's apt step is the natural home for this, but workflow files
+    need the token's `workflows` permission to update via API, so the QA build
+    ensures it here instead. Idempotent: skipped when -lgbm already resolves.
+    """
+    if platform.system() != "Linux":
+        return
+    try:
+        probe = subprocess.run(
+            ["cc", "-lgbm", "-o", os.devnull, "-x", "c", "-"],
+            input="int main(){return 0;}",
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        probe = None
+    if probe is not None and probe.returncode == 0:
+        print("qa-ui-auto: -lgbm resolves; skipping apt install")
+        return
+    print("qa-ui-auto: installing libgbm-dev for the native Linux link")
+    subprocess.run(["sudo", "apt-get", "install", "-y", "libgbm-dev"], check=True)
+
+
 def identity_path(binary: Path) -> Path:
     return binary.with_name(binary.name + ".qa-identity.json")
 
@@ -148,6 +178,7 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     pnpm = shutil.which("pnpm")
     if not pnpm:
         raise ValueError("pnpm not found on PATH")
+    ensure_linux_link_deps()
     target = ROOT / "src-tauri" / "target" / "qa-ui-auto"
     binary = qa_binary(release=release)
     record_path = identity_path(binary)

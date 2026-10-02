@@ -27,6 +27,16 @@ class MouseStepsTest(TestCase):
         locator.drag_to.assert_called_once()
         page.mouse.down.assert_not_called()
 
+    def test_target_drag_preserves_screenshot_source_and_target_positions(self):
+        ctx, page, locator = self.context()
+        source = {"x": 3, "y": 3}
+        target = {"x": 725, "y": 575}
+        step_drag_to(ctx, {"from": "#handle", "to": "#canvas",
+                           "from_position": source, "to_position": target})
+        locator.drag_to.assert_called_once_with(page.locator.return_value.first, force=True,
+                                                source_position=source, target_position=target)
+        page.mouse.down.assert_not_called()
+
     def test_drag_by_offset_moves_from_the_centre_without_a_target(self):
         ctx, page, locator = self.context()
         step_drag_to(ctx, {"from": "#handle", "by": {"dx": 60, "steps": 5}})

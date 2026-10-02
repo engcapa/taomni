@@ -1,0 +1,105 @@
+id: TC-SHOT-020
+title: GIF region start reaches recorder preview save and MP4 entry dispatches its requested format
+description: Browser verifies start routing, physical crop arguments and returned PNG preview save dispatch. The stop stub is not encoded GIF or MP4; MP4 is request and cancel coverage only.
+covers: [F27.1]
+tags: [screenshot, recording, save, p1]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- drag_to:
+    from: '[data-testid="screenshot-select-layer"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 100, y: 100}
+    to_position: {x: 500, y: 400}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- click: '[data-testid="screenshot-record"]'
+- click: '[data-testid="screenshot-record-gif"]'
+- wait_for: '[data-testid="screenshot-recorder-stop"]:enabled'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- assert_visible: '[data-testid="screenshot-recorder-timer"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).includes('"cmd":"screenshot_start_recording","args":{"displayId":"0,0","x":40,"y":40,"width":160,"height":120,"format":"gif","fps":null}')
+- click: '[data-testid="screenshot-recorder-stop"]'
+- wait_for: '[data-testid="screenshot-recorder-preview"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-recorder-preview"]'
+    name: src
+    matches: 'data:image/png;base64,.*'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-recorder-meta"]'
+    equals: '400×300 · 00:03 · 30 frames'
+- click: '[data-testid="screenshot-recorder-save"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="text-input-dialog-input"]'
+    name: value
+    matches: 'Taomni-recording-.*\.gif'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: qa-ui-auto-recording.gif
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-recorder"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_save_image" && window.__taomniStubScreenshotCalls.at(-2).args.dest === "qa-ui-auto-recording.gif" && window.__taomniStubScreenshotCalls.at(-2).args.path.startsWith("data:image/png;base64,")
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_close_overlay"
+- click: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- click: '[data-testid="screenshot-record"]'
+- click: '[data-testid="screenshot-record-mp4"]'
+- wait_for: '[data-testid="screenshot-recorder-stop"]:enabled'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).includes('"cmd":"screenshot_start_recording","args":{"displayId":"0,0","x":0,"y":0,"width":400,"height":300,"format":"mp4","fps":null}')
+- assert_not_visible: '[data-testid="screenshot-recorder-preview"]'
+- click: '[data-testid="screenshot-recorder-cancel"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-recorder"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).split('"cmd":"screenshot_stop_recording"').length === 2 && window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_cancel_recording"
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The public GIF menu entry sends exact physical crop and format arguments, routes to the initialized recorder, and displays the actual stub preview after stop.
+    actions: [1, 2, 4, 6, 7, 12]
+    checkpoints:
+    - {step: 8, expectation: The recorder is initialized after start.}
+    - {step: 9, expectation: The source overlay is unmounted.}
+    - {step: 10, expectation: Running timer is present.}
+    - {step: 11, expectation: GIF start targets the selected 160x120 region at 40x40.}
+    - {step: 14, expectation: The browser stub's real PNG payload is shown without claiming GIF encoding.}
+    - {step: 15, expectation: 'Preview metadata equals the actual fixture, not a fictitious cropped media result.'}
+    results: [8, 9, 10, 11, 14, 15]
+  - id: R2
+    requirement: Confirming preview save dispatches the returned artifact and requested GIF filename and closes the recorder.
+    actions: [16, 19, 20]
+    checkpoints:
+    - {step: 18, expectation: The image-preview branch offers a GIF filename.}
+    - {step: 22, expectation: Save completion unmounts the recorder.}
+    - {step: 23, expectation: Save dispatch passes the exact destination and actual returned PNG stub path.}
+    - {step: 24, expectation: Completion closes the recording session.}
+    results: [22, 23, 24]
+  - id: R3
+    requirement: MP4 start dispatches its requested format and fullscreen geometry, then cancel closes it without invoking stop or pretending to decode an MP4.
+    actions: [25, 27, 29, 30, 34]
+    checkpoints:
+    - {step: 31, expectation: The request reaches an initialized recorder.}
+    - {step: 32, expectation: The MP4 entry sends mp4 with 400x300 fullscreen dimensions.}
+    - {step: 33, expectation: No decoded preview is claimed before cancel.}
+    - {step: 36, expectation: Cancel unmounts the recorder.}
+    - {step: 37, expectation: Only the GIF flow stopped; MP4 sent cancel instead.}
+    results: [31, 32, 33, 36, 37]
+  visual:
+  - check: Public record entries route into running and completed renderer states.
+    method: automated
+    reason: Assertions cover UI routing, metadata and save dispatch, not encoded duration or motion.
+  native:
+  - check: Genuine GIF/MP4 bytes, frame motion, duration and filesystem save.
+    method: external
+    reason: The browser stop payload is a PNG; native SHOT-N media-decode scenarios are the actual output oracle.

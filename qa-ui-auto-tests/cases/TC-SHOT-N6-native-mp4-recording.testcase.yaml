@@ -1,0 +1,25 @@
+id: TC-SHOT-N6
+title: Native H264 MP4 decoded frames match original scene pixels and timeline
+covers: [F27.1]
+tags: [screenshot, recording, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: record, format: mp4, secs: 3}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: mp4-capture
+    requirement: Built-in H264 MP4 records the actual original scene at matching region content, original state order and real playback timing, not merely decodable changing frames.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: "All H264 samples decode and every frame's complementary id/random nonce maps to an actual retained original PNG; all spatial pixel tiles pass the fixed lossy thresholds. Original states stay ordered; anchored clip time falls within <=250ms of each actual original visibility interval (draw through next draw), no unexplained gap/end stall >700ms (actual source holds are verified from draw intervals) and source coverage >=70 percent duration. Twelve-frame/four-state and real three-second timing checks still apply; original PNGs, MP4, timeline, per-frame comparisons and difference contact sheet are retained."}
+    results: [3]
+  visual:
+  - {check: Original scene fidelity, method: automated, reason: "Match every decoded H264 frame to actual drawn originals; pixel tiles/id/nonce/timeline reject incorrect but decodable movies. Original/actual/difference files remain available for review."}
+  native:
+  - {check: MP4 pipeline, method: automated, reason: "Real screen source and built-in OpenH264/muxer, not file-header-only or stub evidence."}

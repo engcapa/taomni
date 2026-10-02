@@ -1,0 +1,29 @@
+id: TC-SHOT-N1
+title: Native full-display capture and real OCR/redaction output
+covers: [F27.1]
+tags: [screenshot, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+# Requires the isolated QA app and actual Tesseract. No synthetic capture pixels.
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: capture}
+- native_screenshot_scenario: {scenario: ocr-redact}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: capture-ocr
+    requirement: Capture physical display pixels, recognize fixture text with real OCR, redact and undo/redo as a batch, and copy changed pixels with restored main window.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: Real display dimensions and nonblank PNG retained.}
+    - {step: 4, expectation: "Email/phone recognized, sensitive boxes found, UI undo/redo verified and redacted clipboard PNG retained."}
+    - {step: 5, expectation: Main window usable after tool teardown.}
+    results: [3, 4, 5]
+  visual:
+  - {check: Redaction fidelity, method: external, reason: Inspect source and redacted PNG artifacts; automated checks prove changed pixels but not unreadability of every glyph.}
+  native:
+  - {check: Capture/OCR/clipboard, method: automated, reason: "Guarded QA command uses real display capture, Tesseract and OS clipboard; browser stubs cannot prove them."}

@@ -1,13 +1,12 @@
 //! Windows console capture for the embedded RDP server.
 //!
-//! The hot path uses xcap's Windows Graphics Capture (WGC) video recorder. It
-//! owns a bounded (zero-capacity) hand-off from the native capture callback, so
-//! a slow RDP encoder can never make native frames accumulate in memory. A GDI
+//! The hot path owns a Windows Graphics Capture (WGC) stream. Only the newest
+//! native surface is retained, with its sampling timestamp; CPU readback is
+//! paced by the consumer. A GDI
 //! screenshot is retained as a compatibility fallback for sessions where WGC
 //! is unavailable (for example an older build, a remote/locked desktop, or a
 //! driver that rejects the capture session).
 
-use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 use super::{Capturer, Frame};
@@ -36,23 +35,14 @@ struct MonitorKey {
 }
 
 enum Backend {
-    Recorder {
-        recorder: xcap::VideoRecorder,
-        frames: Receiver<xcap::Frame>,
-    },
+    Recorder(super::win_wgc::WgcStream),
     Gdi,
 }
 
 impl Backend {
     fn stop(&mut self) {
-        // xcap's WGC callback sends through a zero-capacity channel. Drop the
-        // receiver first so an in-flight callback cannot stay blocked while
-        // Close waits for native capture callbacks to finish.
-        let previous = std::mem::replace(self, Self::Gdi);
-        if let Self::Recorder { recorder, frames } = previous {
-            drop(frames);
-            let _ = recorder.stop();
-        }
+        // Dropping WGC stops its mailbox/callbacks before closing the session.
+        *self = Self::Gdi;
     }
 }
 
@@ -204,40 +194,15 @@ impl WindowsCapturer {
     }
 
     fn next_recorder_frame(&mut self, wait: Duration) -> anyhow::Result<Option<Frame>> {
-        let Backend::Recorder { frames, .. } = &mut self.backend else {
+        let Backend::Recorder(stream) = &mut self.backend else {
             return Ok(None);
         };
-        match frames.recv_timeout(wait) {
-            Ok(frame) => {
-                let width = checked_dimension_u32(frame.width)
-                    .ok_or_else(|| anyhow::anyhow!("WGC returned an invalid frame width"))?;
-                let height = checked_dimension_u32(frame.height)
-                    .ok_or_else(|| anyhow::anyhow!("WGC returned an invalid frame height"))?;
-                let mut rgba = frame.raw;
-                let expected = checked_frame_bytes(width, height)?;
-                if rgba.len() != expected {
-                    anyhow::bail!(
-                        "WGC returned {} bytes for {}x{} frame; expected {}",
-                        rgba.len(),
-                        width,
-                        height,
-                        expected
-                    );
-                }
-                rgba_to_bgra(&mut rgba);
-                let stride = usize::from(width)
-                    .checked_mul(4)
-                    .ok_or_else(|| anyhow::anyhow!("Windows frame stride overflow"))?;
-                self.width = width;
-                self.height = height;
-                Ok(Some(Frame::bgra(rgba, 0, 0, width, height, stride)))
-            }
-            Err(RecvTimeoutError::Timeout) => Ok(None),
-            Err(RecvTimeoutError::Disconnected) => {
-                self.restart_recorder();
-                Ok(None)
-            }
+        let frame = stream.next(wait)?;
+        if let Some(frame) = &frame {
+            self.width = frame.width;
+            self.height = frame.height;
         }
+        Ok(frame)
     }
 
     fn fallback_to_gdi(&mut self, reason: &anyhow::Error) {
@@ -254,6 +219,7 @@ impl WindowsCapturer {
                 None
             }
         };
+        self.next_restart = Instant::now() + RESTART_BACKOFF;
     }
 }
 
@@ -281,8 +247,11 @@ impl Capturer for WindowsCapturer {
             return Ok(Some(frame));
         }
 
+        if matches!(self.backend, Backend::Gdi) {
+            self.restart_recorder();
+        }
         match &self.backend {
-            Backend::Recorder { .. } => match self.next_recorder_frame(FRAME_WAIT) {
+            Backend::Recorder(_) => match self.next_recorder_frame(FRAME_WAIT) {
                 Ok(frame) => Ok(frame),
                 Err(error) => {
                     self.fallback_to_gdi(&error);
@@ -302,7 +271,7 @@ impl Capturer for WindowsCapturer {
     }
 
     fn is_self_paced(&self) -> bool {
-        matches!(self.backend, Backend::Recorder { .. })
+        matches!(self.backend, Backend::Recorder(_))
     }
 
     fn needs_frame_deduplication(&self) -> bool {
@@ -358,17 +327,7 @@ fn capture_gdi(monitor: &xcap::Monitor) -> anyhow::Result<Frame> {
     let width_i32 = i32::from(width);
     let height_i32 = i32::from(height);
 
-    let pixel_bytes = usize::from(width)
-        .checked_mul(usize::from(height))
-        .and_then(|pixels| pixels.checked_mul(4))
-        .ok_or_else(|| anyhow::anyhow!("GDI frame size overflow"))?;
-    if pixel_bytes > MAX_CAPTURE_BYTES {
-        anyhow::bail!(
-            "GDI frame is too large ({} bytes; limit {} bytes)",
-            pixel_bytes,
-            MAX_CAPTURE_BYTES
-        );
-    }
+    let pixel_bytes = checked_frame_bytes(width, height)?;
     let mut pixels = vec![0u8; pixel_bytes];
     unsafe {
         let desktop = GetDesktopWindow();
@@ -450,13 +409,9 @@ fn capture_gdi(monitor: &xcap::Monitor) -> anyhow::Result<Frame> {
 }
 
 fn start_recorder(monitor: &xcap::Monitor) -> anyhow::Result<Backend> {
-    let (recorder, frames) = monitor
-        .video_recorder()
-        .map_err(|error| anyhow::anyhow!("WGC video recorder creation failed: {error}"))?;
-    recorder
-        .start()
-        .map_err(|error| anyhow::anyhow!("WGC video recorder start failed: {error}"))?;
-    Ok(Backend::Recorder { recorder, frames })
+    Ok(Backend::Recorder(super::win_wgc::WgcStream::start(
+        monitor,
+    )?))
 }
 
 fn select_monitor(requested: Option<&str>) -> anyhow::Result<(xcap::Monitor, MonitorKey)> {
@@ -512,14 +467,6 @@ fn monitor_key(monitor: &xcap::Monitor) -> anyhow::Result<MonitorKey> {
     })
 }
 
-/// xcap's Windows video recorder exposes RGBA bytes while the RDP bitmap
-/// encoder consumes BGRA. Swapping in place avoids a second allocation.
-fn rgba_to_bgra(pixels: &mut [u8]) {
-    for pixel in pixels.chunks_exact_mut(4) {
-        pixel.swap(0, 2);
-    }
-}
-
 pub(crate) fn probe_displays() -> anyhow::Result<Vec<super::CaptureDisplay>> {
     let monitors = xcap::Monitor::all()
         .map_err(|error| anyhow::anyhow!("cannot enumerate Windows monitors: {error}"))?;
@@ -551,14 +498,7 @@ pub(crate) fn probe_displays() -> anyhow::Result<Vec<super::CaptureDisplay>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{checked_frame_bytes, rgba_to_bgra};
-
-    #[test]
-    fn swaps_only_complete_rgba_pixels() {
-        let mut pixels = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
-        rgba_to_bgra(&mut pixels);
-        assert_eq!(pixels, vec![3, 2, 1, 4, 7, 6, 5, 8, 9]);
-    }
+    use super::*;
 
     #[test]
     fn rejects_capture_frames_over_memory_budget() {

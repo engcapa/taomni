@@ -1,0 +1,114 @@
+id: TC-SHOT-002
+title: Region selection defaults to recrop then rectangle undo redo and copy export
+description: Real renderer drags and PNG canvas export with stubbed copy IPC; no native clipboard pixel claim.
+covers: [F27.1]
+tags: [screenshot, annotate, copy, p1]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+# The 400x300 synthetic image scales to 1000x750 CSS pixels (0.4 per axis).
+- drag_to:
+    from: '[data-testid="screenshot-select-layer"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 100, y: 100}
+    to_position: {x: 500, y: 400}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_visible: '[data-testid="screenshot-selection-move"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '160 × 120'
+- assert_attribute:
+    selector: '[data-testid="screenshot-recrop"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="screenshot-tool-rect"]'
+    name: aria-pressed
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '0'
+- assert_disabled: '[data-testid="screenshot-undo"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-tool-rect"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-tool-rect"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_not_visible: '[data-testid="screenshot-selection-move"]'
+- click: '[data-testid="screenshot-color-red"]'
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 160, y: 160}
+    to_position: {x: 300, y: 260}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- assert_enabled: '[data-testid="screenshot-undo"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-undo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="0"]'
+- assert_disabled: '[data-testid="screenshot-undo"]'
+- assert_enabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-redo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-copy"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-3).cmd === "screenshot_save_data_url" && window.__taomniStubScreenshotCalls.at(-3).args.width === 160 && window.__taomniStubScreenshotCalls.at(-3).args.height === 120
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_copy_image" && window.__taomniStubScreenshotCalls.at(-2).args.path === window.__taomniStubScreenshotCalls.at(-3).args.path
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_close_overlay"
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: An explicit select-layer drag creates a 160x120 physical crop with no drawing tool active and empty history.
+    actions: [1, 2, 4]
+    checkpoints:
+    - {step: 6, expectation: The crop move surface is available in default select mode.}
+    - {step: 7, expectation: Size feedback matches CSS-to-image scaling.}
+    - {step: 8, expectation: Recrop is active.}
+    - {step: 9, expectation: Rectangle drawing is not implicitly active.}
+    - {step: 10, expectation: The shape list is empty.}
+    - {step: 11, expectation: Undo is disabled.}
+    - {step: 12, expectation: Redo is disabled.}
+    results: [6, 7, 8, 9, 10, 11, 12]
+  - id: R2
+    requirement: Explicit rectangle activation draws one shape; undo removes it and redo restores it without leaving stale redo availability.
+    actions: [13, 16, 17, 21, 25]
+    checkpoints:
+    - {step: 14, expectation: Rectangle is selected after its explicit click.}
+    - {step: 15, expectation: Move interception is removed while drawing.}
+    - {step: 18, expectation: One rectangle was committed.}
+    - {step: 20, expectation: A new draw does not create redo history.}
+    - {step: 22, expectation: Undo restores zero shapes.}
+    - {step: 23, expectation: No earlier undo remains.}
+    - {step: 24, expectation: Redo is available only after undo.}
+    - {step: 26, expectation: Redo restores one shape.}
+    - {step: 27, expectation: The redo stack is exhausted.}
+    results: [14, 15, 18, 20, 22, 23, 24, 26, 27]
+  - id: R3
+    requirement: Copy exports the selected crop, passes that artifact to the copy command, and closes the overlay.
+    actions: [28]
+    checkpoints:
+    - {step: 29, expectation: Main-window chrome returns.}
+    - {step: 30, expectation: The overlay is unmounted.}
+    - {step: 31, expectation: The renderer PNG decodes to exactly 160x120.}
+    - {step: 32, expectation: Copy receives the exported artifact path.}
+    - {step: 33, expectation: Close follows the output dispatch.}
+    results: [29, 30, 31, 32, 33]
+  visual:
+  - check: Crop dimensions and committed annotation count.
+    method: automated
+    reason: Size text and data-shapes assert geometry and history; they do not certify native desktop or clipboard pixels.
+  native:
+  - check: OS clipboard image bytes and real captured desktop.
+    method: external
+    reason: screenshot_copy_image is stubbed; native SHOT-N output checks are required separately.

@@ -1,0 +1,26 @@
+id: TC-SHOT-N10
+title: Native region capture reproduces fixture pixels at physical scale
+description: The child fixture must mount through the real native WebView; Windows QA uses the same isolated profile and browser arguments as main. Readiness failures include document and URL diagnostics and remain failures.
+covers: [F27.1]
+tags: [screenshot, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: capture-fidelity}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: fidelity
+    requirement: Region capture includes known content from a real native fixture with correct crop dimensions, row colors/order and physical heights.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: "Captured region matches the actual original canvas crop across every spatial pixel tile, including text/shapes/checker patterns; fixed lossless thresholds and row order/physical heights all pass. Original crop, captured PNG and amplified difference are retained."}
+    results: [3]
+  visual:
+  - {check: Original pixel fidelity, method: automated, reason: Compare the complete captured region to original rendered canvas pixels; retain expected/actual/difference PNGs rather than relying on nonblank or single-column evidence.}
+  native:
+  - {check: Native pixels, method: automated, reason: "Product region command reads actual OS screen and decodes fixture pixels, without injected or synthetic capture output."}

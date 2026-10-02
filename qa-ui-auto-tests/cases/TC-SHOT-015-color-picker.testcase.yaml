@@ -1,0 +1,85 @@
+id: TC-SHOT-015
+title: Color picker reports the synthetic pixel and copies its exact hex value
+covers: [F27.1]
+tags: [screenshot, color-picker, p2]
+modes: [browser]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}#screenshot-overlay
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- click: '[data-testid="screenshot-fullscreen"]'
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- seed_clipboard: screenshot-picker-before
+- click: '[data-testid="screenshot-color-picker"]'
+- wait_for: '[data-testid="screenshot-picker-layer"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-picker"]'
+    name: aria-pressed
+    equals: 'true'
+# Center of the 1000x750 layer samples (200,150) of the 400x300 fixture.
+- hover: '[data-testid="screenshot-picker-layer"]'
+- wait_for: '[data-testid="screenshot-picker-popup"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-picker-hex"]'
+    equals: '#C82828'
+- assert_text:
+    selector: '[data-testid="screenshot-picker-popup"]'
+    contains: rgb(200, 40, 40)
+- click:
+    selector: '[data-testid="screenshot-picker-layer"]'
+    position: {x: 500, y: 375}
+- assert_text_equals:
+    selector: '[data-testid="screenshot-toast"]'
+    equals: 'Color #C82828 copied to clipboard'
+- assert_not_visible: '[data-testid="screenshot-picker-layer"]'
+- assert_not_visible: '[data-testid="screenshot-picker-popup"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-color-picker"]'
+    name: aria-pressed
+    equals: 'false'
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, '#C82828'))
+- click: '[data-testid="screenshot-color-picker"]'
+- wait_for: '[data-testid="screenshot-picker-layer"]'
+- hover: '[data-testid="screenshot-picker-layer"]'
+- press: Escape
+- assert_not_visible: '[data-testid="screenshot-picker-layer"]'
+- assert_visible: '[data-testid="screenshot-selection"]'
+- eval_readonly:
+    expression: navigator.clipboard.readText().then(Object.is.bind(null, '#C82828'))
+- click: '[data-testid="screenshot-cancel"]'
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Picker samples the fixture center, displays its exact hex and RGB, copies that value and exits picker mode without closing capture.
+    actions: [1, 2, 4, 6, 7, 10, 14]
+    checkpoints:
+    - {step: 9, expectation: Picker reports active state.}
+    - {step: 12, expectation: The displayed color equals the known fixture pixel.}
+    - {step: 13, expectation: RGB agrees with that hex value.}
+    - {step: 15, expectation: The success toast identifies the copied hex rather than merely existing.}
+    - {step: 16, expectation: Picking exits the picker layer.}
+    - {step: 17, expectation: The popup is removed.}
+    - {step: 18, expectation: Picker reports inactive state.}
+    - {step: 19, expectation: The browser text clipboard contains exactly the selected hex.}
+    results: [12, 13, 15, 16, 17, 18, 19]
+  - id: R2
+    requirement: Escape cancels a subsequent picker session without clearing the selection or changing the copied value.
+    actions: [20, 22, 23, 27]
+    checkpoints:
+    - {step: 24, expectation: Escape dismisses the picker layer.}
+    - {step: 25, expectation: The crop survives picker cancellation.}
+    - {step: 26, expectation: The previous clipboard text is unchanged.}
+    - {step: 28, expectation: Capture remains cancelable.}
+    results: [24, 25, 26, 28]
+  visual:
+  - check: Picker hex and RGB identify a known synthetic base-image pixel.
+    method: automated
+    reason: The fixture pixel was decoded independently; this proves renderer sampling, not accuracy on a real captured display.
+  native:
+  - check: Native display color sampling and OS text clipboard interoperability.
+    method: external
+    reason: Browser clipboard and synthetic PNG sampling do not certify native display color management or packaged-WebView behavior.

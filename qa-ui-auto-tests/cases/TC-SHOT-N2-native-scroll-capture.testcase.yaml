@@ -1,0 +1,26 @@
+id: TC-SHOT-N2
+title: Native scrolling screenshot matches the full original page pixels
+covers: [F27.1]
+tags: [screenshot, scroll-capture, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: scroll}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: long-image
+    requirement: Real OS wheel scroll captures the entire original page with matching text, shapes, colored rows and separators, without duplicates, gaps, reordering or squashing.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: "A real scrollbar stays outside the original canvas/capture gutter; full output dimensions and all 24x24 spatial tiles match the retained original page crop; mean RGB error <=2, no bad tile above 5 and <=1 percent materially different pixels. Original full page, expected crop, stitched PNG and amplified difference are retained. Row order/heights and output growth also pass."}
+    - {step: 4, expectation: Main remains usable after fixture cleanup.}
+    results: [3, 4]
+  visual:
+  - {check: Full original content and seams, method: automated, reason: "Compare every output pixel and spatial tile to the actual renderer canvas original; text/checker/shapes across the width expose missing content that a single decode column could miss. Retain expected/actual/difference PNGs for visual review."}
+  native:
+  - {check: Wheel and capture, method: automated, reason: Enigo injects OS wheel and the product captures real native fixture pixels.}
