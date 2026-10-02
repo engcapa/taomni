@@ -417,14 +417,14 @@ fn strategies(fragment: usize, historical: bool) -> Vec<(&'static str, bool, Enc
                 .map(|r| {
                     let px = crop(c, r);
                     let planar = planar_candidate(&px, r.w, r.h);
-                    let mut strips = [0u8; 4096];
+                    let mut strips = [0u8; 1024];
                     let sample = if planar.len() <= strips.len() {
                         planar.as_slice()
                     } else {
                         for index in 0..4 {
-                            let start = index * (planar.len() - 1024) / 3;
-                            strips[index * 1024..(index + 1) * 1024]
-                                .copy_from_slice(&planar[start..start + 1024]);
+                            let start = index * (planar.len() - 256) / 3;
+                            strips[index * 256..(index + 1) * 256]
+                                .copy_from_slice(&planar[start..start + 256]);
                         }
                         &strips
                     };

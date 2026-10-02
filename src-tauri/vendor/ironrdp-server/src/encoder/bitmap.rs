@@ -42,7 +42,7 @@ impl BitmapEncoder {
             // 4 B/pixel. Allow bitmap/planar headers even for one-row chunks.
             pixels * 4 + usize::from(bitmap.height.get()) * 32
         } else {
-            pixels * 8
+            bitmap.data.len() * 2
         }
     }
 
@@ -89,8 +89,12 @@ impl BitmapEncoder {
         for (i, chunk) in chunks.enumerate() {
             // A cropped dirty rectangle keeps its parent stride, but its last
             // row ends at the crop's width. That partial stride is a full row.
-            let height = cast_int!("bitmap height", chunk.len().div_ceil(stride))
-                .map_err(BitmapEncodeError::Encode)?;
+            let rows = if self.byte_scan_width {
+                chunk.len().div_ceil(stride)
+            } else {
+                chunk.len() / stride
+            };
+            let height = cast_int!("bitmap height", rows).map_err(BitmapEncodeError::Encode)?;
             let i: u16 = cast_int!("chunk idx", i).map_err(BitmapEncodeError::Encode)?;
             let top = bitmap.y + i * chunk_height;
 
@@ -248,13 +252,17 @@ fn raw_planes<const R: usize, const G: usize, const B: usize>(
     {
         let start = (height - y - 1) * stride;
         let row = &src[start..start + row_len];
-        for (((red, green), blue), pixel) in
-            red.iter_mut().zip(green).zip(blue).zip(row.chunks_exact(4))
-        {
-            // A fixed pixel layout lets LLVM vectorize the three plane stores.
-            *red = pixel[R];
-            *green = pixel[G];
-            *blue = pixel[B];
+        let pixels = row.as_chunks::<4>().0;
+        // Independent fixed-layout loops let LLVM vectorize each channel
+        // without a four-way zip's minimum-length and alias checks.
+        for (output, pixel) in red.iter_mut().zip(pixels) {
+            *output = pixel[R];
+        }
+        for (output, pixel) in green.iter_mut().zip(pixels) {
+            *output = pixel[G];
+        }
+        for (output, pixel) in blue.iter_mut().zip(pixels) {
+            *output = pixel[B];
         }
     }
 }

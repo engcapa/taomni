@@ -250,10 +250,9 @@ jobs:
             cd src-tauri
             cargo test --locked --release -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server --lib
             cargo test --locked --release -p ironrdp-server --lib profile_photo_encoder_costs -- --ignored --nocapture
-            cargo test --locked --release --lib servers::rdp::
-            cargo test --locked --release --lib rdp::session::tests
-            cargo test --locked --release --lib rdp::ws::tests
-            cargo test --locked --release --lib rdp::tls::tests
+            # The substring filter includes both rdp::* and servers::rdp::*.
+            # One invocation covers all contracts without repeated root links.
+            cargo test --locked --release --lib rdp::
             cargo test --locked --release --bin rdp-probe
           ) 2>&1 | tee 'qa-ui-auto-report/${{ matrix.id }}/rdp-unit.log'
       - name: Run selected cases (Linux native desktop)

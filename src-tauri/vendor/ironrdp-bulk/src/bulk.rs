@@ -124,7 +124,9 @@ impl BulkCompressor {
             return Ok(src_data.len());
         }
         let mut context = MppcContext::new(1);
-        let mut output = alloc::vec![0; OUTPUT_BUFFER_SIZE];
+        // MPPC caps its destination at the input length and falls back to
+        // raw data on expansion. Small estimates need no 64 KiB output.
+        let mut output = alloc::vec![0; src_data.len()];
         let (size, packet_flags) = context.compress(src_data, &mut output)?;
         Ok(if packet_flags & crate::flags::PACKET_COMPRESSED != 0 {
             size + 1

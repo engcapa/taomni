@@ -16,3 +16,5 @@ recovery, the size reduction and exact decompression with continuing histories.
 context for the server's disposable size estimate. It avoids allocating all
 six unrelated compression/decompression contexts for every dirty rectangle;
 its estimates match a fresh RDP5 coordinator byte for byte.
+The estimate output is capped at the input length, matching MPPC's own cap.
+Fresh MPPC contexts are already zeroed and need no redundant initial reset.
