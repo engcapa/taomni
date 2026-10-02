@@ -149,10 +149,8 @@ describe("ScreenshotOverlay", () => {
     await open();
     fireEvent.click(screen.getByTestId("screenshot-fullscreen"));
     fireEvent.click(screen.getByTestId("screenshot-auto-redact"));
-    await waitFor(() => {
-      expect(shapes()).toBe("2");
-      expect(screen.getByTestId("screenshot-undo")).toBeEnabled();
-    });
+    await waitFor(() => expect(shapes()).toBe("2"));
+    expect(screen.getByTestId("screenshot-undo")).toBeEnabled();
     fireEvent.click(screen.getByTestId("screenshot-undo"));
     expect(shapes()).toBe("0");
     fireEvent.click(screen.getByTestId("screenshot-redo"));

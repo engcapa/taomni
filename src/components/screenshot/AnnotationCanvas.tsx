@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -441,7 +442,9 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       [apply],
     );
 
-    useEffect(() => {
+    // Toolbar availability is part of the same visible history update;
+    // a passive effect exposes stale enabled/disabled state for one paint.
+    useLayoutEffect(() => {
       onHistoryChange?.(history.undo.length > 0, history.redo.length > 0);
     }, [history, onHistoryChange]);
 
