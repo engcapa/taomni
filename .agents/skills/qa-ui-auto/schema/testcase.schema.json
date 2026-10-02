@@ -62,6 +62,7 @@
         "enum": [
           "reset_db",
           "backup_policy",
+          "path_completion",
           "ssh_required",
           "sftp_required",
           "mysql_required",
