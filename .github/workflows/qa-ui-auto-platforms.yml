@@ -240,6 +240,14 @@ jobs:
         run: >-
           python -m qa_ui_auto.rdp_helpers.mstsc
           --preflight 'qa-ui-auto-report/${{ matrix.id }}/mstsc-startup'
+      - name: Retain the mstsc startup diagnostic before compiling
+        if: always() && runner.os == 'Windows' && matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-windows-mstsc-startup-${{ needs.plan.outputs.artifact_key }}
+          path: qa-ui-auto-report/${{ matrix.id }}/mstsc-startup/
+          if-no-files-found: error
+          retention-days: 14
       - name: RDP unit contracts on the native platform
         if: matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
         env:
