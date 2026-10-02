@@ -664,8 +664,11 @@ impl XCrushContext {
             }
         }
 
-        // Handle fallback cases: L2 not applied or flushed
-        if !l2_status || (level2_compr_flags & flags::PACKET_FLUSHED != 0) {
+        // A compressed packet may also flush the MPPC history. Its bytes
+        // remain compressed and its FLUSHED flag must reach the peer. Treating
+        // that combination as raw reset both compressors again and trapped
+        // every subsequent compressible packet in the same fallback.
+        if !l2_status || (level2_compr_flags & flags::PACKET_COMPRESSED == 0) {
             if compressed_data_size > dst_size {
                 // Compression didn't help — return uncompressed
                 self.reset(true);
@@ -1281,6 +1284,47 @@ impl XCrushContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compression_recovers_after_an_incompressible_packet_flushes_mppc() {
+        let mut sender = XCrushContext::new();
+        let mut receiver = XCrushContext::new();
+        let mut output = vec![0; 65536];
+        let mut seed = 0x9e3779b9u32;
+        let noise: Vec<u8> = (0..16374)
+            .map(|_| {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                seed as u8
+            })
+            .collect();
+        let (size, packet_flags) = sender.compress(&noise, &mut output).unwrap();
+        assert_ne!(
+            output[1] & flags::PACKET_FLUSHED as u8,
+            0,
+            "fixture must flush the inner MPPC history"
+        );
+        assert_eq!(output[1] & flags::PACKET_COMPRESSED as u8, 0);
+        assert_eq!(
+            receiver.decompress(&output[..size], packet_flags).unwrap(),
+            noise
+        );
+        for frame in 0..3 {
+            let pixels: Vec<u8> = (0..16374).map(|i| ((i + frame) % 31) as u8).collect();
+            let (size, packet_flags) = sender.compress(&pixels, &mut output).unwrap();
+            assert_ne!(
+                packet_flags & flags::PACKET_COMPRESSED,
+                0,
+                "a compressed+FLUSHED inner packet must not cause a permanent raw fallback"
+            );
+            assert!(size < pixels.len() / 10);
+            assert_eq!(
+                receiver.decompress(&output[..size], packet_flags).unwrap(),
+                pixels
+            );
+        }
+    }
 
     #[test]
     fn test_xcrush_context_new_decompressor() {

@@ -2669,6 +2669,7 @@ fn send_status(out_tx: &SessionOutputSender, stage: &str, detail: &str) {
 }
 
 fn send_error(out_tx: &SessionOutputSender, code: &str, message: &str) {
+    tracing::warn!(code, error = %message, "RDP session failed");
     let retryable = is_retryable_rdp_error(message);
     send_text(
         out_tx,

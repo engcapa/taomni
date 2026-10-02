@@ -11,6 +11,9 @@ Encoder-adaptive patch (`docs-feature/rdp-server-parity/encoder-adaptive-design.
   select planar bitmap or default-quantization RemoteFX per dirty rectangle.
 - Reserve XCRUSH/fast-path overhead before advancing history; retain the
   cropped bitmap's final partial-stride row.
+- In the bulk path, write the bitmap header scan width in bytes. This permits
+  odd-width damage rectangles without a forced RemoteFX fallback; legacy
+  non-bulk headers retain their original bytes.
 - Optional aggregate encoding counters and observation of static channels
   actually joined by the peer. Proprietary codec paths keep their wire format.
 - Unit contracts enabled as Cargo workspace members alongside acceptor/bulk.

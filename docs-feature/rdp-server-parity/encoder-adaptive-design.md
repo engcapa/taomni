@@ -90,7 +90,14 @@ EXP-05（RemoteFX 量化与画质，单个条纹块的亮度 PSNR）：默认 35
 
 **结论。** 能在 mstsc 兼容前提下达到预算的只有“位图 + 批量压缩”。照片类内容必须保留 RemoteFX。因此按矩形选择编码，选择依据是实际压缩后的字节数，而不是颜色数之类的启发式（EXP-02 的 ≤16 色、≤256 色启发式试过，效果与不选一样）。
 
-EXP-06 的自适应选择器原型（planar+XCRUSH 与 RemoteFX 取小者）需要在 TASK-E2 完成后用 V-E01 复跑，并把数字回填到本节。
+V-E01 已在仓库执行并通过。原型条件（16352 字节分片、模拟位图头在尾部）的 E/F 仍为 314/292 B/frame，与历史值完全一致；生产条件使用 16374 字节分片与头部，E/F 为 323/312 B/frame。EXP-06 与生产代码一样仅用 planar 首个分片估算，结果如下（Windows 本地 release unit，所有 bulk 结果均完成解压往返；耗时只代表此离线场景）：
+
+| 场景 | EXP-01 A（现状） | EXP-01 B（合并 RemoteFX） | EXP-06 H（自适应） | H 编码耗时 |
+|---|---|---|---|---|
+| 合成 UI | 31120 B/frame，7967 kbps | 27220 B/frame，6968 kbps | 312 B/frame，80 kbps | 6.51 ms/frame（A 4.36 ms） |
+| 照片 | 192069 B/frame，49170 kbps | 188169 B/frame，48171 kbps | 188169 B/frame，48171 kbps | 40.34 ms/frame（A 26.65 ms） |
+
+证据为 `qa-ui-auto-report/_local/encoder-experiment-sampled.log`。照片带宽已保持 RemoteFX 基线；额外 planar 编码的 CPU 成本仍需 PERF-03 的 native 帧率比证明不造成实际退化。
 
 ### 决策记录
 
@@ -128,7 +135,7 @@ EncoderIter::next(rect)
 
 要点：
 
-- **只有真正发出去的字节进入连接的压缩历史。** 连接的 `BulkCompressor` 每调用一次 `compress` 就推进历史，客户端则只会看到发出去的数据。如果拿连接压缩器去“试压”一个最终没发的矩形，双方历史就会错位，后面的画面会解错。所以判断只用 `scratch_mppc64k`：一个当次新建、用完即弃的 MPPC-64K 压缩器，只压当前矩形，不带跨帧历史。这个估算偏保守：EXP-03 中带历史压缩后约 300 B/帧，没有历史的单帧首次压缩也只有 425 B，相对 planar 的 24.9 KB 都远低于 25%。代价是 UI 类矩形要多做一次 MPPC 压缩，约 1–2 ms/帧（640×360）；TASK-E2 用 V-E01 测出实际耗时，回填到本节。
+- **只有真正发出去的字节进入连接的压缩历史。** 连接的 `BulkCompressor` 每调用一次 `compress` 就推进历史，客户端则只会看到发出去的数据。如果拿连接压缩器去“试压”一个最终没发的矩形，双方历史就会错位，后面的画面会解错。所以判断只用 `scratch_mppc64k`：一个当次新建、用完即弃的 MPPC-64K 压缩器，仅试压当前 planar 的首个 16374 字节分片，再按比例估算整个矩形，不带跨帧历史。这样限制照片场景试压 CPU 成本，且不污染发送历史。V-E01 的完整自适应耗时为 UI 6.51 ms/frame、照片 40.34 ms/frame（含 planar、选择与所选编码），与原 RemoteFX 的 4.36/26.65 ms 分开记录；实际输入延迟与帧率以 CI native PERF-01/03 为准。
 - **位图更新的约束。** `BitmapEncoder` 要求宽度是 4 的倍数（`encoder/bitmap.rs` 约 30 行）。合并矩形按 64 对齐，但桌面右缘可能不对齐（1366 宽等）。不满足时，该矩形直接走 RemoteFX，不报错。
 - **两种更新混发。** 同一帧里可能有的矩形是位图更新（`UpdateCode::Bitmap`），有的是 surface bits。mstsc、FreeRDP 和 ironrdp-session 都能处理混发，各自直接绘制到同一个 framebuffer；TASK-E3 的回环测试要覆盖混发的帧。
 - **RemoteFX 首帧头。** `RemoteFxHandler` 在第一次编码时附带 Sync/Context/Channels（`desktop_size.take()`）。自适应路径下，第一个矩形可能是位图，所以这个“首帧”标志必须挂在 RemoteFX 编码器自己身上，不能按“第一个更新”判断。现有实现已经是挂在 `RemoteFxHandler` 上的，保持不变即可。
@@ -444,6 +451,10 @@ EncoderIter::next(rect)
 - CI 等待期间审查发现两个参考服务器 case 残留对未创建的 `qa-rdp-loopback` 会话的等待，已移除并校正验收编号；xrdp 用例明确关闭 NLA，使用其支持的 TLS/Client Info 自动登录。探针补处理独立 `AT_FRONT` 控制包，回归验证后续 MPPC back-reference 使用已回绕的历史；探针 unit 15 passed（`encoder-probe-history.log`）。
 - 后续全量回归增加上游 V-15 的真实 ID `TC-auto-F-Servers-1-servers-dialog`，与原来的 20 个 RDP case 一起选择。
 - 第二轮 [36951702144](https://github.com/engcapa/taomni/actions/runs/36951702144)，源码 `d5dc6aa9`：QA 工具 unit 通过；Linux-only 选单包含 4 个仅 Windows 可执行的显式 ID，plan 如实拒绝，未执行 cases。后续按三平台联合选单运行全部 21 个 ID。
+- 第三轮 [36952621902](https://github.com/engcapa/taomni/actions/runs/36952621902)，源码 `af8092a2`：三平台 browser 均为 5 passed / 0 failed / 0 skipped。Linux native 为 9 passed / 3 failed / 0 skipped：PERF-01 为 9043.94 kbps，M1/M2/M3 为 61 ms / 32.65 ms / 59.28 fps，大量矩形回退 RemoteFX；PERF-03 使用更新 PDU 数比较帧率导致假失败，实际不同画面帧率比为 40.897/42.793=0.9557；REF-02 的原始连接错误被晚到控制消息的 `ctrl channel closed` 覆盖。以上失败产物原样保留，修复后必须重跑，不能改写成通过。
+- Linux 带宽修复：`TS_CD_HEADER.cbScanWidth` 应为每行字节数。bulk 位图路径现填写 `width * 4`，支持任意宽度脏区，避免因非 4 倍数宽度强制回退 RemoteFX。旧非 bulk 路径保持原头部。新增 1/2/3/253/254/255/256 宽、131 高、父 stride 裁剪的逐像素 unit，以及真实 TCP/TLS 回环的 253/255 宽脏区完整帧像素与字节预算断言；vendor 19 passed，根库 RDP 247 passed / 7 live-service ignored。
+- 修正 PERF-03 为比较 `marker.observed_fps`（实际不同画面），仍要求比值 ≥0.95、带宽比 ≤1.05。mstsc `.rdp` 使用单 CRLF 与绝对路径；退出前保存窗口诊断。xrdp 在清理前保存服务、Xorg、会话日志；产品保留原始会话错误而不让晚到输入覆盖它。QA 工具对应 unit 13 passed。互通和原生预算仍待下一轮实际报告。
+- 第三轮 macOS native 为 10 passed / 1 failed / 0 skipped；PERF-01 的 bulk 压缩数为 0、M3=19.06 fps、M4=6692.34 kbps。PERF-03 原断言表面通过，但实际不同画面帧率比为 14.093/18.159=0.7761，按修正后的口径不能验收。XCRUSH 序列 unit 已复现“不可压缩数据触发 MPPC FLUSHED 后，下一包 COMPRESSED+FLUSHED 被误丢弃，并持续重置”的缺陷；改前失败日志 `encoder-xcrush-flush-before-2.log`，修复后 bulk 136 / server 19 tests 全过。另有 WebSocket unit 验证晚到 refresh/resize 不会覆盖原始 TLS 错误（12 passed / 1 live-service ignored）。这些本地日志位于 ignored 的 `qa-ui-auto-report/_local/`；三端原生性能必须重测。
 
 ## 9. 验收追踪与交付条件
 

@@ -66,6 +66,24 @@ class EncoderToolsTest(unittest.TestCase):
             stop.assert_called_once_with(process)
             self.assertIsNone(self.ctx._mstsc_process)
 
+    def test_mstsc_file_uses_absolute_path_and_single_crlf_lines(self):
+        process = Mock(pid=12345)
+        process.poll.return_value = None
+        with patch.object(steps.platform, "system", return_value="Windows"), \
+             patch.dict(os.environ, {"QA_RDP_USER": "fixture-user", "QA_RDP_PASSWORD": "dummy-password"}), \
+             patch.object(steps.subprocess, "run", return_value=SimpleNamespace(returncode=0)), \
+             patch.object(steps.subprocess, "Popen", return_value=process) as launch, \
+             patch.object(steps, "_stop_process"), \
+             patch.object(steps, "_capture_mstsc", side_effect=RuntimeError("capture failed")) as capture:
+            steps._do_host_mstsc(self.ctx, {"action": "start"})
+            launch.assert_called_once_with(["mstsc.exe", str((self.case / "mstsc.rdp").resolve())])
+            raw = (self.case / "mstsc.rdp").read_bytes().decode("utf-16")
+            self.assertIn("\r\nusername:s:fixture-user\r\n", raw)
+            self.assertNotIn("\r\r\n", raw)
+            steps._do_host_mstsc(self.ctx, {"action": "stop"})
+            capture.assert_called_once()
+            self.assertIsNone(self.ctx._mstsc_process)
+
     def test_canvas_waits_for_the_decoded_pixels_and_records_quality(self):
         self.ctx.session.execute.side_effect = [None,
             {"pixels": [[0, 0, 0, 255]], "quality_level": 0},
@@ -128,6 +146,34 @@ class XrdpFixtureTest(unittest.TestCase):
         self.assertEqual(run.call_count, 2)
         self.assertIn("xorgxrdp", run.call_args_list[1].args[0])
         self.assertFalse(any("docker" in call.args[0] for call in run.call_args_list))
+
+    def test_xrdp_diagnostics_keep_original_logs_and_redact_password(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = SimpleNamespace(case_dir=Path(directory))
+            xrdp._STATE["user"] = "qaxrdp-test"
+            with patch.dict(os.environ, {"QA_XRDP_PASSWORD": "dummy-password"}), \
+                 patch.object(xrdp, "_sudo", return_value=subprocess.CompletedProcess([], 0, "session failed dummy-password", "")):
+                xrdp._collect_diagnostics(ctx)
+            logs = list((ctx.case_dir / "xrdp-diagnostics").glob("*.log"))
+            self.assertEqual(len(logs), 5)
+            for path in logs:
+                self.assertIn("session failed [redacted]", path.read_text())
+
+    def test_xrdp_diagnostic_failure_does_not_prevent_teardown(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = SimpleNamespace(case_dir=Path(directory))
+            xrdp._STATE.update(user="qaxrdp-test", config=b"original-config")
+            calls = []
+            def sudo(*args, **kwargs):
+                calls.append(args)
+                if args[0] == "tail":
+                    raise OSError("diagnostic unavailable")
+                return subprocess.CompletedProcess(args, 0, "", "")
+            with patch.object(xrdp, "_sudo", side_effect=sudo):
+                xrdp.teardown(ctx)
+            self.assertIn(("userdel", "-r", "qaxrdp-test"), calls)
+            self.assertFalse(xrdp._STATE)
+            self.assertTrue((ctx.case_dir / "xrdp-diagnostics/collection-error.json").is_file())
 
 
 if __name__ == "__main__":

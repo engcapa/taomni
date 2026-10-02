@@ -307,6 +307,11 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
 
     def cleanup() -> None:
         if process is not None:
+            if process.poll() is None:
+                try:
+                    _capture_mstsc(ctx, process, {"snapshot": "mstsc-last-window.png"})
+                except Exception:
+                    pass  # Capture is diagnostic; owned process/credential cleanup must finish.
             _stop_process(process)
         subprocess.run(["cmdkey", f"/delete:{target}"], capture_output=True, timeout=30)
 
@@ -319,8 +324,10 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
                f"desktopwidth:i:{int(args.get('width') or 1024)}", f"desktopheight:i:{int(args.get('height') or 768)}",
                "session bpp:i:32", "audiomode:i:0", "redirectclipboard:i:1", "autoreconnection enabled:i:0"]
     try:
-        rdp.write_text("\r\n".join(options) + "\r\n", encoding="utf-16")
-        process = subprocess.Popen(["mstsc.exe", str(rdp)])
+        # Avoid Windows text mode expanding CRLF to CRCRLF. mstsc also needs
+        # the complete path when invoked outside the RDP file's directory.
+        rdp.write_text("\r\n".join(options) + "\r\n", encoding="utf-16", newline="")
+        process = subprocess.Popen(["mstsc.exe", str(rdp.resolve())])
     except BaseException:
         cleanup()
         raise

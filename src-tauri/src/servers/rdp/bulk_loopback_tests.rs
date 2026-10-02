@@ -376,6 +376,71 @@ async fn bulk_compressed_planar_round_trip_is_lossless() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn odd_width_damage_preserves_the_full_frame_and_bulk_budget() {
+    let (width, height) = (512u16, 256u16);
+    let server = TestServer::new(width, height, true);
+    let mut client = TestClient::connect(server.addr, Some(CompressionType::Rdp61), false)
+        .await
+        .unwrap();
+    let mut pixels = vec![0; usize::from(width) * usize::from(height) * 4];
+    for pixel in pixels.chunks_exact_mut(4) {
+        pixel.copy_from_slice(&[40, 80, 120, 255]);
+    }
+    server.send_frame(width, height, &pixels);
+    client.frame(&pixels, width, height, false).await.unwrap();
+    let start_bytes = server.stats.bytes_after_bulk.load(Ordering::Relaxed);
+    // A parent-stride crop followed by a tightly packed XDamage-style crop,
+    // both with odd width and enough rows to span TS_BITMAP_DATA chunks.
+    for (index, crop_width) in [253u16, 255].into_iter().enumerate() {
+        let (left, top, crop_height) = (11usize, 19usize, 131usize);
+        for y in top..top + crop_height {
+            for x in left..left + usize::from(crop_width) {
+                let value = if (x / 16 + y / 8 + index) % 2 == 0 {
+                    16
+                } else {
+                    240
+                };
+                pixels[(y * usize::from(width) + x) * 4..][..4]
+                    .copy_from_slice(&[value, 32, 64, 255]);
+            }
+        }
+        let parent = BitmapUpdate {
+            x: 0,
+            y: 0,
+            width: NonZeroU16::new(width).unwrap(),
+            height: NonZeroU16::new(height).unwrap(),
+            format: PixelFormat::BgrA32,
+            data: pixels.clone().into(),
+            stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
+        };
+        let mut crop = parent
+            .sub(
+                left as u16,
+                top as u16,
+                NonZeroU16::new(crop_width).unwrap(),
+                NonZeroU16::new(crop_height as u16).unwrap(),
+            )
+            .unwrap();
+        if index == 1 {
+            crop.data = crop
+                .data
+                .chunks(crop.stride.get())
+                .flat_map(|row| row[..usize::from(crop_width) * 4].iter().copied())
+                .collect::<Vec<_>>()
+                .into();
+            crop.stride = NonZeroUsize::new(usize::from(crop_width) * 4).unwrap();
+        }
+        server.updates.send(DisplayUpdate::Bitmap(crop)).unwrap();
+        client.frame(&pixels, width, height, false).await.unwrap();
+    }
+    assert_eq!(client.wire.rfx, 0);
+    assert!(
+        server.stats.bytes_after_bulk.load(Ordering::Relaxed) - start_bytes < 10_000,
+        "UI damage must stay well below the bandwidth budget"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mppc_64k_client_round_trip() {
     let server = TestServer::new(256, 128, true);
     let mut client = TestClient::connect(server.addr, Some(CompressionType::K64), false)

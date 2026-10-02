@@ -175,7 +175,7 @@ steps:
       kbps:
         max: 4905
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: Connect time, input-to-frame latency samples and animation throughput are measured on the real

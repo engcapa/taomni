@@ -157,7 +157,7 @@ steps:
     action: stop
     name: target
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: Start launches the RDP listener, NLA with the configured account succeeds and the probe decodes the desktop with both the mstsc codec set and the Taomni client codec set.

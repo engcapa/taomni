@@ -232,11 +232,12 @@ impl UpdateEncoder {
                 let rfx = rfx.clone();
                 self.bulk = Some(bulk::BulkEncoder::new(compression)?);
                 *updater = BitmapUpdater::Adaptive(AdaptiveHandler {
-                    bitmap: BitmapHandler::new(),
+                    bitmap: BitmapHandler::for_bulk_compression(),
                     rfx,
                 });
             } else if matches!(updater, BitmapUpdater::Bitmap(_)) {
                 self.bulk = Some(bulk::BulkEncoder::new(compression)?);
+                *updater = BitmapUpdater::Bitmap(BitmapHandler::for_bulk_compression());
             }
         }
         Ok(self)
@@ -648,7 +649,7 @@ struct AdaptiveHandler {
 
 impl BitmapUpdateHandler for AdaptiveHandler {
     fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
-        if !bitmap.width.get().is_multiple_of(4) || bitmap.width.get() > u16::MAX / 4 {
+        if bitmap.width.get() > u16::MAX / 4 {
             return self.rfx.handle(bitmap);
         }
         let planar = self.bitmap.handle(bitmap)?;
@@ -698,6 +699,12 @@ impl BitmapHandler {
     fn new() -> Self {
         Self {
             bitmap: BitmapEncoder::new(),
+        }
+    }
+
+    fn for_bulk_compression() -> Self {
+        Self {
+            bitmap: BitmapEncoder::for_bulk_compression(),
         }
     }
 }
@@ -1052,9 +1059,9 @@ mod bulk_tests {
     }
 
     #[test]
-    fn unaligned_rectangles_fall_back_without_losing_the_rfx_headers() {
+    fn unaligned_ui_rectangles_use_planar_instead_of_remotefx() {
         let mut encoder = encoder();
-        for width in [255, 253] {
+        for width in [1, 2, 3, 253, 254, 255] {
             let bitmap = BitmapUpdate {
                 x: 0,
                 y: 0,
@@ -1070,7 +1077,7 @@ mod bulk_tests {
                 .unwrap()
                 .handle(&bitmap)
                 .unwrap();
-            assert_eq!(encoded.code, UpdateCode::SurfaceCommands);
+            assert_eq!(encoded.code, UpdateCode::Bitmap, "width={width}");
         }
     }
 }

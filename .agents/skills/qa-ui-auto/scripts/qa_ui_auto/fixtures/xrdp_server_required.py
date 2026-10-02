@@ -6,6 +6,7 @@ provisioning fails. No service/account mutation is allowed on a workstation.
 from __future__ import annotations
 
 import os
+import json
 import platform
 import re
 import secrets
@@ -121,6 +122,7 @@ def setup(ctx: Any) -> None:
 def teardown(ctx: Any) -> None:
     if not _STATE:
         return
+    _collect_diagnostics(ctx)
     _sudo("systemctl", "stop", "xrdp", "xrdp-sesman", check=False)
     user = _STATE.get("user")
     if user:
@@ -141,3 +143,35 @@ def teardown(ctx: Any) -> None:
         else:
             os.environ[key] = value
     _STATE.clear()
+
+
+def _collect_diagnostics(ctx: Any) -> None:
+    """Preserve the session's failure before services and account are removed."""
+    case_dir = getattr(ctx, "case_dir", None)
+    if case_dir is None:
+        return
+    destination = Path(case_dir) / "xrdp-diagnostics"
+    try:
+        destination.mkdir(parents=True, exist_ok=True)
+        password = os.environ.get("QA_XRDP_PASSWORD", "")
+        files = [("xrdp.log", "/var/log/xrdp.log"), ("sesman.log", "/var/log/xrdp-sesman.log")]
+        if user := _STATE.get("user"):
+            files.extend([("xsession.log", f"/home/{user}/.xsession-errors"),
+                          ("xorg.log", f"/home/{user}/.xorgxrdp.10.log")])
+        for name, path in files:
+            result = _sudo("tail", "-c", "100000", path, check=False)
+            detail = result.stdout + result.stderr
+            if password:
+                detail = detail.replace(password, "[redacted]")
+            (destination / name).write_text(detail, encoding="utf-8")
+        result = _sudo("journalctl", "-u", "xrdp", "-u", "xrdp-sesman", "--no-pager", "-n", "300", check=False)
+        detail = result.stdout + result.stderr
+        if password:
+            detail = detail.replace(password, "[redacted]")
+        (destination / "services.log").write_text(detail, encoding="utf-8")
+    except Exception as exc:
+        # Optional diagnostics must never prevent ownership cleanup.
+        try:
+            (destination / "collection-error.json").write_text(json.dumps({"error": str(exc)}), encoding="utf-8")
+        except OSError:
+            pass

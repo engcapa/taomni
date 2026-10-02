@@ -138,7 +138,7 @@ steps:
     selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
     timeout_sec: 30
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: Sound played on this computer is streamed to the RDP client as RDPSND waves with the same tone.
