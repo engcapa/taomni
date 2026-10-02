@@ -7,6 +7,7 @@ from contextlib import ExitStack, contextmanager, nullcontext
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 
 
@@ -97,15 +98,15 @@ def launch(rdp_file: Path, port: int) -> MstscProcess:
 
 
 @contextmanager
-def _registry_value(root, path, name, value):
-    """Temporarily set one DWORD without deleting any unrelated registry state."""
+def _registry_value(root, path, name, value, *, value_type=None):
+    """Temporarily set one value without deleting unrelated registry state."""
     import winreg
     with winreg.CreateKeyEx(root, path, 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
         try:
             previous = winreg.QueryValueEx(key, name)
         except FileNotFoundError:
             previous = None
-        winreg.SetValueEx(key, name, 0, winreg.REG_DWORD, value)
+        winreg.SetValueEx(key, name, 0, winreg.REG_DWORD if value_type is None else value_type, value)
     try:
         yield
     finally:
@@ -114,6 +115,62 @@ def _registry_value(root, path, name, value):
                 winreg.DeleteValue(key, name)
             else:
                 winreg.SetValueEx(key, name, 0, previous[1], previous[0])
+
+
+@contextmanager
+def crash_reporting(directory: Path):
+    """Keep an owned client's Windows Error Reporting minidump on hosted CI."""
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        yield
+        return
+    import winreg
+    target = directory.resolve() / "mstsc-crash"
+    target.mkdir(exist_ok=True)
+    path = r"SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\mstsc.exe"
+    with ExitStack() as restore:
+        restore.enter_context(_registry_value(winreg.HKEY_LOCAL_MACHINE, path,
+                                              "DumpFolder", str(target), value_type=winreg.REG_EXPAND_SZ))
+        restore.enter_context(_registry_value(winreg.HKEY_LOCAL_MACHINE, path, "DumpType", 1))
+        restore.enter_context(_registry_value(winreg.HKEY_LOCAL_MACHINE, path, "DumpCount", 1))
+        yield
+
+
+def crash_diagnostics(process: MstscProcess, directory: Path) -> None:
+    """Collect the owned PID's Application Error and optional dump stack."""
+    script = r'''
+$events = @(Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000;
+  StartTime=(Get-Date).AddMinutes(-10)} -ErrorAction SilentlyContinue)
+$owned = foreach ($event in $events) {
+  $xml = [xml]$event.ToXml()
+  $data = @{}
+  foreach ($field in $xml.Event.EventData.Data) { $data[[string]$field.Name] = [string]$field.'#text' }
+  if ($data.AppName -ieq 'mstsc.exe' -and $data.ProcessId) {
+    $pidValue = if ($data.ProcessId.StartsWith('0x')) {
+      [Convert]::ToInt64($data.ProcessId.Substring(2),16)
+    } else { [long]$data.ProcessId }
+    if ($pidValue -eq [long]$env:QA_MSTSC_PID) {
+      [pscustomobject]@{time=$event.TimeCreated.ToString('o'); id=$event.Id; data=$data}
+    }
+  }
+}
+ConvertTo-Json -InputObject @($owned) -Depth 5
+'''
+    result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                            env={**os.environ, "QA_MSTSC_PID": str(process.pid)},
+                            capture_output=True, text=True, timeout=30)
+    (directory / "mstsc-application-error.json").write_text(result.stdout, encoding="utf-8")
+    if result.stderr:
+        (directory / "mstsc-application-error.txt").write_text(result.stderr, encoding="utf-8")
+    dumps = list((directory / "mstsc-crash").glob(f"mstsc.exe.{process.pid}.dmp"))
+    cdb = shutil.which("cdb")
+    if not cdb:
+        candidate = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Windows Kits/10/Debuggers/x64/cdb.exe"
+        if candidate.is_file():
+            cdb = str(candidate)
+    if dumps and cdb:
+        result = subprocess.run([cdb, "-z", str(dumps[0]), "-c", ".ecxr; k; q"],
+                                capture_output=True, text=True, timeout=90)
+        (directory / "mstsc-crash-stack.txt").write_text(result.stdout + result.stderr, encoding="utf-8")
 
 
 @contextmanager

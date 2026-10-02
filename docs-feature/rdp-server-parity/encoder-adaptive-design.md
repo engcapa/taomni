@@ -249,6 +249,9 @@ EncoderIter::next(rect)
 - 验证与完成条件：V-E02（vendored crate 单元测试）、V-E03、V-E04 通过；`cargo test --lib servers::` 与改造前一样全部通过（改造前 238 passed / 7 ignored，提交 e1af63eb，2026-10-01 本地 Windows）；三端编译通过（V-E11）
 - 并行与集成：与 TASK-E3 的测试骨架并行；`server.rs` 与 TASK-E2 共享，E1 先合入
 
+- 状态：done
+- 完成记录：提交 `7c88ebf6` 实现 Client Info 协商、每连接 BulkEncoder、四级分片与生命周期；`69ddd766` 修复 XCRUSH FLUSHED 序列与奇数宽。V-E02~E06 的本地 unit、四级 wire/pixel 回环与三端 release unit 已通过；最终统一运行和构建身份见 §8.2。
+
 ### TASK-E2 内容自适应选择
 
 - 职责与文件范围：`vendor/ironrdp-server/src/encoder/mod.rs`（`AdaptiveHandler`）、`src-tauri/src/servers/rdp.rs`、`src-tauri/src/servers/rdp/metrics.rs`
@@ -262,6 +265,9 @@ EncoderIter::next(rect)
 - 对应验收：AC-E01、AC-E02、AC-E09
 - 验证与完成条件：V-E01（离线：UI 场景 ≤4905 kbps，照片场景不高于 EXP-01 A）、V-E05、V-E06、V-E07 通过
 - 并行与集成：依赖 E1 的接口；与 E4 的探针改动互不重叠
+
+- 状态：done
+- 完成记录：提交 `7c88ebf6` 实现内容选择、单开关回退与统计；`1da27389`、`102a6e00`、`77471a5d` 限制估算成本并优化 raw/RLE planar。当前四段 256 B 采样；V-E01 原型数值偏差 0%，production-vendor 往返与照片带宽通过，最新数字在 §4.1；V-E05~E07 通过。真实三端 UI/照片性能由 E5 验收。
 
 ### TASK-E3 回环正确性测试
 
@@ -281,6 +287,9 @@ EncoderIter::next(rect)
 - 验证与完成条件：V-E03~V-E06 通过；去掉批量压缩器的历史重置（人为制造缺陷）时，`reactivation_resets_compression_history` 必须失败，证明测试有效。缺陷验证完撤销，并在完成记录写明做过
 - 并行与集成：与 E1/E2 共用 `loopback_tests.rs`，由本任务独占该文件
 
+- 状态：done
+- 完成记录：开工旧回环两个 unit 均通过，QOIZ 旧断言保留；新增 `bulk_loopback_tests.rs` 覆盖不声明压缩、MPPC-64K、无损 bitmap、混发、奇数宽、重连与尺寸重激活。两次删除 reset/首次 FLUSHED 的缺陷注入实际失败，恢复并重编后通过（§8.2）。三端 release unit 执行，不在本机运行 browser/native。
+
 ### TASK-E4 探针与客户端声明批量压缩
 
 - 职责与文件范围：`src-tauri/src/bin/rdp-probe/{session.rs,rfx_stats.rs,main.rs}`、`src-tauri/src/rdp/session.rs`
@@ -296,7 +305,12 @@ EncoderIter::next(rect)
 - 验证与完成条件：V-E08、V-E09 通过；对 TermService 跑 PERF-02 时，探针报告 TermService 是否压缩以及压缩比（V-E10）
 - 并行与集成：独立
 
+- 状态：done
+- 完成记录：提交 `7c88ebf6` 实现探针五种 compression 参数、四级解压/字节统计、实际 marker 帧率与 baseline-report；产品客户端声明 RDP6.1。探针 15 个 unit、session 配置 unit 均通过；V-E10 TermService 的真实压缩证据与最终复测见 §8.2。
+
 ### TASK-E5 CI 性能验收与照片场景
+
+- 状态：in_progress（以当前输入的三端 CI 最终证据关闭）
 
 - 职责与文件范围：`rdp_target.py`（`photo` 模式）、`TC-RDPS-PERF-01` 描述、`TC-RDPS-PERF-03-photo-content`（新）、`ci/policy.yaml`、`feature-list.md`
 - 依赖：TASK-E1~E4 合入
@@ -309,6 +323,8 @@ EncoderIter::next(rect)
 - 并行与集成：本任务负责编码器部分的整体集成与 CI 循环
 
 ### TASK-E6 mstsc 互通用例（V-17）
+
+- 状态：in_progress（以当前输入的三端 CI 最终证据关闭）
 
 - 职责与文件范围：`TC-RDPS-NAT-08-mstsc-interop.testcase.yaml`（新）、`rdp_steps.py` 新 verb `host_mstsc`、`schema/testcase.schema.json`、`verb-catalog.md`、`ci/policy.yaml`、`feature-list.md`
 - 输入与必读：上游 V-17（“`cmdkey` 凭据、证书警告抑制；mstsc 完成 NLA 并协商 cliprdr/rdpsnd/drdynvc，服务端日志与截图为证”）；现有 `TC-RDPS-NAT-06-windows-system-rdp-taomni`（Windows 启动与 `platform_choice`）；`rdp_steps.py` 中的 `host_helper`、`host_screenshot`
@@ -337,6 +353,8 @@ EncoderIter::next(rect)
 
 ### TASK-E7 Taomni 客户端连参考服务器（V-21）
 
+- 状态：in_progress（以当前输入的三端 CI 最终证据关闭）
+
 - 职责与文件范围：`TC-RDPC-REF-01-termservice.testcase.yaml`（新）、`rdp_steps.py` 新 verb `host_copy_file`（schema 与 verb-catalog 同步登记）、`TC-RDPC-REF-02-xrdp.testcase.yaml`（新，受 DEC-07 影响）、`fixtures/xrdp_server_required.py`（新，受 DEC-07 影响）、`ci_services.py` 与 workflow 的 xrdp 安装（受 DEC-07 影响）
 - 输入与必读：上游 V-21；现有 `TC-RDPJ-01-client-server-loopback`（客户端会话创建、认证、证书确认、连接栏步骤可直接复用）；`fixtures/rdp_baseline_required.py`（TermService 账号 `QA_RDP_BASELINE_USER1`、密码 `QA_RDP_BASELINE_PASSWORD`、端口 `QA_RDP_BASELINE_PORT`）
 - 依赖：REF-01 无依赖；REF-02 等 DEC-07
@@ -362,6 +380,8 @@ EncoderIter::next(rect)
 - 并行与集成：独立
 
 ### TASK-E8 上游设计回填与交付
+
+- 状态：in_progress（以当前输入的三端 CI 最终证据关闭）
 
 - 职责与文件范围：`docs-feature/rdp-server-parity-design.md`、本设计 §4.1/§4.2/§9、记忆文件（agent 本地）
 - 依赖：E1~E7；DEC-07 已批准，xrdp 实测纳入完成条件
@@ -494,6 +514,9 @@ EncoderIter::next(rect)
 
 - 第九轮 [36984196978](https://github.com/engcapa/taomni/actions/runs/36984196978)，源码 `6c873255`：三端 browser 各 5/0/0；native 为 Linux 12/0/0、macOS 10/1/0、Windows 13/2/0。UI 四项分别为 Linux 138 ms / 40.321 ms p95 / 54.393 实际 fps / 171.184 kbps，macOS 74 ms / 63.259 ms / 24.170 fps / 387.504 kbps，Windows 29 ms / 42.864 ms / 33.809 fps / 504.603 kbps。三端照片帧率比为 0.993598 / 0.970170 / 0.998166，带宽比为 0.985822 / 0.966403 / 0.992410，均通过；bulk 解压错误为 0。Linux xrdp、Windows TermService 与 macOS J-02 通过。macOS 唯一失败仍为 M3；Windows mstsc 已完成 NLA 与通道协商，但连接后进程退出 `0xC0000005`，原因尚未确定；PERF-02 的真实画面为“已登录用户过多 / 选择要断开的用户”，并非测量动画。全部选单、源码/runner/case/build 身份与 receipt 原始文件哈希已核验，两个 Windows 失败保留。
 - TermService 会话限制修复：仅 hosted Windows runner 临时设置并恢复 `fSingleSessionPerUser` 的值和类型；PERF-02 在吞吐账号登录前显式释放本 fixture 创建的延迟测量账号，并轮询确认 slot 消失。新 verb `host_rdp_logoff` 拒绝工作站、继承账号和 runneradmin，失败不写成功证据。部分 PowerShell setup 失败也先登记已创建账号，teardown 只处理本 fixture 拥有的会话；清理失败保留原始 setup 错误并另写 stderr。31 个全 mocked 工具/清理 unit 通过。实际参考性能与所有互通断言须由后续 CI 重测，预算和照片比值门槛均未调整。
+
+- 第十轮 [36986942288](https://github.com/engcapa/taomni/actions/runs/36986942288)，源码 `1afafcb6`：Linux native 12/0/0，UI 128 ms / 43.297 ms p95 / 55.998 实际 fps / 176.558 kbps，照片帧率/带宽比 0.984834 / 0.955343；Windows native 14/1/0，UI 44 ms / 35.979 ms p95 / 32.870 fps / 441.399 kbps，照片比 0.985306 / 0.987450，TermService 通过。Windows 唯一失败为 owned mstsc 进程再次退出 `0xC0000005`：本次 NLA、剪贴板、音频、drdynvc 全通过，像素截图前进程已退出，不能算互通通过。三端 browser 各 5/0/0；macOS native 尚待报告。已核验上述原始 receipt 与身份。
+- 为 mstsc 的重复 crash 增加 hosted-only 的 Windows Application Error（按 owned PID 筛选）与 WER minidump；runner 有 CDB 时另保存异常调用栈。DumpFolder/Type/Count 的原值与类型均恢复，工作站不修改。33 个 mocked 工具/清理 unit 通过；诊断不改变 NAT-08 的协议、像素或性能断言，真实原因仍由下一次 CI 工件确定。
 
 ## 9. 验收追踪与交付条件
 

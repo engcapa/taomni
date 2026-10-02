@@ -360,6 +360,8 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
         nonlocal process
         if process is not None:
             try:
+                from .rdp_helpers.mstsc import crash_diagnostics
+                crash_diagnostics(process, ctx.case_dir)
                 diagnose_mstsc(process, ctx.case_dir)
                 diagnostics = subprocess.run(
                     ["powershell", "-NoProfile", "-NonInteractive", "-Command",
@@ -408,6 +410,8 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
                "session bpp:i:32", "audiomode:i:0", "redirectclipboard:i:1", "autoreconnection enabled:i:0"]
     try:
         host_state.enter_context(file_launch_consent())
+        from .rdp_helpers.mstsc import crash_reporting
+        host_state.enter_context(crash_reporting(ctx.case_dir))
         # Avoid Windows text mode expanding CRLF to CRCRLF. mstsc also needs
         # the complete path when invoked outside the RDP file's directory.
         rdp.write_text("\r\n".join(options) + "\r\n", encoding="utf-16", newline="")

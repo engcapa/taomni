@@ -162,6 +162,40 @@ class EncoderToolsTest(unittest.TestCase):
         self.assertEqual(registry.SetValueEx.call_args.args, (key, "RdpLaunchConsentAccepted", 0, 4, 0))
         self.assertEqual(registry.SetValueEx.call_count, 2)
 
+    def test_hosted_crash_reporting_restores_each_original_value_and_type_after_failure(self):
+        registry = MagicMock()
+        key = registry.CreateKeyEx.return_value.__enter__.return_value
+        registry.QueryValueEx.side_effect = [("prior dump folder", 1), (2, 4), FileNotFoundError()]
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), patch.dict(sys.modules, {"winreg": registry}):
+            with self.assertRaisesRegex(RuntimeError, "launch failed"):
+                with mstsc.crash_reporting(self.case):
+                    raise RuntimeError("launch failed")
+        writes = [call.args for call in registry.SetValueEx.call_args_list]
+        self.assertEqual(writes[0], (key, "DumpFolder", 0, registry.REG_EXPAND_SZ, str(self.case / "mstsc-crash")))
+        self.assertEqual(writes[-2:], [(key, "DumpType", 0, 4, 2), (key, "DumpFolder", 0, 1, "prior dump folder")])
+        registry.DeleteValue.assert_called_once_with(key, "DumpCount")
+        registry.reset_mock()
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}):
+            with mstsc.crash_reporting(self.case):
+                pass
+        registry.CreateKeyEx.assert_not_called()
+
+    def test_crash_stack_reads_only_the_owned_process_dump(self):
+        dumps = self.case / "mstsc-crash"
+        dumps.mkdir()
+        (dumps / "mstsc.exe.54321.dmp").write_bytes(b"other process")
+        response = SimpleNamespace(stdout="[]", stderr="")
+        with patch.object(mstsc.shutil, "which", return_value="mock-cdb"), \
+             patch.object(mstsc.subprocess, "run", return_value=response) as run:
+            mstsc.crash_diagnostics(Mock(pid=12345), self.case)
+            self.assertEqual(run.call_count, 1)
+            self.assertEqual(run.call_args.kwargs["env"]["QA_MSTSC_PID"], "12345")
+            (dumps / "mstsc.exe.12345.dmp").write_bytes(b"owned process")
+            mstsc.crash_diagnostics(Mock(pid=12345), self.case)
+            self.assertEqual(run.call_args.args[0][2], str(dumps / "mstsc.exe.12345.dmp"))
+        self.assertTrue((self.case / "mstsc-application-error.json").is_file())
+        self.assertTrue((self.case / "mstsc-crash-stack.txt").is_file())
+
     def test_mstsc_stop_failure_still_removes_credentials_and_restores_the_account(self):
         process = Mock(pid=12345)
         state = MagicMock()
