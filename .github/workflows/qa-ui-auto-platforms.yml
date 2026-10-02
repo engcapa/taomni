@@ -194,6 +194,27 @@ jobs:
           Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
           Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
           $driver >> $env:GITHUB_PATH
+          if ('${{ contains(matrix.capabilities, 'rdp') }}' -eq 'true') {
+            $dumpZip = Join-Path $env:RUNNER_TEMP 'qa-procdump.zip'
+            $dumpTools = Join-Path $env:RUNNER_TEMP 'qa-procdump'
+            Invoke-WebRequest 'https://download.sysinternals.com/files/Procdump.zip' -OutFile $dumpZip
+            Expand-Archive -LiteralPath $dumpZip -DestinationPath $dumpTools -Force
+            "QA_MSTSC_PROCDUMP=$(Join-Path $dumpTools 'procdump64.exe')" >> $env:GITHUB_ENV
+            $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe"
+            if (-not (Test-Path -LiteralPath $cdb)) {
+              # Microsoft's signed SDK bootstrapper, debugger feature only.
+              $sdkSetup = Join-Path $env:RUNNER_TEMP 'qa-debugger-setup.exe'
+              Invoke-WebRequest 'https://download.microsoft.com/download/f4b30f2a-4fc3-430e-9b03-c842b5f5f9f1/KIT_BUNDLE_WINDOWSSDK_MEDIACREATION/winsdksetup.exe' -OutFile $sdkSetup
+              if ((Get-FileHash -LiteralPath $sdkSetup -Algorithm SHA256).Hash -ne '6FA0FA27DB77A909F5ECB35183CB26A969A6775936780936FE239E4F9C66B458') { throw 'Unexpected debugger bootstrapper' }
+              $install = Start-Process -FilePath $sdkSetup -ArgumentList '/quiet /norestart /features OptionId.WindowsDesktopDebuggers' -Wait -PassThru -WindowStyle Hidden
+              if ($install.ExitCode -notin @(0,3010)) { throw "Debugger setup failed: $($install.ExitCode)" }
+            }
+            if (-not (Test-Path -LiteralPath $cdb)) { throw 'mstsc dump debugger unavailable' }
+            "QA_MSTSC_CDB=$cdb" >> $env:GITHUB_ENV
+            $gflags = Join-Path (Split-Path -Parent $cdb) 'gflags.exe'
+            if (-not (Test-Path -LiteralPath $gflags)) { throw 'mstsc heap verifier unavailable' }
+            "QA_MSTSC_GFLAGS=$gflags" >> $env:GITHUB_ENV
+          }
       # RDP audio cases (rdp_audio_required): hosted Windows/macOS runners have
       # no audio output. This installs VB-CABLE (Windows, devcon with its
       # publisher certificate trusted) or Background Music (macOS); the fixture

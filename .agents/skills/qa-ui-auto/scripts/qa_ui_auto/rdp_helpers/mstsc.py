@@ -135,6 +135,75 @@ def crash_reporting(directory: Path):
         yield
 
 
+@contextmanager
+def crash_capture(process: MstscProcess, directory: Path):
+    """Attach ProcDump to the owned hosted PID, including direct process exits."""
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        yield
+        return
+    executable = os.environ.get("QA_MSTSC_PROCDUMP")
+    if not executable or not Path(executable).is_file():
+        raise RuntimeError("hosted mstsc crash capture requires QA_MSTSC_PROCDUMP")
+    target = directory / "mstsc-crash" / f"owned-{process.pid}"
+    target.mkdir(parents=True, exist_ok=True)
+    with (directory / "mstsc-procdump.log").open("wb") as output:
+        monitor = subprocess.Popen(
+            [executable, "-accepteula", "-mm", "-e", "1", "-f", "C0000005", "-t", "-n", "3", str(process.pid), str(target)],
+            stdout=output, stderr=subprocess.STDOUT,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        try:
+            yield
+        finally:
+            # The caller stops the client first. Allow its crash/exit dump to
+            # finish before collecting diagnostics or restoring host state.
+            try:
+                monitor.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                monitor.terminate()
+                try:
+                    monitor.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    monitor.kill()
+                    monitor.wait(timeout=5)
+
+
+@contextmanager
+def heap_verification():
+    """Catch the corrupting write in the disposable hosted reference client."""
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        yield
+        return
+    import winreg
+    executable = os.environ.get("QA_MSTSC_GFLAGS")
+    if not executable or not Path(executable).is_file():
+        raise RuntimeError("hosted mstsc heap verification requires QA_MSTSC_GFLAGS")
+    path = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\mstsc.exe"
+    names = ("GlobalFlag", "PageHeapFlags", "VerifierFlags", "VerifierDlls", "StackTraceDatabaseSizeInMB")
+    previous = {}
+    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
+        for name in names:
+            try:
+                previous[name] = winreg.QueryValueEx(key, name)
+            except FileNotFoundError:
+                previous[name] = None
+    try:
+        subprocess.run([executable, "/p", "/enable", "mstsc.exe", "/full"],
+                       capture_output=True, check=True, timeout=30,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        yield
+    finally:
+        with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_WRITE) as key:
+            for name in names:
+                old = previous[name]
+                if old is None:
+                    try:
+                        winreg.DeleteValue(key, name)
+                    except FileNotFoundError:
+                        pass
+                else:
+                    winreg.SetValueEx(key, name, 0, old[1], old[0])
+
+
 def crash_diagnostics(process: MstscProcess, directory: Path) -> None:
     """Collect the owned PID's Application Error and optional dump stack."""
     script = r'''
@@ -162,15 +231,19 @@ ConvertTo-Json -InputObject @($owned) -Depth 5
     if result.stderr:
         (directory / "mstsc-application-error.txt").write_text(result.stderr, encoding="utf-8")
     dumps = list((directory / "mstsc-crash").glob(f"mstsc.exe.{process.pid}.dmp"))
-    cdb = shutil.which("cdb")
+    dumps.extend((directory / "mstsc-crash" / f"owned-{process.pid}").glob("*.dmp"))
+    cdb = os.environ.get("QA_MSTSC_CDB") or shutil.which("cdb")
     if not cdb:
         candidate = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Windows Kits/10/Debuggers/x64/cdb.exe"
         if candidate.is_file():
             cdb = str(candidate)
     if dumps and cdb:
-        result = subprocess.run([cdb, "-z", str(dumps[0]), "-c", ".ecxr; k; q"],
-                                capture_output=True, text=True, timeout=90)
-        (directory / "mstsc-crash-stack.txt").write_text(result.stdout + result.stderr, encoding="utf-8")
+        stacks = []
+        for dump in sorted(dumps):
+            result = subprocess.run([cdb, "-z", str(dump), "-c", ".symfix; .exr -1; .ecxr; k; q"],
+                                    capture_output=True, text=True, timeout=90)
+            stacks.append(f"Dump: {dump.name}\n{result.stdout}{result.stderr}")
+            (directory / "mstsc-crash-stack.txt").write_text("\n".join(stacks), encoding="utf-8")
 
 
 @contextmanager

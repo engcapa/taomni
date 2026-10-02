@@ -88,6 +88,7 @@ def main() -> int:
         "frames": 0,
         "last_event_unix_ms": None,
         "ready": False,
+        "flip_samples": [],
     }
 
     def flip(_event: object = None) -> None:
@@ -96,6 +97,14 @@ def main() -> int:
         state["last_event_unix_ms"] = int(time.time() * 1000)
         canvas.configure(bg=state["color"])
         root.update_idletasks()
+        state["flip_samples"].append({
+            "flip": state["flips"],
+            "event_unix_us": state["last_event_unix_ms"] * 1000,
+            "draw_submitted_unix_us": time.time_ns() // 1000,
+        })
+        # Preserve a bounded diagnostic trace to split native input delivery
+        # from the following capture/encode/decode wait on the same host clock.
+        state["flip_samples"] = state["flip_samples"][-128:]
         write_state(args.state, state)
 
     bars: list[int] = []

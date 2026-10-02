@@ -386,13 +386,12 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
         raise StepError("host_mstsc: cmdkey could not store disposable credentials")
     process = None
     host_state = ExitStack()
+    dump_state = ExitStack()
 
     def cleanup_process() -> None:
         nonlocal process
         if process is not None:
             try:
-                from .rdp_helpers.mstsc import crash_diagnostics
-                crash_diagnostics(process, ctx.case_dir)
                 diagnose_mstsc(process, ctx.case_dir)
                 diagnostics = subprocess.run(
                     ["powershell", "-NoProfile", "-NonInteractive", "-Command",
@@ -417,8 +416,16 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
             try:
                 _stop_process(process)
             finally:
-                process.close()
-                process = None
+                try:
+                    dump_state.close()
+                    from .rdp_helpers.mstsc import crash_diagnostics
+                    try:
+                        crash_diagnostics(process, ctx.case_dir)
+                    except Exception as error:
+                        (ctx.case_dir / "mstsc-crash-diagnostic-error.txt").write_text(str(error), encoding="utf-8")
+                finally:
+                    process.close()
+                    process = None
     def cleanup() -> None:
         try:
             cleanup_process()
@@ -441,12 +448,15 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
                "session bpp:i:32", "audiomode:i:0", "redirectclipboard:i:1", "autoreconnection enabled:i:0"]
     try:
         host_state.enter_context(file_launch_consent())
-        from .rdp_helpers.mstsc import crash_reporting
+        from .rdp_helpers.mstsc import crash_reporting, heap_verification
         host_state.enter_context(crash_reporting(ctx.case_dir))
+        host_state.enter_context(heap_verification())
         # Avoid Windows text mode expanding CRLF to CRCRLF. mstsc also needs
         # the complete path when invoked outside the RDP file's directory.
         rdp.write_text("\r\n".join(options) + "\r\n", encoding="utf-16", newline="")
         process = launch_mstsc(rdp, port)
+        from .rdp_helpers.mstsc import crash_capture
+        dump_state.enter_context(crash_capture(process, ctx.case_dir))
     except BaseException:
         cleanup()
         raise

@@ -34,6 +34,14 @@ class EncoderToolsTest(unittest.TestCase):
         self.reporting_context = reporting
         reporting.start()
         self.addCleanup(reporting.stop)
+        capture = patch.object(mstsc, "crash_capture", side_effect=lambda *_: nullcontext())
+        self.capture_context = capture
+        capture.start()
+        self.addCleanup(capture.stop)
+        heap = patch.object(mstsc, "heap_verification", side_effect=nullcontext)
+        self.heap_context = heap
+        heap.start()
+        self.addCleanup(heap.stop)
 
     def test_copy_preserves_reference_oracle_and_waits_for_ready(self):
         source = self.root / "fixture"
@@ -200,6 +208,52 @@ class EncoderToolsTest(unittest.TestCase):
             self.assertEqual(run.call_args.args[0][2], str(dumps / "mstsc.exe.12345.dmp"))
         self.assertTrue((self.case / "mstsc-application-error.json").is_file())
         self.assertTrue((self.case / "mstsc-crash-stack.txt").is_file())
+
+    def test_crash_capture_attaches_to_owned_pid_and_waits_for_the_dump(self):
+        self.capture_context.stop()
+        executable = self.root / "procdump64.exe"
+        executable.write_bytes(b"mock executable")
+        monitor = Mock()
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "QA_MSTSC_PROCDUMP": str(executable)}), \
+             patch.object(mstsc.subprocess, "Popen", return_value=monitor) as start:
+            with mstsc.crash_capture(Mock(pid=12345), self.case):
+                monitor.wait.assert_not_called()
+        self.assertEqual(start.call_args.args[0][-2:], ["12345", str(self.case / "mstsc-crash" / "owned-12345")])
+        self.assertIn("-e", start.call_args.args[0])
+        self.assertIn("-t", start.call_args.args[0])
+        monitor.wait.assert_called_once_with(timeout=15)
+        monitor.terminate.assert_not_called()
+
+    def test_crash_capture_timeout_reaps_only_its_owned_debugger(self):
+        self.capture_context.stop()
+        executable = self.root / "procdump64.exe"
+        executable.write_bytes(b"mock executable")
+        monitor = Mock()
+        monitor.wait.side_effect = [subprocess.TimeoutExpired("procdump", 15), None]
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "QA_MSTSC_PROCDUMP": str(executable)}), \
+             patch.object(mstsc.subprocess, "Popen", return_value=monitor):
+            with mstsc.crash_capture(Mock(pid=12345), self.case):
+                pass
+        monitor.terminate.assert_called_once_with()
+        monitor.kill.assert_not_called()
+
+    def test_heap_verification_restores_value_types_after_a_client_failure(self):
+        self.heap_context.stop()
+        executable = self.root / "gflags.exe"
+        executable.write_bytes(b"mock executable")
+        registry = MagicMock()
+        key = registry.CreateKeyEx.return_value.__enter__.return_value
+        registry.QueryValueEx.side_effect = [("prior flags", 1), (2, 4), (17, 4), FileNotFoundError(), FileNotFoundError()]
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "QA_MSTSC_GFLAGS": str(executable)}), \
+             patch.dict(sys.modules, {"winreg": registry}), patch.object(mstsc.subprocess, "run") as run:
+            with self.assertRaisesRegex(RuntimeError, "client failure"):
+                with mstsc.heap_verification():
+                    raise RuntimeError("client failure")
+        self.assertEqual(run.call_args.args[0], [str(executable), "/p", "/enable", "mstsc.exe", "/full"])
+        self.assertEqual([call.args for call in registry.SetValueEx.call_args_list], [
+            (key, "GlobalFlag", 0, 1, "prior flags"), (key, "PageHeapFlags", 0, 4, 2), (key, "VerifierFlags", 0, 4, 17)])
+        self.assertEqual([call.args for call in registry.DeleteValue.call_args_list], [
+            (key, "VerifierDlls"), (key, "StackTraceDatabaseSizeInMB")])
 
     def test_mstsc_stop_failure_still_removes_credentials_and_restores_the_account(self):
         process = Mock(pid=12345)

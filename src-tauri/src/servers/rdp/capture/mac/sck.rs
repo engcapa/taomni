@@ -12,7 +12,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use block2::RcBlock;
-use dispatch2::{DispatchQueue, DispatchRetained};
+use dispatch2::{DispatchQoS, DispatchQueue, DispatchQueueAttr, DispatchRetained};
 use objc2::rc::Retained;
 use objc2::runtime::{NSObjectProtocol, ProtocolObject};
 use objc2::{AnyThread, DefinedClass, define_class, msg_send};
@@ -278,7 +278,12 @@ impl SckCapturer {
                 Some(delegate),
             )
         };
-        let queue = DispatchQueue::new("taomni.rdp.screencapture", None);
+        // This queue is on the remote input-to-screen path. Its native wait
+        // happens before Frame::captured_at, so Rust mailbox age cannot reveal
+        // callbacks postponed by the default QoS. Keep it serial and shallow,
+        // but schedule the current desktop with interactive work.
+        let attributes = DispatchQueueAttr::with_qos_class(None, DispatchQoS::UserInteractive, 0);
+        let queue = DispatchQueue::new("taomni.rdp.screencapture", Some(&attributes));
         let stream_output: &ProtocolObject<dyn SCStreamOutput> = ProtocolObject::from_ref(&*output);
         unsafe {
             stream.addStreamOutput_type_sampleHandlerQueue_error(

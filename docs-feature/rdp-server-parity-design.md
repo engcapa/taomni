@@ -127,9 +127,9 @@
 
 | 指标 | 场景 | 采样 |
 |---|---|---|
-| M1 `first_frame_ms` | TCP 连接 → 首个完整画面 | 3 次连接取中位数 |
+| M1 `first_graphics_ms` | 连接 → 探针收到并解码首个 graphics update；另断言 framebuffer 绘制比例 ≥95% | 当前 PERF-01 的一次连接，原始报告保留 |
 | M2 `input_to_frame_ms` p50/p95 | 探针在目标方块上点击 → 目标翻色 → 探针解码画面中该像素变化 | 40 次，间隔 250 ms，丢弃前 3 次预热 |
-| M3 `animation_fps` | 目标窗口 1280×720 区域 60 Hz 动画，统计含变化的帧 | 10 s |
+| M3 `marker.observed_fps` | 目标窗口 640×360 区域、60 Hz draw deadline 的动画；按实际可见标记变化计帧，不能以更新 PDU 数代替 | 10 s |
 | M4 `animation_kbps` | 同 M3 的下行字节 | 10 s |
 | M5 `idle_cpu_pct` / M6 `animation_cpu_pct` | 已连接静止 / 动画时系统总 CPU（psutil） | 各 10 s |
 
@@ -143,7 +143,7 @@ Windows 基线：CI fixture 创建一次性本地账号，临时启用系统远�
 | M2 p95 | 50.1 ms（p50 29.1 ms） | ≤ 65 ms（= max(1.25×TS, TS+15 ms)） | 同上 |
 | M3 | 32.0 fps（640×360 区域可见变化） | ≥ 25.6 fps（= 0.8×TS） | 同上 |
 | M4 | 3270 kbps | ≤ 4905 kbps（= 1.5×TS） | 同上 |
-| M5 | 未测：探针尚无 CPU 采样 | 待定 | — |
+| M5 / M6 | 未测：探针尚无系统 CPU 采样；编码器 CPU-only unit 不能替代 | 待定；不计为通过 | — |
 
 两次测量都由同一 Windows runner 上的同一探针完成，只公告 RemoteFX；TermService 会话分辨率 1280×720，Taomni 采集控制台 1024×768，测量区域相同（目标窗口 640×360）。
 
