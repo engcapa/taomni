@@ -1026,25 +1026,83 @@ fn read_clipboard_image(app: &AppHandle) -> anyhow::Result<RgbaImage> {
     .context("clipboard image size mismatch")
 }
 
-fn capture_surfaces(
+#[cfg(any(target_os = "linux", test))]
+fn x11_control_geometry(output: &str) -> Option<(super::surfaces::Rect, bool)> {
+    let field = |name: &str| {
+        output
+            .lines()
+            .find_map(|line| line.trim().strip_prefix(name).map(str::trim))
+    };
+    let rect = super::surfaces::Rect {
+        x: field("Absolute upper-left X:")?.parse().ok()?,
+        y: field("Absolute upper-left Y:")?.parse().ok()?,
+        w: field("Width:")?.parse().ok()?,
+        h: field("Height:")?.parse().ok()?,
+    };
+    let visible = match field("Map State:")? {
+        "IsViewable" => true,
+        "IsUnMapped" | "IsUnviewable" => false,
+        _ => return None,
+    };
+    (rect.w > 0 && rect.h > 0).then_some((rect, visible))
+}
+
+async fn capture_surfaces(
     app: &AppHandle,
     display: &DisplayInfo,
     region: (u32, u32, u32, u32),
     label: &str,
+    require_visible: bool,
 ) -> anyhow::Result<Value> {
     let crop = super::surfaces::region_rect(display, region);
     let bar = app
         .get_webview_window(label)
         .context("capture controls missing")?;
-    let pos = bar.outer_position()?;
-    let size = bar.outer_size()?;
-    let control = super::surfaces::Rect {
-        x: pos.x,
-        y: pos.y,
-        w: size.width as i32,
-        h: size.height as i32,
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    let (control, bar_visible, cached_control, native_probe) = loop {
+        let pos = bar.outer_position()?;
+        let size = bar.outer_size()?;
+        let cached = super::surfaces::Rect {
+            x: pos.x,
+            y: pos.y,
+            w: size.width as i32,
+            h: size.height as i32,
+        };
+        let visible = bar.is_visible()?;
+        #[cfg(target_os = "linux")]
+        let (control, visible, native_probe, ready) = if visible {
+            // Tao initialises its outer-size cache from root_origin and only
+            // refreshes geometry on configure events. Query the X server for
+            // the actual mapped control instead of accepting that cache.
+            let output = std::process::Command::new("xwininfo")
+                .args(["-name", &bar.title()?, "-stats"])
+                .env("LC_ALL", "C")
+                .output()
+                .context("query native capture control geometry")?;
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let probe = json!({"success":output.status.success(),"stdout":stdout,
+                "stderr":String::from_utf8_lossy(&output.stderr)});
+            if let Some((rect, mapped)) =
+                x11_control_geometry(&stdout).filter(|_| output.status.success())
+            {
+                (rect, mapped, probe, true)
+            } else {
+                (cached, false, probe, false)
+            }
+        } else {
+            (cached, false, Value::Null, true)
+        };
+        #[cfg(not(target_os = "linux"))]
+        let (control, native_probe, ready) = (cached, Value::Null, true);
+        if ready && (!require_visible || (visible && control.w > 0 && control.h > 0)) {
+            break (control, visible, cached, native_probe);
+        }
+        anyhow::ensure!(
+            std::time::Instant::now() < deadline,
+            "capture controls were not mapped with a nonempty size: {native_probe}"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
     };
-    let bar_visible = bar.is_visible()?;
     let mut border_count = 0;
     let mut borders_outside = true;
     let mut border_geometry = Vec::new();
@@ -1069,7 +1127,9 @@ fn capture_surfaces(
     Ok(
         json!({"barVisible":bar_visible,"controlsOutside":!bar_visible || !crop.intersects(control),
         "bordersOutside":borders_outside,"borderCount":border_count,"borders":border_geometry,"region":[crop.x,crop.y,crop.w,crop.h],
-        "control":[control.x,control.y,control.w,control.h]}),
+        "control":[control.x,control.y,control.w,control.h],
+        "cachedControl":[cached_control.x,cached_control.y,cached_control.w,cached_control.h],
+        "nativeControlProbe":native_probe}),
     )
 }
 
@@ -1172,8 +1232,6 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     )
     .await
     .map_err(|e| format!("scroll controls readiness: {e}"))?;
-    let geometry = capture_surfaces(&app, &display, region, super::surfaces::SCROLL_LABEL)
-        .map_err(|e| e.to_string())?;
     let progress = run_js(
         &bar,
         r#"
@@ -1188,6 +1246,9 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     )
     .await
     .map_err(|e| format!("scroll progress: {e}"))?;
+    let geometry = capture_surfaces(&app, &display, region, super::surfaces::SCROLL_LABEL, true)
+        .await
+        .map_err(|e| e.to_string())?;
     // Finish closes this window. Read the result from the surviving overlay,
     // rather than polling an async script slot in the window being destroyed.
     bar.eval("document.querySelector('[data-testid=\"screenshot-scroll-stop\"]').click()")
@@ -1291,7 +1352,9 @@ pub async fn screenshot_qa_full_recorder(app: AppHandle) -> Result<String, Strin
         &display,
         (0, 0, display.width, display.height),
         super::RECORDER_LABEL,
+        false,
     )
+    .await
     .map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(1100)).await;
     // Exercise the same route used by the registered global screenshot chord;
@@ -1346,7 +1409,8 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     let bar = wait_window(&app, super::RECORDER_LABEL, Duration::from_secs(10))
         .await
         .map_err(|e| format!("{e:#}"))?;
-    let geometry = capture_surfaces(&app, &display, region, super::RECORDER_LABEL)
+    let geometry = capture_surfaces(&app, &display, region, super::RECORDER_LABEL, true)
+        .await
         .map_err(|e| e.to_string())?;
     let script = r#"
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1881,6 +1945,26 @@ pub async fn screenshot_qa_hotkey(app: AppHandle) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_x11_geometry_uses_absolute_coordinates_and_requires_complete_mapping() {
+        let output = "  Absolute upper-left X: -400\n  Absolute upper-left Y: 562\n  Relative upper-left X: 0\n  Relative upper-left Y: 0\n  Width: 360\n  Height: 200\n  Map State: IsViewable\n";
+        let (rect, visible) = x11_control_geometry(output).unwrap();
+        assert_eq!((rect.x, rect.y, rect.w, rect.h), (-400, 562, 360, 200));
+        assert!(visible);
+        assert!(
+            !x11_control_geometry(&output.replace("IsViewable", "IsUnMapped"))
+                .unwrap()
+                .1
+        );
+        for incomplete in [
+            output.replace("Absolute upper-left X:", "Unknown X:"),
+            output.replace("Width: 360", "Width: 0"),
+            output.replace("Map State: IsViewable", "Map State: unknown"),
+        ] {
+            assert!(x11_control_geometry(&incomplete).is_none());
+        }
+    }
 
     fn row_color(i: u32) -> [u8; 4] {
         [30 + (i % 8) as u8 * 28, 30 + (i / 8) as u8 * 28, 210, 255]

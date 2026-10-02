@@ -284,6 +284,9 @@ pub async fn screenshot_scroll_capture(
     if let Err(error) = surfaces {
         tool_state().scroll = None;
         surfaces::close_borders(&app);
+        if let Some(window) = app.get_webview_window(surfaces::SCROLL_LABEL) {
+            let _ = window.close();
+        }
         if let Some(window) = &overlay {
             let _ = window.show();
         }
@@ -1080,8 +1083,8 @@ pub async fn screenshot_stop_recording(
             state.recording = None;
         }
     }
-    let info = info?;
     surfaces::close_borders(&app);
+    let info = info?;
     Ok(RecordingFile {
         path: info.path.to_string_lossy().into_owned(),
         width: info.width,

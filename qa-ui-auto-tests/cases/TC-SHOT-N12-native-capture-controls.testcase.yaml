@@ -40,7 +40,7 @@ verification:
   native:
   - check: Native capture and window lifecycle
     method: automated
-    reason: Actual Tauri menu entry, OS capture, wheel input, window geometry and stopped-output pixel comparison. Renderer
+    reason: Actual Tauri menu entry, OS capture, wheel input, window geometry and stopped-output pixel comparison. Linux control geometry is queried from the X server after progress begins, with Tao cache values retained for diagnosis. Renderer
       scripts operate public controls; this does not claim physical mouse delivery.
 native_platforms:
 - Linux
