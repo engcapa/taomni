@@ -26,6 +26,7 @@ pub(crate) struct RdpMetrics {
     log: Option<LogEmitter>,
     /// Auto-detect RTT shared with the RDP server (see `with_network_rtt`).
     network_rtt: Option<Arc<AtomicU32>>,
+    encoder_stats: Option<Arc<ironrdp::server::EncoderStats>>,
 }
 
 struct MetricsState {
@@ -109,6 +110,7 @@ impl RdpMetrics {
             })),
             log,
             network_rtt: None,
+            encoder_stats: None,
         }
     }
 
@@ -253,8 +255,13 @@ impl RdpMetrics {
             .filter(|rtt| *rtt != u32::MAX)
             .map(|rtt| format!(" network-rtt={rtt}ms"))
             .unwrap_or_default();
+        let encoding = self
+            .encoder_stats
+            .as_deref()
+            .map(format_encoding_stats)
+            .unwrap_or_default();
         log.line(format!(
-            "RDP latency: captured={captured} forwarded={forwarded} duplicate={duplicates} replaced={replaced} input-coalesced={input_coalesced} input-dropped={input_dropped} raw={}MiB{}{}{}{}{rtt}",
+            "RDP latency: captured={captured} forwarded={forwarded} duplicate={duplicates} replaced={replaced} input-coalesced={input_coalesced} input-dropped={input_dropped} raw={}MiB{}{}{}{}{rtt}{encoding}",
             bytes / (1024 * 1024),
             fmt(" capture", capture),
             fmt(" hash", hash),
@@ -268,12 +275,48 @@ impl RdpMetrics {
         self.network_rtt = Some(rtt);
         self
     }
+
+    pub(crate) fn with_encoder_stats(mut self, stats: Arc<ironrdp::server::EncoderStats>) -> Self {
+        self.encoder_stats = Some(stats);
+        self
+    }
+}
+
+fn format_encoding_stats(stats: &ironrdp::server::EncoderStats) -> String {
+    let planar = stats.planar_rects.load(Ordering::Relaxed);
+    let rfx = stats.rfx_rects.load(Ordering::Relaxed);
+    let before = stats.bytes_before_bulk.load(Ordering::Relaxed);
+    let after = stats.bytes_after_bulk.load(Ordering::Relaxed);
+    let ratio = if before == 0 {
+        100
+    } else {
+        after.saturating_mul(100) / before
+    };
+    format!(" encode=planar:{planar}/rfx:{rfx} bulk={ratio}%")
 }
 
 #[cfg(test)]
 mod tests {
     use super::SampleWindow;
     use std::time::Duration;
+
+    #[test]
+    fn encoding_statistics_append_the_negotiated_distribution_and_ratio() {
+        use std::sync::atomic::Ordering;
+        let stats = ironrdp::server::EncoderStats::default();
+        stats.planar_rects.store(3, Ordering::Relaxed);
+        stats.rfx_rects.store(1, Ordering::Relaxed);
+        stats.bytes_before_bulk.store(1000, Ordering::Relaxed);
+        stats.bytes_after_bulk.store(120, Ordering::Relaxed);
+        assert_eq!(
+            super::format_encoding_stats(&stats),
+            " encode=planar:3/rfx:1 bulk=12%"
+        );
+        assert!(
+            super::format_encoding_stats(&ironrdp::server::EncoderStats::default())
+                .ends_with("bulk=100%")
+        );
+    }
 
     #[test]
     fn percentile_window_evicts_the_oldest_sample() {

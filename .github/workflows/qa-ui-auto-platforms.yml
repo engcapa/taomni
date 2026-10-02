@@ -113,7 +113,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1
       - name: Validate QA tools
-        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract
+        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_vnc_required test_dev_contract test_rdp_encoder_tools
       - name: Plan exact cases and dependencies
         id: plan
         env:
@@ -231,10 +231,24 @@ jobs:
         with:
           gradle-version: '9.1.0'
       - name: Prepare local service packages
-        if: contains(matrix.capabilities, 'ssh') || contains(matrix.capabilities, 'mysql') || contains(matrix.capabilities, 'vnc')
+        if: contains(matrix.capabilities, 'ssh') || contains(matrix.capabilities, 'mysql') || contains(matrix.capabilities, 'vnc') || contains(matrix.capabilities, 'xrdp')
         env:
           QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
         run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
+      - name: RDP unit contracts on the native platform
+        if: matrix.mode == 'native' && contains(matrix.capabilities, 'rdp')
+        env:
+          CARGO_TARGET_DIR: target/qa-ui-auto
+          CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: 'true'
+          CARGO_PROFILE_RELEASE_INCREMENTAL: 'true'
+        run: |
+          pnpm build
+          if [[ "$RUNNER_OS" == "macOS" ]]; then bash scripts/bundle-krb5-macos.sh stage; fi
+          cd src-tauri
+          cargo test --locked --release -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server --lib
+          cargo test --locked --release --lib servers::rdp::
+          cargo test --locked --release --lib rdp::session::tests
+          cargo test --locked --release --bin rdp-probe
       - name: Run selected cases (Linux native desktop)
         if: runner.os == 'Linux' && matrix.mode == 'native'
         env:

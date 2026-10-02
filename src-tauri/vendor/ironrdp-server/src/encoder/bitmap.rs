@@ -23,7 +23,11 @@ impl BitmapEncoder {
         }
     }
 
-    pub(crate) fn encode(&mut self, bitmap: &BitmapUpdate, output: &mut [u8]) -> Result<usize, BitmapEncodeError> {
+    pub(crate) fn encode(
+        &mut self,
+        bitmap: &BitmapUpdate,
+        output: &mut [u8],
+    ) -> Result<usize, BitmapEncodeError> {
         // FIXME: support non-multiple of 4 widths.
         //
         // It’s not clear how to achieve that yet, but generally, server uses multiple of 4-widths,
@@ -43,15 +47,22 @@ impl BitmapEncoder {
         let stride = bitmap.stride.get();
         let chunks = bitmap.data.chunks(stride * usize::from(chunk_height));
 
-        let total = cast_int!("chunks length lower bound", chunks.size_hint().0).map_err(BitmapEncodeError::Encode)?;
+        let total = cast_int!("chunks length lower bound", chunks.size_hint().0)
+            .map_err(BitmapEncodeError::Encode)?;
         BitmapUpdateData::encode_header(total, &mut cursor).map_err(BitmapEncodeError::Encode)?;
 
         for (i, chunk) in chunks.enumerate() {
-            let height = cast_int!("bitmap height", chunk.len() / stride).map_err(BitmapEncodeError::Encode)?;
+            // A cropped dirty rectangle keeps its parent stride, but its last
+            // row ends at the crop's width. That partial stride is a full row.
+            let height = cast_int!("bitmap height", chunk.len().div_ceil(stride))
+                .map_err(BitmapEncodeError::Encode)?;
             let i: u16 = cast_int!("chunk idx", i).map_err(BitmapEncodeError::Encode)?;
             let top = bitmap.y + i * chunk_height;
 
-            let encoder = BitmapStreamEncoder::new(NonZeroUsize::from(bitmap.width).get(), usize::from(height));
+            let encoder = BitmapStreamEncoder::new(
+                NonZeroUsize::from(bitmap.width).get(),
+                usize::from(height),
+            );
 
             let len = {
                 let pixels = chunk
@@ -75,14 +86,16 @@ impl BitmapEncoder {
                 bits_per_pixel: u16::from(bitmap.format.bytes_per_pixel()) * 8,
                 compression_flags: Compression::BITMAP_COMPRESSION,
                 compressed_data_header: Some(bitmap::CompressedDataHeader {
-                    main_body_size: cast_length!("main body size", len).map_err(BitmapEncodeError::Encode)?,
+                    main_body_size: cast_length!("main body size", len)
+                        .map_err(BitmapEncodeError::Encode)?,
                     scan_width: u16::from(bitmap.width),
                     uncompressed_size: height * row_len,
                 }),
                 bitmap_data: &self.buffer[..len],
             };
 
-            data.encode(&mut cursor).map_err(BitmapEncodeError::Encode)?;
+            data.encode(&mut cursor)
+                .map_err(BitmapEncodeError::Encode)?;
         }
 
         Ok(cursor.pos())

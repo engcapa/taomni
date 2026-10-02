@@ -2784,6 +2784,18 @@ controls:
   - id: canvas
     selector: '[data-testid="rdp-canvas"]'
     kind: display       # browser-mode smoke verifies mount; live frame paint is covered by Rust live tests
+  - id: screen-width
+    selector: '.rdp-options-form input[type="number"][min="320"]'
+    kind: interactive
+    optional: true
+  - id: options-section
+    selector: '[data-testid="session-section-rdp"]'
+    kind: interactive
+    optional: true
+  - id: screen-height
+    selector: '.rdp-options-form input[type="number"][min="200"]'
+    kind: interactive
+    optional: true
   - id: scale-toggle
     selector: '[data-testid="rdp-scale-toggle"]'
     kind: interactive
@@ -4431,6 +4443,8 @@ files:
   - src-tauri/src/servers/rdp/
   - src-tauri/src/bin/rdp-probe/
   - src-tauri/vendor/ironrdp-server/
+  - src-tauri/vendor/ironrdp-acceptor/
+  - src-tauri/vendor/ironrdp-bulk/
 controls:
   - id: server-field-port
     selector: '[data-testid="server-field-port"]'

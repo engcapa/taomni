@@ -41,6 +41,12 @@ def is_check(step: dict) -> bool:
         return not args.get("background") and ("expect" in args or "expect_exit" in args)
     if verb == "rdp_probe_wait":
         return "expect" in args or "expect_exit" in args
+    if verb == "rdp_canvas_assert":
+        return bool(args.get("points"))
+    if verb == "host_copy_file":
+        return bool(args.get("expect"))
+    if verb == "host_mstsc":
+        return args.get("action") == "capture" and bool(args.get("expect_pattern"))
     if verb == "host_clipboard":
         return args.get("action") in {"assert", "quiet"}
     return False

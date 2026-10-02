@@ -241,6 +241,12 @@ impl CredentialValidator for ExactMatchCredentialValidator {
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct RdpServerOptions {
+    /// Bulk compression is opt-in and negotiated separately for each connection.
+    pub bulk_compression: bool,
+    /// Optional aggregate display encoder counters.
+    pub encoder_stats: Option<Arc<crate::EncoderStats>>,
+    /// Called for each static channel actually joined by the peer.
+    pub channel_observer: Option<Arc<dyn Fn(&str) + Send + Sync>>,
     pub addr: SocketAddr,
     pub security: RdpServerSecurity,
     pub codecs: BitmapCodecs,
@@ -1160,7 +1166,7 @@ impl RdpServer {
     ) -> Result<(RunState, UpdateEncoder)> {
         if let DisplayUpdate::Resize(desktop_size) = update {
             debug!(?desktop_size, "Display resize");
-            encoder.set_desktop_size(desktop_size);
+            encoder.set_desktop_size(desktop_size)?;
             deactivate_all(io_channel_id, user_channel_id, writer).await?;
             return Ok((RunState::DeactivationReactivation { desktop_size }, encoder));
         }
@@ -1176,7 +1182,7 @@ impl RdpServer {
                 buffer.resize(fragmenter.size_hint(), 0);
             }
 
-            while let Some(len) = fragmenter.next(buffer) {
+            while let Some(len) = encoder_iter.encode_fragment(&mut fragmenter, buffer)? {
                 writer
                     .write_all(&buffer[..len])
                     .await
@@ -1547,6 +1553,21 @@ impl RdpServer {
 
         self.static_channels = result.static_channels;
         if !result.reactivation {
+            if let Some(observer) = &self.opts.channel_observer {
+                for (type_id, channel) in self.static_channels.iter() {
+                    if self
+                        .static_channels
+                        .get_channel_id_by_type_id(type_id)
+                        .is_some()
+                    {
+                        if let Some(name) = channel.channel_name().as_str() {
+                            observer(name);
+                        }
+                    }
+                }
+            }
+        }
+        if !result.reactivation {
             for (_type_id, channel, channel_id) in self.static_channels.iter_mut() {
                 debug!(?channel, ?channel_id, "Start");
                 let Some(channel_id) = channel_id else {
@@ -1661,7 +1682,14 @@ impl RdpServer {
             update_codecs,
             self.opts.max_request_size,
         )
-        .context("failed to initialize update encoder")?;
+        .context("failed to initialize update encoder")?
+        .with_bulk_compression(
+            self.opts
+                .bulk_compression
+                .then_some(result.client_compression)
+                .flatten(),
+            self.opts.encoder_stats.clone(),
+        )?;
 
         let state = self
             .client_loop(

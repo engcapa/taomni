@@ -67,6 +67,8 @@ mod input;
 #[cfg(target_os = "macos")]
 pub(crate) use input::{control_permission_granted, request_control_permission};
 #[cfg(test)]
+mod bulk_loopback_tests;
+#[cfg(test)]
 mod loopback_tests;
 mod metrics;
 mod session;
@@ -757,7 +759,16 @@ fn build_server(
     // Auto-detect RTT (MS-RDPBCGR 2.2.14), written by the server per session
     // and shown in the periodic latency report.
     let network_rtt = Arc::new(std::sync::atomic::AtomicU32::new(u32::MAX));
-    let metrics = RdpMetrics::new(log.clone()).with_network_rtt(Arc::clone(&network_rtt));
+    let encoder_stats = Arc::new(ironrdp::server::EncoderStats::default());
+    let bulk_enabled = std::env::var("TAOMNI_RDP_BULK_COMPRESSION").as_deref() != Ok("0");
+    log.line(if bulk_enabled {
+        "RDP display encoding: adaptive planar+bulk / RemoteFX (negotiated per connection)"
+    } else {
+        "RDP display encoding: compatibility mode (TAOMNI_RDP_BULK_COMPRESSION=0)"
+    });
+    let metrics = RdpMetrics::new(log.clone())
+        .with_network_rtt(Arc::clone(&network_rtt))
+        .with_encoder_stats(Arc::clone(&encoder_stats));
     #[cfg(target_os = "macos")]
     if !params.view_only && !input::control_permission_granted() {
         anyhow::bail!(
@@ -822,6 +833,10 @@ fn build_server(
         .flatten()
         .map(|factory| Box::new(factory) as Box<dyn ironrdp::server::DvcServerFactory>);
 
+    let channel_log = log.clone();
+    let channel_observer: Arc<dyn Fn(&str) + Send + Sync> = Arc::new(move |channel| {
+        channel_log.line(format!("RDP {channel} channel negotiated"));
+    });
     let base = RdpServer::builder().with_addr(params.addr);
     let connection_handler: Box<dyn ConnectionHandler> = Box::new(ConnectionPolicy {
         app: params.app.clone(),
@@ -839,9 +854,12 @@ fn build_server(
                 .with_hybrid(acceptor, identity.pub_key.clone())
                 .with_input_handler(input)
                 .with_display_handler(display)
+                .with_channel_observer(channel_observer)
                 .with_cliprdr_factory(cliprdr)
                 .with_sound_factory(sound)
                 .with_dvc_factory(microphone)
+                .with_bulk_compression(bulk_enabled)
+                .with_encoder_stats_handle(encoder_stats)
                 .with_autodetect_rtt_handle(network_rtt);
             #[cfg(target_os = "macos")]
             let builder = builder.with_honor_client_desktop_size(honor_client_desktop_size);

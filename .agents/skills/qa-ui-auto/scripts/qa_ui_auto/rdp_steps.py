@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -137,6 +138,8 @@ def _do_host_helper(ctx: NativeStepContext, args: Any) -> str:
     command = [sys.executable, str(HELPERS / "rdp_target.py"), "--state", str(state),
                "--mode", str(args.get("mode") or "flip"),
                "--geometry", str(args.get("geometry") or "480x320+40+80")]
+    if args.get("pattern"):
+        command.append("--pattern")
     log = (ctx.case_dir / f"{name}-helper.log").open("w", encoding="utf-8")
     process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
     helpers[name] = process
@@ -193,7 +196,137 @@ def _probe_command(ctx: NativeStepContext, args: dict) -> tuple[list[str], Path]
 
 OFFLINE_SCENARIOS = {"host-play", "host-record", "image-digest", "image-make"}
 # Probe options that name host files; resolved inside the report root.
-PATH_ARGS = {"png", "out-png", "image-png", "files", "out-dir", "wav-out", "snapshot"}
+PATH_ARGS = {"png", "out-png", "image-png", "files", "out-dir", "wav-out", "snapshot", "baseline-report"}
+
+
+@_verb("host_copy_file")
+def _do_host_copy_file(ctx: NativeStepContext, args: Any) -> str:
+    if not isinstance(args, dict):
+        raise StepError("host_copy_file: expected {from_env_dir, name, to, expect?, timeout_sec?}")
+    env_name, name = str(args.get("from_env_dir", "")), str(args.get("name", ""))
+    if not env_name.startswith("QA_RDP_") or not os.environ.get(env_name):
+        raise StepError("host_copy_file: source directory must be a set QA_RDP_ environment variable")
+    if not name or name in {".", ".."} or any(char in name for char in "/\\:"):
+        raise StepError("host_copy_file: name must be a single filename")
+    root = Path(os.environ[env_name]).resolve()
+    source = (root / name).resolve()
+    if not source.is_relative_to(root):
+        raise StepError("host_copy_file: source escapes its fixture directory")
+    destination = _within_report(ctx, str(args.get("to") or name))
+    deadline = time.monotonic() + float(args.get("timeout_sec") or 60)
+    last_error = "file not ready"
+    while time.monotonic() < deadline:
+        try:
+            shutil.copy2(source, destination)
+            expect = args.get("expect") or {}
+            problems = _check_expectations(json.loads(destination.read_text(encoding="utf-8")), expect, name) if expect else []
+            if not problems:
+                return f"copied {name} to {destination.name}"
+            last_error = "; ".join(problems)
+        except (OSError, ValueError) as exc:
+            last_error = str(exc)
+        time.sleep(0.25)
+    raise StepError(f"host_copy_file: {last_error}")
+
+
+def _capture_mstsc(ctx: NativeStepContext, process: subprocess.Popen, args: dict) -> str:
+    path = _within_report(ctx, str(args.get("snapshot") or "mstsc-window.png"))
+    script = r'''
+Add-Type -AssemblyName System.Drawing
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class QaMstscCapture {
+  [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr handle, out Rect rect);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+}
+'@
+[void][QaMstscCapture]::SetProcessDPIAware()
+$p = Get-Process -Id ([int]$env:QA_MSTSC_PID) -ErrorAction Stop
+$r = New-Object QaMstscCapture+Rect
+if ($p.MainWindowHandle -eq 0 -or -not [QaMstscCapture]::GetWindowRect($p.MainWindowHandle,[ref]$r)) { throw 'mstsc window unavailable' }
+$w=$r.Right-$r.Left; $h=$r.Bottom-$r.Top
+if ($w -lt 200 -or $h -lt 200) { throw 'mstsc window is too small' }
+$bmp=New-Object System.Drawing.Bitmap $w,$h
+$g=[System.Drawing.Graphics]::FromImage($bmp)
+$g.CopyFromScreen($r.Left,$r.Top,0,0,$bmp.Size)
+$bmp.Save($env:QA_MSTSC_CAPTURE,[System.Drawing.Imaging.ImageFormat]::Png)
+$g.Dispose(); $bmp.Dispose()
+'''
+    result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                            env={**os.environ, "QA_MSTSC_PID": str(process.pid), "QA_MSTSC_CAPTURE": str(path)},
+                            capture_output=True, text=True, timeout=45)
+    if result.returncode or not path.is_file():
+        host_screenshot(ctx.case_dir / "mstsc-capture-failure.png")
+        raise StepError(f"host_mstsc: window screenshot failed: {result.stderr[-500:]}")
+    if args.get("expect_pattern"):
+        from PIL import Image
+        colors = Image.open(path).convert("RGB").getdata()
+        magenta = cyan = 0
+        for red, green, blue in colors:
+            magenta += int(red > 170 and green < 90 and blue > 170)
+            cyan += int(red < 90 and green > 170 and blue > 170)
+        if min(magenta, cyan) < 200:
+            raise StepError(f"host_mstsc: remote pattern missing in {path.name} (magenta={magenta}, cyan={cyan}); check for authentication/certificate dialogs")
+    return f"mstsc window captured: {path.name}"
+
+
+@_verb("host_mstsc")
+def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
+    if platform.system() != "Windows":
+        raise StepError("host_mstsc requires Windows")
+    if not isinstance(args, dict) or args.get("action") not in {"start", "capture", "stop"}:
+        raise StepError("host_mstsc: expected {action: start|capture|stop, port?, user?, password_env?}")
+    current = getattr(ctx, "_mstsc_process", None)
+    if args["action"] == "capture":
+        if current is None:
+            raise StepError("host_mstsc: no owned mstsc process")
+        return _capture_mstsc(ctx, current, args)
+    if args["action"] == "stop":
+        if current is None:
+            raise StepError("host_mstsc: no owned mstsc process")
+        ctx._mstsc_cleanup()
+        ctx._mstsc_process = None
+        return "stopped mstsc and removed disposable credentials"
+    if current is not None:
+        raise StepError("host_mstsc: an owned session is already running")
+    password_env = str(args.get("password_env") or "QA_RDP_PASSWORD")
+    password = os.environ.get(password_env)
+    if not password:
+        raise StepError("host_mstsc: password environment variable is unset")
+    user = str(args.get("user") or os.environ.get("QA_RDP_USER", ""))
+    port = int(args.get("port") or os.environ.get("QA_RDP_PORT", "3389"))
+    if not 1 <= port <= 65535 or not user or any(c in user for c in "\r\n"):
+        raise StepError("host_mstsc: invalid loopback port or username")
+    target = "TERMSRV/127.0.0.1"
+    added = subprocess.run(["cmdkey", f"/generic:{target}", f"/user:{user}", f"/pass:{password}"], capture_output=True, timeout=30)
+    if added.returncode:
+        raise StepError("host_mstsc: cmdkey could not store disposable credentials")
+    process = None
+
+    def cleanup() -> None:
+        if process is not None:
+            _stop_process(process)
+        subprocess.run(["cmdkey", f"/delete:{target}"], capture_output=True, timeout=30)
+
+    _register_cleanup(ctx, cleanup)
+    rdp = _within_report(ctx, "mstsc.rdp")
+    options = [f"full address:s:127.0.0.1:{port}", f"username:s:{user}",
+               "authentication level:i:0", "prompt for credentials:i:0", "promptcredentialonce:i:0",
+               "enablecredsspsupport:i:1", "negotiate security layer:i:1", "screen mode id:i:1",
+               "winposstr:s:0,1,800,200,1840,1000", "smart sizing:i:1", "compression:i:1",
+               f"desktopwidth:i:{int(args.get('width') or 1024)}", f"desktopheight:i:{int(args.get('height') or 768)}",
+               "session bpp:i:32", "audiomode:i:0", "redirectclipboard:i:1", "autoreconnection enabled:i:0"]
+    try:
+        rdp.write_text("\r\n".join(options) + "\r\n", encoding="utf-16")
+        process = subprocess.Popen(["mstsc.exe", str(rdp)])
+    except BaseException:
+        cleanup()
+        raise
+    ctx._mstsc_process = process
+    ctx._mstsc_cleanup = cleanup
+    return f"started owned mstsc process {process.pid}"
 
 
 def host_screenshot(path: Path) -> str:
@@ -575,6 +708,36 @@ def _do_rdp_canvas_click(ctx: NativeStepContext, args: Any) -> str:
 
 
 # ------------------------------------------------------------------- save_text
+
+@_verb("rdp_canvas_assert")
+def _do_rdp_canvas_assert(ctx: NativeStepContext, args: Any) -> str:
+    """Read decoded pixels at desktop coordinates and preserve quality evidence."""
+    if not isinstance(args, dict) or not isinstance(args.get("points"), list) or not args["points"]:
+        raise StepError("rdp_canvas_assert: expected {points: [{x,y,rgb,tolerance?}], artifact?, timeout_sec?}")
+    selector = str(args.get("selector") or '[data-testid="rdp-canvas"]')
+    points = args["points"]
+    artifact = _within_report(ctx, str(args.get("artifact") or "client-pixels") + ".json")
+
+    def observe() -> tuple[bool, Any]:
+        result = ctx.session.execute(
+            "const c=document.querySelector(" + json.dumps(selector) + ");"
+            "if (!c || !c.width || !c.height) return null;"
+            "const g=c.getContext('2d'); if (!g) return null;"
+            "const points=" + json.dumps(points) + ";"
+            "const pixels=points.map(p=>Array.from(g.getImageData(p.x,p.y,1,1).data));"
+            "const q=document.querySelector('[data-testid=rdp-bar-quality]');"
+            "return {width:c.width,height:c.height,pixels,quality_level:q?Number(q.getAttribute('data-level')):null};"
+        )
+        if not isinstance(result, dict):
+            return False, result
+        artifact.write_text(json.dumps(result, indent=2), encoding="utf-8")
+        ok = all(len(pixel) == 4 and pixel[3] == 255
+                   and all(abs(pixel[channel] - point["rgb"][channel]) <= int(point.get("tolerance", 24)) for channel in range(3))
+                   for point, pixel in zip(points, result.get("pixels", []))) and len(result.get("pixels", [])) == len(points)
+        return ok, result
+
+    _poll(observe, float(args.get("timeout_sec") or 30), f"decoded client pixels in {artifact.name}")
+    return f"decoded client pixel assertions passed; evidence {artifact.name}"
 
 @_verb("save_text")
 def _do_save_text(ctx: NativeStepContext, args: Any) -> str:

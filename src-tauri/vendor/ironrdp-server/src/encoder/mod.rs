@@ -1,16 +1,21 @@
 use core::fmt;
 use core::num::NonZeroU16;
+use core::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use anyhow::{Context as _, Result, anyhow};
 use ironrdp_acceptor::DesktopSize;
+use ironrdp_bulk::{BulkCompressor, CompressionType as BulkType, flags};
 use ironrdp_graphics::diff::{Rect, find_different_rects_sub};
 use ironrdp_pdu::encode_vec;
 use ironrdp_pdu::fast_path::UpdateCode;
 use ironrdp_pdu::geometry::ExclusiveRectangle;
 use ironrdp_pdu::pointer::{
-    CachedPointerAttribute, ColorPointerAttribute, Point16, PointerAttribute, PointerPositionAttribute,
+    CachedPointerAttribute, ColorPointerAttribute, Point16, PointerAttribute,
+    PointerPositionAttribute,
 };
 use ironrdp_pdu::rdp::capability_sets::{CmdFlags, EntropyBits};
+use ironrdp_pdu::rdp::client_info::CompressionType;
 use ironrdp_pdu::surface_commands::{ExtendedBitmapDataPdu, SurfaceBitsPdu, SurfaceCommand};
 use tracing::{debug, warn};
 
@@ -21,11 +26,42 @@ use crate::macros::time_warn;
 use crate::{ColorPointer, DisplayUpdate, Framebuffer, RGBAPointer};
 
 mod bitmap;
+mod bulk;
 mod fast_path;
 pub(crate) mod rfx;
 
 pub(crate) use fast_path::*;
 use ironrdp_graphics::rdp6::BitmapEncodeError;
+
+/// Optional aggregate counters. The compressor itself always remains per connection.
+#[derive(Debug, Default)]
+pub struct EncoderStats {
+    pub planar_rects: AtomicU64,
+    pub rfx_rects: AtomicU64,
+    pub bytes_before_bulk: AtomicU64,
+    pub bytes_after_bulk: AtomicU64,
+}
+
+const PLANAR_BULK_GIVE_UP_RATIO: f64 = 0.25;
+
+/// Estimate with a throwaway MPPC-64K history. Never touch the connection's
+/// compressor until the selected payload is actually fragmented and sent.
+fn estimate_bulk_size(data: &[u8]) -> Result<usize> {
+    let mut scratch = BulkCompressor::new(BulkType::Rdp5)?;
+    // Bound the estimate's CPU cost on photo content. The first fragment
+    // provides a conservative ratio without any previous-frame history.
+    let sample = &data[..data.len().min(MAX_FASTPATH_UPDATE_SIZE)];
+    if sample.is_empty() {
+        return Ok(0);
+    }
+    let (size, packet_flags) = scratch.compress(sample)?;
+    let encoded = if packet_flags & flags::PACKET_COMPRESSED != 0 {
+        size
+    } else {
+        sample.len()
+    } + usize::from(packet_flags & 0xE0 != 0);
+    Ok((encoded * data.len()).div_ceil(sample.len()))
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
@@ -104,6 +140,8 @@ impl Default for UpdateEncoderCodecs {
 
 #[cfg_attr(feature = "__bench", visibility::make(pub))]
 pub(crate) struct UpdateEncoder {
+    bulk: Option<bulk::BulkEncoder>,
+    stats: Option<Arc<EncoderStats>>,
     desktop_size: DesktopSize,
     framebuffer: Option<Framebuffer>,
     bitmap_updater: Option<BitmapUpdater>,
@@ -132,11 +170,13 @@ impl UpdateEncoder {
         let bitmap_updater = if surface_flags.contains(CmdFlags::SET_SURFACE_BITS) {
             match codecs {
                 #[cfg(feature = "qoiz")]
-                UpdateEncoderCodecs { qoiz: Some(id), .. } => {
-                    BitmapUpdater::Qoiz(QoizHandler::new(id).context("failed to initialize qoiz handler")?)
-                }
+                UpdateEncoderCodecs { qoiz: Some(id), .. } => BitmapUpdater::Qoiz(
+                    QoizHandler::new(id).context("failed to initialize qoiz handler")?,
+                ),
                 #[cfg(feature = "qoi")]
-                UpdateEncoderCodecs { qoi: Some(id), .. } => BitmapUpdater::Qoi(QoiHandler::new(id)),
+                UpdateEncoderCodecs { qoi: Some(id), .. } => {
+                    BitmapUpdater::Qoi(QoiHandler::new(id))
+                }
                 UpdateEncoderCodecs {
                     remotefx: Some((algo, id)),
                     ..
@@ -159,6 +199,8 @@ impl UpdateEncoder {
         };
 
         Ok(Self {
+            bulk: None,
+            stats: None,
             desktop_size,
             framebuffer: None,
             bitmap_updater: Some(bitmap_updater),
@@ -174,12 +216,43 @@ impl UpdateEncoder {
         }
     }
 
-    pub(crate) fn set_desktop_size(&mut self, size: DesktopSize) {
+    pub(crate) fn with_bulk_compression(
+        mut self,
+        compression: Option<CompressionType>,
+        stats: Option<Arc<EncoderStats>>,
+    ) -> Result<Self> {
+        self.stats = stats;
+        if let Some(compression) = compression {
+            // Preserve the proprietary codec paths byte for byte.
+            let updater = self
+                .bitmap_updater
+                .as_mut()
+                .expect("bitmap updater always Some");
+            if let BitmapUpdater::RemoteFx(rfx) = updater {
+                let rfx = rfx.clone();
+                self.bulk = Some(bulk::BulkEncoder::new(compression)?);
+                *updater = BitmapUpdater::Adaptive(AdaptiveHandler {
+                    bitmap: BitmapHandler::new(),
+                    rfx,
+                });
+            } else if matches!(updater, BitmapUpdater::Bitmap(_)) {
+                self.bulk = Some(bulk::BulkEncoder::new(compression)?);
+            }
+        }
+        Ok(self)
+    }
+
+    pub(crate) fn set_desktop_size(&mut self, size: DesktopSize) -> Result<()> {
         self.desktop_size = size;
+        self.framebuffer = None;
+        if let Some(bulk) = self.bulk.as_mut() {
+            bulk.reset()?;
+        }
         self.bitmap_updater
             .as_mut()
             .expect("bitmap updater always Some")
             .set_desktop_size(size);
+        Ok(())
     }
 
     fn rgba_pointer(ptr: RGBAPointer) -> Result<UpdateFragmenter> {
@@ -201,7 +274,10 @@ impl UpdateEncoder {
             xor_bpp: 32,
             color_pointer,
         };
-        Ok(UpdateFragmenter::new(UpdateCode::NewPointer, encode_vec(&ptr)?))
+        Ok(UpdateFragmenter::new(
+            UpdateCode::NewPointer,
+            encode_vec(&ptr)?,
+        ))
     }
 
     fn color_pointer(ptr: ColorPointer) -> Result<UpdateFragmenter> {
@@ -217,12 +293,18 @@ impl UpdateEncoder {
             xor_mask: &ptr.xor_mask,
             and_mask: &ptr.and_mask,
         };
-        Ok(UpdateFragmenter::new(UpdateCode::ColorPointer, encode_vec(&ptr)?))
+        Ok(UpdateFragmenter::new(
+            UpdateCode::ColorPointer,
+            encode_vec(&ptr)?,
+        ))
     }
 
     fn cached_pointer(cache_index: u16) -> Result<UpdateFragmenter> {
         let ptr = CachedPointerAttribute { cache_index };
-        Ok(UpdateFragmenter::new(UpdateCode::CachedPointer, encode_vec(&ptr)?))
+        Ok(UpdateFragmenter::new(
+            UpdateCode::CachedPointer,
+            encode_vec(&ptr)?,
+        ))
     }
 
     fn default_pointer() -> Result<UpdateFragmenter> {
@@ -234,7 +316,10 @@ impl UpdateEncoder {
     }
 
     fn pointer_position(pos: PointerPositionAttribute) -> Result<UpdateFragmenter> {
-        Ok(UpdateFragmenter::new(UpdateCode::PositionPointer, encode_vec(&pos)?))
+        Ok(UpdateFragmenter::new(
+            UpdateCode::PositionPointer,
+            encode_vec(&pos)?,
+        ))
     }
 
     fn bitmap_diffs(&mut self, bitmap: &BitmapUpdate) -> Vec<Rect> {
@@ -333,7 +418,10 @@ impl UpdateEncoder {
     async fn bitmap(&mut self, bitmap: BitmapUpdate) -> Result<UpdateFragmenter> {
         // Move the bitmap updater to satisfy spawn_blocking 'static requirement.
         // It is restored after the blocking operation completes.
-        let mut updater = self.bitmap_updater.take().expect("bitmap updater always Some");
+        let mut updater = self
+            .bitmap_updater
+            .take()
+            .expect("bitmap updater always Some");
 
         let (result, updater) = tokio::task::spawn_blocking(move || {
             let result = time_warn!("Encoding bitmap", 10, updater.handle(&bitmap));
@@ -342,6 +430,17 @@ impl UpdateEncoder {
         .await?;
 
         self.bitmap_updater = Some(updater);
+
+        if let (Ok(fragment), Some(stats)) = (&result, &self.stats) {
+            if fragment.code == UpdateCode::Bitmap {
+                stats.planar_rects.fetch_add(1, Ordering::Relaxed);
+            } else if matches!(
+                self.bitmap_updater,
+                Some(BitmapUpdater::RemoteFx(_) | BitmapUpdater::Adaptive(_))
+            ) {
+                stats.rfx_rects.fetch_add(1, Ordering::Relaxed);
+            }
+        }
 
         result
     }
@@ -366,6 +465,26 @@ pub(crate) struct EncoderIter<'a> {
 }
 
 impl EncoderIter<'_> {
+    pub(crate) fn encode_fragment(
+        &mut self,
+        fragment: &mut UpdateFragmenter,
+        buffer: &mut [u8],
+    ) -> Result<Option<usize>> {
+        let encoder = &mut self.encoder;
+        let result = fragment.next(buffer, encoder.bulk.as_mut(), encoder.stats.as_deref());
+        if encoder
+            .bulk
+            .as_ref()
+            .is_some_and(|bulk| bulk.compressor.is_none())
+            && matches!(encoder.bitmap_updater, Some(BitmapUpdater::Adaptive(_)))
+        {
+            if let Some(BitmapUpdater::Adaptive(handler)) = encoder.bitmap_updater.take() {
+                encoder.bitmap_updater = Some(BitmapUpdater::RemoteFx(handler.rfx));
+            }
+        }
+        result
+    }
+
     #[cfg_attr(feature = "__bench", visibility::make(pub))]
     pub(crate) async fn next(&mut self) -> Option<Result<UpdateFragmenter>> {
         loop {
@@ -376,16 +495,27 @@ impl EncoderIter<'_> {
                 State::Start(update) => match update {
                     DisplayUpdate::Bitmap(bitmap) => {
                         let ds = encoder.desktop_size;
-                        if bitmap.x + bitmap.width.get() > ds.width || bitmap.y + bitmap.height.get() > ds.height {
+                        if bitmap.x + bitmap.width.get() > ds.width
+                            || bitmap.y + bitmap.height.get() > ds.height
+                        {
                             debug!(
                                 "Dropping bitmap update that exceeds desktop size: \
                                  bitmap ({}, {}) {}x{} vs desktop {}x{}",
-                                bitmap.x, bitmap.y, bitmap.width, bitmap.height, ds.width, ds.height,
+                                bitmap.x,
+                                bitmap.y,
+                                bitmap.width,
+                                bitmap.height,
+                                ds.width,
+                                ds.height,
                             );
                             continue;
                         }
                         let diffs = encoder.bitmap_diffs(&bitmap);
-                        self.state = State::BitmapDiffs { diffs, bitmap, pos: 0 };
+                        self.state = State::BitmapDiffs {
+                            diffs,
+                            bitmap,
+                            pos: 0,
+                        };
                         continue;
                     }
                     DisplayUpdate::PointerPosition(pos) => UpdateEncoder::pointer_position(pos),
@@ -402,29 +532,50 @@ impl EncoderIter<'_> {
                         self.state = State::Ended;
                         return None;
                     };
-                    let Rect { x, y, width, height } = *rect;
+                    let Rect {
+                        x,
+                        y,
+                        width,
+                        height,
+                    } = *rect;
 
                     let x = match u16::try_from(x) {
                         Ok(x) => x,
-                        Err(_) => return Some(Err(anyhow!("invalid `x`: out of range integral conversion"))),
+                        Err(_) => {
+                            return Some(Err(anyhow!(
+                                "invalid `x`: out of range integral conversion"
+                            )));
+                        }
                     };
                     let y = match u16::try_from(y) {
                         Ok(y) => y,
-                        Err(_) => return Some(Err(anyhow!("invalid `y`: out of range integral conversion"))),
+                        Err(_) => {
+                            return Some(Err(anyhow!(
+                                "invalid `y`: out of range integral conversion"
+                            )));
+                        }
                     };
                     let width = match u16::try_from(width) {
                         Ok(width) => match NonZeroU16::new(width) {
                             Some(width) => width,
                             None => return Some(Err(anyhow!("rectangle width cannot be zero"))),
                         },
-                        Err(_) => return Some(Err(anyhow!("invalid `width`: out of range integral conversion"))),
+                        Err(_) => {
+                            return Some(Err(anyhow!(
+                                "invalid `width`: out of range integral conversion"
+                            )));
+                        }
                     };
                     let height = match u16::try_from(height) {
                         Ok(height) => match NonZeroU16::new(height) {
                             Some(height) => height,
                             None => return Some(Err(anyhow!("rectangle height cannot be zero"))),
                         },
-                        Err(_) => return Some(Err(anyhow!("invalid `height`: out of range integral conversion"))),
+                        Err(_) => {
+                            return Some(Err(anyhow!(
+                                "invalid `height`: out of range integral conversion"
+                            )));
+                        }
                     };
 
                     let Some(sub) = bitmap.sub(x, y, width, height) else {
@@ -448,6 +599,7 @@ impl EncoderIter<'_> {
 
 #[derive(Debug)]
 enum BitmapUpdater {
+    Adaptive(AdaptiveHandler),
     None(NoneHandler),
     Bitmap(BitmapHandler),
     RemoteFx(RemoteFxHandler),
@@ -462,6 +614,7 @@ enum BitmapUpdater {
 impl BitmapUpdater {
     fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
         match self {
+            Self::Adaptive(up) => up.handle(bitmap),
             Self::None(up) => up.handle(bitmap),
             Self::Bitmap(up) => up.handle(bitmap),
             Self::RemoteFx(up) => up.handle(bitmap),
@@ -475,14 +628,45 @@ impl BitmapUpdater {
     }
 
     fn set_desktop_size(&mut self, size: DesktopSize) {
-        if let Self::RemoteFx(up) = self {
-            up.set_desktop_size(size)
+        match self {
+            Self::RemoteFx(up) => up.set_desktop_size(size),
+            Self::Adaptive(up) => up.rfx.set_desktop_size(size),
+            _ => {}
         }
     }
 }
 
 trait BitmapUpdateHandler {
     fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter>;
+}
+
+#[derive(Debug)]
+struct AdaptiveHandler {
+    bitmap: BitmapHandler,
+    rfx: RemoteFxHandler,
+}
+
+impl BitmapUpdateHandler for AdaptiveHandler {
+    fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
+        if !bitmap.width.get().is_multiple_of(4) || bitmap.width.get() > u16::MAX / 4 {
+            return self.rfx.handle(bitmap);
+        }
+        let planar = self.bitmap.handle(bitmap)?;
+        let estimate = estimate_bulk_size(&planar.data)?;
+        if estimate as f64 <= planar.data.len() as f64 * PLANAR_BULK_GIVE_UP_RATIO {
+            return Ok(planar);
+        }
+        // Encoding a rejected RemoteFX candidate must not consume its first
+        // frame headers or advance its frame index.
+        let mut candidate = self.rfx.clone();
+        let rfx = candidate.handle(bitmap)?;
+        if estimate <= rfx.data.len() {
+            Ok(planar)
+        } else {
+            self.rfx = candidate;
+            Ok(rfx)
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -616,7 +800,9 @@ struct QoizHandler {
 #[cfg(feature = "qoiz")]
 impl fmt::Debug for QoizHandler {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("QoizHandler").field("codec_id", &self.codec_id).finish()
+        f.debug_struct("QoizHandler")
+            .field("codec_id", &self.codec_id)
+            .finish()
     }
 }
 
@@ -664,7 +850,12 @@ impl BitmapUpdateHandler for QoizHandler {
                     &mut inb,
                     zstd_safe::zstd_sys::ZSTD_EndDirective::ZSTD_e_flush,
                 )
-                .map_err(|code| anyhow!("failed to Zstd compress: {}", zstd_safe::get_error_name(code)))?;
+                .map_err(|code| {
+                    anyhow!(
+                        "failed to Zstd compress: {}",
+                        zstd_safe::get_error_name(code)
+                    )
+                })?;
             if res == 0 {
                 break;
             }
@@ -732,10 +923,14 @@ fn qoi_encode(bitmap: &BitmapUpdate) -> Result<Vec<u8>> {
         BgrA32 | BgrX32 => qoi::RawChannels::Bgrx,
         RgbA32 | RgbX32 => qoi::RawChannels::Rgbx,
     };
-    let enc = qoi::EncoderBuilder::new(&bitmap.data, bitmap.width.get().into(), bitmap.height.get().into())
-        .stride(bitmap.stride.get())
-        .raw_channels(raw_channels)
-        .build()?;
+    let enc = qoi::EncoderBuilder::new(
+        &bitmap.data,
+        bitmap.width.get().into(),
+        bitmap.height.get().into(),
+    )
+    .stride(bitmap.stride.get())
+    .raw_channels(raw_channels)
+    .build()?;
     Ok(enc.encode_to_vec()?)
 }
 
@@ -759,5 +954,123 @@ fn set_surface(bitmap: &BitmapUpdate, codec_id: u8, data: &[u8]) -> Result<Updat
         extended_bitmap_data,
     };
     let cmd = SurfaceCommand::SetSurfaceBits(pdu);
-    Ok(UpdateFragmenter::new(UpdateCode::SurfaceCommands, encode_vec(&cmd)?))
+    Ok(UpdateFragmenter::new(
+        UpdateCode::SurfaceCommands,
+        encode_vec(&cmd)?,
+    ))
+}
+
+#[cfg(test)]
+mod bulk_tests {
+    use super::*;
+    use core::num::NonZeroUsize;
+    use ironrdp_core::{ReadCursor, decode_cursor};
+    use ironrdp_pdu::fast_path::{FastPathHeader, FastPathUpdatePdu};
+    use ironrdp_pdu::rdp::headers::CompressionFlags;
+
+    fn encoder() -> UpdateEncoder {
+        let mut codecs = UpdateEncoderCodecs::new();
+        codecs.set_remotefx(Some((EntropyBits::Rlgr3, 3)));
+        UpdateEncoder::new(
+            DesktopSize {
+                width: 256,
+                height: 128,
+            },
+            CmdFlags::SET_SURFACE_BITS,
+            codecs,
+            8 * 1024 * 1024,
+        )
+        .unwrap()
+        .with_bulk_compression(Some(CompressionType::Rdp61), None)
+        .unwrap()
+    }
+
+    #[test]
+    fn desktop_resize_flushes_history_even_when_reusing_the_encoder() {
+        let mut encoder = encoder();
+        let original = vec![42; 4000];
+        let mut receiver = BulkCompressor::new(BulkType::Rdp61).unwrap();
+        for index in 0..3 {
+            if index == 2 {
+                encoder
+                    .set_desktop_size(DesktopSize {
+                        width: 320,
+                        height: 128,
+                    })
+                    .unwrap();
+            }
+            let mut fragment = UpdateFragmenter::new(UpdateCode::Bitmap, original.clone());
+            let mut output = vec![0; fragment.size_hint()];
+            let mut iter = encoder.update(DisplayUpdate::DefaultPointer);
+            let size = iter
+                .encode_fragment(&mut fragment, &mut output)
+                .unwrap()
+                .unwrap();
+            let mut cursor = ReadCursor::new(&output[..size]);
+            let _: FastPathHeader = decode_cursor(&mut cursor).unwrap();
+            let update: FastPathUpdatePdu<'_> = decode_cursor(&mut cursor).unwrap();
+            let packet_flags = update.compression_flags.unwrap();
+            assert_eq!(
+                packet_flags.contains(CompressionFlags::FLUSHED),
+                index == 0 || index == 2
+            );
+            assert_eq!(
+                receiver
+                    .decompress(update.data, u32::from(packet_flags.bits()) | 3)
+                    .unwrap(),
+                original
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_disabled_compressor_returns_the_adaptive_encoder_to_remotefx() {
+        let mut encoder = encoder();
+        encoder.bulk.as_mut().unwrap().compressor = None;
+        let mut fragment = UpdateFragmenter::new(UpdateCode::Bitmap, vec![1; 80]);
+        let mut output = vec![0; fragment.size_hint()];
+        let mut iter = encoder.update(DisplayUpdate::DefaultPointer);
+        iter.encode_fragment(&mut fragment, &mut output).unwrap();
+        drop(iter);
+        assert!(matches!(
+            encoder.bitmap_updater,
+            Some(BitmapUpdater::RemoteFx(_))
+        ));
+        let bitmap = BitmapUpdate {
+            x: 0,
+            y: 0,
+            width: NonZeroU16::new(256).unwrap(),
+            height: NonZeroU16::new(128).unwrap(),
+            format: ironrdp_graphics::image_processing::PixelFormat::BgrA32,
+            data: vec![42; 256 * 128 * 4].into(),
+            stride: NonZeroUsize::new(256 * 4).unwrap(),
+        };
+        assert_eq!(
+            encoder.bitmap(bitmap).await.unwrap().code,
+            UpdateCode::SurfaceCommands
+        );
+    }
+
+    #[test]
+    fn unaligned_rectangles_fall_back_without_losing_the_rfx_headers() {
+        let mut encoder = encoder();
+        for width in [255, 253] {
+            let bitmap = BitmapUpdate {
+                x: 0,
+                y: 0,
+                width: NonZeroU16::new(width).unwrap(),
+                height: NonZeroU16::new(128).unwrap(),
+                format: ironrdp_graphics::image_processing::PixelFormat::BgrA32,
+                data: vec![42; usize::from(width) * 128 * 4].into(),
+                stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
+            };
+            let encoded = encoder
+                .bitmap_updater
+                .as_mut()
+                .unwrap()
+                .handle(&bitmap)
+                .unwrap();
+            assert_eq!(encoded.code, UpdateCode::SurfaceCommands);
+        }
+    }
 }

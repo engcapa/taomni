@@ -103,7 +103,7 @@ impl RdpServerDisplayUpdates for PatternUpdates {
     }
 }
 
-fn tls_identity(dir: &Path) -> TlsIdentityCtx {
+pub(super) fn tls_identity(dir: &Path) -> TlsIdentityCtx {
     super::tls::ensure_crypto_provider();
     std::fs::create_dir_all(dir).expect("create identity dir");
     let certified = rcgen::generate_simple_self_signed(vec!["localhost".to_string()])
@@ -163,7 +163,9 @@ impl ServerCertVerifier for AcceptAnyServerCert {
     }
 }
 
-async fn tls_connect(tcp: TcpStream) -> anyhow::Result<tokio_rustls::client::TlsStream<TcpStream>> {
+pub(super) async fn tls_connect(
+    tcp: TcpStream,
+) -> anyhow::Result<tokio_rustls::client::TlsStream<TcpStream>> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let config = rustls::ClientConfig::builder_with_provider(Arc::clone(&provider))
         .with_safe_default_protocol_versions()?
@@ -175,7 +177,7 @@ async fn tls_connect(tcp: TcpStream) -> anyhow::Result<tokio_rustls::client::Tls
         .connect(name, tcp)
         .await?)
 }
-fn client_config(codecs: BitmapCodecs) -> connector::Config {
+pub(super) fn client_config(codecs: BitmapCodecs) -> connector::Config {
     connector::Config {
         credentials: Credentials::UsernamePassword {
             username: "loopback".to_owned(),
@@ -220,7 +222,7 @@ fn client_config(codecs: BitmapCodecs) -> connector::Config {
     }
 }
 
-async fn connect_with_retry(addr: SocketAddr) -> anyhow::Result<TcpStream> {
+pub(super) async fn connect_with_retry(addr: SocketAddr) -> anyhow::Result<TcpStream> {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         match TcpStream::connect(addr).await {

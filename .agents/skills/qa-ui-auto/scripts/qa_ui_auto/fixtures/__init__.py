@@ -69,6 +69,7 @@ from . import system_rdp_running
 from . import release_build_required
 from . import rdp_baseline_required
 from . import rdp_audio_required
+from . import xrdp_server_required
 
 
 class FixtureContext(Protocol):
@@ -119,6 +120,7 @@ REGISTRY: dict[str, Fixture] = {
     "release_build_required": Fixture("release_build_required", release_build_required.setup),
     "rdp_baseline_required": Fixture("rdp_baseline_required", rdp_baseline_required.setup, rdp_baseline_required.teardown),
     "rdp_audio_required": Fixture("rdp_audio_required", rdp_audio_required.setup, rdp_audio_required.teardown),
+    "xrdp_server_required": Fixture("xrdp_server_required", xrdp_server_required.setup, xrdp_server_required.teardown),
 }
 
 
