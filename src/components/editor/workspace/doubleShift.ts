@@ -5,6 +5,8 @@
 export interface DoubleShiftDetector {
   handleKeyDown(event: KeyboardEvent): void;
   handleKeyUp(event: KeyboardEvent): void;
+  /** Any pointer press between two Shift taps cancels the gesture, like IDEA. */
+  handlePointerDown(): void;
 }
 
 export function createDoubleShiftDetector(
@@ -16,6 +18,10 @@ export function createDoubleShiftDetector(
   let lastTapAt: number | null = null;
 
   return {
+    handlePointerDown() {
+      pureShiftPress = false;
+      lastTapAt = null;
+    },
     handleKeyDown(event: KeyboardEvent) {
       if (
         event.key === "Shift" &&
