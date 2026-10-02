@@ -1,26 +1,25 @@
 id: TC-SHOT-N7
-title: Native GIF recording has complete frames matching duration and fps
-covers:
-- F27.2
-tags:
-- screenshot
-- recording
-- native
-- p1
-modes:
-- native
-native_platforms:
-- Linux
-- Windows
-- macOS
-fixtures:
-- reset_db
+title: Native GIF recorder timer stop preview copy and cleanup
+covers: [F27.1]
+tags: [screenshot, recording, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="system-screenshot"]'
-- wait: 5
-# Record 3s at 5fps, decode the GIF, verify frame count is within 20% of
-# expected (15) and dimensions are 200x200.
-- eval_readonly:
-    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_gif_complete", {secs: 3, fps: 5}).then(JSON.stringify)'
-    contains: 'OK frames='
+- native_screenshot_scenario: {scenario: recorder, format: gif}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: gif-recorder
+    requirement: Recorder UI stops a real clip, loads GIF preview, copies first frame, preserves preview on reentry and Done restores main/removes temp clip.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: "Timer advances, real clip decodes with motion/timing, preview dimensions agree, first frame clipboard exists, preview retained, Done closes and temp removed; clip retained externally."}
+    results: [3]
+  visual:
+  - {check: Preview motion, method: external, reason: Inspect/play retained recorder-preview GIF; image load and decode dimensions are automated.}
+  native:
+  - {check: Recorder lifecycle, method: automated, reason: "Actual native recorder window, raw-file blob transport, encoding and clipboard."}

@@ -1654,6 +1654,8 @@ async function readStubWorkspaceEncodedFile(
 
 // Screenshot tool stub helpers (browser preview only).
 const STUB_SCREENSHOT_DATA_URL: string = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAEsCAIAAABi1XKVAAAHYElEQVR42u3UsQ3DIBRAQSZJ7do1QzAEQ3gSaoZgCMZJnSodcvlFE8m5pzfDpbfC5XT6/jyOva9UvR6pOXjCELCABSxgAQtYwAIWsIAFLGABS8ACFrCABSxgAQtYwAIWsIAFLAELWMACFrCABSxgAQtYwAIWsAQsYAELWMACFqeABSxgAQtYwBKwgAUsYAELWAYWsIAFLGABC1gGFrCABSxgAcvAAhawgAUsYBlYwAIWsIAFLAMLWMACFrCABSxgAQtYwAIWsAwsYAELWMACFrCABSxgAQtYwDKwgAUsYAELWMACFrCABSxgAQtYAhawgAUsYAELWMACFrCABSxgCVjAAhawgAUsYAELWMACFrCAJWABC1jAAhawgAUsYAELWMACloAFLGABC1jAMrCABSxgAQtYAhawgAUsYAHLGAIWsIAFLGABy8ACFrCABSxgGVjAAhawgAUsAwtYwAIWsIBlYAELWMACFrCABSxgAQtYwAKWgQUsYAELWMACFrCABSxgAQtYBhawgAUsYAELWMACFrCABSxgAUvAAhawgAUsYAELWMACFrCABSwBC1jAAhawgAUsYAELWMACFrAELGABC1jAAhawgAUsYAELWMASsIAFLGABC1gGFrCABSxgAUvAAhawgAUsYAGLRMACFrCABSxgGVjA+h1YikcoYAELWMACFrAMLGABC1jAApaBBSxgAQtYwDKwgAUsYAELWMACFrCABSxgAcvAAhawgAUsYAELWMACFrCABSwDC1jAAhawgAUsYAELWMACFrAMLGABC1jAAhawgAUsYAELWMACloAFLGABC1jAAhawgAUsYAELWAIWsIAFLGABC1jAAhawgAUsYAlYwAIWsIAFLEgBaxescjp4LtX398EqzetRpoMDC1jAAhawgAUsYAELWMACFrCAZWABC1jAAhawgAUsYAELWMACloEFLGABC1jAAhawgAUsYAELWAYWsIAFLGABi1PAAhawgAUsYBlYwAIWsIAFLAMLWMACFrCABSxIAQtYwAIWsIBlYAELWMACFrAMLGABC1jAApaBBSxgAQtYwAIWsIAFLGABC1gGFrCABSxgAQtYwAIWsIAFLGAZWMACFrCABSxgAQtYwAIWsIAFLAwBC1jAAhawgAUsYAELWMACFrAMLGABC1jAAhawgAUsYAELWMAysIAFLGABC1jAAhawgAUsYAHLwAIWsIAFLGBxCljAAhawgAUsAwtYwAIWsIBlYAELWMACFrCAZWABC1jAAhawDCxgAQtYwAKWgQUsYAELWMAysIAFLGABC1jAAhawgAUsYAHLwAIWsIAFLGABC1jAAhawgAUsAwtYwAIWsIAFLGABC1jAAhawgEUiYAELWMACFrCABSxgAQtYwAKWgQUsYAELWMACFrCABSxgAQtYBhawgAUsYAELWMACFrCABSxgGVjAAhawgAUsAwtYwAIWsIBlYAELWMACFrCMIWABC1jAAhawDCxgAQtYwAKWgQUsYAELWMAysIAFLGABC1gGFrCABSxgAQtYwAIWsIAFLGAZWMACFrCABSxgAQtYwAIWsIBlYAELWMACFrCABSxgAQtYwAIWsEgELGABC1jAAhawgAUsYAELWMAysIAFLGABC1jAAhawgAUsYAHLwAIWsIAFLGABC1jAAhawgAUsAwtYwAIWsIBlYAELWMAC1qPB6tXBc2++vw9Wn16P/nFwYAELWMACFrCABSxgAQtYwAIWsAwsYAELWMACFrCABSxgAQtYwDKwgAUsYAELWMACFrCABSxgAcvAAhawgAUsYHEKWMACFrCABSwDC1jAAhawgGVgAQtYwAIWsIAFKWABC1jAAhawDCxgAQtYwAKWgQUsYAELWMAysIAFLGABC1jAAhawgAUsYAHLwAIWsIAFLGABC1jAAhawgPUHYL0UC1jAAhawgAUsYAELWMACFrCABSwDC1jAAhawgAUsYAELWMACFrAMLGABC1jAAhawgAUsYAELWMAysIAFLGABC1icAhawgAUsYAHLwAIWsIAFLGAZWMACFrCABSxgQQpYwAIWsIAFLAELWMACFrCAZWABC1jAAhawBCxgAQtYwAIWsIAFLGABC1jAErCABSxgAQtYwAIWsIAFLGABS8ACFrCABSxgAQtYwAIWsIAFLGBhCFjAAhawgAUsYAELWMACFrCAZWABC1jAAhawgAUsYAELWMACloEFLGABC1jAAhawgAUsYAELWAYWsIAFLGABi1PAAhawgAUsYBlYwAIWsIAFLAMLWMACFrCABSwDC1jAAhawgCVgAQtYwAIWsAwsYAELWMACloAFLGABC1jAAhawgAUsYAELWAIWsIAFLGABC1jAAhawgAUsYAlYwAIWsIAFLGABC1jAAhawgAUsEgELWMACFrCABSxgAQtYwAIWsAwsYAELWMACFrCABSxgAQtYwDKwgAUsYAELWMACFrCABSxgAcvAAhawgAUsYBlYwAIWsIAFLAMLWMACFrCAZWABC1jAAtYD+wK40T0UTMEo5gAAAABJRU5ErkJggg==";
+/** Browser-preview screenshot artifacts: stub path -> data URL. */
+const stubScreenshotFiles = new Map<string, string>();
 function stubScreenshotCall(cmd: string, args: unknown): void {
   try {
     const w = window as unknown as Record<string, unknown>;
@@ -4910,18 +4912,20 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     // Synthetic 400x300 desktop; the overlay treats it like a captured screen.
     // `screenshot_open_overlay` navigates the page to the overlay hash so the
     // browser flow is end-to-end testable. Calls are logged to
-    // `window.__taomniStubScreenshotCalls` for `eval_readonly` assertions.
+    // `window.__taomniStubScreenshotCalls` for `eval_readonly` assertions;
+    // exported images are decoded so cases can assert their real size.
     case "screenshot_list_displays": {
       return ([
-        { id: "0", name: "Stub Display", width: 400, height: 300, x: 0, y: 0, primary: true },
+        { id: "0,0", name: "Stub Display", width: 400, height: 300, x: 0, y: 0, scaleFactor: 1, primary: true },
       ] as unknown) as T;
     }
     case "screenshot_overlay_init": {
       return ({
         path: STUB_SCREENSHOT_DATA_URL,
-        displayId: "0",
+        displayId: "0,0",
         width: 400,
         height: 300,
+        scaleFactor: 1,
       } as unknown) as T;
     }
     case "screenshot_open_overlay": {
@@ -4931,7 +4935,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     }
     case "screenshot_close_overlay": {
       stubScreenshotCall(cmd, args);
-      location.hash = "";
+      // A pin is a separate native window; keep its browser route alive
+      // when the originating overlay session closes.
+      if (location.hash !== "#screenshot-pin") location.hash = "";
       return (undefined as unknown) as T;
     }
     case "screenshot_capture_full": {
@@ -4950,39 +4956,84 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return ({
         path: STUB_SCREENSHOT_DATA_URL,
         width: 400,
-        height: 600,
+        height: 300,
         frames: 3,
       } as unknown) as T;
     }
-    case "screenshot_save_data_url": {
+    case "screenshot_overlay_update": {
       stubScreenshotCall(cmd, args);
-      return ({ path: "stub-annotated.png", width: 200, height: 150 } as unknown) as T;
+      return (undefined as unknown) as T;
+    }
+    case "screenshot_save_data_url": {
+      const dataUrl = String((args as { dataUrl?: string } | undefined)?.dataUrl ?? "");
+      const size = await new Promise<{ width: number; height: number }>((resolve) => {
+        const image = new Image();
+        image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+        image.onerror = () => resolve({ width: 0, height: 0 });
+        image.src = dataUrl;
+      });
+      const path = `stub-annotated-${Date.now()}.png`;
+      stubScreenshotFiles.set(path, dataUrl);
+      stubScreenshotCall(cmd, { path, ...size });
+      return ({ path, ...size } as unknown) as T;
+    }
+    case "screenshot_read_file": {
+      throw new Error("screenshot_read_file is native-only");
     }
     case "screenshot_copy_image":
     case "screenshot_save_image": {
       stubScreenshotCall(cmd, args);
       return (undefined as unknown) as T;
     }
+    case "screenshot_close_pin": {
+      stubScreenshotCall(cmd, args);
+      location.hash = "";
+      return (undefined as unknown) as T;
+    }
+    case "screenshot_pin_to_screen": {
+      stubScreenshotCall(cmd, args);
+      location.hash = "screenshot-pin";
+      return ("screenshot-pin-1" as unknown) as T;
+    }
+    case "screenshot_pin_init": {
+      const files = [...stubScreenshotFiles.values()];
+      return ({ path: files[files.length - 1] ?? STUB_SCREENSHOT_DATA_URL, width: 400, height: 300 } as unknown) as T;
+    }
+    case "screenshot_ocr": {
+      stubScreenshotCall(cmd, args);
+      return ({ text: "Taomni stub OCR\nuser@example.com", langs: "eng" } as unknown) as T;
+    }
+    case "screenshot_auto_redact": {
+      stubScreenshotCall(cmd, args);
+      return ({ boxes: [{ x: 10, y: 10, w: 60, h: 20, kind: "email" }], count: 1 } as unknown) as T;
+    }
     case "screenshot_probe": {
       return ({
         permission: "notRequired",
         controlPermission: "notRequired",
-        ffmpegAvailable: false,
+        mp4Available: true,
+        ocrAvailable: false,
         summary: "browser stub",
       } as unknown) as T;
     }
     case "screenshot_start_recording": {
       stubScreenshotCall(cmd, args);
+      location.hash = "screenshot-recorder";
       return ({ recordingId: "stub-rec-1" } as unknown) as T;
     }
     case "screenshot_stop_recording": {
       stubScreenshotCall(cmd, args);
-      return ({ path: STUB_SCREENSHOT_DATA_URL, width: 400, height: 300 } as unknown) as T;
+      return ({ path: STUB_SCREENSHOT_DATA_URL, width: 400, height: 300, frames: 30, durationMs: 3000 } as unknown) as T;
     }
     case "screenshot_cancel_recording":
     case "screenshot_current_recording": {
       stubScreenshotCall(cmd, args);
       return (cmd === "screenshot_current_recording" ? ("stub-rec-1" as unknown) : (undefined as unknown)) as T;
+    }
+    case "screenshot_shortcut_status":
+    case "screenshot_shortcut_set": {
+      stubScreenshotCall(cmd, args);
+      throw new Error("global shortcuts are native-only");
     }
     default:
       console.warn(`[tauri-stub] Unknown invoke command: ${cmd}`, args);

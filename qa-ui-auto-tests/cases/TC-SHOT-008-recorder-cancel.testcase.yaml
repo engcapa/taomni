@@ -1,21 +1,46 @@
 id: TC-SHOT-008
-title: Recorder cancel discards the recording and closes the bar
-covers:
-- F27.1
-tags:
-- screenshot
-- recording
-- p2
-modes:
-- browser
-fixtures:
-- reset_db
+title: Recorder cancel targets the initialized recording without stopping or saving it
+description: Direct browser recorder route; cancel IPC and renderer teardown are checked, not native capture or temp-file cleanup.
+covers: [F27.1]
+tags: [screenshot, recording, p2]
+modes: [browser]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}#screenshot-recorder
-- wait_for: '[data-testid="screenshot-recorder"]'
-- assert_visible: '[data-testid="screenshot-recorder-cancel"]'
+- wait_for: '[data-testid="screenshot-recorder-stop"]:enabled'
+- assert_visible: '[data-testid="screenshot-recorder-timer"]'
+- assert_not_visible: '[data-testid="screenshot-recorder-preview"]'
 - click: '[data-testid="screenshot-recorder-cancel"]'
-- wait_for:
-    selector: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-recorder"]'
 - eval_readonly:
-    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_cancel_recording")
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_cancel_recording" && window.__taomniStubScreenshotCalls.at(-2).args.recordingId === "stub-rec-1"
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).split('"cmd":"screenshot_cancel_recording"').length === 2 && window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_close_overlay"
+- eval_readonly:
+    expression: >-
+      !JSON.stringify(window.__taomniStubScreenshotCalls).includes('"cmd":"screenshot_stop_recording"') && !JSON.stringify(window.__taomniStubScreenshotCalls).includes('"cmd":"screenshot_save_image"')
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Cancel during an initialized recording sends exactly one cancel for that recording and closes the bar without stop or save dispatch.
+    actions: [1, 5]
+    checkpoints:
+    - {step: 2, expectation: Initialization resolved before cancel.}
+    - {step: 3, expectation: The recording timer is visible.}
+    - {step: 4, expectation: No stopped preview exists.}
+    - {step: 6, expectation: Main-window chrome returns.}
+    - {step: 7, expectation: The recorder is unmounted.}
+    - {step: 8, expectation: Cancel targets stub-rec-1.}
+    - {step: 9, expectation: Exactly one cancel is followed by close.}
+    - {step: 10, expectation: Cancel does not stop or save a preview.}
+    results: [6, 7, 8, 9, 10]
+  visual:
+  - check: Recording controls disappear after cancel.
+    method: automated
+    reason: DOM checks establish renderer teardown only.
+  native:
+  - check: Stop the real capture worker and discard temporary native media.
+    method: external
+    reason: Browser cancel is a stub; native recording scenarios must inspect real worker and artifact cleanup separately.

@@ -474,6 +474,16 @@
         "eval_readonly": {
           "$ref": "#/$defs/eval_readonly_arg"
         },
+        "native_screenshot_scenario": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scenario"],
+          "properties": {
+            "scenario": {"enum": ["capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact"]},
+            "format": {"enum": ["gif", "mp4"]},
+            "secs": {"type": "integer", "minimum": 1, "maximum": 8}
+          }
+        },
         "assert_file_contains": {
           "type": "object",
           "required": [

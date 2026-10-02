@@ -113,7 +113,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1
       - name: Validate QA tools
-        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_dev_contract
+        run: python -m unittest test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_ci_provenance test_ci_services test_dev_contract test_screenshot_scenarios test_stage_screenshot_artifacts test_setup_screenshot_ocr
       - name: Plan exact cases and dependencies
         id: plan
         env:
@@ -155,7 +155,7 @@ jobs:
         if: runner.os == 'Linux' && matrix.mode == 'native'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev libudev-dev libgbm-dev nasm xvfb xauth openbox wmctrl xdotool x11-utils x11-xserver-utils libxtst6 dbus-x11 xclip python3-tk python3-gi gir1.2-gtk-3.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons fonts-noto-cjk
+          sudo apt-get install -y libwebkit2gtk-4.1-dev webkit2gtk-driver libappindicator3-dev librsvg2-dev patchelf libkrb5-dev libasound2-dev libv4l-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev libudev-dev libgbm-dev nasm xvfb xauth openbox wmctrl xdotool x11-utils x11-xserver-utils libxtst6 dbus-x11 xclip python3-tk python3-gi gir1.2-gtk-3.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons fonts-noto-cjk tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim gstreamer1.0-libav gstreamer1.0-plugins-good gstreamer1.0-plugins-bad
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.mode == 'native'
       - uses: arduino/setup-protoc@v3
@@ -189,14 +189,20 @@ jobs:
           Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
           Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
           $driver >> $env:GITHUB_PATH
+          choco install tesseract --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Tesseract installation failed' }
+          'C:\Program Files\Tesseract-OCR' >> $env:GITHUB_PATH
       - name: macOS build dependencies
         if: runner.os == 'macOS' && matrix.mode == 'native'
         run: |
-          brew install krb5
+          brew install krb5 tesseract
           echo "SHELL=/bin/zsh" >> "$GITHUB_ENV"
           echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
           echo "LIBGSSAPI_PREFIX=$(brew --prefix krb5)" >> "$GITHUB_ENV"
           echo "PKG_CONFIG_PATH=$(brew --prefix krb5)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Verify OCR executable and pinned English/Chinese data
+        if: matrix.mode == 'native'
+        run: python .agents/skills/qa-ui-auto/scripts/setup_screenshot_ocr.py
       - name: Native adapter
         if: matrix.mode == 'native' && runner.os != 'macOS'
         run: cargo install tauri-driver --locked
@@ -240,13 +246,20 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/ci_execute.py
           --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY"
           --report "qa-ui-auto-report/$QA_ENTRY"
+      - name: Stage screenshot outputs under the report root
+        if: always()
+        env:
+          QA_ENTRY: ${{ matrix.id }}
+        run: >-
+          python .agents/skills/qa-ui-auto/scripts/stage_screenshot_artifacts.py
+          --source "$RUNNER_TEMP/taomni-qa-artifacts"
+          --report "qa-ui-auto-report/$QA_ENTRY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: qa-${{ matrix.id }}-${{ needs.plan.outputs.artifact_key }}
           path: |
             qa-ui-auto-report/${{ matrix.id }}/
-            ${{ runner.temp }}/taomni-qa-artifacts/
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appdata/**
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**

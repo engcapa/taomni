@@ -9235,11 +9235,15 @@ controls:
 
 ---
 
+## 27. 系统截图与录屏
+
+### 27.1 截图、标注与录屏工作流
+
 <!-- feature
 id: F27.1
 status: done
 area: screenshot/screen-record
-components: [ScreenshotOverlay, AnnotationCanvas, RecorderBar, ControlBar, screenshot.ts, screenshot (tauri)]
+components: [ScreenshotOverlay, AnnotationCanvas, PinnedImage, RecorderBar, ControlBar, screenshot.ts, screenshot (tauri)]
 files:
   - src/components/screenshot/ScreenshotOverlay.tsx
   - src/components/screenshot/AnnotationCanvas.tsx
@@ -9256,6 +9260,24 @@ controls:
   - id: system-screenshot
     selector: '[data-testid="system-screenshot"]'
     kind: interactive
+  - id: system-screenshot-delay-toggle
+    selector: '[data-testid="system-screenshot-delay-toggle"]'
+    kind: interactive
+  - id: system-screenshot-delay-menu
+    selector: '[data-testid="system-screenshot-delay-menu"]'
+    kind: display
+  - id: system-screenshot-delay-3
+    selector: '[data-testid="system-screenshot-delay-3"]'
+    kind: interactive
+  - id: system-screenshot-delay-5
+    selector: '[data-testid="system-screenshot-delay-5"]'
+    kind: interactive
+  - id: system-screenshot-delay-10
+    selector: '[data-testid="system-screenshot-delay-10"]'
+    kind: interactive
+  - id: system-screenshot-countdown
+    selector: '[data-testid="system-screenshot-countdown"]'
+    kind: display
   - id: screenshot-overlay
     selector: '[data-testid="screenshot-overlay"]'
     kind: display
@@ -9268,6 +9290,36 @@ controls:
   - id: screenshot-selection
     selector: '[data-testid="screenshot-selection"]'
     kind: display
+  - id: screenshot-select-layer
+    selector: '[data-testid="screenshot-select-layer"]'
+    kind: interactive
+  - id: screenshot-selection-move
+    selector: '[data-testid="screenshot-selection-move"]'
+    kind: interactive
+  - id: screenshot-handle-nw
+    selector: '[data-testid="screenshot-handle-nw"]'
+    kind: interactive
+  - id: screenshot-handle-n
+    selector: '[data-testid="screenshot-handle-n"]'
+    kind: interactive
+  - id: screenshot-handle-ne
+    selector: '[data-testid="screenshot-handle-ne"]'
+    kind: interactive
+  - id: screenshot-handle-e
+    selector: '[data-testid="screenshot-handle-e"]'
+    kind: interactive
+  - id: screenshot-handle-se
+    selector: '[data-testid="screenshot-handle-se"]'
+    kind: interactive
+  - id: screenshot-handle-s
+    selector: '[data-testid="screenshot-handle-s"]'
+    kind: interactive
+  - id: screenshot-handle-sw
+    selector: '[data-testid="screenshot-handle-sw"]'
+    kind: interactive
+  - id: screenshot-handle-w
+    selector: '[data-testid="screenshot-handle-w"]'
+    kind: interactive
   - id: screenshot-size-hint
     selector: '[data-testid="screenshot-size-hint"]'
     kind: display
@@ -9307,11 +9359,17 @@ controls:
   - id: screenshot-tool-eraser
     selector: '[data-testid="screenshot-tool-eraser"]'
     kind: interactive
+  - id: screenshot-tool-number
+    selector: '[data-testid="screenshot-tool-number"]'
+    kind: interactive
   - id: screenshot-color-picker
     selector: '[data-testid="screenshot-color-picker"]'
     kind: interactive
   - id: screenshot-picker-layer
     selector: '[data-testid="screenshot-picker-layer"]'
+    kind: interactive
+  - id: screenshot-picker-hex
+    selector: '[data-testid="screenshot-picker-hex"]'
     kind: display
   - id: screenshot-picker-popup
     selector: '[data-testid="screenshot-picker-popup"]'
@@ -9328,12 +9386,33 @@ controls:
   - id: screenshot-watermark-text
     selector: '[data-testid="screenshot-watermark-text"]'
     kind: interactive
+  - id: screenshot-watermark-opacity
+    selector: '[data-testid="screenshot-watermark-opacity"]'
+    kind: interactive
+  - id: screenshot-watermark-color
+    selector: '[data-testid^="screenshot-watermark-color-"]'
+    kind: interactive
+    aliases:
+      - '[data-testid="screenshot-watermark-color-ffffff"]'
+      - '[data-testid="screenshot-watermark-color-000000"]'
+      - '[data-testid="screenshot-watermark-color-ff4444"]'
+      - '[data-testid="screenshot-watermark-color-ffcc00"]'
+      - '[data-testid="screenshot-watermark-color-00aaff"]'
+  - id: screenshot-watermark-clear
+    selector: '[data-testid="screenshot-watermark-clear"]'
+    kind: interactive
   - id: screenshot-watermark-apply
     selector: '[data-testid="screenshot-watermark-apply"]'
     kind: interactive
   - id: screenshot-pin
     selector: '[data-testid="screenshot-pin"]'
     kind: interactive
+  - id: screenshot-pin-window
+    selector: '[data-testid="screenshot-pin-window"]'
+    kind: interactive
+  - id: screenshot-pin-image
+    selector: '[data-testid="screenshot-pin-image"]'
+    kind: display
   - id: screenshot-ocr
     selector: '[data-testid="screenshot-ocr"]'
     kind: interactive
@@ -9345,6 +9424,9 @@ controls:
     kind: display
   - id: screenshot-ocr-close
     selector: '[data-testid="screenshot-ocr-close"]'
+    kind: interactive
+  - id: screenshot-ocr-copy
+    selector: '[data-testid="screenshot-ocr-copy"]'
     kind: interactive
   - id: screenshot-auto-redact
     selector: '[data-testid="screenshot-auto-redact"]'
@@ -9375,6 +9457,9 @@ controls:
     kind: interactive
   - id: screenshot-annotation-canvas
     selector: '[data-testid="screenshot-annotation-canvas"]'
+    kind: display
+  - id: screenshot-annotation-layer
+    selector: '[data-testid="screenshot-annotation-layer"]'
     kind: interactive
   - id: screenshot-hint
     selector: '[data-testid="screenshot-hint"]'
@@ -9397,6 +9482,15 @@ controls:
   - id: screenshot-color-white
     selector: '[data-testid="screenshot-color-white"]'
     kind: interactive
+  - id: screenshot-line-width-2
+    selector: '[data-testid="screenshot-line-width-2"]'
+    kind: interactive
+  - id: screenshot-line-width-4
+    selector: '[data-testid="screenshot-line-width-4"]'
+    kind: interactive
+  - id: screenshot-line-width-8
+    selector: '[data-testid="screenshot-line-width-8"]'
+    kind: interactive
   - id: screenshot-recorder
     selector: '[data-testid="screenshot-recorder"]'
     kind: display
@@ -9409,6 +9503,15 @@ controls:
   - id: screenshot-recorder-preview
     selector: '[data-testid="screenshot-recorder-preview"]'
     kind: display
+  - id: screenshot-recorder-meta
+    selector: '[data-testid="screenshot-recorder-meta"]'
+    kind: display
+  - id: screenshot-recorder-error
+    selector: '[data-testid="screenshot-recorder-error"]'
+    kind: display
+  - id: screenshot-recorder-copy
+    selector: '[data-testid="screenshot-recorder-copy"]'
+    kind: interactive
   - id: screenshot-recorder-done
     selector: '[data-testid="screenshot-recorder-done"]'
     kind: interactive
@@ -9418,24 +9521,66 @@ controls:
   - id: screenshot-recorder-cancel
     selector: '[data-testid="screenshot-recorder-cancel"]'
     kind: interactive
+  - id: screenshot-record-menu
+    selector: '[data-testid="screenshot-record-menu"]'
+    kind: display
   - id: screenshot-record-gif
     selector: '[data-testid="screenshot-record-gif"]'
     kind: interactive
-    optional: true
   - id: screenshot-record-mp4
     selector: '[data-testid="screenshot-record-mp4"]'
     kind: interactive
-    optional: true
-  - id: annotation-text-input
-    selector: '[data-testid="annotation-text-input"]'
+  - id: screenshot-text-input
+    selector: '[data-testid="screenshot-text-input"]'
     kind: interactive
   - id: screenshot-toast
     selector: '[data-testid="screenshot-toast"]'
     kind: display
 -->
 
-- 系统截图工具：ControlBar 全局截图按钮（不依附 tab）与快捷键 Ctrl+Shift+A（macOS Cmd+Shift+A）打开全屏截图 overlay；飞书式区域选择（放大镜 + 尺寸提示）、7 种标注工具、撤销/重做、复制到剪贴板、保存 PNG；滚动长截图（Enigo 滚轮注入 + 重叠检测拼接）；录屏支持 GIF / MP4（系统 ffmpeg 编码），独立录屏状态条窗口。
-- Browser 用例覆盖 UI 触发、区域选择、标注、撤销/重做、复制、保存、滚动截图、快捷键、录屏状态条；Native 用例覆盖三端真实屏幕采集、真实滚动注入与拼接、真实剪贴板路径。
+- 系统截图工具：ControlBar 全局相机按钮（不依附 tab）与当前配置快捷键打开截图 overlay；默认 Windows/Linux `Ctrl+Alt+A`，macOS `Ctrl+Super+A`（Control+Command+A）。延迟菜单支持 3/5/10 秒，倒计时中点击相机取消。
+- 区域选择与全屏选择默认处于 select 模式，显式点击矩形等工具后才开始绘制；选区可通过八方向 handles 与 move 区域调整，recrop 保留标注，选区外重新选择和滚动截图完成则清空旧标注。12 个工具包含矩形、椭圆、箭头、直线、画笔、荧光笔、文字、气泡、马赛克、模糊、编号和橡皮；实际拖拽创建形状，文字 Enter/blur 提交、Escape 取消，擦除是可撤销的变更，redo 仅在 undo 后可用。
+- 输出支持复制、PNG 保存（取消保留选区）、贴图；OCR 显示/复制识别结果，auto-redact 将返回框作为一次可撤销标注，水印支持文字/透明度/颜色的 apply/clear。滚动截图刷新 overlay；GIF/MP4 录制入口配独立状态条、停止预览、保存/完成和 GIF 首帧复制（剪贴板不承载动画）。
+- Browser `TC-SHOT-001`–`021` 检查真实 renderer 输入、选区几何、`data-shapes` 历史、已绘制 canvas 颜色/线宽、PNG 解码尺寸、dialog 取消/确认、贴图 route 和快捷键/倒计时；浏览器 OCR 返回 `Taomni stub OCR\nuser@example.com`，滚动 stub 返回同一 400×300 图，录制 stop 返回 PNG preview。请求/route/形状数断言不等于真实采集、拼接、GIF/MP4 编码或敏感像素遮盖证据；水印 apply/clear 状态不宣称水印输出像素通过。
+- Native `SHOT-N*` 用例负责真实屏幕、滚动注入/拼接、OS 剪贴板、媒体解码和窗口/全局热键边界；每次交付分别记录实际执行的平台与结果，browser 或静态检查不外推为 native 通过。
+- `status: done` 表示功能代码已实装，不表示本次验收已通过。本次 browser 用例维护仅做静态检查，所有新增/更新流程尚未运行；Windows/macOS/Linux native 与托管执行证据须由对应独立报告补齐。
+
+### 27.2 截图快捷键设置与能力状态
+
+<!-- feature
+id: F27.2
+status: done
+area: screenshot/settings
+components: [ScreenshotSettings, SettingsPanel, screenshotShortcut, ControlBar]
+files:
+  - src/components/settings/ScreenshotSettings.tsx
+  - src/components/settings/SettingsPanel.tsx
+  - src/components/settings/settingsSearch.ts
+  - src/lib/screenshotShortcut.ts
+  - src-tauri/src/screenshot/shortcut.rs
+controls:
+  - id: settings-screenshot-shortcut
+    selector: '[data-testid="settings-screenshot-shortcut"]'
+    kind: interactive
+  - id: settings-screenshot-shortcut-reset
+    selector: '[data-testid="settings-screenshot-shortcut-reset"]'
+    kind: interactive
+  - id: settings-screenshot-shortcut-disable
+    selector: '[data-testid="settings-screenshot-shortcut-disable"]'
+    kind: interactive
+  - id: settings-screenshot-shortcut-status
+    selector: '[data-testid="settings-screenshot-shortcut-status"]'
+    kind: display
+  - id: settings-screenshot-shortcut-error
+    selector: '[data-testid="settings-screenshot-shortcut-error"]'
+    kind: display
+  - id: settings-screenshot-probe
+    selector: '[data-testid="settings-screenshot-probe"]'
+    kind: display
+-->
+
+- Settings 可搜索截图设置，录制带修饰键或函数键的 chord，裸字母显示校验错误，Escape 放弃；支持 disable/reset，配置同步到相机 tooltip 与 app-local routing。快捷键在 input/textarea/select/contentEditable、CodeMirror 和 xterm 焦点下不抢输入。
+- Browser `TC-SHOT-018` 验证重绑、禁用、相机保留入口与恢复默认，明确只验证内存中的 app-local 配置，状态为 `Works while this window is focused.`，不显示 native probe。Native 才负责持久化、系统注册/冲突反馈和采集/OCR/MP4 权限能力，缺少注册不伪装成全局成功。
 
 ---
 

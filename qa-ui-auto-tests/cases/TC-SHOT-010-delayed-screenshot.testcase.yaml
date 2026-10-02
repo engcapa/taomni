@@ -1,32 +1,111 @@
 id: TC-SHOT-010
-title: Delayed screenshot counts down then opens the overlay
-covers:
-- F27.1
-tags:
-- screenshot
-- delayed-capture
-- p2
-modes:
-- browser
-fixtures:
-- reset_db
+title: Delay menu cancels five and ten second countdowns and completes three second capture
+description: Renderer countdown and request timing only; browser stubs cannot prove delayed OS screen capture.
+covers: [F27.1]
+tags: [screenshot, delayed-capture, p2]
+modes: [browser]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="system-screenshot"]'
-# Open the delay menu and pick 3 seconds.
 - click: '[data-testid="system-screenshot-delay-toggle"]'
-- wait_for: '[data-testid="system-screenshot-delay-menu"]'
-- click: '[data-testid="system-screenshot-delay-3"]'
-# Countdown is visible on the button.
-- wait_for: '[data-testid="system-screenshot-countdown"]'
-- assert_text:
-    selector: '[data-testid="system-screenshot-countdown"]'
-    contains: "3"
-# After the countdown the overlay opens for capture (stubbed backend).
-- wait_for:
-    selector: '[data-testid="screenshot-base-image"]'
-    timeout_sec: 10
-# In select phase there is no cancel button; ESC closes the overlay.
+- assert_attribute:
+    selector: '[data-testid="system-screenshot-delay-toggle"]'
+    name: aria-expanded
+    equals: 'true'
+- assert_visible: '[data-testid="system-screenshot-delay-3"]'
+- assert_visible: '[data-testid="system-screenshot-delay-5"]'
+- assert_visible: '[data-testid="system-screenshot-delay-10"]'
 - press: Escape
-- wait_for:
+- assert_not_visible: '[data-testid="system-screenshot-delay-menu"]'
+- click: '[data-testid="system-screenshot-delay-toggle"]'
+- click: '[data-testid="system-screenshot-delay-5"]'
+- assert_text_equals:
+    selector: '[data-testid="system-screenshot-countdown"]'
+    equals: '5'
+- assert_disabled: '[data-testid="system-screenshot-delay-toggle"]'
+- assert_attribute:
     selector: '[data-testid="system-screenshot"]'
+    name: title
+    equals: Cancel timed capture
+- click: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="system-screenshot-countdown"]'
+- assert_enabled: '[data-testid="system-screenshot-delay-toggle"]'
+- click: '[data-testid="system-screenshot-delay-toggle"]'
+- click: '[data-testid="system-screenshot-delay-10"]'
+- assert_text_equals:
+    selector: '[data-testid="system-screenshot-countdown"]'
+    equals: '10'
+- click: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="system-screenshot-countdown"]'
+- eval_readonly:
+    expression: >-
+      !JSON.stringify(window.__taomniStubScreenshotCalls || []).includes('"cmd":"screenshot_open_overlay"')
+# Cross both canceled deadlines so a stale timer cannot be mistaken for success.
+- wait: 10.2
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: >-
+      !JSON.stringify(window.__taomniStubScreenshotCalls || []).includes('"cmd":"screenshot_open_overlay"')
+- click: '[data-testid="system-screenshot-delay-toggle"]'
+- click: '[data-testid="system-screenshot-delay-3"]'
+- assert_text_equals:
+    selector: '[data-testid="system-screenshot-countdown"]'
+    equals: '3'
+- assert_not_visible: '[data-testid="system-screenshot-delay-menu"]'
+- assert_disabled: '[data-testid="system-screenshot-delay-toggle"]'
+- wait_for:
+    selector: '[data-testid="screenshot-overlay"][data-phase="select"]'
+    timeout_sec: 10
+- assert_visible: '[data-testid="screenshot-base-image"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).split('"cmd":"screenshot_open_overlay"').length === 2
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="system-screenshot-countdown"]'
+- assert_enabled: '[data-testid="system-screenshot-delay-toggle"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Delay menu exposes three, five and ten seconds; Escape dismisses the menu; clicking the camera cancels countdowns without deferred capture.
+    actions: [1, 3, 8, 10, 11, 15, 18, 19, 21, 24]
+    checkpoints:
+    - {step: 4, expectation: The delay toggle reports expanded state.}
+    - {step: 5, expectation: Three-second entry is present.}
+    - {step: 6, expectation: Five-second entry is present.}
+    - {step: 7, expectation: Ten-second entry is present.}
+    - {step: 9, expectation: Escape dismisses the menu.}
+    - {step: 12, expectation: Five-second countdown starts at five.}
+    - {step: 13, expectation: Delay scheduling is disabled during countdown.}
+    - {step: 14, expectation: Camera tooltip explains cancellation.}
+    - {step: 16, expectation: Camera click clears the countdown.}
+    - {step: 17, expectation: Delay scheduling is available again.}
+    - {step: 20, expectation: Ten-second countdown starts at ten.}
+    - {step: 22, expectation: The second countdown is canceled.}
+    - {step: 23, expectation: Cancellation sends no immediate capture.}
+    - {step: 25, expectation: Neither canceled deadline opens an overlay.}
+    - {step: 26, expectation: No canceled timer dispatches a deferred capture.}
+    results: [9, 12, 13, 14, 16, 17, 20, 22, 23, 25, 26]
+  - id: R2
+    requirement: A noncanceled three-second countdown dispatches exactly one capture and resets countdown controls after close.
+    actions: [27, 28, 35]
+    checkpoints:
+    - {step: 29, expectation: The countdown starts at three.}
+    - {step: 30, expectation: Scheduling closes the menu.}
+    - {step: 31, expectation: Another delay cannot be scheduled concurrently.}
+    - {step: 32, expectation: Completion opens a ready selection overlay.}
+    - {step: 33, expectation: The returned image is visible.}
+    - {step: 34, expectation: Exactly one capture request has been sent.}
+    - {step: 36, expectation: Escape returns to main.}
+    - {step: 37, expectation: No countdown survives capture completion.}
+    - {step: 38, expectation: Delay controls are usable again.}
+    results: [29, 30, 31, 32, 33, 34, 36, 37, 38]
+  visual:
+  - check: Menu expansion, countdown digits and cancellation feedback.
+    method: automated
+    reason: DOM assertions verify UI state; the bounded wait crosses canceled deadlines and is not a performance measurement.
+  native:
+  - check: Delayed desktop capture and window hiding at the deadline.
+    method: external
+    reason: Browser open-overlay only changes the route; real screen timing requires native evidence.

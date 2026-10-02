@@ -1,27 +1,25 @@
 id: TC-SHOT-N5
-title: Native GIF recording produces a valid GIF file
-covers:
-- F27.2
-tags:
-- screenshot
-- recording
-- native
-- p1
-modes:
-- native
-native_platforms:
-- Linux
-- Windows
-- macOS
-fixtures:
-- reset_db
+title: Native animated fixture records a decodable GIF at wall-clock speed
+covers: [F27.1]
+tags: [screenshot, recording, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}
-# Ensure the main window (and Tauri API) is ready before invoking backends.
 - wait_for: '[data-testid="system-screenshot"]'
-- wait: 5
-# Record a 3-second GIF clip and verify the file header starts with
-# GIF87a or GIF89a (hex 47494638 = "GIF8").
-- eval_readonly:
-    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_recording", {format: "gif", secs: 3}).then(JSON.stringify)'
-    contains: '47494638'
+- native_screenshot_scenario: {scenario: record, format: gif, secs: 3}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: gif-capture
+    requirement: Real persistent capture yields a decodable GIF with sufficient changing frames, correct size and duration.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: "Decode at least twelve frames/four distinct frames, duration 75-140 percent of three seconds, region dimensions and actual GIF retained."}
+    results: [3]
+  visual:
+  - {check: Motion fidelity, method: external, reason: Play retained GIF and compare to the native moving fixture; automated decoder asserts timing and frame variation.}
+  native:
+  - {check: GIF pipeline, method: automated, reason: "Real native window and screen capture into built-in GIF encoder, not generated pixels or file-header-only proof."}

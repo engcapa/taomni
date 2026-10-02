@@ -1,98 +1,153 @@
 id: TC-SHOT-007
-title: Annotation tools colors record menu fullscreen and cancel sweep
-covers:
-- F27.1
-tags:
-- screenshot
-- annotate
-- p2
-modes:
-- browser
-fixtures:
-- reset_db
+title: Drag-only annotations text commit cancel and record-menu dismissal retain shapes
+description: Production renderer input and shape history on a synthetic fullscreen image; text and draw commits are asserted, not inferred from tool clicks.
+covers: [F27.1]
+tags: [screenshot, annotate, p2]
+modes: [browser]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}#screenshot-overlay
-- wait_for: '[data-testid="screenshot-base-image"]'
-# Fullscreen selection from the select-phase hint bar.
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
 - click: '[data-testid="screenshot-fullscreen"]'
 - wait_for: '[data-testid="screenshot-toolbar"]'
-# Sweep the remaining annotation tools; each must accept input.
+- assert_attribute:
+    selector: '[data-testid="screenshot-tool-rect"]'
+    name: aria-pressed
+    equals: 'false'
 - click: '[data-testid="screenshot-tool-arrow"]'
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 60
-      y: 40
-    to_position:
-      x: 180
-      y: 100
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 80, y: 80}
+    to_position: {x: 200, y: 140}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
 - click: '[data-testid="screenshot-tool-ellipse"]'
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 60
-      y: 60
-    to_position:
-      x: 160
-      y: 140
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 260, y: 80}
+    to_position: {x: 380, y: 160}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="2"]'
 - click: '[data-testid="screenshot-tool-line"]'
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 60
-      y: 160
-    to_position:
-      x: 200
-      y: 120
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 440, y: 80}
+    to_position: {x: 580, y: 140}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="3"]'
 - click: '[data-testid="screenshot-tool-pen"]'
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 60
-      y: 180
-    to_position:
-      x: 220
-      y: 200
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 80, y: 200}
+    to_position: {x: 220, y: 240}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="4"]'
 - click: '[data-testid="screenshot-tool-mosaic"]'
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 240
-      y: 60
-    to_position:
-      x: 340
-      y: 140
-# Text tool opens an inline editor on click (handled in onClick so a drag's
-# mouseup does not blur it away); Enter commits the text.
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 300, y: 200}
+    to_position: {x: 420, y: 260}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="5"]'
 - click: '[data-testid="screenshot-tool-text"]'
-- wait: 1
-- click: '[data-testid="screenshot-annotation-layer"]'
-- wait_for: '[data-testid="annotation-text-input"]'
+- click:
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    position: {x: 120, y: 320}
+- wait_for: '[data-testid="screenshot-text-input"]'
 - fill:
-    selector: '[data-testid="annotation-text-input"]'
+    selector: '[data-testid="screenshot-text-input"]'
     value: qa-shot
 - press:
     key: Enter
-    selector: '[data-testid="annotation-text-input"]'
-- wait: 1
-# Sweep the remaining colors.
-- click: '[data-testid="screenshot-color-yellow"]'
-- click: '[data-testid="screenshot-color-green"]'
-- click: '[data-testid="screenshot-color-blue"]'
-- click: '[data-testid="screenshot-color-white"]'
-# Record dropdown exposes GIF and MP4 entries.
+    selector: '[data-testid="screenshot-text-input"]'
+- assert_not_visible: '[data-testid="screenshot-text-input"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="6"]'
+- assert_count:
+    selector: '[data-testid="screenshot-overlay"]'
+    equal: 1
+# Blur commits text; Escape cancels text without resetting the selection.
+- click:
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    position: {x: 320, y: 320}
+- wait_for: '[data-testid="screenshot-text-input"]'
+- fill:
+    selector: '[data-testid="screenshot-text-input"]'
+    value: blur-commit
+- blur: '[data-testid="screenshot-text-input"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="7"]'
+- click:
+    selector: '[data-testid="screenshot-annotation-layer"]'
+    position: {x: 520, y: 320}
+- wait_for: '[data-testid="screenshot-text-input"]'
+- fill:
+    selector: '[data-testid="screenshot-text-input"]'
+    value: cancel-me
+- press:
+    key: Escape
+    selector: '[data-testid="screenshot-text-input"]'
+- assert_not_visible: '[data-testid="screenshot-text-input"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '7'
 - click: '[data-testid="screenshot-record"]'
+- assert_visible: '[data-testid="screenshot-record-menu"]'
 - assert_visible: '[data-testid="screenshot-record-gif"]'
 - assert_visible: '[data-testid="screenshot-record-mp4"]'
-# Escape closes the dropdown (clicking the button again is intercepted by the
-# fullscreen dismiss overlay).
 - press: Escape
-# Cancel closes the overlay back to the main window.
+- assert_not_visible: '[data-testid="screenshot-record-menu"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '7'
 - click: '[data-testid="screenshot-cancel"]'
-- wait_for:
-    selector: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- eval_readonly:
+    expression: >-
+      !JSON.stringify(window.__taomniStubScreenshotCalls || []).includes('"cmd":"screenshot_copy_image"') && !JSON.stringify(window.__taomniStubScreenshotCalls || []).includes('"cmd":"screenshot_start_recording"')
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Fullscreen begins without a drawing tool; explicit arrow, ellipse, line, pen and mosaic drags each commit exactly one annotation.
+    actions: [1, 2, 4, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20]
+    checkpoints:
+    - {step: 6, expectation: Rectangle is not implicitly selected.}
+    - {step: 9, expectation: The arrow drag commits the first shape.}
+    - {step: 12, expectation: The ellipse drag commits the second shape.}
+    - {step: 15, expectation: The line drag commits the third shape.}
+    - {step: 18, expectation: The pen drag commits the fourth shape.}
+    - {step: 21, expectation: The mosaic drag commits the fifth shape.}
+    results: [9, 12, 15, 18, 21]
+  - id: R2
+    requirement: Text Enter and blur each commit one annotation while Escape cancels uncommitted text without closing or clearing the overlay.
+    actions: [22, 23, 25, 26, 30, 32, 33, 35, 37, 38]
+    checkpoints:
+    - {step: 27, expectation: Enter dismisses the text editor.}
+    - {step: 28, expectation: Enter adds one text shape.}
+    - {step: 29, expectation: Enter in the input did not trigger screenshot copy.}
+    - {step: 34, expectation: Blur adds one text shape.}
+    - {step: 39, expectation: Escape dismisses only the inline text input.}
+    - {step: 40, expectation: Escape leaves the previous seven committed shapes unchanged.}
+    results: [27, 28, 29, 34, 39, 40]
+  - id: R3
+    requirement: The record menu exposes both formats and Escape dismisses it without altering annotations; cancel closes without recording or copying.
+    actions: [41, 45, 48]
+    checkpoints:
+    - {step: 42, expectation: The format menu is open.}
+    - {step: 43, expectation: GIF entry is reachable.}
+    - {step: 44, expectation: MP4 entry is reachable.}
+    - {step: 46, expectation: Escape closes the menu.}
+    - {step: 47, expectation: All seven shapes survive menu dismissal.}
+    - {step: 49, expectation: Cancel returns to main.}
+    - {step: 50, expectation: No copy or recording-start command was sent.}
+    results: [42, 43, 44, 46, 47, 49, 50]
+  visual:
+  - check: Each tool commits and text input is replaced by committed history.
+    method: automated
+    reason: Exact shape counts protect input and history behavior; they do not certify native font rendering or privacy-filter pixels.
+  native:
+  - check: Native composition, packaged-WebView drawing and captured-image fidelity.
+    method: external
+    reason: Browser synthetic capture cannot establish native IME, WebView or desktop pixel behavior.

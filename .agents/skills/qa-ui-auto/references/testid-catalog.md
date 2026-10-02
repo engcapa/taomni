@@ -1463,10 +1463,26 @@
 ## screenshot/screen-record (F27.1)
 
 - `[data-testid="system-screenshot"]` — interactive — F27.1.system-screenshot
+- `[data-testid="system-screenshot-delay-toggle"]` — interactive — F27.1.system-screenshot-delay-toggle
+- `[data-testid="system-screenshot-delay-menu"]` — display — F27.1.system-screenshot-delay-menu
+- `[data-testid="system-screenshot-delay-3"]` — interactive — F27.1.system-screenshot-delay-3
+- `[data-testid="system-screenshot-delay-5"]` — interactive — F27.1.system-screenshot-delay-5
+- `[data-testid="system-screenshot-delay-10"]` — interactive — F27.1.system-screenshot-delay-10
+- `[data-testid="system-screenshot-countdown"]` — display — F27.1.system-screenshot-countdown
 - `[data-testid="screenshot-overlay"]` — display — F27.1.screenshot-overlay
 - `[data-testid="screenshot-overlay-error"]` — display — F27.1.screenshot-overlay-error
 - `[data-testid="screenshot-base-image"]` — display — F27.1.screenshot-base-image
 - `[data-testid="screenshot-selection"]` — display — F27.1.screenshot-selection
+- `[data-testid="screenshot-select-layer"]` — interactive — F27.1.screenshot-select-layer
+- `[data-testid="screenshot-selection-move"]` — interactive — F27.1.screenshot-selection-move
+- `[data-testid="screenshot-handle-nw"]` — interactive — F27.1.screenshot-handle-nw
+- `[data-testid="screenshot-handle-n"]` — interactive — F27.1.screenshot-handle-n
+- `[data-testid="screenshot-handle-ne"]` — interactive — F27.1.screenshot-handle-ne
+- `[data-testid="screenshot-handle-e"]` — interactive — F27.1.screenshot-handle-e
+- `[data-testid="screenshot-handle-se"]` — interactive — F27.1.screenshot-handle-se
+- `[data-testid="screenshot-handle-s"]` — interactive — F27.1.screenshot-handle-s
+- `[data-testid="screenshot-handle-sw"]` — interactive — F27.1.screenshot-handle-sw
+- `[data-testid="screenshot-handle-w"]` — interactive — F27.1.screenshot-handle-w
 - `[data-testid="screenshot-size-hint"]` — display — F27.1.screenshot-size-hint
 - `[data-testid="screenshot-toolbar"]` — display — F27.1.screenshot-toolbar
 - `[data-testid="screenshot-tool-rect"]` — interactive — F27.1.screenshot-tool-rect
@@ -1476,6 +1492,37 @@
 - `[data-testid="screenshot-tool-pen"]` — interactive — F27.1.screenshot-tool-pen
 - `[data-testid="screenshot-tool-text"]` — interactive — F27.1.screenshot-tool-text
 - `[data-testid="screenshot-tool-mosaic"]` — interactive — F27.1.screenshot-tool-mosaic
+- `[data-testid="screenshot-tool-highlighter"]` — interactive — F27.1.screenshot-tool-highlighter
+- `[data-testid="screenshot-tool-blur"]` — interactive — F27.1.screenshot-tool-blur
+- `[data-testid="screenshot-tool-balloon"]` — interactive — F27.1.screenshot-tool-balloon
+- `[data-testid="screenshot-tool-eraser"]` — interactive — F27.1.screenshot-tool-eraser
+- `[data-testid="screenshot-tool-number"]` — interactive — F27.1.screenshot-tool-number
+- `[data-testid="screenshot-color-picker"]` — interactive — F27.1.screenshot-color-picker
+- `[data-testid="screenshot-picker-layer"]` — interactive — F27.1.screenshot-picker-layer
+- `[data-testid="screenshot-picker-hex"]` — display — F27.1.screenshot-picker-hex
+- `[data-testid="screenshot-picker-popup"]` — display — F27.1.screenshot-picker-popup
+- `[data-testid="screenshot-recrop"]` — interactive — F27.1.screenshot-recrop
+- `[data-testid="screenshot-watermark"]` — interactive — F27.1.screenshot-watermark
+- `[data-testid="screenshot-watermark-panel"]` — display — F27.1.screenshot-watermark-panel
+- `[data-testid="screenshot-watermark-text"]` — interactive — F27.1.screenshot-watermark-text
+- `[data-testid="screenshot-watermark-opacity"]` — interactive — F27.1.screenshot-watermark-opacity
+- `[data-testid^="screenshot-watermark-color-"]` — interactive — F27.1.screenshot-watermark-color
+  ↳ `[data-testid="screenshot-watermark-color-ffffff"]` — alias
+  ↳ `[data-testid="screenshot-watermark-color-000000"]` — alias
+  ↳ `[data-testid="screenshot-watermark-color-ff4444"]` — alias
+  ↳ `[data-testid="screenshot-watermark-color-ffcc00"]` — alias
+  ↳ `[data-testid="screenshot-watermark-color-00aaff"]` — alias
+- `[data-testid="screenshot-watermark-clear"]` — interactive — F27.1.screenshot-watermark-clear
+- `[data-testid="screenshot-watermark-apply"]` — interactive — F27.1.screenshot-watermark-apply
+- `[data-testid="screenshot-pin"]` — interactive — F27.1.screenshot-pin
+- `[data-testid="screenshot-pin-window"]` — interactive — F27.1.screenshot-pin-window
+- `[data-testid="screenshot-pin-image"]` — display — F27.1.screenshot-pin-image
+- `[data-testid="screenshot-ocr"]` — interactive — F27.1.screenshot-ocr
+- `[data-testid="screenshot-ocr-panel"]` — display — F27.1.screenshot-ocr-panel
+- `[data-testid="screenshot-ocr-text"]` — display — F27.1.screenshot-ocr-text
+- `[data-testid="screenshot-ocr-close"]` — interactive — F27.1.screenshot-ocr-close
+- `[data-testid="screenshot-ocr-copy"]` — interactive — F27.1.screenshot-ocr-copy
+- `[data-testid="screenshot-auto-redact"]` — interactive — F27.1.screenshot-auto-redact
 - `[data-testid="screenshot-undo"]` — interactive — F27.1.screenshot-undo
 - `[data-testid="screenshot-redo"]` — interactive — F27.1.screenshot-redo
 - `[data-testid="screenshot-scroll-capture"]` — interactive — F27.1.screenshot-scroll-capture
@@ -1484,7 +1531,8 @@
 - `[data-testid="screenshot-save"]` — interactive — F27.1.screenshot-save
 - `[data-testid="screenshot-cancel"]` — interactive — F27.1.screenshot-cancel
 - `[data-testid="screenshot-fullscreen"]` — interactive — F27.1.screenshot-fullscreen
-- `[data-testid="screenshot-annotation-canvas"]` — interactive — F27.1.screenshot-annotation-canvas
+- `[data-testid="screenshot-annotation-canvas"]` — display — F27.1.screenshot-annotation-canvas
+- `[data-testid="screenshot-annotation-layer"]` — interactive — F27.1.screenshot-annotation-layer
 - `[data-testid="screenshot-hint"]` — display — F27.1.screenshot-hint
 - `[data-testid="screenshot-scroll-busy"]` — display — F27.1.screenshot-scroll-busy
 - `[data-testid="screenshot-color-red"]` — interactive — F27.1.screenshot-color-red
@@ -1492,17 +1540,33 @@
 - `[data-testid="screenshot-color-green"]` — interactive — F27.1.screenshot-color-green
 - `[data-testid="screenshot-color-blue"]` — interactive — F27.1.screenshot-color-blue
 - `[data-testid="screenshot-color-white"]` — interactive — F27.1.screenshot-color-white
+- `[data-testid="screenshot-line-width-2"]` — interactive — F27.1.screenshot-line-width-2
+- `[data-testid="screenshot-line-width-4"]` — interactive — F27.1.screenshot-line-width-4
+- `[data-testid="screenshot-line-width-8"]` — interactive — F27.1.screenshot-line-width-8
 - `[data-testid="screenshot-recorder"]` — display — F27.1.screenshot-recorder
 - `[data-testid="screenshot-recorder-timer"]` — display — F27.1.screenshot-recorder-timer
 - `[data-testid="screenshot-recorder-stop"]` — interactive — F27.1.screenshot-recorder-stop
 - `[data-testid="screenshot-recorder-preview"]` — display — F27.1.screenshot-recorder-preview
+- `[data-testid="screenshot-recorder-meta"]` — display — F27.1.screenshot-recorder-meta
+- `[data-testid="screenshot-recorder-error"]` — display — F27.1.screenshot-recorder-error
+- `[data-testid="screenshot-recorder-copy"]` — interactive — F27.1.screenshot-recorder-copy
 - `[data-testid="screenshot-recorder-done"]` — interactive — F27.1.screenshot-recorder-done
 - `[data-testid="screenshot-recorder-save"]` — interactive — F27.1.screenshot-recorder-save
 - `[data-testid="screenshot-recorder-cancel"]` — interactive — F27.1.screenshot-recorder-cancel
-- `[data-testid="screenshot-record-gif"]` — interactive [optional] — F27.1.screenshot-record-gif
-- `[data-testid="screenshot-record-mp4"]` — interactive [optional] — F27.1.screenshot-record-mp4
-- `[data-testid="annotation-text-input"]` — interactive — F27.1.annotation-text-input
+- `[data-testid="screenshot-record-menu"]` — display — F27.1.screenshot-record-menu
+- `[data-testid="screenshot-record-gif"]` — interactive — F27.1.screenshot-record-gif
+- `[data-testid="screenshot-record-mp4"]` — interactive — F27.1.screenshot-record-mp4
+- `[data-testid="screenshot-text-input"]` — interactive — F27.1.screenshot-text-input
 - `[data-testid="screenshot-toast"]` — display — F27.1.screenshot-toast
+
+## screenshot/settings (F27.2)
+
+- `[data-testid="settings-screenshot-shortcut"]` — interactive — F27.2.settings-screenshot-shortcut
+- `[data-testid="settings-screenshot-shortcut-reset"]` — interactive — F27.2.settings-screenshot-shortcut-reset
+- `[data-testid="settings-screenshot-shortcut-disable"]` — interactive — F27.2.settings-screenshot-shortcut-disable
+- `[data-testid="settings-screenshot-shortcut-status"]` — display — F27.2.settings-screenshot-shortcut-status
+- `[data-testid="settings-screenshot-shortcut-error"]` — display — F27.2.settings-screenshot-shortcut-error
+- `[data-testid="settings-screenshot-probe"]` — display — F27.2.settings-screenshot-probe
 
 ## servers (F-Servers-1)
 

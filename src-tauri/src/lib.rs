@@ -37,7 +37,6 @@ mod servers;
 pub mod session;
 pub mod sockscap;
 mod state;
-mod structural_search;
 mod tab;
 pub mod terminal;
 mod test_results;
@@ -51,6 +50,7 @@ mod workspace;
 mod workspace_execution;
 mod workspace_fs;
 mod workspace_search;
+mod structural_search;
 pub mod workspace_tooling;
 mod wsl;
 
@@ -61,7 +61,7 @@ use tauri::{AppHandle, Manager, State, WebviewWindowBuilder};
 
 const AI_PROCESS_REAPER_INTERVAL_SECS: u64 = 30;
 const AI_PROCESS_IDLE_REAP_SECS: u64 = 300;
-const QA_APP_ID: &str = "com.taomni.app.qa";
+pub(crate) const QA_APP_ID: &str = "com.taomni.app.qa";
 
 fn qa_override_path(raw: &str) -> Option<std::path::PathBuf> {
     let path = std::path::PathBuf::from(raw.trim());
@@ -133,42 +133,6 @@ async fn exit_app(app_handle: AppHandle, state: State<'_, AppState>) -> Result<(
     Ok(())
 }
 
-/// Register the OS-global screenshot hotkey (Ctrl+Shift+A, Cmd+Shift+A on
-/// macOS — the Feishu default). Best-effort: platforms that cannot grab a
-/// global hotkey (notably Wayland) log a warning and keep the app-local
-/// shortcut as the fallback.
-#[cfg(desktop)]
-fn register_screenshot_global_shortcut(app: &AppHandle) {
-    use tauri_plugin_global_shortcut::{
-        Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
-    };
-
-    #[cfg(target_os = "macos")]
-    let modifiers = Modifiers::SUPER | Modifiers::SHIFT;
-    #[cfg(not(target_os = "macos"))]
-    let modifiers = Modifiers::CONTROL | Modifiers::SHIFT;
-    let shortcut = Shortcut::new(Some(modifiers), Code::KeyA);
-
-    if let Err(e) = app
-        .global_shortcut()
-        .on_shortcut(shortcut, |app_handle, _shortcut, event| {
-            if event.state == ShortcutState::Pressed {
-                let app = app_handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    if let Err(e) = crate::screenshot::open_overlay(&app, None).await {
-                        log::warn!("global screenshot shortcut failed: {e}");
-                    }
-                });
-            }
-        })
-    {
-        log::warn!("could not register global screenshot shortcut (Ctrl+Shift+A): {e}");
-    }
-}
-
-#[cfg(not(desktop))]
-fn register_screenshot_global_shortcut(_app: &AppHandle) {}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -182,7 +146,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
-            register_screenshot_global_shortcut(app.handle());
+            screenshot::init(app.handle());
             let app_data = resolved_app_data_dir(app.handle())
                 .expect("failed to resolve app data dir");
 
@@ -1093,18 +1057,11 @@ pub fn run() {
             screenshot::screenshot_copy_image,
             screenshot::screenshot_save_image,
             screenshot::screenshot_save_data_url,
+            screenshot::screenshot_read_file,
             screenshot::screenshot_probe,
-            screenshot::screenshot_read_file_header,
-            screenshot::screenshot_test_recording,
-            screenshot::screenshot_test_scroll_capture,
-            screenshot::screenshot_test_gif_complete,
-            screenshot::screenshot_test_mp4_complete,
-            screenshot::screenshot_test_scroll_content,
-            screenshot::screenshot_test_capture_fidelity,
-            screenshot::screenshot_test_capture_full,
-            screenshot::screenshot_test_annotate,
             screenshot::screenshot_open_overlay,
             screenshot::screenshot_overlay_init,
+            screenshot::screenshot_overlay_update,
             screenshot::screenshot_close_overlay,
             screenshot::screenshot_pin_to_screen,
             screenshot::screenshot_pin_init,
@@ -1115,6 +1072,17 @@ pub fn run() {
             screenshot::screenshot_stop_recording,
             screenshot::screenshot_cancel_recording,
             screenshot::screenshot_current_recording,
+            screenshot::shortcut::screenshot_shortcut_status,
+            screenshot::shortcut::screenshot_shortcut_set,
+            screenshot::qa::screenshot_qa_capture,
+            screenshot::qa::screenshot_qa_capture_fidelity,
+            screenshot::qa::screenshot_qa_ocr_redact,
+            screenshot::qa::screenshot_qa_scroll,
+            screenshot::qa::screenshot_qa_record,
+            screenshot::qa::screenshot_qa_overlay_copy,
+            screenshot::qa::screenshot_qa_recorder,
+            screenshot::qa::screenshot_qa_pin,
+            screenshot::qa::screenshot_qa_hotkey,
             lanchat::commands::lanchat_send_clipboard_image,
             lanchat::commands::lanchat_send_image_bytes,
             lanchat::commands::lanchat_send_signal,
@@ -1169,6 +1137,7 @@ pub fn run() {
             // WinDivert driver) so no elevated process/driver leaks. The
             // helper's parent-death watchdog covers crash/kill paths.
             if let tauri::RunEvent::Exit = event {
+                screenshot::shutdown();
                 let state = app_handle.state::<AppState>();
                 sockscap::shutdown_on_exit(app_handle, &state);
             }

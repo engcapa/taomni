@@ -1,21 +1,68 @@
 id: TC-SHOT-004
-title: App-local shortcut Control Shift A opens the screenshot overlay
-covers:
-- F27.1
-tags:
-- screenshot
-- shortcut
-- p1
-modes:
-- browser
-fixtures:
-- reset_db
+title: Current platform screenshot shortcut opens once per press and works again after close
+description: App-local keyboard routing only; this case does not register or inject an OS-global shortcut.
+covers: [F27.1]
+tags: [screenshot, shortcut, p1]
+modes: [browser]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="system-screenshot"]'
-- press: Control+Shift+A
-- wait_for: '[data-testid="screenshot-overlay"]'
-- assert_visible: '[data-testid="screenshot-base-image"]'
-- press: Escape
-- wait_for:
+# The retired shortcut must not open a screenshot overlay.
+- press:
+    key: Control+Shift+A
+    macos_key: Meta+Shift+A
     selector: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).split('"cmd":"screenshot_open_overlay"').length === 1
+- press:
+    key: Control+Alt+A
+    macos_key: Control+Meta+A
+    selector: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- assert_visible: '[data-testid="screenshot-base-image"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).split('"cmd":"screenshot_open_overlay"').length === 2
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- press:
+    key: Control+Alt+A
+    macos_key: Control+Meta+A
+    selector: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- eval_readonly:
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls).split('"cmd":"screenshot_open_overlay"').length === 3
+- press: Escape
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The retired Shift chord does not open capture; Ctrl+Alt+A or macOS Control+Command+A opens exactly one ready overlay per invocation.
+    actions: [1, 3, 6]
+    checkpoints:
+    - {step: 4, expectation: The old chord leaves the main window visible.}
+    - {step: 5, expectation: The old chord sends zero screenshot requests.}
+    - {step: 7, expectation: The current chord reaches the ready select phase.}
+    - {step: 8, expectation: The base image loads.}
+    - {step: 9, expectation: Only one request was sent for the first valid chord.}
+    results: [4, 5, 7, 8, 9]
+  - id: R2
+    requirement: Closing and reopening does not lose shortcut routing or accumulate duplicate listeners.
+    actions: [10, 13, 16]
+    checkpoints:
+    - {step: 12, expectation: Escape unmounts the first overlay.}
+    - {step: 14, expectation: The same chord reopens a ready overlay.}
+    - {step: 15, expectation: Two valid invocations produce exactly two open requests in total.}
+    - {step: 17, expectation: The second overlay can also be closed.}
+    results: [12, 14, 15, 17]
+  visual:
+  - check: Shortcut invocation reaches the same ready overlay as the camera button.
+    method: automated
+    reason: DOM checks establish routing and readiness, not layout or captured pixel fidelity.
+  native:
+  - check: OS registration and capture while another application owns focus.
+    method: external
+    reason: Browser press exercises app-local routing only; native hotkey scenarios verify the OS boundary separately.

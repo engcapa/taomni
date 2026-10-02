@@ -36,6 +36,8 @@ def is_check(step: dict) -> bool:
         return any(key in args for key in ("requests", "resolves", "symbols", "prepares", "renames", "pending"))
     if verb == "parity007_java_oracle":
         return bool(args.get("expected"))
+    if verb == "native_screenshot_scenario":
+        return bool(args.get("scenario"))
     return False
 
 

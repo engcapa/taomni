@@ -1,138 +1,85 @@
-# Screenshot & Screen-Recording Tool — Design
+# Screenshot and Screen Recording
 
-> Branch: `feat/screenshot-tool`. Feishu-like system screenshot tool: fullscreen /
-> region capture on any display (not limited to the terminal), scrolling (long)
-> screenshot, annotation, and screen recording to GIF / MP4. Windows / Linux /
-> macOS.
+Branch: `feat/screenshot-tool`. System screenshot/recording is independent of the terminal-tab renderer capture. Windows, macOS and Linux desktop compatibility is required; browser mode verifies renderer contracts only.
 
-## Goals / non-goals
+## Current architecture
 
-- Goals: fullscreen capture per display, region select with magnifier,
-  scrolling capture (auto-scroll + stitch), annotation toolbar
-  (rect/ellipse/arrow/line/pen/text/mosaic, undo/redo), copy to clipboard,
-  save to file, screen recording to GIF and MP4.
-- Non-goals (v1): global hotkey (no `tauri-plugin-global-shortcut` yet),
-  window auto-detect, cloud upload, audio capture. The old per-tab xterm-render
-  capture (`src/lib/capture`) stays untouched.
+- `src-tauri/src/screenshot/mod.rs`: commands, overlay/recorder/pin state, hidden-window restoration, output actions and raw binary artifact transport.
+- `capture.rs`: Tauri physical monitor enumeration, capture/crop/mapping, BGRA-stride conversion and process-owned temporary artifacts.
+- `record.rs`: persistent screen source, bounded capture/encode queue, real timestamps, built-in GIF/OpenH264/MP4 encoding. No system ffmpeg requirement.
+- `scroll.rs`: OS wheel injection and consecutive-frame overlap matching, retaining sticky header/footer once.
+- `ocr.rs`: optional Tesseract process, English/Chinese language fallback, TSV word/line boxes and sensitive-token detection.
+- `shortcut.rs`: configurable OS-global shortcut, persisted registration status and conflict handling.
+- `qa.rs`: fixed scenario commands guarded by debug mode and the isolated `com.taomni.app.qa` identifier.
+- React overlay, annotation canvas, recorder and pin render in separate labeled native windows. Browser stubs route by hash without claiming native effects.
 
-## Architecture
+### Shared RDP capture implementation
 
-```text
-React overlay (fullscreen window "screenshot-overlay")
-  selection + magnifier + AnnotationCanvas + toolbar
-             |  Tauri invoke (src/lib/screenshot.ts)
-             v
-src-tauri/src/screenshot/
-  mod.rs      Tauri commands, overlay/recorder window management, shared state
-  capture.rs  display enumeration, fullscreen / region capture -> temp PNG
-  scroll.rs   scrolling capture: enigo wheel synthesis + overlap stitching
-  record.rs   GIF (gif crate) and MP4 (ffmpeg pipe) recording sessions
-```
+Recording owns `servers::rdp::capture::Capturer` on the capture thread: Windows WGC/GDI, macOS ScreenCaptureKit/legacy capture and Linux X11/portal capture remain behind their platform gates. Backends are thread-affine and must not be moved across threads. Frames carry BGRA bytes and explicit stride; macOS surfaces may be copied lazily. Still capture on Windows/macOS uses the existing xcap path; Linux uses the shared capturer.
 
-Overlay UX is static-background: backend captures fullscreen first, then the
-overlay window shows that PNG while the main window hides. This avoids
-transparent-window focus/click-through issues on Linux and freezes the frame
-exactly like Feishu does during annotation.
+Do not use an RDP server connection, network loopback or its transport/encoder for screenshots. No merge from `origin/feat/rdp-server-parity` is required for this reuse. Future shared-capture changes must retain both consumers.
 
-Scroll capture: overlay hides -> backend captures region, synthesizes wheel
-scrolls at region center via `enigo`, captures again, stitches by vertical
-overlap detection -> overlay reopens on the stitched image for annotation.
+### Coordinates and artifacts
 
-Recording: overlay region-select -> "record" -> overlay hides -> `record.rs`
-spawns a capture loop (frames -> gif encoder / ffmpeg stdin) -> tiny
-always-on-top "screenshot-recorder" window with stop button + timer ->
-on stop the file is finalized and offered for save/copy.
+Display IDs derive from physical desktop origin. Selection/annotation use CSS coordinates; independent `naturalWidth / viewportWidth` and `naturalHeight / viewportHeight` map export, crop and mosaic/blur sampling to physical pixels. Crop edges are rounded and clamped. Native fixture checks verify physical dimensions and row heights.
 
-## Reuse (do not reinvent)
+Artifacts live under the current process's `temp_dir()/taomni-screenshot/<pid>/`. Read/copy/OCR/record preview source paths are canonicalized and confined there. `screenshot_read_file` returns raw IPC bytes; the frontend creates same-origin blob URLs, avoiding asset-scope failures and canvas taint. Blob URLs have explicit ownership and teardown. Capture/record outputs are purged at session close; pins use independent copies removed on window destruction. User-selected saved files and QA evidence copies outlive session cleanup.
 
-- Capture backends: `crate::servers::rdp::capture` on Linux (X11 SHM/Damage,
-  Wayland portal/PipeWire); `xcap::Monitor` on Windows/macOS (both are
-  non-optional target deps). Same split as `lanchat/transfer.rs`.
-- Scroll injection: `enigo` 0.6 (already a dependency; `scroll(length, axis)`).
-- Image clipboard: `arboard` 3 (`set_image`).
-- PNG encode/crop/stitch: `image` 0.25 (png feature).
-- GIF encode: new `gif` 0.13 dependency (pure Rust).
+### Session lifecycle
 
-## IPC contract (Tauri commands, `Result<_, String>`)
+Opening is serialized and repeated triggers focus the existing overlay or recorder, including the stopped preview. Capture hides only currently visible app windows, merges their labels and restores them on failure or close. Screenshot tool/QA fixture windows are excluded. A generation check cancels stale opens/record starts. Native tool-window destruction restores the app through off-event-loop cleanup.
 
-- `screenshot_list_displays() -> Vec<ScreenshotDisplay>`
-  `{ id, name, width, height, x, y, primary }` (physical pixels; `x/y` display origin)
-- `screenshot_capture_full(display_id?: string) -> ScreenshotFile`
-- `screenshot_capture_region(display_id?: string, x, y, width, height) -> ScreenshotFile`
-- `screenshot_scroll_capture(display_id?: string, x, y, width, height) -> ScrollCaptureResult`
-  `ScreenshotFile { path, width, height }` (temp PNG path; frontend loads via `convertFileSrc`);
-  `ScrollCaptureResult { path, width, height, frames }`. Blocking — runs in `spawn_blocking`.
-- `screenshot_copy_image(path: string) -> ()`
-- `screenshot_save_image(path: string, dest: string) -> ()`
-- `screenshot_save_data_url(data_url: string) -> ScreenshotFile` — annotated
-  canvas PNG round-trip for copy/save
-- `screenshot_probe() -> ScreenshotProbe { permission, control_permission, ffmpeg_available, summary }`
-- `screenshot_open_overlay(display_id?: string) -> ()` — hides main window,
-  captures fullscreen, opens `screenshot-overlay` window; overlay frontend then
-  calls `screenshot_overlay_init() -> OverlayInit { path, display_id, width, height }`.
-- `screenshot_close_overlay() -> ()` — closes overlay, reshows main window.
-- `screenshot_start_recording(display_id?: string, x?, y?, width?, height?, format: "gif"|"mp4", fps?) -> { recording_id }`
-- `screenshot_stop_recording(recording_id) -> ScreenshotFile`
-- `screenshot_cancel_recording(recording_id) -> ()`
+Recording has an exclusive lease spanning startup, live capture and finalization; timeout cleanup retains it until worker threads exit. Invalid partial region payloads are rejected rather than accidentally recording the entire screen. A capture failure is an error even when encoding produced a partial file; failed output is deleted. Stop/cancel cannot clear another recording's state.
 
-Frontend mapping: overlay window is fullscreen on the target display, so CSS
-pixels map to image pixels by `naturalWidth / window.innerWidth` — no backend
-scale factor needed.
+## User workflows
 
-## Platform matrix
+- Camera button: immediate capture or delayed 3/5/10 second entry with cancellation.
+- Default OS shortcut: `Control+Alt+A` on Windows/Linux, `Control+Super+A` on macOS. Settings allow change/reset/disable and show registration/probe errors. Native focused-app fallback runs only if OS registration failed; browser mode uses that fallback. Editable fields retain keystrokes, and child tool windows do not reopen the tool. The old Ctrl+Shift+A conflict with Code Workspace Find Action is removed.
+- Region or fullscreen selection defaults to selection mode. Choose drawing tools explicitly. Handles move/resize the crop while preserving shapes; selecting elsewhere resets the crop/history. Tiny selections are ignored.
+- Tools: rectangle, ellipse, arrow, line, pen, highlighter, text, balloon, mosaic, blur, numbered markers and eraser. Snapshot history supports undo/redo, batch auto-redaction and undoable erasing. Text editor owns Enter/Escape rather than invoking output shortcuts.
+- Copy/save/pin export natural-size annotations plus selected crop/watermark. Failed output remains retryable; canceled save dialog leaves the overlay open. Picker copies a sampled color. OCR offers text/copy; auto-redaction adds detected boxes in one history step. Automatic detection is not a guarantee that every secret was found: users must inspect the result.
+- Scroll: hide overlay, move pointer to the selection and inject wheel, capture/stitch, then replace background and clear stale annotations. Matching compares consecutive frames, not a growing stitched image. Lost overlap is not passed as a duplicated long screenshot.
+- Recorder: timer, stop/cancel; stopped GIF or MP4 preview includes actual dimensions/frame count/duration. Save/Done restore the app; GIF copy deliberately copies its first frame because the clipboard has no animated-image contract.
 
-| | Capture | Scroll inject | GIF | MP4 |
-|---|---|---|---|---|
-| Windows | xcap WGC (+GDI fallback in rdp backend) | enigo | gif crate | ffmpeg if on PATH |
-| macOS | xcap ScreenCaptureKit (Screen Recording permission) | enigo (Accessibility permission) | gif crate | ffmpeg if on PATH |
-| Linux X11 | rdp x11 backend | enigo x11rb | gif crate | ffmpeg if on PATH |
-| Linux Wayland | rdp portal/PipeWire backend | enigo Wayland / portal input | gif crate | ffmpeg if on PATH |
+## Recording contract
 
-Permissions are probed, never silently assumed (`screenshot_probe`; macOS
-reuses the existing Screen Recording request flow). MP4 without ffmpeg returns
-a clear error pointing at ffmpeg or GIF.
+| Format | Default fps | Maximum time | Width cap | Encoding |
+|---|---:|---:|---:|---|
+| GIF | 10 | 60 s | 960 px | `gif` crate, timestamp-derived centiseconds, infinite loop |
+| MP4 | 15 | 300 s | 1920 px | Built-in OpenH264 screen-content H264 + `mp4` muxer, timescale 1000 |
 
-## Recording bounds (v1)
+FPS is clamped to 1–30, output is even-sized and at least 2x2. Capture and encoding are separate threads with a bounded four-frame queue. Accepted frames alone update dedup state; a pending changed image survives backpressure, is retried during idle capture and is flushed before the end timestamp. Unchanged pixels extend prior duration rather than distort wall-clock playback. SPS/PPS and length-prefixed H264 samples form a valid AVC track.
 
-- GIF: default 10 fps, cap 60 s, auto-downscale to max 960 px wide, infinite loop.
-- MP4: default 15 fps, piped raw RGBA to
-  `ffmpeg -f rawvideo -pix_fmt rgba -s WxH -framerate F -i pipe:0 -c:v libx264 -pix_fmt yuv420p -movflags +faststart`.
-- Both: region or fullscreen; stop via recorder bar window.
+Main IPC payloads use camelCase. Displays include `scaleFactor`; recordings return `path,width,height,frames,durationMs`; probe returns `permission,controlPermission,mp4Available,ocrAvailable,summary`; shortcut status includes configured/default accelerator, enabled/registered/error.
 
-## Frontend files
+## Acceptance and verification mapping
 
-- `src/lib/screenshot.ts` — invoke wrappers + types (contract above).
-- `src/components/screenshot/ScreenshotOverlay.tsx` — fullscreen overlay:
-  background image, region drag-select with magnifier + size tooltip, toolbar,
-  scroll-capture and record entry points.
-- `src/components/screenshot/AnnotationCanvas.tsx` — canvas annotation layer
-  (rect/ellipse/arrow/line/pen/text/mosaic, undo/redo, HiDPI-aware).
-- `src/components/screenshot/RecorderBar.tsx` — tiny stop/timer window UI.
-- `App.tsx` — render overlay/recorder when
-  `getCurrentWindow().label` is `screenshot-overlay` / `screenshot-recorder`.
-- Trigger: camera button in `ControlBar`'s global window chrome (after the
-  divider, next to the tray controls) — independent of any tab.
+| Acceptance | Implementation | Executable evidence |
+|---|---|---|
+| AC-01 Real full/region pixels and correct physical size | capture/raw blob transport | TC-SHOT-N1, N10; screenshot geometry/unit tests |
+| AC-02 Selection, all annotations, undo/redo and recrop | Overlay/AnnotationCanvas | TC-SHOT-001–017, 021; mounted overlay/annotation tests; N3 native clipboard |
+| AC-03 Copy/save/pin/cleanup and restored main | mod.rs/PinnedImage | TC-SHOT-002, 005, 019; N3/N4 and native saved bytes/pin cleanup |
+| AC-04 Genuine long screenshot without reordered/squashed rows | scroll.rs | N2/N9 actual OS wheel + row oracle, six stitch unit regressions |
+| AC-05 GIF/MP4 motion, duration and platform preview | record.rs/RecorderBar | N5/N6 decoder; N7/N8 real native preview/playback, recorder mounted tests, browser 006/008/020 |
+| AC-06 Shortcut configuration/disable and safe routing | shortcut/settings/app fallback | TC-SHOT-004/011/018; N4 real OS injection; settings/shortcut tests |
+| AC-07 OCR and batch redaction | ocr.rs/overlay | TC-SHOT-017 renderer stub; N1 real Tesseract and clipboard pixels; OCR unit regressions |
 
-## Shortcuts
+Native test commands use a fixed `native_screenshot_scenario` verb, never side-effecting `eval_readonly`. Async IPC settles into a slot before synchronous WebDriver reads, including the macOS WKWebView bridge. Native scenarios automate child-window DOM interaction, not physical pointer fidelity; scroll/hotkey inject actual OS input. A successful scenario requires its stated postconditions and retained files, not a signature/header check or synthetic injected recording frame.
 
-- OS-global hotkey `Ctrl+Shift+A` (`Cmd+Shift+A` on macOS, the Feishu default)
-  registered by the Rust backend via `tauri-plugin-global-shortcut`
-  (best-effort: restrictive environments such as Wayland log a warning and
-  fall back). Fires even when the app is not focused.
-- App-local fallback: the same chord handled in `App.tsx` when the main window
-  is focused (editable fields keep the keystroke); also the only path in
-  browser preview.
-- i18n: `screenshot.*` keys in `en.ts` + `zh-CN.ts`.
+Hosted workflow: `.github/workflows/qa-ui-auto-platforms.yml`, selected F27 cases on Linux/Windows/macOS in browser/native modes. English/Chinese OCR data is pinned and checked. Linux native uses an isolated X11/Xvfb desktop and real WebKitGTK. All native builds use `com.taomni.app.qa` with separate data/config/cache. Native outputs are staged under each entry's report root, outside signed `run-*` receipt directories, so upload layout cannot hide provenance. GIF/MP4/stitched PNGs and output hashes are retained for downloading and review.
 
-## Testing
+## Verification status — 2026-10-02
 
-- Rust: unit tests for `scroll.rs` overlap detection + stitching (synthetic
-  frames); `record.rs` GIF header sanity on synthetic frames.
-- Frontend: vitest for pure geometry helpers (rect normalize, scale mapping).
-- Manual matrix: Win / macOS / Linux(X11+Wayland) smoke per AGENTS.md
-  (current-platform verification suffices per delivery, others recorded).
+Local unit/static verification only, per the requested execution boundary. Current screenshot Rust suite: 35 passed (including encoder roundtrip, queue backpressure and GIF clipboard decode). Focused frontend: 108 passed across six files; TypeScript build check passed. Native command/schema/behavior-contract checks, 41 QA infrastructure unit tests and combined catalog/audit gate have passed; hosted execution is still pending. These are not native UI passes.
 
-## Follow-ups (not v1)
+Earlier full frontend sweep had two pre-existing failures in `TerminalPanel.test.tsx`; do not claim that suite completely green. Earlier hosted run `36854784738` on SHA `4df5f4aa` had real scroll/recording failures and a broken multi-root artifact layout; its weak/synthetic checks cannot certify repaired functionality.
 
-Global hotkey via `tauri-plugin-global-shortcut`; window auto-detect under
-cursor; audio track for MP4; native openh264 MP4 path when ffmpeg is absent.
+Next verification tasks: TASK-VERIFY-01 finalize catalog/audit and exact selection; TASK-VERIFY-02 push the repaired SHA and run all six hosted combinations; TASK-VERIFY-03 download/inspect receipts and real PNG/GIF/MP4 outputs; TASK-VERIFY-04 fix failures and repeat on the new SHA. Record actual run IDs/results after execution. No new repaired hosted run has yet completed.
+
+## Platform boundaries and follow-ups
+
+- macOS screen recording and Accessibility permissions must be genuinely available; denial is a failure, not a pass. Mixed-DPI/multi-display Quartz mapping still needs native multi-monitor evidence.
+- Linux hosted verification is X11. Wayland portal source selection and permission/input support must be validated separately; the X11 result does not certify Wayland wheel/global hotkey behavior.
+- Native browser codec availability is verified by loaded metadata/pixels and playback advancement, not video tag presence. No audio track is provided.
+- Visual review must inspect annotations/redactions/scroll seams and play retained clips. Color/row/decoder assertions do not establish every aspect of visual fidelity.
+- Window auto-detection, audio capture and cloud upload remain outside this scope.

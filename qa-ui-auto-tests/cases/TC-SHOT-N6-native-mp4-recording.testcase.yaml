@@ -1,27 +1,25 @@
 id: TC-SHOT-N6
-title: Native MP4 recording produces a valid MP4 file
-covers:
-- F27.2
-tags:
-- screenshot
-- recording
-- native
-- p1
-modes:
-- native
-native_platforms:
-- Linux
-- Windows
-- macOS
-fixtures:
-- reset_db
+title: Native animated fixture records decodable built-in H264 MP4
+covers: [F27.1]
+tags: [screenshot, recording, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}
-# Ensure the main window (and Tauri API) is ready before invoking backends.
 - wait_for: '[data-testid="system-screenshot"]'
-- wait: 5
-# Record a 3-second MP4 clip and verify the file header contains the ftyp
-# box (hex 66747970 = "ftyp"). Requires ffmpeg on PATH.
-- eval_readonly:
-    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_recording", {format: "mp4", secs: 3}).then(JSON.stringify)'
-    contains: '66747970'
+- native_screenshot_scenario: {scenario: record, format: mp4, secs: 3}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: mp4-capture
+    requirement: Built-in H264 and MP4 recording captures real motion at correct dimensions and wall-clock duration without system ffmpeg.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: "Actual H264 samples decode, at least twelve frames/four distinct frames, duration 75-140 percent of three seconds and actual MP4 retained."}
+    results: [3]
+  visual:
+  - {check: Motion fidelity, method: external, reason: Play retained MP4; automated H264 decoder verifies frames and duration.}
+  native:
+  - {check: MP4 pipeline, method: automated, reason: "Real screen source and built-in OpenH264/muxer, not file-header-only or stub evidence."}

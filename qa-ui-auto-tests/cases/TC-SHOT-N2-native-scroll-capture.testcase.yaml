@@ -1,32 +1,26 @@
 id: TC-SHOT-N2
-title: Native scroll capture backend stitches frames
-covers:
-- F27.1
-tags:
-- screenshot
-- scroll-capture
-- native
-- p1
-modes:
-- native
-native_platforms:
-- Linux
-- Windows
-- macOS
-fixtures:
-- reset_db
+title: Native wheel capture stitches ordered rows at their physical height
+covers: [F27.1]
+tags: [screenshot, scroll-capture, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}
-# Ensure the main window (and Tauri API) is ready before invoking backends.
 - wait_for: '[data-testid="system-screenshot"]'
-- wait: 5
-# Scroll capture drives the OS wheel over the given region and stitches
-# frames; verify the backend resolves with a stitched image file.
-- eval_readonly:
-    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_scroll_capture", {displayId: null, x: 0, y: 0, width: 200, height: 200}).then(JSON.stringify)'
-    contains: '"path"'
-# Verify multiple frames were captured (frames>1) and the stitched height
-# exceeds the requested height, proving real scroll + stitch.
-- eval_readonly:
-    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_scroll_capture", {width: 200, height: 200}).then(JSON.stringify)'
-    contains: 'OK frames='
+- native_screenshot_scenario: {scenario: scroll}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: long-image
+    requirement: Real OS wheel scroll produces a longer screenshot without duplicate, missing or squashed fixture rows.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: "At least three source frames and ten consecutive row IDs, correct interior heights and at least 1.8x output growth; PNG retained."}
+    - {step: 4, expectation: Main remains usable after fixture cleanup.}
+    results: [3, 4]
+  visual:
+  - {check: Stitched seams, method: external, reason: Inspect retained scroll-stitched PNG in addition to row-order/height oracle.}
+  native:
+  - {check: Wheel and capture, method: automated, reason: Enigo injects OS wheel and the product captures real native fixture pixels.}

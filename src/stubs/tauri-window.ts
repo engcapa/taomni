@@ -38,6 +38,17 @@ class MockWindow {
   async setFocus(): Promise<void> {
     return undefined;
   }
+
+  async setSize(_size: LogicalSize): Promise<void> {
+    return undefined;
+  }
+}
+
+export class LogicalSize {
+  constructor(
+    public width: number,
+    public height: number,
+  ) {}
 }
 
 const mockWindow = new MockWindow();

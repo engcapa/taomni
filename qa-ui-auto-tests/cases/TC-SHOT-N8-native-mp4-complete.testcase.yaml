@@ -1,26 +1,25 @@
 id: TC-SHOT-N8
-title: Native MP4 recording has correct duration, codec and dimensions
-covers:
-- F27.2
-tags:
-- screenshot
-- recording
-- native
-- p1
-modes:
-- native
-native_platforms:
-- Linux
-- Windows
-- macOS
-fixtures:
-- reset_db
+title: Native MP4 recorder preview decodes and actually plays
+covers: [F27.1]
+tags: [screenshot, recording, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="system-screenshot"]'
-- wait: 5
-# Record 3s at 5fps, probe with ffprobe, verify duration ~3s, h264 codec,
-# and 200x200 dimensions. Requires ffmpeg/ffprobe on PATH.
-- eval_readonly:
-    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_mp4_complete", {secs: 3, fps: 5}).then(JSON.stringify)'
-    contains: 'OK duration='
+- native_screenshot_scenario: {scenario: recorder, format: mp4}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: mp4-recorder
+    requirement: Recorder stop loads a real MP4 in the platform WebView and playback advances, then Done restores main/removes temp clip.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: "Timer advances, video has loaded metadata/pixels with currentTime advancement, dimensions match decoded clip, reentry retains preview, Done closes and temp removed; actual MP4 retained."}
+    results: [3]
+  visual:
+  - {check: Preview quality, method: external, reason: Play retained recorder-preview MP4; automated currentTime/pixels establish platform codec playback.}
+  native:
+  - {check: WebView MP4 support, method: automated, reason: Real WebView2/WebKitGTK/WKWebView video element must decode and play; VIDEO tag presence alone cannot pass.}

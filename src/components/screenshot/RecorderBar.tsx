@@ -1,57 +1,108 @@
-import { useEffect, useState } from "react";
-import { Check, Download, Square, X } from "lucide-react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, Copy, Download, Square, X } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
+import { LogicalSize, getCurrentWindow } from "@tauri-apps/api/window";
 import { useT } from "../../lib/i18n";
+import { formatUnknownError } from "../../lib/appDialogs";
 import {
+  RECORDING_ENDED_EVENT,
   cancelRecording,
   closeScreenshotOverlay,
+  copyImageToClipboard,
   currentRecording,
+  loadScreenshotUrl,
+  revokeScreenshotUrl,
   saveImageToFile,
-  screenshotFileUrl,
   stopRecording,
-  type ScreenshotFile,
+  type RecordingFile,
 } from "../../lib/screenshot";
 
-function formatElapsed(totalSeconds: number): string {
+export function formatElapsed(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60)
     .toString()
     .padStart(2, "0");
-  const s = (totalSeconds % 60).toString().padStart(2, "0");
+  const s = Math.floor(totalSeconds % 60)
+    .toString()
+    .padStart(2, "0");
   return `${m}:${s}`;
 }
 
+function formatSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/**
+ * Small always-on-top window controlling a running recording: timer, stop,
+ * cancel; after stop a preview with save / copy (GIF) / done.
+ */
 export function RecorderBar() {
   const t = useT();
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [initFailed, setInitFailed] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [preview, setPreview] = useState<ScreenshotFile | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [preview, setPreview] = useState<RecordingFile | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewBytes, setPreviewBytes] = useState(0);
   const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const stopRef = useRef(false);
+  const mountedRef = useRef(false);
+  const closingRef = useRef(false);
+  const previewRequestRef = useRef(0);
+  const previewUrlRef = useRef<string | null>(null);
+
+  const isActive = useCallback(() => mountedRef.current && !closingRef.current, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      previewRequestRef.current++;
+      revokeScreenshotUrl(previewUrlRef.current);
+      previewUrlRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     currentRecording()
       .then((id) => {
-        if (cancelled) return;
-        if (id) setRecordingId(id);
-        else setInitFailed(true);
+        if (cancelled || !isActive()) return;
+        if (id) {
+          setRecordingId(id);
+          setStartedAt(Date.now());
+        } else setInitFailed(true);
       })
       .catch(() => {
-        if (!cancelled) setInitFailed(true);
+        if (!cancelled && isActive()) setInitFailed(true);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isActive]);
 
   useEffect(() => {
-    if (preview || !recordingId) return;
-    const timer = window.setInterval(() => setElapsed((v) => v + 1), 1000);
+    if (preview || !recordingId || stopping) return;
+    const timer = window.setInterval(() => {
+      if (isActive()) setNow(Date.now());
+    }, 250);
     return () => window.clearInterval(timer);
-  }, [preview, recordingId]);
+  }, [preview, recordingId, stopping, isActive]);
 
-  const closeAll = async () => {
+  useEffect(() => {
+    if (preview || !isActive() || !(initFailed || stopping || notice || error)) return;
+    // The native bar starts at 300×56; extra status rows would be clipped.
+    void getCurrentWindow().setSize(new LogicalSize(300, 140)).catch(() => undefined);
+  }, [preview, initFailed, stopping, notice, error, isActive]);
+
+  const closeAll = useCallback(async () => {
+    closingRef.current = true;
+    previewRequestRef.current++;
+    revokeScreenshotUrl(previewUrlRef.current);
+    previewUrlRef.current = null;
     try {
       await closeScreenshotOverlay();
     } catch {
@@ -59,63 +110,133 @@ export function RecorderBar() {
         .close()
         .catch(() => undefined);
     }
-  };
+  }, []);
 
-  const handleStop = async () => {
-    if (!recordingId || stopping) return;
+  const showPreview = useCallback(async (file: RecordingFile) => {
+    if (!isActive()) return;
+    const request = ++previewRequestRef.current;
+    const isCurrent = () => isActive() && request === previewRequestRef.current;
+    revokeScreenshotUrl(previewUrlRef.current);
+    previewUrlRef.current = null;
+    setPreviewUrl(null);
+    setPreviewBytes(0);
+    setPreview(file);
+    try {
+      await getCurrentWindow()
+        .setSize(new LogicalSize(380, 300))
+        .catch(() => undefined);
+      if (!isCurrent()) return;
+      const url = await loadScreenshotUrl(file.path);
+      if (!isCurrent()) {
+        revokeScreenshotUrl(url);
+        return;
+      }
+      previewUrlRef.current = url;
+      setPreviewUrl(url);
+      if (url.startsWith("blob:")) {
+        const blob = await fetch(url).then((r) => r.blob());
+        if (isCurrent()) setPreviewBytes(blob.size);
+      }
+    } catch (e) {
+      if (isCurrent()) setError(formatUnknownError(e));
+    }
+  }, [isActive]);
+
+  const handleStop = useCallback(async () => {
+    if (!recordingId || stopRef.current || !isActive()) return;
+    stopRef.current = true;
     setStopping(true);
     setError(null);
     try {
-      const file = await stopRecording(recordingId);
-      setPreview(file);
-    } catch {
-      setError(t("screenshot.recordFailed"));
+      await showPreview(await stopRecording(recordingId));
+    } catch (e) {
+      if (isActive()) {
+        // Finalization consumes the backend session even when it fails.
+        // Leave Cancel available, but never retry Stop for this id.
+        setRecordingId(null);
+        setError(t("screenshot.recordFailed", { error: formatUnknownError(e) }));
+      }
     } finally {
-      setStopping(false);
+      if (isActive()) setStopping(false);
     }
-  };
+  }, [recordingId, showPreview, t, isActive]);
+
+  // The backend stops on its own at the time limit (or on failure).
+  useEffect(() => {
+    if (!recordingId) return;
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    void listen<{ recordingId: string; error: string | null }>(RECORDING_ENDED_EVENT, (event) => {
+      if (disposed || !isActive() || stopRef.current || event.payload.recordingId !== recordingId) return;
+      if (event.payload.error) setNotice(event.payload.error);
+      else setNotice(t("screenshot.recordLimitReached"));
+      void handleStop();
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    }).catch(() => undefined);
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [recordingId, handleStop, t, isActive]);
 
   const handleCancel = async () => {
-    if (recordingId) {
-      try {
-        await cancelRecording(recordingId);
-      } catch {
-        // Best effort: the file is discarded regardless.
-      }
+    if (!isActive()) return;
+    closingRef.current = true;
+    previewRequestRef.current++;
+    if (recordingId && !preview && !stopRef.current) {
+      stopRef.current = true;
+      await cancelRecording(recordingId).catch(() => undefined);
     }
     await closeAll();
   };
 
+  const isMp4 = preview?.path.toLowerCase().endsWith(".mp4") ?? false;
+
   const handleSave = async () => {
-    if (!preview) return;
+    if (!preview || !isActive()) return;
+    setError(null);
     try {
       const { save } = await import("@tauri-apps/plugin-dialog");
-      const ext = preview.path.toLowerCase().endsWith(".mp4") ? "mp4" : "gif";
+      if (!isActive()) return;
+      const ext = isMp4 ? "mp4" : "gif";
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
       const dest = await save({
         title: t("screenshot.save"),
-        defaultPath: `taomni-recording.${ext}`,
+        defaultPath: `Taomni-recording-${stamp}.${ext}`,
         filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
       });
-      if (typeof dest !== "string" || !dest.trim()) return;
+      if (!isActive() || typeof dest !== "string" || !dest.trim()) return;
       await saveImageToFile(preview.path, dest);
-      await closeAll();
-    } catch {
-      setError(t("screenshot.saveFailed"));
+      if (isActive()) await closeAll();
+    } catch (e) {
+      if (isActive()) setError(t("screenshot.saveFailed", { error: formatUnknownError(e) }));
     }
   };
 
-  const isMp4 = preview?.path.toLowerCase().endsWith(".mp4") ?? false;
+  const handleCopyGif = async () => {
+    if (!preview || !isActive()) return;
+    setError(null);
+    try {
+      // The clipboard has no animated-image type; copy the first frame.
+      await copyImageToClipboard(preview.path);
+      if (isActive()) setNotice(t("screenshot.copiedFirstFrame"));
+    } catch (e) {
+      if (isActive()) setError(t("screenshot.copyFailed", { error: formatUnknownError(e) }));
+    }
+  };
+
+  const elapsed = startedAt !== null ? Math.max(0, (now - startedAt) / 1000) : 0;
 
   return (
     <div
       data-testid="screenshot-recorder"
-      className="flex flex-col items-stretch gap-2 px-3 py-2 text-[13px] select-none"
+      className="fixed inset-0 flex flex-col items-stretch gap-2 px-3 py-2 text-[13px] select-none overflow-x-hidden overflow-y-auto break-words"
       style={{
         background: "var(--taomni-panel-bg)",
         border: "1px solid var(--taomni-divider)",
         color: "var(--taomni-text)",
-        borderRadius: 12,
-        minWidth: 200,
       }}
     >
       {initFailed ? (
@@ -135,29 +256,46 @@ export function RecorderBar() {
         </div>
       ) : preview ? (
         <>
-          {isMp4 ? (
-            <video
-              data-testid="screenshot-recorder-preview"
-              src={screenshotFileUrl(preview.path)}
-              controls
-              className="rounded-lg"
-              style={{ maxWidth: 320, maxHeight: 200, background: "#000" }}
-            />
-          ) : (
-            <img
-              data-testid="screenshot-recorder-preview"
-              src={screenshotFileUrl(preview.path)}
-              alt=""
-              className="rounded-lg"
-              style={{ maxWidth: 320, maxHeight: 200 }}
-            />
-          )}
+          <div className="flex-1 min-h-0 flex items-center justify-center rounded-lg overflow-hidden" style={{ background: "#000" }}>
+            {previewUrl &&
+              (isMp4 ? (
+                <video
+                  data-testid="screenshot-recorder-preview"
+                  src={previewUrl}
+                  controls
+                  autoPlay
+                  loop
+                  muted
+                  className="max-w-full max-h-full"
+                />
+              ) : (
+                <img data-testid="screenshot-recorder-preview" src={previewUrl} alt="" className="max-w-full max-h-full object-contain" />
+              ))}
+          </div>
+          <p data-testid="screenshot-recorder-meta" className="text-[11px] text-[var(--taomni-text-muted)]">
+            {`${preview.width}×${preview.height} · ${formatElapsed(preview.durationMs / 1000)} · ${preview.frames} ${t("screenshot.frames")}${
+              previewBytes ? ` · ${formatSize(previewBytes)}` : ""
+            }`}
+          </p>
+          {notice && <p data-testid="screenshot-recorder-notice" className="text-[11px] text-[var(--taomni-text-muted)]">{notice}</p>}
           {error && (
             <p data-testid="screenshot-recorder-error" className="text-[12px]" style={{ color: "#ff6b6b" }}>
               {error}
             </p>
           )}
           <div className="flex items-center justify-end gap-2">
+            {!isMp4 && (
+              <button
+                type="button"
+                data-testid="screenshot-recorder-copy"
+                onClick={() => void handleCopyGif()}
+                className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-[12px]"
+                style={{ background: "var(--taomni-hover)", color: "var(--taomni-text)" }}
+              >
+                <Copy size={13} />
+                {t("screenshot.copy")}
+              </button>
+            )}
             <button
               type="button"
               data-testid="screenshot-recorder-save"
@@ -182,22 +320,19 @@ export function RecorderBar() {
         </>
       ) : (
         <>
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0"
-              style={{ background: "#ff4d4f" }}
-            />
-            <span data-testid="screenshot-recorder-timer" className="tabular-nums font-medium">
+          <div className="flex items-center gap-2" data-tauri-drag-region>
+            <span className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0" style={{ background: "#ff4d4f" }} />
+            <span data-testid="screenshot-recorder-timer" className="tabular-nums font-medium" data-tauri-drag-region>
               {formatElapsed(elapsed)}
             </span>
-            <span className="flex-1" />
+            <span className="flex-1" data-tauri-drag-region />
             <button
               type="button"
               data-testid="screenshot-recorder-stop"
               title={t("screenshot.stop")}
               aria-label={t("screenshot.stop")}
               onClick={() => void handleStop()}
-              disabled={stopping || !recordingId}
+              disabled={stopping || stopRef.current || !recordingId}
               className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-40"
               style={{ background: "#ff4d4f", color: "#ffffff" }}
             >
@@ -215,6 +350,8 @@ export function RecorderBar() {
               <X size={14} />
             </button>
           </div>
+          {stopping && <p className="text-[12px] text-[var(--taomni-text-muted)]">{t("screenshot.recordFinishing")}</p>}
+          {notice && <p data-testid="screenshot-recorder-notice" className="text-[11px] text-[var(--taomni-text-muted)]">{notice}</p>}
           {error && (
             <p data-testid="screenshot-recorder-error" className="text-[12px]" style={{ color: "#ff6b6b" }}>
               {error}

@@ -1,47 +1,196 @@
 id: TC-SHOT-016
-title: Re-crop after capture keeps annotations
-covers:
-- F27.1
-tags:
-- screenshot
-- annotate
-- p2
-modes:
-- browser
-fixtures:
-- reset_db
+title: Recrop handles and move preserve annotations and Enter exports the resized region
+covers: [F27.1]
+tags: [screenshot, annotate, recrop, p2]
+modes: [browser]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}#screenshot-overlay
-- wait_for: '[data-testid="screenshot-base-image"]'
-- click: '[data-testid="screenshot-fullscreen"]'
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
+- drag_to:
+    from: '[data-testid="screenshot-select-layer"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 100, y: 100}
+    to_position: {x: 600, y: 450}
 - wait_for: '[data-testid="screenshot-toolbar"]'
-# Draw a rectangle annotation first.
 - click: '[data-testid="screenshot-tool-rect"]'
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 80
-      y: 80
-    to_position:
-      x: 200
-      y: 160
-- assert_enabled: '[data-testid="screenshot-undo"]'
-# Enter re-crop mode; toolbar hides while selecting.
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 200, y: 200}
+    to_position: {x: 350, y: 300}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
 - click: '[data-testid="screenshot-recrop"]'
-- assert_not_visible: '[data-testid="screenshot-toolbar"]'
-# Drag a new region; toolbar returns and annotation survives (undo still on).
+- assert_visible: '[data-testid="screenshot-toolbar"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-recrop"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_visible: '[data-testid="screenshot-handle-nw"]'
+- assert_visible: '[data-testid="screenshot-handle-n"]'
+- assert_visible: '[data-testid="screenshot-handle-ne"]'
+- assert_visible: '[data-testid="screenshot-handle-e"]'
+- assert_visible: '[data-testid="screenshot-handle-se"]'
+- assert_visible: '[data-testid="screenshot-handle-s"]'
+- assert_visible: '[data-testid="screenshot-handle-sw"]'
+- assert_visible: '[data-testid="screenshot-handle-w"]'
+# Resize the existing selection, not a new select-layer drag that clears shapes.
 - drag_to:
-    from: '[data-testid="screenshot-base-image"]'
-    to: '[data-testid="screenshot-base-image"]'
-    from_position:
-      x: 40
-      y: 40
-    to_position:
-      x: 320
-      y: 240
+    from: '[data-testid="screenshot-handle-nw"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 4, y: 4}
+    to_position: {x: 150, y: 150}
 - wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '180 × 120'
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '1'
+# Exercise every resize direction, restoring the same crop at the end.
+- drag_to:
+    from: '[data-testid="screenshot-handle-n"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 4, y: 4}
+    to_position: {x: 375, y: 125}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '180 × 130'
+- drag_to:
+    from: '[data-testid="screenshot-handle-ne"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 4, y: 4}
+    to_position: {x: 625, y: 125}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '190 × 130'
+- drag_to:
+    from: '[data-testid="screenshot-handle-e"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 4, y: 4}
+    to_position: {x: 600, y: 287.5}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '180 × 130'
+- drag_to:
+    from: '[data-testid="screenshot-handle-se"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 4, y: 4}
+    to_position: {x: 625, y: 475}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '190 × 140'
+- drag_to:
+    from: '[data-testid="screenshot-handle-s"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 4, y: 4}
+    to_position: {x: 387.5, y: 450}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '190 × 130'
+- drag_to:
+    from: '[data-testid="screenshot-handle-sw"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 4, y: 4}
+    to_position: {x: 125, y: 450}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '200 × 130'
+- drag_to:
+    from: '[data-testid="screenshot-handle-w"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 4, y: 4}
+    to_position: {x: 150, y: 287.5}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '190 × 130'
+- drag_to:
+    from: '[data-testid="screenshot-handle-ne"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 4, y: 4}
+    to_position: {x: 600, y: 150}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '180 × 120'
+- drag_to:
+    from: '[data-testid="screenshot-selection-move"]'
+    to: '[data-testid="screenshot-select-layer"]'
+    from_position: {x: 100, y: 100}
+    to_position: {x: 275, y: 275}
+- wait_for: '[data-testid="screenshot-toolbar"]'
+- assert_attribute:
+    selector: '[data-testid="screenshot-selection"]'
+    name: style
+    matches: '.*left: 175px;.*top: 175px;.*width: 450px;.*height: 300px;.*'
+- assert_text_equals:
+    selector: '[data-testid="screenshot-size-hint"]'
+    equals: '180 × 120'
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '1'
 - assert_enabled: '[data-testid="screenshot-undo"]'
-- click: '[data-testid="screenshot-cancel"]'
-- wait_for:
-    selector: '[data-testid="system-screenshot"]'
+- click: '[data-testid="screenshot-undo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="0"]'
+- click: '[data-testid="screenshot-redo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
+- press:
+    key: Enter
+    selector: '[data-testid="screenshot-recrop"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-3).cmd === "screenshot_save_data_url" && window.__taomniStubScreenshotCalls.at(-3).args.width === 180 && window.__taomniStubScreenshotCalls.at(-3).args.height === 120
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_copy_image" && window.__taomniStubScreenshotCalls.at(-2).args.path === window.__taomniStubScreenshotCalls.at(-3).args.path
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Recrop keeps the toolbar and existing shape while exposing all eight handles; each handle changes the existing crop dimensions and move preserves annotation history.
+    actions: [1, 2, 4, 6, 7, 9, 20, 24, 27, 30, 33, 36, 39, 42, 45, 48]
+    checkpoints:
+    - {step: 10, expectation: Recrop does not hide the toolbar or start a destructive new selection.}
+    - {step: 11, expectation: Select mode is active.}
+    - {step: 22, expectation: Northwest resize produces 180x120 physical pixels.}
+    - {step: 23, expectation: The original shape survives resize.}
+    - {step: 26, expectation: North resize changes height to 130 physical pixels.}
+    - {step: 29, expectation: Northeast resize changes width to 190 physical pixels.}
+    - {step: 32, expectation: East resize restores width to 180 physical pixels.}
+    - {step: 35, expectation: Southeast resize changes both dimensions to 190x140.}
+    - {step: 38, expectation: South resize restores height to 130 physical pixels.}
+    - {step: 41, expectation: Southwest resize changes dimensions to 200x130.}
+    - {step: 44, expectation: West resize changes width to 190 physical pixels.}
+    - {step: 47, expectation: Northeast resize restores the final 180x120 region.}
+    - {step: 50, expectation: Move changes the origin by 25px on each axis without changing the resized dimensions.}
+    - {step: 51, expectation: Physical dimensions stay 180x120 after move.}
+    - {step: 52, expectation: The annotation survives every handle operation and move.}
+    - {step: 53, expectation: Recrop retains annotation undo history.}
+    results: [10, 11, 22, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 51, 52, 53]
+  - id: R2
+    requirement: Annotation undo and redo still work after recrop; Enter exports and copies the resized physical region.
+    actions: [54, 56, 58]
+    checkpoints:
+    - {step: 55, expectation: Undo removes the retained shape.}
+    - {step: 57, expectation: Redo restores it.}
+    - {step: 59, expectation: Enter closes capture.}
+    - {step: 60, expectation: Export decodes to the resized 180x120 crop.}
+    - {step: 61, expectation: Copy receives that resized export.}
+    results: [55, 57, 59, 60, 61]
+  visual:
+  - check: Selection origin, size and annotation history across resize and move.
+    method: automated
+    reason: Geometry, dimensions and shape assertions establish renderer recrop behavior only.
+  native:
+  - check: Physical display scaling and native clipboard pixels after recrop.
+    method: external
+    reason: The synthetic 0.4 scale and copy stub cannot certify native multi-monitor DPI or OS output.

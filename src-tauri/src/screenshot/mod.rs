@@ -5,28 +5,55 @@
 //! (auto-scroll + stitch), and video recording to GIF / MP4. Windows, macOS
 //! and Linux are all supported.
 //!
-//! The overlay UX is static-background: [`screenshot_open_overlay`] hides the
-//! app windows, captures the display, then opens a fullscreen overlay window
-//! that renders the captured PNG while the user selects / annotates. This
-//! avoids transparent-window focus and click-through problems on Linux.
+//! Overlay UX is static-background: [`open_overlay`] hides the app windows,
+//! captures the display under the pointer, then opens a borderless overlay
+//! covering that display which renders the captured PNG while the user
+//! selects / annotates. Capture files are temp artifacts (see
+//! `capture::temp_artifact_path`) read by the webview through
+//! [`screenshot_read_file`] and deleted when the capture session ends.
 
 pub mod capture;
 pub mod ocr;
+pub mod qa;
 pub mod record;
 pub mod scroll;
+pub mod shortcut;
 
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder,
+};
 
+use crate::state::AppState;
 use capture::{DisplayInfo, ScreenshotFile};
 use scroll::ScrollCaptureResult;
 
-const OVERLAY_LABEL: &str = "screenshot-overlay";
-const RECORDER_LABEL: &str = "screenshot-recorder";
-const PIN_LABEL_PREFIX: &str = "screenshot-pin-";
+pub const OVERLAY_LABEL: &str = "screenshot-overlay";
+pub const RECORDER_LABEL: &str = "screenshot-recorder";
+pub const PIN_LABEL_PREFIX: &str = "screenshot-pin-";
+
+/// Time for the compositor to remove hidden windows from the screen before
+/// the desktop is captured (Windows DWM and macOS fade animations).
+const HIDE_SETTLE: Duration = Duration::from_millis(250);
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OverlayInit {
+    pub path: String,
+    pub display_id: String,
+    /// Physical pixels.
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+}
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,21 +65,14 @@ pub struct PinInit {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OverlayInit {
-    pub path: String,
-    pub display_id: Option<String>,
-    pub width: u32,
-    pub height: u32,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ScreenshotProbe {
     /// `granted`, `denied`, or `notRequired` — OS screen-capture permission.
     pub permission: String,
     /// Accessibility / input-injection permission (macOS scroll capture).
     pub control_permission: String,
-    pub ffmpeg_available: bool,
+    /// MP4 uses the bundled H.264 encoder, so it is always available.
+    pub mp4_available: bool,
+    pub ocr_available: bool,
     pub summary: String,
 }
 
@@ -62,54 +82,94 @@ pub struct RecordingStarted {
     pub recording_id: String,
 }
 
-static OVERLAY_INIT: OnceLock<Mutex<Option<OverlayInit>>> = OnceLock::new();
-static HIDDEN_WINDOWS: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
-static CURRENT_RECORDING: OnceLock<Mutex<Option<String>>> = OnceLock::new();
-static PIN_INIT: OnceLock<Mutex<Option<PinInit>>> = OnceLock::new();
-static PIN_COUNTER: OnceLock<std::sync::atomic::AtomicU64> = OnceLock::new();
-
-fn overlay_init_slot() -> &'static Mutex<Option<OverlayInit>> {
-    OVERLAY_INIT.get_or_init(|| Mutex::new(None))
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordingFile {
+    pub path: String,
+    pub width: u32,
+    pub height: u32,
+    pub frames: u32,
+    pub duration_ms: u64,
 }
 
-fn pin_init_slot() -> &'static Mutex<Option<PinInit>> {
-    PIN_INIT.get_or_init(|| Mutex::new(None))
+#[derive(Default)]
+struct ToolState {
+    overlay: Option<OverlayInit>,
+    /// Labels of app windows hidden for the capture session.
+    hidden: Vec<String>,
+    recording: Option<String>,
+    /// Remains true while the stopped clip is being previewed.
+    recorder_open: bool,
+    pins: HashMap<String, PinInit>,
 }
 
-fn pin_counter() -> &'static std::sync::atomic::AtomicU64 {
-    PIN_COUNTER.get_or_init(|| std::sync::atomic::AtomicU64::new(1))
-}
+static STATE: OnceLock<Mutex<ToolState>> = OnceLock::new();
+/// Serializes overlay opening (hotkey repeat, double clicks, StrictMode).
+static OPENING: AtomicBool = AtomicBool::new(false);
+static STARTING_RECORDING: AtomicBool = AtomicBool::new(false);
+static SESSION_GENERATION: AtomicU64 = AtomicU64::new(0);
+static PIN_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-/// Directory where test-only commands stash visual artifacts (captured PNGs,
-/// recorded GIFs/MP4s) for CI upload. Best-effort: failures are ignored so
-/// tests never fail because artifact saving failed.
-/// Prefers RUNNER_TEMP (GitHub Actions) so the workflow can upload it.
-fn qa_artifact_dir() -> std::path::PathBuf {
-    let base = std::env::var("RUNNER_TEMP")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| std::env::temp_dir());
-    base.join("taomni-qa-artifacts")
-}
+struct RecordingStartGuard;
 
-pub(crate) fn save_qa_artifact(src_path: &str, name: &str) {
-    let dir = qa_artifact_dir();
-    if std::fs::create_dir_all(&dir).is_err() {
-        return;
+impl Drop for RecordingStartGuard {
+    fn drop(&mut self) {
+        STARTING_RECORDING.store(false, Ordering::SeqCst);
     }
-    let dest = dir.join(name);
-    let _ = std::fs::copy(src_path, &dest);
 }
 
-fn hidden_windows_slot() -> &'static Mutex<Vec<String>> {
-    HIDDEN_WINDOWS.get_or_init(|| Mutex::new(Vec::new()))
-}
-
-fn current_recording_slot() -> &'static Mutex<Option<String>> {
-    CURRENT_RECORDING.get_or_init(|| Mutex::new(None))
+fn tool_state() -> std::sync::MutexGuard<'static, ToolState> {
+    STATE
+        .get_or_init(|| Mutex::new(ToolState::default()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn internal_error(e: anyhow::Error) -> String {
     format!("{e:#}")
+}
+
+/// Startup: purge leftovers of earlier runs and register the hotkey.
+pub fn init(app: &AppHandle) {
+    capture::purge_stale_artifacts();
+    shortcut::init(app);
+}
+
+/// Raw bytes of a screenshot artifact. The UI turns them into a same-origin
+/// `blob:` URL: unlike asset-protocol URLs (a different origin), blob images
+/// never taint the annotation canvas, so export / color picking keep working
+/// on every WebView engine.
+#[tauri::command]
+pub async fn screenshot_read_file(path: String) -> Result<tauri::ipc::Response, String> {
+    blocking("read", move || {
+        let path = capture::ensure_artifact_path(&path)?;
+        Ok(tauri::ipc::Response::new(std::fs::read(path)?))
+    })
+    .await
+}
+
+/// App exit: stop recordings and delete temp files.
+pub fn shutdown() {
+    record::cancel_all();
+    capture::purge_tracked();
+}
+
+async fn blocking<T: Send + 'static>(
+    what: &str,
+    f: impl FnOnce() -> anyhow::Result<T> + Send + 'static,
+) -> Result<T, String> {
+    tokio::task::spawn_blocking(f)
+        .await
+        .map_err(|e| format!("{what} task failed: {e}"))?
+        .map_err(internal_error)
+}
+
+fn to_file(result: (PathBuf, u32, u32)) -> ScreenshotFile {
+    ScreenshotFile {
+        path: result.0.to_string_lossy().into_owned(),
+        width: result.1,
+        height: result.2,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -118,10 +178,7 @@ fn internal_error(e: anyhow::Error) -> String {
 
 #[tauri::command]
 pub async fn screenshot_list_displays(app: AppHandle) -> Result<Vec<DisplayInfo>, String> {
-    tokio::task::spawn_blocking(move || capture::list_displays(&app))
-        .await
-        .map_err(|e| format!("display enumeration task failed: {e}"))?
-        .map_err(internal_error)
+    blocking("display enumeration", move || capture::list_displays(&app)).await
 }
 
 #[tauri::command]
@@ -129,15 +186,12 @@ pub async fn screenshot_capture_full(
     app: AppHandle,
     display_id: Option<String>,
 ) -> Result<ScreenshotFile, String> {
-    tokio::task::spawn_blocking(move || capture::capture_display_png(&app, display_id.as_deref()))
-        .await
-        .map_err(|e| format!("capture task failed: {e}"))?
-        .map_err(internal_error)
-        .map(|(path, width, height)| ScreenshotFile {
-            path: path.to_string_lossy().into_owned(),
-            width,
-            height,
-        })
+    blocking("capture", move || {
+        let display = capture::resolve_display(&app, display_id.as_deref())?;
+        let image = capture::capture_display(&app, &display)?;
+        capture::save_png(&image, "shot").map(to_file)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -149,19 +203,17 @@ pub async fn screenshot_capture_region(
     width: u32,
     height: u32,
 ) -> Result<ScreenshotFile, String> {
-    tokio::task::spawn_blocking(move || {
-        capture::capture_region_png(&app, display_id.as_deref(), x, y, width, height)
+    blocking("capture", move || {
+        let display = capture::resolve_display(&app, display_id.as_deref())?;
+        let image = capture::capture_display(&app, &display)?;
+        capture::save_png(&capture::crop(&image, x, y, width, height), "shot").map(to_file)
     })
     .await
-    .map_err(|e| format!("capture task failed: {e}"))?
-    .map_err(internal_error)
-    .map(|(path, width, height)| ScreenshotFile {
-        path: path.to_string_lossy().into_owned(),
-        width,
-        height,
-    })
 }
 
+/// Scrolling capture of a display-relative physical region. The overlay is
+/// hidden for the duration (it would be captured and swallow the wheel) and
+/// shown again afterwards, success or not.
 #[tauri::command]
 pub async fn screenshot_scroll_capture(
     app: AppHandle,
@@ -171,26 +223,45 @@ pub async fn screenshot_scroll_capture(
     width: u32,
     height: u32,
 ) -> Result<ScrollCaptureResult, String> {
-    // Enigo is not `Send` on macOS; the whole flow owns its OS thread.
-    tokio::task::spawn_blocking(move || {
-        let origin = capture::display_origin(&app, display_id.as_deref());
-        scroll::scroll_capture(&app, display_id.as_deref(), origin, x, y, width, height)
+    let overlay = app.get_webview_window(OVERLAY_LABEL);
+    if let Some(window) = &overlay {
+        let _ = window.hide();
+    }
+    let worker = app.clone();
+    let result = blocking("scroll capture", move || {
+        let display = capture::resolve_display(&worker, display_id.as_deref())?;
+        scroll::scroll_capture(&worker, &display, (x, y, width, height))
     })
-    .await
-    .map_err(|e| format!("scroll capture task failed: {e}"))?
-    .map_err(internal_error)
+    .await;
+    if let Some(window) = overlay {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    result
 }
 
+/// Copy a screenshot artifact to the OS clipboard as an image. Uses the
+/// app-wide clipboard instance: on X11 the owner must outlive the call or
+/// the clipboard content disappears with it.
 #[tauri::command]
-pub async fn screenshot_copy_image(path: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || {
-        let image = image::open(&path)
-            .map_err(|e| anyhow::anyhow!("open image: {e}"))?
-            .to_rgba8();
+pub async fn screenshot_copy_image(app: AppHandle, path: String) -> Result<(), String> {
+    blocking("clipboard", move || {
+        let path = capture::ensure_artifact_path(&path)?;
+        let image = clipboard_image(&path)?;
         let (width, height) = (image.width() as usize, image.height() as usize);
-        let mut clipboard =
-            arboard::Clipboard::new().map_err(|e| anyhow::anyhow!("open clipboard: {e}"))?;
-        clipboard
+        let state = app.state::<AppState>();
+        let mut guard = state
+            .clipboard
+            .lock()
+            .map_err(|_| anyhow::anyhow!("clipboard lock poisoned"))?;
+        if guard.is_none() {
+            *guard = Some(
+                arboard::Clipboard::new().map_err(|e| anyhow::anyhow!("open clipboard: {e}"))?,
+            );
+        }
+        guard
+            .as_mut()
+            .expect("clipboard initialised")
             .set_image(arboard::ImageData {
                 width,
                 height,
@@ -199,27 +270,47 @@ pub async fn screenshot_copy_image(path: String) -> Result<(), String> {
             .map_err(|e| anyhow::anyhow!("write image to clipboard: {e}"))
     })
     .await
-    .map_err(|e| format!("clipboard task failed: {e}"))?
-    .map_err(internal_error)
 }
 
+fn clipboard_image(path: &std::path::Path) -> anyhow::Result<image::RgbaImage> {
+    if path
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"))
+    {
+        let mut options = gif::DecodeOptions::new();
+        options.set_color_output(gif::ColorOutput::RGBA);
+        let mut decoder = options.read_info(std::fs::File::open(path)?)?;
+        let (width, height) = (u32::from(decoder.width()), u32::from(decoder.height()));
+        let frame = decoder
+            .read_next_frame()?
+            .ok_or_else(|| anyhow::anyhow!("GIF has no frames"))?;
+        return image::RgbaImage::from_raw(width, height, frame.buffer.to_vec())
+            .ok_or_else(|| anyhow::anyhow!("GIF first frame dimensions do not match its canvas"));
+    }
+    Ok(image::open(path)?.to_rgba8())
+}
+
+/// Copy a screenshot artifact to a user-chosen destination.
 #[tauri::command]
 pub async fn screenshot_save_image(path: String, dest: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || {
-        std::fs::copy(&path, &dest)
+    blocking("save", move || {
+        let src = capture::ensure_artifact_path(&path)?;
+        let dest = PathBuf::from(dest);
+        if dest.as_os_str().is_empty() {
+            anyhow::bail!("no destination path");
+        }
+        std::fs::copy(&src, &dest)
             .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("save image: {e}"))
+            .map_err(|e| anyhow::anyhow!("save to {}: {e}", dest.display()))
     })
     .await
-    .map_err(|e| format!("save task failed: {e}"))?
-    .map_err(internal_error)
 }
 
 /// Decode a `data:image/png;base64,...` URL from the annotation canvas and
-/// write it as a temp PNG. Returns the file for copy/save.
+/// write it as a temp PNG. Returns the file for copy/save/pin.
 #[tauri::command]
 pub async fn screenshot_save_data_url(data_url: String) -> Result<ScreenshotFile, String> {
-    tokio::task::spawn_blocking(move || {
+    blocking("save", move || {
         use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
         let payload = data_url
             .split_once(',')
@@ -231,583 +322,188 @@ pub async fn screenshot_save_data_url(data_url: String) -> Result<ScreenshotFile
         if bytes.len() < 8 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" {
             anyhow::bail!("not a PNG data url");
         }
+        let (width, height) = image::ImageReader::new(std::io::Cursor::new(&bytes))
+            .with_guessed_format()
+            .map_err(|e| anyhow::anyhow!("read png: {e}"))?
+            .into_dimensions()
+            .map_err(|e| anyhow::anyhow!("read png: {e}"))?;
         let path = capture::temp_artifact_path("annotated", "png")?;
         std::fs::write(&path, &bytes).map_err(|e| anyhow::anyhow!("write png: {e}"))?;
-        let image = image::open(&path).map_err(|e| anyhow::anyhow!("read png: {e}"))?;
-        Ok::<ScreenshotFile, anyhow::Error>(ScreenshotFile {
+        Ok(ScreenshotFile {
             path: path.to_string_lossy().into_owned(),
-            width: image.width(),
-            height: image.height(),
+            width,
+            height,
         })
     })
     .await
-    .map_err(|e| format!("save task failed: {e}"))?
-    .map_err(internal_error)
 }
 
 #[tauri::command]
 pub async fn screenshot_probe() -> Result<ScreenshotProbe, String> {
-    let base = tokio::task::spawn_blocking(|| crate::servers::rdp::capture::probe())
-        .await
-        .map_err(|e| format!("probe task failed: {e}"))?
-        .map_err(internal_error)?;
-    Ok(ScreenshotProbe {
-        permission: base.permission,
-        control_permission: base.control_permission,
-        ffmpeg_available: record::ffmpeg_available(),
-        summary: format!(
-            "{}. MP4 recording {}.",
-            base.summary,
-            if record::ffmpeg_available() {
-                "is available (ffmpeg found)"
-            } else {
-                "needs ffmpeg on PATH (GIF always works)"
-            }
-        ),
-    })
-}
-
-/// Read the first `len` bytes of a file as lowercase hex. Test-only helper
-/// for QA to verify recording file headers (GIF87a/89a, MP4 ftyp).
-#[tauri::command]
-pub async fn screenshot_read_file_header(path: String, len: u32) -> Result<String, String> {
-    let len = len.min(64) as usize;
-    let bytes = tokio::task::spawn_blocking(move || {
-        use std::io::Read;
-        let mut f = std::fs::File::open(&path).map_err(|e| format!("open failed: {e}"))?;
-        let mut buf = vec![0u8; len];
-        let n = f.read(&mut buf).map_err(|e| format!("read failed: {e}"))?;
-        buf.truncate(n);
-        Ok::<Vec<u8>, String>(buf)
-    })
-    .await
-    .map_err(|e| format!("read task failed: {e}"))??;
-    Ok(bytes.iter().map(|b| format!("{:02x}", *b)).collect())
-}
-
-/// Test-only: capture full screen and stash the PNG for CI artifact upload.
-/// Returns the same ScreenshotFile as screenshot_capture_full.
-#[tauri::command]
-pub async fn screenshot_test_capture_full(
-    app: AppHandle,
-    display_id: Option<String>,
-) -> Result<ScreenshotFile, String> {
-    let file = screenshot_capture_full(app, display_id).await?;
-    save_qa_artifact(&file.path, "n1-screen-capture.png");
-    Ok(file)
-}
-
-/// Test-only: capture screen, draw test annotations (rectangle, arrow, circle),
-/// and save for visual QA. Returns "OK path=...".
-/// Used by N3 to verify the annotation pipeline produces a valid image.
-#[tauri::command]
-pub async fn screenshot_test_annotate(
-    app: AppHandle,
-    display_id: Option<String>,
-) -> Result<String, String> {
-    let file = screenshot_capture_full(app, display_id).await?;
-    let annotated_path = tokio::task::spawn_blocking(move || {
-        use image::{Rgb, RgbImage};
-        let mut img = image::open(&file.path)
-            .map_err(|e| format!("open screenshot: {e}"))?
-            .to_rgb8();
-        let (w, h) = (img.width(), img.height());
-        let red = Rgb([255, 0, 0]);
-        let green = Rgb([0, 255, 0]);
-        let blue = Rgb([0, 0, 255]);
-
-        // Helper to draw a thick line via Bresenham.
-        fn draw_line(img: &mut RgbImage, x0: i32, y0: i32, x1: i32, y1: i32, color: Rgb<u8>) {
-            let (mut x0, mut y0) = (x0, y0);
-            let dx = (x1 - x0).abs();
-            let dy = -(y1 - y0).abs();
-            let sx = if x0 < x1 { 1 } else { -1 };
-            let sy = if y0 < y1 { 1 } else { -1 };
-            let mut err = dx + dy;
-            loop {
-                for ox in -1..=1 {
-                    for oy in -1..=1 {
-                        let (px, py) = (x0 + ox, y0 + oy);
-                        if px >= 0
-                            && py >= 0
-                            && (px as u32) < img.width()
-                            && (py as u32) < img.height()
-                        {
-                            img.put_pixel(px as u32, py as u32, color);
-                        }
-                    }
+    blocking("probe", || {
+        let base = crate::servers::rdp::capture::probe()?;
+        let ocr_available = ocr::tesseract_available();
+        Ok(ScreenshotProbe {
+            permission: base.permission,
+            control_permission: base.control_permission,
+            mp4_available: true,
+            ocr_available,
+            summary: format!(
+                "{}. OCR {}.",
+                base.summary,
+                if ocr_available {
+                    "is available (tesseract found)"
+                } else {
+                    "needs tesseract installed"
                 }
-                if x0 == x1 && y0 == y1 {
-                    break;
-                }
-                let e2 = 2 * err;
-                if e2 >= dy {
-                    err += dy;
-                    x0 += sx;
-                }
-                if e2 <= dx {
-                    err += dx;
-                    y0 += sy;
-                }
-            }
-        }
-
-        // Red hollow rectangle (top-left).
-        let (rx, ry, rw, rh) = (w as i32 / 8, h as i32 / 8, w as i32 / 4, h as i32 / 4);
-        draw_line(&mut img, rx, ry, rx + rw, ry, red);
-        draw_line(&mut img, rx + rw, ry, rx + rw, ry + rh, red);
-        draw_line(&mut img, rx + rw, ry + rh, rx, ry + rh, red);
-        draw_line(&mut img, rx, ry + rh, rx, ry, red);
-
-        // Green arrow (diagonal).
-        let (ax0, ay0) = (w as i32 * 6 / 10, h as i32 * 6 / 10);
-        let (ax1, ay1) = (w as i32 * 8 / 10, h as i32 * 4 / 10);
-        draw_line(&mut img, ax0, ay0, ax1, ay1, green);
-        draw_line(&mut img, ax1, ay1, ax1 - 15, ay1 + 5, green);
-        draw_line(&mut img, ax1, ay1, ax1 - 5, ay1 + 15, green);
-
-        // Blue circle (polygon approximation).
-        let (cx, cy, r) = (w as i32 * 3 / 10, h as i32 * 7 / 10, 30);
-        let mut prev = (cx + r, cy);
-        for i in 1..=24 {
-            let a = i as f32 * std::f32::consts::PI * 2.0 / 24.0;
-            let curr = (
-                cx + (r as f32 * a.cos()) as i32,
-                cy + (r as f32 * a.sin()) as i32,
-            );
-            draw_line(&mut img, prev.0, prev.1, curr.0, curr.1, blue);
-            prev = curr;
-        }
-
-        let out = capture::temp_artifact_path("annotated-test", "png")
-            .map_err(|e| format!("temp path: {e}"))?;
-        img.save(&out).map_err(|e| format!("save annotated: {e}"))?;
-        Ok::<String, String>(out.to_string_lossy().into_owned())
-    })
-    .await
-    .map_err(|e| format!("annotate task failed: {e}"))??;
-    save_qa_artifact(&annotated_path, "n3-annotated.png");
-    Ok(format!("OK path={}", annotated_path))
-}
-
-/// Test-only: run scroll capture and verify multi-frame stitching in one call.
-/// Returns "OK frames=N height=H" where N>1 and H>requested height prove
-/// the wheel scrolled and frames were stitched.
-/// Saves a full-display screenshot as the visual QA artifact (the 200x200
-/// scroll region is black on headless CI VMs; the full display shows the
-/// actual desktop content for visual inspection).
-#[tauri::command]
-pub async fn screenshot_test_scroll_capture(
-    app: AppHandle,
-    width: u32,
-    height: u32,
-) -> Result<String, String> {
-    let r = screenshot_scroll_capture(app.clone(), None, 0, 0, width, height).await?;
-    // Save full display for visual artifact (scroll region is empty on CI).
-    if let Ok(full) = screenshot_capture_full(app, None).await {
-        save_qa_artifact(&full.path, "n2-scroll-stitch.png");
-    } else {
-        save_qa_artifact(&r.path, "n2-scroll-stitch.png");
-    }
-    let ok = r.frames > 1 && r.height > height;
-    Ok(format!(
-        "{} frames={} height={}",
-        if ok { "OK" } else { "FAIL" },
-        r.frames,
-        r.height
-    ))
-}
-
-/// Test-only: record a short clip and verify its file header in one call.
-/// Starts a recording, waits `secs` seconds, stops it, reads the first 12
-/// bytes as hex. Returns "OK <hex>" on success. Avoids JS promise chaining
-/// (banned by the QA audit) in native test cases.
-/// Bypasses the recorder-bar window (UI) used by the interactive flow.
-/// Moves the cursor during recording so the clip shows visible movement.
-#[tauri::command]
-pub async fn screenshot_test_recording(
-    app: AppHandle,
-    format: String,
-    secs: u64,
-) -> Result<String, String> {
-    let recording_id = {
-        let app_clone = app.clone();
-        let format_clone = format.clone();
-        tokio::task::spawn_blocking(move || {
-            record::start_recording_with_overlay(
-                &app_clone,
-                None,
-                None, // full display (fixed 200x200 region may be empty on Linux CI)
-                &format_clone,
-                Some(5),
-                true, // test overlay: moving red dot
-            )
+            ),
         })
-        .await
-        .map_err(|e| format!("start recording task failed: {e}"))?
-        .map_err(internal_error)?
-    };
-    // Move cursor during recording for visible movement in the clip.
-    let move_handle = tokio::task::spawn_blocking(move || {
-        use enigo::{Coordinate, Enigo, Mouse, Settings};
-        if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
-            let points = [(50, 50), (150, 50), (150, 150), (50, 150)];
-            for (x, y) in points {
-                let _ = enigo.move_mouse(x, y, Coordinate::Abs);
-                std::thread::sleep(std::time::Duration::from_millis(400));
-            }
-        }
-    });
-    tokio::time::sleep(std::time::Duration::from_secs(secs.min(10))).await;
-    let _ = move_handle.await;
-    let file = tokio::task::spawn_blocking(move || record::stop_recording(&recording_id))
-        .await
-        .map_err(|e| format!("stop recording task failed: {e}"))?
-        .map_err(internal_error)?;
-    let header = screenshot_read_file_header(file.path.clone(), 12).await?;
-    // Save the recording for CI artifact upload (visual inspection).
-    // N5 passes format="gif", N6 passes format="mp4".
-    let artifact_name = format!("n56-recording-{}.{}", format, format);
-    save_qa_artifact(&file.path, &artifact_name);
-    Ok(format!("OK path={} header={}", file.path, header))
-}
-
-/// Test-only: record a GIF and verify frame completeness by decoding it.
-/// Checks frame count is within 20% of expected (secs * fps) and dimensions
-/// match. Returns "OK frames=N width=W height=H".
-/// Moves the cursor in a square pattern during recording so the GIF shows
-/// visible cursor movement (not static blank frames on headless CI).
-#[tauri::command]
-pub async fn screenshot_test_gif_complete(
-    app: AppHandle,
-    secs: u64,
-    fps: u32,
-) -> Result<String, String> {
-    let recording_id = {
-        let app_clone = app.clone();
-        tokio::task::spawn_blocking(move || {
-            // Use full display (None) instead of fixed 200x200 region.
-            // On Linux CI, the (0,0,200,200) region may be empty/invalid,
-            // while full display capture (like N1) is verified to work.
-            record::start_recording_with_overlay(&app_clone, None, None, "gif", Some(fps), true)
-        })
-        .await
-        .map_err(|e| format!("start task failed: {e}"))?
-        .map_err(internal_error)?
-    };
-    // Move cursor in a square pattern during recording for visible movement.
-    let move_handle = tokio::task::spawn_blocking(move || {
-        use enigo::{Coordinate, Enigo, Mouse, Settings};
-        if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
-            let points = [(50, 50), (150, 50), (150, 150), (50, 150), (50, 50)];
-            for (x, y) in points {
-                let _ = enigo.move_mouse(x, y, Coordinate::Abs);
-                std::thread::sleep(std::time::Duration::from_millis(400));
-            }
-        }
-    });
-    tokio::time::sleep(std::time::Duration::from_secs(secs.min(10))).await;
-    let _ = move_handle.await;
-    let file = tokio::task::spawn_blocking(move || record::stop_recording(&recording_id))
-        .await
-        .map_err(|e| format!("stop task failed: {e}"))?
-        .map_err(internal_error)?;
-    let path = file.path.clone();
-    save_qa_artifact(&path, "n7-gif-complete.gif");
-    let (frames, width, height) = tokio::task::spawn_blocking(move || {
-        let f = std::fs::File::open(&path).map_err(|e| format!("open failed: {e}"))?;
-        let mut decoder = gif::DecodeOptions::new()
-            .read_info(f)
-            .map_err(|e| format!("gif decode failed: {e}"))?;
-        let (w, h) = (decoder.width() as u32, decoder.height() as u32);
-        let mut count = 0u32;
-        while decoder
-            .read_next_frame()
-            .map_err(|e| format!("frame read failed: {e}"))?
-            .is_some()
-        {
-            count += 1;
-        }
-        Ok::<(u32, u32, u32), String>((count, w, h))
     })
     .await
-    .map_err(|e| format!("decode task failed: {e}"))??;
-    let expected = secs as u32 * fps;
-    // Full display dimensions vary by CI runner; just verify frames and non-zero size
-    let ok = frames >= expected * 8 / 10 && frames <= expected * 12 / 10 && width > 0 && height > 0;
-    Ok(format!(
-        "{} frames={} width={} height={} expected={}",
-        if ok { "OK" } else { "FAIL" },
-        frames,
-        width,
-        height,
-        expected
-    ))
-}
-
-/// Test-only: record MP4 and verify via ffprobe (duration, codec, dims).
-/// Returns "OK duration=D codec=C width=W height=H".
-/// Moves the cursor during recording so the video shows visible movement.
-#[tauri::command]
-pub async fn screenshot_test_mp4_complete(
-    app: AppHandle,
-    secs: u64,
-    fps: u32,
-) -> Result<String, String> {
-    let recording_id = {
-        let app_clone = app.clone();
-        tokio::task::spawn_blocking(move || {
-            record::start_recording_with_overlay(
-                &app_clone,
-                None,
-                None, // full display
-                "mp4",
-                Some(fps),
-                true,
-            )
-        })
-        .await
-        .map_err(|e| format!("start task failed: {e}"))?
-        .map_err(internal_error)?
-    };
-    // Move cursor in a square pattern during recording for visible movement.
-    let move_handle = tokio::task::spawn_blocking(move || {
-        use enigo::{Coordinate, Enigo, Mouse, Settings};
-        if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
-            let points = [(50, 50), (150, 50), (150, 150), (50, 150), (50, 50)];
-            for (x, y) in points {
-                let _ = enigo.move_mouse(x, y, Coordinate::Abs);
-                std::thread::sleep(std::time::Duration::from_millis(400));
-            }
-        }
-    });
-    tokio::time::sleep(std::time::Duration::from_secs(secs.min(10))).await;
-    let _ = move_handle.await;
-    let file = tokio::task::spawn_blocking(move || record::stop_recording(&recording_id))
-        .await
-        .map_err(|e| format!("stop task failed: {e}"))?
-        .map_err(internal_error)?;
-    let path = file.path.clone();
-    save_qa_artifact(&path, "n8-mp4-complete.mp4");
-    let info = tokio::task::spawn_blocking(move || {
-        let out = std::process::Command::new("ffprobe")
-            .args([
-                "-v",
-                "quiet",
-                "-print_format",
-                "json",
-                "-show_format",
-                "-show_streams",
-                &path,
-            ])
-            .output()
-            .map_err(|e| format!("ffprobe failed: {e}"))?;
-        let json: serde_json::Value =
-            serde_json::from_slice(&out.stdout).map_err(|e| format!("json parse failed: {e}"))?;
-        let stream = json["streams"]
-            .as_array()
-            .and_then(|s| s.iter().find(|v| v["codec_type"] == "video"))
-            .ok_or_else(|| "no video stream".to_string())?;
-        let duration: f64 = json["format"]["duration"]
-            .as_str()
-            .and_then(|d| d.parse().ok())
-            .unwrap_or(0.0);
-        let codec = stream["codec_name"].as_str().unwrap_or("?").to_string();
-        let w = stream["width"].as_u64().unwrap_or(0);
-        let h = stream["height"].as_u64().unwrap_or(0);
-        Ok::<(f64, String, u64, u64), String>((duration, codec, w, h))
-    })
-    .await
-    .map_err(|e| format!("probe task failed: {e}"))??;
-    let (duration, codec, w, h) = info;
-    let ok = duration >= secs as f64 - 0.5
-        && duration <= secs as f64 + 1.5
-        && codec == "h264"
-        && w > 0
-        && h > 0;
-    Ok(format!(
-        "{} duration={:.2} codec={} width={} height={}",
-        if ok { "OK" } else { "FAIL" },
-        duration,
-        codec,
-        w,
-        h
-    ))
-}
-
-/// Test-only: verify scroll-stitch content is real (not duplicated frames).
-/// Divides the stitched image into 3 vertical thirds and checks at least 2
-/// have different average colors, proving the wheel actually scrolled.
-/// Saves a full-display screenshot as the visual QA artifact (the scroll
-/// region is black on headless CI VMs).
-#[tauri::command]
-pub async fn screenshot_test_scroll_content(
-    app: AppHandle,
-    width: u32,
-    height: u32,
-) -> Result<String, String> {
-    let r = screenshot_scroll_capture(app.clone(), None, 0, 0, width, height).await?;
-    let path = r.path.clone();
-    // Save full display for visual artifact (scroll region is empty on CI).
-    if let Ok(full) = screenshot_capture_full(app, None).await {
-        save_qa_artifact(&full.path, "n9-scroll-content.png");
-    } else {
-        save_qa_artifact(&path, "n9-scroll-content.png");
-    }
-    let differ = tokio::task::spawn_blocking(move || {
-        let img = image::open(&path)
-            .map_err(|e| format!("open failed: {e}"))?
-            .to_rgba8();
-        let (w, h) = img.dimensions();
-        let third = h / 3;
-        let mut avgs = Vec::new();
-        for i in 0..3 {
-            let y0 = i * third;
-            let y1 = if i == 2 { h } else { (i + 1) * third };
-            let mut sr: u64 = 0;
-            let mut sg: u64 = 0;
-            let mut sb: u64 = 0;
-            let mut n: u64 = 0;
-            // Sample every 7th pixel for speed.
-            for y in (y0..y1).step_by(7) {
-                for x in (0..w).step_by(7) {
-                    let p = img.get_pixel(x, y);
-                    sr += p[0] as u64;
-                    sg += p[1] as u64;
-                    sb += p[2] as u64;
-                    n += 1;
-                }
-            }
-            avgs.push((sr / n, sg / n, sb / n));
-        }
-        let mut differ = 0;
-        for a in 0..3 {
-            for b in (a + 1)..3 {
-                let dr = (avgs[a].0 as i64 - avgs[b].0 as i64).abs();
-                let dg = (avgs[a].1 as i64 - avgs[b].1 as i64).abs();
-                let db = (avgs[a].2 as i64 - avgs[b].2 as i64).abs();
-                if dr + dg + db > 30 {
-                    differ += 1;
-                }
-            }
-        }
-        Ok::<u32, String>(differ)
-    })
-    .await
-    .map_err(|e| format!("content task failed: {e}"))??;
-    Ok(format!(
-        "{} differing_thirds={}",
-        if differ >= 1 { "OK" } else { "FAIL" },
-        differ
-    ))
-}
-
-/// Test-only: capture the screen twice and verify the captures are nearly
-/// identical (proving deterministic, faithful capture).
-#[tauri::command]
-pub async fn screenshot_test_capture_fidelity(app: AppHandle) -> Result<String, String> {
-    let cap = |app: &AppHandle| {
-        let app_clone = app.clone();
-        capture::capture_display_png(&app_clone, None).map_err(|e| format!("capture failed: {e}"))
-    };
-    let (p1, _, _) = cap(&app)?;
-    let (p2, _, _) = cap(&app)?;
-    save_qa_artifact(&p1.to_string_lossy(), "n10-capture-1.png");
-    save_qa_artifact(&p2.to_string_lossy(), "n10-capture-2.png");
-    let diff_pct = tokio::task::spawn_blocking(move || {
-        let a = image::open(&p1)
-            .map_err(|e| format!("open1 failed: {e}"))?
-            .to_rgba8();
-        let b = image::open(&p2)
-            .map_err(|e| format!("open2 failed: {e}"))?
-            .to_rgba8();
-        let (w, h) = a.dimensions();
-        if b.dimensions() != (w, h) {
-            return Ok::<f64, String>(100.0);
-        }
-        let mut diff: u64 = 0;
-        let mut total: u64 = 0;
-        for y in (0..h).step_by(3) {
-            for x in (0..w).step_by(3) {
-                let pa = a.get_pixel(x, y);
-                let pb = b.get_pixel(x, y);
-                let d = (pa[0] as i32 - pb[0] as i32).abs()
-                    + (pa[1] as i32 - pb[1] as i32).abs()
-                    + (pa[2] as i32 - pb[2] as i32).abs();
-                if d > 30 {
-                    diff += 1;
-                }
-                total += 1;
-            }
-        }
-        Ok::<f64, String>(diff as f64 * 100.0 / total as f64)
-    })
-    .await
-    .map_err(|e| format!("diff task failed: {e}"))??;
-    Ok(format!(
-        "{} diff_pct={:.2}",
-        if diff_pct < 5.0 { "OK" } else { "FAIL" },
-        diff_pct
-    ))
 }
 
 // ---------------------------------------------------------------------------
 // Overlay window
 // ---------------------------------------------------------------------------
 
-/// Hide app windows, capture the display, and open the fullscreen annotation
-/// overlay. Split from the Tauri command so the global-shortcut handler can
-/// reuse it.
-pub async fn open_overlay(app: &AppHandle, display_id: Option<String>) -> Result<(), String> {
-    if let Some(existing) = app.get_webview_window(OVERLAY_LABEL) {
-        let _ = existing.close();
-    }
-    // Hide every visible app window (no label assumptions about the main
-    // window); they are reshown by `screenshot_close_overlay`.
-    let mut hidden = Vec::new();
+/// Hide every visible app window except the screenshot tool's own and remember
+/// them (merged with windows already hidden for this session).
+fn hide_app_windows(app: &AppHandle) -> bool {
+    let mut hid_any = false;
+    let mut state = tool_state();
     for (label, window) in app.webview_windows() {
-        if label == OVERLAY_LABEL || label == RECORDER_LABEL {
+        if label == OVERLAY_LABEL
+            || label == RECORDER_LABEL
+            || label.starts_with(PIN_LABEL_PREFIX)
+            || label == qa::QA_WINDOW_LABEL
+        {
             continue;
         }
-        if window.is_visible().unwrap_or(false) {
-            let _ = window.hide();
-            hidden.push(label);
+        if window.is_visible().unwrap_or(false) && window.hide().is_ok() {
+            hid_any = true;
+            if !state.hidden.contains(&label) {
+                state.hidden.push(label);
+            }
         }
     }
-    *hidden_windows_slot().lock().unwrap() = hidden;
+    hid_any
+}
 
-    let origin = capture::display_origin(app, display_id.as_deref());
-    let app_clone = app.clone();
-    let display_clone = display_id.clone();
-    let (path, width, height) = tokio::task::spawn_blocking(move || {
-        capture::capture_display_png(&app_clone, display_clone.as_deref())
-    })
-    .await
-    .map_err(|e| format!("capture task failed: {e}"))?
-    .map_err(internal_error)?;
-    // Save QA artifact for macOS N4 test (which triggers overlay via UI click
-    // and cannot invoke test commands directly). Only in CI (RUNNER_TEMP set).
-    if std::env::var("RUNNER_TEMP").is_ok() {
-        save_qa_artifact(&path.to_string_lossy(), "n4-macos-capture.png");
+fn restore_app_windows(app: &AppHandle) {
+    let hidden = std::mem::take(&mut tool_state().hidden);
+    for label in hidden {
+        if let Some(window) = app.get_webview_window(&label) {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
     }
-    *overlay_init_slot().lock().unwrap() = Some(OverlayInit {
+}
+
+/// Place a borderless window exactly over `display` (physical pixels).
+fn cover_display(window: &WebviewWindow, display: &DisplayInfo) {
+    let _ = window.set_position(PhysicalPosition::new(display.x, display.y));
+    let _ = window.set_size(PhysicalSize::new(display.width, display.height));
+    #[cfg(target_os = "macos")]
+    {
+        // Simple fullscreen hides the menu bar and Dock without the Space
+        // switch animation of native fullscreen.
+        let _ = window.set_simple_fullscreen(true);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window.set_fullscreen(true);
+    }
+}
+
+/// Hide app windows, capture `display_id` (default: the display under the
+/// pointer) and open the annotation overlay on it. Re-entrant calls while an
+/// overlay is opening/open just focus the existing one; while a recording
+/// runs they focus the recorder bar.
+pub async fn open_overlay(app: &AppHandle, display_id: Option<String>) -> Result<(), String> {
+    if let Some(label) = {
+        let state = tool_state();
+        if state.recording.is_some() || state.recorder_open {
+            Some(RECORDER_LABEL)
+        } else if state.overlay.is_some() {
+            Some(OVERLAY_LABEL)
+        } else {
+            None
+        }
+    } {
+        if let Some(window) = app.get_webview_window(label) {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+        return Ok(());
+    }
+    if OPENING.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    let result = open_overlay_inner(app, display_id).await;
+    OPENING.store(false, Ordering::SeqCst);
+    if result.is_err() {
+        // Never leave the user with no visible window.
+        tool_state().overlay = None;
+        if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
+            let _ = window.close();
+        }
+        restore_app_windows(app);
+        capture::purge_tracked();
+    }
+    result
+}
+
+async fn open_overlay_inner(app: &AppHandle, display_id: Option<String>) -> Result<(), String> {
+    let generation = SESSION_GENERATION.load(Ordering::SeqCst);
+    let display = {
+        let app = app.clone();
+        blocking("display lookup", move || match display_id {
+            Some(id) if !id.trim().is_empty() => capture::resolve_display(&app, Some(&id)),
+            _ => capture::display_at_cursor(&app),
+        })
+        .await?
+    };
+    if hide_app_windows(app) {
+        tokio::time::sleep(HIDE_SETTLE).await;
+    }
+    let (path, width, height) = {
+        let app = app.clone();
+        let display = display.clone();
+        blocking("capture", move || {
+            let image = capture::capture_display(&app, &display)?;
+            capture::save_png(&image, "shot")
+        })
+        .await?
+    };
+    if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
+        std::fs::remove_file(path).ok();
+        return Err("screenshot opening was cancelled".into());
+    }
+    tool_state().overlay = Some(OverlayInit {
         path: path.to_string_lossy().into_owned(),
-        display_id,
+        display_id: display.id.clone(),
         width,
         height,
+        scale_factor: display.scale_factor,
     });
 
     let url = WebviewUrl::App("index.html#screenshot-overlay".into());
-    WebviewWindowBuilder::new(app, OVERLAY_LABEL, url)
+    let window = WebviewWindowBuilder::new(app, OVERLAY_LABEL, url)
         .title("Screenshot")
-        .position(origin.0 as f64, origin.1 as f64)
-        .fullscreen(true)
+        .visible(false)
         .decorations(false)
         .resizable(false)
+        .shadow(false)
         .always_on_top(true)
         .skip_taskbar(true)
         .build()
         .map_err(|e| format!("open overlay window: {e}"))?;
+    watch_session_window(&window);
+    cover_display(&window, &display);
+    window
+        .show()
+        .map_err(|e| format!("show overlay window: {e}"))?;
+    let _ = window.set_focus();
     Ok(())
 }
 
@@ -820,88 +516,163 @@ pub async fn screenshot_open_overlay(
     open_overlay(&app, display_id).await
 }
 
-/// One-shot fetch of the pending overlay payload, set by
-/// [`screenshot_open_overlay`].
+/// The pending overlay payload, set by [`open_overlay`].
 #[tauri::command]
 pub async fn screenshot_overlay_init() -> Result<OverlayInit, String> {
-    overlay_init_slot()
-        .lock()
-        .unwrap()
+    tool_state()
+        .overlay
         .clone()
         .ok_or_else(|| "no pending screenshot overlay".to_string())
 }
 
-/// Close the overlay (and recorder bar) and reshow hidden app windows.
+/// The overlay replaced its background (scroll capture result).
+#[tauri::command]
+pub async fn screenshot_overlay_update(
+    path: String,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    capture::ensure_artifact_path(&path).map_err(internal_error)?;
+    if let Some(overlay) = tool_state().overlay.as_mut() {
+        overlay.path = path;
+        overlay.width = width;
+        overlay.height = height;
+    }
+    Ok(())
+}
+
+/// End the capture session: close the overlay and recorder bar, reshow the
+/// hidden app windows and delete the session's temp files.
 #[tauri::command]
 pub async fn screenshot_close_overlay(app: AppHandle) -> Result<(), String> {
+    close_session(&app);
+    Ok(())
+}
+
+fn watch_session_window(window: &WebviewWindow) {
+    let app = window.app_handle().clone();
+    let label = window.label().to_string();
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            let active = {
+                let state = tool_state();
+                if label == OVERLAY_LABEL {
+                    state.overlay.is_some()
+                } else {
+                    state.recorder_open
+                }
+            };
+            if active {
+                let app = app.clone();
+                // Joining recorder threads must not block the event loop.
+                tauri::async_runtime::spawn_blocking(move || close_session(&app));
+            }
+        }
+    });
+}
+
+pub(crate) fn close_session(app: &AppHandle) {
+    SESSION_GENERATION.fetch_add(1, Ordering::SeqCst);
+    let recording = {
+        let mut state = tool_state();
+        state.overlay = None;
+        state.recorder_open = false;
+        state.recording.take()
+    };
+    if let Some(id) = recording {
+        let _ = record::cancel_recording(&id);
+    }
     for label in [OVERLAY_LABEL, RECORDER_LABEL] {
         if let Some(window) = app.get_webview_window(label) {
             let _ = window.close();
         }
     }
-    let hidden: Vec<String> = std::mem::take(&mut *hidden_windows_slot().lock().unwrap());
-    for label in hidden {
-        if let Some(window) = app.get_webview_window(&label) {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
-    }
-    Ok(())
+    restore_app_windows(app);
+    capture::purge_tracked();
 }
 
 // ---------------------------------------------------------------------------
 // Pin to screen
 // ---------------------------------------------------------------------------
 
-/// Open a frameless always-on-top window showing the given image file.
-/// Returns the new window label.
+/// Open a frameless always-on-top window showing a copy of the given
+/// artifact (the copy outlives the capture session). Returns its label.
 #[tauri::command]
 pub async fn screenshot_pin_to_screen(app: AppHandle, path: String) -> Result<String, String> {
-    let (width, height) = tokio::task::spawn_blocking({
-        let path = path.clone();
-        move || -> Result<(u32, u32), String> {
-            let img = image::open(&path).map_err(|e| format!("open pin image: {e}"))?;
-            Ok((img.width(), img.height()))
-        }
+    let (pinned, width, height) = blocking("pin", move || {
+        let src = capture::ensure_artifact_path(&path)?;
+        let (width, height) = image::image_dimensions(&src)?;
+        let dest = capture::untracked_artifact_path("pin", "png")?;
+        std::fs::copy(&src, &dest)?;
+        Ok((dest, width, height))
     })
-    .await
-    .map_err(|e| format!("pin task failed: {e}"))??;
+    .await?;
 
-    // Cap the initial window size so huge screenshots don't cover the screen.
-    const MAX_DIM: f64 = 640.0;
-    let scale = (MAX_DIM / width.max(height) as f64).min(1.0);
-    let win_w = (width as f64 * scale).round();
-    let win_h = (height as f64 * scale).round();
-
-    let id = pin_counter().fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let label = format!("{PIN_LABEL_PREFIX}{id}");
-    *pin_init_slot().lock().unwrap() = Some(PinInit {
-        path,
-        width,
-        height,
-    });
+    let scale = tool_state()
+        .overlay
+        .as_ref()
+        .map(|o| o.scale_factor)
+        .or_else(|| {
+            app.primary_monitor()
+                .ok()
+                .flatten()
+                .map(|m| m.scale_factor())
+        })
+        .unwrap_or(1.0)
+        .max(0.5);
+    // Logical size at 1:1 physical pixels, capped so huge shots stay usable.
+    const MAX_DIM: f64 = 720.0;
+    let (lw, lh) = (width as f64 / scale, height as f64 / scale);
+    let fit = (MAX_DIM / lw.max(lh)).min(1.0);
+    let label = format!(
+        "{PIN_LABEL_PREFIX}{}",
+        PIN_COUNTER.fetch_add(1, Ordering::Relaxed)
+    );
+    tool_state().pins.insert(
+        label.clone(),
+        PinInit {
+            path: pinned.to_string_lossy().into_owned(),
+            width,
+            height,
+        },
+    );
 
     let url = WebviewUrl::App("index.html#screenshot-pin".into());
-    WebviewWindowBuilder::new(&app, &label, url)
+    let window = WebviewWindowBuilder::new(&app, &label, url)
         .title("Pinned Screenshot")
-        .inner_size(win_w, win_h)
+        .inner_size((lw * fit).round().max(48.0), (lh * fit).round().max(48.0))
         .decorations(false)
         .resizable(true)
         .always_on_top(true)
         .skip_taskbar(true)
-        .build()
-        .map_err(|e| format!("open pin window: {e}"))?;
+        .build();
+    let window = match window {
+        Ok(window) => window,
+        Err(e) => {
+            tool_state().pins.remove(&label);
+            std::fs::remove_file(&pinned).ok();
+            return Err(format!("open pin window: {e}"));
+        }
+    };
+    let pin_label = label.clone();
+    window.on_window_event(move |event| {
+        if let tauri::WindowEvent::Destroyed = event {
+            if let Some(pin) = tool_state().pins.remove(&pin_label) {
+                std::fs::remove_file(pin.path).ok();
+            }
+        }
+    });
     Ok(label)
 }
 
-/// One-shot fetch of the pending pin payload, set by [`screenshot_pin_to_screen`].
+/// The calling pin window's payload.
 #[tauri::command]
-pub async fn screenshot_pin_init() -> Result<PinInit, String> {
-    pin_init_slot()
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or_else(|| "no pending screenshot pin".to_string())
+pub async fn screenshot_pin_init(window: WebviewWindow) -> Result<PinInit, String> {
+    tool_state()
+        .pins
+        .get(window.label())
+        .cloned()
+        .ok_or_else(|| "no pinned screenshot for this window".to_string())
 }
 
 /// Close a pinned screenshot window by label.
@@ -920,20 +691,24 @@ pub async fn screenshot_close_pin(app: AppHandle, label: String) -> Result<(), S
 // OCR & auto-redact
 // ---------------------------------------------------------------------------
 
-/// Extract text from an image file via tesseract (if installed).
+/// Extract text from a screenshot artifact via tesseract (if installed).
 #[tauri::command]
 pub async fn screenshot_ocr(path: String) -> Result<ocr::OcrResult, String> {
-    tokio::task::spawn_blocking(move || ocr::ocr_image(&path))
-        .await
-        .map_err(|e| format!("ocr task failed: {e}"))?
+    tokio::task::spawn_blocking(move || {
+        let path = capture::ensure_artifact_path(&path).map_err(internal_error)?;
+        ocr::ocr_image(&path.to_string_lossy())
+    })
+    .await
+    .map_err(|e| format!("ocr task failed: {e}"))?
 }
 
-/// Find sensitive tokens (e-mail / phone / ID) in an image via OCR.
+/// Find sensitive tokens (e-mail / phone / ID) in an artifact via OCR.
 /// Returns bounding boxes in physical pixels relative to the image.
 #[tauri::command]
 pub async fn screenshot_auto_redact(path: String) -> Result<ocr::RedactResult, String> {
     tokio::task::spawn_blocking(move || {
-        let result = ocr::ocr_image(&path)?;
+        let path = capture::ensure_artifact_path(&path).map_err(internal_error)?;
+        let result = ocr::ocr_image(&path.to_string_lossy())?;
         let boxes = ocr::find_sensitive(&result.words);
         Ok::<_, String>(ocr::RedactResult {
             count: boxes.len(),
@@ -948,6 +723,27 @@ pub async fn screenshot_auto_redact(path: String) -> Result<ocr::RedactResult, S
 // Recording
 // ---------------------------------------------------------------------------
 
+fn recording_region(
+    x: Option<u32>,
+    y: Option<u32>,
+    width: Option<u32>,
+    height: Option<u32>,
+) -> Result<Option<(u32, u32, u32, u32)>, String> {
+    match (x, y, width, height) {
+        (None, None, None, None) => Ok(None),
+        (Some(x), Some(y), Some(w), Some(h)) if w >= 2 && h >= 2 => Ok(Some((x, y, w, h))),
+        (Some(_), Some(_), Some(_), Some(_)) => {
+            Err("recording region must be at least 2x2 pixels".into())
+        }
+        _ => Err("recording region requires x, y, width and height together".into()),
+    }
+}
+
+/// Start recording a display region (physical pixels; all of `x/y/w/h`
+/// absent = whole display). The overlay closes; the hidden app windows stay
+/// hidden until the session ends so the recorded area matches the frozen
+/// screenshot the region was chosen on.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn screenshot_start_recording(
     app: AppHandle,
@@ -959,69 +755,215 @@ pub async fn screenshot_start_recording(
     format: String,
     fps: Option<u32>,
 ) -> Result<RecordingStarted, String> {
-    // Recording owns an OS thread; also give the overlay a chance to hide by
-    // opening the tiny recorder bar window first (frontend hides the overlay
-    // before invoking this).
-    let region = match (x, y, width, height) {
-        (Some(x), Some(y), Some(w), Some(h)) => Some((x, y, w, h)),
-        _ => None,
+    let format = record::RecordFormat::parse(&format).map_err(internal_error)?;
+    let region = recording_region(x, y, width, height)?;
+    if STARTING_RECORDING.swap(true, Ordering::SeqCst) {
+        return Err("screen recording is already starting".into());
+    }
+    let _start_guard = RecordingStartGuard;
+    if tool_state().recorder_open {
+        return Err("finish the current recording session first".into());
+    }
+    let generation = SESSION_GENERATION.load(Ordering::SeqCst);
+    let had_overlay = tool_state().overlay.is_some();
+    hide_app_windows(&app);
+    if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
+        let _ = window.hide();
+    }
+    let worker = app.clone();
+    let started = blocking("start recording", move || {
+        let display = capture::resolve_display(&worker, display_id.as_deref())?;
+        std::thread::sleep(HIDE_SETTLE);
+        let id = record::start_recording(&worker, display.clone(), region, format, fps)?;
+        Ok((id, display))
+    })
+    .await;
+    let (recording_id, display) = match started {
+        Ok(started) => started,
+        Err(e) => {
+            if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+            if !had_overlay {
+                restore_app_windows(&app);
+            }
+            return Err(e);
+        }
     };
-    let recording_id = {
-        let app_clone = app.clone();
-        tokio::task::spawn_blocking(move || {
-            record::start_recording(&app_clone, display_id, region, &format, fps)
-        })
-        .await
-        .map_err(|e| format!("start recording task failed: {e}"))?
-        .map_err(internal_error)?
-    };
-    *current_recording_slot().lock().unwrap() = Some(recording_id.clone());
-
-    open_recorder_bar(&app)?;
+    if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
+        let id = recording_id.clone();
+        let _ = blocking("cancel recording", move || record::cancel_recording(&id)).await;
+        return Err("screen recording start was cancelled".into());
+    }
+    {
+        let mut state = tool_state();
+        state.recording = Some(recording_id.clone());
+        state.recorder_open = true;
+        state.overlay = None;
+    }
+    if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
+        let _ = window.close();
+    }
+    if let Err(e) = open_recorder_bar(&app, &display) {
+        let _ = record::cancel_recording(&recording_id);
+        tool_state().recording = None;
+        close_session(&app);
+        return Err(e);
+    }
     Ok(RecordingStarted { recording_id })
 }
 
 #[tauri::command]
-pub async fn screenshot_stop_recording(recording_id: String) -> Result<ScreenshotFile, String> {
-    let file = tokio::task::spawn_blocking(move || record::stop_recording(&recording_id))
-        .await
-        .map_err(|e| format!("stop recording task failed: {e}"))?
-        .map_err(internal_error)?;
-    *current_recording_slot().lock().unwrap() = None;
-    Ok(file)
+pub async fn screenshot_stop_recording(recording_id: String) -> Result<RecordingFile, String> {
+    if tool_state().recording.as_deref() != Some(&recording_id) {
+        return Err("unknown recording id".into());
+    }
+    let current_id = recording_id.clone();
+    let info = blocking("stop recording", move || {
+        record::stop_recording(&recording_id)
+    })
+    .await;
+    {
+        let mut state = tool_state();
+        if state.recording.as_deref() == Some(&current_id) {
+            state.recording = None;
+        }
+    }
+    let info = info?;
+    Ok(RecordingFile {
+        path: info.path.to_string_lossy().into_owned(),
+        width: info.width,
+        height: info.height,
+        frames: info.frames,
+        duration_ms: info.duration_ms,
+    })
 }
 
 #[tauri::command]
 pub async fn screenshot_cancel_recording(recording_id: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || record::cancel_recording(&recording_id))
-        .await
-        .map_err(|e| format!("cancel recording task failed: {e}"))?
-        .map_err(internal_error)?;
-    *current_recording_slot().lock().unwrap() = None;
-    Ok(())
+    if tool_state().recording.as_deref() != Some(&recording_id) {
+        return Err("unknown recording id".into());
+    }
+    let current_id = recording_id.clone();
+    let result = blocking("cancel recording", move || {
+        record::cancel_recording(&recording_id)
+    })
+    .await;
+    {
+        let mut state = tool_state();
+        if state.recording.as_deref() == Some(&current_id) {
+            state.recording = None;
+        }
+    }
+    result
 }
 
 /// The recorder bar window reads this to learn which recording it controls.
 #[tauri::command]
 pub async fn screenshot_current_recording() -> Result<Option<String>, String> {
-    Ok(current_recording_slot().lock().unwrap().clone())
+    Ok(tool_state().recording.clone())
 }
 
-fn open_recorder_bar(app: &AppHandle) -> Result<(), String> {
+fn open_recorder_bar(app: &AppHandle, display: &DisplayInfo) -> Result<(), String> {
     if let Some(existing) = app.get_webview_window(RECORDER_LABEL) {
         let _ = existing.close();
     }
     let url = WebviewUrl::App("index.html#screenshot-recorder".into());
-    // Position: bottom-center of the primary display area; the bar frontend
-    // recenters itself on its own display via the window API if needed.
-    WebviewWindowBuilder::new(app, RECORDER_LABEL, url)
+    // Compact while recording; the bar grows itself for the preview.
+    let (lw, lh) = (300.0, 56.0);
+    let window = WebviewWindowBuilder::new(app, RECORDER_LABEL, url)
         .title("Recording")
-        .inner_size(300.0, 72.0)
+        .inner_size(lw, lh)
+        .visible(false)
         .decorations(false)
         .resizable(false)
         .always_on_top(true)
         .skip_taskbar(true)
+        // Keep the bar out of the recording (WDA_EXCLUDEFROMCAPTURE on
+        // Windows, NSWindowSharingNone on macOS; no-op on Linux).
+        .content_protected(true)
         .build()
         .map_err(|e| format!("open recorder bar: {e}"))?;
+    watch_session_window(&window);
+    // Bottom-center of the recorded display.
+    let s = display.scale_factor.max(0.5);
+    let (pw, ph) = ((lw * s) as i32, (lh * s) as i32);
+    let x = display.x + (display.width as i32 - pw) / 2;
+    // Leave room above for the grown preview (240 logical px).
+    let y = display.y + display.height as i32 - ph - (240.0 * s) as i32;
+    let _ = window.set_position(PhysicalPosition::new(x, y));
+    window
+        .show()
+        .map_err(|e| format!("show recorder bar: {e}"))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recording_requires_a_complete_nonempty_region() {
+        assert_eq!(recording_region(None, None, None, None).unwrap(), None);
+        assert_eq!(
+            recording_region(Some(1), Some(2), Some(10), Some(20)).unwrap(),
+            Some((1, 2, 10, 20))
+        );
+        assert!(recording_region(Some(1), None, Some(10), Some(20)).is_err());
+        assert!(recording_region(Some(1), Some(2), Some(0), Some(20)).is_err());
+    }
+
+    #[test]
+    fn clipboard_decodes_the_first_gif_frame_without_png_only_image_features() {
+        let file = tempfile::Builder::new().suffix(".GIF").tempfile().unwrap();
+        {
+            let mut encoder =
+                gif::Encoder::new(std::fs::File::create(file.path()).unwrap(), 4, 2, &[]).unwrap();
+            for color in [[240, 40, 20, 255], [20, 60, 220, 255]] {
+                let mut pixels = color.repeat(8);
+                let frame = gif::Frame::from_rgba_speed(4, 2, &mut pixels, 10);
+                encoder.write_frame(&frame).unwrap();
+            }
+        }
+        let first = clipboard_image(file.path()).unwrap();
+        assert_eq!(first.dimensions(), (4, 2));
+        assert!(first.pixels().all(|p| p[0] > 200 && p[1] < 70 && p[2] < 50));
+    }
+
+    #[test]
+    fn empty_gif_clipboard_image_is_rejected() {
+        let file = tempfile::Builder::new().suffix(".gif").tempfile().unwrap();
+        {
+            let encoder = gif::Encoder::new(
+                std::fs::File::create(file.path()).unwrap(),
+                4,
+                2,
+                &[0, 0, 0],
+            )
+            .unwrap();
+            drop(encoder);
+        }
+        assert!(clipboard_image(file.path()).is_err());
+    }
+
+    #[test]
+    fn close_session_state_resets_overlay_and_recording() {
+        {
+            let mut state = tool_state();
+            state.overlay = Some(OverlayInit {
+                path: "x".into(),
+                display_id: "0,0".into(),
+                width: 1,
+                height: 1,
+                scale_factor: 1.0,
+            });
+            state.hidden = vec!["main".into()];
+        }
+        // Without an app handle we can only exercise the state transitions.
+        let hidden = std::mem::take(&mut tool_state().hidden);
+        tool_state().overlay = None;
+        assert_eq!(hidden, vec!["main".to_string()]);
+        assert!(tool_state().overlay.is_none());
+    }
 }

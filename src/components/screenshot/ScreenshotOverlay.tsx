@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invoke } from "@tauri-apps/api/core";
 import {
   ArrowUpRight,
+  Check,
   ChevronDown,
   Circle,
-  Clipboard,
+  Crop,
   Download,
+  Droplets,
   Eraser,
   Highlighter,
   LayoutGrid,
@@ -16,35 +16,39 @@ import {
   MessageCircle,
   Minus,
   Pencil,
-  Pipette,
   Pin,
-  Crop,
-  Stamp,
-  ScanText,
-  ShieldAlert,
+  Pipette,
   Redo2,
+  ScanText,
   ScrollText,
+  ShieldAlert,
   Square,
+  Stamp,
   Type,
   Undo2,
   Video,
   X,
-  Droplets,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useT } from "../../lib/i18n";
+import { formatUnknownError } from "../../lib/appDialogs";
 import {
+  autoRedact,
   captureFull,
   closeScreenshotOverlay,
   copyImageToClipboard,
   fetchOverlayInit,
+  loadScreenshotUrl,
+  normalizeRect,
+  ocrImage,
+  pinToScreen,
+  revokeScreenshotUrl,
   saveDataUrl,
   saveImageToFile,
   scrollCapture,
-  screenshotFileUrl,
   startRecording,
-  normalizeRect,
   toPhysicalRect,
+  updateOverlayImage,
   type OverlayInit,
   type RecordFormat,
 } from "../../lib/screenshot";
@@ -53,11 +57,14 @@ import {
   type AnnotationCanvasHandle,
   type AnnotationTool,
   type CssRect,
+  type Shape,
 } from "./AnnotationCanvas";
 
 type Phase = "loading" | "select" | "annotate" | "busy";
 
+/** Selections smaller than this (CSS px) are treated as a click. */
 const MIN_SEL = 6;
+const HANDLE = 8;
 
 const COLORS: { value: string; testid: string; titleKey: string }[] = [
   { value: "#ff4d4f", testid: "screenshot-color-red", titleKey: "screenshot.colorRed" },
@@ -84,6 +91,8 @@ const TOOLS: { tool: AnnotationTool; testid: string; titleKey: string; Icon: Luc
 
 const LINE_WIDTHS = [2, 4, 8];
 
+type Handle = "move" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -93,27 +102,27 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/** Load a backend artifact into an image backed by a same-origin URL. */
+async function loadArtifact(path: string): Promise<{ img: HTMLImageElement; url: string }> {
+  const url = await loadScreenshotUrl(path);
+  try {
+    return { img: await loadImage(url), url };
+  } catch (e) {
+    revokeScreenshotUrl(url);
+    throw e;
+  }
+}
+
 /** Crop a PNG data URL to a device-pixel rect. */
-function cropDataUrl(
-  dataUrl: string,
-  r: { x: number; y: number; w: number; h: number },
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => {
-      const c = document.createElement("canvas");
-      c.width = Math.max(1, Math.round(r.w));
-      c.height = Math.max(1, Math.round(r.h));
-      const ctx = c.getContext("2d");
-      if (!ctx) {
-        reject(new Error("canvas 2d context unavailable"));
-        return;
-      }
-      ctx.drawImage(image, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
-      resolve(c.toDataURL("image/png"));
-    };
-    image.onerror = () => reject(new Error("failed to crop screenshot"));
-    image.src = dataUrl;
+function cropDataUrl(dataUrl: string, r: { x: number; y: number; width: number; height: number }): Promise<string> {
+  return loadImage(dataUrl).then((image) => {
+    const c = document.createElement("canvas");
+    c.width = r.width;
+    c.height = r.height;
+    const ctx = c.getContext("2d");
+    if (!ctx) throw new Error("canvas 2d context unavailable");
+    ctx.drawImage(image, r.x, r.y, r.width, r.height, 0, 0, r.width, r.height);
+    return c.toDataURL("image/png");
   });
 }
 
@@ -125,33 +134,25 @@ export interface WatermarkSettings {
 
 /** Overlay a text watermark at the bottom-right corner. */
 function applyWatermark(dataUrl: string, wm: WatermarkSettings): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => {
-      const c = document.createElement("canvas");
-      c.width = image.naturalWidth;
-      c.height = image.naturalHeight;
-      const ctx = c.getContext("2d");
-      if (!ctx) {
-        reject(new Error("canvas 2d context unavailable"));
-        return;
-      }
-      ctx.drawImage(image, 0, 0);
-      const fontSize = Math.max(14, Math.round(c.width / 40));
-      ctx.font = `500 ${fontSize}px Inter, -apple-system, "Segoe UI", sans-serif`;
-      ctx.globalAlpha = wm.opacity;
-      ctx.fillStyle = wm.color;
-      ctx.textAlign = "right";
-      ctx.textBaseline = "bottom";
-      const pad = Math.round(fontSize * 0.8);
-      // Subtle shadow for readability on any background.
-      ctx.shadowColor = "rgba(0,0,0,0.5)";
-      ctx.shadowBlur = Math.round(fontSize / 4);
-      ctx.fillText(wm.text, c.width - pad, c.height - pad);
-      resolve(c.toDataURL("image/png"));
-    };
-    image.onerror = () => reject(new Error("failed to apply watermark"));
-    image.src = dataUrl;
+  return loadImage(dataUrl).then((image) => {
+    const c = document.createElement("canvas");
+    c.width = image.naturalWidth;
+    c.height = image.naturalHeight;
+    const ctx = c.getContext("2d");
+    if (!ctx) throw new Error("canvas 2d context unavailable");
+    ctx.drawImage(image, 0, 0);
+    const fontSize = Math.max(14, Math.round(Math.min(c.width, c.height * 2) / 30));
+    ctx.font = `600 ${fontSize}px Inter, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif`;
+    ctx.globalAlpha = wm.opacity;
+    ctx.fillStyle = wm.color;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "bottom";
+    const pad = Math.round(fontSize * 0.8);
+    // Subtle shadow for readability on any background.
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = Math.round(fontSize / 4);
+    ctx.fillText(wm.text, c.width - pad, c.height - pad);
+    return c.toDataURL("image/png");
   });
 }
 
@@ -175,18 +176,16 @@ function ToolButton({
       type="button"
       data-testid={testid}
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
+      className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40 ${
+        active ? "" : "hover:bg-[var(--taomni-hover)]"
+      }`}
       style={{
-        background: active ? "var(--taomni-accent)" : "transparent",
+        background: active ? "var(--taomni-accent)" : undefined,
         color: active ? "#ffffff" : "var(--taomni-text)",
-      }}
-      onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.background = "var(--taomni-hover)";
-      }}
-      onMouseLeave={(e) => {
-        if (!active) e.currentTarget.style.background = "transparent";
       }}
     >
       {children}
@@ -194,34 +193,44 @@ function ToolButton({
   );
 }
 
-/** Feishu-style magnifier: 120px box, 3x zoom, crosshair. */
+/** Feishu-style magnifier: 120px box, 4x zoom, crosshair, pixel color. */
 function Magnifier({
   img,
   cursor,
-  scale,
+  sx,
+  sy,
+  viewport,
 }: {
   img: HTMLImageElement;
   cursor: { x: number; y: number };
-  scale: number;
+  sx: number;
+  sy: number;
+  viewport: { w: number; h: number };
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [hex, setHex] = useState("");
+  const size = 120;
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const size = 120;
-    const zoom = 3;
+    const zoom = 4;
     canvas.width = size;
     canvas.height = size;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
-    const srcCss = size / zoom;
-    const cx = cursor.x * scale;
-    const cy = cursor.y * scale;
-    const half = (srcCss * scale) / 2;
+    const srcW = (size / zoom) * sx;
+    const srcH = (size / zoom) * sy;
     ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, size, size);
-    ctx.drawImage(img, cx - half, cy - half, half * 2, half * 2, 0, 0, size, size);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(img, cursor.x * sx - srcW / 2, cursor.y * sy - srcH / 2, srcW, srcH, 0, 0, size, size);
+    try {
+      const px = ctx.getImageData(size / 2, size / 2, 1, 1).data;
+      setHex(`#${[px[0], px[1], px[2]].map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase()}`);
+    } catch {
+      setHex("");
+    }
     ctx.strokeStyle = "rgba(22, 119, 255, 0.9)";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -230,60 +239,96 @@ function Magnifier({
     ctx.moveTo(0, size / 2 + 0.5);
     ctx.lineTo(size, size / 2 + 0.5);
     ctx.stroke();
-  }, [img, cursor, scale]);
+  }, [img, cursor, sx, sy]);
 
-  const size = 120;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
   let left = cursor.x + 18;
   let top = cursor.y + 18;
-  if (cursor.x > vw - size - 24) left = cursor.x - size - 18;
-  if (cursor.y > vh - size - 24) top = cursor.y - size - 18;
+  if (cursor.x > viewport.w - size - 24) left = cursor.x - size - 18;
+  if (cursor.y > viewport.h - size - 60) top = cursor.y - size - 54;
 
   return (
     <div
       data-testid="screenshot-magnifier"
-      style={{
-        position: "fixed",
-        zIndex: 60,
-        left,
-        top,
-        width: size,
-        height: size,
-        pointerEvents: "none",
-        borderRadius: 8,
-        overflow: "hidden",
-        border: "1px solid rgba(255, 255, 255, 0.65)",
-        boxShadow: "0 4px 18px rgba(0, 0, 0, 0.55)",
-        background: "#000",
-      }}
+      style={{ position: "fixed", zIndex: 60, left, top, width: size, pointerEvents: "none" }}
     >
-      <canvas ref={canvasRef} style={{ display: "block", width: size, height: size }} />
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 8,
+          overflow: "hidden",
+          border: "1px solid rgba(255, 255, 255, 0.65)",
+          boxShadow: "0 4px 18px rgba(0, 0, 0, 0.55)",
+        }}
+      >
+        <canvas ref={canvasRef} style={{ display: "block", width: size, height: size }} />
+      </div>
+      <div
+        className="mt-1 rounded px-1.5 py-0.5 text-center font-mono text-[11px]"
+        style={{ background: "rgba(0,0,0,0.75)", color: "#fff" }}
+      >
+        {Math.round(cursor.x * sx)}, {Math.round(cursor.y * sy)} {hex}
+      </div>
     </div>
   );
 }
+
+function clampRect(r: CssRect, vw: number, vh: number): CssRect {
+  const w = Math.min(r.w, vw);
+  const h = Math.min(r.h, vh);
+  return { x: Math.min(Math.max(0, r.x), vw - w), y: Math.min(Math.max(0, r.y), vh - h), w, h };
+}
+
+/** Apply a handle drag of (dx, dy) to the rect captured at drag start. */
+function dragRect(start: CssRect, handle: Handle, dx: number, dy: number, vw: number, vh: number): CssRect {
+  if (handle === "move") {
+    return clampRect({ ...start, x: start.x + dx, y: start.y + dy }, vw, vh);
+  }
+  let x1 = start.x;
+  let y1 = start.y;
+  let x2 = start.x + start.w;
+  let y2 = start.y + start.h;
+  if (handle.includes("w")) x1 += dx;
+  if (handle.includes("e")) x2 += dx;
+  if (handle.includes("n")) y1 += dy;
+  if (handle.includes("s")) y2 += dy;
+  const clamp = (v: number, max: number) => Math.min(Math.max(0, v), max);
+  return normalizeRect({ x: clamp(x1, vw), y: clamp(y1, vh) }, { x: clamp(x2, vw), y: clamp(y2, vh) });
+}
+
+const HANDLE_CURSORS: Record<Handle, string> = {
+  move: "move",
+  n: "ns-resize",
+  s: "ns-resize",
+  e: "ew-resize",
+  w: "ew-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  nw: "nwse-resize",
+  se: "nwse-resize",
+};
 
 export function ScreenshotOverlay() {
   const t = useT();
   const [init, setInit] = useState<OverlayInit | null>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
   const [sel, setSel] = useState<CssRect | null>(null);
   const [tool, setTool] = useState<AnnotationTool>("select");
-  const [color, setColor] = useState(COLORS[3].value);
-  const [lineWidth, setLineWidth] = useState(3);
+  const [color, setColor] = useState(COLORS[0].value);
+  const [lineWidth, setLineWidth] = useState(4);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [recordOpen, setRecordOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
   const [pickerMode, setPickerMode] = useState(false);
   const [pickerInfo, setPickerInfo] = useState<{ x: number; y: number; hex: string; rgb: string } | null>(null);
   const pickerCacheRef = useRef<ImageData | null>(null);
-  /** True when the select phase was entered via the crop button (keeps annotations). */
-  const [isRecrop, setIsRecrop] = useState(false);
   const [watermarkOpen, setWatermarkOpen] = useState(false);
   const [watermark, setWatermark] = useState<WatermarkSettings | null>(null);
   const [watermarkText, setWatermarkText] = useState("");
@@ -292,13 +337,19 @@ export function ScreenshotOverlay() {
   const [ocrOpen, setOcrOpen] = useState(false);
   const [ocrText, setOcrText] = useState("");
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(null);
   const canvasRef = useRef<AnnotationCanvasHandle | null>(null);
-  const dragRef = useRef<{ start: { x: number; y: number } } | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  /** Region-select / move / resize drag in progress. */
+  const dragRef = useRef<{ kind: "select" | Handle; origin: { x: number; y: number }; start: CssRect; current: CssRect } | null>(null);
   const toastTimer = useRef<number | null>(null);
+  const busyRef = useRef(false);
 
-  /** CSS px -> physical px (backend image is physical pixels). */
-  const scale = img ? img.naturalWidth / viewport.w : 1;
-  const bgUrl = init ? screenshotFileUrl(init.path) : "";
+  /** CSS px -> physical px, per axis (backend image is physical pixels). */
+  const sx = img ? img.naturalWidth / Math.max(1, viewport.w) : 1;
+  const sy = img ? img.naturalHeight / Math.max(1, viewport.h) : 1;
+  const bounds = img ? { width: img.naturalWidth, height: img.naturalHeight } : undefined;
+  const toPhysical = (r: CssRect) => toPhysicalRect(r, sx, sy, bounds);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -306,74 +357,17 @@ export function ScreenshotOverlay() {
     toastTimer.current = window.setTimeout(() => setToast(null), 2500);
   }, []);
 
-  /** Enter color-picker mode: cache the background pixels for fast lookup. */
-  const enterPickerMode = useCallback(() => {
-    if (!img) return;
-    try {
-      const c = document.createElement("canvas");
-      c.width = viewport.w;
-      c.height = viewport.h;
-      const ctx = c.getContext("2d", { willReadFrequently: true });
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0, viewport.w, viewport.h);
-      pickerCacheRef.current = ctx.getImageData(0, 0, viewport.w, viewport.h);
-      setPickerInfo(null);
-      setPickerMode(true);
-    } catch {
-      showToast(t("screenshot.pickerUnavailable"));
-    }
-  }, [img, viewport.w, viewport.h, showToast, t]);
-
-  const exitPickerMode = useCallback(() => {
-    setPickerMode(false);
-    setPickerInfo(null);
-    pickerCacheRef.current = null;
-  }, []);
-
-  const handlePickerMove = useCallback((e: ReactMouseEvent) => {
-    const cache = pickerCacheRef.current;
-    if (!cache) return;
-    const x = Math.max(0, Math.min(viewport.w - 1, Math.floor(e.clientX)));
-    const y = Math.max(0, Math.min(viewport.h - 1, Math.floor(e.clientY)));
-    const i = (y * viewport.w + x) * 4;
-    const r = cache.data[i];
-    const g = cache.data[i + 1];
-    const b = cache.data[i + 2];
-    const hex = `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
-    setPickerInfo({ x: e.clientX, y: e.clientY, hex, rgb: `rgb(${r}, ${g}, ${b})` });
-  }, [viewport.w, viewport.h]);
-
-  const handlePickerPick = useCallback(async () => {
-    if (!pickerInfo) return;
-    try {
-      const { writeText } = await import("../../lib/clipboard");
-      await writeText(pickerInfo.hex);
-      showToast(t("screenshot.pickerCopied", { color: pickerInfo.hex }));
-    } catch {
-      showToast(t("screenshot.pickerCopyFailed"));
-    }
-    exitPickerMode();
-  }, [pickerInfo, showToast, t, exitPickerMode]);
-
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    };
-  }, []);
+    },
+    [],
+  );
+  useEffect(() => () => revokeScreenshotUrl(imgUrl), [imgUrl]);
 
-  // Escape closes the record dropdown when open (stopImmediatePropagation so
-  // the overlay's own Escape-to-close does not fire).
-  useEffect(() => {
-    if (!recordOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopImmediatePropagation();
-        setRecordOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [recordOpen]);
+  const close = useCallback(() => {
+    void closeScreenshotOverlay().catch(() => undefined);
+  }, []);
 
   // Init: prefer the pending overlay payload; fall back to a live fullscreen
   // capture so the overlay never renders blank (dev/QA direct open).
@@ -385,16 +379,20 @@ export function ScreenshotOverlay() {
         data = await fetchOverlayInit();
       } catch {
         const file = await captureFull();
-        data = { path: file.path, displayId: null, width: file.width, height: file.height };
+        data = { path: file.path, displayId: "", width: file.width, height: file.height, scaleFactor: 1 };
       }
       if (cancelled) return;
+      const loaded = await loadArtifact(data.path);
+      if (cancelled) {
+        revokeScreenshotUrl(loaded.url);
+        return;
+      }
       setInit(data);
-      const image = await loadImage(screenshotFileUrl(data.path));
-      if (cancelled) return;
-      setImg(image);
+      setImg(loaded.img);
+      setImgUrl(loaded.url);
       setPhase("select");
     })().catch((e: unknown) => {
-      if (!cancelled) setLoadError(e instanceof Error ? e.message : String(e));
+      if (!cancelled) setLoadError(formatUnknownError(e));
     });
     return () => {
       cancelled = true;
@@ -407,270 +405,367 @@ export function ScreenshotOverlay() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  /** Re-crop after capture: back to select phase, keep annotations. */
-  const startRecrop = useCallback(() => {
-    exitPickerMode();
-    setIsRecrop(true);
-    setPhase("select");
-  }, [exitPickerMode]);
+  // ---------------------------------------------------------------------
+  // Color picker
+  // ---------------------------------------------------------------------
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (pickerMode) {
-          e.stopImmediatePropagation();
-          exitPickerMode();
-          return;
-        }
-        if (isRecrop) {
-          e.stopImmediatePropagation();
-          setIsRecrop(false);
-          setPhase("annotate");
-          return;
-        }
-        void closeScreenshotOverlay().catch(() => undefined);
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [pickerMode, isRecrop, exitPickerMode]);
+  const enterPickerMode = useCallback(() => {
+    if (!img) return;
+    try {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      pickerCacheRef.current = ctx.getImageData(0, 0, c.width, c.height);
+      setPickerInfo(null);
+      setPickerMode(true);
+    } catch {
+      showToast(t("screenshot.pickerUnavailable"));
+    }
+  }, [img, showToast, t]);
+
+  const exitPickerMode = useCallback(() => {
+    setPickerMode(false);
+    setPickerInfo(null);
+    pickerCacheRef.current = null;
+  }, []);
+
+  const handlePickerMove = (e: ReactMouseEvent) => {
+    const cache = pickerCacheRef.current;
+    if (!cache) return;
+    const x = Math.max(0, Math.min(cache.width - 1, Math.floor(e.clientX * sx)));
+    const y = Math.max(0, Math.min(cache.height - 1, Math.floor(e.clientY * sy)));
+    const i = (y * cache.width + x) * 4;
+    const [r, g, b] = [cache.data[i], cache.data[i + 1], cache.data[i + 2]];
+    const hex = `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+    setPickerInfo({ x: e.clientX, y: e.clientY, hex, rgb: `rgb(${r}, ${g}, ${b})` });
+  };
+
+  const handlePickerPick = async () => {
+    if (!pickerInfo) return;
+    try {
+      const { writeText } = await import("../../lib/clipboard");
+      await writeText(pickerInfo.hex);
+      showToast(t("screenshot.pickerCopied", { color: pickerInfo.hex }));
+    } catch {
+      showToast(t("screenshot.pickerCopyFailed"));
+    }
+    exitPickerMode();
+  };
+
+  // ---------------------------------------------------------------------
+  // Selection
+  // ---------------------------------------------------------------------
+
+  const fullscreenSelect = useCallback(() => {
+    setSel({ x: 0, y: 0, w: viewport.w, h: viewport.h });
+    setTool("select");
+    setPhase("annotate");
+  }, [viewport.w, viewport.h]);
+
+  /** Drop the selection and annotations; back to region selection. */
+  const resetSelection = useCallback(() => {
+    canvasRef.current?.clear();
+    setSel(null);
+    setTool("select");
+    setRecordOpen(false);
+    setWatermarkOpen(false);
+    setPhase("select");
+  }, []);
 
   const pointInSel = (x: number, y: number): boolean =>
     sel !== null && x >= sel.x && x <= sel.x + sel.w && y >= sel.y && y <= sel.y + sel.h;
 
-  const fullscreenSelect = useCallback(() => {
-    setSel({ x: 0, y: 0, w: viewport.w, h: viewport.h });
-    setTool("rect");
-    setPhase("annotate");
-  }, [viewport.w, viewport.h]);
+  const startRegionDrag = (x: number, y: number) => {
+    const start = { x, y, w: 0, h: 0 };
+    dragRef.current = { kind: "select", origin: { x, y }, start, current: start };
+    setDragging(true);
+    setSel({ x, y, w: 0, h: 0 });
+  };
 
-  const handleRequestReselect = useCallback(() => {
-    canvasRef.current?.clear();
-    setSel(null);
-    setTool("select");
-    setPhase("select");
-  }, []);
-
-  const handleMouseDown = (e: ReactMouseEvent) => {
+  /** Mousedown on the base layer (outside any shape tool). */
+  const handleSelectMouseDown = (e: ReactMouseEvent) => {
     if (e.button !== 0 || phase === "busy" || phase === "loading") return;
-    const x = e.clientX;
-    const y = e.clientY;
     if (phase === "select") {
-      dragRef.current = { start: { x, y } };
-      setSel({ x, y, w: 0, h: 0 });
-    } else if (phase === "annotate" && !pointInSel(x, y)) {
-      handleRequestReselect();
-      dragRef.current = { start: { x, y } };
-      setSel({ x, y, w: 0, h: 0 });
-      setPhase("select");
+      startRegionDrag(e.clientX, e.clientY);
+    } else if (phase === "annotate" && !pointInSel(e.clientX, e.clientY)) {
+      // Feishu: pressing outside the selection starts a new one.
+      resetSelection();
+      startRegionDrag(e.clientX, e.clientY);
     }
   };
 
-  const handleMouseMove = (e: ReactMouseEvent) => {
-    if (phase === "select") {
+  const startHandleDrag = (e: ReactMouseEvent, handle: Handle) => {
+    if (e.button !== 0 || !sel) return;
+    e.stopPropagation();
+    e.preventDefault();
+    dragRef.current = { kind: handle, origin: { x: e.clientX, y: e.clientY }, start: sel, current: sel };
+    setDragging(true);
+  };
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
       setCursor({ x: e.clientX, y: e.clientY });
       const d = dragRef.current;
-      if (d) setSel(normalizeRect(d.start, { x: e.clientX, y: e.clientY }));
-    }
-  };
-
-  const handleMouseUp = () => {
-    if (!dragRef.current || phase !== "select") return;
-    dragRef.current = null;
-    if (sel && sel.w >= MIN_SEL && sel.h >= MIN_SEL) {
-      if (isRecrop) {
-        setIsRecrop(false);
-        setPhase("annotate");
-      } else {
-        setTool("rect");
+      if (!d) return;
+      const point = {
+        x: Math.min(Math.max(0, e.clientX), viewport.w),
+        y: Math.min(Math.max(0, e.clientY), viewport.h),
+      };
+      d.current = d.kind === "select"
+        ? normalizeRect(d.origin, point)
+        : dragRect(d.start, d.kind, point.x - d.origin.x, point.y - d.origin.y, viewport.w, viewport.h);
+      setSel(d.current);
+    };
+    const onUp = (e: MouseEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      onMove(e);
+      dragRef.current = null;
+      setDragging(false);
+      if (d.current.w < MIN_SEL || d.current.h < MIN_SEL) {
+        setSel(d.kind === "select" ? null : d.start);
+        if (d.kind === "select") setPhase("select");
+      } else if (d.kind === "select") {
+        setTool("select");
         setPhase("annotate");
       }
-    } else if (isRecrop) {
-      // Too small: cancel re-crop, keep previous selection and annotations.
-      setIsRecrop(false);
-      setPhase("annotate");
-    } else {
-      setSel(null);
-    }
-  };
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [viewport.w, viewport.h]);
 
   const handleDoubleClick = (e: ReactMouseEvent) => {
     if (phase === "busy" || phase === "loading" || !img) return;
     if (phase === "select") {
       fullscreenSelect();
-    } else if (phase === "annotate" && !pointInSel(e.clientX, e.clientY)) {
-      handleRequestReselect();
+    } else if (phase === "annotate" && pointInSel(e.clientX, e.clientY) && tool === "select") {
+      void handleCopy();
     }
   };
 
-  const toPhysical = (r: CssRect) => toPhysicalRect(r, scale);
+  // ---------------------------------------------------------------------
+  // Output
+  // ---------------------------------------------------------------------
 
-  /** Composite base + annotations at natural size, then crop to selection. */
+  /** Composite base + annotations at natural size, cropped to the selection. */
   const exportCropped = async (): Promise<string> => {
     const canvas = canvasRef.current;
     if (!canvas || !img) throw new Error("screenshot not ready");
-    const full = canvas.exportDataUrl(img, scale);
-    let out: string;
-    if (!sel) {
-      out = full;
-    } else {
-      out = await cropDataUrl(full, {
-        x: sel.x * scale,
-        y: sel.y * scale,
-        w: sel.w * scale,
-        h: sel.h * scale,
-      });
-    }
-    if (watermark && watermark.text.trim()) {
-      out = await applyWatermark(out, watermark);
-    }
+    const full = canvas.exportDataUrl(img, sx, sy);
+    let out = sel ? await cropDataUrl(full, toPhysical(sel)) : full;
+    if (watermark && watermark.text.trim()) out = await applyWatermark(out, watermark);
     return out;
   };
 
-  const handleCopy = async () => {
+  /** Run an output action once (buttons + shortcuts can race). */
+  const runBusy = async (action: () => Promise<void>) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
-      const dataUrl = await exportCropped();
-      const file = await saveDataUrl(dataUrl);
-      await copyImageToClipboard(file.path);
-      showToast(t("screenshot.copied"));
-      await closeScreenshotOverlay();
-    } catch {
-      showToast(t("screenshot.copyFailed"));
-    }
-  };
-
-  /** Pin the current screenshot (with annotations) to the screen. */
-  const handlePin = async () => {
-    try {
-      const dataUrl = await exportCropped();
-      const file = await saveDataUrl(dataUrl);
-      await invoke("screenshot_pin_to_screen", { path: file.path });
-      showToast(t("screenshot.pinned"));
-    } catch {
-      showToast(t("screenshot.pinFailed"));
-    }
-  };
-
-  interface OcrResponse {
-    text: string;
-    words: unknown[];
-    langs: string;
-  }
-
-  /** Extract text from the current screenshot via OCR. */
-  const handleOcr = async () => {
-    setOcrLoading(true);
-    setOcrOpen(true);
-    setOcrText("");
-    try {
-      const dataUrl = await exportCropped();
-      const file = await saveDataUrl(dataUrl);
-      const res = await invoke<OcrResponse>("screenshot_ocr", { path: file.path });
-      setOcrText(res.text || t("screenshot.ocrEmpty"));
-    } catch (e) {
-      setOcrText(t("screenshot.ocrFailed", { error: String(e) }));
+      await action();
     } finally {
-      setOcrLoading(false);
+      busyRef.current = false;
     }
   };
 
-  interface RedactResponse {
-    boxes: { x: number; y: number; w: number; h: number; kind: string }[];
-    count: number;
-  }
+  const handleCopy = () =>
+    runBusy(async () => {
+      try {
+        const file = await saveDataUrl(await exportCropped());
+        await copyImageToClipboard(file.path);
+        showToast(t("screenshot.copied"));
+        await closeScreenshotOverlay();
+      } catch (e) {
+        showToast(t("screenshot.copyFailed", { error: formatUnknownError(e) }));
+      }
+    });
+
+  const handleSave = () =>
+    runBusy(async () => {
+      try {
+        const file = await saveDataUrl(await exportCropped());
+        const { save } = await import("@tauri-apps/plugin-dialog");
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        const dest = await save({
+          title: t("screenshot.save"),
+          defaultPath: `Taomni-${stamp}.png`,
+          filters: [{ name: "PNG", extensions: ["png"] }],
+        });
+        if (typeof dest !== "string" || !dest.trim()) return;
+        await saveImageToFile(file.path, dest);
+        showToast(t("screenshot.saved"));
+        await closeScreenshotOverlay();
+      } catch (e) {
+        showToast(t("screenshot.saveFailed", { error: formatUnknownError(e) }));
+      }
+    });
+
+  const handlePin = () =>
+    runBusy(async () => {
+      try {
+        const file = await saveDataUrl(await exportCropped());
+        await pinToScreen(file.path);
+        await closeScreenshotOverlay();
+      } catch (e) {
+        showToast(t("screenshot.pinFailed", { error: formatUnknownError(e) }));
+      }
+    });
+
+  const handleOcr = () =>
+    runBusy(async () => {
+      setOcrLoading(true);
+      setOcrOpen(true);
+      setOcrText("");
+      try {
+        const file = await saveDataUrl(await exportCropped());
+        const res = await ocrImage(file.path);
+        setOcrText(res.text || t("screenshot.ocrEmpty"));
+      } catch (e) {
+        setOcrText(t("screenshot.ocrFailed", { error: formatUnknownError(e) }));
+      } finally {
+        setOcrLoading(false);
+      }
+    });
 
   /** Auto-redact e-mail / phone / ID tokens found by OCR. */
-  const handleAutoRedact = async () => {
-    try {
-      const dataUrl = await exportCropped();
-      const file = await saveDataUrl(dataUrl);
-      const res = await invoke<RedactResponse>("screenshot_auto_redact", { path: file.path });
-      if (res.count === 0) {
-        showToast(t("screenshot.redactNone"));
+  const handleAutoRedact = () =>
+    runBusy(async () => {
+      try {
+        const file = await saveDataUrl(await exportCropped());
+        const res = await autoRedact(file.path);
+        if (res.count === 0) {
+          showToast(t("screenshot.redactNone"));
+          return;
+        }
+        // Boxes are physical pixels of the exported (cropped) image.
+        const ox = sel ? sel.x : 0;
+        const oy = sel ? sel.y : 0;
+        const shapes: Shape[] = res.boxes.map((b) => ({
+          id: -1,
+          kind: "mosaic" as const,
+          color: "#000000",
+          lineWidth: 2,
+          x: ox + b.x / sx,
+          y: oy + b.y / sy,
+          w: b.w / sx,
+          h: b.h / sy,
+        }));
+        canvasRef.current?.addShapes(shapes);
+        showToast(t("screenshot.redacted", { count: res.count }));
+      } catch (e) {
+        showToast(t("screenshot.redactFailed", { error: formatUnknownError(e) }));
+      }
+    });
+
+  const handleScrollCapture = () =>
+    runBusy(async () => {
+      if (!init || !img || !sel) return;
+      setPhase("busy");
+      setRecordOpen(false);
+      try {
+        // The backend hides this window while it scrolls, then shows it.
+        const res = await scrollCapture(init.displayId || undefined, toPhysical(sel));
+        const loaded = await loadArtifact(res.path);
+        await updateOverlayImage(res).catch(() => undefined);
+        canvasRef.current?.clear();
+        setInit({ ...init, path: res.path, width: res.width, height: res.height });
+        setImg(loaded.img);
+        setImgUrl(loaded.url);
+        setSel(null);
+        setTool("select");
+        setPhase("select");
+        showToast(t("screenshot.scrollDone", { count: res.frames }));
+      } catch (e) {
+        showToast(t("screenshot.scrollFailed", { error: formatUnknownError(e) }));
+        setPhase("annotate");
+      }
+    });
+
+  const handleRecord = (format: RecordFormat) =>
+    runBusy(async () => {
+      if (!init || !sel) return;
+      setRecordOpen(false);
+      setPhase("busy");
+      try {
+        // The backend closes this overlay and opens the recorder bar.
+        await startRecording(init.displayId || undefined, toPhysical(sel), format);
+      } catch (e) {
+        showToast(t("screenshot.recordFailed", { error: formatUnknownError(e) }));
+        setPhase("annotate");
+      }
+    });
+
+  // ---------------------------------------------------------------------
+  // Keyboard
+  // ---------------------------------------------------------------------
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = !!target?.closest("input, textarea, select, [contenteditable='true']");
+      const mod = e.ctrlKey || e.metaKey;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (recordOpen) setRecordOpen(false);
+        else if (watermarkOpen) setWatermarkOpen(false);
+        else if (ocrOpen) setOcrOpen(false);
+        else if (pickerMode) exitPickerMode();
+        else if (phase === "annotate" && tool !== "select" && canvasRef.current?.shapeCount() === 0) setTool("select");
+        else if (phase === "annotate") resetSelection();
+        else close();
         return;
       }
-      // Backend boxes are physical pixels relative to the exported (cropped)
-      // image. Convert to CSS pixels relative to the overlay viewport.
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const shapes = res.boxes.map((b) => ({
-        id: -1,
-        kind: "mosaic" as const,
-        color: "#000000",
-        lineWidth: 2,
-        x: (sel ? sel.x : 0) + b.x / scale,
-        y: (sel ? sel.y : 0) + b.y / scale,
-        w: b.w / scale,
-        h: b.h / scale,
-      }));
-      canvas.addShapes(shapes);
-      showToast(t("screenshot.redacted", { count: res.count }));
-    } catch (e) {
-      showToast(t("screenshot.redactFailed", { error: String(e) }));
-    }
-  };
+      if (typing || phase !== "annotate") return;
+      if (mod && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) canvasRef.current?.redo();
+        else canvasRef.current?.undo();
+      } else if (mod && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        canvasRef.current?.redo();
+      } else if (mod && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        void handleCopy();
+      } else if (mod && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void handleSave();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        void handleCopy();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
-  const handleSave = async () => {
-    try {
-      const dataUrl = await exportCropped();
-      const file = await saveDataUrl(dataUrl);
-      const { save } = await import("@tauri-apps/plugin-dialog");
-      const dest = await save({
-        title: t("screenshot.save"),
-        defaultPath: "screenshot.png",
-        filters: [{ name: "PNG", extensions: ["png"] }],
-      });
-      if (typeof dest !== "string" || !dest.trim()) return;
-      await saveImageToFile(file.path, dest);
-      showToast(t("screenshot.saved"));
-      await closeScreenshotOverlay();
-    } catch {
-      showToast(t("screenshot.saveFailed"));
-    }
-  };
+  // ---------------------------------------------------------------------
+  // Toolbar placement: below the selection, else above, else inside;
+  // horizontally clamped to the viewport using its measured width.
+  // ---------------------------------------------------------------------
 
-  const handleScrollCapture = async () => {
-    if (!init || !img || phase === "busy") return;
-    setPhase("busy");
-    setRecordOpen(false);
-    const win = getCurrentWindow();
-    await win.hide().catch(() => undefined);
-    try {
-      const phys = sel
-        ? toPhysical(sel)
-        : { x: 0, y: 0, width: init.width, height: init.height };
-      const res = await scrollCapture(init.displayId ?? undefined, phys.x, phys.y, phys.width, phys.height);
-      const image = await loadImage(screenshotFileUrl(res.path));
-      canvasRef.current?.clear();
-      setInit({ path: res.path, displayId: init.displayId, width: res.width, height: res.height });
-      setImg(image);
-      setSel(null);
-      setTool("select");
-      setPhase("select");
-    } catch {
-      showToast(t("screenshot.scrollFailed"));
-      setPhase(sel ? "annotate" : "select");
-    } finally {
-      await win.show().catch(() => undefined);
-      await win.setFocus().catch(() => undefined);
+  useLayoutEffect(() => {
+    if (!sel || phase !== "annotate" || dragging) {
+      setToolbarPos(null);
+      return;
     }
-  };
-
-  const handleRecord = async (format: RecordFormat) => {
-    if (!init || phase === "busy") return;
-    setRecordOpen(false);
-    const win = getCurrentWindow();
-    await win.hide().catch(() => undefined);
-    try {
-      const region = sel ? toPhysical(sel) : null;
-      await startRecording(init.displayId ?? undefined, region, format);
-      // Backend opens the recorder-bar window; this overlay stays hidden.
-    } catch {
-      showToast(t("screenshot.recordFailed"));
-      await win.show().catch(() => undefined);
-      await win.setFocus().catch(() => undefined);
-    }
-  };
+    const el = toolbarRef.current;
+    const w = el?.offsetWidth ?? 600;
+    const h = el?.offsetHeight ?? 44;
+    const gap = 8;
+    let top: number;
+    if (sel.y + sel.h + gap + h <= viewport.h - 4) top = sel.y + sel.h + gap;
+    else if (sel.y - gap - h >= 4) top = sel.y - gap - h;
+    else top = Math.max(4, sel.y + sel.h - h - gap);
+    const left = Math.min(Math.max(4, sel.x + sel.w - w), Math.max(4, viewport.w - w - 4));
+    setToolbarPos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }));
+  }, [sel, phase, dragging, viewport.w, viewport.h, ocrOpen]);
 
   if (loadError) {
     return (
@@ -679,14 +774,14 @@ export function ScreenshotOverlay() {
         className="fixed inset-0 flex items-center justify-center"
         style={{ background: "#141414", color: "#ffffff" }}
       >
-        <div className="text-center px-6">
-          <p data-testid="screenshot-overlay-error" className="mb-4 text-[14px]">
-            {loadError}
+        <div className="text-center px-6 max-w-xl">
+          <p data-testid="screenshot-overlay-error" className="mb-4 text-[14px] break-words">
+            {t("screenshot.openFailed", { error: loadError })}
           </p>
           <button
             type="button"
             data-testid="screenshot-cancel"
-            onClick={() => void closeScreenshotOverlay().catch(() => undefined)}
+            onClick={close}
             className="rounded-lg px-4 py-1.5 text-[13px]"
             style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
           >
@@ -697,32 +792,37 @@ export function ScreenshotOverlay() {
     );
   }
 
-  const toolbarStyle: CSSProperties = (() => {
-    if (!sel) return { display: "none" };
-    const h = 48;
-    let top: number | undefined;
-    let bottom: number | undefined;
-    if (sel.y - h - 12 >= 8) {
-      top = sel.y - h - 12;
-    } else if (sel.y + sel.h + h + 12 <= viewport.h - 8) {
-      top = sel.y + sel.h + 12;
-    } else {
-      bottom = 16;
-    }
-    const left = Math.min(Math.max(sel.x + sel.w / 2, 330), viewport.w - 330);
-    return { position: "fixed", zIndex: 50, left, top, bottom, transform: "translateX(-50%)" };
-  })();
+  const showHandles = phase === "annotate" && sel && tool === "select" && !pickerMode;
+  const handles: { h: Handle; x: number; y: number }[] = sel
+    ? [
+        { h: "nw", x: sel.x, y: sel.y },
+        { h: "n", x: sel.x + sel.w / 2, y: sel.y },
+        { h: "ne", x: sel.x + sel.w, y: sel.y },
+        { h: "e", x: sel.x + sel.w, y: sel.y + sel.h / 2 },
+        { h: "se", x: sel.x + sel.w, y: sel.y + sel.h },
+        { h: "s", x: sel.x + sel.w / 2, y: sel.y + sel.h },
+        { h: "sw", x: sel.x, y: sel.y + sel.h },
+        { h: "w", x: sel.x, y: sel.y + sel.h / 2 },
+      ]
+    : [];
+  const physSel = sel ? toPhysical(sel) : null;
+  const panelStyle: CSSProperties = {
+    background: "var(--taomni-panel-bg)",
+    border: "1px solid var(--taomni-divider)",
+    color: "var(--taomni-text)",
+  };
 
   return (
     <div
       data-testid="screenshot-overlay"
+      data-phase={phase}
       className="fixed inset-0 overflow-hidden select-none"
       style={{ background: "#000000" }}
     >
-      {img && (
+      {img && imgUrl && (
         <img
           data-testid="screenshot-base-image"
-          src={bgUrl}
+          src={imgUrl}
           alt=""
           draggable={false}
           className="fixed inset-0 z-0"
@@ -731,98 +831,136 @@ export function ScreenshotOverlay() {
       )}
 
       {/* Dim layer: full dim while selecting, selection-hole dim once selected. */}
-      {phase === "select" && !sel && (
-        <div
-          className="fixed inset-0 z-10 pointer-events-none"
-          style={{ background: "rgba(0, 0, 0, 0.35)" }}
-        />
+      {!sel && (
+        <div className="fixed inset-0 z-10 pointer-events-none" style={{ background: "rgba(0, 0, 0, 0.4)" }} />
       )}
-      {sel && (phase === "select" || phase === "annotate") && (
+      {sel && (
         <div
           data-testid="screenshot-selection"
-          className="fixed z-30 pointer-events-none"
+          className="fixed z-[35] pointer-events-none"
           style={{
             left: sel.x,
             top: sel.y,
             width: Math.max(0, sel.w),
             height: Math.max(0, sel.h),
-            border: "2px solid #1677ff",
-            boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.5)",
+            outline: "1px solid #1677ff",
+            boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.45)",
           }}
         />
       )}
 
-      {/* Interaction layer: region drag-select. */}
+      {/* Region selection / outside-press layer. */}
       <div
+        data-testid="screenshot-select-layer"
         className="fixed inset-0 z-20"
         style={{ cursor: phase === "select" ? "crosshair" : "default" }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
+        onMouseDown={handleSelectMouseDown}
         onDoubleClick={handleDoubleClick}
       />
 
-      {/* Annotation layer (above the interaction layer). */}
+      {/* Move area + resize handles (no draw tool active). */}
+      {showHandles && sel && (
+        <>
+          <div
+            data-testid="screenshot-selection-move"
+            className="fixed z-[36]"
+            style={{ left: sel.x, top: sel.y, width: sel.w, height: sel.h, cursor: "move" }}
+            onMouseDown={(e) => startHandleDrag(e, "move")}
+            onDoubleClick={handleDoubleClick}
+          />
+          {handles.map(({ h, x, y }) => (
+            <div
+              key={h}
+              data-testid={`screenshot-handle-${h}`}
+              className="fixed z-[37] rounded-sm"
+              style={{
+                left: x - HANDLE / 2,
+                top: y - HANDLE / 2,
+                width: HANDLE,
+                height: HANDLE,
+                background: "#1677ff",
+                border: "1px solid #fff",
+                cursor: HANDLE_CURSORS[h],
+              }}
+              onMouseDown={(e) => startHandleDrag(e, h)}
+            />
+          ))}
+        </>
+      )}
+
+      {/* Annotation layer (above the select layer while a tool is active). */}
       {img && (
         <AnnotationCanvas
           ref={canvasRef}
           imageWidth={viewport.w}
           imageHeight={viewport.h}
-          tool={phase === "annotate" ? tool : "select"}
+          tool={phase === "annotate" && !pickerMode ? tool : "select"}
           color={color}
           lineWidth={lineWidth}
           baseImage={img}
-          selection={phase === "annotate" ? sel : null}
+          selection={sel}
           onHistoryChange={(u, r) => {
             setCanUndo(u);
             setCanRedo(r);
           }}
-          onRequestReselect={handleRequestReselect}
+          onRequestReselect={(p) => {
+            resetSelection();
+            startRegionDrag(p.x, p.y);
+          }}
         />
       )}
 
-      {/* Magnifier + size hint while selecting. */}
-      {phase === "select" && img && cursor && !dragRef.current && (
-        <Magnifier img={img} cursor={cursor} scale={scale} />
+      {/* Magnifier while choosing a region. */}
+      {phase === "select" && img && cursor && (
+        <Magnifier img={img} cursor={cursor} sx={sx} sy={sy} viewport={viewport} />
       )}
-      {(phase === "select" || phase === "annotate") && sel && (sel.w > 0 || sel.h > 0) && (cursor || phase === "annotate") && (
+
+      {/* Size label at the selection's top-left. */}
+      {sel && physSel && sel.w > 0 && sel.h > 0 && (phase === "select" || phase === "annotate") && (
         <div
           data-testid="screenshot-size-hint"
           style={{
             position: "fixed",
             zIndex: 60,
-            left: Math.min((cursor ? cursor.x : sel.x + sel.w) + 16, viewport.w - 110),
-            top: Math.min((cursor ? cursor.y : sel.y + sel.h) + 16, viewport.h - 40),
+            left: sel.x,
+            top: sel.y >= 26 ? sel.y - 24 : sel.y + 4,
             pointerEvents: "none",
             background: "rgba(0, 0, 0, 0.75)",
             color: "#ffffff",
             fontSize: 12,
-            padding: "3px 8px",
-            borderRadius: 6,
+            padding: "2px 6px",
+            borderRadius: 4,
             whiteSpace: "nowrap",
           }}
         >
-          {`${Math.round(sel.w * scale)} × ${Math.round(sel.h * scale)}`}
+          {`${physSel.width} × ${physSel.height}`}
         </div>
       )}
 
       {/* Toolbar after a region is selected. */}
-      {phase === "annotate" && sel && (
-        <div data-testid="screenshot-toolbar" style={toolbarStyle}>
-          <div
-            className="flex items-center gap-1 rounded-xl px-2 py-1.5 shadow-2xl"
-            style={{
-              background: "var(--taomni-panel-bg)",
-              border: "1px solid var(--taomni-divider)",
-            }}
-          >
+      {phase === "annotate" && sel && !dragging && (
+        <div
+          ref={toolbarRef}
+          data-testid="screenshot-toolbar"
+          className="fixed z-50"
+          style={{
+            left: toolbarPos?.left ?? -9999,
+            top: toolbarPos?.top ?? -9999,
+            maxWidth: viewport.w - 8,
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="flex flex-wrap items-center gap-0.5 rounded-xl px-1.5 py-1 shadow-2xl" style={panelStyle}>
             {TOOLS.map(({ tool: name, testid, titleKey, Icon }) => (
               <ToolButton
                 key={name}
                 testid={testid}
                 title={t(titleKey)}
                 active={tool === name}
-                onClick={() => setTool(name)}
+                onClick={() => {
+                  exitPickerMode();
+                  setTool((cur) => (cur === name ? "select" : name));
+                }}
               >
                 <Icon size={16} />
               </ToolButton>
@@ -834,14 +972,13 @@ export function ScreenshotOverlay() {
                 type="button"
                 data-testid={c.testid}
                 title={t(c.titleKey)}
+                aria-label={t(c.titleKey)}
+                aria-pressed={color === c.value}
                 onClick={() => setColor(c.value)}
-                className="w-5 h-5 rounded-full shrink-0"
+                className="w-5 h-5 mx-0.5 rounded-full shrink-0"
                 style={{
                   background: c.value,
-                  outline:
-                    color === c.value
-                      ? "2px solid var(--taomni-accent)"
-                      : "1px solid rgba(128, 128, 128, 0.45)",
+                  outline: color === c.value ? "2px solid var(--taomni-accent)" : "1px solid rgba(128, 128, 128, 0.45)",
                   outlineOffset: 1,
                 }}
               />
@@ -852,42 +989,24 @@ export function ScreenshotOverlay() {
                 type="button"
                 data-testid={`screenshot-line-width-${w}`}
                 title={`${w}px`}
+                aria-label={`${w}px`}
+                aria-pressed={lineWidth === w}
                 onClick={() => setLineWidth(w)}
                 className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                style={{
-                  background: lineWidth === w ? "var(--taomni-hover)" : "transparent",
-                  color: "var(--taomni-text)",
-                }}
+                style={{ background: lineWidth === w ? "var(--taomni-hover)" : "transparent", color: "var(--taomni-text)" }}
               >
-                <span
-                  className="rounded-full"
-                  style={{ width: w + 4, height: w + 4, background: "currentColor" }}
-                />
+                <span className="rounded-full" style={{ width: w + 3, height: w + 3, background: "currentColor" }} />
               </button>
             ))}
             <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-            <ToolButton
-              testid="screenshot-undo"
-              title={t("screenshot.undo")}
-              disabled={!canUndo}
-              onClick={() => canvasRef.current?.undo()}
-            >
+            <ToolButton testid="screenshot-undo" title={t("screenshot.undo")} disabled={!canUndo} onClick={() => canvasRef.current?.undo()}>
               <Undo2 size={16} />
             </ToolButton>
-            <ToolButton
-              testid="screenshot-redo"
-              title={t("screenshot.redo")}
-              disabled={!canRedo}
-              onClick={() => canvasRef.current?.redo()}
-            >
+            <ToolButton testid="screenshot-redo" title={t("screenshot.redo")} disabled={!canRedo} onClick={() => canvasRef.current?.redo()}>
               <Redo2 size={16} />
             </ToolButton>
             <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-            <ToolButton
-              testid="screenshot-scroll-capture"
-              title={t("screenshot.scrollCapture")}
-              onClick={() => void handleScrollCapture()}
-            >
+            <ToolButton testid="screenshot-scroll-capture" title={t("screenshot.scrollCapture")} onClick={() => void handleScrollCapture()}>
               <ScrollText size={16} />
             </ToolButton>
             <ToolButton
@@ -898,32 +1017,16 @@ export function ScreenshotOverlay() {
             >
               <Pipette size={16} />
             </ToolButton>
-            <ToolButton
-              testid="screenshot-recrop"
-              title={t("screenshot.recrop")}
-              onClick={startRecrop}
-            >
+            <ToolButton testid="screenshot-recrop" title={t("screenshot.recrop")} active={tool === "select"} onClick={() => setTool("select")}>
               <Crop size={16} />
             </ToolButton>
-            <ToolButton
-              testid="screenshot-pin"
-              title={t("screenshot.pin")}
-              onClick={() => void handlePin()}
-            >
+            <ToolButton testid="screenshot-pin" title={t("screenshot.pin")} onClick={() => void handlePin()}>
               <Pin size={16} />
             </ToolButton>
-            <ToolButton
-              testid="screenshot-ocr"
-              title={t("screenshot.ocr")}
-              onClick={() => void handleOcr()}
-            >
+            <ToolButton testid="screenshot-ocr" title={t("screenshot.ocr")} onClick={() => void handleOcr()}>
               <ScanText size={16} />
             </ToolButton>
-            <ToolButton
-              testid="screenshot-auto-redact"
-              title={t("screenshot.autoRedact")}
-              onClick={() => void handleAutoRedact()}
-            >
+            <ToolButton testid="screenshot-auto-redact" title={t("screenshot.autoRedact")} onClick={() => void handleAutoRedact()}>
               <ShieldAlert size={16} />
             </ToolButton>
             <div className="relative">
@@ -931,20 +1034,18 @@ export function ScreenshotOverlay() {
                 testid="screenshot-watermark"
                 title={t("screenshot.watermark")}
                 active={watermarkOpen || watermark !== null}
-                onClick={() => setWatermarkOpen((v) => !v)}
+                onClick={() => {
+                  setRecordOpen(false);
+                  setWatermarkOpen((v) => !v);
+                }}
               >
                 <Stamp size={16} />
               </ToolButton>
               {watermarkOpen && (
                 <div
                   data-testid="screenshot-watermark-panel"
-                  className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 rounded-lg shadow-2xl p-3 w-56"
-                  style={{
-                    zIndex: 10,
-                    background: "var(--taomni-panel-bg)",
-                    border: "1px solid var(--taomni-divider)",
-                    color: "var(--taomni-text)",
-                  }}
+                  className="absolute bottom-full mb-2 right-0 rounded-lg shadow-2xl p-3 w-56"
+                  style={{ zIndex: 10, ...panelStyle }}
                 >
                   <input
                     type="text"
@@ -952,12 +1053,8 @@ export function ScreenshotOverlay() {
                     value={watermarkText}
                     onChange={(e) => setWatermarkText(e.target.value)}
                     placeholder={t("screenshot.watermarkPlaceholder")}
-                    className="w-full rounded px-2 py-1 text-[13px] mb-2"
-                    style={{
-                      background: "var(--taomni-input-bg, transparent)",
-                      border: "1px solid var(--taomni-divider)",
-                      color: "var(--taomni-text)",
-                    }}
+                    aria-label={t("screenshot.watermarkPlaceholder")}
+                    className="taomni-input w-full h-7 px-2 text-[13px] mb-2"
                   />
                   <label className="flex items-center gap-2 text-[12px] mb-2">
                     <span className="shrink-0">{t("screenshot.watermarkOpacity")}</span>
@@ -978,6 +1075,7 @@ export function ScreenshotOverlay() {
                         key={c}
                         type="button"
                         data-testid={`screenshot-watermark-color-${c.slice(1)}`}
+                        aria-label={c}
                         onClick={() => setWatermarkColor(c)}
                         className="w-5 h-5 rounded-full shrink-0"
                         style={{
@@ -1025,7 +1123,10 @@ export function ScreenshotOverlay() {
                 testid="screenshot-record"
                 title={t("screenshot.record")}
                 active={recordOpen}
-                onClick={() => setRecordOpen((v) => !v)}
+                onClick={() => {
+                  setWatermarkOpen(false);
+                  setRecordOpen((v) => !v);
+                }}
               >
                 <span className="flex items-center">
                   <Video size={16} />
@@ -1033,92 +1134,68 @@ export function ScreenshotOverlay() {
                 </span>
               </ToolButton>
               {recordOpen && (
-                <>
-                  <div
-                    className="fixed inset-0"
-                    style={{ zIndex: 5 }}
-                    onClick={() => setRecordOpen(false)}
-                  />
-                  <div
-                    className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 rounded-lg py-1 shadow-2xl text-[12px] whitespace-nowrap"
-                    style={{
-                      zIndex: 10,
-                      background: "var(--taomni-panel-bg)",
-                      border: "1px solid var(--taomni-divider)",
-                      color: "var(--taomni-text)",
-                    }}
+                <div
+                  data-testid="screenshot-record-menu"
+                  className="absolute bottom-full mb-2 right-0 rounded-lg py-1 shadow-2xl text-[12px] whitespace-nowrap"
+                  style={{ zIndex: 10, ...panelStyle }}
+                >
+                  <button
+                    type="button"
+                    data-testid="screenshot-record-gif"
+                    onClick={() => void handleRecord("gif")}
+                    className="block w-full text-left px-4 py-1.5 hover:bg-[var(--taomni-hover)]"
                   >
-                    <button
-                      type="button"
-                      data-testid="screenshot-record-gif"
-                      onClick={() => void handleRecord("gif")}
-                      className="block w-full text-left px-4 py-1.5 hover:bg-[var(--taomni-hover)]"
-                    >
-                      {t("screenshot.recordGif")}
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="screenshot-record-mp4"
-                      onClick={() => void handleRecord("mp4")}
-                      className="block w-full text-left px-4 py-1.5 hover:bg-[var(--taomni-hover)]"
-                    >
-                      {t("screenshot.recordMp4")}
-                    </button>
-                  </div>
-                </>
+                    {t("screenshot.recordGif")}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="screenshot-record-mp4"
+                    onClick={() => void handleRecord("mp4")}
+                    className="block w-full text-left px-4 py-1.5 hover:bg-[var(--taomni-hover)]"
+                  >
+                    {t("screenshot.recordMp4")}
+                  </button>
+                </div>
               )}
             </div>
-            <ToolButton
-              testid="screenshot-copy"
-              title={t("screenshot.copy")}
-              onClick={() => void handleCopy()}
-            >
-              <Clipboard size={16} />
-            </ToolButton>
-            <ToolButton
-              testid="screenshot-save"
-              title={t("screenshot.save")}
-              onClick={() => void handleSave()}
-            >
-              <Download size={16} />
-            </ToolButton>
-            <ToolButton
-              testid="screenshot-cancel"
-              title={t("screenshot.cancel")}
-              onClick={() => void closeScreenshotOverlay().catch(() => undefined)}
-            >
+            <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
+            <ToolButton testid="screenshot-cancel" title={`${t("screenshot.cancel")} (Esc)`} onClick={close}>
               <X size={16} />
             </ToolButton>
+            <ToolButton testid="screenshot-save" title={`${t("screenshot.save")} (Ctrl+S)`} onClick={() => void handleSave()}>
+              <Download size={16} />
+            </ToolButton>
+            <button
+              type="button"
+              data-testid="screenshot-copy"
+              title={`${t("screenshot.copy")} (Enter / Ctrl+C)`}
+              onClick={() => void handleCopy()}
+              className="ml-1 h-8 shrink-0 rounded-lg px-3 flex items-center gap-1 text-[13px] font-medium"
+              style={{ background: "var(--taomni-accent)", color: "#ffffff" }}
+            >
+              <Check size={15} />
+              {t("screenshot.done")}
+            </button>
           </div>
         </div>
       )}
 
-      {/* Scroll-capture busy state. */}
+      {/* Busy state (scroll capture / recording start). */}
       {phase === "busy" && (
         <div
           data-testid="screenshot-scroll-busy"
           className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xl px-5 py-3 text-[13px] shadow-2xl"
-          style={{
-            zIndex: 60,
-            background: "var(--taomni-panel-bg)",
-            border: "1px solid var(--taomni-divider)",
-            color: "var(--taomni-text)",
-          }}
+          style={{ zIndex: 60, ...panelStyle }}
         >
           {t("screenshot.scrollCapturing")}
         </div>
       )}
 
       {/* Bottom hint bar while selecting. */}
-      {phase === "select" && !loadError && (
+      {phase === "select" && !dragging && (
         <div
           className="fixed left-1/2 -translate-x-1/2 bottom-8 flex items-center gap-3 rounded-full px-4 py-2 shadow-2xl text-[13px]"
-          style={{
-            zIndex: 50,
-            background: "var(--taomni-panel-bg)",
-            border: "1px solid var(--taomni-divider)",
-            color: "var(--taomni-text)",
-          }}
+          style={{ zIndex: 50, ...panelStyle }}
         >
           <span data-testid="screenshot-hint">{t("screenshot.selectHint")}</span>
           <button
@@ -1134,7 +1211,7 @@ export function ScreenshotOverlay() {
         </div>
       )}
 
-      {/* Color picker layer (above canvas z-30, below toolbar z-50). */}
+      {/* Color picker layer (above the canvas, below the toolbar). */}
       {pickerMode && (
         <div
           data-testid="screenshot-picker-layer"
@@ -1142,7 +1219,7 @@ export function ScreenshotOverlay() {
           style={{ zIndex: 40, cursor: "crosshair" }}
           onMouseMove={handlePickerMove}
           onMouseLeave={() => setPickerInfo(null)}
-          onClick={handlePickerPick}
+          onClick={() => void handlePickerPick()}
         />
       )}
       {pickerMode && pickerInfo && (
@@ -1151,18 +1228,17 @@ export function ScreenshotOverlay() {
           className="fixed pointer-events-none flex items-center gap-2 rounded-lg px-2.5 py-1.5 shadow-2xl"
           style={{
             zIndex: 45,
-            left: Math.min(pickerInfo.x + 18, viewport.w - 190),
+            left: Math.min(pickerInfo.x + 18, viewport.w - 200),
             top: Math.min(pickerInfo.y + 18, viewport.h - 60),
             background: "rgba(20, 20, 20, 0.92)",
             color: "#ffffff",
             fontSize: 12,
           }}
         >
-          <span
-            className="w-6 h-6 rounded shrink-0"
-            style={{ background: pickerInfo.hex, border: "1px solid rgba(255,255,255,0.4)" }}
-          />
-          <span className="font-mono whitespace-nowrap">{pickerInfo.hex}</span>
+          <span className="w-6 h-6 rounded shrink-0" style={{ background: pickerInfo.hex, border: "1px solid rgba(255,255,255,0.4)" }} />
+          <span data-testid="screenshot-picker-hex" className="font-mono whitespace-nowrap">
+            {pickerInfo.hex}
+          </span>
           <span className="opacity-70 font-mono whitespace-nowrap">{pickerInfo.rgb}</span>
         </div>
       )}
@@ -1172,20 +1248,15 @@ export function ScreenshotOverlay() {
         <div
           data-testid="screenshot-ocr-panel"
           className="fixed rounded-xl shadow-2xl p-4 w-80"
-          style={{
-            zIndex: 60,
-            right: 16,
-            top: 16,
-            background: "var(--taomni-panel-bg)",
-            border: "1px solid var(--taomni-divider)",
-            color: "var(--taomni-text)",
-          }}
+          style={{ zIndex: 60, right: 16, top: 16, ...panelStyle }}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-[13px] font-medium">{t("screenshot.ocrTitle")}</span>
             <button
               type="button"
               data-testid="screenshot-ocr-close"
+              aria-label={t("screenshot.cancel")}
               onClick={() => setOcrOpen(false)}
               className="rounded p-1 hover:bg-[var(--taomni-hover)]"
             >
@@ -1201,12 +1272,8 @@ export function ScreenshotOverlay() {
                 readOnly
                 value={ocrText}
                 rows={8}
-                className="w-full rounded px-2 py-1.5 text-[13px] font-mono resize-y mb-2"
-                style={{
-                  background: "var(--taomni-input-bg, transparent)",
-                  border: "1px solid var(--taomni-divider)",
-                  color: "var(--taomni-text)",
-                }}
+                aria-label={t("screenshot.ocrTitle")}
+                className="taomni-input w-full px-2 py-1.5 text-[13px] font-mono resize-y mb-2"
               />
               <button
                 type="button"
@@ -1231,6 +1298,7 @@ export function ScreenshotOverlay() {
       {toast && (
         <div
           data-testid="screenshot-toast"
+          role="status"
           className="fixed left-1/2 -translate-x-1/2 bottom-20 rounded-full px-4 py-2 text-[13px] shadow-2xl"
           style={{ zIndex: 70, background: "rgba(20, 20, 20, 0.92)", color: "#ffffff" }}
         >

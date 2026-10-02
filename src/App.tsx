@@ -13,12 +13,14 @@ import { detectDetachedRoute } from "./lib/detachedSession";
 import {
   isScreenshotOverlayWindow,
   isScreenshotPinWindow,
+  isScreenshotQaFixtureWindow,
   isScreenshotRecorderWindow,
-  openScreenshotOverlay,
 } from "./lib/screenshot";
+import { useScreenshotAppShortcut } from "./lib/screenshotShortcut";
 import { ScreenshotOverlay } from "./components/screenshot/ScreenshotOverlay";
 import { PinnedImage } from "./components/screenshot/PinnedImage";
 import { RecorderBar } from "./components/screenshot/RecorderBar";
+import { ScreenshotQaFixture } from "./components/screenshot/ScreenshotQaFixture";
 import { useAppTheme } from "./lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
 import { attachSftpSync } from "./lib/sftpSync";
@@ -46,29 +48,8 @@ function App() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
-  // App-local screenshot hotkey: Ctrl+Shift+A (Cmd+Shift+A on macOS), the
-  // Feishu default. The OS-global hotkey is registered by the Rust backend;
-  // this is the fallback when the app window is focused (and the only path in
-  // browser preview). Editable fields keep the keystroke.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
-      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) return;
-      if (event.code !== "KeyA") return;
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [contenteditable='true']")) {
-        return;
-      }
-      // The overlay/recorder windows own their keys (ESC etc.).
-      if (isScreenshotOverlayWindow() || isScreenshotRecorderWindow()) return;
-      event.preventDefault();
-      void openScreenshotOverlay().catch((err) => {
-        console.error("[screenshot] app shortcut failed", err);
-      });
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  // App-local fallback for the screenshot hotkey (see screenshotShortcut.ts).
+  useScreenshotAppShortcut();
 
   useEffect(() => {
     const root = document.documentElement;
@@ -223,6 +204,9 @@ function App() {
     overlayHash.startsWith("#screenshot-pin")
   ) {
     return <PinnedImage />;
+  }
+  if (isScreenshotQaFixtureWindow() || overlayHash.startsWith("#screenshot-qa-")) {
+    return <ScreenshotQaFixture route={overlayHash.replace("#screenshot-qa-", "")} />;
   }
   const detachedSftpId = detectDetachedSftpRoute();
   if (detachedSftpId) {

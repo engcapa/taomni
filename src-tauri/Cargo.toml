@@ -168,7 +168,9 @@ cpal = { version = "0.17", optional = true }
 # x86 asm). Self-contained — no system ffmpeg/gstreamer. Linux-first per the
 # native-AV plan; the deps themselves are cross-platform.
 audiopus = { version = "0.3.0-rc.0", optional = true }
-openh264 = { version = "0.9", optional = true }
+# Also the screenshot tool's MP4 encoder (always on): built from source,
+# assembly is optional (nasm is used when present).
+openh264 = "0.9"
 # Camera capture for the native A/V stack (Linux: v4l2 via the `v4l` crate, which
 # uses raw videodev2 ioctls — no libv4l system dep). input-native picks the
 # platform backend; we only drive it on Linux.
@@ -215,10 +217,12 @@ socket2 = { version = "0.6", features = ["all"] }
 tauri-plugin-notification = "2.4.0"
 xcap = { version = "0.9.6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
+# Screenshot tool recording: GIF encoder and MP4 (ISO BMFF) muxer.
 gif = "0.13"
+mp4 = "0.14"
 tauri-plugin-dialog = "2.7.3"
-# Pinned to 2.3.2: 2.4.0 requires tauri ^2.12 and would force a
-# workspace-wide tauri 2.11 -> 2.12 upgrade. 2.3.2 works with tauri ^2.10.
+# Screenshot hotkey. Pinned to 2.3.2: 2.4.0 requires tauri ^2.12 and would
+# force a workspace-wide tauri 2.11 -> 2.12 upgrade.
 tauri-plugin-global-shortcut = "=2.3.2"
 sqlparser = "0.62.0"
 scopeguard = "1.2"
@@ -246,7 +250,7 @@ screen-capture = ["dep:xcap"]
 # capture), audiopus (Opus) and openh264 (H.264). Off by default; enable for
 # Linux desktop bundles that need native voice/video. See
 # claudedocs/lanchat-linux-native-av-transport.md.
-native-av = ["dep:cpal", "dep:audiopus", "dep:openh264", "dep:nokhwa"]
+native-av = ["dep:cpal", "dep:audiopus", "dep:nokhwa"]
 asr-sherpa-onnx = []
 vulkan-detect = ["dep:ash"]
 local-llm-fim = ["dep:llama-cpp-2"]

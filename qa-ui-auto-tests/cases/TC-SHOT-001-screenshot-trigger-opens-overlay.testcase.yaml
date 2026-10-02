@@ -1,31 +1,59 @@
 id: TC-SHOT-001
-title: ControlBar system screenshot button opens the fullscreen overlay
-covers:
-- F27.1
-tags:
-- screenshot
-- trigger
-- p1
-modes:
-- browser
-fixtures:
-- reset_db
+title: Global camera opens a ready screenshot selection overlay and Escape closes it
+description: Browser renderer and stub dispatch only; the synthetic image is not evidence of OS screen capture.
+covers: [F27.1]
+tags: [screenshot, trigger, p1]
+modes: [browser]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}
-# The trigger must live in the global window chrome, not inside any tab.
+- set_viewport: {width: 1000, height: 750}
 - wait_for: '[data-testid="system-screenshot"]'
-- assert_visible: '[data-testid="system-screenshot"]'
 - assert_attribute:
     selector: '[data-testid="system-screenshot"]'
     name: title
-    matches: ".*Shift\\+A.*"
+    matches: '.*(?:Ctrl\+Alt\+A|⌃⌘A).*'
 - click: '[data-testid="system-screenshot"]'
-- wait_for: '[data-testid="screenshot-overlay"]'
-- assert_visible: '[data-testid="screenshot-overlay"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
 - assert_visible: '[data-testid="screenshot-base-image"]'
 - assert_visible: '[data-testid="screenshot-hint"]'
+- assert_not_visible: '[data-testid="screenshot-toolbar"]'
+- assert_not_visible: '[data-testid="screenshot-selection"]'
 - eval_readonly:
-    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).includes("screenshot_open_overlay")
+    expression: JSON.stringify(window.__taomniStubScreenshotCalls || []).split('"cmd":"screenshot_open_overlay"').length === 2
 - press: Escape
-- wait_for:
-    selector: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="system-screenshot"]'
+- assert_not_visible: '[data-testid="screenshot-overlay"]'
+- eval_readonly:
+    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_close_overlay"
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The global camera displays the current platform default shortcut and opens one ready selection overlay without a premature toolbar or selection.
+    actions: [1, 2, 5]
+    checkpoints:
+    - {step: 4, expectation: 'The tooltip uses Ctrl+Alt+A or macOS Control+Command+A, not the retired Shift chord.'}
+    - {step: 6, expectation: Image initialization reaches the select phase.}
+    - {step: 7, expectation: The synthetic base image is visible.}
+    - {step: 8, expectation: Selection instructions are visible.}
+    - {step: 9, expectation: No annotation toolbar exists before selection.}
+    - {step: 10, expectation: No region has been selected.}
+    - {step: 11, expectation: Exactly one open-overlay request was dispatched.}
+    results: [6, 7, 8, 9, 10, 11]
+  - id: R2
+    requirement: Escape from the select phase closes the screenshot tool and returns to the main window.
+    actions: [12]
+    checkpoints:
+    - {step: 13, expectation: The main-window camera returns.}
+    - {step: 14, expectation: The overlay is unmounted.}
+    - {step: 15, expectation: The close-overlay request was dispatched.}
+    results: [13, 14, 15]
+  visual:
+  - check: Ready overlay image and selection instructions are reachable.
+    method: automated
+    reason: DOM visibility checks establish renderer state, not screenshot pixel fidelity or cross-WebView layout.
+  native:
+  - check: Real desktop pixels and native overlay window lifecycle.
+    method: external
+    reason: Browser capture and routing are stubbed; native SHOT-N cases own these boundaries and are not executed by this case.

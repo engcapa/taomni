@@ -40,6 +40,7 @@ import { WindowDragHandle } from "../window/WindowDragHandle";
 import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
 import { CaptureIndicators } from "../capture/CaptureIndicators";
 import { openScreenshotOverlay } from "../../lib/screenshot";
+import { screenshotShortcutLabel, useScreenshotShortcutStore } from "../../lib/screenshotShortcut";
 import { useAppDialogs, formatUnknownError } from "../../lib/appDialogs";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import type { AppCommand } from "../menubar/commands";
@@ -101,6 +102,8 @@ export function ControlBar({
   const [screenshotDelayMenu, setScreenshotDelayMenu] = useState(false);
   const [screenshotCountdown, setScreenshotCountdown] = useState<number | null>(null);
   const countdownTimer = useRef<number | null>(null);
+  const delayMenuRef = useRef<HTMLDivElement | null>(null);
+  const shortcutLabel = screenshotShortcutLabel(useScreenshotShortcutStore((s) => s.status));
 
   const clearScreenshotCountdown = () => {
     if (countdownTimer.current !== null) {
@@ -115,6 +118,23 @@ export function ControlBar({
       if (countdownTimer.current !== null) window.clearInterval(countdownTimer.current);
     };
   }, []);
+
+  // Close the delay menu on outside click / Escape.
+  useEffect(() => {
+    if (!screenshotDelayMenu) return;
+    const onDown = (e: MouseEvent) => {
+      if (!delayMenuRef.current?.contains(e.target as Node)) setScreenshotDelayMenu(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setScreenshotDelayMenu(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [screenshotDelayMenu]);
 
   const handleScreenshot = async () => {
     if (screenshotBusy) return;
@@ -137,20 +157,16 @@ export function ControlBar({
     setScreenshotDelayMenu(false);
     if (screenshotBusy || screenshotCountdown !== null) return;
     clearScreenshotCountdown();
-    setScreenshotCountdown(seconds);
+    let remaining = seconds;
+    setScreenshotCountdown(remaining);
     countdownTimer.current = window.setInterval(() => {
-      setScreenshotCountdown((prev) => {
-        if (prev === null || prev <= 1) {
-          if (countdownTimer.current !== null) {
-            window.clearInterval(countdownTimer.current);
-            countdownTimer.current = null;
-          }
-          // Fire the real capture on the next tick so state settles.
-          window.setTimeout(() => void handleScreenshot(), 0);
-          return null;
-        }
-        return prev - 1;
-      });
+      remaining -= 1;
+      if (remaining > 0) {
+        setScreenshotCountdown(remaining);
+        return;
+      }
+      clearScreenshotCountdown();
+      void handleScreenshot();
     }, 1000);
   };
   const {
@@ -337,12 +353,18 @@ export function ControlBar({
       {/* System screenshot: independent of any tab — global window chrome.
           Click captures immediately; the chevron offers timed (delayed) capture
           Flameshot-style. Clicking during a countdown cancels it. */}
-      <div className="relative shrink-0 self-center flex items-center">
+      <div ref={delayMenuRef} className="relative shrink-0 self-center flex items-center">
         <button
           type="button"
           data-testid="system-screenshot"
           aria-label={t("screenshot.tooltip")}
-          title={`${t("screenshot.tooltip")} (${IS_MAC ? "Cmd" : "Ctrl"}+Shift+A)`}
+          title={
+            screenshotCountdown !== null
+              ? t("screenshot.cancelCountdown")
+              : shortcutLabel
+                ? `${t("screenshot.tooltip")} (${shortcutLabel})`
+                : t("screenshot.tooltip")
+          }
           disabled={screenshotBusy && screenshotCountdown === null}
           onClick={() => {
             if (screenshotCountdown !== null) clearScreenshotCountdown();
@@ -364,6 +386,8 @@ export function ControlBar({
           aria-label={t("screenshot.delayedCapture")}
           title={t("screenshot.delayedCapture")}
           disabled={screenshotBusy || screenshotCountdown !== null}
+          aria-expanded={screenshotDelayMenu}
+          aria-haspopup="menu"
           onClick={() => setScreenshotDelayMenu((v) => !v)}
           className="h-6 w-4 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50"
         >
@@ -372,6 +396,7 @@ export function ControlBar({
         {screenshotDelayMenu && (
           <div
             data-testid="system-screenshot-delay-menu"
+            role="menu"
             className="absolute right-0 top-7 z-50 min-w-28 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] py-1 shadow-xl"
           >
             {[3, 5, 10].map((s) => (
@@ -379,6 +404,7 @@ export function ControlBar({
                 key={s}
                 type="button"
                 data-testid={`system-screenshot-delay-${s}`}
+                role="menuitem"
                 onClick={() => handleDelayedScreenshot(s)}
                 className="block w-full px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]"
               >

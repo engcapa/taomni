@@ -1,79 +1,105 @@
 id: TC-SHOT-014
-title: New annotation tools draw and erase
-covers:
-- F27.1
-tags:
-- screenshot
-- annotate
-- p2
-modes:
-- browser
-fixtures:
-- reset_db
+title: Highlighter blur balloon and eraser commit one undoable history mutation each
+covers: [F27.1]
+tags: [screenshot, annotate, history, p2]
+modes: [browser]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}#screenshot-overlay
-- wait_for: '[data-testid="screenshot-base-image"]'
+- set_viewport: {width: 1000, height: 750}
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
 - click: '[data-testid="screenshot-fullscreen"]'
 - wait_for: '[data-testid="screenshot-toolbar"]'
-# Highlighter: drag a stroke, undo becomes available.
 - click: '[data-testid="screenshot-tool-highlighter"]'
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 80
-      y: 80
-    to_position:
-      x: 200
-      y: 120
-- assert_enabled: '[data-testid="screenshot-undo"]'
-# Blur: drag a region, undo still available.
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 80, y: 80}
+    to_position: {x: 200, y: 120}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="1"]'
 - click: '[data-testid="screenshot-tool-blur"]'
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 220
-      y: 80
-    to_position:
-      x: 300
-      y: 160
-- assert_enabled: '[data-testid="screenshot-undo"]'
-# Balloon: drag a balloon, undo still available.
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 260, y: 80}
+    to_position: {x: 380, y: 160}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="2"]'
 - click: '[data-testid="screenshot-tool-balloon"]'
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 80
-      y: 200
-    to_position:
-      x: 220
-      y: 280
-- assert_enabled: '[data-testid="screenshot-undo"]'
-# Eraser: draw a rect then erase it; undo chain reflects removal.
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 80, y: 200}
+    to_position: {x: 220, y: 280}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="3"]'
 - click: '[data-testid="screenshot-tool-rect"]'
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 250
-      y: 200
-    to_position:
-      x: 320
-      y: 260
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 300, y: 220}
+    to_position: {x: 380, y: 280}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="4"]'
 - click: '[data-testid="screenshot-tool-eraser"]'
+# Stay inside the separate rectangle so other shapes cannot be erased by accident.
 - drag_to:
-    from: '[data-testid="screenshot-annotation-canvas"]'
-    to: '[data-testid="screenshot-annotation-canvas"]'
-    from_position:
-      x: 240
-      y: 190
-    to_position:
-      x: 330
-      y: 270
-# Erasing pushes removed shapes to redo; redo becomes available.
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 320, y: 240}
+    to_position: {x: 350, y: 250}
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="3"]'
+- assert_enabled: '[data-testid="screenshot-undo"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-undo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="4"]'
 - assert_enabled: '[data-testid="screenshot-redo"]'
+- click: '[data-testid="screenshot-redo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="3"]'
+- assert_disabled: '[data-testid="screenshot-redo"]'
+# A miss does not create another history step.
+- drag_to:
+    from: '[data-testid="screenshot-annotation-layer"]'
+    to: '[data-testid="screenshot-annotation-layer"]'
+    from_position: {x: 600, y: 400}
+    to_position: {x: 650, y: 450}
+- assert_attribute:
+    selector: '[data-testid="screenshot-annotation-canvas"]'
+    name: data-shapes
+    equals: '3'
+- click: '[data-testid="screenshot-undo"]'
+- wait_for: '[data-testid="screenshot-annotation-canvas"][data-shapes="4"]'
 - click: '[data-testid="screenshot-cancel"]'
-- wait_for:
-    selector: '[data-testid="system-screenshot"]'
+- wait_for: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Highlighter, blur, balloon and rectangle drags each commit one visible-history shape.
+    actions: [1, 2, 4, 6, 7, 9, 10, 12, 13, 15, 16]
+    checkpoints:
+    - {step: 8, expectation: The highlighter commits one shape.}
+    - {step: 11, expectation: Blur adds a second shape.}
+    - {step: 14, expectation: Balloon adds a third shape.}
+    - {step: 17, expectation: The isolated rectangle adds a fourth shape.}
+    results: [8, 11, 14, 17]
+  - id: R2
+    requirement: Erasing a hit removes the rectangle as an undoable mutation, enables redo only after undo, and ignores an eraser miss without polluting history.
+    actions: [18, 19, 23, 26, 29, 31, 33]
+    checkpoints:
+    - {step: 20, expectation: The hit removes exactly one shape.}
+    - {step: 21, expectation: The erase can be undone.}
+    - {step: 22, expectation: Erasing itself does not enable redo.}
+    - {step: 24, expectation: Undo restores the erased rectangle.}
+    - {step: 25, expectation: Redo becomes available only after undo.}
+    - {step: 27, expectation: Redo removes the rectangle again.}
+    - {step: 28, expectation: Redo is exhausted.}
+    - {step: 30, expectation: An eraser miss leaves three shapes.}
+    - {step: 32, expectation: 'Undo immediately restores four shapes, proving the miss added no history entry.'}
+    - {step: 34, expectation: Cancel returns to main.}
+    results: [20, 21, 22, 24, 25, 27, 28, 30, 32, 34]
+  visual:
+  - check: Advanced-tool commits and eraser history outcomes.
+    method: automated
+    reason: Exact shape counts establish interaction and history only; blur strength and native privacy-filter pixels are outside this case.
+  native:
+  - check: Actual blur, highlighter and redaction pixels on a native captured image.
+    method: external
+    reason: Synthetic browser shapes do not certify native output fidelity or sensitive-data concealment.

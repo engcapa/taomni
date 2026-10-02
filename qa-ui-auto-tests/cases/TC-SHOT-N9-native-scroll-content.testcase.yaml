@@ -1,27 +1,27 @@
 id: TC-SHOT-N9
-title: Native scroll capture stitches real content without duplication
-covers:
-- F27.1
-tags:
-- screenshot
-- scroll-capture
-- native
-- p1
-modes:
-- native
-native_platforms:
-- Linux
-- Windows
-- macOS
-fixtures:
-- reset_db
+title: Native repeated scroll capture keeps independent ordered outputs
+covers: [F27.1]
+tags: [screenshot, scroll-capture, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="system-screenshot"]'
-- wait: 5
-# Scroll-capture a region, then verify the stitched image contains real
-# scrolled content: at least 2 of 3 vertical thirds must have differing
-# average colors (proving the wheel moved, not duplicated frames).
-- eval_readonly:
-    expression: 'window.__TAURI_INTERNALS__.invoke("screenshot_test_scroll_content", {width: 200, height: 200}).then(JSON.stringify)'
-    contains: 'OK differing_thirds='
+- native_screenshot_scenario: {scenario: scroll}
+- native_screenshot_scenario: {scenario: scroll}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: repeated-scroll
+    requirement: Two consecutive real wheel/stitch sessions independently retain row order/heights without stale fixture state.
+    actions: [1]
+    checkpoints:
+    - {step: 3, expectation: First native long screenshot passes row oracle and is retained.}
+    - {step: 4, expectation: "Fresh fixture capture again grows with consecutive correctly sized rows; no duplicate/synthetic fallback pass."}
+    results: [3, 4]
+  visual:
+  - {check: Stitch quality, method: external, reason: Inspect retained stitched PNGs alongside row oracle.}
+  native:
+  - {check: Repeated wheel and capture, method: automated, reason: Both scenarios use actual native source and OS input.}

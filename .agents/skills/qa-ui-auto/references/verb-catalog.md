@@ -41,6 +41,12 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `host_write_file` | `{path, text}` | Writes real UTF-8 bytes (LF-preserving) to an existing path inside the current retained report root and records before/after SHA-256 metadata. Simulates a genuine external editor/process mutation while the app holds stale state; testcase assertions own the app-reaction postconditions via the file-assertion verbs. |
 | `native_clipboard_owner` | `{action, text?}` | Native Linux/X11 only. Drives an out-of-process X11 CLIPBOARD selection owner. `grant` takes the selection with `text` (postcondition verified by an external read); `deny` replaces it with an owner that advertises standard text targets but rejects their conversion, causing an immediate real OS read failure; `suspend` retains the timeout-based unresponsive-owner fault; `resume` restores the last granted text; `release` terminates it. Teardown always kills the owner and records that the host selection was replaced - it is deliberately not republished, because an X11 selection needs a live owner and faking a restore would leak a process. |
 
+## Native screenshot boundaries
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `native_screenshot_scenario` | `{scenario, format?, secs?}` | Isolated debug QA app only, Linux/Windows/macOS. `scenario`: `capture`, `capture-fidelity`, `scroll`, `overlay-copy`, `record`, `recorder`, `pin`, `hotkey`, `ocr-redact`. `record`/`recorder` require `format: gif\|mp4`; only `record` accepts `secs` (1–8, default 3). Settles Rust IPC asynchronously on every WebView. `capture-fidelity` checks native row fixture pixels; `ocr-redact` requires real Tesseract language data and verifies OCR/redaction undo/redo plus clipboard export. Opens real child windows and verifies real captures, OS clipboard pixels, decoded clip duration/motion, stitched row order/heights, pin cleanup or OS hotkey. Saves the full result even on failure. Child-window DOM input is renderer automation, not physical pointer evidence; scroll/hotkey use OS injection. Permission/capability failures stay failures. |
+
 ## Keyboard
 
 | Verb | Args | Notes |
