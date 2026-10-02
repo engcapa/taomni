@@ -19,14 +19,14 @@ steps:
 verification:
   review: reviewed
   requirements:
-  - id: controls
+  - id: full-recorder
     requirement: Whole-display recording keeps controls outside captured pixels or hides them; the production screenshot hotkey
       route stops it before showing the preview; a real GIF decodes and cleanup restores main.
     actions:
     - 1
     checkpoints:
     - step: 3
-      expectation: 'native_screenshot_scenario: {''scenario'': ''controls''}'
+      expectation: 'native_screenshot_scenario: {''scenario'': ''full-recorder''}'
     - step: 4
       expectation: 'assert_visible: [data-testid="system-screenshot"]'
     results:
