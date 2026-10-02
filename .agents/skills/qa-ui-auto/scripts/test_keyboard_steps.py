@@ -103,7 +103,37 @@ class KeyboardStepsTest(TestCase):
             },
         })
         self.assertEqual(locator.evaluate.call_count, 2)
-        self.assertEqual([c.args[0] for c in locator.press.call_args_list], ["Shift", "Enter", "Shift", "Enter"])
+        self.assertEqual([c.args[0] for c in locator.press.call_args_list], [
+            "Shift", "Enter", "Control+c", "Control+u", "Shift", "Enter",
+        ])
+
+    def test_terminal_probe_retry_clears_an_unsubmitted_partial_line(self):
+        ctx, page, locator = self.context()
+        pane = Mock()
+        state = {"attempts": 0, "line": "", "output": ""}
+
+        def insert(_script, payload):
+            state["attempts"] += 1
+            state["line"] += "echo qa-" if state["attempts"] == 1 else payload["text"]
+            return True
+
+        def press(key):
+            if key == "Control+u":
+                state["line"] = ""
+            elif key == "Enter" and state["attempts"] > 1:
+                state["output"] = state["line"].removeprefix("echo ") + "\n"
+
+        locator.evaluate.side_effect = insert
+        locator.press.side_effect = press
+        pane.text_content.side_effect = lambda: state["output"]
+        pane.get_attribute.return_value = ""
+        page.locator.side_effect = lambda selector: Mock(first=pane if selector == "#pane" else locator)
+        step_terminal_input(ctx, {
+            "selector": ".xterm-helper-textarea", "text": "echo ready", "submit": True,
+            "verify": {"selector": "#pane", "regex": r"(?m)^ready\r?$", "timeout_sec": 0.1, "attempts": 2},
+        })
+        self.assertEqual(state["output"], "ready\n")
+        self.assertEqual(state["attempts"], 2)
 
     def test_terminal_input_reports_a_probe_that_never_appears(self):
         ctx, page, locator = self.context()
