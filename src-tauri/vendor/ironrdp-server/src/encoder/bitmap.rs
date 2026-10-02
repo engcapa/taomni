@@ -1,10 +1,13 @@
 use core::num::NonZeroUsize;
 
-use ironrdp_core::{Encode as _, WriteCursor, cast_int, cast_length, invalid_field_err};
+use ironrdp_core::{
+    Encode as _, WriteCursor, cast_int, cast_length, invalid_field_err, not_enough_bytes_err,
+};
 use ironrdp_graphics::image_processing::PixelFormat;
 use ironrdp_graphics::rdp6::{
     ABgrChannels, ARgbChannels, BgrAChannels, BitmapEncodeError, BitmapStreamEncoder, RgbAChannels,
 };
+use ironrdp_pdu::bitmap::rdp6::{BitmapStreamHeader, ColorPlaneDefinition};
 use ironrdp_pdu::bitmap::{self, BitmapData, BitmapUpdateData, Compression};
 use ironrdp_pdu::geometry::InclusiveRectangle;
 
@@ -49,6 +52,12 @@ impl BitmapEncoder {
         }
 
         let bytes_per_pixel = u16::from(bitmap.format.bytes_per_pixel());
+        // RLE is useful for repeated horizontal colours or vertical deltas.
+        // On noisy pixels its literal/run search costs more than RemoteFX
+        // itself. Use the standard lossless raw planar representation for
+        // those pixels; the adaptive selector still compares compressed sizes.
+        // This choice is restricted to the new bulk path.
+        let rle = !self.byte_scan_width || has_repeated_pixels(bitmap);
         let row_len = bitmap
             .width
             .get()
@@ -86,7 +95,14 @@ impl BitmapEncoder {
                     .rev()
                     .flat_map(|row| row.chunks(usize::from(bytes_per_pixel)));
 
-                Self::encode_iter(encoder, bitmap.format, pixels, self.buffer.as_mut_slice())?
+                Self::encode_iter(
+                    encoder,
+                    bitmap.format,
+                    pixels,
+                    self.buffer.as_mut_slice(),
+                    rle,
+                    usize::from(bitmap.width.get()) * usize::from(height),
+                )?
             };
 
             let data = BitmapData {
@@ -125,27 +141,104 @@ impl BitmapEncoder {
         format: PixelFormat,
         src: P,
         dst: &mut [u8],
+        rle: bool,
+        pixel_count: usize,
     ) -> Result<usize, BitmapEncodeError>
     where
         P: Iterator<Item = &'a [u8]> + Clone,
     {
+        if !rle {
+            let mut cursor = WriteCursor::new(dst);
+            BitmapStreamHeader {
+                enable_rle_compression: false,
+                use_alpha: false,
+                color_plane_definition: ColorPlaneDefinition::Argb,
+            }
+            .encode(&mut cursor)
+            .map_err(BitmapEncodeError::Encode)?;
+            let (red_index, green_index, blue_index) = match format {
+                PixelFormat::ARgb32 | PixelFormat::XRgb32 => (1, 2, 3),
+                PixelFormat::RgbA32 | PixelFormat::RgbX32 => (0, 1, 2),
+                PixelFormat::ABgr32 | PixelFormat::XBgr32 => (3, 2, 1),
+                PixelFormat::BgrA32 | PixelFormat::BgrX32 => (2, 1, 0),
+            };
+            let needed = pixel_count * 3 + 1;
+            if cursor.len() < needed {
+                return Err(BitmapEncodeError::Encode(not_enough_bytes_err!(
+                    "BitmapStreamData",
+                    cursor.len(),
+                    needed
+                )));
+            }
+            let planes = &mut cursor.remaining_mut()[..pixel_count * 3];
+            let (red, green_blue) = planes.split_at_mut(pixel_count);
+            let (green, blue) = green_blue.split_at_mut(pixel_count);
+            for (((red, green), blue), pixel) in red.iter_mut().zip(green).zip(blue).zip(src) {
+                *red = pixel[red_index];
+                *green = pixel[green_index];
+                *blue = pixel[blue_index];
+            }
+            cursor.advance(pixel_count * 3);
+            cursor.write_u8(0);
+            return Ok(cursor.pos());
+        }
         let written = match format {
             PixelFormat::ARgb32 | PixelFormat::XRgb32 => {
-                encoder.encode_pixels_stream::<_, ARgbChannels>(src, dst, true)?
+                encoder.encode_pixels_stream::<_, ARgbChannels>(src, dst, rle)?
             }
             PixelFormat::RgbA32 | PixelFormat::RgbX32 => {
-                encoder.encode_pixels_stream::<_, RgbAChannels>(src, dst, true)?
+                encoder.encode_pixels_stream::<_, RgbAChannels>(src, dst, rle)?
             }
             PixelFormat::ABgr32 | PixelFormat::XBgr32 => {
-                encoder.encode_pixels_stream::<_, ABgrChannels>(src, dst, true)?
+                encoder.encode_pixels_stream::<_, ABgrChannels>(src, dst, rle)?
             }
             PixelFormat::BgrA32 | PixelFormat::BgrX32 => {
-                encoder.encode_pixels_stream::<_, BgrAChannels>(src, dst, true)?
+                encoder.encode_pixels_stream::<_, BgrAChannels>(src, dst, rle)?
             }
         };
 
         Ok(written)
     }
+}
+
+fn has_repeated_pixels(bitmap: &BitmapUpdate) -> bool {
+    let width = usize::from(bitmap.width.get());
+    let height = usize::from(bitmap.height.get());
+    if width < 2 || height < 2 {
+        return true;
+    }
+    let stride = bitmap.stride.get();
+    let mut repeated = 0;
+    // Cover the whole rectangle with 256 neighbouring pixel pairs, not only
+    // its first strip (which might contain a frame marker or toolbar).
+    for row in 0..8 {
+        let y = if height >= 3 {
+            row * (height - 3) / 7 + 2
+        } else {
+            1
+        };
+        for column in 0..32 {
+            let x = column * (width - 2) / 31 + 1;
+            let offset = y * stride + x * 4;
+            let pixel = &bitmap.data[offset..offset + 4];
+            if pixel == &bitmap.data[offset - 4..offset]
+                || pixel == &bitmap.data[offset - stride..offset - stride + 4]
+                || (y >= 2
+                    && (0..4).all(|channel| {
+                        bitmap.data[offset + channel]
+                            .wrapping_sub(bitmap.data[offset - stride + channel])
+                            == bitmap.data[offset - stride + channel]
+                                .wrapping_sub(bitmap.data[offset - stride * 2 + channel])
+                    }))
+            {
+                repeated += 1;
+            }
+        }
+    }
+    // A merged 64x64-tile crop can include plain desktop around a photo.
+    // Require a majority of coherent samples so those borders do not force
+    // an expensive RLE attempt over the noisy interior.
+    repeated >= 128
 }
 
 #[cfg(test)]
@@ -154,6 +247,128 @@ mod tests {
     use core::num::NonZeroU16;
     use ironrdp_core::decode;
     use ironrdp_graphics::rdp6::BitmapStreamDecoder;
+
+    #[test]
+    fn photo_inside_a_merged_tile_crop_uses_raw_planar_but_smooth_ui_uses_rle() {
+        let width = 704u16;
+        let height = 384u16;
+        let mut pixels = vec![48; usize::from(width) * usize::from(height) * 4];
+        let mut seed = 0x9e3779b9u32;
+        for y in 16..376usize {
+            for x in 40..680usize {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                let value = (x / 4 + y / 8 + (seed & 31) as usize) as u8;
+                let offset = (y * usize::from(width) + x) * 4;
+                pixels[offset..offset + 4].copy_from_slice(&[
+                    value,
+                    value.wrapping_add(20),
+                    value / 2,
+                    255,
+                ]);
+            }
+        }
+        let mut bitmap = BitmapUpdate {
+            x: 0,
+            y: 0,
+            width: NonZeroU16::new(width).unwrap(),
+            height: NonZeroU16::new(height).unwrap(),
+            format: PixelFormat::BgrA32,
+            data: pixels.into(),
+            stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
+        };
+        assert!(
+            !has_repeated_pixels(&bitmap),
+            "plain borders must not force photo RLE"
+        );
+        let gradient: Vec<u8> = (0..usize::from(width) * usize::from(height))
+            .flat_map(|i| {
+                [
+                    (i % usize::from(width)) as u8,
+                    (i / usize::from(width)) as u8,
+                    64,
+                    255,
+                ]
+            })
+            .collect();
+        bitmap.data = gradient.into();
+        assert!(
+            has_repeated_pixels(&bitmap),
+            "coherent vertical deltas benefit from RLE"
+        );
+    }
+
+    #[test]
+    fn noisy_raw_planar_crops_are_lossless_in_every_pixel_layout() {
+        for format in [
+            PixelFormat::ARgb32,
+            PixelFormat::XRgb32,
+            PixelFormat::RgbA32,
+            PixelFormat::RgbX32,
+            PixelFormat::ABgr32,
+            PixelFormat::XBgr32,
+            PixelFormat::BgrA32,
+            PixelFormat::BgrX32,
+        ] {
+            let width = 253u16;
+            let height = 131u16;
+            let stride = usize::from(width + 11) * 4;
+            let mut pixels = vec![0xcc; usize::from(height - 1) * stride + usize::from(width) * 4];
+            for y in 0..usize::from(height) {
+                for x in 0..usize::from(width) {
+                    let (r, g, b) = ((x * x + y * 3) as u8, (y * y + x * 5) as u8, (x * y) as u8);
+                    let pixel = match format {
+                        PixelFormat::ARgb32 | PixelFormat::XRgb32 => [255, r, g, b],
+                        PixelFormat::RgbA32 | PixelFormat::RgbX32 => [r, g, b, 255],
+                        PixelFormat::ABgr32 | PixelFormat::XBgr32 => [255, b, g, r],
+                        PixelFormat::BgrA32 | PixelFormat::BgrX32 => [b, g, r, 255],
+                    };
+                    pixels[y * stride + x * 4..][..4].copy_from_slice(&pixel);
+                }
+            }
+            let bitmap = BitmapUpdate {
+                x: 7,
+                y: 13,
+                width: NonZeroU16::new(width).unwrap(),
+                height: NonZeroU16::new(height).unwrap(),
+                format,
+                data: pixels.into(),
+                stride: NonZeroUsize::new(stride).unwrap(),
+            };
+            assert!(!has_repeated_pixels(&bitmap));
+            let mut encoder = BitmapEncoder::for_bulk_compression();
+            let mut output = vec![0; usize::from(width) * usize::from(height) * 8 + 4096];
+            let length = encoder.encode(&bitmap, &mut output).unwrap();
+            let update: BitmapUpdateData<'_> = decode(&output[..length]).unwrap();
+            let mut rows = 0;
+            let mut decoder = BitmapStreamDecoder::default();
+            for rectangle in update.rectangles {
+                let header: BitmapStreamHeader = decode(rectangle.bitmap_data).unwrap();
+                assert!(!header.enable_rle_compression);
+                let mut rgb = Vec::new();
+                decoder
+                    .decode_bitmap_stream_to_rgb24(
+                        rectangle.bitmap_data,
+                        &mut rgb,
+                        usize::from(width),
+                        usize::from(rectangle.height),
+                    )
+                    .unwrap();
+                for (local_y, row) in rgb.chunks_exact(usize::from(width) * 3).rev().enumerate() {
+                    let y = usize::from(rows) + local_y;
+                    for (x, pixel) in row.chunks_exact(3).enumerate() {
+                        assert_eq!(
+                            pixel,
+                            [(x * x + y * 3) as u8, (y * y + x * 5) as u8, (x * y) as u8]
+                        );
+                    }
+                }
+                rows += rectangle.height;
+            }
+            assert_eq!(rows, height);
+        }
+    }
 
     #[test]
     fn odd_width_crops_keep_every_pixel_row_and_position_across_chunks() {

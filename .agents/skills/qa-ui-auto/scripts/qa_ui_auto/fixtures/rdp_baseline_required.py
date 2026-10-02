@@ -175,6 +175,22 @@ def setup(ctx: Any) -> None:
 def teardown(ctx: Any) -> None:
     if platform.system() != "Windows":
         return
+    # Public certificates only, never private keys. Preserve the actual
+    # reference server certificate so TLS failures can be reproduced by unit
+    # verification after downloading CI evidence.
+    try:
+        result = _ps(r"""
+Get-ChildItem 'Cert:\LocalMachine\Remote Desktop' | ForEach-Object {
+  [pscustomobject]@{ Thumbprint=$_.Thumbprint; Subject=$_.Subject; Issuer=$_.Issuer;
+    SignatureAlgorithm=$_.SignatureAlgorithm.Value; PublicKeyAlgorithm=$_.PublicKey.Oid.Value;
+    CertificateDer=[Convert]::ToBase64String($_.RawData) }
+} | ConvertTo-Json
+""", check=False)
+        (Path(ctx.case_dir) / "termservice-certificates.json").write_text(result.stdout, encoding="utf-8")
+        if result.stderr:
+            (Path(ctx.case_dir) / "termservice-certificates-error.txt").write_text(result.stderr, encoding="utf-8")
+    except Exception:
+        pass  # Diagnostics must not prevent owned account/host-state cleanup.
     names = ",".join(USERS)
     _ps(r"""
 $names = $env:QA_BASELINE_USERS.Split(',')

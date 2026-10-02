@@ -97,6 +97,8 @@ steps:
         max: 1.05
       vs_baseline.fps_ratio:
         min: 0.95
+      rfx.tile_sets:
+        min: 1
       rfx.bulk.decompression_errors: 0
 - host_helper:
     action: stop

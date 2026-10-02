@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use anyhow::{Context as _, Result, anyhow};
 use ironrdp_acceptor::DesktopSize;
-use ironrdp_bulk::{BulkCompressor, CompressionType as BulkType, flags};
+use ironrdp_bulk::BulkCompressor;
+#[cfg(test)]
+use ironrdp_bulk::CompressionType as BulkType;
 use ironrdp_graphics::diff::{Rect, find_different_rects_sub};
 use ironrdp_pdu::encode_vec;
 use ironrdp_pdu::fast_path::UpdateCode;
@@ -47,19 +49,13 @@ const PLANAR_BULK_GIVE_UP_RATIO: f64 = 0.25;
 /// Estimate with a throwaway MPPC-64K history. Never touch the connection's
 /// compressor until the selected payload is actually fragmented and sent.
 fn estimate_bulk_size(data: &[u8]) -> Result<usize> {
-    let mut scratch = BulkCompressor::new(BulkType::Rdp5)?;
     // Bound the estimate's CPU cost on photo content. The first fragment
     // provides a conservative ratio without any previous-frame history.
     let sample = &data[..data.len().min(MAX_FASTPATH_UPDATE_SIZE)];
     if sample.is_empty() {
         return Ok(0);
     }
-    let (size, packet_flags) = scratch.compress(sample)?;
-    let encoded = if packet_flags & flags::PACKET_COMPRESSED != 0 {
-        size
-    } else {
-        sample.len()
-    } + usize::from(packet_flags & 0xE0 != 0);
+    let encoded = BulkCompressor::estimate_mppc64k_size(sample)?;
     Ok((encoded * data.len()).div_ceil(sample.len()))
 }
 
@@ -650,7 +646,10 @@ struct AdaptiveHandler {
 impl BitmapUpdateHandler for AdaptiveHandler {
     fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
         if bitmap.width.get() > u16::MAX / 4 {
-            return self.rfx.handle(bitmap);
+            return self
+                .rfx
+                .handle(bitmap)
+                .map(UpdateFragmenter::without_bulk_compression);
         }
         let planar = self.bitmap.handle(bitmap)?;
         let estimate = estimate_bulk_size(&planar.data)?;
@@ -665,7 +664,7 @@ impl BitmapUpdateHandler for AdaptiveHandler {
             Ok(planar)
         } else {
             self.rfx = candidate;
-            Ok(rfx)
+            Ok(rfx.without_bulk_compression())
         }
     }
 }
@@ -711,7 +710,10 @@ impl BitmapHandler {
 
 impl BitmapUpdateHandler for BitmapHandler {
     fn handle(&mut self, bitmap: &BitmapUpdate) -> Result<UpdateFragmenter> {
-        let mut buffer = vec![0; bitmap.data.len() * 2]; // TODO: estimate bitmap encoded size
+        // Crops may retain a much wider parent stride. Reserve for pixels
+        // actually encoded rather than clearing the entire parent-sized tail.
+        let pixels = usize::from(bitmap.width.get()) * usize::from(bitmap.height.get());
+        let mut buffer = vec![0; pixels * 8];
         let len = loop {
             match self.bitmap.encode(bitmap, buffer.as_mut_slice()) {
                 Err(err) => match err {
@@ -1078,6 +1080,80 @@ mod bulk_tests {
                 .handle(&bitmap)
                 .unwrap();
             assert_eq!(encoded.code, UpdateCode::Bitmap, "width={width}");
+        }
+    }
+
+    #[test]
+    #[ignore = "offline CPU timings; run with --release --ignored --nocapture"]
+    fn profile_photo_encoder_costs() {
+        use std::time::{Duration, Instant};
+        let width = 640u16;
+        let height = 360u16;
+        let frames: Vec<_> = (0..16u32)
+            .map(|frame| {
+                let mut seed = 0x9e3779b9u32.wrapping_mul(frame + 1);
+                let pixels: Vec<u8> = (0..usize::from(width) * usize::from(height))
+                    .flat_map(|i| {
+                        seed ^= seed << 13;
+                        seed ^= seed >> 17;
+                        seed ^= seed << 5;
+                        let x = i % usize::from(width);
+                        let y = i / usize::from(width);
+                        [
+                            (x + seed as usize % 64) as u8,
+                            (y + (seed >> 8) as usize % 64) as u8,
+                            (x + y + (seed >> 16) as usize % 64) as u8,
+                            255,
+                        ]
+                    })
+                    .collect();
+                BitmapUpdate {
+                    x: 0,
+                    y: 0,
+                    width: NonZeroU16::new(width).unwrap(),
+                    height: NonZeroU16::new(height).unwrap(),
+                    format: ironrdp_graphics::image_processing::PixelFormat::BgrA32,
+                    data: pixels.into(),
+                    stride: NonZeroUsize::new(usize::from(width) * 4).unwrap(),
+                }
+            })
+            .collect();
+        for adaptive in [false, true] {
+            let mut rfx =
+                RemoteFxHandler::new(EntropyBits::Rlgr3, 3, DesktopSize { width, height });
+            let mut handler = AdaptiveHandler {
+                bitmap: BitmapHandler::for_bulk_compression(),
+                rfx: rfx.clone(),
+            };
+            let mut bulk = bulk::BulkEncoder::new(CompressionType::Rdp61).unwrap();
+            let mut encoded_time = Duration::ZERO;
+            let mut send_time = Duration::ZERO;
+            let mut bytes = 0;
+            for bitmap in &frames {
+                let started = Instant::now();
+                let mut fragment = if adaptive {
+                    handler.handle(bitmap).unwrap()
+                } else {
+                    rfx.handle(bitmap).unwrap()
+                };
+                assert_eq!(fragment.code, UpdateCode::SurfaceCommands);
+                encoded_time += started.elapsed();
+                let started = Instant::now();
+                let mut output = vec![0; fragment.size_hint()];
+                while let Some(size) = fragment
+                    .next(&mut output, adaptive.then_some(&mut bulk), None)
+                    .unwrap()
+                {
+                    bytes += size;
+                }
+                send_time += started.elapsed();
+            }
+            eprintln!(
+                "photo adaptive={adaptive}: encode={:.3}ms/frame bulk={:.3}ms/frame wire={}B/frame",
+                encoded_time.as_secs_f64() * 1000.0 / frames.len() as f64,
+                send_time.as_secs_f64() * 1000.0 / frames.len() as f64,
+                bytes / frames.len()
+            );
         }
     }
 }

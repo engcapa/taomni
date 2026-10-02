@@ -258,6 +258,8 @@ $g.Dispose(); $bmp.Dispose()
                             env={**os.environ, "QA_MSTSC_PID": str(process.pid), "QA_MSTSC_CAPTURE": str(path)},
                             capture_output=True, text=True, timeout=45)
     if result.returncode or not path.is_file():
+        (ctx.case_dir / "mstsc-capture-error.txt").write_text(
+            f"exit={result.returncode}\n{result.stderr[-3000:]}\n{result.stdout[-3000:]}", encoding="utf-8")
         host_screenshot(ctx.case_dir / "mstsc-capture-failure.png")
         raise StepError(f"host_mstsc: window screenshot failed: {result.stderr[-500:]}")
     if args.get("expect_pattern"):
@@ -307,6 +309,17 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
 
     def cleanup() -> None:
         if process is not None:
+            try:
+                diagnostics = subprocess.run(
+                    ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                     "Get-Process mstsc -ErrorAction SilentlyContinue | "
+                     "Select-Object Id,SessionId,MainWindowHandle,MainWindowTitle,Path | ConvertTo-Json"],
+                    capture_output=True, text=True, timeout=30)
+                (ctx.case_dir / "mstsc-process-state.txt").write_text(
+                    f"owned_pid={process.pid} exit={process.poll()}\n{diagnostics.stdout}\n{diagnostics.stderr}",
+                    encoding="utf-8")
+            except Exception:
+                pass  # Diagnostics must not prevent process and credential restoration.
             if process.poll() is None:
                 try:
                     _capture_mstsc(ctx, process, {"snapshot": "mstsc-last-window.png"})
@@ -320,14 +333,22 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
     options = [f"full address:s:127.0.0.1:{port}", f"username:s:{user}",
                "authentication level:i:0", "prompt for credentials:i:0", "promptcredentialonce:i:0",
                "enablecredsspsupport:i:1", "negotiate security layer:i:1", "screen mode id:i:1",
-               "winposstr:s:0,1,800,200,1840,1000", "smart sizing:i:1", "compression:i:1",
+               "winposstr:s:0,1,10,10,1014,750", "smart sizing:i:1", "compression:i:1",
                f"desktopwidth:i:{int(args.get('width') or 1024)}", f"desktopheight:i:{int(args.get('height') or 768)}",
                "session bpp:i:32", "audiomode:i:0", "redirectclipboard:i:1", "autoreconnection enabled:i:0"]
     try:
         # Avoid Windows text mode expanding CRLF to CRCRLF. mstsc also needs
         # the complete path when invoked outside the RDP file's directory.
         rdp.write_text("\r\n".join(options) + "\r\n", encoding="utf-16", newline="")
-        process = subprocess.Popen(["mstsc.exe", str(rdp.resolve())])
+        startup_factory = getattr(subprocess, "STARTUPINFO", None)
+        startup = startup_factory() if startup_factory is not None else None
+        if startup is not None:
+            # A detached CI runner may inherit SW_HIDE. This case explicitly
+            # tests mstsc's visible native window, including failure dialogs.
+            startup.dwFlags |= getattr(subprocess, "STARTF_USESHOWWINDOW", 1)
+            startup.wShowWindow = 1  # SW_SHOWNORMAL
+        process = subprocess.Popen(["mstsc.exe", str(rdp.resolve()), f"/v:127.0.0.1:{port}"],
+                                   startupinfo=startup)
     except BaseException:
         cleanup()
         raise

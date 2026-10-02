@@ -69,14 +69,19 @@ class EncoderToolsTest(unittest.TestCase):
     def test_mstsc_file_uses_absolute_path_and_single_crlf_lines(self):
         process = Mock(pid=12345)
         process.poll.return_value = None
+        startup = SimpleNamespace(dwFlags=0, wShowWindow=0)
         with patch.object(steps.platform, "system", return_value="Windows"), \
              patch.dict(os.environ, {"QA_RDP_USER": "fixture-user", "QA_RDP_PASSWORD": "dummy-password"}), \
-             patch.object(steps.subprocess, "run", return_value=SimpleNamespace(returncode=0)), \
+             patch.object(steps.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")), \
+             patch.object(steps.subprocess, "STARTUPINFO", return_value=startup, create=True), \
              patch.object(steps.subprocess, "Popen", return_value=process) as launch, \
              patch.object(steps, "_stop_process"), \
              patch.object(steps, "_capture_mstsc", side_effect=RuntimeError("capture failed")) as capture:
             steps._do_host_mstsc(self.ctx, {"action": "start"})
-            launch.assert_called_once_with(["mstsc.exe", str((self.case / "mstsc.rdp").resolve())])
+            launch.assert_called_once_with(["mstsc.exe", str((self.case / "mstsc.rdp").resolve()),
+                                            "/v:127.0.0.1:3389"], startupinfo=startup)
+            self.assertEqual(startup.wShowWindow, 1)
+            self.assertNotEqual(startup.dwFlags, 0)
             raw = (self.case / "mstsc.rdp").read_bytes().decode("utf-16")
             self.assertIn("\r\nusername:s:fixture-user\r\n", raw)
             self.assertNotIn("\r\r\n", raw)

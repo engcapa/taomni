@@ -14,7 +14,10 @@
 
 use std::time::Instant;
 
+#[cfg(not(feature = "production-vendor"))]
 use ironrdp_bulk::{BulkCompressor, CompressionType};
+#[cfg(feature = "production-vendor")]
+use ironrdp_bulk_vendored::{BulkCompressor, CompressionType};
 use ironrdp_graphics::color_conversion::to_64x64_ycbcr_tile;
 use ironrdp_graphics::image_processing::PixelFormat;
 use ironrdp_graphics::rdp6::{BgrAChannels, BitmapStreamEncoder};
@@ -220,6 +223,16 @@ fn planar_bytes(pixels: &[u8], w: usize, h: usize) -> Vec<u8> {
 }
 
 fn planar_bytes_layout(pixels: &[u8], w: usize, h: usize, header_first: bool) -> Vec<u8> {
+    planar_bytes_with_rle(pixels, w, h, header_first, true)
+}
+
+fn planar_bytes_with_rle(
+    pixels: &[u8],
+    w: usize,
+    h: usize,
+    header_first: bool,
+    rle: bool,
+) -> Vec<u8> {
     let row = w * 4;
     let chunk_rows = (65535 / row).max(1);
     let mut all = Vec::new();
@@ -233,7 +246,7 @@ fn planar_bytes_layout(pixels: &[u8], w: usize, h: usize, header_first: bool) ->
             .rev()
             .flat_map(|r| r.chunks(4));
         let n = enc
-            .encode_pixels_stream::<_, BgrAChannels>(src, &mut out, true)
+            .encode_pixels_stream::<_, BgrAChannels>(src, &mut out, rle)
             .unwrap();
         if header_first {
             all.extend_from_slice(&[0u8; 26]);
@@ -245,6 +258,55 @@ fn planar_bytes_layout(pixels: &[u8], w: usize, h: usize, header_first: bool) ->
         y += rows;
     }
     all
+}
+
+#[cfg(feature = "production-vendor")]
+fn planar_candidate(pixels: &[u8], w: usize, h: usize) -> Vec<u8> {
+    let mut repeated = 0;
+    if w >= 2 && h >= 2 {
+        for row in 0..8 {
+            let y = if h >= 3 { row * (h - 3) / 7 + 2 } else { 1 };
+            for column in 0..32 {
+                let x = column * (w - 2) / 31 + 1;
+                let offset = (y * w + x) * 4;
+                let pixel = &pixels[offset..offset + 4];
+                if pixel == &pixels[offset - 4..offset]
+                    || pixel == &pixels[offset - w * 4..offset - w * 4 + 4]
+                    || (y >= 2
+                        && (0..4).all(|channel| {
+                            pixels[offset + channel].wrapping_sub(pixels[offset - w * 4 + channel])
+                                == pixels[offset - w * 4 + channel]
+                                    .wrapping_sub(pixels[offset - w * 8 + channel])
+                        }))
+                {
+                    repeated += 1;
+                }
+            }
+        }
+    }
+    planar_bytes_with_rle(pixels, w, h, true, w < 2 || h < 2 || repeated >= 128)
+}
+
+#[cfg(not(feature = "production-vendor"))]
+fn planar_candidate(pixels: &[u8], w: usize, h: usize) -> Vec<u8> {
+    planar_bytes(pixels, w, h)
+}
+
+fn estimate_mppc(sample: &[u8]) -> usize {
+    #[cfg(feature = "production-vendor")]
+    {
+        BulkCompressor::estimate_mppc64k_size(sample).unwrap()
+    }
+    #[cfg(not(feature = "production-vendor"))]
+    {
+        let mut scratch = BulkCompressor::new(CompressionType::Rdp5).unwrap();
+        let (size, flags) = scratch.compress(sample).unwrap();
+        if flags & PACKET_COMPRESSED != 0 {
+            size + 1
+        } else {
+            sample.len() + 1
+        }
+    }
 }
 
 fn zstd(bytes: &[u8], level: i32) -> usize {
@@ -354,15 +416,9 @@ fn strategies(fragment: usize, historical: bool) -> Vec<(&'static str, bool, Enc
                 .into_iter()
                 .map(|r| {
                     let px = crop(c, r);
-                    let planar = planar_bytes(&px, r.w, r.h);
-                    let mut scratch = BulkCompressor::new(CompressionType::Rdp5).unwrap();
+                    let planar = planar_candidate(&px, r.w, r.h);
                     let sample = &planar[..planar.len().min(FRAGMENT)];
-                    let (size, flags) = scratch.compress(sample).unwrap();
-                    let encoded = if flags & PACKET_COMPRESSED != 0 {
-                        size + 1
-                    } else {
-                        sample.len() + 1
-                    };
+                    let encoded = estimate_mppc(sample);
                     let estimate = (encoded * planar.len()).div_ceil(sample.len());
                     if estimate as f64 <= planar.len() as f64 * 0.25 {
                         bulk_send(&mut tx, &mut rx, &planar, fragment)
@@ -371,8 +427,8 @@ fn strategies(fragment: usize, historical: bool) -> Vec<(&'static str, bool, Enc
                         if estimate <= rfx_size {
                             bulk_send(&mut tx, &mut rx, &planar, fragment)
                         } else {
-                            // Conservative RemoteFX size: the server also bulk
-                            // compresses it, so the actual wire size can be lower.
+                            // RemoteFX is already compressed. The production
+                            // server sends it raw without advancing bulk history.
                             rfx_size
                         }
                     }

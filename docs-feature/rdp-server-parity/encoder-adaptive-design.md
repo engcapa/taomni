@@ -27,7 +27,9 @@ Taomni 目前从不做批量压缩。TermService 对 PERF-01 发的是位图更�
 
 **不做。** EGFX/AVC420 通道改造（macOS 已有实验路径，见 DEC-05）；RemoteFX progressive；RDPDR 驱动器重定向；连续带宽测量；改变客户端（`src-tauri/src/rdp/`）的编码选择。客户端只在 TASK-E4 中改为声明批量压缩。
 
-## 2. 当前实现与功能缺口
+## 2. 实施前基线与功能缺口
+
+下表记录调研基线 `e1af63eb`；实施后的状态、测试与运行号见 §6、§8.2、§9。客户端编码列表的实际默认值已在开工 unit 中核实。
 
 | 位置与符号 | 当前行为 / 契约 | 本次影响 | 依据与确定性 |
 |---|---|---|---|
@@ -39,9 +41,9 @@ Taomni 目前从不做批量压缩。TermService 对 PERF-01 发的是位图更�
 | `ironrdp-acceptor 0.10.0` `connection.rs` 约 680–723 行 | 解析 Client Info PDU（含 `ClientInfoFlags::COMPRESSION` 和 `compression_type`），只把 TLS 模式下的凭据存进 `AcceptorResult`；压缩声明被丢弃 | 需要把客户端的压缩声明带到 `UpdateEncoder`（TASK-E1） | 源码；`ironrdp-acceptor` 不在 `[patch.crates-io]` 中 |
 | `ironrdp-bulk 0.1.1` `BulkCompressor` | 提供 MPPC（RDP4/5）、NCRUSH（RDP6）、XCRUSH（RDP6.1）压缩与解压；`compress` 对 ≤50 或 ≥16384 字节直接跳过；压缩后变大时返回未压缩并置 FLUSHED | 服务端直接复用 | 源码 + EXP-03 往返校验 |
 | `ironrdp-session 0.11.0` `fast_path.rs` 约 100–130 行、`active_stage.rs` 约 79 行 | `compression_type` 为 `Some` 时建 `BulkCompressor` 并解压带 COMPRESSED/FLUSHED 标志的快速路径更新 | Taomni 客户端与探针能解压，只是目前都传 `None` | 源码 |
-| `src-tauri/src/rdp/session.rs` `build_ironrdp_config`（约 2456 行，`compression_type: None` 在约 2524 行）、`client_bitmap_codecs()`（约 2451 行，只公告 `remotefx`） | Taomni 客户端不声明批量压缩 | TASK-E4 改为声明 RDP6.1 | 源码 |
+| `src-tauri/src/rdp/session.rs` `build_ironrdp_config`（基线 `compression_type: None`）、`client_bitmap_codecs()` | Taomni 客户端未声明批量压缩；`client_codecs_capabilities(["remotefx"])` 也按默认声明 QOI/QOIZ，不能把该参数误读为只公告 RemoteFX | TASK-E4 改为声明 RDP6.1；保留编码能力列表 | 源码 + 开工前回环 unit |
 | `src-tauri/src/bin/rdp-probe/session.rs` `connector_config`（`compression_type: None` 约 313 行）、`MSTSC_LIKE_CODECS = "remotefx,qoi:off,qoiz:off"` | 探针不声明批量压缩，所以 CI 测不到压缩路径 | TASK-E4 加 `--compression` 选项，默认按 mstsc 声明 RDP6.1 | 源码 |
-| `src-tauri/src/servers/rdp/loopback_tests.rs` `round_trip`、`client_config`（`compression_type: None`） | 真实服务端 + ironrdp 客户端栈的回环像素校验，现有 QOIZ 与仅 RemoteFX 两个用例 | 增加压缩 / 自适应用例（TASK-E3） | 源码。注：`taomni_client_decodes_the_codec_the_server_picks_for_it` 断言客户端公告 QOIZ，而 `client_bitmap_codecs()` 目前只公告 `remotefx`，TASK-E3 开工前须先跑一遍确认该用例现状（见 §10） |
+| `src-tauri/src/servers/rdp/loopback_tests.rs` `round_trip`、`client_config`（基线 `compression_type: None`） | 真实服务端 + ironrdp 客户端栈的回环像素校验，原有 QOIZ 与仅 RemoteFX 两个用例均通过 | 增加压缩 / 自适应用例（TASK-E3） | 原 QOIZ 断言符合客户端实际默认能力，未改该列表或旧断言 |
 | `src-tauri/src/bin/rdp-probe/rfx_stats.rs` | 报告 RemoteFX 量化与 tile、各快速路径更新类型的次数与字节、位图更新的 bpp/压缩方式；遇到批量压缩的更新只计数、不解析 | TASK-E4 加压缩前后字节与压缩比 | 源码 |
 | `qa-ui-auto-tests/cases/TC-RDPS-PERF-01-performance-budget.testcase.yaml` 第 27–29 步 | 按 §4.7 预算断言 M1≤500 ms、M2 p95≤65 ms、M3≥25.6 fps、M4≤4905 kbps；三端当前都因 M4 失败 | 验收口径不变 | CI 运行 36864121715 |
 
@@ -130,13 +132,15 @@ EncoderIter::next(rect)
             else
                  rfx = RfxEncoder::encode(rect)                     // UpdateCode::SurfaceCommands
                  rfx.len() < estimate ? 发 rfx : 发 planar
-       // 选定的那份数据在分片写出前经过连接的批量压缩器（§4.3），且只经过一次
+       // planar 分片写出前经过连接的批量压缩器（§4.3），且只经过一次
+       // 已压缩的 RemoteFX 直接发送；不推进发送端或接收端 bulk 历史
 ```
 
 要点：
 
 - **只有真正发出去的字节进入连接的压缩历史。** 连接的 `BulkCompressor` 每调用一次 `compress` 就推进历史，客户端则只会看到发出去的数据。如果拿连接压缩器去“试压”一个最终没发的矩形，双方历史就会错位，后面的画面会解错。所以判断只用 `scratch_mppc64k`：一个当次新建、用完即弃的 MPPC-64K 压缩器，仅试压当前 planar 的首个 16374 字节分片，再按比例估算整个矩形，不带跨帧历史。这样限制照片场景试压 CPU 成本，且不污染发送历史。V-E01 的完整自适应耗时为 UI 6.51 ms/frame、照片 40.34 ms/frame（含 planar、选择与所选编码），与原 RemoteFX 的 4.36/26.65 ms 分开记录；实际输入延迟与帧率以 CI native PERF-01/03 为准。
-- **位图更新的约束。** `BitmapEncoder` 要求宽度是 4 的倍数（`encoder/bitmap.rs` 约 30 行）。合并矩形按 64 对齐，但桌面右缘可能不对齐（1366 宽等）。不满足时，该矩形直接走 RemoteFX，不报错。
+- **位图更新的约束。** bulk 路径的 `TS_CD_HEADER.cbScanWidth` 为每行字节数 `width * 4`，因此任意 32bpp 像素宽度都对齐；只有该值超出 u16 时回退 RemoteFX。奇数宽 XDamage 与保留父 stride 的裁剪由逐像素 unit 覆盖。非 bulk 路径保持原头部字节。
+- **照片的 CPU 成本。** 第三轮 CI 的实际画面帧率证明完整 planar RLE 与 RemoteFX 重复编码、再尝试 bulk，会拖慢照片。仍先生成完整无损 planar 并比较压缩大小；在矩形全范围采样 256 个邻域，超过一半有重复色或一致的垂直增量时使用 RLE，否则用一次遍历生成标准 raw planar 的 R/G/B 三个平面。采样只选择 planar 内部的 RLE 表示，不直接决定最终 wire codec。大小估算只分配独立 MPPC 上下文。选中 RemoteFX 时直接发送，因为照片 unit 中额外 bulk 5.07 ms/frame 没有节省字节；未压缩更新不进入两端历史，四种级别的混发测试验证这一点。
 - **两种更新混发。** 同一帧里可能有的矩形是位图更新（`UpdateCode::Bitmap`），有的是 surface bits。mstsc、FreeRDP 和 ironrdp-session 都能处理混发，各自直接绘制到同一个 framebuffer；TASK-E3 的回环测试要覆盖混发的帧。
 - **RemoteFX 首帧头。** `RemoteFxHandler` 在第一次编码时附带 Sync/Context/Channels（`desktop_size.take()`）。自适应路径下，第一个矩形可能是位图，所以这个“首帧”标志必须挂在 RemoteFX 编码器自己身上，不能按“第一个更新”判断。现有实现已经是挂在 `RemoteFxHandler` 上的，保持不变即可。
 
@@ -238,11 +242,11 @@ EncoderIter::next(rect)
 ### TASK-E2 内容自适应选择
 
 - 职责与文件范围：`vendor/ironrdp-server/src/encoder/mod.rs`（`AdaptiveHandler`）、`src-tauri/src/servers/rdp.rs`、`src-tauri/src/servers/rdp/metrics.rs`
-- 输入与必读：§4.1、§4.2、DEC-02/03；`encoder/bitmap.rs`（宽度须为 4 的倍数）；`encoder/rfx.rs`
+- 输入与必读：§4.1、§4.2、DEC-02/03；`encoder/bitmap.rs`（基线有宽度限制，新 bulk 路径按字节写 scan width）；`encoder/rfx.rs`
 - 依赖：TASK-E1
 - 实施内容：
   1. `UpdateEncoder::new` 中，当协商出 RemoteFX、且连接有批量压缩器时，构建 `BitmapUpdater::Adaptive(AdaptiveHandler { bitmap: BitmapHandler, rfx: RemoteFxHandler })`；其他情况保持原有选择，不改动。
-  2. `AdaptiveHandler::handle` 按 §4.2 的伪代码实现。`PLANAR_BULK_GIVE_UP_RATIO = 0.25`；宽度不是 4 的倍数时直接走 RemoteFX。每次选择后更新 `EncoderStats`。
+  2. `AdaptiveHandler::handle` 按 §4.2 的伪代码实现。`PLANAR_BULK_GIVE_UP_RATIO = 0.25`；支持任意宽度，仅每行字节数超出 u16 时走 RemoteFX。每次选择后更新 `EncoderStats`。照片开销优化与 raw/bulk 混发规则见 §4.2。
   3. `servers/rdp.rs`：builder 上 `.with_bulk_compression(...)`、`.with_encoder_stats_handle(...)`，并加启动日志；`metrics.rs` 在 “RDP latency:” 行尾追加编码分布与压缩比。
   4. 在离线实验中按最终实现补一个 EXP-06 行（scratch MPPC 估算 + 选择），运行 V-E01，把数字和耗时回填到 §4.1、§4.2。
 - 对应验收：AC-E01、AC-E02、AC-E09
@@ -255,7 +259,7 @@ EncoderIter::next(rect)
 - 输入与必读：现有 `round_trip`、`decode_desktop`、`start_server`、`pattern()`；§3 AC-E03~E05
 - 依赖：可先写骨架；断言部分依赖 TASK-E1/E2
 - 实施内容：
-  1. 开工前先单独跑 `cargo test --lib servers::rdp::loopback_tests`，记录现有两个用例的结果。尤其是 `taomni_client_decodes_the_codec_the_server_picks_for_it`：它断言客户端公告 QOIZ，而 `client_bitmap_codecs()` 当前只公告 `remotefx`。如果该用例已经失败，把它单独记为预先存在的问题，按事实修正断言或客户端编码列表，并在完成记录里说明，不要把它混进本次改动。
+  1. 开工前先单独跑 `cargo test --lib servers::rdp::loopback_tests`，记录现有两个用例的结果。实际已确认二者均通过：默认能力仍包含 QOIZ，原设计对参数列表的解读有误，不需要修正客户端列表或旧断言。
   2. `client_config(codecs, compression)`；新增用例：
      - `mstsc_like_client_without_compression_gets_remotefx_unchanged`（AC-E03）：断言收到的更新全是 surface bits，没有 compression 标志；
      - `bulk_compressed_planar_round_trip_is_lossless`（AC-E05，RDP6.1）：静态 UI 图案，位图部分逐像素相等；
@@ -455,6 +459,10 @@ EncoderIter::next(rect)
 - Linux 带宽修复：`TS_CD_HEADER.cbScanWidth` 应为每行字节数。bulk 位图路径现填写 `width * 4`，支持任意宽度脏区，避免因非 4 倍数宽度强制回退 RemoteFX。旧非 bulk 路径保持原头部。新增 1/2/3/253/254/255/256 宽、131 高、父 stride 裁剪的逐像素 unit，以及真实 TCP/TLS 回环的 253/255 宽脏区完整帧像素与字节预算断言；vendor 19 passed，根库 RDP 247 passed / 7 live-service ignored。
 - 修正 PERF-03 为比较 `marker.observed_fps`（实际不同画面），仍要求比值 ≥0.95、带宽比 ≤1.05。mstsc `.rdp` 使用单 CRLF 与绝对路径；退出前保存窗口诊断。xrdp 在清理前保存服务、Xorg、会话日志；产品保留原始会话错误而不让晚到输入覆盖它。QA 工具对应 unit 13 passed。互通和原生预算仍待下一轮实际报告。
 - 第三轮 macOS native 为 10 passed / 1 failed / 0 skipped；PERF-01 的 bulk 压缩数为 0、M3=19.06 fps、M4=6692.34 kbps。PERF-03 原断言表面通过，但实际不同画面帧率比为 14.093/18.159=0.7761，按修正后的口径不能验收。XCRUSH 序列 unit 已复现“不可压缩数据触发 MPPC FLUSHED 后，下一包 COMPRESSED+FLUSHED 被误丢弃，并持续重置”的缺陷；改前失败日志 `encoder-xcrush-flush-before-2.log`，修复后 bulk 136 / server 19 tests 全过。另有 WebSocket unit 验证晚到 refresh/resize 不会覆盖原始 TLS 错误（12 passed / 1 live-service ignored）。这些本地日志位于 ignored 的 `qa-ui-auto-report/_local/`；三端原生性能必须重测。
+- 第四轮 [36957070003](https://github.com/engcapa/taomni/actions/runs/36957070003)，源码 `69ddd766`：三端 browser 各 5 passed / 0 failed / 0 skipped；native 为 Linux 10/2/0、Windows 12/3/0、macOS 9/2/0。PERF-01 在 Linux、Windows 全部通过（172.585/476.354 kbps，实际画面 54.782/32.467 fps）；macOS 带宽 306.519 kbps 已达标，但实际画面 19.115 fps 未达 25.6。照片的实际帧率比分别为 Linux 0.829128、Windows 0.703827、macOS 0.786720，不能验收。照片 CPU 优化改为只分配 MPPC 估算上下文、一次遍历生成 raw planar 候选、仅按裁剪尺寸分配输出缓冲，并让已压缩的 RemoteFX 走不推进 bulk 历史的 raw fast-path；四级混发历史与逐像素 unit 均通过，真实性能待下一轮复测。
+- 第四轮互通失败原样保留：Linux xrdp 的实际错误为 rustls `NotValidForNameContext`，精确 pin 策略已用改前失败 / 改后通过的纯 unit 补齐；Windows TermService 为 `BadSignature`，补明确 provider 与 TLS 握手阶段诊断，保持签名验证。mstsc 未完成任何通道握手，补可见启动状态、窗口位置与进程/截图错误诊断，仍需真实 CI 证明。
+- native runner 此前未执行声明的 fixture teardown，现成功 setup 的 fixture 在关闭 session 后逆序恢复，部分 setup / step / cleanup 失败保留原始错误并继续清理；全 mocked Python unit 通过。下一轮需核对 xrdp 服务、基线账号和音频恢复。
+- V-E06 网络缺陷注入：临时将 `BulkEncoder::new` 的 `flush_next` 设为 false，真实 `reactivation_resets_compression_history` 在尺寸重激活后无法取得正确画面而超时失败（`encoder-network-injection.log`）；恢复首次 FLUSHED 信号并更新源文件时间戳使 Cargo 实际重编后，1 passed（`encoder-network-restored-fresh.log`）。另新增断言逐个记录的重激活后首个压缩分片必须带 FLUSHED；先前复用 encoder 的 reset 删除实验仍单独保留。
 
 ## 9. 验收追踪与交付条件
 
@@ -486,7 +494,7 @@ EncoderIter::next(rect)
 | 压缩历史不同步导致花屏 | 一旦服务端多压缩或漏发一个分片，客户端后续画面全错 | §4.2 规定只有发出的字节进入历史；V-E05/E06 逐帧校验，并要求做缺陷注入；出错时本连接关闭压缩并发 FLUSHED | E1、E3 | V-E05/E06 通过 |
 | CPU 开销 | 每个 UI 类矩形多一次 scratch MPPC 压缩（估计 1–2 ms/帧，640×360）；照片类再多一次 RemoteFX 编码 | TASK-E2 在 V-E01 中测量并回填；若某端 M2 p95 因此恶化，可把 scratch 估算改为只压 planar 的前 16 KB | E2 | V-E01 耗时与 V-E12 M2 结果 |
 | vendored acceptor 维护成本 | 新增一个打了补丁的 crate，升级 ironrdp 时要重新合并 | `VENDORED.md` 写明改动只有一处字段与一处赋值；同时可向上游提 PR（不阻塞） | 不阻塞 | — |
-| 现有回环用例与客户端编码列表不一致 | `taomni_client_decodes_the_codec_the_server_picks_for_it` 断言客户端公告 QOIZ，而 `client_bitmap_codecs()` 当前只公告 `remotefx`（`src-tauri/src/rdp/session.rs` 约 2451 行）；2026-10-01 本地 `servers::` 238 passed / 7 ignored，未逐条核对该用例是否在 ignored 或已失败 | TASK-E3 第一步单独运行并记录；属于预先存在的问题时单独修正，不混入本次改动 | E3 | 该用例状态明确 |
+| 原设计怀疑 QOIZ 断言与能力列表不一致 | 开工单独执行原回环 unit，确认通过；`client_codecs_capabilities(["remotefx"])` 默认也包含 QOI/QOIZ | 保留客户端列表与原断言；专有编码另有 INFO_COMPRESSION 条件下逐字节兼容 unit | E3 | 已解除 |
 | xrdp 安装（DEC-07） | 需要在 runner 上用 sudo 安装并启动系统服务 | 用户于 2026-10-02 要求按建议执行；已实现 Linux hosted runner 的安装与可恢复 fixture | E7 的 REF-02 | 已解除；仍需 V-E15 实测 |
 | EGFX/AVC420 后续方向 | 照片 / 视频类内容的最优解是视频编码；本次只保证不比现在差 | 记录为后续工作；macOS 已有实验路径 `servers/rdp/gfx.rs` | 不阻塞 | — |
 

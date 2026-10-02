@@ -459,6 +459,7 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                 dry_run=False, worker_id=0, report_root=report_root,
                 values=fixture_values, step_index=0,
             )
+            applied_fixtures = []
             try:
                 fixture_started = time.monotonic()
                 # Fixtures first — a FixtureSkip turns into "skipped".
@@ -467,6 +468,7 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     try:
                         deadline.remaining()
                         fix.setup(ctx_ns)
+                        applied_fixtures.append(fix)
                         deadline.remaining()
                     except FixtureSkip as fs:
                         r["status"] = "skipped"
@@ -553,6 +555,25 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     "message": f"{type(e).__name__}: {e}",
                     "artifacts": {},
                 }
+            finally:
+                fixture_cleanup_started = time.monotonic()
+                cleanup_errors = []
+                for fix in reversed(applied_fixtures):
+                    teardown = getattr(fix, "teardown", None)
+                    if teardown is not None:
+                        try:
+                            teardown(ctx_ns)
+                        except Exception as exc:  # continue restoring other owned fixtures
+                            cleanup_errors.append({"fixture": fix.name, "message": str(exc)})
+                r["timings"]["fixture_cleanup_sec"] = time.monotonic() - fixture_cleanup_started
+                if cleanup_errors:
+                    r["fixture_cleanup_errors"] = cleanup_errors
+                    if r["status"] != "failed":
+                        r["status"] = "failed"
+                        r["failure"] = {
+                            "step_index": 0, "verb": "<fixture-cleanup>", "args": None,
+                            "message": f"fixture cleanup failed: {cleanup_errors}", "artifacts": {},
+                        }
             if r["status"] == "failed":
                 r["failure"]["artifacts"] = failure_artifacts
             with suppress(Exception):

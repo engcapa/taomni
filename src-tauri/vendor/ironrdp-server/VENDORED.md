@@ -9,6 +9,10 @@ Encoder-adaptive patch (`docs-feature/rdp-server-parity/encoder-adaptive-design.
   resize reset and connection-local error fallback.
 - Independent scratch MPPC estimate of at most one 16374-byte planar fragment;
   select planar bitmap or default-quantization RemoteFX per dirty rectangle.
+- Use raw lossless planar for noisy pixels, a single pass for its three colour
+  planes, and a lightweight disposable MPPC estimator. Repeated colours and
+  coherent vertical deltas retain planar RLE. Selected RemoteFX is sent without
+  another bulk-compression attempt; raw fragments advance neither history.
 - Reserve XCRUSH/fast-path overhead before advancing history; retain the
   cropped bitmap's final partial-stride row.
 - In the bulk path, write the bitmap header scan width in bytes. This permits

@@ -130,7 +130,11 @@ where
         ));
     }
 
-    let webpki = WebPkiServerVerifier::builder(Arc::new(roots))
+    // Other network clients can install a different process-wide provider.
+    // Keep RDP's verifier and TLS negotiation on the same provider as its
+    // tested transport/probe rather than depending on initialization order.
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let webpki = WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider.clone())
         .build()
         .map_err(io::Error::other)?;
     let verifier = Arc::new(PinnedServerVerifier {
@@ -141,7 +145,9 @@ where
     });
     let used_pin = verifier.pin.is_some();
 
-    let mut config = rustls::ClientConfig::builder()
+    let mut config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(io::Error::other)?
         .dangerous()
         .with_custom_certificate_verifier(verifier)
         .with_no_client_auth();
@@ -240,9 +246,10 @@ impl PinnedServerVerifier {
 
         match system_error {
             rustls::Error::InvalidCertificate(rustls::CertificateError::UnknownIssuer)
-            | rustls::Error::InvalidCertificate(rustls::CertificateError::NotValidForName) => {
-                Ok(ServerCertVerified::assertion())
-            }
+            | rustls::Error::InvalidCertificate(rustls::CertificateError::NotValidForName)
+            | rustls::Error::InvalidCertificate(
+                rustls::CertificateError::NotValidForNameContext { .. },
+            ) => Ok(ServerCertVerified::assertion()),
             other => Err(other),
         }
     }
@@ -275,7 +282,14 @@ impl ServerCertVerifier for PinnedServerVerifier {
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        self.webpki.verify_tls12_signature(message, cert, dss)
+        self.webpki
+            .verify_tls12_signature(message, cert, dss)
+            .map_err(|error| {
+                rustls::Error::General(format!(
+                    "TLS 1.2 handshake signature {:?}: {error}",
+                    dss.scheme
+                ))
+            })
     }
 
     fn verify_tls13_signature(
@@ -284,7 +298,14 @@ impl ServerCertVerifier for PinnedServerVerifier {
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, rustls::Error> {
-        self.webpki.verify_tls13_signature(message, cert, dss)
+        self.webpki
+            .verify_tls13_signature(message, cert, dss)
+            .map_err(|error| {
+                rustls::Error::General(format!(
+                    "TLS 1.3 handshake signature {:?}: {error}",
+                    dss.scheme
+                ))
+            })
     }
 
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
@@ -321,6 +342,62 @@ mod tests {
         assert_eq!(
             load_pin(&conn, "rdp.example.com", 3389).unwrap().as_deref(),
             Some(fingerprint.as_str())
+        );
+    }
+
+    #[test]
+    fn exact_pin_accepts_a_trusted_certificate_with_a_different_server_name() {
+        use rustls::client::danger::ServerCertVerifier as _;
+        super::install_crypto_provider();
+        let generated = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
+        let cert = CertificateDer::from(generated.cert.der().to_vec());
+        let fingerprint = certificate_fingerprint(&cert);
+        let mut roots = rustls::RootCertStore::empty();
+        roots.add(cert.clone()).unwrap();
+        let webpki = rustls::client::WebPkiServerVerifier::builder(Arc::new(roots))
+            .build()
+            .unwrap();
+        let server_name = rustls::pki_types::ServerName::try_from("127.0.0.1").unwrap();
+        let now = rustls::pki_types::UnixTime::now();
+        assert!(matches!(
+            webpki.verify_server_cert(&cert, &[], &server_name, &[], now),
+            Err(rustls::Error::InvalidCertificate(
+                rustls::CertificateError::NotValidForNameContext { .. }
+            ))
+        ));
+        let mut pinned = super::PinnedServerVerifier {
+            webpki,
+            pin: Some(fingerprint.clone()),
+            host: "127.0.0.1".to_string(),
+            port: 3389,
+        };
+        pinned
+            .verify_server_cert(&cert, &[], &server_name, &[], now)
+            .unwrap();
+        pinned.pin = Some("00".repeat(32));
+        assert!(
+            pinned
+                .verify_server_cert(&cert, &[], &server_name, &[], now)
+                .unwrap_err()
+                .to_string()
+                .contains("RDP_CERTIFICATE_CHANGED")
+        );
+        pinned.pin = None;
+        assert!(
+            pinned
+                .verify_server_cert(&cert, &[], &server_name, &[], now)
+                .unwrap_err()
+                .to_string()
+                .contains("RDP_CERTIFICATE_UNTRUSTED")
+        );
+        pinned.pin = Some(fingerprint);
+        assert!(
+            pinned
+                .verify_pin(
+                    &cert,
+                    rustls::Error::InvalidCertificate(rustls::CertificateError::Revoked)
+                )
+                .is_err()
         );
     }
 
