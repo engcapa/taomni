@@ -23,4 +23,4 @@ verification:
   visual:
   - {check: Full original content and seams, method: automated, reason: "Compare every output pixel and spatial tile to the actual renderer canvas original; text/checker/shapes across the width expose missing content that a single decode column could miss. Retain expected/actual/difference PNGs for visual review."}
   native:
-  - {check: Wheel and capture, method: automated, reason: Enigo injects OS wheel and the product captures real native fixture pixels.}
+  - {check: Wheel and capture, method: automated, reason: "The fixture hides its pointer with CSS cursor:none so its native scene matches the cursor-free retained canvas original. Enigo still injects real OS wheel input and the product captures native fixture pixels; no output pixels are masked."}
