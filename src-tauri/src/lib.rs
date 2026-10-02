@@ -1082,6 +1082,7 @@ pub fn run() {
             screenshot::qa::screenshot_qa_overlay_copy,
             screenshot::qa::screenshot_qa_recorder,
             screenshot::qa::screenshot_qa_pin,
+            screenshot::qa::screenshot_qa_freehand,
             screenshot::qa::screenshot_qa_hotkey,
             lanchat::commands::lanchat_send_clipboard_image,
             lanchat::commands::lanchat_send_image_bytes,

@@ -8,6 +8,8 @@ import {
   useState,
 } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { pointInContour, traceContour } from "../../lib/screenshotSelection";
+import type { ScreenshotPoint } from "../../lib/screenshot";
 
 export type AnnotationTool =
   | "select"
@@ -116,6 +118,8 @@ interface AnnotationCanvasProps {
   baseImage: HTMLImageElement | null;
   /** CSS-pixel rect annotations are clipped to; null = whole image. */
   selection: CssRect | null;
+  /** Optional closed freehand boundary in the same CSS-pixel space. */
+  selectionContour?: readonly ScreenshotPoint[] | null;
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
   /** Fired when the user presses a draw tool outside the selection. */
   onRequestReselect?: (at: Point) => void;
@@ -416,7 +420,7 @@ const EMPTY_HISTORY: History = { shapes: [], undo: [], redo: [] };
 
 export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCanvasProps>(
   function AnnotationCanvas(props, ref) {
-    const { imageWidth, imageHeight, tool, color, lineWidth, baseImage, selection, onHistoryChange, onRequestReselect } =
+    const { imageWidth, imageHeight, tool, color, lineWidth, baseImage, selection, selectionContour, onHistoryChange, onRequestReselect } =
       props;
 
     const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -508,9 +512,14 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (selection) {
         ctx.save();
-        ctx.beginPath();
-        ctx.rect(selection.x, selection.y, selection.w, selection.h);
-        ctx.clip();
+        if (selectionContour) {
+          traceContour(ctx, selectionContour);
+          ctx.clip("evenodd");
+        } else {
+          ctx.beginPath();
+          ctx.rect(selection.x, selection.y, selection.w, selection.h);
+          ctx.clip();
+        }
       }
       const sampleScaleX = baseImage ? baseImage.naturalWidth / Math.max(1, imageWidth) : 1;
       const sampleScaleY = baseImage ? baseImage.naturalHeight / Math.max(1, imageHeight) : 1;
@@ -527,7 +536,7 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
         paintPolyline(ctx, eraserTrail);
         ctx.restore();
       }
-    }, [history, draft, eraserTrail, selection, baseImage, imageWidth, imageHeight, lineWidth]);
+    }, [history, draft, eraserTrail, selection, selectionContour, baseImage, imageWidth, imageHeight, lineWidth]);
 
     const localPos = (e: { clientX: number; clientY: number }): Point => {
       const r = wrapRef.current?.getBoundingClientRect();
@@ -569,7 +578,8 @@ export const AnnotationCanvas = forwardRef<AnnotationCanvasHandle, AnnotationCan
       addShape({ id: -1, kind: "number", x: p.x, y: p.y, num: nextNumber(), color, lineWidth });
     };
 
-    const outsideSelection = (p: Point) => selection !== null && !inRect(p, selection);
+    const outsideSelection = (p: Point) => selection !== null
+      && (selectionContour ? !pointInContour(p, selectionContour) : !inRect(p, selection));
 
     const handleMouseDown = (e: ReactMouseEvent) => {
       if (e.button !== 0 || tool === "select") return;

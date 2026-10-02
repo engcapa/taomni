@@ -9250,6 +9250,7 @@ files:
   - src/components/screenshot/PinnedImage.tsx
   - src/components/screenshot/RecorderBar.tsx
   - src/lib/screenshot.ts
+  - src/lib/screenshotSelection.ts
   - src/components/tabbar/ControlBar.tsx
   - src-tauri/src/screenshot/mod.rs
   - src-tauri/src/screenshot/capture.rs
@@ -9292,6 +9293,15 @@ controls:
     kind: display
   - id: screenshot-selection
     selector: '[data-testid="screenshot-selection"]'
+    kind: display
+  - id: screenshot-selection-rectangle
+    selector: '[data-testid="screenshot-selection-rectangle"]'
+    kind: interactive
+  - id: screenshot-selection-freehand
+    selector: '[data-testid="screenshot-selection-freehand"]'
+    kind: interactive
+  - id: screenshot-freehand-contour
+    selector: '[data-testid="screenshot-freehand-contour"]'
     kind: display
   - id: screenshot-select-layer
     selector: '[data-testid="screenshot-select-layer"]'
@@ -9543,10 +9553,12 @@ controls:
 
 - 系统截图工具：ControlBar 全局相机按钮（不依附 tab）与当前配置快捷键打开截图 overlay；默认 Windows/Linux `Ctrl+Alt+A`，macOS `Ctrl+Super+A`（Control+Command+A）。延迟菜单支持 3/5/10 秒，倒计时中点击相机取消。
 - 区域选择与全屏选择默认处于 select 模式，显式点击矩形等工具后才开始绘制；选区可通过八方向 handles 与 move 区域调整，recrop 保留标注，选区外重新选择和滚动截图完成则清空旧标注。12 个工具包含矩形、椭圆、箭头、直线、画笔、荧光笔、文字、气泡、马赛克、模糊、编号和橡皮；实际拖拽创建形状，文字 Enter/blur 提交、Escape 取消，擦除是可撤销的变更，redo 仅在 undo 后可用。
-- 输出支持复制、PNG 保存（取消保留选区）、贴图；OCR 显示/复制识别结果，auto-redact 将返回框作为一次可撤销标注，水印支持文字/透明度/颜色的 apply/clear。滚动截图刷新 overlay；GIF/MP4 录制入口配独立状态条、停止预览、保存/完成和 GIF 首帧复制（剪贴板不承载动画）。
+- 自由手绘选区：hint/toolbar 可在矩形与自由选区间切换，松手自动闭合，凹形/交叉轮廓按 even-odd 规则命中和导出；退化直线/微小轮廓不进入标注。八方向 handles 与 move 按包围盒变换轮廓并保留标注历史；轮廓外（包括包围盒内空白）按下重新选择。切回矩形保留包围盒/标注，重新进入自由选区清空旧形状。画笔仍是独立标注工具。
+- 输出支持复制、PNG 保存（取消保留选区）、贴图；自由选区在自然尺寸 PNG 中保留内部原画/标注并将外部变为透明，最终遮罩在水印之后应用。Pin 保留原有无边框/置顶/原生拖动和三种关闭入口，以棋盘背景显示透明 PNG，不扩展为跨重启图库。OCR 显示/复制识别结果，auto-redact 将返回框作为一次可撤销标注，水印支持文字/透明度/颜色的 apply/clear。滚动截图刷新 overlay；GIF/MP4 录制入口配独立状态条、停止预览、保存/完成和 GIF 首帧复制（剪贴板不承载动画）；自由选区禁用滚动/录制并提示切换矩形。
 - Browser `TC-SHOT-001`–`021` 检查真实 renderer 输入、选区几何、`data-shapes` 历史、已绘制 canvas 颜色/线宽、PNG 解码尺寸、dialog 取消/确认、贴图 route 和快捷键/倒计时；浏览器 OCR 返回 `Taomni stub OCR\nuser@example.com`，滚动 stub 返回同一 400×300 图，录制 stop 返回 PNG preview。请求/route/形状数断言不等于真实采集、拼接、GIF/MP4 编码或敏感像素遮盖证据；水印 apply/clear 状态不宣称水印输出像素通过。
 - Native `SHOT-N*` 用例负责真实屏幕、滚动注入/拼接、OS 剪贴板、媒体解码和窗口/全局热键边界。N2/N9 捕获完整长页并将产物逐像素/24×24 区块与真实 renderer canvas 保留的原画比对，覆盖文字、图案、分隔线及缺失/重复/错位/拉伸，不只检查高度或单列颜色。N5–N8 对 GIF/MP4 每一解码帧核对原画 frame id、每轮随机 nonce、区域像素及有序时间线，黑帧/错区域/静态或无关多帧均不得通过；保存原始 PNG、产物、逐帧指标/时间线和原图/实际/差异接触图。
-- `status: done` 表示功能代码已实装。完整原画内容比对标准下，run36973502375（SHA fb0f02c5）三端 native 各10/10、零失败零跳过；回执、构建身份、用例摘要与产物哈希均已核验，Pillow/PyAV 独立解码确认每一 GIF/MP4 帧匹配本轮原画且长图逐像素一致。旧标准 run36956493957 结果不作为该证据。混合 DPI/多显示器与 Wayland 仍未验证。
+- 新增 Browser `TC-SHOT-022` 验证自由轮廓/退化拒绝/移动缩放/历史/切换/轮廓外命中，`TC-SHOT-023` 将两种轮廓 Pin 的实际 PNG 与导出前保留原图做独立 RGB/alpha 比对。Native `TC-SHOT-N11` 使用真实 OS 鼠标绘制凹形选区，分别核对 Pin 文件与 OS 剪贴板 RGBA；实际拖动 Pin 后读取窗口位置差/置顶状态，并检查独立副本存活/销毁。新功能三端实测待执行，单元测试不作为原生通过。
+- `status: done` 表示功能代码已实装。完整原画内容比对标准下，run36973502375（SHA fb0f02c5）三端 native 各10/10、零失败零跳过；回执、构建身份、用例摘要与产物哈希均已核验，Pillow/PyAV 独立解码确认每一 GIF/MP4 帧匹配本轮原画且长图逐像素一致。该历史结果不证明新增自由选区或物理 Pin 拖动。旧标准 run36956493957 结果不作为该证据。混合 DPI/多显示器与 Wayland 仍未验证。
 
 ### 27.2 截图快捷键设置与能力状态
 

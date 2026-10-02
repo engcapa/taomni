@@ -100,6 +100,66 @@ describe("ScreenshotOverlay", () => {
     expect(shapes()).toBe("1");
   });
 
+  it("closes a freehand selection, scales its contour and retains annotation history when switching to rectangle", async () => {
+    await open();
+    fireEvent.click(screen.getByTestId("screenshot-selection-freehand"));
+    const layer = screen.getByTestId("screenshot-select-layer");
+    fireEvent.mouseDown(layer, { button: 0, clientX: 100, clientY: 100 });
+    for (const [x, y] of [[300, 100], [300, 180], [180, 180], [180, 300], [100, 300]]) {
+      fireEvent.mouseMove(window, { clientX: x, clientY: y });
+    }
+    fireEvent.mouseUp(window, { clientX: 100, clientY: 300 });
+    expect(screen.getByTestId("screenshot-freehand-contour")).toHaveAttribute("d", expect.stringMatching(/ Z$/));
+    expect(screen.getByTestId("screenshot-scroll-capture")).toBeDisabled();
+    expect(screen.getByTestId("screenshot-record")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("screenshot-tool-rect"));
+    drag("screenshot-annotation-layer", [110, 120], [160, 160]);
+    expect(shapes()).toBe("1");
+    fireEvent.click(screen.getByTestId("screenshot-recrop"));
+    drag("screenshot-handle-se", [300, 300], [400, 400]);
+    expect(screen.getByTestId("screenshot-freehand-contour")).toHaveAttribute("d", "M 100 100 L 400 100 L 400 220 L 220 220 L 220 400 L 100 400 Z");
+    fireEvent.click(screen.getByTestId("screenshot-selection-rectangle"));
+    expect(screen.queryByTestId("screenshot-freehand-contour")).not.toBeInTheDocument();
+    expect(screen.getByTestId("screenshot-record")).toBeEnabled();
+    expect(shapes()).toBe("1");
+  });
+
+  it("rejects a diagonal freehand gesture and reselects from a contour's empty bounding-box area", async () => {
+    await open();
+    fireEvent.click(screen.getByTestId("screenshot-selection-freehand"));
+    drag("screenshot-select-layer", [100, 100], [400, 400]);
+    expect(screen.queryByTestId("screenshot-toolbar")).not.toBeInTheDocument();
+    const layer = screen.getByTestId("screenshot-select-layer");
+    fireEvent.mouseDown(layer, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.mouseMove(window, { clientX: 300, clientY: 100 });
+    fireEvent.mouseUp(window, { clientX: 100, clientY: 300 });
+    fireEvent.click(screen.getByTestId("screenshot-tool-rect"));
+    fireEvent.mouseDown(screen.getByTestId("screenshot-annotation-layer"), { button: 0, clientX: 290, clientY: 290 });
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "select");
+    expect(shapes()).toBe("0");
+    fireEvent.mouseUp(window, { clientX: 290, clientY: 290 });
+  });
+
+  it("applies the freehand mask after watermarking and sends the same natural-size crop to Pin", async () => {
+    await open();
+    fireEvent.click(screen.getByTestId("screenshot-selection-freehand"));
+    const layer = screen.getByTestId("screenshot-select-layer");
+    fireEvent.mouseDown(layer, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.mouseMove(window, { clientX: 300, clientY: 100 });
+    fireEvent.mouseUp(window, { clientX: 100, clientY: 300 });
+    fireEvent.click(screen.getByTestId("screenshot-watermark"));
+    fireEvent.change(screen.getByTestId("screenshot-watermark-text"), { target: { value: "masked watermark" } });
+    fireEvent.click(screen.getByTestId("screenshot-watermark-apply"));
+    const ctx = (screen.getByTestId("screenshot-annotation-canvas") as HTMLCanvasElement).getContext("2d")!;
+    vi.mocked(ctx.fill).mockClear();
+    fireEvent.click(screen.getByTestId("screenshot-pin"));
+    await waitFor(() => expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce());
+    expect(ctx.fill).toHaveBeenCalledWith("evenodd");
+    expect(vi.mocked(ctx.fillText).mock.invocationCallOrder.at(-1)).toBeLessThan(vi.mocked(ctx.fill).mock.invocationCallOrder.at(-1)!);
+    expect(api.saveDataUrl).toHaveBeenCalledWith("data:image/png;base64,400x300");
+    expect(api.pinToScreen).toHaveBeenCalledWith("export.png");
+  });
+
   it("owns annotation text shortcuts and adds rapid number clicks only once", async () => {
     await open();
     fireEvent.click(screen.getByTestId("screenshot-fullscreen"));

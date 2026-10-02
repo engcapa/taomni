@@ -1137,6 +1137,249 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
     ))
 }
 
+/// Send real desktop mouse input; physical coordinates are never injected into
+/// the DOM. Also used to verify the pin renderer's native startDragging path.
+async fn mouse_path(points: Vec<(i32, i32)>) -> anyhow::Result<()> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        use enigo::{Button, Direction, Enigo, Mouse, Settings};
+        let mut input = Enigo::new(&Settings::default())
+            .map_err(|e| anyhow::anyhow!("input synthesis unavailable: {e}"))?;
+        let first = *points.first().context("empty mouse path")?;
+        let move_to = |input: &mut Enigo, (x, y): (i32, i32)| -> anyhow::Result<()> {
+            #[cfg(target_os = "windows")]
+            {
+                let _ = input;
+                unsafe { windows::Win32::UI::WindowsAndMessaging::SetCursorPos(x, y) }
+                    .context("move pointer")?;
+            }
+            #[cfg(not(target_os = "windows"))]
+            input
+                .move_mouse(x, y, enigo::Coordinate::Abs)
+                .map_err(|e| anyhow::anyhow!("move pointer: {e}"))?;
+            Ok(())
+        };
+        move_to(&mut input, first)?;
+        std::thread::sleep(Duration::from_millis(150));
+        let result = (|| -> anyhow::Result<()> {
+            input
+                .button(Button::Left, Direction::Press)
+                .map_err(|e| anyhow::anyhow!("mouse down: {e}"))?;
+            std::thread::sleep(Duration::from_millis(250));
+            for pair in points.windows(2) {
+                for step in 1..=16 {
+                    let x = pair[0].0 + (pair[1].0 - pair[0].0) * step / 16;
+                    let y = pair[0].1 + (pair[1].1 - pair[0].1) * step / 16;
+                    move_to(&mut input, (x, y))?;
+                    std::thread::sleep(Duration::from_millis(18));
+                }
+            }
+            Ok(())
+        })();
+        let released = input
+            .button(Button::Left, Direction::Release)
+            .map_err(|e| anyhow::anyhow!("mouse up: {e}"));
+        result.and(released)
+    })
+    .await
+    .context("desktop mouse task")?
+}
+
+/// Enigo uses Quartz logical points on macOS, physical screen pixels elsewhere.
+fn input_point(point: (i32, i32), scale: f64) -> (i32, i32) {
+    if cfg!(target_os = "macos") {
+        (
+            (point.0 as f64 / scale).round() as i32,
+            (point.1 as f64 / scale).round() as i32,
+        )
+    } else {
+        point
+    }
+}
+
+async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyhow::Result<Value> {
+    let scale = window.scale_factor()?.max(0.5);
+    // A deterministic visible starting point is setup, not the asserted move.
+    window.set_position(tauri::PhysicalPosition::new(
+        display.x + (36.0 * scale).round() as i32,
+        display.y + (48.0 * scale).round() as i32,
+    ))?;
+    window.set_focus()?;
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    let before = window.outer_position()?;
+    let inner = window.inner_position()?;
+    let size = window.inner_size()?;
+    let start = (
+        inner.x + size.width as i32 / 2,
+        inner.y + size.height as i32 / 2,
+    );
+    let delta = ((80.0 * scale).round() as i32, (64.0 * scale).round() as i32);
+    let end = (start.0 + delta.0, start.1 + delta.1);
+    mouse_path(vec![input_point(start, scale), input_point(end, scale)]).await?;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let after = window.outer_position()?;
+    let actual = (after.x - before.x, after.y - before.y);
+    let moved = (actual.0 - delta.0).abs() <= 6 && (actual.1 - delta.1).abs() <= 6;
+    let topmost = window.is_always_on_top()?;
+    Ok(
+        json!({"passed":moved && topmost,"before":[before.x,before.y],"after":[after.x,after.y],
+        "expectedDelta":delta,"actualDelta":actual,"alwaysOnTop":topmost,"input":"OS mouse down/move/up"}),
+    )
+}
+
+/// Real freehand gesture -> public Pin/Copy -> independent original RGBA oracle.
+#[tauri::command]
+pub async fn screenshot_qa_freehand(app: AppHandle) -> Result<String, String> {
+    ensure_qa(&app)?;
+    let _cleanup = ScenarioCleanup(app.clone());
+    super::close_session(&app);
+    let (fixture, display, _) = open_fixture(&app, "scroll")
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+    let source = read_source(&fixture).await.map_err(|e| format!("{e:#}"))?;
+    let original = source_png(source.data_url.as_deref().ok_or("missing original page")?)
+        .map_err(|e| format!("{e:#}"))?;
+    let scale = source.scale;
+    let offset = (24.0 * scale).round() as u32;
+    let width = (320.0 * scale).round() as u32;
+    let height = (240.0 * scale).round() as u32;
+    let notch_x = (128.0 * scale).round() as u32;
+    let notch_y = (96.0 * scale).round() as u32;
+    let polygon = vec![
+        (0.0, 0.0),
+        (width as f64, 0.0),
+        (width as f64, notch_y as f64),
+        (notch_x as f64, notch_y as f64),
+        (notch_x as f64, height as f64),
+        (0.0, height as f64),
+    ];
+    // This geometry is a fixed testcase input, never read from the exported path.
+    let cropped_original = capture::crop(&original, offset, offset, width, height);
+    let expected = qa_oracle::masked_original(&cropped_original, &polygon);
+    let mut results = Vec::new();
+    for action in ["pin", "copy"] {
+        fixture.set_focus().map_err(|e| e.to_string())?;
+        tokio::time::sleep(Duration::from_millis(350)).await;
+        let origin = fixture.inner_position().map_err(|e| e.to_string())?;
+        super::open_overlay(&app, Some(display.id.clone())).await?;
+        let overlay = wait_window(&app, super::OVERLAY_LABEL, Duration::from_secs(10))
+            .await
+            .map_err(|e| format!("{e:#}"))?;
+        let init = super::screenshot_overlay_init().await?;
+        run_js(&overlay, r#"
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const q = id => document.querySelector('[data-testid="' + id + '"]');
+          for (let i = 0; i < 100 && !(q('screenshot-base-image')?.complete && q('screenshot-hint')); i++) await sleep(100);
+          if (!q('screenshot-base-image')?.naturalWidth) throw new Error('background not loaded');
+          q('screenshot-selection-freehand').click();
+          await sleep(150);
+          return q('screenshot-overlay').dataset.selectionMode === 'freehand';
+        "#, Duration::from_secs(20)).await.map_err(|e| format!("{e:#}"))?;
+        let points = polygon
+            .iter()
+            .map(|&(x, y)| {
+                input_point(
+                    (
+                        origin.x + offset as i32 + x.round() as i32,
+                        origin.y + offset as i32 + y.round() as i32,
+                    ),
+                    scale,
+                )
+            })
+            .collect();
+        mouse_path(points).await.map_err(|e| format!("{e:#}"))?;
+        let page = run_js(&overlay, r#"
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const q = id => document.querySelector('[data-testid="' + id + '"]');
+          for (let i = 0; i < 50 && !q('screenshot-toolbar'); i++) await sleep(100);
+          const path = q('screenshot-freehand-contour')?.getAttribute('d') || '';
+          return {closed: path.endsWith(' Z'), scrollDisabled:q('screenshot-scroll-capture')?.disabled,
+            recordDisabled:q('screenshot-record')?.disabled, mode:q('screenshot-overlay')?.dataset.selectionMode};
+        "#, Duration::from_secs(10)).await.map_err(|e| format!("{e:#}"))?;
+        overlay
+            .eval(format!(
+                "document.querySelector('[data-testid=\"screenshot-{action}\"]').click()"
+            ))
+            .map_err(|e| e.to_string())?;
+        let overlay_closed = wait_closed(&app, super::OVERLAY_LABEL, Duration::from_secs(10)).await;
+        let (actual, pin) = if action == "pin" {
+            let label = super::tool_state()
+                .pins
+                .keys()
+                .next()
+                .cloned()
+                .ok_or("public Pin did not open")?;
+            let path = super::tool_state()
+                .pins
+                .get(&label)
+                .ok_or("missing pin payload")?
+                .path
+                .clone();
+            let window = wait_window(&app, &label, Duration::from_secs(10))
+                .await
+                .map_err(|e| format!("{e:#}"))?;
+            let page = run_js(&window, r#"
+              const q = () => document.querySelector('[data-testid="screenshot-pin-image"]');
+              for (let i = 0; i < 100 && !(q()?.complete && q()?.naturalWidth); i++) await new Promise(r => setTimeout(r,100));
+              return {width:q()?.naturalWidth,height:q()?.naturalHeight};
+            "#, Duration::from_secs(20)).await.map_err(|e| format!("{e:#}"))?;
+            let actual = image::open(&path).map_err(|e| e.to_string())?.to_rgba8();
+            let drag = verify_pin_drag(&window, &display)
+                .await
+                .map_err(|e| format!("{e:#}"))?;
+            let survived = std::path::Path::new(&path).exists() && overlay_closed;
+            window.eval("window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true}))")
+                .map_err(|e| e.to_string())?;
+            let closed = wait_closed(&app, &label, Duration::from_secs(10)).await;
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let removed = !std::path::Path::new(&path).exists();
+            (
+                actual,
+                json!({"passed":drag["passed"] == json!(true) && survived && closed && removed
+                && page["width"] == json!(width) && page["height"] == json!(height),
+                "page":page,"drag":drag,"survivedOverlayClose":survived,"closed":closed,"copyRemoved":removed}),
+            )
+        } else {
+            (
+                read_clipboard_image(&app).map_err(|e| format!("{e:#}"))?,
+                Value::Null,
+            )
+        };
+        let comparison = qa_oracle::compare_masked(&actual, &expected, &polygon);
+        let artifacts = json!({
+            "original":keep_image(&original, &format!("freehand-{action}-original-full.png")),
+            "sourceCrop":keep_image(&cropped_original, &format!("freehand-{action}-source-crop.png")),
+            "expected":keep_image(&expected, &format!("freehand-{action}-expected.png")),
+            "actual":keep_image(&actual, &format!("freehand-{action}-actual.png")),
+            "difference":keep_image(&qa_oracle::mask_difference(&actual, &expected), &format!("freehand-{action}-difference.png")),
+        });
+        let passed = comparison.passed
+            && overlay_closed
+            && main_visible(&app)
+            && !std::path::Path::new(&init.path).exists()
+            && page["closed"] == json!(true)
+            && page["mode"] == json!("freehand")
+            && page["scrollDisabled"] == json!(true)
+            && page["recordDisabled"] == json!(true)
+            && (action != "pin" || pin["passed"] == json!(true))
+            && artifacts
+                .as_object()
+                .is_some_and(|a| a.values().all(Value::is_string));
+        results.push(json!({"action":action,"passed":passed,"comparison":comparison,"polygon":polygon,
+            "sourceOffset":[offset,offset],"expectedSize":[width,height],"page":page,"pin":pin,
+            "overlayClosed":overlay_closed,"sessionSourceRemoved":!std::path::Path::new(&init.path).exists(),
+            "artifacts":artifacts}));
+    }
+    let passed = results.iter().all(|r| r["passed"] == json!(true));
+    let details = json!({"passed":passed,"scale":scale,"results":results,
+        "boundaryTolerancePixels":2,"input":"OS mouse down/move/up"});
+    let metrics =
+        keep_json(&details, "freehand-rgba-comparison.json").map_err(|e| format!("{e:#}"))?;
+    Ok(report(
+        passed,
+        json!({"comparison":details,"metricsArtifact":metrics}),
+    ))
+}
+
 /// Pin a capture: the pin window shows the image, closing it removes the
 /// pinned copy.
 #[tauri::command]

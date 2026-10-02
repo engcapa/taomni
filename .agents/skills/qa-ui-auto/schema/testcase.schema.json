@@ -341,6 +341,15 @@
         "drag_to": {
           "$ref": "#/$defs/drag_arg"
         },
+        "drag_path": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selector", "points"],
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "points": {"type": "array", "minItems": 2, "maxItems": 256, "items": {"$ref": "#/$defs/point"}}
+          }
+        },
         "fill": {
           "$ref": "#/$defs/fill_arg"
         },
@@ -471,6 +480,35 @@
         "send_text_via_label": {
           "$ref": "#/$defs/send_text_via_label_arg"
         },
+        "screenshot_reference": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selector"],
+          "properties": {"selector": {"$ref": "#/$defs/selector"}}
+        },
+        "assert_screenshot_mask": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["selector", "crop", "polygon"],
+          "properties": {
+            "selector": {"$ref": "#/$defs/selector"},
+            "crop": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["x", "y", "width", "height"],
+              "properties": {
+                "x": {"type": "integer", "minimum": 0},
+                "y": {"type": "integer", "minimum": 0},
+                "width": {"type": "integer", "minimum": 1},
+                "height": {"type": "integer", "minimum": 1}
+              }
+            },
+            "polygon": {
+              "type": "array", "minItems": 3, "maxItems": 256,
+              "items": {"$ref": "#/$defs/point"}
+            }
+          }
+        },
         "eval_readonly": {
           "$ref": "#/$defs/eval_readonly_arg"
         },
@@ -479,7 +517,7 @@
           "additionalProperties": false,
           "required": ["scenario"],
           "properties": {
-            "scenario": {"enum": ["capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact"]},
+            "scenario": {"enum": ["capture", "capture-fidelity", "scroll", "overlay-copy", "record", "recorder", "pin", "hotkey", "ocr-redact", "freehand"]},
             "format": {"enum": ["gif", "mp4"]},
             "secs": {"type": "integer", "minimum": 1, "maximum": 8}
           }

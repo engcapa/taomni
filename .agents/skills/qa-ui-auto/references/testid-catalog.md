@@ -1473,6 +1473,9 @@
 - `[data-testid="screenshot-overlay-error"]` — display — F27.1.screenshot-overlay-error
 - `[data-testid="screenshot-base-image"]` — display — F27.1.screenshot-base-image
 - `[data-testid="screenshot-selection"]` — display — F27.1.screenshot-selection
+- `[data-testid="screenshot-selection-rectangle"]` — interactive — F27.1.screenshot-selection-rectangle
+- `[data-testid="screenshot-selection-freehand"]` — interactive — F27.1.screenshot-selection-freehand
+- `[data-testid="screenshot-freehand-contour"]` — display — F27.1.screenshot-freehand-contour
 - `[data-testid="screenshot-select-layer"]` — interactive — F27.1.screenshot-select-layer
 - `[data-testid="screenshot-selection-move"]` — interactive — F27.1.screenshot-selection-move
 - `[data-testid="screenshot-handle-nw"]` — interactive — F27.1.screenshot-handle-nw

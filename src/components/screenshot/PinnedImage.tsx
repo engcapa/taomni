@@ -89,7 +89,11 @@ export function PinnedImage() {
     <div
       data-testid="screenshot-pin-window"
       className="fixed inset-0 select-none"
-      style={{ cursor: "move", background: "#000" }}
+      style={{
+        cursor: "move", backgroundColor: "#e2e2e2",
+        backgroundImage: "conic-gradient(#c4c4c4 25%, transparent 0 50%, #c4c4c4 0 75%, transparent 0)",
+        backgroundSize: "16px 16px",
+      }}
       onMouseDown={handleMouseDown}
       onDoubleClick={() => void close()}
       onContextMenu={(e) => e.preventDefault()}

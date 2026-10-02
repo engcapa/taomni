@@ -80,6 +80,97 @@ pub fn compare(actual: &RgbaImage, expected: &RgbaImage, lossy: bool) -> PixelMa
     }
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskMatch {
+    pub pixels: PixelMatch,
+    pub opaque_pixels: u64,
+    pub transparent_pixels: u64,
+    pub alpha_mismatches: u64,
+    pub passed: bool,
+}
+
+fn inside_polygon(x: f64, y: f64, polygon: &[(f64, f64)]) -> bool {
+    let mut inside = false;
+    for i in 0..polygon.len() {
+        let (ax, ay) = polygon[i];
+        let (bx, by) = polygon[(i + 1) % polygon.len()];
+        if (ay > y) != (by > y) && x < ax + (y - ay) * (bx - ax) / (by - ay) {
+            inside = !inside;
+        }
+    }
+    inside
+}
+
+fn edge_distance(x: f64, y: f64, polygon: &[(f64, f64)]) -> f64 {
+    (0..polygon.len())
+        .map(|i| {
+            let (ax, ay) = polygon[i];
+            let (bx, by) = polygon[(i + 1) % polygon.len()];
+            let length = (bx - ax).powi(2) + (by - ay).powi(2);
+            let t = if length > 0.0 {
+                ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / length
+            } else {
+                0.0
+            }
+            .clamp(0.0, 1.0);
+            (x - ax - t * (bx - ax)).hypot(y - ay - t * (by - ay))
+        })
+        .fold(f64::INFINITY, f64::min)
+}
+
+/// Independent pixel-center mask; do not use the renderer's exported contour or pixels.
+pub fn masked_original(original: &RgbaImage, polygon: &[(f64, f64)]) -> RgbaImage {
+    RgbaImage::from_fn(original.width(), original.height(), |x, y| {
+        if inside_polygon(x as f64 + 0.5, y as f64 + 0.5, polygon) {
+            *original.get_pixel(x, y)
+        } else {
+            Rgba([0, 0, 0, 0])
+        }
+    })
+}
+
+pub fn compare_masked(
+    actual: &RgbaImage,
+    expected: &RgbaImage,
+    polygon: &[(f64, f64)],
+) -> MaskMatch {
+    let mut comparable = actual.clone();
+    let mut opaque = 0;
+    let mut transparent = 0;
+    let mut mismatches = 0;
+    if actual.dimensions() == expected.dimensions() {
+        for (x, y, pixel) in actual.enumerate_pixels() {
+            let reference = expected.get_pixel(x, y);
+            // Canvas coverage at contour edges can differ by at most two pixels;
+            // all other interior/exterior alpha values must be exact.
+            let boundary = edge_distance(x as f64 + 0.5, y as f64 + 0.5, polygon) <= 2.0;
+            if !boundary {
+                if reference[3] == 0 {
+                    transparent += 1;
+                } else {
+                    opaque += 1;
+                }
+                if pixel[3] != reference[3] {
+                    mismatches += 1;
+                }
+            }
+            if reference[3] == 0 || boundary {
+                comparable.put_pixel(x, y, *reference);
+            }
+        }
+    }
+    let pixels = compare(&comparable, expected, false);
+    let passed = pixels.passed && opaque > 100 && transparent > 100 && mismatches == 0;
+    MaskMatch {
+        pixels,
+        opaque_pixels: opaque,
+        transparent_pixels: transparent,
+        alpha_mismatches: mismatches,
+        passed,
+    }
+}
+
 #[derive(Default)]
 pub struct Timeline {
     first: Option<(u64, f64)>,
@@ -158,6 +249,23 @@ pub fn difference(actual: &RgbaImage, expected: &RgbaImage) -> RgbaImage {
             255,
         ])
     })
+}
+
+/// Show both RGB and alpha errors; transparent RGB is irrelevant to the mask.
+pub fn mask_difference(actual: &RgbaImage, expected: &RgbaImage) -> RgbaImage {
+    let mut diff = difference(actual, expected);
+    for (x, y, pixel) in diff.enumerate_pixels_mut() {
+        let a = actual.get_pixel(x, y);
+        let b = expected.get_pixel(x.min(expected.width() - 1), y.min(expected.height() - 1));
+        let alpha = a[3].abs_diff(b[3]).saturating_mul(4);
+        if b[3] == 0 {
+            *pixel = Rgba([alpha, 0, alpha, 255]);
+        } else {
+            pixel[0] = pixel[0].max(alpha);
+            pixel[2] = pixel[2].max(alpha);
+        }
+    }
+    diff
 }
 
 /// Decode complementary black/white fiducials, not color/motion heuristics.
@@ -247,6 +355,33 @@ mod tests {
                 "corruption {kind}"
             );
         }
+    }
+
+    #[test]
+    fn freehand_mask_requires_original_interior_and_exact_exterior_alpha() {
+        let original = original();
+        let polygon = [
+            (0.0, 0.0),
+            (144.0, 0.0),
+            (144.0, 60.0),
+            (60.0, 60.0),
+            (60.0, 192.0),
+            (0.0, 192.0),
+        ];
+        let expected = masked_original(&original, &polygon);
+        assert!(compare_masked(&expected, &expected, &polygon).passed);
+        assert!(!compare_masked(&original, &expected, &polygon).passed);
+        assert!(!compare_masked(&RgbaImage::new(144, 192), &expected, &polygon).passed);
+        let mut corrupt = expected.clone();
+        corrupt.put_pixel(120, 150, Rgba([0, 0, 0, 1]));
+        assert_eq!(
+            compare_masked(&corrupt, &expected, &polygon).alpha_mismatches,
+            1
+        );
+        let black = RgbaImage::from_fn(144, 192, |x, y| {
+            Rgba([0, 0, 0, expected.get_pixel(x, y)[3]])
+        });
+        assert!(!compare_masked(&black, &expected, &polygon).passed);
     }
 
     #[test]

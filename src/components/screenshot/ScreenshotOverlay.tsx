@@ -11,6 +11,7 @@ import {
   Eraser,
   Highlighter,
   LayoutGrid,
+  Lasso,
   ListOrdered,
   Maximize,
   MessageCircle,
@@ -51,7 +52,9 @@ import {
   updateOverlayImage,
   type OverlayInit,
   type RecordFormat,
+  type ScreenshotPoint,
 } from "../../lib/screenshot";
+import { contourBounds, contourPath, maskContour, pointInContour, transformContour, validContour } from "../../lib/screenshotSelection";
 import {
   AnnotationCanvas,
   type AnnotationCanvasHandle,
@@ -316,6 +319,8 @@ export function ScreenshotOverlay() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
   const [sel, setSel] = useState<CssRect | null>(null);
+  const [selectionMode, setSelectionMode] = useState<"rectangle" | "freehand">("rectangle");
+  const [contour, setContour] = useState<ScreenshotPoint[] | null>(null);
   const [tool, setTool] = useState<AnnotationTool>("select");
   const [color, setColor] = useState(COLORS[0].value);
   const [lineWidth, setLineWidth] = useState(4);
@@ -341,7 +346,13 @@ export function ScreenshotOverlay() {
   const canvasRef = useRef<AnnotationCanvasHandle | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   /** Region-select / move / resize drag in progress. */
-  const dragRef = useRef<{ kind: "select" | Handle; origin: { x: number; y: number }; start: CssRect; current: CssRect } | null>(null);
+  const dragRef = useRef<{
+    kind: "select" | "freehand" | Handle;
+    origin: ScreenshotPoint;
+    start: CssRect;
+    current: CssRect;
+    points: ScreenshotPoint[] | null;
+  } | null>(null);
   const toastTimer = useRef<number | null>(null);
   const busyRef = useRef(false);
 
@@ -461,6 +472,8 @@ export function ScreenshotOverlay() {
 
   const fullscreenSelect = useCallback(() => {
     setSel({ x: 0, y: 0, w: viewport.w, h: viewport.h });
+    setContour(null);
+    setSelectionMode("rectangle");
     setTool("select");
     setPhase("annotate");
   }, [viewport.w, viewport.h]);
@@ -468,21 +481,37 @@ export function ScreenshotOverlay() {
   /** Drop the selection and annotations; back to region selection. */
   const resetSelection = useCallback(() => {
     canvasRef.current?.clear();
+    dragRef.current = null;
+    setDragging(false);
     setSel(null);
+    setContour(null);
     setTool("select");
     setRecordOpen(false);
     setWatermarkOpen(false);
     setPhase("select");
   }, []);
 
+  const changeSelectionMode = (mode: "rectangle" | "freehand") => {
+    if (mode === selectionMode) return;
+    exitPickerMode();
+    setRecordOpen(false);
+    setSelectionMode(mode);
+    setTool("select");
+    if (mode === "rectangle") setContour(null);
+    else resetSelection();
+  };
+
   const pointInSel = (x: number, y: number): boolean =>
-    sel !== null && x >= sel.x && x <= sel.x + sel.w && y >= sel.y && y <= sel.y + sel.h;
+    sel !== null && (contour ? pointInContour({ x, y }, contour)
+      : x >= sel.x && x <= sel.x + sel.w && y >= sel.y && y <= sel.y + sel.h);
 
   const startRegionDrag = (x: number, y: number) => {
     const start = { x, y, w: 0, h: 0 };
-    dragRef.current = { kind: "select", origin: { x, y }, start, current: start };
+    const points = selectionMode === "freehand" ? [{ x, y }] : null;
+    dragRef.current = { kind: points ? "freehand" : "select", origin: { x, y }, start, current: start, points };
+    setContour(points);
     setDragging(true);
-    setSel({ x, y, w: 0, h: 0 });
+    setSel(start);
   };
 
   /** Mousedown on the base layer (outside any shape tool). */
@@ -501,7 +530,7 @@ export function ScreenshotOverlay() {
     if (e.button !== 0 || !sel) return;
     e.stopPropagation();
     e.preventDefault();
-    dragRef.current = { kind: handle, origin: { x: e.clientX, y: e.clientY }, start: sel, current: sel };
+    dragRef.current = { kind: handle, origin: { x: e.clientX, y: e.clientY }, start: sel, current: sel, points: contour };
     setDragging(true);
   };
 
@@ -514,9 +543,21 @@ export function ScreenshotOverlay() {
         x: Math.min(Math.max(0, e.clientX), viewport.w),
         y: Math.min(Math.max(0, e.clientY), viewport.h),
       };
-      d.current = d.kind === "select"
-        ? normalizeRect(d.origin, point)
-        : dragRect(d.start, d.kind, point.x - d.origin.x, point.y - d.origin.y, viewport.w, viewport.h);
+      if (d.kind === "freehand" && d.points) {
+        const last = d.points[d.points.length - 1];
+        if (Math.hypot(point.x - last.x, point.y - last.y) >= 1) {
+          // Keep memory/render cost bounded for long gestures without losing the endpoint.
+          if (d.points.length >= 4096) d.points = d.points.filter((_, i) => i % 2 === 0);
+          d.points.push(point);
+        }
+        d.current = contourBounds(d.points) ?? d.start;
+        setContour([...d.points]);
+      } else {
+        d.current = d.kind === "select"
+          ? normalizeRect(d.origin, point)
+          : dragRect(d.start, d.kind as Handle, point.x - d.origin.x, point.y - d.origin.y, viewport.w, viewport.h);
+        if (d.points) setContour(transformContour(d.points, d.start, d.current));
+      }
       setSel(d.current);
     };
     const onUp = (e: MouseEvent) => {
@@ -525,10 +566,13 @@ export function ScreenshotOverlay() {
       onMove(e);
       dragRef.current = null;
       setDragging(false);
-      if (d.current.w < MIN_SEL || d.current.h < MIN_SEL) {
-        setSel(d.kind === "select" ? null : d.start);
-        if (d.kind === "select") setPhase("select");
-      } else if (d.kind === "select") {
+      const selecting = d.kind === "select" || d.kind === "freehand";
+      if (d.current.w < MIN_SEL || d.current.h < MIN_SEL
+        || (d.kind === "freehand" && !validContour(d.points ?? [], MIN_SEL))) {
+        setSel(selecting ? null : d.start);
+        setContour(selecting ? null : d.points);
+        if (selecting) setPhase("select");
+      } else if (selecting) {
         setTool("select");
         setPhase("annotate");
       }
@@ -561,6 +605,17 @@ export function ScreenshotOverlay() {
     const full = canvas.exportDataUrl(img, sx, sy);
     let out = sel ? await cropDataUrl(full, toPhysical(sel)) : full;
     if (watermark && watermark.text.trim()) out = await applyWatermark(out, watermark);
+    if (contour && sel) {
+      const image = await loadImage(out);
+      const c = document.createElement("canvas");
+      c.width = image.naturalWidth;
+      c.height = image.naturalHeight;
+      const ctx = c.getContext("2d");
+      if (!ctx) throw new Error("canvas 2d context unavailable");
+      ctx.drawImage(image, 0, 0);
+      maskContour(ctx, contour, sx, sy, toPhysical(sel));
+      out = c.toDataURL("image/png");
+    }
     return out;
   };
 
@@ -666,7 +721,7 @@ export function ScreenshotOverlay() {
 
   const handleScrollCapture = () =>
     runBusy(async () => {
-      if (!init || !img || !sel) return;
+      if (!init || !img || !sel || contour) return;
       setPhase("busy");
       setRecordOpen(false);
       try {
@@ -679,6 +734,7 @@ export function ScreenshotOverlay() {
         setImg(loaded.img);
         setImgUrl(loaded.url);
         setSel(null);
+        setContour(null);
         setTool("select");
         setPhase("select");
         showToast(t("screenshot.scrollDone", { count: res.frames }));
@@ -690,7 +746,7 @@ export function ScreenshotOverlay() {
 
   const handleRecord = (format: RecordFormat) =>
     runBusy(async () => {
-      if (!init || !sel) return;
+      if (!init || !sel || contour) return;
       setRecordOpen(false);
       setPhase("busy");
       try {
@@ -816,6 +872,7 @@ export function ScreenshotOverlay() {
     <div
       data-testid="screenshot-overlay"
       data-phase={phase}
+      data-selection-mode={selectionMode}
       className="fixed inset-0 overflow-hidden select-none"
       style={{ background: "#000000" }}
     >
@@ -834,6 +891,15 @@ export function ScreenshotOverlay() {
       {!sel && (
         <div className="fixed inset-0 z-10 pointer-events-none" style={{ background: "rgba(0, 0, 0, 0.4)" }} />
       )}
+      {contour && (
+        <svg className="fixed inset-0 z-[35] pointer-events-none" width={viewport.w} height={viewport.h}>
+          <path
+            d={`M 0 0 H ${viewport.w} V ${viewport.h} H 0 Z ${contourPath(contour)}`}
+            fill="rgba(0,0,0,0.45)" fillRule="evenodd"
+          />
+          <path data-testid="screenshot-freehand-contour" d={contourPath(contour)} fill="none" stroke="#1677ff" strokeWidth={1} />
+        </svg>
+      )}
       {sel && (
         <div
           data-testid="screenshot-selection"
@@ -843,8 +909,9 @@ export function ScreenshotOverlay() {
             top: sel.y,
             width: Math.max(0, sel.w),
             height: Math.max(0, sel.h),
-            outline: "1px solid #1677ff",
-            boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.45)",
+            outline: contour ? undefined : "1px solid #1677ff",
+            border: contour ? "1px dashed rgba(22,119,255,0.55)" : undefined,
+            boxShadow: contour ? undefined : "0 0 0 9999px rgba(0, 0, 0, 0.45)",
           }}
         />
       )}
@@ -864,7 +931,10 @@ export function ScreenshotOverlay() {
           <div
             data-testid="screenshot-selection-move"
             className="fixed z-[36]"
-            style={{ left: sel.x, top: sel.y, width: sel.w, height: sel.h, cursor: "move" }}
+            style={{
+              left: sel.x, top: sel.y, width: sel.w, height: sel.h, cursor: "move",
+              clipPath: contour ? `polygon(evenodd, ${contour.map((p) => `${p.x - sel.x}px ${p.y - sel.y}px`).join(", ")})` : undefined,
+            }}
             onMouseDown={(e) => startHandleDrag(e, "move")}
             onDoubleClick={handleDoubleClick}
           />
@@ -899,6 +969,7 @@ export function ScreenshotOverlay() {
           lineWidth={lineWidth}
           baseImage={img}
           selection={sel}
+          selectionContour={contour}
           onHistoryChange={(u, r) => {
             setCanUndo(u);
             setCanRedo(r);
@@ -951,6 +1022,13 @@ export function ScreenshotOverlay() {
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="flex flex-wrap items-center gap-0.5 rounded-xl px-1.5 py-1 shadow-2xl" style={panelStyle}>
+            <ToolButton testid="screenshot-selection-rectangle" title={t("screenshot.selectionRectangle")} active={selectionMode === "rectangle"} onClick={() => changeSelectionMode("rectangle")}>
+              <Square size={16} />
+            </ToolButton>
+            <ToolButton testid="screenshot-selection-freehand" title={t("screenshot.selectionFreehand")} active={selectionMode === "freehand"} onClick={() => changeSelectionMode("freehand")}>
+              <Lasso size={16} />
+            </ToolButton>
+            <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
             {TOOLS.map(({ tool: name, testid, titleKey, Icon }) => (
               <ToolButton
                 key={name}
@@ -1006,7 +1084,7 @@ export function ScreenshotOverlay() {
               <Redo2 size={16} />
             </ToolButton>
             <div className="w-px h-5 mx-1" style={{ background: "var(--taomni-divider)" }} />
-            <ToolButton testid="screenshot-scroll-capture" title={t("screenshot.scrollCapture")} onClick={() => void handleScrollCapture()}>
+            <ToolButton testid="screenshot-scroll-capture" title={t(contour ? "screenshot.rectangleRequired" : "screenshot.scrollCapture")} disabled={!!contour} onClick={() => void handleScrollCapture()}>
               <ScrollText size={16} />
             </ToolButton>
             <ToolButton
@@ -1121,7 +1199,8 @@ export function ScreenshotOverlay() {
             <div className="relative">
               <ToolButton
                 testid="screenshot-record"
-                title={t("screenshot.record")}
+                title={t(contour ? "screenshot.rectangleRequired" : "screenshot.record")}
+                disabled={!!contour}
                 active={recordOpen}
                 onClick={() => {
                   setWatermarkOpen(false);
@@ -1197,7 +1276,13 @@ export function ScreenshotOverlay() {
           className="fixed left-1/2 -translate-x-1/2 bottom-8 flex items-center gap-3 rounded-full px-4 py-2 shadow-2xl text-[13px]"
           style={{ zIndex: 50, ...panelStyle }}
         >
-          <span data-testid="screenshot-hint">{t("screenshot.selectHint")}</span>
+          <span data-testid="screenshot-hint">{t(selectionMode === "freehand" ? "screenshot.freehandHint" : "screenshot.selectHint")}</span>
+          <ToolButton testid="screenshot-selection-rectangle" title={t("screenshot.selectionRectangle")} active={selectionMode === "rectangle"} onClick={() => changeSelectionMode("rectangle")}>
+            <Square size={16} />
+          </ToolButton>
+          <ToolButton testid="screenshot-selection-freehand" title={t("screenshot.selectionFreehand")} active={selectionMode === "freehand"} onClick={() => changeSelectionMode("freehand")}>
+            <Lasso size={16} />
+          </ToolButton>
           <button
             type="button"
             data-testid="screenshot-fullscreen"

@@ -19,6 +19,7 @@ SCENARIOS = {
     "record": "screenshot_qa_record",
     "recorder": "screenshot_qa_recorder",
     "pin": "screenshot_qa_pin",
+    "freehand": "screenshot_qa_freehand",
     "hotkey": "screenshot_qa_hotkey",
 }
 
