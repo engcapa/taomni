@@ -2035,6 +2035,7 @@
 
 - `[data-testid="terminal-pane"]` — interactive — F2.2.terminal-pane
 - `[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea` — interactive — F2.2.terminal-keyboard-target
+- `button[title="Copy (Ctrl+C)"]` — interactive [optional] — F2.2.terminal-selection-copy
 - `[data-testid="attached-sftp-toggle"]` — interactive [optional] — F2.2.attached-sftp-toggle
 - `[data-testid="tab-chat-toggle"]` — interactive [optional] — F2.2.tab-chat-toggle
 - `[data-testid="context-menu"]` — display [optional] — F2.2.context-menu
@@ -2063,12 +2064,15 @@
 - `input[placeholder="Find"]` — interactive [optional] — F4.1.find-input
 - `span:has-text("Match")` — display [optional] — F4.1.find-match-info
 - `role=button[name="Close"]` — interactive [optional] — F4.1.find-close
+  ↳ `xpath=//*[@data-testid='terminal-pane']//button[normalize-space(.)='Close']` — alias
 
 ## terminal/right-menu (F4.2)
 
 - `text="Zoom in"` — interactive [optional] — F4.2.zoom-in
+  ↳ `[data-testid="context-menu-item-zoom-in"]` — alias
 - `text="Zoom out"` — interactive [optional] — F4.2.zoom-out
 - `text="Reset zoom"` — interactive [optional] — F4.2.zoom-reset
+  ↳ `[data-testid="context-menu-item-reset-zoom"]` — alias
 - `[data-testid="context-menu-item-appearance"]` — interactive [optional] — F4.2.appearance
 - `text="Terminal display"` — interactive [optional] — F4.2.terminal-display
 - `[data-testid="context-menu-item-terminal-display"]` — interactive [optional] — F4.2.terminal-display-menu-item

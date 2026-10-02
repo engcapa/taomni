@@ -612,6 +612,7 @@ area: terminal/local
 components: [TerminalPanel]
 files:
   - src/components/terminal/TerminalPanel.tsx
+  - src/components/terminal/SelectionToolbar.tsx
   - src/components/ContextMenu.tsx
   - src/lib/terminalCommand.ts
 controls:
@@ -621,6 +622,10 @@ controls:
   - id: terminal-keyboard-target
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     kind: interactive       # xterm input target driven through terminal_input
+  - id: terminal-selection-copy
+    selector: 'button[title="Copy (Ctrl+C)"]'
+    kind: interactive
+    optional: true          # only while a terminal text selection is active
   - id: attached-sftp-toggle
     selector: '[data-testid="attached-sftp-toggle"]'
     kind: interactive
@@ -646,6 +651,7 @@ controls:
 
 - xterm.js + FitAddon + WebglAddon（失败回退 canvas）+ SearchAddon + WebLinksAddon
 - ResizeObserver + debounce 自动 fit
+- 终端第一列保留 8px 左侧留白；留白位于 xterm 内部，支持从留白处正向/反向拖选与矩形选区，FitAddon 按留白后的宽度计算列数。TC-154（browser）和 TC-155（native）验证首字符、复制内容、搜索/选区高亮及缩放/全屏后的布局，TC-110 覆盖分屏布局。
 - 容器卸载时正确 dispose 终端实例与监听器
 - 浮动工具栏包含当前 tab 绑定 Chat 入口（`tab-chat-toggle` / Ctrl+Shift+L）；全局 Chat 入口已移除
 - 命令历史持久化：每条 host 维度记录到 SQLite (`command_history` 表)，支持 `history_append / history_match_prefix / history_list_recent / history_clear`
@@ -788,6 +794,8 @@ controls:
     selector: 'role=button[name="Close"]'
     kind: interactive
     optional: true
+    aliases:
+      - "xpath=//*[@data-testid='terminal-pane']//button[normalize-space(.)='Close']"
 -->
 
 - Copy / Copy All / Paste / Paste with Shift+Insert
@@ -816,6 +824,8 @@ controls:
     selector: 'text="Zoom in"'
     kind: interactive
     optional: true
+    aliases:
+      - '[data-testid="context-menu-item-zoom-in"]'
   - id: zoom-out
     selector: 'text="Zoom out"'
     kind: interactive
@@ -824,6 +834,8 @@ controls:
     selector: 'text="Reset zoom"'
     kind: interactive
     optional: true
+    aliases:
+      - '[data-testid="context-menu-item-reset-zoom"]'
   - id: appearance
     selector: '[data-testid="context-menu-item-appearance"]'
     kind: interactive

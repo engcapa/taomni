@@ -348,6 +348,9 @@
         "drag_to": {
           "$ref": "#/$defs/drag_arg"
         },
+        "terminal_drag_selection": {
+          "$ref": "#/$defs/terminal_drag_selection_arg"
+        },
         "fill": {
           "$ref": "#/$defs/fill_arg"
         },
@@ -2193,6 +2196,20 @@
         }
       }
     },
+    "terminal_drag_selection_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selector"],
+      "properties": {
+        "selector": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["forward", "reverse"], "default": "forward"},
+        "modifiers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["Alt", "Control", "Meta", "Shift"]}
+        }
+      }
+    },
     "eval_readonly_arg": {
       "type": "object",
       "additionalProperties": false,
@@ -2250,6 +2267,12 @@
         "contains": {
           "type": "string",
           "description": "Optional: assert that String(result) contains this substring."
+        },
+        "timeout_sec": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Poll the read-only condition until it passes or this timeout expires; zero evaluates once."
         }
       }
     },

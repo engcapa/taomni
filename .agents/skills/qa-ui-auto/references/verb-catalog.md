@@ -35,6 +35,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `right_click` | same as click | Native supports selector only (W3C right button); rich click options are browser-only and fail explicitly. Use before `assert_menu_items`; `click_menu` supports an exact visible label in native mode. |
 | `hover` | selector | |
 | `drag_to` | `{from, to}` | Both selectors. |
+| `terminal_drag_selection` | `{selector, direction?: forward\|reverse, modifiers?}` | Browser/native, three platforms. The selector identifies the terminal pane; its active search highlight locates a first-column output marker. Drags between 4 CSS px before the highlight's left edge and 2 px inside its right edge; optional Control+Shift exercises block selection. Native W3C input uses the interactive xterm root as element origin, since the highlight ignores pointer events. macOS dispatches packaged WebView events and does not prove OS mouse input. Records geometry in `terminal-selection-drags.json` and releases input sources on failure. Pair with exact selected-text assertions; the action itself does not establish selection correctness. |
 | `native_click` | `{selector}` | Native Linux/X11 only. Activates the exact test executable window and sends W3C pointer actions through its packaged WebKitGTK session; testcase assertions own the postcondition. |
 | `native_pointer_drag` | `{selector, from:{line,column}, to:{line,column}, modifiers?}` | Native Linux/X11 only. Resolves CodeMirror line/column positions through read-only DOM geometry, then sends a real modifier-aware W3C pointer drag to the packaged WebKitGTK session. The verb records geometry/transport only; testcase assertions own selection and edit postconditions. |
 | `native_set_writable` | `{path, writable}` | Native Linux only. Toggles owner-write permission for a path inside the current retained report root and records mode metadata; used for deterministic real-write failure/recovery evidence. |
@@ -220,7 +221,7 @@ Relative paths resolve from the repository root.
 
 | Verb | Args | Notes |
 |------|------|-------|
-| `eval_readonly` | `{expression, expect_truthy?, contains?}` | Evaluates a single read-only JS expression. Schema **rejects** assignments, function declarations, `await`, `new`, `.click(`, `.setAttribute(`, `.dispatchEvent(`, `.innerHTML=`, `document.write`. Use for things like reading `localStorage` to verify persistence. Max 400 chars. |
+| `eval_readonly` | `{expression, expect_truthy?, contains?, timeout_sec?}` | Evaluates a read-only JS expression once by default; optional `timeout_sec` polls the same condition until it passes or the bounded timeout expires. Browser/native share the assertion and polling rules. Schema **rejects** assignments, function declarations, `await`, `new`, `.click(`, `.setAttribute(`, `.dispatchEvent(`, `.innerHTML=`, `document.write`. Use for things like reading `localStorage` to verify persistence. Max 400 chars. |
 
 ## What you should NOT do
 
