@@ -1047,6 +1047,7 @@ fn capture_surfaces(
     let bar_visible = bar.is_visible()?;
     let mut border_count = 0;
     let mut borders_outside = true;
+    let mut border_geometry = Vec::new();
     for (name, window) in app.windows() {
         if !name.starts_with(super::surfaces::BORDER_PREFIX) {
             continue;
@@ -1059,12 +1060,15 @@ fn capture_surfaces(
             w: size.width as i32,
             h: size.height as i32,
         };
-        borders_outside &= !crop.intersects(rect) && window.is_visible()?;
+        let visible = window.is_visible()?;
+        borders_outside &= !crop.intersects(rect) && visible;
+        border_geometry
+            .push(json!({"label":name,"rect":[rect.x,rect.y,rect.w,rect.h],"visible":visible}));
         border_count += 1;
     }
     Ok(
         json!({"barVisible":bar_visible,"controlsOutside":!bar_visible || !crop.intersects(control),
-        "bordersOutside":borders_outside,"borderCount":border_count,"region":[crop.x,crop.y,crop.w,crop.h],
+        "bordersOutside":borders_outside,"borderCount":border_count,"borders":border_geometry,"region":[crop.x,crop.y,crop.w,crop.h],
         "control":[control.x,control.y,control.w,control.h]}),
     )
 }

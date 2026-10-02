@@ -8,7 +8,9 @@ use super::capture::DisplayInfo;
 pub const SCROLL_LABEL: &str = "screenshot-scroll";
 pub const BORDER_PREFIX: &str = "screenshot-boundary-";
 pub const CONTROL_WIDTH: f64 = 360.0;
-pub const CONTROL_HEIGHT: f64 = 140.0;
+// GTK can give even compact WebViews a 200px minimum height. Reserve that
+// space on every platform so controls positioned above a crop stay outside it.
+pub const CONTROL_HEIGHT: f64 = 200.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Rect {
@@ -159,9 +161,17 @@ pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Res
             if rect.w <= 0 || rect.h <= 0 {
                 continue;
             }
+            let scale = display.scale_factor.max(0.5);
+            let (width, height) = (rect.w as f64 / scale, rect.h as f64 / scale);
             let window = WindowBuilder::new(app, format!("{BORDER_PREFIX}{i}"))
                 .background_color(Color(255, 77, 79, 255))
                 .title("Capture range")
+                // Empty GTK windows otherwise use a 200px size when first
+                // shown. Establish the thin dimensions before realization
+                // and constrain both axes for this fixed, native surface.
+                .inner_size(width, height)
+                .min_inner_size(width, height)
+                .max_inner_size(width, height)
                 .visible(false)
                 .decorations(false)
                 .resizable(false)
