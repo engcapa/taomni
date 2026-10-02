@@ -164,6 +164,31 @@ async fn blocking<T: Send + 'static>(
         .map_err(internal_error)
 }
 
+pub(crate) fn window_builder<'a>(
+    app: &'a AppHandle,
+    label: &str,
+    url: WebviewUrl,
+) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
+    #[allow(unused_mut)]
+    let mut builder = WebviewWindowBuilder::new(app, label, url);
+    #[cfg(target_os = "windows")]
+    if cfg!(debug_assertions) && app.config().identifier == crate::QA_APP_ID {
+        // All QA WebViews must use the same isolated environment/profile and
+        // EdgeDriver arguments as main, never a personal/default profile.
+        if std::env::var_os("NEWMOB_DATA_DIR").is_some() {
+            if let Ok(data_dir) = crate::resolved_app_data_dir(app) {
+                builder = builder.data_directory(data_dir.join("webview"));
+            }
+            if let Ok(arguments) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+                if !arguments.trim().is_empty() {
+                    builder = builder.additional_browser_args(&arguments);
+                }
+            }
+        }
+    }
+    builder
+}
+
 fn to_file(result: (PathBuf, u32, u32)) -> ScreenshotFile {
     ScreenshotFile {
         path: result.0.to_string_lossy().into_owned(),
@@ -488,7 +513,7 @@ async fn open_overlay_inner(app: &AppHandle, display_id: Option<String>) -> Resu
     });
 
     let url = WebviewUrl::App("index.html#screenshot-overlay".into());
-    let window = WebviewWindowBuilder::new(app, OVERLAY_LABEL, url)
+    let window = window_builder(app, OVERLAY_LABEL, url)
         .title("Screenshot")
         .visible(false)
         .decorations(false)
@@ -638,7 +663,7 @@ pub async fn screenshot_pin_to_screen(app: AppHandle, path: String) -> Result<St
     );
 
     let url = WebviewUrl::App("index.html#screenshot-pin".into());
-    let window = WebviewWindowBuilder::new(&app, &label, url)
+    let window = window_builder(&app, &label, url)
         .title("Pinned Screenshot")
         .inner_size((lw * fit).round().max(48.0), (lh * fit).round().max(48.0))
         .decorations(false)
@@ -872,7 +897,7 @@ fn open_recorder_bar(app: &AppHandle, display: &DisplayInfo) -> Result<(), Strin
     let url = WebviewUrl::App("index.html#screenshot-recorder".into());
     // Compact while recording; the bar grows itself for the preview.
     let (lw, lh) = (300.0, 56.0);
-    let window = WebviewWindowBuilder::new(app, RECORDER_LABEL, url)
+    let window = window_builder(app, RECORDER_LABEL, url)
         .title("Recording")
         .inner_size(lw, lh)
         .visible(false)

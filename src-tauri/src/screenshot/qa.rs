@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 use anyhow::Context;
 use image::RgbaImage;
 use serde_json::{Value, json};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow};
 
 use super::capture::{self, DisplayInfo};
 
@@ -102,8 +102,13 @@ static EVAL_ID: AtomicU64 = AtomicU64::new(1);
 async fn eval_raw(window: &WebviewWindow, js: String, wait: Duration) -> Option<Value> {
     let (tx, rx) = tokio::sync::oneshot::channel::<String>();
     let tx = Mutex::new(Some(tx));
+    // Keep expression completion explicit on WebView2 and preserve JS errors
+    // as data instead of silently interpreting them as an unready window.
+    let script = format!(
+        "(() => {{ try {{ return ({js}); }} catch (e) {{ return {{qaEvalError:String(e)}}; }} }})()"
+    );
     window
-        .eval_with_callback(js, move |result| {
+        .eval_with_callback(script, move |result| {
             if let Some(tx) = tx.lock().ok().and_then(|mut t| t.take()) {
                 let _ = tx.send(result);
             }
@@ -134,7 +139,14 @@ async fn run_js(window: &WebviewWindow, body: &str, timeout: Duration) -> anyhow
             break;
         }
         if Instant::now() >= deadline {
-            anyhow::bail!("window '{}' did not finish loading", window.label());
+            let diagnostic = eval_raw(window,
+                "({url:location.href,readyState:document.readyState,root:document.getElementById('root')?.innerHTML?.slice(0,1000),tauri:!!window.__TAURI_INTERNALS__})".into(),
+                Duration::from_secs(2)).await;
+            anyhow::bail!(
+                "window '{}' did not finish loading; last={ready:?}; document={diagnostic:?}; nativeUrl={:?}",
+                window.label(),
+                window.url()
+            );
         }
         tokio::time::sleep(Duration::from_millis(150)).await;
     }
@@ -225,7 +237,7 @@ async fn open_fixture(
     let display = capture::resolve_display(app, None)?;
     let s = display.scale_factor.max(0.5);
     let url = WebviewUrl::App(format!("index.html#screenshot-qa-{route}").into());
-    let window = WebviewWindowBuilder::new(app, QA_WINDOW_LABEL, url)
+    let window = super::window_builder(app, QA_WINDOW_LABEL, url)
         .title("Screenshot QA fixture")
         .inner_size(520.0, 440.0)
         .position(display.x as f64 / s + 120.0, display.y as f64 / s + 120.0)

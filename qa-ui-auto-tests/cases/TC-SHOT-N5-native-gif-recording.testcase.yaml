@@ -1,5 +1,6 @@
 id: TC-SHOT-N5
 title: Native animated fixture records a decodable GIF at wall-clock speed
+description: Regression for region capture throughput; the twelve-frame minimum is retained after crop-before-conversion optimization and startup-frame reuse.
 covers: [F27.1]
 tags: [screenshot, recording, native, p1]
 modes: [native]

@@ -1,5 +1,6 @@
 id: TC-SHOT-N10
 title: Native region capture reproduces fixture pixels at physical scale
+description: The child fixture must mount through the real native WebView; Windows QA uses the same isolated profile and browser arguments as main. Readiness failures include document and URL diagnostics and remain failures.
 covers: [F27.1]
 tags: [screenshot, native, p1]
 modes: [native]

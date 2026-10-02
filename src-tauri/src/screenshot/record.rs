@@ -25,7 +25,7 @@ use anyhow::Context;
 use image::RgbaImage;
 use tauri::{AppHandle, Emitter};
 
-use super::capture::{DisplayInfo, FrameSource, crop, map_region, temp_artifact_path};
+use super::capture::{DisplayInfo, FrameSource, temp_artifact_path};
 
 /// Event emitted when a recording ends on its own (time limit or failure).
 pub const RECORDING_ENDED_EVENT: &str = "screenshot://recording-ended";
@@ -363,13 +363,15 @@ fn capture_loop(
     tx: SyncSender<TimedFrame>,
     ready: std::sync::mpsc::Sender<anyhow::Result<()>>,
 ) -> anyhow::Result<()> {
-    let display_size = (display.width, display.height);
-    let mut source = FrameSource::open(app, display);
-    // The first frame proves the backend works before the UI switches over.
-    if let Err(e) = source.poll() {
-        let _ = ready.send(Err(e.context("start screen capture")));
-        return Ok(());
-    }
+    let mut source = FrameSource::for_region(app, display, region);
+    // Reuse the readiness frame; a second read can block on a static screen.
+    let mut initial = match source.grab() {
+        Ok(image) => Some(image),
+        Err(e) => {
+            let _ = ready.send(Err(e.context("start screen capture")));
+            return Ok(());
+        }
+    };
     let _ = ready.send(Ok(()));
 
     let interval = Duration::from_secs_f64(1.0 / fps as f64);
@@ -377,22 +379,18 @@ fn capture_loop(
     let deadline = start + format.max_duration();
     let (out_w, out_h) = output_dims(region.2, region.3, format.max_width());
     let mut queue = FrameQueue::default();
-    let mut first = true;
     let mut failures = 0u32;
 
     while !stop.load(Ordering::SeqCst) && Instant::now() < deadline {
         let tick = Instant::now();
-        let polled = if first {
-            first = false;
-            source.grab().map(Some)
+        let polled = if let Some(image) = initial.take() {
+            Ok(Some(image))
         } else {
             source.poll().map(|f| f.cloned())
         };
         match polled {
-            Ok(Some(full)) => {
+            Ok(Some(mut image)) => {
                 failures = 0;
-                let (x, y, w, h) = map_region(region, display_size, full.dimensions());
-                let mut image = crop(&full, x, y, w, h);
                 if image.dimensions() != (out_w, out_h) {
                     image = image::imageops::resize(
                         &image,

@@ -367,19 +367,27 @@ pub fn map_region(
 
 /// Convert a BGRA capture frame (any stride) to RGBA.
 pub(crate) fn frame_to_rgba(frame: &Frame) -> anyhow::Result<RgbaImage> {
+    frame_region_to_rgba(
+        frame,
+        (0, 0, u32::from(frame.width), u32::from(frame.height)),
+    )
+}
+
+fn frame_region_to_rgba(frame: &Frame, region: (u32, u32, u32, u32)) -> anyhow::Result<RgbaImage> {
     let width = u32::from(frame.width);
     let height = u32::from(frame.height);
     if width == 0 || height == 0 {
         anyhow::bail!("capturer returned an empty frame");
     }
     let bytes = frame.bgra_bytes().context("read frame pixels")?;
-    let row_bytes = width as usize * 4;
-    if frame.stride < row_bytes {
+    if frame.stride < width as usize * 4 {
         anyhow::bail!("frame stride is smaller than the visible row");
     }
+    let (x, y, width, height) = clamp_region(width, height, region);
+    let row_bytes = width as usize * 4;
     let mut rgba = vec![0u8; row_bytes * height as usize];
     for (row, out) in rgba.chunks_exact_mut(row_bytes).enumerate() {
-        let start = row * frame.stride;
+        let start = (row + y as usize) * frame.stride + x as usize * 4;
         let src = bytes
             .get(start..start + row_bytes)
             .context("frame row out of bounds")?;
@@ -406,6 +414,9 @@ pub struct FrameSource {
     display: DisplayInfo,
     backend: Backend,
     last: Option<RgbaImage>,
+    region: Option<(u32, u32, u32, u32)>,
+    #[cfg(target_os = "linux")]
+    desktop_origin: (i32, i32),
 }
 
 impl FrameSource {
@@ -427,11 +438,75 @@ impl FrameSource {
                 Backend::OneShot
             }
         };
+        #[cfg(target_os = "linux")]
+        let desktop_origin = list_displays(app)
+            .map(|ds| {
+                (
+                    ds.iter().map(|d| d.x).min().unwrap_or(0),
+                    ds.iter().map(|d| d.y).min().unwrap_or(0),
+                )
+            })
+            .unwrap_or((0, 0));
         Self {
             app: app.clone(),
             display,
             backend,
             last: None,
+            region: None,
+            #[cfg(target_os = "linux")]
+            desktop_origin,
+        }
+    }
+
+    /// Recording crops before BGRA conversion and retains only the region,
+    /// instead of copying/converting the whole desktop on every tick.
+    pub fn for_region(app: &AppHandle, display: DisplayInfo, region: (u32, u32, u32, u32)) -> Self {
+        let mut source = Self::open(app, display);
+        source.region = Some(region);
+        source
+    }
+
+    fn decode_frame(&self, frame: &Frame) -> anyhow::Result<RgbaImage> {
+        let Some(region) = self.region else {
+            return Ok(self.crop_desktop(frame_to_rgba(frame)?));
+        };
+        let (width, height) = (u32::from(frame.width), u32::from(frame.height));
+        #[cfg(target_os = "linux")]
+        let rect = {
+            if (width, height) == (self.display.width, self.display.height) {
+                region
+            } else {
+                let x = (self.display.x - self.desktop_origin.0).max(0) as u32;
+                let y = (self.display.y - self.desktop_origin.1).max(0) as u32;
+                (
+                    x.saturating_add(region.0),
+                    y.saturating_add(region.1),
+                    region.2,
+                    region.3,
+                )
+            }
+        };
+        #[cfg(not(target_os = "linux"))]
+        let rect = map_region(
+            region,
+            (self.display.width, self.display.height),
+            (width, height),
+        );
+        frame_region_to_rgba(frame, rect)
+    }
+
+    fn decode_one_shot(&self) -> anyhow::Result<RgbaImage> {
+        let full = capture_one_shot(&self.app, &self.display)?;
+        match self.region {
+            None => Ok(full),
+            Some(region) => {
+                let (x, y, w, h) = map_region(
+                    region,
+                    (self.display.width, self.display.height),
+                    full.dimensions(),
+                );
+                Ok(crop(&full, x, y, w, h))
+            }
         }
     }
 
@@ -449,6 +524,7 @@ impl FrameSource {
                 display,
                 backend: Backend::OneShot,
                 last: None,
+                region: None,
             }
         }
     }
@@ -458,10 +534,10 @@ impl FrameSource {
     pub fn poll(&mut self) -> anyhow::Result<Option<&RgbaImage>> {
         let image = match &mut self.backend {
             Backend::Persistent(capturer) => match capturer.poll_frame()? {
-                Some(frame) => Some(self.crop_desktop(frame_to_rgba(&frame)?)),
+                Some(frame) => Some(self.decode_frame(&frame)?),
                 None => None,
             },
-            Backend::OneShot => Some(capture_one_shot(&self.app, &self.display)?),
+            Backend::OneShot => Some(self.decode_one_shot()?),
         };
         match image {
             Some(image) => {
@@ -474,9 +550,9 @@ impl FrameSource {
                 let image = match &mut self.backend {
                     Backend::Persistent(capturer) => {
                         let frame = capturer.capture()?;
-                        self.crop_desktop(frame_to_rgba(&frame)?)
+                        self.decode_frame(&frame)?
                     }
-                    Backend::OneShot => capture_one_shot(&self.app, &self.display)?,
+                    Backend::OneShot => self.decode_one_shot()?,
                 };
                 self.last = Some(image);
                 Ok(self.last.as_ref())
@@ -605,6 +681,38 @@ mod tests {
         assert!(ensure_artifact_path(&traversal.to_string_lossy()).is_err());
         std::fs::remove_file(outside).ok();
         std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn cropped_frame_conversion_matches_full_crop_with_stride_padding() {
+        let (width, height, stride) = (7u16, 6u16, 36usize);
+        let mut data = vec![0u8; stride * usize::from(height)];
+        for y in 0..usize::from(height) {
+            for x in 0..usize::from(width) {
+                let i = y * stride + x * 4;
+                data[i..i + 4].copy_from_slice(&[x as u8, y as u8, (x + y) as u8, 255]);
+            }
+        }
+        let frame = Frame::bgra(data, 0, 0, width, height, stride);
+        let full = frame_to_rgba(&frame).unwrap();
+        for rect in [(2, 1, 3, 4), (5, 4, 20, 20), (0, 0, 7, 6)] {
+            let (x, y, w, h) = rect;
+            assert_eq!(
+                frame_region_to_rgba(&frame, rect).unwrap(),
+                crop(&full, x, y, w, h)
+            );
+        }
+        let small = frame_region_to_rgba(&frame, (2, 1, 3, 4)).unwrap();
+        assert_eq!(small.dimensions(), (3, 4));
+        assert_eq!(small.get_pixel(0, 0).0, [3, 1, 2, 255]);
+    }
+
+    #[test]
+    fn cropped_frame_conversion_rejects_incomplete_rows() {
+        let frame = Frame::bgra(vec![0u8; 12], 0, 0, 3, 2, 12);
+        assert!(frame_region_to_rgba(&frame, (1, 1, 1, 1)).is_err());
+        let frame = Frame::bgra(vec![0u8; 24], 0, 0, 3, 2, 8);
+        assert!(frame_region_to_rgba(&frame, (0, 0, 1, 1)).is_err());
     }
 
     #[test]
