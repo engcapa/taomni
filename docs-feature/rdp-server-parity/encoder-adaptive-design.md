@@ -131,13 +131,13 @@ EncoderIter::next(rect)
        ├─ 客户端未声明批量压缩，或协商出的编码不是 RemoteFX（QOIZ/QOI/NSCodec/无 SurfaceCommands）
        │    → 原 BitmapUpdater 路径（行为与改造前逐字节一致，AC-E03）
        └─ 声明了批量压缩，且协商出 RemoteFX
-            planar   = BitmapEncoder::encode(rect)                  // UpdateCode::Bitmap
+            planar   = BitmapEncoder::candidate(rect)               // RLE 完整编码；raw 先取精确长度/采样
             estimate = scratch_mppc64k(planar_strips).len()         // 一次性压缩器，用完即弃
             if estimate <= planar.len() * PLANAR_BULK_GIVE_UP_RATIO // DEC-02，0.25
-                 → 发 planar
+                 → 必要时构造完整 planar，然后发送
             else
                  rfx = RfxEncoder::encode(rect)                     // UpdateCode::SurfaceCommands
-                 rfx.len() < estimate ? 发 rfx : 发 planar
+                 rfx.len() < estimate ? 发 rfx : 构造并发送 planar
        // planar 分片写出前经过连接的批量压缩器（§4.3），且只经过一次
        // 已压缩的 RemoteFX 直接发送；不推进发送端或接收端 bulk 历史
 ```
@@ -146,7 +146,7 @@ EncoderIter::next(rect)
 
 - **只有真正发出去的字节进入连接的压缩历史。** 连接的 `BulkCompressor` 每调用一次 `compress` 就推进历史，客户端则只会看到发出去的数据。如果拿连接压缩器去“试压”一个最终没发的矩形，双方历史就会错位，后面的画面会解错。所以判断只用 `scratch_mppc64k`：一个当次新建、用完即弃的 MPPC-64K 压缩器，≤1024 字节直接试压；更大的候选在完整 planar 范围取四段均匀分离的 256 字节数据，再按比例估算整个矩形，不带跨帧历史。第五轮先采用四段共 4 KiB 的采样；第六轮照片仍未达帧率比后，将采样上限降至 1 KiB。平坦前缀与噪声主体的专门 unit 保护误判边界。V-E01 的完整自适应耗时与原 RemoteFX 分开记录；实际输入延迟与帧率以 CI native PERF-01/03 为准。
 - **位图更新的约束。** bulk 路径的 `TS_CD_HEADER.cbScanWidth` 为每行字节数 `width * 4`，因此任意 32bpp 像素宽度都对齐；只有该值超出 u16 时回退 RemoteFX。奇数宽 XDamage 与保留父 stride 的裁剪由逐像素 unit 覆盖。非 bulk 路径保持原头部字节。
-- **照片的 CPU 成本。** 第三轮 CI 的实际画面帧率证明完整 planar RLE 与 RemoteFX 重复编码、再尝试 bulk，会拖慢照片。仍先生成完整无损 planar 并比较压缩大小；在矩形全范围采样 256 个邻域，超过一半有重复色或一致的垂直增量时使用 RLE，否则按行用固定像素布局一次遍历生成标准 raw planar 的 R/G/B 三个平面。采样只选择 planar 内部的 RLE 表示，不直接决定最终 wire codec。大小估算只分配独立 MPPC 上下文，候选输出缓冲按 bulk 的 4 B/pixel 与头部预留，避免原 8 B/pixel 清零。选中 RemoteFX 时直接发送，因为照片 unit 中额外 bulk 5.07 ms/frame 没有节省字节；未压缩更新不进入两端历史，四种级别的混发测试验证这一点。
+- **照片的 CPU 成本。** 第三轮 CI 的实际画面帧率证明完整 planar RLE 与 RemoteFX 重复编码、再尝试 bulk，会拖慢照片。在矩形全范围采样 256 个邻域，超过一半有重复色或一致的垂直增量时使用 RLE，否则使用标准 raw planar。raw 候选现直接从像素读取与完整编码完全相同的四段采样，并计算精确长度，只有选中 planar 时才生成全部 R/G/B 平面；RLE 候选仍完整编码。八种像素布局、父 stride、部分尾行及跨 bitmap 分块的 unit 校验长度、采样字节和估算结果完全一致。采样只选择 planar 内部表示，不直接决定最终 wire codec；选择阈值未改。大小估算只分配独立 MPPC 上下文，候选输出缓冲按 bulk 的 4 B/pixel 与头部预留，避免原 8 B/pixel 清零。选中 RemoteFX 时直接发送，因为照片 unit 中额外 bulk 5.07 ms/frame 没有节省字节；未压缩更新不进入两端历史，四种级别的混发测试验证这一点。
 - **两种更新混发。** 同一帧里可能有的矩形是位图更新（`UpdateCode::Bitmap`），有的是 surface bits。mstsc、FreeRDP 和 ironrdp-session 都能处理混发，各自直接绘制到同一个 framebuffer；TASK-E3 的回环测试要覆盖混发的帧。
 - **RemoteFX 首帧头。** `RemoteFxHandler` 在第一次编码时附带 Sync/Context/Channels（`desktop_size.take()`）。自适应路径下，第一个矩形可能是位图，所以这个“首帧”标志必须挂在 RemoteFX 编码器自己身上，不能按“第一个更新”判断。现有实现已经是挂在 `RemoteFxHandler` 上的，保持不变即可。
 
@@ -213,7 +213,7 @@ EncoderIter::next(rect)
 | `qa-ui-auto-tests/cases/TC-RDPS-PERF-03-photo-content.testcase.yaml`* | 照片类内容的 M4 不回退（AC-E02）；需要 `rdp_target.py` 新增 `--mode photo` | AC-E02 | TASK-E5 |
 | `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/rdp_helpers/rdp_target.py` | 新增同算法 photo；固定时钟调度真实绘制与逐秒源遥测；照片两次测量从匹配的初始场景启动 | AC-E01/E02 | TASK-E5 |
 | `qa-ui-auto-tests/cases/TC-RDPS-NAT-08-mstsc-interop.testcase.yaml`* | V-17，见 §6 TASK-E6 | AC-E06 | TASK-E6 |
-| `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/rdp_steps.py`、`rdp_helpers/mstsc.py` | `host_mstsc` 使用 Win32 交互桌面与 owned handles；hosted loopback 文件授权临时恢复；PrintWindow 校验已知图案；失败同样清理进程、cmdkey 和授权 | AC-E06 | TASK-E6 |
+| `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/rdp_steps.py`、`rdp_helpers/mstsc.py` | `host_mstsc` 使用 Win32 交互桌面与 owned handles；hosted loopback 文件授权临时恢复；诊断用 PrintWindow，最终图案校验将 owned 窗口放到宿主目标右侧并读取可见 compositor 区域，按窗口和桌面边界裁剪；失败同样清理进程、cmdkey 和授权，保留 owned PID crash 证据 | AC-E06 | TASK-E6 |
 | `qa-ui-auto-tests/cases/TC-RDPC-REF-01-termservice.testcase.yaml`*、`TC-RDPC-REF-02-xrdp.testcase.yaml`* | V-21，见 §6 TASK-E7 | AC-E07/E08 | TASK-E7 |
 | `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/rdp_steps.py`（新 verb `host_copy_file`）、`rdp_steps.py` `PATH_ARGS` 加 `baseline-report` | 把基线目录里的状态文件复制进用例目录；探针基线报告路径在报告根目录内解析 | AC-E02/E07 | TASK-E4、TASK-E7 |
 | `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/fixtures/xrdp_server_required.py`*、`fixtures/__init__.py`、`schema/testcase.schema.json` | xrdp fixture（受 DEC-07 影响） | AC-E08 | TASK-E7 |
@@ -520,6 +520,10 @@ EncoderIter::next(rect)
 
 - 第十轮 macOS 完成：native 11/0/0，UI 62 ms / 57.607 ms p95 / 38.354 实际 fps / 598.640 kbps；照片 baseline/adaptive 31.748/31.197 fps，比值 0.982638，带宽比 0.990042，bulk 解压错误 0。修正真实 draw deadline 后，M3 与其余性能门槛均通过；整轮仅 Windows mstsc 失败。完整三端原始 receipt 与身份已核验。
 - mstsc 诊断运行 [36991919276](https://github.com/engcapa/taomni/actions/runs/36991919276) 在 planner unit 失败：四个旧 mocked 测试未 mock 新 WER 上下文，Linux 的 `GITHUB_ACTIONS=true` 导致导入 winreg；没有执行产品用例。补齐 mock 后同 hosted 环境的 33 个工具/清理 unit 通过，再推送重跑。该失败原始日志保留。
+
+- 第十一轮 [36988038403](https://github.com/engcapa/taomni/actions/runs/36988038403)，源码 `874cd15e`：三端 browser 各 5/0/0，Linux native 12/0/0、macOS 11/0/0、Windows 13/2/0。UI 四项均通过；Windows 照片 baseline/adaptive 实际帧率 15.691/27.282、带宽比 1.652665，未通过；mstsc 进程未退出，但 PrintWindow 图像几乎全黑，两种颜色均为 0。两项失败均保留，不能作为验收通过。
+- 第十二轮 [36989986976](https://github.com/engcapa/taomni/actions/runs/36989986976)，源码 `351cbe48`：三端 browser 各 5/0/0；Linux native 11/1/0、macOS 11/0/0、Windows 14/1/0。UI 分别为 Linux 116 ms / 35.779 ms p95 / 54.854 实际 fps / 173.613 kbps，macOS 106 ms / 58.067 ms / 33.588 fps / 515.892 kbps，Windows 50 ms / 49.760 ms / 33.077 fps / 443.193 kbps。照片帧率/带宽比依次为 0.918293/0.922676、0.993767/0.986528、0.978430/0.962941；Linux 帧率失败。Windows 唯一失败仍是 PrintWindow 两种图案颜色均为 0，协议、音频和 TermService 通过。全部原始 receipt 哈希与源码/runner/case/build 身份已核验。
+- 照片候选延迟构造的本地 release unit：vendor 24 passed / 1 CPU-only ignored（另行执行通过），lazy sample 与完整候选逐字节一致。CPU-only profiler 的独立采样为 0.067/0.079 ms/frame，完整 planar 加估算为 0.445/0.481 ms/frame；旧/自适应完整编码在无裁剪为 3.656/3.671 ms、裁剪为 3.637/3.414 ms。该定位数据不替代三端实际帧率验收。mstsc 图案截图改为 owned PID 窗口的可见 compositor crop，强制 x≥680，与宿主图案/动画不重叠，并裁剪到桌面边界；两种颜色各至少 200 pixels 的门槛保持，33 个 mocked 工具 unit 通过。两项改动仍须新 CI 验证。
 
 ## 9. 验收追踪与交付条件
 

@@ -254,6 +254,7 @@ def _capture_mstsc(ctx: NativeStepContext, process: subprocess.Popen, args: dict
     path = _within_report(ctx, str(args.get("snapshot") or "mstsc-window.png"))
     script = r'''
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -265,6 +266,7 @@ public class QaMstscCapture {
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr handle, out Rect rect);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr handle, IntPtr hdc, uint flags);
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr handle, IntPtr after, int x, int y, int w, int h, uint flags);
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   public static IntPtr FindVisibleWindow(uint pid) {
     IntPtr best = IntPtr.Zero; long largest = 0;
@@ -286,24 +288,53 @@ $p = Get-Process -Id ([int]$env:QA_MSTSC_PID) -ErrorAction Stop
 $window = [QaMstscCapture]::FindVisibleWindow([uint32]$p.Id)
 $r = New-Object QaMstscCapture+Rect
 if ($window -eq [IntPtr]::Zero -or -not [QaMstscCapture]::GetWindowRect($window,[ref]$r)) { throw 'mstsc visible window unavailable' }
+$actor = 'PrintWindow'
+if ($env:QA_MSTSC_PATTERN -eq 'true') {
+  # PrintWindow can omit mstsc's accelerated client surface when occluded.
+  # Put the owned client to the right of both known host targets, then read
+  # its visible compositor pixels. The crop cannot contain the host targets.
+  $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
+  $left = $screen.Right - 324
+  if ($left -lt 680) { throw 'desktop has no separate region for the owned mstsc viewport' }
+  if (-not [QaMstscCapture]::SetWindowPos($window,[IntPtr](-1),$left,$screen.Top+10,314,235,0x40)) {
+    throw 'could not position the owned mstsc viewport'
+  }
+  Start-Sleep -Milliseconds 1200
+  if (-not [QaMstscCapture]::GetWindowRect($window,[ref]$r) -or $r.Left -lt 680) {
+    throw 'mstsc viewport overlaps the independent host targets'
+  }
+  $actor = 'owned-visible-compositor-crop'
+}
+$captureX=$r.Left; $captureY=$r.Top
 $w=$r.Right-$r.Left; $h=$r.Bottom-$r.Top
+if ($actor -eq 'owned-visible-compositor-crop') {
+  # mstsc may enforce a minimum window size larger than the requested one.
+  # Keep the capture inside both the owned window and the visible desktop.
+  $captureX=[Math]::Max($r.Left,$screen.Left)
+  $captureY=[Math]::Max($r.Top,$screen.Top)
+  $w=[Math]::Min($r.Right,$screen.Right)-$captureX
+  $h=[Math]::Min($r.Bottom,$screen.Bottom)-$captureY
+}
 if ($w -lt 100 -or $h -lt 80) { throw 'mstsc window is too small' }
 $bmp=New-Object System.Drawing.Bitmap $w,$h
 $g=[System.Drawing.Graphics]::FromImage($bmp)
-$hdc=$g.GetHdc()
-try {
-  # Capture the client window itself. The known host target is topmost, and
-  # copying the same screen rectangle would incorrectly count its pixels as
-  # proof of mstsc decoding the remote desktop.
-  if (-not [QaMstscCapture]::PrintWindow($window,$hdc,2)) { throw 'mstsc PrintWindow failed' }
-} finally { $g.ReleaseHdc($hdc) }
+if ($actor -eq 'owned-visible-compositor-crop') {
+  $g.CopyFromScreen($captureX,$captureY,0,0,$bmp.Size)
+} else {
+  $hdc=$g.GetHdc()
+  try {
+    if (-not [QaMstscCapture]::PrintWindow($window,$hdc,2)) { throw 'mstsc PrintWindow failed' }
+  } finally { $g.ReleaseHdc($hdc) }
+}
 $bmp.Save($env:QA_MSTSC_CAPTURE,[System.Drawing.Imaging.ImageFormat]::Png)
-[pscustomobject]@{capture_kind='owned-client-window'; actor='PrintWindow'; pid=$p.Id; hwnd=$window.ToInt64(); width=$w; height=$h} |
+[pscustomobject]@{capture_kind='owned-client-window'; actor=$actor; pid=$p.Id; hwnd=$window.ToInt64(); x=$captureX; y=$captureY; width=$w; height=$h;
+  window_x=$r.Left; window_y=$r.Top; window_width=$r.Right-$r.Left; window_height=$r.Bottom-$r.Top} |
   ConvertTo-Json | Set-Content -Encoding UTF8 ($env:QA_MSTSC_CAPTURE + '.metadata.json')
 $g.Dispose(); $bmp.Dispose()
 '''
     result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
-                            env={**os.environ, "QA_MSTSC_PID": str(process.pid), "QA_MSTSC_CAPTURE": str(path)},
+                            env={**os.environ, "QA_MSTSC_PID": str(process.pid), "QA_MSTSC_CAPTURE": str(path),
+                                 "QA_MSTSC_PATTERN": "true" if args.get("expect_pattern") else "false"},
                             capture_output=True, text=True, timeout=45)
     if result.returncode or not path.is_file():
         (ctx.case_dir / "mstsc-capture-error.txt").write_text(

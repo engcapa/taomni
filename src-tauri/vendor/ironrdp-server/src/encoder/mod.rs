@@ -68,8 +68,12 @@ fn estimate_bulk_size(data: &[u8]) -> Result<usize> {
         }
         &strips
     };
+    estimate_bulk_sample(data.len(), sample)
+}
+
+fn estimate_bulk_sample(length: usize, sample: &[u8]) -> Result<usize> {
     let encoded = BulkCompressor::estimate_mppc64k_size(sample)?;
-    Ok((encoded * data.len()).div_ceil(sample.len()))
+    Ok((encoded * length).div_ceil(sample.len()))
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -664,17 +668,32 @@ impl BitmapUpdateHandler for AdaptiveHandler {
                 .handle_compact(bitmap)
                 .map(UpdateFragmenter::without_bulk_compression);
         }
-        let planar = self.bitmap.handle(bitmap)?;
-        let estimate = estimate_bulk_size(&planar.data)?;
-        if estimate as f64 <= planar.data.len() as f64 * PLANAR_BULK_GIVE_UP_RATIO {
-            return Ok(planar);
+        let (length, estimate, planar) =
+            if let Some((length, sample)) = self.bitmap.bitmap.raw_planar_sample(bitmap)? {
+                (length, estimate_bulk_sample(length, &sample)?, None)
+            } else {
+                let planar = self.bitmap.handle(bitmap)?;
+                (
+                    planar.data.len(),
+                    estimate_bulk_size(&planar.data)?,
+                    Some(planar),
+                )
+            };
+        if estimate as f64 <= length as f64 * PLANAR_BULK_GIVE_UP_RATIO {
+            return match planar {
+                Some(planar) => Ok(planar),
+                None => self.bitmap.handle(bitmap),
+            };
         }
         // Encoding a rejected RemoteFX candidate must not consume its first
         // frame headers or advance its frame index.
         let mut candidate = self.rfx.clone();
         let rfx = candidate.handle_compact(bitmap)?;
         if estimate <= rfx.data.len() {
-            Ok(planar)
+            match planar {
+                Some(planar) => Ok(planar),
+                None => self.bitmap.handle(bitmap),
+            }
         } else {
             self.rfx = candidate;
             Ok(rfx.without_bulk_compression())
@@ -1217,7 +1236,12 @@ mod bulk_tests {
             let mut planar = BitmapHandler::for_bulk_compression();
             let mut planar_time = Duration::ZERO;
             let mut estimate_time = Duration::ZERO;
+            let mut sample_time = Duration::ZERO;
             for bitmap in &frames {
+                let started = Instant::now();
+                let (length, sample) = planar.bitmap.raw_planar_sample(bitmap).unwrap().unwrap();
+                estimate_bulk_sample(length, &sample).unwrap();
+                sample_time += started.elapsed();
                 let started = Instant::now();
                 let fragment = planar.handle(bitmap).unwrap();
                 planar_time += started.elapsed();
@@ -1226,9 +1250,10 @@ mod bulk_tests {
                 estimate_time += started.elapsed();
             }
             eprintln!(
-                "photo cropped={cropped}: planar={:.3}ms/frame estimate={:.3}ms/frame",
+                "photo cropped={cropped}: planar={:.3}ms/frame estimate={:.3}ms/frame lazy-sample={:.3}ms/frame",
                 planar_time.as_secs_f64() * 1000.0 / frames.len() as f64,
                 estimate_time.as_secs_f64() * 1000.0 / frames.len() as f64,
+                sample_time.as_secs_f64() * 1000.0 / frames.len() as f64,
             );
             for adaptive in [false, true] {
                 let mut rfx =

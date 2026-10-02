@@ -46,6 +46,112 @@ impl BitmapEncoder {
         }
     }
 
+    pub(crate) fn raw_planar_sample(
+        &self,
+        bitmap: &BitmapUpdate,
+    ) -> Result<Option<(usize, Vec<u8>)>, BitmapEncodeError> {
+        if !self.byte_scan_width || has_repeated_pixels(bitmap) {
+            return Ok(None);
+        }
+        // Raw planar has an exact size and byte layout. Read the same four
+        // strips as the materialized candidate without allocating/writing all
+        // three planes of a photo that RemoteFX will usually beat.
+        let width = usize::from(bitmap.width.get());
+        let row_len = bitmap.width.get().checked_mul(4).ok_or_else(|| {
+            BitmapEncodeError::Encode(invalid_field_err!("bitmap", "Row size exceeds u16"))
+        })?;
+        let chunk_height = usize::from(u16::MAX / row_len);
+        let stride = bitmap.stride.get();
+        let chunks: Vec<_> = bitmap.data.chunks(stride * chunk_height).collect();
+        let mut update_header = [0; 4];
+        BitmapUpdateData::encode_header(
+            cast_length!("rectangle count", chunks.len()).map_err(BitmapEncodeError::Encode)?,
+            &mut WriteCursor::new(&mut update_header),
+        )
+        .map_err(BitmapEncodeError::Encode)?;
+        let mut headers = Vec::with_capacity(chunks.len());
+        let mut length = update_header.len();
+        for (index, chunk) in chunks.iter().enumerate() {
+            let height = chunk.len().div_ceil(stride);
+            let body_size = width * height * 3 + 2; // planar header and pad
+            // BitmapStreamHeader checks two bytes of capacity but writes one
+            // for ARGB. Keep its actual length separate from that capacity.
+            let mut header = [0; 28];
+            let mut cursor = WriteCursor::new(&mut header);
+            let top = bitmap.y + (index * chunk_height) as u16;
+            InclusiveRectangle {
+                left: bitmap.x,
+                top,
+                right: bitmap.x + bitmap.width.get() - 1,
+                bottom: top + height as u16 - 1,
+            }
+            .encode(&mut cursor)
+            .map_err(BitmapEncodeError::Encode)?;
+            cursor.write_u16(bitmap.width.get());
+            cursor.write_u16(height as u16);
+            cursor.write_u16(32);
+            cursor.write_u16(Compression::BITMAP_COMPRESSION.bits());
+            cursor.write_u16((body_size + bitmap::CompressedDataHeader::ENCODED_SIZE) as u16);
+            bitmap::CompressedDataHeader {
+                main_body_size: body_size as u16,
+                scan_width: row_len,
+                uncompressed_size: height as u16 * row_len,
+            }
+            .encode(&mut cursor)
+            .map_err(BitmapEncodeError::Encode)?;
+            BitmapStreamHeader {
+                enable_rle_compression: false,
+                use_alpha: false,
+                color_plane_definition: ColorPlaneDefinition::Argb,
+            }
+            .encode(&mut cursor)
+            .map_err(BitmapEncodeError::Encode)?;
+            let header_len = cursor.pos();
+            headers.push((header, header_len, height));
+            length += 28 + width * height * 3;
+        }
+        let channels = match bitmap.format {
+            PixelFormat::ARgb32 | PixelFormat::XRgb32 => [1, 2, 3],
+            PixelFormat::RgbA32 | PixelFormat::RgbX32 => [0, 1, 2],
+            PixelFormat::ABgr32 | PixelFormat::XBgr32 => [3, 2, 1],
+            PixelFormat::BgrA32 | PixelFormat::BgrX32 => [2, 1, 0],
+        };
+        let byte_at = |position: usize| {
+            if position < update_header.len() {
+                return update_header[position];
+            }
+            let position = position - update_header.len();
+            let full_chunk_size = 28 + width * chunk_height * 3;
+            let index = position / full_chunk_size;
+            let position = position % full_chunk_size;
+            let (header, header_len, height) = &headers[index];
+            if position < *header_len {
+                return header[position];
+            }
+            let position = position - header_len;
+            let pixels = width * height;
+            if position == pixels * 3 {
+                return 0; // raw planar trailing pad
+            }
+            let channel = channels[position / pixels];
+            let pixel = position % pixels;
+            let offset = (height - pixel / width - 1) * stride + pixel % width * 4;
+            chunks[index][offset + channel]
+        };
+        let sample_len = length.min(super::PLANAR_ESTIMATE_SAMPLE_SIZE);
+        let mut sample = vec![0; sample_len];
+        for (index, byte) in sample.iter_mut().enumerate() {
+            let position = if length <= sample_len {
+                index
+            } else {
+                let strip = sample_len / 4;
+                (index / strip) * (length - strip) / 3 + index % strip
+            };
+            *byte = byte_at(position);
+        }
+        Ok(Some((length, sample)))
+    }
+
     pub(crate) fn encode(
         &mut self,
         bitmap: &BitmapUpdate,
@@ -313,6 +419,67 @@ mod tests {
     use core::num::NonZeroU16;
     use ironrdp_core::decode;
     use ironrdp_graphics::rdp6::BitmapStreamDecoder;
+
+    #[test]
+    fn lazy_raw_planar_samples_match_materialized_bytes_across_crops_and_layouts() {
+        for format in [
+            PixelFormat::ARgb32,
+            PixelFormat::XRgb32,
+            PixelFormat::RgbA32,
+            PixelFormat::RgbX32,
+            PixelFormat::ABgr32,
+            PixelFormat::XBgr32,
+            PixelFormat::BgrA32,
+            PixelFormat::BgrX32,
+        ] {
+            for width in [2u16, 3, 17, 253, 704] {
+                for height in [3u16, 131] {
+                    let stride = usize::from(width + 11) * 4;
+                    let mut seed = 0x9e3779b9u32;
+                    let data: Vec<_> = (0..stride * (usize::from(height) - 1)
+                        + usize::from(width) * 4)
+                        .map(|_| {
+                            seed ^= seed << 13;
+                            seed ^= seed >> 17;
+                            seed ^= seed << 5;
+                            seed as u8
+                        })
+                        .collect();
+                    let bitmap = BitmapUpdate {
+                        x: 13,
+                        y: 19,
+                        width: NonZeroU16::new(width).unwrap(),
+                        height: NonZeroU16::new(height).unwrap(),
+                        format,
+                        data: data.into(),
+                        stride: NonZeroUsize::new(stride).unwrap(),
+                    };
+                    let mut encoder = BitmapEncoder::for_bulk_compression();
+                    let (length, sample) = encoder.raw_planar_sample(&bitmap).unwrap().unwrap();
+                    let mut output = vec![0; encoder.output_size_hint(&bitmap)];
+                    let written = encoder.encode(&bitmap, &mut output).unwrap();
+                    output.truncate(written);
+                    assert_eq!(length, output.len(), "{width}x{height} {format:?}");
+                    let expected = if length <= sample.len() {
+                        output.clone()
+                    } else {
+                        let strip = sample.len() / 4;
+                        (0..4)
+                            .flat_map(|index| {
+                                let start = index * (length - strip) / 3;
+                                output[start..start + strip].iter().copied()
+                            })
+                            .collect()
+                    };
+                    assert_eq!(sample, expected, "{width}x{height} {format:?}");
+                    assert_eq!(
+                        super::super::estimate_bulk_sample(length, &sample).unwrap(),
+                        super::super::estimate_bulk_size(&output).unwrap(),
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn photo_inside_a_merged_tile_crop_uses_raw_planar_but_smooth_ui_uses_rle() {

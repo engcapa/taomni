@@ -148,7 +148,7 @@ verification:
     - step: 24
       expectation: At least one planar rectangle is sent.
     - step: 25
-      expectation: PrintWindow captures the owned mstsc client window and finds both known remote target colors.
+      expectation: The owned mstsc viewport is placed outside both host targets and its visible compositor crop contains both known decoded target colors.
     results:
     - 19
     - 20
