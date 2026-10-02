@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 from qa_ui_auto import rdp_steps as steps
 from qa_ui_auto.fixtures import xrdp_server_required as xrdp
+from qa_ui_auto.fixtures import rdp_baseline_required as baseline
 from qa_ui_auto.rdp_helpers.rdp_target import photo_noise
 from qa_ui_auto.rdp_helpers import mstsc
 from qa_ui_auto.steps import StepError
@@ -197,6 +198,36 @@ class EncoderToolsTest(unittest.TestCase):
         self.assertNotEqual(photo_noise(20, 12, 0), photo_noise(20, 12, 1))
         self.assertEqual(len(photo_noise(20, 12, 0)), 240)
         self.assertLessEqual(max(photo_noise(20, 12, 0)), 31)
+
+
+class TermServiceFixtureTest(unittest.TestCase):
+    def test_startup_evidence_is_redacted_and_unavailable_evidence_does_not_block_cleanup(self):
+        for unavailable in (False, True):
+            with self.subTest(unavailable=unavailable), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                work, report = root / "baseline", root / "report"
+                work.mkdir()
+                report.mkdir()
+                (work / "run-key.log").write_text("fixture-user dummy-password", encoding="utf-8")
+                (work / "flip-state.json").write_text('{"ready":true}', encoding="utf-8")
+                if unavailable:
+                    # A non-directory already occupies the evidence destination.
+                    (report / "termservice-target").write_text("unavailable", encoding="utf-8")
+                baseline._CREATED.append("fixture-user")
+                baseline._ANIMATION.append("unset")
+                with patch.object(baseline.platform, "system", return_value="Windows"), \
+                     patch.object(baseline, "WORK_DIR", work), \
+                     patch.dict(os.environ, {"QA_RDP_BASELINE_PASSWORD": "dummy-password"}), \
+                     patch.object(baseline, "_ps", return_value=subprocess.CompletedProcess([], 0, "[]", "")) as ps:
+                    baseline.teardown(SimpleNamespace(case_dir=report))
+                self.assertTrue(any("Remove-LocalUser -Name 'fixture-user'" in call.args[0] for call in ps.call_args_list))
+                self.assertFalse(baseline._CREATED)
+                self.assertFalse(baseline._ANIMATION)
+                if unavailable:
+                    self.assertTrue((report / "termservice-target-error.txt").is_file())
+                else:
+                    self.assertEqual((report / "termservice-target/run-key.log").read_text(), "fixture-user [redacted]")
+                    self.assertTrue(json.loads((report / "termservice-target/flip-state.json").read_text())["ready"])
 
 
 class XrdpFixtureTest(unittest.TestCase):

@@ -157,34 +157,34 @@ EncoderIter::next(rect)
   - 未压缩但带 FLUSHED 时：仍写 compression 字段并发原数据。
   - 两者都不带时：`compression_flags: None`。
 
-  ≤50 字节或 ≥16384 字节的分片由 `BulkCompressor` 自动跳过。分片上限 16374 字节，所以正常分片都会尝试压缩。
-- **所有快速路径更新都要经过压缩器**，包括指针（`rgba_pointer` 等）。历史窗口是整条输出流共享的，跳过某类更新本身没问题：未压缩的分片不影响历史。但写入顺序必须与压缩顺序一致，所以压缩必须在 `fragmenter.next(buffer)` 写入前、同一线程上完成，不能放到并行的编码线程里。
+  ≤50 字节或 ≥16384 字节的分片由 `BulkCompressor` 自动跳过。分片上限通常为 16374 字节；MPPC-8K 则为 8191 字节，避免超过其历史窗口。
+- **快速路径压缩共用同一连接的历史**，包括指针（`rgba_pointer` 等）。自适应选择的 RemoteFX 已编码为照片数据，使用不推进 bulk 历史的 raw fast-path；位图与指针仍在顺序发送时尝试 bulk。写入顺序必须与压缩顺序一致，所以压缩在 `EncoderIter::encode_fragment` 写入前完成，不放到并行的编码线程里。四级 raw/压缩交替 unit 逐包解压证明历史保持一致。
 - **重置。** `UpdateEncoder::set_desktop_size`（重激活）和新连接都新建压缩器；新压缩器的第一个压缩分片按 MS-RDPBCGR 置 `PACKET_FLUSHED（AT_FRONT 仅使用各压缩器按实际历史产生的值，NCRUSH 首包不可强置 AT_FRONT）`，由连接包装器明确发送 FLUSHED；XCRUSH 内层 MPPC 同时发送 FLUSHED。四级连续分片与重置 unit 已覆盖。
 
 ### 数据流、状态与生命周期
 
 | 状态 | 所有者 | 创建 | 销毁 / 重置 |
 |---|---|---|---|
-| `BulkCompressor`（每连接，可为空） | `UpdateEncoder`（新字段 `bulk: Option<BulkCompressor>`） | `run_connection_with` 构建编码器时，按 `AcceptorResult.client_compression` 与 builder 开关 | 连接结束随编码器 drop；重激活时新建 |
-| 自适应统计（planar/RemoteFX 矩形数、压缩前后字节） | `UpdateEncoder`，原子计数器 | 同上 | 同上；通过 `RdpServerBuilder::with_encoder_stats_handle(Arc<EncoderStats>)` 暴露给 Taomni 的 `RdpMetrics` |
+| `BulkCompressor`（每连接，可为空） | `UpdateEncoder::bulk: Option<BulkEncoder>`；包装器持有 compressor、协商级别与首次 FLUSHED 状态 | `run_connection_with` 构建编码器时，按 `AcceptorResult.client_compression` 与 builder 开关 | 连接结束随编码器 drop；重激活时 reset；故障后本连接保持禁用 |
+| 自适应统计（planar/RemoteFX 矩形数、压缩前后字节） | 服务端共享 `Arc<EncoderStats>` 原子计数器，供每连接编码器写入 | builder 构建时传入 | 服务端停止后销毁；通过 `with_encoder_stats_handle` 暴露给 Taomni 的 `RdpMetrics`，日志为当前服务端的累计统计 |
 | 上一帧 framebuffer | `UpdateEncoder`（现有） | 现有 | 现有 |
 
 ### 接口与共享契约
 
-| 名称（现有或拟新增） | 调用方 → 实现方 | 输入 | 输出 / 错误 | 兼容规则 |
+| 名称 | 调用方 → 实现方 | 输入 | 输出 / 错误 | 兼容规则 |
 |---|---|---|---|---|
-| `AcceptorResult::client_compression`（拟新增，vendored acceptor） | `ironrdp-server::server` → acceptor | Client Info 的 flags 与 `compression_type` | `Option<ironrdp_pdu::rdp::client_info::CompressionType>` | 新增字段；acceptor 的其他调用者只有 ironrdp-server |
-| `RdpServerBuilder::with_bulk_compression(bool)`（拟新增） | `servers/rdp.rs` `build_server` → vendored server | `bool`，默认 false | — | 不调用时行为不变 |
-| `RdpServerBuilder::with_encoder_stats_handle(Arc<EncoderStats>)`（拟新增） | 同上 | 共享计数器 | `planar_rects`、`rfx_rects`、`bytes_before_bulk`、`bytes_after_bulk`（`AtomicU64`） | 不调用时不统计 |
+| `AcceptorResult::client_compression`（vendored acceptor） | `ironrdp-server::server` → acceptor | Client Info 的 flags 与 `compression_type` | `Option<ironrdp_pdu::rdp::client_info::CompressionType>` | 新增字段；acceptor 的其他调用者只有 ironrdp-server |
+| `RdpServerBuilder::with_bulk_compression(bool)` | `servers/rdp.rs` `build_server` → vendored server | `bool`，默认 false | — | 不调用时行为不变 |
+| `RdpServerBuilder::with_encoder_stats_handle(Arc<EncoderStats>)` | 同上 | 共享计数器 | `planar_rects`、`rfx_rects`、`bytes_before_bulk`、`bytes_after_bulk`（`AtomicU64`） | 不调用时不统计 |
 | 服务端日志 “RDP latency:” 行（现有，扩展） | `servers/rdp/metrics.rs` `report_if_due` | `EncoderStats` 快照 | 追加 ` encode=planar:N/rfx:M bulk=XX%` | 现有字段与顺序不变，只在行尾追加；NAT-07 断言的 `network-rtt=` 不受影响 |
-| 探针 `--compression none\|k8\|k64\|rdp6\|rdp61`（拟新增） | qa case → `rdp-probe` | 默认 `rdp61`（与 mstsc 一致） | 报告 `negotiated.compression`、`rfx.bulk.{compressed_updates, bytes_before, bytes_after}` | 现有 case 不传时改用默认 `rdp61`；AC-E03 用 `none` |
+| 探针 `--compression none\|k8\|k64\|rdp6\|rdp61` | qa case → `rdp-probe` | 默认 `rdp61`（与 mstsc 一致） | 报告 `negotiated.compression`、`rfx.bulk.{compressed_updates, bytes_before, bytes_after}` | 现有 case 不传时改用默认 `rdp61`；AC-E03 用 `none` |
 | Taomni 客户端 `build_ironrdp_config` `compression_type`（现有字段） | `rdp/session.rs` | 改为 `Some(CompressionType::Rdp61)` | ironrdp-session 建解压器 | 对不支持压缩的服务端无影响（服务端可以不压缩） |
 
 ### 三端兼容与故障边界
 
 - `ironrdp-bulk`、`ironrdp-graphics` 都是纯 Rust，没有平台条件编译。改动只在 vendored crate 与 `servers/rdp.rs`，三端同一份代码。
 - macOS 的实验 EGFX/AVC420 路径（`servers/rdp/gfx.rs`，需环境变量 `TAOMNI_RDP_EXPERIMENTAL_AVC420=1`）不经过 `UpdateEncoder`，不受影响；该路径开启时，位图路径只用于回退。
-- **故障边界。** 压缩器返回 `Err` 时，记录警告、本连接关闭批量压缩（后续分片 `compression_flags: None`，并对下一个分片置 FLUSHED，告诉客户端丢弃历史），不断开连接。客户端解压失败表现为客户端报错断开；所以 TASK-E3 必须用真实 ironrdp 客户端逐帧校验。
+- **故障边界。** 压缩器返回 `Err` 时，记录警告，以 raw 数据发送本次分片并置 FLUSHED，让客户端丢弃历史；本连接之后关闭 bulk，自适应编码退回原 RemoteFX，后续分片无 compression 字段。Resize 不重新启用故障压缩器，新连接才重新协商。vendor 故障注入 unit 与真实 ironrdp 客户端逐帧校验保护恢复路径。
 - 不涉及持久化与配置迁移。
 
 ## 5. 改动清单
@@ -480,6 +480,8 @@ EncoderIter::next(rect)
 - 第六轮 macOS 采集每秒约 56 次，而 UI 动画源约 29 fps；照片源平均约 18.4 fps。SDK 的 `SCStreamFrameInfoStatus` 附件表明 idle 样本也可以保留图像缓冲；旧代码只判断缓冲存在。现按状态过滤非 Complete 样本，并补充真实 CoreVideo/CoreMedia unit，检查带图像缓冲的 Idle/Blank/Suspended/Started/Stopped 均不重发画面。该平台 unit 和 M2/M3/照片帧率必须下一轮实际 CI 验证。
 
 - 第八轮 [36981210337](https://github.com/engcapa/taomni/actions/runs/36981210337)，源码 `e974f9c1`：三端 browser 各 5/0/0，已核对当前输入 identity 与全部 receipt 文件哈希；native 尚在执行。提前上传的 mstsc 启动证据显示 initial 为首次 RDP 文件确认，fixture 则已进入未知发布者资源授权提示，两者 TCP 均为 false；第一处设置已生效，但不能据此判定互通通过。根据 Microsoft [RedirectionWarningDialogVersion 文档](https://github.com/MicrosoftDocs/win32/blob/e103fa4e8810bd8d42c4777e17081e24dbe62dbd/desktop-src/TermServ/imsrdpextendedsettings-property.md) 和 [WindowsProtocolTestSuites 的无人值守设置](https://github.com/microsoft/WindowsProtocolTestSuites/blob/29ddb4238a5443b7499e82934c90cc898861c5e7/TestSuites/RDP/Client/Setup/Scripts/Set-RdpFileSigning.ps1)，CI fixture 临时采用版本 1 的资源授权提示，并只预授权 loopback 的 LocalDevices。三处注册表 value/type 均保存、逆序恢复，部分 setup 失败也恢复；本机不修改。mocked 工具 unit 22 passed，实际 TCP、通道握手与像素证明仍须后续 CI。
+- 第七轮单平台补测完成：Windows [36977367532](https://github.com/engcapa/taomni/actions/runs/36977367532)（`8e2d1857`）browser 5/0/0、native 11/4/0；UI 57 ms / 70.806 ms p95 / 33.021 实际 fps / 487.961 kbps，照片帧率比 0.939945、带宽比 0.958465。mstsc 仍受首次文件提示阻挡；REF-01 已显示真实参考桌面，但 90 s 内没有目标状态，之后 PERF-02 的目标等待成功。REF-01 的首次 profile 目标就绪等待调整为 180 s，覆盖已记录的 105–127 s shell 启动，并保留 Run 启动日志与目标原始状态。macOS [36977624600](https://github.com/engcapa/taomni/actions/runs/36977624600)（`f3cf6478`）browser 5/0/0、native 9/2/0；UI 77 ms / 58.684 ms p95 / 23.996 实际 fps / 404.898 kbps，旧连续照片场景帧率比 0.662578。acceptor/bulk/server 为 1/137/23 passed，CPU-only unit 另跑通过，根库 RDP 277 passed / 7 live ignored，探针 15 passed；真实 CoreMedia Idle/Blank 状态 unit 通过。两端全部原始 receipt 与 identity 已核对；这些不同 runner/case 输入的历史结果用于定位，当前验收仍须复测。
+- Windows 单卡启动诊断 [36982670416](https://github.com/engcapa/taomni/actions/runs/36982670416)（`abb50fb4`）已取得 initial TCP=false / fixture TCP=true；owned 窗口截图显示诊断监听器关闭后的预期连接错误。这证明 hosted loopback 预授权有效，完整 NAT-08 的协议与像素验收继续执行。
 
 ## 9. 验收追踪与交付条件
 

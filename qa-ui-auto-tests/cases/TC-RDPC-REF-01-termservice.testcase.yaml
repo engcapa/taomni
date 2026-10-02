@@ -67,7 +67,8 @@ steps:
     from_env_dir: QA_RDP_BASELINE_DIR
     name: flip-state.json
     to: reference-ready.json
-    timeout_sec: 90
+    # First-profile shell/Run startup took 105-127 s in the baseline evidence.
+    timeout_sec: 180
     expect:
       ready: true
 - rdp_canvas_assert:

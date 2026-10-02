@@ -175,6 +175,22 @@ def setup(ctx: Any) -> None:
 def teardown(ctx: Any) -> None:
     if platform.system() != "Windows":
         return
+    # Explorer can delay Run entries after a fresh account's desktop is already
+    # visible. Keep the session's own startup/state files before logging it off.
+    try:
+        diagnostics = Path(ctx.case_dir) / "termservice-target"
+        diagnostics.mkdir(exist_ok=True)
+        password = os.environ.get("QA_RDP_BASELINE_PASSWORD", "")
+        for source in [*WORK_DIR.glob("*.log"), *WORK_DIR.glob("*-state.json")]:
+            content = source.read_text(encoding="utf-8", errors="replace")
+            if password:
+                content = content.replace(password, "[redacted]")
+            (diagnostics / source.name).write_text(content, encoding="utf-8")
+    except Exception as error:
+        try:
+            (Path(ctx.case_dir) / "termservice-target-error.txt").write_text(str(error), encoding="utf-8")
+        except OSError:
+            pass  # Even an unavailable report directory must not prevent cleanup.
     # Public certificates only, never private keys. Preserve the actual
     # reference server certificate so TLS failures can be reproduced by unit
     # verification after downloading CI evidence.
