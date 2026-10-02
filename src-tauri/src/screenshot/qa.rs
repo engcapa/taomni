@@ -905,7 +905,8 @@ async fn press_hotkey() -> Result<(), String> {
         use enigo::{Direction, Enigo, Key, Keyboard, Settings};
         let mut enigo = Enigo::new(&Settings::default())
             .map_err(|e| anyhow::anyhow!("input synthesis unavailable: {e}"))?;
-        let keys = [Key::Control, Key::Alt];
+        // Ctrl+Alt+Fn is reserved for Linux virtual-terminal switching.
+        let keys = [Key::Control, Key::Shift];
         let result = (|| -> anyhow::Result<()> {
             for key in keys {
                 enigo
@@ -937,7 +938,7 @@ pub async fn screenshot_qa_hotkey(app: AppHandle) -> Result<String, String> {
     ensure_qa(&app)?;
     let _cleanup = ScenarioCleanup(app.clone());
     super::close_session(&app);
-    let chord = "Control+Alt+F9";
+    let chord = "Control+Shift+F9";
     let previous = super::shortcut::screenshot_shortcut_status().await?;
     let settings_path = crate::resolved_app_data_dir(&app)
         .map_err(|e| e.to_string())?

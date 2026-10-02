@@ -365,6 +365,14 @@ describe("RecorderBar preview ownership and stale work", () => {
     expect(mocks.unlisten).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a playable preview when the WebView rejects optional blob Fetch metadata", async () => {
+    mocks.fetch.mockRejectedValueOnce(new Error("Load failed"));
+    await stopToPreview(mp4);
+    expect(screen.getByTestId("screenshot-recorder-preview").tagName).toBe("VIDEO");
+    expect(screen.queryByTestId("screenshot-recorder-error")).not.toBeInTheDocument();
+    expect(screen.getByTestId("screenshot-recorder-save")).toBeEnabled();
+  });
+
   it.each(["unmount", "done"])("revokes a late preview blob after %s without fetching its size", async (end) => {
     const url = deferred<string>();
     mocks.loadScreenshotUrl.mockReturnValue(url.promise);

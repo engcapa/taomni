@@ -134,8 +134,14 @@ export function RecorderBar() {
       previewUrlRef.current = url;
       setPreviewUrl(url);
       if (url.startsWith("blob:")) {
-        const blob = await fetch(url).then((r) => r.blob());
-        if (isCurrent()) setPreviewBytes(blob.size);
+        // Some native WebViews allow blob media playback but reject Fetch
+        // on the same URL. Optional size metadata must not fail the preview.
+        try {
+          const blob = await fetch(url).then((r) => r.blob());
+          if (isCurrent()) setPreviewBytes(blob.size);
+        } catch {
+          // The media element still owns decode/playback error reporting.
+        }
       }
     } catch (e) {
       if (isCurrent()) setError(formatUnknownError(e));

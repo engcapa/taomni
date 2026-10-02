@@ -76,7 +76,7 @@ steps:
     selector: '[data-testid="screenshot-toast"]'
     equals: Text copied to clipboard
 - eval_readonly:
-    expression: navigator.clipboard.readText().then(Object.is.bind(null, 'Taomni stub OCR\nuser@example.com'))
+    expression: navigator.clipboard.readText().then(RegExp.prototype.test.bind(/^Taomni stub OCR\r?\nuser@example\.com$/))
 - click: '[data-testid="screenshot-ocr-close"]'
 - assert_not_visible: '[data-testid="screenshot-ocr-panel"]'
 - assert_attribute:
@@ -115,7 +115,7 @@ verification:
     - {step: 32, expectation: Recognized text is read-only.}
     - {step: 33, expectation: OCR consumes the renderer export path.}
     - {step: 36, expectation: Copy reports a successful text result.}
-    - {step: 37, expectation: Browser clipboard equals the complete OCR result.}
+    - {step: 37, expectation: Browser clipboard equals the complete OCR result with platform LF or CRLF line endings.}
     - {step: 39, expectation: The OCR panel closes.}
     - {step: 40, expectation: The capture selection stays in annotate phase.}
     - {step: 41, expectation: OCR adds no annotation shapes.}
