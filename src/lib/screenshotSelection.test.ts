@@ -27,6 +27,17 @@ describe("freehand screenshot selection", () => {
     expect(pointInContour({ x: 10, y: 50 }, crossed)).toBe(false);
   });
 
+  it("rejects long diagonals with OS integer-coordinate staircases despite their accumulated area", () => {
+    const jittered = [{ x: 100, y: 100 }, { x: 150, y: 137 }, { x: 200, y: 175 },
+      { x: 250, y: 212 }, { x: 300, y: 250 }, { x: 350, y: 287 },
+      { x: 400, y: 325 }, { x: 450, y: 362 }, { x: 500, y: 400 }];
+    expect(validContour(jittered)).toBe(false);
+    expect(validContour(jittered.map((p) => ({ x: 1000 - p.x, y: p.y })))).toBe(false);
+    expect(validContour([...jittered, ...[...jittered].reverse()])).toBe(false);
+    // A narrow but genuinely enclosed triangle must not be mistaken for jitter.
+    expect(validContour([{ x: 0, y: 0 }, { x: 100, y: 100 }, { x: 44, y: 56 }])).toBe(true);
+  });
+
   it("moves and independently rescales a contour with its bounding box", () => {
     const from = contourBounds(concave)!;
     const changed = transformContour(concave, from, { x: 40, y: 50, w: 200, h: 50 });

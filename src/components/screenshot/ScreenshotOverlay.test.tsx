@@ -131,6 +131,12 @@ describe("ScreenshotOverlay", () => {
     expect(screen.queryByTestId("screenshot-toolbar")).not.toBeInTheDocument();
     const layer = screen.getByTestId("screenshot-select-layer");
     fireEvent.mouseDown(layer, { button: 0, clientX: 100, clientY: 100 });
+    for (const [x, y] of [[150, 137], [200, 175], [250, 212], [300, 250], [350, 287], [400, 325], [450, 362]]) {
+      fireEvent.mouseMove(window, { clientX: x, clientY: y });
+    }
+    fireEvent.mouseUp(window, { clientX: 500, clientY: 400 });
+    expect(screen.queryByTestId("screenshot-toolbar")).not.toBeInTheDocument();
+    fireEvent.mouseDown(layer, { button: 0, clientX: 100, clientY: 100 });
     fireEvent.mouseMove(window, { clientX: 300, clientY: 100 });
     fireEvent.mouseUp(window, { clientX: 100, clientY: 300 });
     fireEvent.click(screen.getByTestId("screenshot-tool-rect"));

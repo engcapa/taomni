@@ -31,6 +31,15 @@ export function pointInContour(point: ScreenshotPoint, points: readonly Screensh
 export function validContour(points: readonly ScreenshotPoint[], minimum = 6): boolean {
   const bounds = contourBounds(points);
   if (!bounds || points.length < 3 || bounds.w < minimum || bounds.h < minimum) return false;
+  // OS/browser integer coordinates give diagonal lines a subpixel staircase.
+  // Its accumulated area can be large; require meaningful departure from the
+  // longest axis as well, without simplifying a valid user's contour.
+  const origin = points[0];
+  const axis = points.reduce((far, p) => Math.hypot(p.x - origin.x, p.y - origin.y)
+    > Math.hypot(far.x - origin.x, far.y - origin.y) ? p : far, origin);
+  const dx = axis.x - origin.x, dy = axis.y - origin.y;
+  const length = Math.hypot(dx, dy);
+  if (!points.some((p) => Math.abs((p.x - origin.x) * dy - (p.y - origin.y) * dx) / length >= minimum / 2)) return false;
   // Bounded scanline integration also admits self-intersecting even-odd contours.
   const rows = 64;
   let area = 0;

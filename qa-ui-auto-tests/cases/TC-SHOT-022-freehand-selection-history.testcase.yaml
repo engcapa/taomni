@@ -18,7 +18,9 @@ steps:
     selector: '[data-testid="screenshot-selection-freehand"]'
     name: aria-pressed
     equals: 'true'
-# A large diagonal has a bounding box but no enclosed area.
+# A large diagonal has a bounding box but no meaningful enclosed region.
+# Browser/OS coordinate quantization gives this real path a subpixel staircase;
+# accepting its accumulated area was the hosted run36987576617 regression.
 - drag_path:
     selector: '[data-testid="screenshot-select-layer"]'
     points: [{x: 100, y: 100}, {x: 500, y: 400}]
