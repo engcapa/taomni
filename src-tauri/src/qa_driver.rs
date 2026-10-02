@@ -811,10 +811,10 @@ async fn native_about<R: Runtime>(
                 use objc2_foundation::NSString;
                 use tauri::menu::MenuItemKind;
                 let menu = app.menu().ok_or("application menu is not installed yet")?;
-                let Some(MenuItemKind::Submenu(submenu)) = menu.get(&"app") else {
+                let Some(MenuItemKind::Submenu(submenu)) = menu.get("app") else {
                     return Err("application submenu is not installed yet".into());
                 };
-                let Some(MenuItemKind::MenuItem(item)) = submenu.get(&"about") else {
+                let Some(MenuItemKind::MenuItem(item)) = submenu.get("about") else {
                     return Err("About item is not installed yet".into());
                 };
                 if !item.is_enabled().map_err(|e| e.to_string())? {
