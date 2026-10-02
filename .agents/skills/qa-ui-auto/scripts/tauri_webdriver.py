@@ -239,7 +239,21 @@ class WebDriverError(RuntimeError):
 
 
 def _is_stale_element_error(error: BaseException) -> bool:
-    return "stale element" in str(error).lower()
+    """True when re-resolving the element can recover the command.
+
+    WebKitWebDriver reports the spec stale-element error, but WebView2
+    resolves the removed node to null inside the follow-up script and answers
+    with a JavaScript error: "TypeError: null is not an object" (seen on the
+    macOS tree context click in run 36939546831). Both spellings mean the node
+    was replaced between the locator lookup and the command, so both retry
+    against a freshly resolved element.
+    """
+    message = str(error).lower()
+    return (
+        "stale element" in message
+        or "null is not an object" in message
+        or "undefined is not an object" in message
+    )
 
 
 class TauriDriverProcess:
