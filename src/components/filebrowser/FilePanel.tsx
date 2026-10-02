@@ -19,6 +19,7 @@ import {
   formatBytes,
   parentPath,
   sftpLocalDrives,
+  sftpLocalHome,
   type DriveEntry,
   type FileEntry,
 } from "../../lib/sftp";
@@ -34,6 +35,7 @@ import {
   type CustomDragData,
 } from "../../lib/customDnD";
 import { useT } from "../../lib/i18n";
+import { isWindowsPath, resolvePathInput } from "../../lib/pathCompletion";
 
 const CROSS_PANE_DRAG_MIME = "taomni/sftp-files";
 
@@ -167,6 +169,7 @@ export function FilePanel({
   const useStore = (store ?? useSftpStore) as FilePanelStoreHook;
   const session = useStore((s) => s.sessions[sessionId]);
   const navigate = useStore((s) => s.navigate);
+  const listPath = useStore((s) => s.listPath);
   const navigateBack = useStore((s) => s.navigateBack);
   const navigateForward = useStore((s) => s.navigateForward);
   const navigateUp = useStore((s) => s.navigateUp);
@@ -229,6 +232,22 @@ export function FilePanel({
 
   const pane = session?.[side];
   const showHidden = pane?.showHidden ?? false;
+  const resolveAddress = useCallback(async (value: string) => {
+    const home = side === "local" && /^~(?:[\\/]|$)/.test(value)
+      ? await sftpLocalHome() : session?.homeDir;
+    return resolvePathInput(value, pane?.path ?? "", home, side === "local" && (isWindowsPath(value) || isWindowsPath(pane?.path ?? "")));
+  }, [side, session?.homeDir, pane?.path]);
+  const listDirectory = useCallback(async (directory: string) => {
+    return listPath(sessionId, side, await resolveAddress(directory));
+  }, [listPath, sessionId, side, resolveAddress]);
+  const submitAddress = useCallback(async (value: string) => {
+    try {
+      await navigate(sessionId, side, await resolveAddress(value));
+    } catch {
+      // Home lookup errors still use the pane's normal navigation error path.
+      void navigate(sessionId, side, value);
+    }
+  }, [navigate, sessionId, side, resolveAddress]);
   // Show the drives dropdown only on the LOCAL pane when the current path
   // looks like a Windows path. Lets the user jump back from `C:\foo` to a
   // list of drives (C:, D:, …) without typing the path manually.
@@ -612,8 +631,10 @@ export function FilePanel({
           path={pane.path}
           homePath={side === "remote" ? session?.homeDir ?? null : null}
           onNavigate={(p) => void navigate(sessionId, side, p)}
-          onSubmit={(p) => void navigate(sessionId, side, p)}
-          detectWindows={pane.path.includes("\\")}
+          onSubmit={(p) => void submitAddress(p)}
+          detectWindows={side === "remote" ? false : undefined}
+          listDirectory={listDirectory}
+          showHidden={showHidden}
         />
       </div>
 

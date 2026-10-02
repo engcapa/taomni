@@ -72,6 +72,7 @@ from . import rdp_baseline_required
 from . import rdp_audio_required
 from . import xrdp_server_required
 from . import backup_policy
+from . import path_completion
 
 
 class FixtureContext(Protocol):
@@ -89,6 +90,7 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "path_completion": Fixture("path_completion", path_completion.setup),
     "backup_policy": Fixture("backup_policy", backup_policy.setup),
     "project_tree": Fixture("project_tree", project_tree.setup),
     "reset_db":     Fixture("reset_db",     reset_db.setup,     reset_db.teardown),
