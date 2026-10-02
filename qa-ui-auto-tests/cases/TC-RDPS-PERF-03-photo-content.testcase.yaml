@@ -1,7 +1,8 @@
 id: TC-RDPS-PERF-03-photo-content
 title: Adaptive RDP encoding keeps photo bandwidth and frame rate at the RemoteFX baseline
 description: 'AC-E02/V-E12: measure the same deterministic noisy photo animation with compression disabled and RDP6.1
-  enabled on one release server. Preserve both decoded snapshots, bulk statistics and frame rate ratios. Bandwidth
+  enabled on one release server, restarting each target at the same initial photo frame. Preserve both decoded
+  snapshots, source telemetry, bulk statistics and frame rate ratios. Bandwidth
   cannot improve by dropping delivered frames.'
 covers:
 - F-RdpServer-1
@@ -63,7 +64,7 @@ steps:
     timeout_sec: 90
 - host_helper:
     action: start
-    name: photo
+    name: photo-baseline
     mode: photo
     geometry: 640x360+40+80
     timeout_sec: 60
@@ -81,6 +82,15 @@ steps:
       kbps:
         min: 1
       negotiated.compression: none
+- host_helper:
+    action: stop
+    name: photo-baseline
+- host_helper:
+    action: start
+    name: photo-adaptive
+    mode: photo
+    geometry: 640x360+40+80
+    timeout_sec: 60
 - rdp_probe:
     scenario: throughput
     artifact: photo-adaptive
@@ -97,12 +107,13 @@ steps:
         max: 1.05
       vs_baseline.fps_ratio:
         min: 0.95
+      negotiated.compression: rdp61
       rfx.tile_sets:
         min: 1
       rfx.bulk.decompression_errors: 0
 - host_helper:
     action: stop
-    name: photo
+    name: photo-adaptive
 - save_text:
     selector: '[data-testid="server-log"]'
     path: server-log.txt
@@ -123,16 +134,18 @@ verification:
     actions:
     - 17
     - 18
+    - 19
+    - 20
     checkpoints:
-    - step: 19
+    - step: 21
       expectation: The independently decoded measurement meets both ratios with zero bulk errors.
-    - step: 22
+    - step: 24
       expectation: The server actually selected RemoteFX for photo rectangles.
     results:
-    - 19
-    - 22
+    - 21
+    - 24
   native:
-  - check: Release encoder/capture and two sequential native probe connections.
+  - check: Release encoder/capture and two sequential native probe connections with matching initial photo frames.
     method: automated
     reason: Requires the real RDP transport, decoder and hosted desktop; browser stubs cannot establish this.
   visual:

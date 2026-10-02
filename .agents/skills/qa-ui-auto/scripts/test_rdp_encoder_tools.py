@@ -4,9 +4,11 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import sys
+from contextlib import nullcontext
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from qa_ui_auto import rdp_steps as steps
 from qa_ui_auto.fixtures import xrdp_server_required as xrdp
@@ -23,6 +25,9 @@ class EncoderToolsTest(unittest.TestCase):
         self.case = self.root / "report" / "case"
         self.case.mkdir(parents=True)
         self.ctx = SimpleNamespace(case_dir=self.case, session=Mock(), restore_host_permissions=Mock())
+        consent = patch.object(steps, "file_launch_consent", side_effect=nullcontext)
+        consent.start()
+        self.addCleanup(consent.stop)
 
     def test_copy_preserves_reference_oracle_and_waits_for_ready(self):
         source = self.root / "fixture"
@@ -102,39 +107,55 @@ class EncoderToolsTest(unittest.TestCase):
         api.WaitForSingleObject.return_value = 0
         with patch.dict(os.environ, {"SystemRoot": r"C:\Windows"}), \
              patch.object(mstsc.ctypes, "WinDLL", return_value=api, create=True):
-            process = mstsc.launch_create(self.case / "mstsc.rdp", 45678)
+            process = mstsc.launch(self.case / "mstsc.rdp", 45678)
             self.assertEqual(process.pid, 44)
             self.assertEqual(process.wait(timeout=1), 0)
             process.close()
             process.close()
         self.assertEqual([call.args[0] for call in api.CloseHandle.call_args_list], [43, 42])
 
-    def test_mstsc_shell_launch_retains_only_its_process_and_reports_failure(self):
-        import ctypes
-        kernel, shell, ole = Mock(), Mock(), Mock()
-        kernel.GetProcessId.return_value = 123
-        ole.CoInitializeEx.return_value = 0
-        def execute(info):
-            self.assertEqual(info._obj.cbSize, ctypes.sizeof(mstsc.ShellExecuteInfo))
-            self.assertEqual(info._obj.fMask, 0x140)
-            self.assertEqual(info._obj.nShow, 1)
-            self.assertEqual(info._obj.lpVerb, "open")
-            self.assertIn(str((self.case / "mstsc.rdp").resolve()), info._obj.lpParameters)
-            self.assertIn("/v:127.0.0.1:45678", info._obj.lpParameters)
-            info._obj.hProcess = 42
-            return True
-        shell.ShellExecuteExW.side_effect = execute
-        with patch.dict(os.environ, {"SystemRoot": r"C:\Windows"}), \
-             patch.object(mstsc, "_kernel", return_value=kernel), \
-             patch.object(mstsc.ctypes, "WinDLL", side_effect=lambda name, **kwargs: ole if name == "ole32" else shell, create=True):
-            process = mstsc.launch(self.case / "mstsc.rdp", 45678)
-            self.assertEqual(process.pid, 123)
-            process.close()
-            kernel.CloseHandle.assert_called_once_with(42)
-            shell.ShellExecuteExW.side_effect = lambda info: True
-            with self.assertRaisesRegex(OSError, "owned process"):
-                mstsc.launch(self.case / "mstsc.rdp", 45678)
-            self.assertEqual(ole.CoUninitialize.call_count, 2)
+    def test_hosted_file_consent_restores_an_existing_setting_after_failure(self):
+        registry = MagicMock()
+        key = registry.CreateKeyEx.return_value.__enter__.return_value
+        registry.QueryValueEx.return_value = (0, 4)
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), patch.dict(sys.modules, {"winreg": registry}):
+            with self.assertRaisesRegex(RuntimeError, "client failed"):
+                with mstsc.file_launch_consent():
+                    registry.SetValueEx.assert_called_once_with(key, "RdpLaunchConsentAccepted", 0, registry.REG_DWORD, 1)
+                    raise RuntimeError("client failed")
+        self.assertEqual(registry.SetValueEx.call_args.args, (key, "RdpLaunchConsentAccepted", 0, 4, 0))
+        registry.DeleteValue.assert_not_called()
+
+    def test_hosted_file_consent_removes_only_its_previously_absent_value(self):
+        registry = MagicMock()
+        key = registry.CreateKeyEx.return_value.__enter__.return_value
+        registry.QueryValueEx.side_effect = FileNotFoundError()
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), patch.dict(sys.modules, {"winreg": registry}):
+            with mstsc.file_launch_consent():
+                pass
+        registry.DeleteValue.assert_called_once_with(key, "RdpLaunchConsentAccepted")
+        registry.DeleteKey.assert_not_called()
+        registry.reset_mock()
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}), patch.dict(sys.modules, {"winreg": registry}):
+            with mstsc.file_launch_consent():
+                pass
+        registry.CreateKeyEx.assert_not_called()
+
+    def test_mstsc_stop_failure_still_removes_credentials_and_restores_the_account(self):
+        process = Mock(pid=12345)
+        state = MagicMock()
+        with patch.object(steps.platform, "system", return_value="Windows"), \
+             patch.dict(os.environ, {"QA_RDP_USER": "fixture-user", "QA_RDP_PASSWORD": "dummy-password"}), \
+             patch.object(steps.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as run, \
+             patch.object(steps, "launch_mstsc", return_value=process), \
+             patch.object(steps, "file_launch_consent", return_value=state), \
+             patch.object(steps, "_stop_process", side_effect=RuntimeError("stop failed")):
+            steps._do_host_mstsc(self.ctx, {"action": "start"})
+            with self.assertRaisesRegex(RuntimeError, "stop failed"):
+                steps._do_host_mstsc(self.ctx, {"action": "stop"})
+        self.assertEqual(run.call_args_list[-1].args[0], ["cmdkey", "/delete:TERMSRV/127.0.0.1"])
+        state.__exit__.assert_called_once()
+        process.close.assert_called_once()
 
     def test_canvas_waits_for_the_decoded_pixels_and_records_quality(self):
         self.ctx.session.execute.side_effect = [None,

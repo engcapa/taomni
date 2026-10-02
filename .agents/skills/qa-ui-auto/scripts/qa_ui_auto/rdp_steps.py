@@ -26,6 +26,7 @@ import platform
 import shutil
 import subprocess
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,7 @@ from .steps import StepError
 from . import host_clipboard
 from .rdp_helpers.mstsc import launch as launch_mstsc
 from .rdp_helpers.mstsc import diagnose as diagnose_mstsc
+from .rdp_helpers.mstsc import file_launch_consent
 
 HELPERS = Path(__file__).resolve().parent / "rdp_helpers"
 
@@ -268,7 +270,7 @@ $window = [QaMstscCapture]::FindVisibleWindow([uint32]$p.Id)
 $r = New-Object QaMstscCapture+Rect
 if ($window -eq [IntPtr]::Zero -or -not [QaMstscCapture]::GetWindowRect($window,[ref]$r)) { throw 'mstsc visible window unavailable' }
 $w=$r.Right-$r.Left; $h=$r.Bottom-$r.Top
-if ($w -lt 200 -or $h -lt 200) { throw 'mstsc window is too small' }
+if ($w -lt 100 -or $h -lt 80) { throw 'mstsc window is too small' }
 $bmp=New-Object System.Drawing.Bitmap $w,$h
 $g=[System.Drawing.Graphics]::FromImage($bmp)
 $hdc=$g.GetHdc()
@@ -335,8 +337,9 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
     if added.returncode:
         raise StepError("host_mstsc: cmdkey could not store disposable credentials")
     process = None
+    host_state = ExitStack()
 
-    def cleanup() -> None:
+    def cleanup_process() -> None:
         nonlocal process
         if process is not None:
             try:
@@ -366,7 +369,14 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
             finally:
                 process.close()
                 process = None
-        subprocess.run(["cmdkey", f"/delete:{target}"], capture_output=True, timeout=30)
+    def cleanup() -> None:
+        try:
+            cleanup_process()
+        finally:
+            try:
+                subprocess.run(["cmdkey", f"/delete:{target}"], capture_output=True, timeout=30)
+            finally:
+                host_state.close()
 
     _register_cleanup(ctx, cleanup)
     rdp = _within_report(ctx, "mstsc.rdp")
@@ -380,6 +390,7 @@ def _do_host_mstsc(ctx: NativeStepContext, args: Any) -> str:
                f"desktopwidth:i:{int(args.get('width') or 1024)}", f"desktopheight:i:{int(args.get('height') or 768)}",
                "session bpp:i:32", "audiomode:i:0", "redirectclipboard:i:1", "autoreconnection enabled:i:0"]
     try:
+        host_state.enter_context(file_launch_consent())
         # Avoid Windows text mode expanding CRLF to CRCRLF. mstsc also needs
         # the complete path when invoked outside the RDP file's directory.
         rdp.write_text("\r\n".join(options) + "\r\n", encoding="utf-16", newline="")

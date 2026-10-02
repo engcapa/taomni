@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
+from contextlib import contextmanager, nullcontext
 import json
 import os
 from pathlib import Path
@@ -24,17 +25,6 @@ class StartupInfo(ctypes.Structure):
 class ProcessInfo(ctypes.Structure):
     _fields_ = [("hProcess", wintypes.HANDLE), ("hThread", wintypes.HANDLE),
                ("dwProcessId", wintypes.DWORD), ("dwThreadId", wintypes.DWORD)]
-
-
-class ShellExecuteInfo(ctypes.Structure):
-    _fields_ = [("cbSize", wintypes.DWORD), ("fMask", wintypes.ULONG),
-               ("hwnd", wintypes.HWND), ("lpVerb", wintypes.LPCWSTR),
-               ("lpFile", wintypes.LPCWSTR), ("lpParameters", wintypes.LPCWSTR),
-               ("lpDirectory", wintypes.LPCWSTR), ("nShow", ctypes.c_int),
-               ("hInstApp", wintypes.HINSTANCE), ("lpIDList", ctypes.c_void_p),
-               ("lpClass", wintypes.LPCWSTR), ("hkeyClass", wintypes.HKEY),
-               ("dwHotKey", wintypes.DWORD), ("hIcon", wintypes.HANDLE),
-               ("hProcess", wintypes.HANDLE)]
 
 
 class MstscProcess:
@@ -87,8 +77,8 @@ def _kernel():
     return api
 
 
-def launch_create(rdp_file: Path, port: int) -> MstscProcess:
-    """Direct Win32 launch, retained for the hosted startup diagnostic."""
+def launch(rdp_file: Path, port: int) -> MstscProcess:
+    """Launch the owned client on the interactive Win32 desktop."""
     api = _kernel()
     executable = Path(os.environ["SystemRoot"]) / "System32" / "mstsc.exe"
     command = ctypes.create_unicode_buffer(subprocess.list2cmdline([
@@ -106,43 +96,34 @@ def launch_create(rdp_file: Path, port: int) -> MstscProcess:
     return MstscProcess(api, info.hProcess, info.dwProcessId)
 
 
-def launch(rdp_file: Path, port: int) -> MstscProcess:
-    """Use the Windows shell's normal GUI launch and retain the process handle."""
-    api = _kernel()
-    api.GetProcessId.argtypes = [wintypes.HANDLE]
-    api.GetProcessId.restype = wintypes.DWORD
-    shell = ctypes.WinDLL("shell32", use_last_error=True)
-    shell.ShellExecuteExW.argtypes = [ctypes.POINTER(ShellExecuteInfo)]
-    shell.ShellExecuteExW.restype = wintypes.BOOL
-    ole = ctypes.WinDLL("ole32")
-    ole.CoInitializeEx.argtypes = [ctypes.c_void_p, wintypes.DWORD]
-    ole.CoInitializeEx.restype = ctypes.c_long
-    ole.CoUninitialize.argtypes = []
-    ole.CoUninitialize.restype = None
-    initialized = ole.CoInitializeEx(None, 6)  # apartment threaded, disable OLE1 DDE
-    if initialized not in (0, 1, -2147417850):  # S_OK, S_FALSE, RPC_E_CHANGED_MODE
-        raise OSError(f"mstsc shell COM initialization failed: {initialized}")
-    executable = Path(os.environ["SystemRoot"]) / "System32" / "mstsc.exe"
-    info = ShellExecuteInfo(
-        cbSize=ctypes.sizeof(ShellExecuteInfo),
-        fMask=0x40 | 0x100,  # SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC
-        lpVerb="open", lpFile=str(executable), nShow=1,
-        lpParameters=subprocess.list2cmdline([str(rdp_file.resolve()), f"/v:127.0.0.1:{port}"]),
-        lpDirectory=str(rdp_file.resolve().parent),
-    )
+@contextmanager
+def file_launch_consent():
+    """Restore the disposable hosted account's first RDP-file launch setting.
+
+    This only handles the initial file-opening notice, before any TCP traffic.
+    Authentication and server-certificate validation remain the mstsc settings
+    in the owned RDP file. Never change a developer's Windows account.
+    """
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        yield
+        return
+    import winreg
+    path = r"Software\Microsoft\Terminal Server Client"
+    value = "RdpLaunchConsentAccepted"
+    with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
+        try:
+            previous = winreg.QueryValueEx(key, value)
+        except FileNotFoundError:
+            previous = None
+        winreg.SetValueEx(key, value, 0, winreg.REG_DWORD, 1)
     try:
-        if not shell.ShellExecuteExW(ctypes.byref(info)):
-            raise ctypes.WinError(ctypes.get_last_error())
+        yield
     finally:
-        if initialized in (0, 1):
-            ole.CoUninitialize()
-    if not info.hProcess:
-        raise OSError("mstsc shell launch did not return an owned process")
-    pid = api.GetProcessId(info.hProcess)
-    if not pid:
-        api.CloseHandle(info.hProcess)
-        raise ctypes.WinError(ctypes.get_last_error())
-    return MstscProcess(api, info.hProcess, pid)
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_WRITE) as key:
+            if previous is None:
+                winreg.DeleteValue(key, value)
+            else:
+                winreg.SetValueEx(key, value, 0, previous[1], previous[0])
 
 
 def diagnose(process: MstscProcess, directory: Path) -> None:
@@ -203,12 +184,12 @@ def preflight(directory: Path) -> None:
         raise RuntimeError("mstsc startup probe requires the hosted Windows desktop")
     from qa_ui_auto.rdp_steps import _capture_mstsc
     directory.mkdir(parents=True, exist_ok=True)
-    for name, launcher in (("create", launch_create), ("shell", launch)):
+    for name, consent in (("initial", nullcontext()), ("fixture", file_launch_consent())):
         target = directory / name
         target.mkdir(exist_ok=True)
         process = None
         facts = {"launch_api": name, "tcp_initiated": False}
-        with socket.socket() as listener:
+        with consent, socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             listener.listen()
             listener.settimeout(20)
@@ -220,7 +201,7 @@ def preflight(directory: Path) -> None:
                 "redirectprinters:i:0\r\nredirectsmartcards:i:0\r\ndisableconnectionsharing:i:1\r\n",
                 encoding="utf-16", newline="")
             try:
-                process = launcher(rdp_file, port)
+                process = launch(rdp_file, port)
                 try:
                     connection, _ = listener.accept()
                     with connection:
