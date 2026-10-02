@@ -178,10 +178,12 @@ pub fn open_borders(app: &AppHandle, display: &DisplayInfo, region: Rect) -> Res
             window
                 .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
                 .map_err(|e| e.to_string())?;
+            // GTK creates its GDK surface on show. Applying an input shape
+            // before that makes Tao unwrap a missing native window.
+            window.show().map_err(|e| e.to_string())?;
             window
                 .set_ignore_cursor_events(true)
                 .map_err(|e| e.to_string())?;
-            window.show().map_err(|e| e.to_string())?;
         }
         Ok(())
     })();
