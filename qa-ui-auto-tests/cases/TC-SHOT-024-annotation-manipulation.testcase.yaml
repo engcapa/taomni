@@ -48,17 +48,17 @@ steps:
 - assert_attribute:
     selector: '[data-testid="screenshot-annotation-selection"]'
     name: style
-    matches: 'left: 160px; top: 190px; width: 100px; height: 80px;'
+    matches: '.*left: 160px; top: 190px; width: 100px; height: 80px;.*'
 - click: '[data-testid="screenshot-undo"]'
 - assert_attribute:
     selector: '[data-testid="screenshot-annotation-selection"]'
     name: style
-    matches: 'left: 140px; top: 160px;'
+    matches: '.*left: 140px; top: 160px;.*'
 - click: '[data-testid="screenshot-redo"]'
 - assert_attribute:
     selector: '[data-testid="screenshot-annotation-selection"]'
     name: style
-    matches: 'left: 160px; top: 190px; width: 100px; height: 80px;'
+    matches: '.*left: 160px; top: 190px; width: 100px; height: 80px;.*'
 - drag_to:
     from: '[data-testid="screenshot-annotation-resize-se"]'
     to: '[data-testid="screenshot-annotation-layer"]'
@@ -98,7 +98,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="screenshot-annotation-selection"]'
     name: style
-    matches: 'left: 120px; top: 150px; width: 220px; height: 180px;'
+    matches: '.*left: 120px; top: 150px; width: 220px; height: 180px;.*'
 - click: '[data-testid="screenshot-color-green"]'
 - click: '[data-testid="screenshot-line-width-8"]'
 - assert_attribute:

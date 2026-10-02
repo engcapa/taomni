@@ -29,7 +29,7 @@ import {
   GitBranch,
   Braces,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { TabBar } from "./TabBar";
 import { OpenTabsMenu } from "./OpenTabsMenu";

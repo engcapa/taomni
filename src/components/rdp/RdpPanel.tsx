@@ -61,7 +61,6 @@ import {
   FT_ICON_BUTTON_STYLE,
   FT_SEPARATOR_STYLE,
 } from "../floating-toolbar/floatingToolbarStyles";
-import { useAppStore } from "../../stores/appStore";
 import { confirmAppDialog } from "../../lib/appDialogs";
 
 export interface RdpPanelProps {

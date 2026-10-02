@@ -16,6 +16,9 @@ steps:
     to_position: {x: 500, y: 400}
 - wait_for: '[data-testid="screenshot-toolbar"]'
 - click: '[data-testid="screenshot-record"]'
+- assert_text:
+    selector: '[data-testid="screenshot-record-hint"]'
+    contains: Click Stop recording to finish
 - click: '[data-testid="screenshot-record-gif"]'
 - wait_for: '[data-testid="screenshot-recorder-stop"]:enabled'
 - assert_not_visible: '[data-testid="screenshot-overlay"]'
@@ -67,34 +70,35 @@ verification:
   requirements:
   - id: R1
     requirement: The public GIF menu entry sends exact physical crop and format arguments, routes to the initialized recorder, and displays the actual stub preview after stop.
-    actions: [1, 2, 4, 6, 7, 12]
+    actions: [1, 2, 4, 6, 8, 13]
     checkpoints:
-    - {step: 8, expectation: The recorder is initialized after start.}
-    - {step: 9, expectation: The source overlay is unmounted.}
-    - {step: 10, expectation: Running timer is present.}
-    - {step: 11, expectation: GIF start targets the selected 160x120 region at 40x40.}
-    - {step: 14, expectation: The browser stub's real PNG payload is shown without claiming GIF encoding.}
-    - {step: 15, expectation: 'Preview metadata equals the actual fixture, not a fictitious cropped media result.'}
-    results: [8, 9, 10, 11, 14, 15]
+    - {step: 7, expectation: Before starting, the menu explains the recording range, stop button and whole-display stop shortcut.}
+    - {step: 9, expectation: The recorder is initialized after start.}
+    - {step: 10, expectation: The source overlay is unmounted.}
+    - {step: 11, expectation: Running timer is present.}
+    - {step: 12, expectation: GIF start targets the selected 160x120 region at 40x40.}
+    - {step: 15, expectation: The browser stub's real PNG payload is shown without claiming GIF encoding.}
+    - {step: 16, expectation: 'Preview metadata equals the actual fixture, not a fictitious cropped media result.'}
+    results: [7, 9, 10, 11, 12, 15, 16]
   - id: R2
     requirement: Confirming preview save dispatches the returned artifact and requested GIF filename and closes the recorder.
-    actions: [16, 19, 20]
+    actions: [17, 20, 21]
     checkpoints:
-    - {step: 18, expectation: The image-preview branch offers a GIF filename.}
-    - {step: 22, expectation: Save completion unmounts the recorder.}
-    - {step: 23, expectation: Save dispatch passes the exact destination and actual returned PNG stub path.}
-    - {step: 24, expectation: Completion closes the recording session.}
-    results: [22, 23, 24]
+    - {step: 19, expectation: The image-preview branch offers a GIF filename.}
+    - {step: 23, expectation: Save completion unmounts the recorder.}
+    - {step: 24, expectation: Save dispatch passes the exact destination and actual returned PNG stub path.}
+    - {step: 25, expectation: Completion closes the recording session.}
+    results: [23, 24, 25]
   - id: R3
     requirement: MP4 start dispatches its requested format and fullscreen geometry, then cancel closes it without invoking stop or pretending to decode an MP4.
-    actions: [25, 27, 29, 30, 34]
+    actions: [26, 28, 30, 31, 35]
     checkpoints:
-    - {step: 31, expectation: The request reaches an initialized recorder.}
-    - {step: 32, expectation: The MP4 entry sends mp4 with 400x300 fullscreen dimensions.}
-    - {step: 33, expectation: No decoded preview is claimed before cancel.}
-    - {step: 36, expectation: Cancel unmounts the recorder.}
-    - {step: 37, expectation: Only the GIF flow stopped; MP4 sent cancel instead.}
-    results: [31, 32, 33, 36, 37]
+    - {step: 32, expectation: The request reaches an initialized recorder.}
+    - {step: 33, expectation: The MP4 entry sends mp4 with 400x300 fullscreen dimensions.}
+    - {step: 34, expectation: No decoded preview is claimed before cancel.}
+    - {step: 37, expectation: Cancel unmounts the recorder.}
+    - {step: 38, expectation: Only the GIF flow stopped; MP4 sent cancel instead.}
+    results: [32, 33, 34, 37, 38]
   visual:
   - check: Public record entries route into running and completed renderer states.
     method: automated

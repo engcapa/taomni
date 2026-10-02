@@ -9,6 +9,9 @@ steps:
 - open: ${cfg.app.base_url}#screenshot-recorder
 - wait_for: '[data-testid="screenshot-recorder-stop"]:enabled'
 - assert_visible: '[data-testid="screenshot-recorder-timer"]'
+- assert_text:
+    selector: '[data-testid="screenshot-recorder-range-hint"]'
+    contains: Recording inside the red border
 - assert_pattern:
     selector: '[data-testid="screenshot-recorder-timer"]'
     regex: '^\d{2}:\d{2}$'
@@ -57,31 +60,32 @@ verification:
   requirements:
   - id: R1
     requirement: A ready recorder exposes timer and stop; stop transitions to the returned preview and exact stub metadata with no remaining recording controls.
-    actions: [1, 7]
+    actions: [1, 8]
     checkpoints:
-    - {step: 4, expectation: The running timer is formatted as minutes and seconds.}
-    - {step: 5, expectation: Preview is absent before stop.}
-    - {step: 6, expectation: Recorder initialization queried its current recording.}
-    - {step: 9, expectation: Preview uses the actual PNG stub payload rather than pretending to be encoded video.}
-    - {step: 10, expectation: 'Width, height, duration and frame count match the returned fixture exactly.'}
-    - {step: 11, expectation: Stop is replaced by preview controls.}
-    - {step: 12, expectation: The running timer is replaced by preview metadata.}
-    - {step: 13, expectation: No recorder error is displayed.}
-    - {step: 14, expectation: Stop targets stub-rec-1.}
-    results: [9, 10, 11, 12, 13, 14]
+    - {step: 4, expectation: The running recorder identifies the recording range and states that controls stay outside.}
+    - {step: 5, expectation: The running timer is formatted as minutes and seconds.}
+    - {step: 6, expectation: Preview is absent before stop.}
+    - {step: 7, expectation: Recorder initialization queried its current recording.}
+    - {step: 10, expectation: Preview uses the actual PNG stub payload rather than pretending to be encoded video.}
+    - {step: 11, expectation: 'Width, height, duration and frame count match the returned fixture exactly.'}
+    - {step: 12, expectation: Stop is replaced by preview controls.}
+    - {step: 13, expectation: The running timer is replaced by preview metadata.}
+    - {step: 14, expectation: No recorder error is displayed.}
+    - {step: 15, expectation: Stop targets stub-rec-1.}
+    results: [4, 10, 11, 12, 13, 14, 15]
   - id: R2
     requirement: Preview copy reports first-frame semantics; canceling save keeps the preview and sends no save request; Done closes without stopping twice.
-    actions: [15, 18, 21, 25]
+    actions: [16, 19, 22, 26]
     checkpoints:
-    - {step: 16, expectation: The notice explicitly says only the first frame was copied.}
-    - {step: 17, expectation: The image-copy command was dispatched.}
-    - {step: 20, expectation: The image-preview branch offers a GIF destination.}
-    - {step: 22, expectation: Save cancel closes the path dialog.}
-    - {step: 23, expectation: The existing preview remains visible.}
-    - {step: 24, expectation: Cancel has not sent a save-image command.}
-    - {step: 27, expectation: Done unmounts the recorder.}
-    - {step: 28, expectation: There is exactly one stop request and a final close.}
-    results: [16, 17, 20, 22, 23, 24, 27, 28]
+    - {step: 17, expectation: The notice explicitly says only the first frame was copied.}
+    - {step: 18, expectation: The image-copy command was dispatched.}
+    - {step: 21, expectation: The image-preview branch offers a GIF destination.}
+    - {step: 23, expectation: Save cancel closes the path dialog.}
+    - {step: 24, expectation: The existing preview remains visible.}
+    - {step: 25, expectation: Cancel has not sent a save-image command.}
+    - {step: 28, expectation: Done unmounts the recorder.}
+    - {step: 29, expectation: There is exactly one stop request and a final close.}
+    results: [17, 18, 21, 23, 24, 25, 28, 29]
   visual:
   - check: Recording controls transition to preview, metadata and completion controls.
     method: automated

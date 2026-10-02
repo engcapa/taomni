@@ -52,7 +52,6 @@ import {
 } from "../../lib/vncPointerScheduler";
 import { useVncStore } from "../../stores/vncStore";
 import { isEditableTarget, isTerminalFocused } from "../../lib/terminal/keyboardGuards";
-import { useAppStore } from "../../stores/appStore";
 import {
   ExternalLink,
   Maximize,
@@ -1813,8 +1812,8 @@ export default function VncPanel({
     >
       {/* Tab-action toolbar. Always rendered so a dropped session can still be
           restored; the scale control needs the live canvas, so it's gated on
-          the connection state. Screenshot actions live in the tab-strip `⋯`
-          menu (main window) or the detached capture button. */}
+          the connection state. System capture lives in the main window bar
+          or the detached window's action slot. */}
       <TabActions active={visible}>
         {showCanvas && (
           <>
@@ -1881,6 +1880,7 @@ export default function VncPanel({
           )}
           {detachedWindowControls && (
             <>
+              <ScreenshotMenuButton />
               <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
               <button
                 data-testid="detached-reattach"
