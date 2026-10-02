@@ -526,7 +526,7 @@ fn compare_record_original(
     Ok((
         clip,
         json!({"passed":passed,"mismatchedFrames":failures,"matchedDistinctOriginals":matched_ids.len(),"expectedSize":expected_size,
-        "nonce":source.nonce,"timelineMatches":timeline_ok,"worstTimelineDriftMs":timeline.worst_drift_ms,"longestFrameGapMs":timeline.longest_gap_ms,
+        "nonce":source.nonce,"timelineMatches":timeline_ok,"worstTimelineDriftMs":timeline.worst_drift_ms,"longestFrameGapMs":timeline.longest_gap_ms,"longestUnexplainedGapMs":timeline.longest_unexplained_gap_ms,
         "sourceTimeline":source_manifest,"comparisonArtifact":checks,"contactArtifact":contact_artifact}),
     ))
 }

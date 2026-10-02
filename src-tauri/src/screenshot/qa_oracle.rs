@@ -84,9 +84,11 @@ pub fn compare(actual: &RgbaImage, expected: &RgbaImage, lossy: bool) -> PixelMa
 pub struct Timeline {
     first: Option<(u64, f64)>,
     last: Option<(u64, f64)>,
+    last_visible_until_ms: f64,
     pub invalid: u32,
     pub worst_drift_ms: f64,
     pub longest_gap_ms: u64,
+    pub longest_unexplained_gap_ms: u64,
 }
 
 impl Timeline {
@@ -107,26 +109,37 @@ impl Timeline {
                 clip_ms >= last_clip && original_ms >= last_original
             });
         if let Some((last_clip, _)) = self.last {
-            self.longest_gap_ms = self.longest_gap_ms.max(clip_ms.saturating_sub(last_clip));
+            let gap = clip_ms.saturating_sub(last_clip);
+            self.longest_gap_ms = self.longest_gap_ms.max(gap);
+            let last_source_ms = first_original + last_clip.saturating_sub(first_clip) as f64;
+            let held_ms = (self.last_visible_until_ms.min(source_ms) - last_source_ms).max(0.0);
+            // A long held original is not a dropped moving scene. Count only
+            // time after that original actually stopped being visible.
+            let unexplained = (gap as f64 - held_ms).max(0.0).ceil() as u64;
+            self.longest_unexplained_gap_ms = self.longest_unexplained_gap_ms.max(unexplained);
         }
         let valid = ordered && drift <= 250.0;
         if !valid {
             self.invalid += 1;
         }
         self.last = Some((clip_ms, original_ms));
+        self.last_visible_until_ms = visible_until_ms;
         valid
     }
 
     pub fn complete(&self, duration_ms: u64) -> bool {
-        let Some((last_clip, last_original)) = self.last else {
+        let Some((_, last_original)) = self.last else {
             return false;
         };
         let Some((_, first_original)) = self.first else {
             return false;
         };
+        let (first_clip, _) = self.first.unwrap();
+        let end_source_ms = first_original + duration_ms.saturating_sub(first_clip) as f64;
+        let tail_gap = (end_source_ms - self.last_visible_until_ms).max(0.0);
         self.invalid == 0
-            && self.longest_gap_ms <= 700
-            && duration_ms.saturating_sub(last_clip) <= 700
+            && self.longest_unexplained_gap_ms <= 700
+            && tail_gap <= 700.0
             && last_original - first_original >= duration_ms as f64 * 0.7
     }
 }
@@ -305,6 +318,20 @@ mod tests {
         assert!(stale.observe(0, 1000.0, 1050.0));
         assert!(!stale.observe(800, 1400.0, 1450.0));
         assert!(!stale.complete(1000));
+        let mut long_hold = Timeline::default();
+        assert!(long_hold.observe(0, 1000.0, 1050.0));
+        assert!(long_hold.observe(100, 1100.0, 1950.0));
+        assert!(long_hold.observe(900, 1100.0, 1950.0));
+        assert!(long_hold.observe(1000, 2000.0, 2100.0));
+        assert!(long_hold.observe(1100, 2100.0, 2200.0));
+        assert!(long_hold.complete(1200));
+        assert_eq!(long_hold.longest_gap_ms, 800);
+        assert!(long_hold.longest_unexplained_gap_ms < 700);
+        let mut dropped_motion = Timeline::default();
+        assert!(dropped_motion.observe(0, 1000.0, 1050.0));
+        assert!(dropped_motion.observe(900, 1900.0, 1950.0));
+        assert!(!dropped_motion.complete(1000));
+        assert!(dropped_motion.longest_unexplained_gap_ms > 700);
     }
 
     #[test]

@@ -263,11 +263,20 @@ winapi = { version = "0.3", features = [
   "handleapi", "minwindef", "synchapi", "tlhelp32",
 ] }
 winreg = "0.55"
-# Windows console RDP capture: use xcap's WGC recorder so stop/drop closes the
-# native frame pool and session. The capture module supplies a bounded native
-# GDI fallback when Graphics Capture is unavailable.
+# Windows display enumeration/still capture uses xcap. Shared persistent
+# capture owns WGC directly to retain native sampling timestamps and lazy BGRA
+# readback; GDI remains the compatibility fallback.
 xcap = { version = "0.9.6", features = ["wgc"] }
 windows = { version = "0.62", features = [
+  "Foundation",
+  "Graphics_Capture",
+  "Graphics_DirectX_Direct3D11",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Dxgi",
+  "Win32_System_Performance",
+  "Win32_System_WinRT_Direct3D11",
+  "Win32_System_WinRT_Graphics_Capture",
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
   "Win32_UI_Input_KeyboardAndMouse",

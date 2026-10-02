@@ -1,15 +1,12 @@
 //! Windows console capture for the embedded RDP server.
 //!
-//! The hot path uses xcap's Windows Graphics Capture (WGC) video recorder. It
-//! drains the native callback into a latest-frame mailbox. Slow consumers never
-//! block WGC's callback or accumulate stale frames. A GDI
+//! The hot path owns a Windows Graphics Capture (WGC) stream. Only the newest
+//! native surface is retained, with its sampling timestamp; CPU readback is
+//! paced by the consumer. A GDI
 //! screenshot is retained as a compatibility fallback for sessions where WGC
 //! is unavailable (for example an older build, a remote/locked desktop, or a
 //! driver that rejects the capture session).
 
-use std::sync::mpsc::{Receiver, RecvTimeoutError};
-use std::sync::{Arc, Condvar, Mutex};
-use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use super::{Capturer, Frame};
@@ -37,109 +34,15 @@ struct MonitorKey {
     height: u32,
 }
 
-#[derive(Default)]
-struct FrameMailbox {
-    state: Mutex<MailboxState>,
-    ready: Condvar,
-}
-
-#[derive(Default)]
-struct MailboxState {
-    latest: Option<(xcap::Frame, Instant)>,
-    stopped: bool,
-}
-
-impl FrameMailbox {
-    fn publish(&self, frame: xcap::Frame, captured_at: Instant) -> bool {
-        let Ok(mut state) = self.state.lock() else {
-            return false;
-        };
-        if state.stopped {
-            return false;
-        }
-        state.latest = Some((frame, captured_at));
-        self.ready.notify_one();
-        true
-    }
-
-    fn stop(&self) {
-        if let Ok(mut state) = self.state.lock() {
-            state.stopped = true;
-            state.latest = None;
-        }
-        self.ready.notify_all();
-    }
-
-    fn stopped(&self) -> bool {
-        self.state.lock().map_or(true, |state| state.stopped)
-    }
-
-    fn take(&self, wait: Duration) -> Result<Option<(xcap::Frame, Instant)>, RecvTimeoutError> {
-        let deadline = Instant::now() + wait;
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| RecvTimeoutError::Disconnected)?;
-        loop {
-            if state.stopped {
-                return Err(RecvTimeoutError::Disconnected);
-            }
-            if let Some(frame) = state.latest.take() {
-                return Ok(Some(frame));
-            }
-            let now = Instant::now();
-            if now >= deadline {
-                return Ok(None);
-            }
-            (state, _) = self
-                .ready
-                .wait_timeout(state, deadline - now)
-                .map_err(|_| RecvTimeoutError::Disconnected)?;
-        }
-    }
-}
-
-fn pump_frames(frames: Receiver<xcap::Frame>, mailbox: Arc<FrameMailbox>) {
-    // xcap sends through a zero-capacity channel and WGC itself retains two
-    // frames. Always drain that handoff so encoding/pacing cannot pin an old
-    // callback and make successive screen samples hundreds of ms late.
-    while !mailbox.stopped() {
-        match frames.recv_timeout(FRAME_WAIT) {
-            Ok(frame) => {
-                if !mailbox.publish(frame, Instant::now()) {
-                    break;
-                }
-            }
-            Err(RecvTimeoutError::Timeout) => {}
-            Err(RecvTimeoutError::Disconnected) => break,
-        }
-    }
-    mailbox.stop();
-    // Drop the receiver before Close joins any outstanding WGC callback.
-}
-
 enum Backend {
-    Recorder {
-        recorder: xcap::VideoRecorder,
-        mailbox: Arc<FrameMailbox>,
-        pump: JoinHandle<()>,
-    },
+    Recorder(super::win_wgc::WgcStream),
     Gdi,
 }
 
 impl Backend {
     fn stop(&mut self) {
-        let previous = std::mem::replace(self, Self::Gdi);
-        if let Self::Recorder {
-            recorder,
-            mailbox,
-            pump,
-        } = previous
-        {
-            mailbox.stop();
-            let _ = pump.join();
-            let _ = recorder.stop();
-        }
+        // Dropping WGC stops its mailbox/callbacks before closing the session.
+        *self = Self::Gdi;
     }
 }
 
@@ -291,42 +194,15 @@ impl WindowsCapturer {
     }
 
     fn next_recorder_frame(&mut self, wait: Duration) -> anyhow::Result<Option<Frame>> {
-        let Backend::Recorder { mailbox, .. } = &self.backend else {
+        let Backend::Recorder(stream) = &mut self.backend else {
             return Ok(None);
         };
-        match mailbox.take(wait) {
-            Ok(Some((frame, captured_at))) => {
-                let width = checked_dimension_u32(frame.width)
-                    .ok_or_else(|| anyhow::anyhow!("WGC returned an invalid frame width"))?;
-                let height = checked_dimension_u32(frame.height)
-                    .ok_or_else(|| anyhow::anyhow!("WGC returned an invalid frame height"))?;
-                let mut rgba = frame.raw;
-                let expected = checked_frame_bytes(width, height)?;
-                if rgba.len() != expected {
-                    anyhow::bail!(
-                        "WGC returned {} bytes for {}x{} frame; expected {}",
-                        rgba.len(),
-                        width,
-                        height,
-                        expected
-                    );
-                }
-                rgba_to_bgra(&mut rgba);
-                let stride = usize::from(width)
-                    .checked_mul(4)
-                    .ok_or_else(|| anyhow::anyhow!("Windows frame stride overflow"))?;
-                self.width = width;
-                self.height = height;
-                let mut frame = Frame::bgra(rgba, 0, 0, width, height, stride);
-                frame.captured_at = captured_at;
-                Ok(Some(frame))
-            }
-            Ok(None) | Err(RecvTimeoutError::Timeout) => Ok(None),
-            Err(RecvTimeoutError::Disconnected) => {
-                self.restart_recorder();
-                Ok(None)
-            }
+        let frame = stream.next(wait)?;
+        if let Some(frame) = &frame {
+            self.width = frame.width;
+            self.height = frame.height;
         }
+        Ok(frame)
     }
 
     fn fallback_to_gdi(&mut self, reason: &anyhow::Error) {
@@ -343,6 +219,7 @@ impl WindowsCapturer {
                 None
             }
         };
+        self.next_restart = Instant::now() + RESTART_BACKOFF;
     }
 }
 
@@ -370,8 +247,11 @@ impl Capturer for WindowsCapturer {
             return Ok(Some(frame));
         }
 
+        if matches!(self.backend, Backend::Gdi) {
+            self.restart_recorder();
+        }
         match &self.backend {
-            Backend::Recorder { .. } => match self.next_recorder_frame(FRAME_WAIT) {
+            Backend::Recorder(_) => match self.next_recorder_frame(FRAME_WAIT) {
                 Ok(frame) => Ok(frame),
                 Err(error) => {
                     self.fallback_to_gdi(&error);
@@ -391,7 +271,7 @@ impl Capturer for WindowsCapturer {
     }
 
     fn is_self_paced(&self) -> bool {
-        matches!(self.backend, Backend::Recorder { .. })
+        matches!(self.backend, Backend::Recorder(_))
     }
 
     fn needs_frame_deduplication(&self) -> bool {
@@ -447,17 +327,7 @@ fn capture_gdi(monitor: &xcap::Monitor) -> anyhow::Result<Frame> {
     let width_i32 = i32::from(width);
     let height_i32 = i32::from(height);
 
-    let pixel_bytes = usize::from(width)
-        .checked_mul(usize::from(height))
-        .and_then(|pixels| pixels.checked_mul(4))
-        .ok_or_else(|| anyhow::anyhow!("GDI frame size overflow"))?;
-    if pixel_bytes > MAX_CAPTURE_BYTES {
-        anyhow::bail!(
-            "GDI frame is too large ({} bytes; limit {} bytes)",
-            pixel_bytes,
-            MAX_CAPTURE_BYTES
-        );
-    }
+    let pixel_bytes = checked_frame_bytes(width, height)?;
     let mut pixels = vec![0u8; pixel_bytes];
     unsafe {
         let desktop = GetDesktopWindow();
@@ -539,30 +409,9 @@ fn capture_gdi(monitor: &xcap::Monitor) -> anyhow::Result<Frame> {
 }
 
 fn start_recorder(monitor: &xcap::Monitor) -> anyhow::Result<Backend> {
-    let (recorder, frames) = monitor
-        .video_recorder()
-        .map_err(|error| anyhow::anyhow!("WGC video recorder creation failed: {error}"))?;
-    recorder
-        .start()
-        .map_err(|error| anyhow::anyhow!("WGC video recorder start failed: {error}"))?;
-    let mailbox = Arc::new(FrameMailbox::default());
-    let target = mailbox.clone();
-    let pump = match std::thread::Builder::new()
-        .name("windows-capture-latest".into())
-        .spawn(move || pump_frames(frames, target))
-    {
-        Ok(pump) => pump,
-        Err(error) => {
-            // Failed spawn drops the moved receiver before stopping callbacks.
-            let _ = recorder.stop();
-            return Err(error.into());
-        }
-    };
-    Ok(Backend::Recorder {
-        recorder,
-        mailbox,
-        pump,
-    })
+    Ok(Backend::Recorder(super::win_wgc::WgcStream::start(
+        monitor,
+    )?))
 }
 
 fn select_monitor(requested: Option<&str>) -> anyhow::Result<(xcap::Monitor, MonitorKey)> {
@@ -618,14 +467,6 @@ fn monitor_key(monitor: &xcap::Monitor) -> anyhow::Result<MonitorKey> {
     })
 }
 
-/// xcap's Windows video recorder exposes RGBA bytes while the RDP bitmap
-/// encoder consumes BGRA. Swapping in place avoids a second allocation.
-fn rgba_to_bgra(pixels: &mut [u8]) {
-    for pixel in pixels.chunks_exact_mut(4) {
-        pixel.swap(0, 2);
-    }
-}
-
 pub(crate) fn probe_displays() -> anyhow::Result<Vec<super::CaptureDisplay>> {
     let monitors = xcap::Monitor::all()
         .map_err(|error| anyhow::anyhow!("cannot enumerate Windows monitors: {error}"))?;
@@ -658,54 +499,6 @@ pub(crate) fn probe_displays() -> anyhow::Result<Vec<super::CaptureDisplay>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn slow_consumers_receive_only_the_latest_frame_and_its_timestamp() {
-        let mailbox = FrameMailbox::default();
-        let first = Instant::now();
-        let latest = first + Duration::from_millis(300);
-        assert!(mailbox.publish(xcap::Frame::new(1, 1, vec![1; 4]), first));
-        assert!(mailbox.publish(xcap::Frame::new(1, 1, vec![2; 4]), latest));
-        let (frame, at) = mailbox.take(Duration::ZERO).unwrap().unwrap();
-        assert_eq!(frame.raw, vec![2; 4]);
-        assert_eq!(at, latest);
-        assert!(mailbox.take(Duration::ZERO).unwrap().is_none());
-        mailbox.stop();
-        assert!(!mailbox.publish(xcap::Frame::new(1, 1, vec![3; 4]), latest));
-        assert!(matches!(
-            mailbox.take(Duration::ZERO),
-            Err(RecvTimeoutError::Disconnected)
-        ));
-    }
-
-    #[test]
-    fn pump_disconnects_a_blocked_native_producer_on_stop() {
-        let (tx, rx) = std::sync::mpsc::sync_channel(0);
-        let mailbox = Arc::new(FrameMailbox::default());
-        let target = mailbox.clone();
-        let pump = std::thread::spawn(move || pump_frames(rx, target));
-        let producer = std::thread::spawn(move || {
-            for i in 0..100 {
-                if tx.send(xcap::Frame::new(1, 1, vec![i; 4])).is_err() {
-                    return;
-                }
-            }
-        });
-        mailbox.stop();
-        pump.join().unwrap();
-        producer.join().unwrap();
-        assert!(matches!(
-            mailbox.take(Duration::ZERO),
-            Err(RecvTimeoutError::Disconnected)
-        ));
-    }
-
-    #[test]
-    fn swaps_only_complete_rgba_pixels() {
-        let mut pixels = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
-        rgba_to_bgra(&mut pixels);
-        assert_eq!(pixels, vec![3, 2, 1, 4, 7, 6, 5, 8, 9]);
-    }
 
     #[test]
     fn rejects_capture_frames_over_memory_budget() {

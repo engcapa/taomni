@@ -17,7 +17,7 @@ verification:
     requirement: Recorder stop loads a real MP4 in the platform WebView and playback advances, then Done restores main/removes temp clip.
     actions: [1]
     checkpoints:
-    - {step: 3, expectation: "Every decoded video frame matches its actual original scene PNG/id/random nonce and ordered timeline, in addition to timer advance and real WebView metadata/pixels/playback advancement. Dimensions agree, reentry retains preview and Done restores main/removes temp. MP4, source frame PNGs, per-frame metrics/timeline and difference contact sheet are retained."}
+    - {step: 3, expectation: "Every decoded video frame matches its actual original scene PNG/id/random nonce and ordered timeline; only gaps unexplained by real original visibility holds may count as a stall, in addition to timer advance and real WebView metadata/pixels/playback advancement. Dimensions agree, reentry retains preview and Done restores main/removes temp. MP4, source frame PNGs, per-frame metrics/timeline and difference contact sheet are retained."}
     results: [3]
   visual:
   - {check: Preview quality, method: external, reason: Play retained recorder-preview MP4; automated currentTime/pixels establish platform codec playback.}
