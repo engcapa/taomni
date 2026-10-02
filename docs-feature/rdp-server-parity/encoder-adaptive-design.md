@@ -518,6 +518,9 @@ EncoderIter::next(rect)
 - 第十轮 [36986942288](https://github.com/engcapa/taomni/actions/runs/36986942288)，源码 `1afafcb6`：Linux native 12/0/0，UI 128 ms / 43.297 ms p95 / 55.998 实际 fps / 176.558 kbps，照片帧率/带宽比 0.984834 / 0.955343；Windows native 14/1/0，UI 44 ms / 35.979 ms p95 / 32.870 fps / 441.399 kbps，照片比 0.985306 / 0.987450，TermService 通过。Windows 唯一失败为 owned mstsc 进程再次退出 `0xC0000005`：本次 NLA、剪贴板、音频、drdynvc 全通过，像素截图前进程已退出，不能算互通通过。三端 browser 各 5/0/0；macOS native 尚待报告。已核验上述原始 receipt 与身份。
 - 为 mstsc 的重复 crash 增加 hosted-only 的 Windows Application Error（按 owned PID 筛选）与 WER minidump；runner 有 CDB 时另保存异常调用栈。DumpFolder/Type/Count 的原值与类型均恢复，工作站不修改。33 个 mocked 工具/清理 unit 通过；诊断不改变 NAT-08 的协议、像素或性能断言，真实原因仍由下一次 CI 工件确定。
 
+- 第十轮 macOS 完成：native 11/0/0，UI 62 ms / 57.607 ms p95 / 38.354 实际 fps / 598.640 kbps；照片 baseline/adaptive 31.748/31.197 fps，比值 0.982638，带宽比 0.990042，bulk 解压错误 0。修正真实 draw deadline 后，M3 与其余性能门槛均通过；整轮仅 Windows mstsc 失败。完整三端原始 receipt 与身份已核验。
+- mstsc 诊断运行 [36991919276](https://github.com/engcapa/taomni/actions/runs/36991919276) 在 planner unit 失败：四个旧 mocked 测试未 mock 新 WER 上下文，Linux 的 `GITHUB_ACTIONS=true` 导致导入 winreg；没有执行产品用例。补齐 mock 后同 hosted 环境的 33 个工具/清理 unit 通过，再推送重跑。该失败原始日志保留。
+
 ## 9. 验收追踪与交付条件
 
 | AC | 方案位置 | 开发任务 | 验证项与平台 | 所需证据 | 当前缺口 |

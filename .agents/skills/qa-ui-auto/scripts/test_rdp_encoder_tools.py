@@ -30,6 +30,10 @@ class EncoderToolsTest(unittest.TestCase):
         consent = patch.object(steps, "file_launch_consent", side_effect=nullcontext)
         consent.start()
         self.addCleanup(consent.stop)
+        reporting = patch.object(mstsc, "crash_reporting", side_effect=nullcontext)
+        self.reporting_context = reporting
+        reporting.start()
+        self.addCleanup(reporting.stop)
 
     def test_copy_preserves_reference_oracle_and_waits_for_ready(self):
         source = self.root / "fixture"
@@ -163,6 +167,7 @@ class EncoderToolsTest(unittest.TestCase):
         self.assertEqual(registry.SetValueEx.call_count, 2)
 
     def test_hosted_crash_reporting_restores_each_original_value_and_type_after_failure(self):
+        self.reporting_context.stop()
         registry = MagicMock()
         key = registry.CreateKeyEx.return_value.__enter__.return_value
         registry.QueryValueEx.side_effect = [("prior dump folder", 1), (2, 4), FileNotFoundError()]
