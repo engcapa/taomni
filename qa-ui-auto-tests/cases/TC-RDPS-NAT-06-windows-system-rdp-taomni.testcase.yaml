@@ -160,7 +160,7 @@ steps:
     action: stop
     name: target
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: The settings card reports the runner's running system Remote Desktop from the real probe.

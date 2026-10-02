@@ -103,7 +103,7 @@ if mode:
         out.write(f"{time.strftime('%H:%M:%S')} start {mode[0]} pid={os.getpid()} python={sys.executable}\n")
     try:
         sys.argv = [str(here / "rdp_target.py"), "--state", str(here / f"{mode[0]}-state.json"),
-                    "--mode", mode[0], "--geometry", mode[1], "--lifetime-sec", "1800"]
+                    "--mode", mode[0], "--pattern", "--geometry", mode[1], "--lifetime-sec", "1800"]
         runpy.run_path(str(here / "rdp_target.py"), run_name="__main__")
     except BaseException:
         with log.open("a", encoding="utf-8") as out:

@@ -170,7 +170,7 @@ steps:
       first_graphics_ms:
         exists: true
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: The product client completes NLA against the product server after confirming its certificate and shows the host desktop.

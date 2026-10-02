@@ -72,7 +72,7 @@ steps:
 - click: '[data-testid="rdp-system-choice-reset"]'
 - assert_not_visible: '[data-testid="rdp-system-choice"]'
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: The card reports the running system Remote Desktop and its port.

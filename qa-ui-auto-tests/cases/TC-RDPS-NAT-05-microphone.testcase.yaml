@@ -118,7 +118,7 @@ steps:
     selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
     timeout_sec: 30
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: A client microphone redirected over AUDIO_INPUT is played into a host input that local applications record with the same tone.

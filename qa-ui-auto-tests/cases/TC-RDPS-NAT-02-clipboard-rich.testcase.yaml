@@ -163,7 +163,7 @@ steps:
     selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
     timeout_sec: 30
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: Text, HTML and a picture copied on the RDP client reach the real host clipboard unchanged.

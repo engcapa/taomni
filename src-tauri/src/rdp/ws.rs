@@ -540,13 +540,10 @@ async fn run_relay(
                         Some(RdpControl::Disconnect) => { cancel.cancel(); break; }
                         Some(other) => {
                             if let Err(e) = session.dispatch_control(other).await {
-                                let json = serde_json::json!({
-                                    "type": "error",
-                                    "code": "control-failed",
-                                    "message": e,
-                                })
-                                .to_string();
-                                let _ = ws_out_clone.send(WsOutgoing::Text(json));
+                                // The connection task queues its real error before
+                                // dropping the control receiver. A late resize or
+                                // input must not overwrite that diagnostic.
+                                tracing::debug!(error = %e, "RDP control arrived after session ended");
                             }
                         }
                         None => break,
@@ -887,6 +884,63 @@ mod tests {
         assert!(is_authorized_origin("https://tauri.localhost"));
         assert!(!is_authorized_origin("https://attacker.example"));
         assert!(!is_authorized_origin("null"));
+    }
+
+    #[tokio::test]
+    async fn late_controls_do_not_replace_the_connection_error_in_the_websocket() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let (session, output, receiver) = RdpSessionHandle::new();
+        let original = r#"{"type":"error","code":"rdp-session","message":"rdp TLS upgrade failed: handshake error"}"#;
+        output
+            .send(SessionOutput::Text(original.to_string()))
+            .unwrap();
+        drop(receiver);
+        let (controls, controls_rx) = mpsc::unbounded_channel();
+        // Both branches are ready when the relay starts. Its biased control
+        // branch used to queue a generic ctrl-channel error ahead of this one.
+        controls.send(RdpControl::Refresh).unwrap();
+        controls
+            .send(RdpControl::Resize {
+                width: 1280,
+                height: 720,
+            })
+            .unwrap();
+        let (ws_out, ws_rx) = WsOutgoingQueue::new();
+        let cancel = CancellationToken::new();
+        let task = tokio::spawn(run_relay(
+            listener,
+            session,
+            ws_out,
+            ws_rx,
+            controls,
+            controls_rx,
+            cancel.clone(),
+            "test-error".to_string(),
+        ));
+        let mut request = format!("ws://{address}").into_client_request().unwrap();
+        request.headers_mut().insert(
+            header::ORIGIN,
+            HeaderValue::from_static("tauri://localhost"),
+        );
+        request.headers_mut().insert(
+            header::SEC_WEBSOCKET_PROTOCOL,
+            HeaderValue::from_static("taomni-rdp.test-error"),
+        );
+        let (mut socket, _) = connect_async(request).await.unwrap();
+        let message = tokio::time::timeout(Duration::from_secs(5), socket.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(message, Message::Text(original.into()));
+        cancel.cancel();
+        socket.close(None).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -92,7 +92,8 @@
           "system_rdp_running",
           "release_build_required",
           "rdp_baseline_required",
-          "rdp_audio_required"
+          "rdp_audio_required",
+          "xrdp_server_required"
         ]
       },
       "uniqueItems": true
@@ -1361,6 +1362,15 @@
         },
         "native_show_image_window": {
           "$ref": "#/$defs/native_show_image_window_arg"
+        },
+        "host_copy_file": {
+          "$ref": "#/$defs/host_copy_file_arg"
+        },
+        "host_mstsc": {
+          "$ref": "#/$defs/host_mstsc_arg"
+        },
+        "rdp_canvas_assert": {
+          "$ref": "#/$defs/rdp_canvas_assert_arg"
         }
       }
     },
@@ -2684,7 +2694,8 @@
         "mode": {
           "enum": [
             "flip",
-            "animate"
+            "animate",
+            "photo"
           ]
         },
         "geometry": {
@@ -2698,6 +2709,9 @@
         "timeout_sec": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "pattern": {
+          "type": "boolean"
         }
       }
     },
@@ -3106,6 +3120,140 @@
           }
         }
       ]
+    },
+    "host_copy_file_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from_env_dir",
+        "name",
+        "to"
+      ],
+      "properties": {
+        "from_env_dir": {
+          "type": "string",
+          "pattern": "^QA_RDP_[A-Z0-9_]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect": {
+          "$ref": "#/$defs/rdp_expect"
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "host_mstsc_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "start",
+            "capture",
+            "stop"
+          ]
+        },
+        "port": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "password_env": {
+          "type": "string",
+          "minLength": 1
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 320
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 200
+        },
+        "snapshot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect_pattern": {
+          "type": "boolean"
+        }
+      }
+    },
+    "rdp_canvas_assert_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "points"
+      ],
+      "properties": {
+        "selector": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y",
+              "rgb"
+            ],
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "rgb": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "tolerance": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 24
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

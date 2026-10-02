@@ -96,7 +96,7 @@ steps:
     selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
     timeout_sec: 30
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: The server runs continuous auto-detection and reports network characteristics to the connected client.

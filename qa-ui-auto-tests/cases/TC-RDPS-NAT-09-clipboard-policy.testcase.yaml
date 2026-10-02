@@ -146,7 +146,7 @@ steps:
     selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
     timeout_sec: 30
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: The server applies each clipboard direction's level when it starts.

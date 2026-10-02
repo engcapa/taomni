@@ -28,6 +28,28 @@ fn usage(message: String) -> (ProbeError, Value) {
     plain(ProbeError::usage(message))
 }
 
+fn throughput_comparison(report: &Value, baseline: &Value) -> Result<Value, ProbeError> {
+    let ratio = |key: &str| {
+        let current = report
+            .pointer(key)
+            .and_then(Value::as_f64)
+            .filter(|v| v.is_finite() && *v >= 0.0);
+        let previous = baseline
+            .pointer(key)
+            .and_then(Value::as_f64)
+            .filter(|v| v.is_finite() && *v > 0.0);
+        match (current, previous) {
+            (Some(current), Some(previous)) => Ok(current / previous),
+            _ => Err(ProbeError::usage(format!(
+                "throughput comparison requires finite, positive baseline {key}"
+            ))),
+        }
+    };
+    // Update PDUs can divide one animation frame into several rectangles.
+    // Compare distinct decoded frames, the same M3 measurement as PERF-01.
+    Ok(json!({ "kbps_ratio": ratio("/kbps")?, "fps_ratio": ratio("/marker/observed_fps")? }))
+}
+
 /// Whether the host target state file at `path` reports `"ready": true`.
 fn target_ready(path: &str) -> bool {
     std::fs::read_to_string(path)
@@ -427,7 +449,51 @@ async fn throughput(args: &Args) -> ScenarioResult {
             "observed_fps": f64::from(observed) / elapsed,
         });
     }
+    if let Some(path) = args.opt("baseline-report") {
+        let baseline: Value = std::fs::read_to_string(&path)
+            .map_err(|e| {
+                (
+                    ProbeError::usage(format!("read baseline {path}: {e}")),
+                    report.clone(),
+                )
+            })
+            .and_then(|text| {
+                serde_json::from_str(&text).map_err(|e| {
+                    (
+                        ProbeError::usage(format!("parse baseline {path}: {e}")),
+                        report.clone(),
+                    )
+                })
+            })?;
+        report["vs_baseline"] =
+            throughput_comparison(&report, &baseline).map_err(|e| (e, report.clone()))?;
+    }
     Ok(report)
+}
+
+#[cfg(test)]
+mod throughput_comparison_tests {
+    use super::*;
+    #[test]
+    fn comparison_reports_both_bandwidth_and_delivery_rate() {
+        let compared = throughput_comparison(
+            &json!({"kbps": 95.0, "fps": 100.0, "marker": {"observed_fps": 28.0}}),
+            &json!({"kbps": 100.0, "fps": 50.0, "marker": {"observed_fps": 32.0}}),
+        )
+        .unwrap();
+        assert_eq!(compared, json!({"kbps_ratio": 0.95, "fps_ratio": 0.875}));
+        assert!(
+            throughput_comparison(
+                &json!({"kbps": 1, "marker": {"observed_fps": 1}}),
+                &json!({"kbps": 0, "marker": {"observed_fps": 1}}),
+            )
+            .is_err()
+        );
+        assert!(
+            throughput_comparison(&json!({"kbps": 1, "fps": 1}), &json!({"kbps": 1, "fps": 1}))
+                .is_err()
+        );
+    }
 }
 
 fn collect_files(paths: &str) -> Result<Vec<LocalFile>, String> {

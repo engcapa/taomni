@@ -228,8 +228,8 @@ workflow 改动：`Prepare local service packages` 的条件扩展到上述 capa
 | TASK-08 | AUDIO_INPUT 麦克风三端 | TASK-01、07 | 已实现并验证：NAT-05 三端通过（运行 36855295948 起；Windows 失败为探针音调分析窗口落在 VB-CABLE 起始瞬态上，已修） |
 | TASK-09 | autodetect 与 Network Characteristics Result | TASK-01 | 已实现并验证：NAT-07 三端通过；连续带宽测量需客户端字节计数，ironrdp 客户端不支持，记为缺口 |
 | TASK-10 | Taomni 客户端连接栏与质量事件 | TASK-09 | 已实现并验证：TC-RDPJ-01 三端通过（运行 36850382615 起），Vitest 10 项通过 |
-| TASK-11 | 性能调优至预算 | TASK-03 | 进行中：M1/M2/M3 Linux、Windows 达标；M4 三端约 11 Mbps 超预算 4905 kbps，macOS M2 p95 贴线、M3 约 19.6 fps 未达标；需内容自适应编码（见 §4.7） |
-| TASK-12 | 集成：三端全量 RDP 用例（含联合与参考服务器 V-18~V-21）+ 保留行为回归，交付报告 | 全部 | 进行中：联合用例 TC-RDPJ-01/02 三端通过；V-17 mstsc 互通、V-21 xrdp 参考服务器待建 |
+| TASK-11 | 性能调优至预算 | TASK-03 | 进行中：M1/M2/M3 Linux、Windows 达标；M4 三端约 11 Mbps 超预算 4905 kbps，macOS M2 p95 贴线、M3 约 19.6 fps 未达标。方案与任务书见 [encoder-adaptive-design.md](rdp-server-parity/encoder-adaptive-design.md)（批量压缩 + 按矩形选择位图/RemoteFX，TASK-E1~E5） |
+| TASK-12 | 集成：三端全量 RDP 用例（含联合与参考服务器 V-18~V-21）+ 保留行为回归，交付报告 | 全部 | 进行中：联合用例 TC-RDPJ-01/02 三端通过；V-17 mstsc 互通、V-21 参考服务器的设计与任务见 [encoder-adaptive-design.md](rdp-server-parity/encoder-adaptive-design.md) TASK-E6/E7（xrdp 部分待 DEC-07） |
 
 ### TASK-01 `rdp-probe`
 

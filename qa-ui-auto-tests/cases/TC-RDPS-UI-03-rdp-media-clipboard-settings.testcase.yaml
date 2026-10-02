@@ -106,7 +106,7 @@ steps:
     name: value
     equals: '512'
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: The RDP settings open with safe defaults for clipboard, sound and microphone.

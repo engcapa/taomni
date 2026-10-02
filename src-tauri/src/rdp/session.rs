@@ -2196,7 +2196,10 @@ fn next_remote_file_request(
     }
 }
 
-pub(crate) fn remote_clipboard_safe_path(root: &Path, remote_name: &str) -> Result<PathBuf, String> {
+pub(crate) fn remote_clipboard_safe_path(
+    root: &Path,
+    remote_name: &str,
+) -> Result<PathBuf, String> {
     let mut path = root.to_path_buf();
     let mut saw_part = false;
     for part in remote_name.split(['\\', '/']) {
@@ -2223,7 +2226,11 @@ pub(crate) fn remote_top_level_name(remote_name: &str) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-pub(crate) fn write_remote_file_chunk(path: &Path, position: u64, data: &[u8]) -> Result<(), String> {
+pub(crate) fn write_remote_file_chunk(
+    path: &Path,
+    position: u64,
+    data: &[u8],
+) -> Result<(), String> {
     let mut options = OpenOptions::new();
     options.write(true);
     #[cfg(unix)]
@@ -2521,7 +2528,7 @@ fn build_ironrdp_config(cfg: &RdpConnectionSettings) -> connector::Config {
         hardware_id: None,
         license_cache: None::<Arc<dyn connector::LicenseCache>>,
         timezone_info: TimezoneInfo::default(),
-        compression_type: None,
+        compression_type: Some(ironrdp::pdu::rdp::client_info::CompressionType::Rdp61),
         multitransport_flags: None,
     }
 }
@@ -2662,6 +2669,7 @@ fn send_status(out_tx: &SessionOutputSender, stage: &str, detail: &str) {
 }
 
 fn send_error(out_tx: &SessionOutputSender, code: &str, message: &str) {
+    tracing::warn!(code, error = %message, "RDP session failed");
     let retryable = is_retryable_rdp_error(message);
     send_text(
         out_tx,
@@ -2861,6 +2869,10 @@ mod tests {
 
         assert!(config.enable_server_pointer);
         assert!(!config.pointer_software_rendering);
+        assert_eq!(
+            config.compression_type,
+            Some(ironrdp::pdu::rdp::client_info::CompressionType::Rdp61)
+        );
     }
 
     #[test]

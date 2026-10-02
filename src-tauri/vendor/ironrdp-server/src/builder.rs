@@ -12,9 +12,10 @@ use super::display::{DesktopSize, RdpServerDisplay};
 use super::gfx::GfxServerFactory;
 use super::handler::{KeyboardEvent, MouseEvent, RdpServerInputHandler};
 use super::server::{
-    ConnectionHandler, CredentialValidator, DvcServerFactory, RdpServer, RdpServerOptions, RdpServerSecurity,
+    ConnectionHandler, CredentialValidator, DvcServerFactory, RdpServer, RdpServerOptions,
+    RdpServerSecurity,
 };
-use crate::{DisplayUpdate, RdpServerDisplayUpdates, SoundServerFactory};
+use crate::{DisplayUpdate, EncoderStats, RdpServerDisplayUpdates, SoundServerFactory};
 
 pub struct WantsAddr {}
 pub struct WantsSecurity {
@@ -45,6 +46,9 @@ pub struct BuilderDone {
     display_suppressed: Option<Arc<AtomicBool>>,
     autodetect_rtt: Option<Arc<AtomicU32>>,
     honor_client_desktop_size: bool,
+    bulk_compression: bool,
+    encoder_stats: Option<Arc<EncoderStats>>,
+    channel_observer: Option<Arc<dyn Fn(&str) + Send + Sync>>,
     dvc_factory: Option<Box<dyn DvcServerFactory>>,
 }
 
@@ -54,7 +58,9 @@ pub struct RdpServerBuilder<State> {
 
 impl RdpServerBuilder<WantsAddr> {
     pub fn new() -> Self {
-        Self { state: WantsAddr {} }
+        Self {
+            state: WantsAddr {},
+        }
     }
 
     #[expect(clippy::unused_self)] // ensuring state transition from WantsAddr
@@ -90,7 +96,11 @@ impl RdpServerBuilder<WantsSecurity> {
         }
     }
 
-    pub fn with_hybrid(self, acceptor: impl Into<TlsAcceptor>, pub_key: Vec<u8>) -> RdpServerBuilder<WantsHandler> {
+    pub fn with_hybrid(
+        self,
+        acceptor: impl Into<TlsAcceptor>,
+        pub_key: Vec<u8>,
+    ) -> RdpServerBuilder<WantsHandler> {
         RdpServerBuilder {
             state: WantsHandler {
                 addr: self.state.addr,
@@ -147,6 +157,9 @@ impl RdpServerBuilder<WantsDisplay> {
                 display_suppressed: None,
                 autodetect_rtt: None,
                 honor_client_desktop_size: false,
+                bulk_compression: false,
+                encoder_stats: None,
+                channel_observer: None,
                 dvc_factory: None,
             },
         }
@@ -170,6 +183,9 @@ impl RdpServerBuilder<WantsDisplay> {
                 display_suppressed: None,
                 autodetect_rtt: None,
                 honor_client_desktop_size: false,
+                bulk_compression: false,
+                encoder_stats: None,
+                channel_observer: None,
                 dvc_factory: None,
             },
         }
@@ -177,7 +193,29 @@ impl RdpServerBuilder<WantsDisplay> {
 }
 
 impl RdpServerBuilder<BuilderDone> {
-    pub fn with_cliprdr_factory(mut self, cliprdr_factory: Option<Box<dyn CliprdrServerFactory>>) -> Self {
+    /// Enable bulk compression and adaptive planar/RemoteFX encoding for clients
+    /// that request compression. Disabled by default for upstream compatibility.
+    pub fn with_bulk_compression(mut self, enabled: bool) -> Self {
+        self.state.bulk_compression = enabled;
+        self
+    }
+
+    /// Share aggregate encoder counters with the application's telemetry.
+    pub fn with_encoder_stats_handle(mut self, stats: Arc<EncoderStats>) -> Self {
+        self.state.encoder_stats = Some(stats);
+        self
+    }
+
+    /// Observe channels that the peer actually joined, after activation.
+    pub fn with_channel_observer(mut self, observer: Arc<dyn Fn(&str) + Send + Sync>) -> Self {
+        self.state.channel_observer = Some(observer);
+        self
+    }
+
+    pub fn with_cliprdr_factory(
+        mut self,
+        cliprdr_factory: Option<Box<dyn CliprdrServerFactory>>,
+    ) -> Self {
         self.state.cliprdr_factory = cliprdr_factory;
         self
     }
@@ -284,7 +322,10 @@ impl RdpServerBuilder<BuilderDone> {
     ///
     /// Not used for CredSSP/Hybrid connections (those use pre-loaded
     /// credentials for NTLM challenge-response).
-    pub fn with_credential_validator(mut self, validator: Option<Arc<dyn CredentialValidator>>) -> Self {
+    pub fn with_credential_validator(
+        mut self,
+        validator: Option<Arc<dyn CredentialValidator>>,
+    ) -> Self {
         self.state.credential_validator = validator;
         self
     }
@@ -308,6 +349,9 @@ impl RdpServerBuilder<BuilderDone> {
                 codecs: self.state.codecs,
                 max_request_size: self.state.max_request_size,
                 honor_client_desktop_size: self.state.honor_client_desktop_size,
+                bulk_compression: self.state.bulk_compression,
+                encoder_stats: self.state.encoder_stats,
+                channel_observer: self.state.channel_observer,
             },
             self.state.handler,
             self.state.display,
@@ -347,7 +391,10 @@ struct NoopDisplay;
 #[async_trait::async_trait]
 impl RdpServerDisplay for NoopDisplay {
     async fn size(&mut self) -> DesktopSize {
-        DesktopSize { width: 0, height: 0 }
+        DesktopSize {
+            width: 0,
+            height: 0,
+        }
     }
 
     async fn updates(&mut self) -> Result<Box<dyn RdpServerDisplayUpdates>> {

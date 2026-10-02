@@ -1,0 +1,139 @@
+id: TC-RDPS-PERF-03-photo-content
+title: Adaptive RDP encoding keeps photo bandwidth and frame rate at the RemoteFX baseline
+description: 'AC-E02/V-E12: measure the same deterministic noisy photo animation with compression disabled and RDP6.1
+  enabled on one release server. Preserve both decoded snapshots, bulk statistics and frame rate ratios. Bandwidth
+  cannot improve by dropping delivered frames.'
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- performance
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- rdp_server_required
+- system_rdp_running
+- release_build_required
+timeout_sec: 600
+steps:
+- open_route: ?servers=main
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- host_helper:
+    action: start
+    name: photo
+    mode: photo
+    geometry: 640x360+40+80
+    timeout_sec: 60
+- rdp_probe:
+    scenario: throughput
+    artifact: photo-baseline
+    args:
+      compression: none
+      seconds: 10
+      rect: 40,80,640,360
+      marker: 56,96
+    expect:
+      marker.frames:
+        min: 100
+      kbps:
+        min: 1
+      negotiated.compression: none
+- rdp_probe:
+    scenario: throughput
+    artifact: photo-adaptive
+    args:
+      compression: rdp61
+      seconds: 10
+      rect: 40,80,640,360
+      marker: 56,96
+      baseline-report: photo-baseline.json
+    expect:
+      marker.frames:
+        min: 100
+      vs_baseline.kbps_ratio:
+        max: 1.05
+      vs_baseline.fps_ratio:
+        min: 0.95
+      rfx.bulk.decompression_errors: 0
+- host_helper:
+    action: stop
+    name: photo
+- save_text:
+    selector: '[data-testid="server-log"]'
+    path: server-log.txt
+- assert_pattern:
+    selector: '[data-testid="server-log"]'
+    regex: encode=planar:[0-9]+/rfx:[1-9][0-9]*
+    timeout_sec: 15
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Photo traffic uses at most 105% of the uncompressed RemoteFX bandwidth while delivering at least
+      95% of its frames.
+    actions:
+    - 17
+    - 18
+    checkpoints:
+    - step: 19
+      expectation: The independently decoded measurement meets both ratios with zero bulk errors.
+    - step: 22
+      expectation: The server actually selected RemoteFX for photo rectangles.
+    results:
+    - 19
+    - 22
+  native:
+  - check: Release encoder/capture and two sequential native probe connections.
+    method: automated
+    reason: Requires the real RDP transport, decoder and hosted desktop; browser stubs cannot establish this.
+  visual:
+  - check: Decoded pixels are checked against known target colors and retained as JSON/screenshots.
+    method: automated
+    reason: Known content provides an independent rendering oracle.

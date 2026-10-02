@@ -29,7 +29,7 @@ use ironrdp::pdu::rdp::autodetect::AutoDetectRequest;
 use ironrdp::pdu::rdp::capability_sets::{
     BitmapCodecs, MajorPlatformType, client_codecs_capabilities,
 };
-use ironrdp::pdu::rdp::client_info::{PerformanceFlags, TimezoneInfo};
+use ironrdp::pdu::rdp::client_info::{CompressionType, PerformanceFlags, TimezoneInfo};
 use ironrdp::pdu::rdp::headers::ShareDataPdu;
 use ironrdp::pdu::rdp::refresh_rectangle::RefreshRectanglePdu;
 use ironrdp::rdpsnd::client::Rdpsnd;
@@ -79,9 +79,33 @@ pub(crate) struct ConnectOptions {
     /// `client_codecs_capabilities` configuration. The default mimics mstsc,
     /// which offers RemoteFX but none of IronRDP's QOI codecs.
     pub codecs: Vec<String>,
+    pub compression: Option<CompressionType>,
 }
 
 const MSTSC_LIKE_CODECS: &str = "remotefx,qoi:off,qoiz:off";
+
+fn parse_compression(value: &str) -> Result<Option<CompressionType>, ProbeError> {
+    match value {
+        "none" => Ok(None),
+        "k8" => Ok(Some(CompressionType::K8)),
+        "k64" => Ok(Some(CompressionType::K64)),
+        "rdp6" => Ok(Some(CompressionType::Rdp6)),
+        "rdp61" => Ok(Some(CompressionType::Rdp61)),
+        _ => Err(ProbeError::usage(
+            "--compression expects none|k8|k64|rdp6|rdp61",
+        )),
+    }
+}
+
+fn compression_name(value: Option<CompressionType>) -> &'static str {
+    match value {
+        None => "none",
+        Some(CompressionType::K8) => "k8",
+        Some(CompressionType::K64) => "k64",
+        Some(CompressionType::Rdp6) => "rdp6",
+        Some(CompressionType::Rdp61) => "rdp61",
+    }
+}
 
 impl ConnectOptions {
     pub fn from_args(args: &Args) -> Result<Self, ProbeError> {
@@ -112,6 +136,7 @@ impl ConnectOptions {
             work_dir: args.str("work-dir", ""),
             timeout: Duration::from_secs(args.u64("connect-timeout-sec", 30)?),
             snapshot: args.opt("snapshot").map(PathBuf::from),
+            compression: parse_compression(&args.str("compression", "rdp61"))?,
             codecs: args
                 .str("codecs", MSTSC_LIKE_CODECS)
                 .split(',')
@@ -161,6 +186,7 @@ pub(crate) struct ProbeSession {
     advertised_codecs: Vec<u8>,
     /// RemoteFX wire statistics (quantization, tiles, bytes per frame).
     rfx: RfxStats,
+    compression: Option<CompressionType>,
 }
 
 #[derive(Debug)]
@@ -310,7 +336,7 @@ fn connector_config(
         hardware_id: None,
         license_cache: None::<Arc<dyn connector::LicenseCache>>,
         timezone_info: TimezoneInfo::default(),
-        compression_type: None,
+        compression_type: opts.compression,
         multitransport_flags: None,
     }
 }
@@ -448,7 +474,8 @@ impl ProbeSession {
             empty_updates: 0,
             snapshot: opts.snapshot.clone(),
             advertised_codecs,
-            rfx: RfxStats::default(),
+            rfx: RfxStats::new(result.compression_type).map_err(ProbeError::connection)?,
+            compression: result.compression_type,
         })
     }
 
@@ -462,7 +489,8 @@ impl ProbeSession {
 
     /// Start the RemoteFX statistics over (a scenario's measured window).
     pub fn reset_rfx_stats(&mut self) {
-        self.rfx = RfxStats::default();
+        // A measurement window resets counters, never the live receive history.
+        self.rfx.reset_counters();
     }
 
     /// RGBA of one desktop pixel, or `None` outside the framebuffer.
@@ -540,6 +568,7 @@ impl ProbeSession {
                         desktop_size.height,
                     );
                     self.reactivation = None;
+                    self.rfx.reactivate();
                     self.request_refresh().await?;
                     return Ok(vec![PumpEvent::Reactivated {
                         width: desktop_size.width,
@@ -813,6 +842,7 @@ impl ProbeSession {
             "rfx": self.rfx.report(),
             "requested_channels": self.channels,
             "negotiated": {
+                "compression": compression_name(self.compression),
                 "cliprdr": self.active_stage.get_svc_processor::<CliprdrClient>().is_some(),
                 "rdpsnd": self.active_stage.get_svc_processor::<Rdpsnd>().is_some(),
                 "drdynvc": self.active_stage.get_svc_processor::<DrdynvcClient>().is_some(),
@@ -836,6 +866,19 @@ fn codec_name(id: u8) -> String {
 #[cfg(test)]
 mod tests {
     use super::{MSTSC_LIKE_CODECS, client_codecs};
+
+    #[test]
+    fn compression_levels_parse_and_reject_unknown_values() {
+        use super::{compression_name, parse_compression};
+        for name in ["none", "k8", "k64", "rdp6", "rdp61"] {
+            assert_eq!(compression_name(parse_compression(name).unwrap()), name);
+        }
+        assert!(parse_compression("rdp7").is_err());
+        assert_eq!(
+            parse_compression("rdp61").unwrap(),
+            Some(super::CompressionType::Rdp61)
+        );
+    }
 
     fn ids(config: &str) -> Vec<u8> {
         let config: Vec<String> = config.split(',').map(str::to_string).collect();

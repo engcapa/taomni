@@ -68,7 +68,7 @@ steps:
     selector: '[data-testid="rdp-system-card"]'
     equal: 0
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: An administrator with Remote Desktop off can open the system settings from the card and from Start, and that branch never starts Taomni.

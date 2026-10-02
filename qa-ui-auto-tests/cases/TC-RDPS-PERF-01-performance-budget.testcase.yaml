@@ -1,23 +1,42 @@
 id: TC-RDPS-PERF-01-performance-budget
 title: RDP server performance - connect time, input-to-frame latency and animation throughput
-description: |
-  V-13 (docs-feature/rdp-server-parity-design.md §4.7, AC-16). Measures the
+description: 'V-13 (docs-feature/rdp-server-parity-design.md §4.7, AC-16). Measures the
+
   Taomni RDP server with rdp-probe over loopback on the runner desktop:
+
   M1 connect/first-graphics time, M2 input-to-frame latency (40 clicks on a
+
   host Tk target that inverts colour per click) and M3/M4 distinct animation
+
   frames per second and bandwidth while a 640x360 host animation runs.
 
+
   The measurement steps only guard that measurement happened, so every
+
   report is kept; the last steps then hold the reports to the absolute
+
   budgets of design §4.7, derived from Windows TermService on the same
+
   runner and probe (run 36835206663, TC-RDPS-PERF-02): M1 ≤ 500 ms,
+
   M2 p95 ≤ 65 ms, M3 ≥ 25.6 fps, M4 ≤ 4905 kbps. Budgets may only be
+
   tightened (DEC-04). The server log is saved as server-log.txt for the
+
   capture and encoder timings.
 
+
   Measured on a release QA build (release_build_required) on all three
+
   platforms; on Windows platform_choice picks Taomni over the running system
+
   Remote Desktop. TC-RDPS-PERF-02 measures the TermService reference.
+
+
+  The probe declares RDP6.1 bulk compression (mstsc-like). The measurement also requires actual compressed updates
+  and zero independent decompression errors. Absolute M1-M4 budgets remain fixed.
+
+  '
 covers:
 - F-RdpServer-1
 tags:
@@ -34,7 +53,7 @@ fixtures:
 - release_build_required
 timeout_sec: 600
 steps:
-- open_route: '?servers=main'
+- open_route: ?servers=main
 - wait_for:
     selector: '[data-testid="servers-dialog"]'
     timeout_sec: 30
@@ -125,6 +144,9 @@ steps:
         min: 10
       marker.frames:
         min: 100
+      rfx.bulk.compressed_updates:
+        min: 1
+      rfx.bulk.decompression_errors: 0
 - host_helper:
     action: stop
     name: animation
@@ -153,10 +175,11 @@ steps:
       kbps:
         max: 4905
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
-    requirement: Connect time, input-to-frame latency samples and animation throughput are measured on the real server.
+    requirement: Connect time, input-to-frame latency samples and animation throughput are measured on the real
+      server.
     actions:
     - 10
     - 18
@@ -172,7 +195,8 @@ verification:
     - 19
     - 22
   - id: R2
-    requirement: The measurements meet the absolute budgets of design §4.7, derived from Windows TermService on the same runner and probe (run 36835206663).
+    requirement: The measurements meet the absolute budgets of design §4.7, derived from Windows TermService on
+      the same runner and probe (run 36835206663).
     actions:
     - 17
     - 19
@@ -183,7 +207,8 @@ verification:
     - step: 28
       expectation: Input-to-frame latency p95 is at most 65 ms (M2).
     - step: 29
-      expectation: At least 25.6 distinct animation frames per second are displayed (M3) using at most 4905 kbps (M4).
+      expectation: At least 25.6 distinct animation frames per second are displayed (M3) using at most 4905 kbps
+        (M4).
     results:
     - 27
     - 28

@@ -118,7 +118,7 @@ steps:
       marker.frames:
         min: 100
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: TermService connect time, input-to-frame latency and animation throughput are measured with the PERF-01 probe scenarios and target geometry.

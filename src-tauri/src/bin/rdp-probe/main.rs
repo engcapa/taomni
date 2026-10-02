@@ -215,6 +215,9 @@ Connection options:
   --host 127.0.0.1 --port 3389 --user NAME --password-env QA_RDP_PASSWORD
   --domain DOMAIN --width 1280 --height 720 --timeout-sec 60
   --alternate-shell CMD --work-dir DIR   (reference-server initial program)
+  --compression none|k8|k64|rdp6|rdp61  (default rdp61)
+  --codecs remotefx,qoi:off,qoiz:off     (default mstsc capabilities)
+  --baseline-report PATH               (throughput comparison)
 Output:
   --out report.json   also write the JSON report to this path
   --snapshot fb.png   save the decoded framebuffer whenever the report is built";

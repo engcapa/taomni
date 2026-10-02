@@ -10,6 +10,13 @@ rust-version = "1.94"
 # `cargo tauri dev` cannot pick between taomni and acp-fake-agent.
 default-run = "taomni"
 
+# Make the patched protocol crates' unit tests runnable with this application's
+# patch table, while ordinary Cargo commands continue to target Taomni only.
+[workspace]
+members = ["vendor/ironrdp-acceptor", "vendor/ironrdp-bulk", "vendor/ironrdp-server"]
+default-members = ["."]
+resolver = "2"
+
 [lib]
 name = "taomni_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
@@ -137,6 +144,7 @@ tokio-openssl = "0.6.5"
 # advertises QOI/QOIZ, and an IronRDP-based server (Taomni's own included)
 # then sends surface bits the client could not decode — a black desktop.
 ironrdp = { version = "0.17.0", features = ["core", "connector", "session", "graphics", "input", "cliprdr", "rdpdr", "rdpsnd", "svc", "dvc", "displaycontrol", "server", "acceptor", "qoi", "qoiz"] }
+ironrdp-bulk = "=0.1.1"
 ironrdp-tokio = { version = "0.10.0", features = ["reqwest-rustls-ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 rustls-native-certs = "0.8"
@@ -243,6 +251,8 @@ scopeguard = "1.2"
 # PipeWire 0.3.48 ABI buildable while retaining newer-header support.
 libspa = { path = "vendor/libspa" }
 ironrdp-connector = { path = "vendor/ironrdp-connector" }
+ironrdp-acceptor = { path = "vendor/ironrdp-acceptor" }
+ironrdp-bulk = { path = "vendor/ironrdp-bulk" }
 # Keep latency-sensitive RDP display updates out of Nagle's small-packet delay.
 ironrdp-server = { path = "vendor/ironrdp-server" }
 picky = { path = "vendor/picky" }
