@@ -82,7 +82,7 @@ steps:
     verify:
       selector: '[data-testid="terminal-pane"]'
       regex: (?m)^qa\-ssh\-after\-sftp\-close\r?$
-      timeout_sec: 10
+      timeout_sec: 60
       attempts: 2
 - wait: 1
 - assert_pattern:

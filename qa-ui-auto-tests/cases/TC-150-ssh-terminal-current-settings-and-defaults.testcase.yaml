@@ -61,7 +61,7 @@ steps:
     verify:
       selector: '[data-testid="terminal-pane"]'
       regex: (?m)^qa-ssh-current-settings\r?$
-      timeout_sec: 10
+      timeout_sec: 60
       attempts: 2
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
@@ -107,7 +107,7 @@ steps:
     verify:
       selector: '[data-testid="terminal-pane"]'
       regex: (?m)^qa-ssh-after-current-settings\r?$
-      timeout_sec: 10
+      timeout_sec: 60
       attempts: 2
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'

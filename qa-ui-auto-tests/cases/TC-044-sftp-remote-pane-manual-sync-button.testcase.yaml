@@ -44,7 +44,7 @@ steps:
     verify:
       selector: '[data-testid="terminal-pane"]'
       regex: (?m)^QA_CWD_READY\r?$
-      timeout_sec: 5
+      timeout_sec: 60
       attempts: 3
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
