@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
-from contextlib import contextmanager, nullcontext
+from contextlib import ExitStack, contextmanager, nullcontext
 import json
 import os
 from pathlib import Path
@@ -97,33 +97,50 @@ def launch(rdp_file: Path, port: int) -> MstscProcess:
 
 
 @contextmanager
-def file_launch_consent():
-    """Restore the disposable hosted account's first RDP-file launch setting.
+def _registry_value(root, path, name, value):
+    """Temporarily set one DWORD without deleting any unrelated registry state."""
+    import winreg
+    with winreg.CreateKeyEx(root, path, 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
+        try:
+            previous = winreg.QueryValueEx(key, name)
+        except FileNotFoundError:
+            previous = None
+        winreg.SetValueEx(key, name, 0, winreg.REG_DWORD, value)
+    try:
+        yield
+    finally:
+        with winreg.CreateKeyEx(root, path, 0, winreg.KEY_WRITE) as key:
+            if previous is None:
+                winreg.DeleteValue(key, name)
+            else:
+                winreg.SetValueEx(key, name, 0, previous[1], previous[0])
 
-    This only handles the initial file-opening notice, before any TCP traffic.
-    Authentication and server-certificate validation remain the mstsc settings
-    in the owned RDP file. Never change a developer's Windows account.
+
+@contextmanager
+def file_launch_consent():
+    """Prepare and restore the disposable runner's loopback RDP-file launch.
+
+    The April 2026 resource dialog ignores the per-host LocalDevices setting.
+    Microsoft's WindowsProtocolTestSuites uses this dialog-version policy to
+    restore that setting's behavior for unattended protocol tests. Preauthorize
+    only 127.0.0.1; the owned RDP file still explicitly limits redirections.
+    These settings precede TCP, authentication and server-certificate checks.
+    Never change a developer's Windows account or machine policy.
     """
     if os.environ.get("GITHUB_ACTIONS") != "true":
         yield
         return
     import winreg
-    path = r"Software\Microsoft\Terminal Server Client"
-    value = "RdpLaunchConsentAccepted"
-    with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
-        try:
-            previous = winreg.QueryValueEx(key, value)
-        except FileNotFoundError:
-            previous = None
-        winreg.SetValueEx(key, value, 0, winreg.REG_DWORD, 1)
-    try:
+    client = r"Software\Microsoft\Terminal Server Client"
+    policy = r"SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services\Client"
+    with ExitStack() as restore:
+        restore.enter_context(_registry_value(winreg.HKEY_CURRENT_USER, client,
+                                              "RdpLaunchConsentAccepted", 1))
+        restore.enter_context(_registry_value(winreg.HKEY_LOCAL_MACHINE, policy,
+                                              "RedirectionWarningDialogVersion", 1))
+        restore.enter_context(_registry_value(winreg.HKEY_CURRENT_USER, client + r"\LocalDevices",
+                                              "127.0.0.1", 0x4C))
         yield
-    finally:
-        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_WRITE) as key:
-            if previous is None:
-                winreg.DeleteValue(key, value)
-            else:
-                winreg.SetValueEx(key, value, 0, previous[1], previous[0])
 
 
 def diagnose(process: MstscProcess, directory: Path) -> None:
@@ -198,7 +215,8 @@ def preflight(directory: Path) -> None:
             rdp_file.write_text(
                 f"full address:s:127.0.0.1:{port}\r\nscreen mode id:i:1\r\n"
                 "desktopwidth:i:1024\r\ndesktopheight:i:768\r\nauthentication level:i:0\r\n"
-                "redirectprinters:i:0\r\nredirectsmartcards:i:0\r\ndisableconnectionsharing:i:1\r\n",
+                "redirectprinters:i:0\r\nredirectsmartcards:i:0\r\nredirectwebauthn:i:0\r\n"
+                "redirectclipboard:i:1\r\ndisableconnectionsharing:i:1\r\n",
                 encoding="utf-16", newline="")
             try:
                 process = launch(rdp_file, port)

@@ -479,6 +479,8 @@ EncoderIter::next(rect)
 - PERF-03 的两次测量此前从连续动画的不同帧开始，平移渐变会使亮度裁剪与噪声相位不同。用例现对 none 与 rdp61 分别从初始帧重新启动同一算法、同一几何的目标，保留独立 `photo-baseline-state.json` / `photo-adaptive-state.json` 源遥测和解码快照。仍使用同一 release 服务端、10 秒测量，保留实际帧率比 ≥0.95、带宽比 ≤1.05；新增明确的 rdp61 声明断言，旧失败证据原样保留。
 - 第六轮 macOS 采集每秒约 56 次，而 UI 动画源约 29 fps；照片源平均约 18.4 fps。SDK 的 `SCStreamFrameInfoStatus` 附件表明 idle 样本也可以保留图像缓冲；旧代码只判断缓冲存在。现按状态过滤非 Complete 样本，并补充真实 CoreVideo/CoreMedia unit，检查带图像缓冲的 Idle/Blank/Suspended/Started/Stopped 均不重发画面。该平台 unit 和 M2/M3/照片帧率必须下一轮实际 CI 验证。
 
+- 第八轮 [36981210337](https://github.com/engcapa/taomni/actions/runs/36981210337)，源码 `e974f9c1`：三端 browser 各 5/0/0，已核对当前输入 identity 与全部 receipt 文件哈希；native 尚在执行。提前上传的 mstsc 启动证据显示 initial 为首次 RDP 文件确认，fixture 则已进入未知发布者资源授权提示，两者 TCP 均为 false；第一处设置已生效，但不能据此判定互通通过。根据 Microsoft [RedirectionWarningDialogVersion 文档](https://github.com/MicrosoftDocs/win32/blob/e103fa4e8810bd8d42c4777e17081e24dbe62dbd/desktop-src/TermServ/imsrdpextendedsettings-property.md) 和 [WindowsProtocolTestSuites 的无人值守设置](https://github.com/microsoft/WindowsProtocolTestSuites/blob/29ddb4238a5443b7499e82934c90cc898861c5e7/TestSuites/RDP/Client/Setup/Scripts/Set-RdpFileSigning.ps1)，CI fixture 临时采用版本 1 的资源授权提示，并只预授权 loopback 的 LocalDevices。三处注册表 value/type 均保存、逆序恢复，部分 setup 失败也恢复；本机不修改。mocked 工具 unit 22 passed，实际 TCP、通道握手与像素证明仍须后续 CI。
+
 ## 9. 验收追踪与交付条件
 
 | AC | 方案位置 | 开发任务 | 验证项与平台 | 所需证据 | 当前缺口 |

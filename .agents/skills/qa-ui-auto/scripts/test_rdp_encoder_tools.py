@@ -117,13 +117,20 @@ class EncoderToolsTest(unittest.TestCase):
     def test_hosted_file_consent_restores_an_existing_setting_after_failure(self):
         registry = MagicMock()
         key = registry.CreateKeyEx.return_value.__enter__.return_value
-        registry.QueryValueEx.return_value = (0, 4)
+        registry.QueryValueEx.side_effect = [(0, 4), (2, 4), ("old-loopback-setting", 1)]
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), patch.dict(sys.modules, {"winreg": registry}):
             with self.assertRaisesRegex(RuntimeError, "client failed"):
                 with mstsc.file_launch_consent():
-                    registry.SetValueEx.assert_called_once_with(key, "RdpLaunchConsentAccepted", 0, registry.REG_DWORD, 1)
                     raise RuntimeError("client failed")
-        self.assertEqual(registry.SetValueEx.call_args.args, (key, "RdpLaunchConsentAccepted", 0, 4, 0))
+        writes = [call.args for call in registry.SetValueEx.call_args_list]
+        self.assertEqual(writes, [
+            (key, "RdpLaunchConsentAccepted", 0, registry.REG_DWORD, 1),
+            (key, "RedirectionWarningDialogVersion", 0, registry.REG_DWORD, 1),
+            (key, "127.0.0.1", 0, registry.REG_DWORD, 0x4C),
+            (key, "127.0.0.1", 0, 1, "old-loopback-setting"),
+            (key, "RedirectionWarningDialogVersion", 0, 4, 2),
+            (key, "RdpLaunchConsentAccepted", 0, 4, 0),
+        ])
         registry.DeleteValue.assert_not_called()
 
     def test_hosted_file_consent_removes_only_its_previously_absent_value(self):
@@ -133,13 +140,25 @@ class EncoderToolsTest(unittest.TestCase):
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), patch.dict(sys.modules, {"winreg": registry}):
             with mstsc.file_launch_consent():
                 pass
-        registry.DeleteValue.assert_called_once_with(key, "RdpLaunchConsentAccepted")
+        self.assertEqual([call.args for call in registry.DeleteValue.call_args_list], [
+            (key, "127.0.0.1"), (key, "RedirectionWarningDialogVersion"), (key, "RdpLaunchConsentAccepted")])
         registry.DeleteKey.assert_not_called()
         registry.reset_mock()
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}), patch.dict(sys.modules, {"winreg": registry}):
             with mstsc.file_launch_consent():
                 pass
         registry.CreateKeyEx.assert_not_called()
+
+    def test_hosted_file_consent_restores_prior_changes_if_machine_policy_is_unavailable(self):
+        registry = MagicMock()
+        key = registry.CreateKeyEx.return_value.__enter__.return_value
+        registry.QueryValueEx.side_effect = [(0, 4), PermissionError("machine policy unavailable")]
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), patch.dict(sys.modules, {"winreg": registry}):
+            with self.assertRaisesRegex(PermissionError, "machine policy unavailable"):
+                with mstsc.file_launch_consent():
+                    self.fail("launch must not continue after incomplete fixture setup")
+        self.assertEqual(registry.SetValueEx.call_args.args, (key, "RdpLaunchConsentAccepted", 0, 4, 0))
+        self.assertEqual(registry.SetValueEx.call_count, 2)
 
     def test_mstsc_stop_failure_still_removes_credentials_and_restores_the_account(self):
         process = Mock(pid=12345)
