@@ -1443,7 +1443,12 @@ def _do_type(ctx: NativeStepContext, args: Any) -> str:
 def _do_terminal_input(ctx: NativeStepContext, args: Any) -> str:
     selector, text, submit, verify = _terminal_input_args(args)
     attempts = verify["attempts"] if verify else 1
-    for _ in range(attempts):
+    for attempt in range(attempts):
+        if attempt:
+            # Recover a truncated shell line or a probe now reading stdin.
+            ctx.session.focus(selector)
+            ctx.session.press_combo("Control+c")
+            ctx.session.press_combo("Control+u")
         _dispatch_terminal_input(ctx, selector, text, submit)
         if verify is None:
             break
