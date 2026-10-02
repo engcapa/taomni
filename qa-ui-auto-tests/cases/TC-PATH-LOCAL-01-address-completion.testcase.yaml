@@ -363,7 +363,7 @@ verification:
     results:
     - 77
   visual:
-  - check: Inspect the matching-folder popup, input, selection and pane for clipping or overlap.
+  - check: Inspect the matching-folder popup, input, selection and pane for clipping or overlap; folder names must remain distinguishable with long parent paths.
     method: manual
     reason: Screenshots supplement exact path, focus and navigation assertions.
   native:

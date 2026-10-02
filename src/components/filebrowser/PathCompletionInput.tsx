@@ -159,7 +159,10 @@ export function PathCompletionInput({ path, value, onChange, onCommit, onCancel,
             onClick={() => { pendingTab.current = null; onChange(suggestion.value); inputRef.current?.focus(); }}
           >
             <Folder className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">{suggestion.value}</span>
+            <div className="min-w-0">
+              <div className="truncate font-medium">{suggestion.name}</div>
+              <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">{suggestion.value}</div>
+            </div>
           </div>)}
         </div>
         {!suggestions.length && <div role="status" className="px-2 py-1 text-[var(--taomni-text-muted)]">
