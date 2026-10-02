@@ -1196,6 +1196,21 @@ fn input_point(point: (i32, i32), scale: f64) -> (i32, i32) {
     }
 }
 
+#[cfg(any(target_os = "linux", test))]
+fn x11_pin_is_above(state: &Value) -> bool {
+    state["success"] == json!(true)
+        && state["stdout"].as_str().is_some_and(|output| {
+            output.lines().any(|line| {
+                line.strip_prefix("_NET_WM_STATE(ATOM) =")
+                    .is_some_and(|atoms| {
+                        atoms
+                            .split(',')
+                            .any(|atom| atom.trim() == "_NET_WM_STATE_ABOVE")
+                    })
+            })
+        })
+}
+
 async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyhow::Result<Value> {
     let scale = window.scale_factor()?.max(0.5);
     // A deterministic visible starting point is setup, not the asserted move.
@@ -1219,7 +1234,7 @@ async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyho
     let after = window.outer_position()?;
     let actual = (after.x - before.x, after.y - before.y);
     let moved = (actual.0 - delta.0).abs() <= 6 && (actual.1 - delta.1).abs() <= 6;
-    let topmost = window.is_always_on_top()?;
+    let cached_topmost = window.is_always_on_top()?;
     #[cfg(target_os = "linux")]
     let native_state = tokio::task::spawn_blocking(|| {
         std::process::Command::new("xprop")
@@ -1235,10 +1250,17 @@ async fn verify_pin_drag(window: &WebviewWindow, display: &DisplayInfo) -> anyho
     .context("native pin state probe")?;
     #[cfg(not(target_os = "linux"))]
     let native_state = Value::Null;
+    // Tao's GTK window-state cache can lose ABOVE after a move even when the
+    // actual X11 window retains it (run36990397751). Require the WM's atom,
+    // not the builder's requested flag or a fallback to the stale cache.
+    #[cfg(target_os = "linux")]
+    let topmost = x11_pin_is_above(&native_state);
+    #[cfg(not(target_os = "linux"))]
+    let topmost = cached_topmost;
     Ok(
         json!({"passed":moved && topmost,"before":[before.x,before.y],"after":[after.x,after.y],
-        "expectedDelta":delta,"actualDelta":actual,"alwaysOnTop":topmost,"nativeState":native_state,
-        "input":"OS mouse down/move/up"}),
+        "expectedDelta":delta,"actualDelta":actual,"alwaysOnTop":topmost,"cachedAlwaysOnTop":cached_topmost,
+        "nativeState":native_state,"input":"OS mouse down/move/up"}),
     )
 }
 
@@ -1555,6 +1577,22 @@ mod tests {
             frames: Vec::new(),
             data_url: None,
         }
+    }
+
+    #[test]
+    fn native_x11_topmost_requires_the_actual_above_atom_and_a_successful_probe() {
+        let above = "_NET_WM_STATE(ATOM) = _NET_WM_STATE_SKIP_TASKBAR, _NET_WM_STATE_SKIP_PAGER, _NET_WM_STATE_ABOVE\n";
+        assert!(x11_pin_is_above(&json!({"success":true,"stdout":above})));
+        assert!(!x11_pin_is_above(&json!({"success":false,"stdout":above})));
+        for output in [
+            "_NET_WM_STATE(ATOM) = _NET_WM_STATE_SKIP_TASKBAR\n",
+            "_NET_WM_STATE: not found.\n",
+            "_NET_WM_STATE(ATOM) = _NET_WM_STATE_ABOVE_FAKE\n",
+            "unrelated _NET_WM_STATE_ABOVE\n",
+        ] {
+            assert!(!x11_pin_is_above(&json!({"success":true,"stdout":output})));
+        }
+        assert!(!x11_pin_is_above(&json!({"error":"xprop unavailable"})));
     }
 
     #[test]

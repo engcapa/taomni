@@ -24,7 +24,7 @@ verification:
     requirement: Public Pin opens an independent native always-on-top window, survives overlay/session cleanup, moves by the requested displacement under actual OS dragging, then closes and removes its retained copy without hiding the main window.
     actions: [1]
     checkpoints:
-    - {step: 3, expectation: 'Actual native outer position changes by 80x64 logical pixels (scaled physically, within 6 physical pixels) after OS mouse down/move/up, native topmost is true, source session is cleaned while the pin copy survives, and Escape closes/removes the independent copy.'}
+    - {step: 3, expectation: 'Actual native outer position changes by 80x64 logical pixels (scaled physically, within 6 physical pixels) after OS mouse down/move/up, native topmost is true (Linux requires the successful X11 window-manager ABOVE atom rather than GTK cached state), source session is cleaned while the pin copy survives, and Escape closes/removes the independent copy.'}
     - {step: 4, expectation: Main application is restored after both public output operations.}
     results: [3, 4]
   visual:
