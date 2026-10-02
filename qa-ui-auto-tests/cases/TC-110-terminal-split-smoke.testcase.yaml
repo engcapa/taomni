@@ -37,9 +37,11 @@ steps:
 - eval_readonly:
     expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8
     expect_truthy: true
+    timeout_sec: 5
 - eval_readonly:
     expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right
     expect_truthy: true
+    timeout_sec: 5
 - assert_visible: '[data-testid="terminal-split-resize-handle"]'
 - click: '[data-testid="terminal-split-layout-vertical"]'
 - assert_attribute:
@@ -50,9 +52,11 @@ steps:
 - eval_readonly:
     expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8
     expect_truthy: true
+    timeout_sec: 5
 - eval_readonly:
     expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right
     expect_truthy: true
+    timeout_sec: 5
 - assert_visible: '[data-testid="terminal-split-resize-handle"]'
 - click: '[data-testid="terminal-split-layout-grid"]'
 - assert_attribute:
@@ -63,9 +67,11 @@ steps:
 - eval_readonly:
     expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8
     expect_truthy: true
+    timeout_sec: 5
 - eval_readonly:
     expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right
     expect_truthy: true
+    timeout_sec: 5
 - assert_visible: '[data-testid="terminal-split-grid-column-resize-handle"]'
 - click: '[data-testid="terminal-split-layout-horizontal"]'
 - assert_attribute:
@@ -76,9 +82,11 @@ steps:
 - eval_readonly:
     expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8
     expect_truthy: true
+    timeout_sec: 5
 - eval_readonly:
     expression: document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right
     expect_truthy: true
+    timeout_sec: 5
 - click: '[data-testid^="terminal-split-lock-"]'
 - assert_visible: '[data-testid="terminal-input-locked"]'
 - click: '[data-testid="tab-multiexec-toggle"]'
@@ -117,33 +125,33 @@ verification:
     - step: 10
       expectation: '{assert_visible: ''[data-testid="terminal-split-panes"]''}'
     - step: 12
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
     - step: 13
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
     - step: 14
       expectation: '{assert_visible: ''[data-testid="terminal-split-resize-handle"]''}'
     - step: 16
       expectation: '{assert_attribute: {equals: vertical, name: data-layout, selector: ''[data-testid="terminal-split-panes"]''}}'
     - step: 18
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
     - step: 19
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
     - step: 20
       expectation: '{assert_visible: ''[data-testid="terminal-split-resize-handle"]''}'
     - step: 22
       expectation: '{assert_attribute: {equals: grid, name: data-layout, selector: ''[data-testid="terminal-split-panes"]''}}'
     - step: 24
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
     - step: 25
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
     - step: 26
       expectation: '{assert_visible: ''[data-testid="terminal-split-grid-column-resize-handle"]''}'
     - step: 28
       expectation: '{assert_attribute: {equals: horizontal, name: data-layout, selector: ''[data-testid="terminal-split-panes"]''}}'
     - step: 30
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8''}}'
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
     - step: 31
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right''}}'
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
     - step: 33
       expectation: '{assert_visible: ''[data-testid="terminal-input-locked"]''}'
     - step: 37

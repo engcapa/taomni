@@ -221,7 +221,7 @@ Relative paths resolve from the repository root.
 
 | Verb | Args | Notes |
 |------|------|-------|
-| `eval_readonly` | `{expression, expect_truthy?, contains?}` | Evaluates a single read-only JS expression. Schema **rejects** assignments, function declarations, `await`, `new`, `.click(`, `.setAttribute(`, `.dispatchEvent(`, `.innerHTML=`, `document.write`. Use for things like reading `localStorage` to verify persistence. Max 400 chars. |
+| `eval_readonly` | `{expression, expect_truthy?, contains?, timeout_sec?}` | Evaluates a read-only JS expression once by default; optional `timeout_sec` polls the same condition until it passes or the bounded timeout expires. Browser/native share the assertion and polling rules. Schema **rejects** assignments, function declarations, `await`, `new`, `.click(`, `.setAttribute(`, `.dispatchEvent(`, `.innerHTML=`, `document.write`. Use for things like reading `localStorage` to verify persistence. Max 400 chars. |
 
 ## What you should NOT do
 

@@ -2267,6 +2267,12 @@
         "contains": {
           "type": "string",
           "description": "Optional: assert that String(result) contains this substring."
+        },
+        "timeout_sec": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Poll the read-only condition until it passes or this timeout expires; zero evaluates once."
         }
       }
     },

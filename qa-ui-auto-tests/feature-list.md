@@ -824,6 +824,8 @@ controls:
     selector: 'text="Zoom in"'
     kind: interactive
     optional: true
+    aliases:
+      - '[data-testid="context-menu-item-zoom-in"]'
   - id: zoom-out
     selector: 'text="Zoom out"'
     kind: interactive
@@ -832,6 +834,8 @@ controls:
     selector: 'text="Reset zoom"'
     kind: interactive
     optional: true
+    aliases:
+      - '[data-testid="context-menu-item-reset-zoom"]'
   - id: appearance
     selector: '[data-testid="context-menu-item-appearance"]'
     kind: interactive

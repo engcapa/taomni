@@ -181,8 +181,24 @@ def step_eval_readonly(ctx: StepContext, args: Any) -> None:
             raise StepError(f"eval_readonly: forbidden pattern {pat.pattern!r} in expression")
     if ctx.dry_run:
         return
-    result = ctx.page.evaluate(f"() => ({expr})")  # type: ignore[attr-defined]
-    if args.get("expect_truthy", True) and not result:
-        raise StepError(f"eval_readonly: expression {expr!r} returned falsy: {result!r}")
-    if "contains" in args and args["contains"] not in str(result):
-        raise StepError(f"eval_readonly: result {result!r} does not contain {args['contains']!r}")
+    assert_readonly_result(args, lambda: ctx.page.evaluate(f"() => ({expr})"))
+
+
+def assert_readonly_result(args: dict[str, Any], evaluate) -> None:
+    """Optionally wait for a read-only postcondition after an asynchronous layout change."""
+    from ..deadline import budget_time as time
+
+    timeout = float(args.get("timeout_sec", 0))
+    deadline = time.time() + timeout
+    while True:
+        try:
+            result = evaluate()
+            if args.get("expect_truthy", True) and not result:
+                raise StepError(f"eval_readonly: expression returned falsy: {result!r}")
+            if "contains" in args and args["contains"] not in str(result):
+                raise StepError(f"eval_readonly: result {result!r} does not contain {args['contains']!r}")
+            return
+        except Exception:
+            if timeout <= 0 or time.time() >= deadline:
+                raise
+            time.sleep(min(0.1, max(0, deadline - time.time())))

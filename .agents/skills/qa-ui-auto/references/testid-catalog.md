@@ -2069,8 +2069,10 @@
 ## terminal/right-menu (F4.2)
 
 - `text="Zoom in"` — interactive [optional] — F4.2.zoom-in
+  ↳ `[data-testid="context-menu-item-zoom-in"]` — alias
 - `text="Zoom out"` — interactive [optional] — F4.2.zoom-out
 - `text="Reset zoom"` — interactive [optional] — F4.2.zoom-reset
+  ↳ `[data-testid="context-menu-item-reset-zoom"]` — alias
 - `[data-testid="context-menu-item-appearance"]` — interactive [optional] — F4.2.appearance
 - `text="Terminal display"` — interactive [optional] — F4.2.terminal-display
 - `[data-testid="context-menu-item-terminal-display"]` — interactive [optional] — F4.2.terminal-display-menu-item

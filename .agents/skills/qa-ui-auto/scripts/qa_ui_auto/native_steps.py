@@ -290,11 +290,8 @@ def _eval_readonly(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(args, dict) or "expression" not in args:
         raise StepError("eval_readonly: expected {expression, ...}")
     expr = str(args["expression"])
-    result = ctx.session.execute(f"return ({expr});")
-    if args.get("expect_truthy", True) and not result:
-        raise StepError(f"eval_readonly: expression returned falsy: {result!r}")
-    if "contains" in args and args["contains"] not in str(result):
-        raise StepError(f"eval_readonly: result {result!r} does not contain {args['contains']!r}")
+    from .steps.assertions import assert_readonly_result
+    assert_readonly_result(args, lambda: ctx.session.execute(f"return ({expr});"))
     return f"eval ok"
 
 
