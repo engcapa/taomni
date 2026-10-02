@@ -348,6 +348,9 @@
         "drag_to": {
           "$ref": "#/$defs/drag_arg"
         },
+        "terminal_drag_selection": {
+          "$ref": "#/$defs/terminal_drag_selection_arg"
+        },
         "fill": {
           "$ref": "#/$defs/fill_arg"
         },
@@ -2190,6 +2193,20 @@
         "double_click": {
           "type": "boolean",
           "default": true
+        }
+      }
+    },
+    "terminal_drag_selection_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selector"],
+      "properties": {
+        "selector": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["forward", "reverse"], "default": "forward"},
+        "modifiers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["Alt", "Control", "Meta", "Shift"]}
         }
       }
     },

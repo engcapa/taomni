@@ -3958,7 +3958,7 @@ export function TerminalPanel({
       onMouseUpCapture={handleTerminalMouseUpCapture}
       onAuxClick={handleMiddleClick}
     >
-      <div ref={containerRef} className="w-full h-full overflow-hidden" />
+      <div ref={containerRef} className="terminal-host w-full h-full overflow-hidden" />
 
       <TabActions active={activeForShortcuts}>
         {sftpToggle && (

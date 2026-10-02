@@ -361,6 +361,45 @@ def _mouse_path(ctx: NativeStepContext, args: Any) -> str:
     return f"moved through {len(points)} point(s)"
 
 
+def _terminal_drag_selection(ctx: NativeStepContext, args: Any) -> str:
+    from .steps.mouse import record_terminal_drag, terminal_selection_args, terminal_selection_points
+
+    selector, direction, modifiers = terminal_selection_args(args)
+    element = ctx.session.find(selector, interactive=False)
+    box = ctx.session.execute(
+        f"const el=document.querySelector({json.dumps(selector)});"
+        "if (!el) return null; const r=el.getBoundingClientRect();"
+        "return {x:r.left,y:r.top,width:r.width,height:r.height};"
+    )
+    start, end = terminal_selection_points(box, direction)
+    origin = {"element-6066-11e4-a52e-4f735466cecf": element}
+    # Element origins keep CSS offsets consistent with the macOS Retina bridge.
+    def move(point: dict[str, float], duration: int) -> dict[str, Any]:
+        return {"type": "pointerMove", "duration": duration, "origin": origin,
+                "x": round(point["x"] - box["x"] - box["width"] / 2),
+                "y": round(point["y"] - box["y"] - box["height"] / 2)}
+
+    drag = [move(start, 100), {"type": "pointerDown", "button": 0},
+            move(end, 400), {"type": "pause", "duration": 100}, {"type": "pointerUp", "button": 0}]
+    actions = [{"type": "pointer", "id": "terminal-selection-mouse", "parameters": {"pointerType": "mouse"},
+                "actions": [{"type": "pause", "duration": 0} for _ in modifiers] + drag
+                           + [{"type": "pause", "duration": 0} for _ in modifiers]}]
+    if modifiers:
+        actions.insert(0, {"type": "key", "id": "terminal-selection-keys", "actions":
+            [{"type": "keyDown", "value": ctx.session.MODIFIER_MAP[m]} for m in modifiers]
+            + [{"type": "pause", "duration": 0} for _ in drag]
+            + [{"type": "keyUp", "value": ctx.session.MODIFIER_MAP[m]} for m in reversed(modifiers)]})
+    try:
+        ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": actions})
+    finally:
+        with suppress(Exception):
+            ctx.session.request("DELETE", ctx.session.endpoint("/actions"))
+    record_terminal_drag(ctx, {"mode": "native", "platform": platform.system(), "selector": selector,
+                               "direction": direction, "modifiers": modifiers, "box": box,
+                               "start": start, "end": end, "transport": "W3C element-origin pointer actions"})
+    return f"dragged terminal selection {direction} from the first-column gutter"
+
+
 def _select_option(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(args, dict) or "selector" not in args:
         raise StepError("select_option: expected {selector, value?|label?}")
@@ -1319,6 +1358,7 @@ def _append_clipboard_observation(ctx: NativeStepContext, entry: dict[str, Any])
 
 VERBS: dict[str, Callable[[NativeStepContext], str]] = {}
 VERBS.update(assert_count=assert_count, assert_menu_items=assert_menu_items)
+VERBS["terminal_drag_selection"] = _terminal_drag_selection
 
 
 def _verb(name: str) -> Callable[[Callable[[NativeStepContext, Any], str]], Callable[[NativeStepContext, Any], str]]:

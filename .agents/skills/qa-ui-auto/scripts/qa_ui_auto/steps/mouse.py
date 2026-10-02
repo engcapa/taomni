@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import platform
 from typing import Any
 
@@ -154,3 +155,56 @@ def step_drag_to(ctx: StepContext, args: Any) -> None:
     mouse.down()
     mouse.move(x + dx, y + dy, steps=steps)
     mouse.up()
+
+
+def terminal_selection_args(args: Any) -> tuple[str, str, list[str]]:
+    if not isinstance(args, dict) or not isinstance(args.get("selector"), str) or not args["selector"]:
+        raise StepError("terminal_drag_selection: expected {selector, direction?, modifiers?}")
+    direction = args.get("direction", "forward")
+    if direction not in {"forward", "reverse"}:
+        raise StepError("terminal_drag_selection: direction must be forward/reverse")
+    modifiers = args.get("modifiers", [])
+    if not isinstance(modifiers, list) or any(m not in {"Alt", "Control", "Meta", "Shift"} for m in modifiers):
+        raise StepError("terminal_drag_selection: modifiers must contain only Alt/Control/Meta/Shift")
+    return args["selector"], direction, modifiers
+
+
+def terminal_selection_points(box: dict[str, float] | None, direction: str) -> tuple[dict[str, float], dict[str, float]]:
+    if not box or box["width"] <= 4 or box["height"] <= 0:
+        raise StepError("terminal_drag_selection: target has no usable layout box")
+    # The search highlight identifies the output row without fixed font/row sizes.
+    # Start in the gutter; end inside the last cell so block selection has no extra column.
+    left = {"x": box["x"] - 4, "y": box["y"] + box["height"] / 2}
+    right = {"x": box["x"] + box["width"] - 2, "y": left["y"]}
+    return (left, right) if direction == "forward" else (right, left)
+
+
+def record_terminal_drag(ctx: Any, observation: dict[str, Any]) -> None:
+    path = ctx.case_dir / "terminal-selection-drags.json"
+    entries = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    entries.append(observation)
+    path.write_text(json.dumps(entries, indent=2) + "\n", encoding="utf-8")
+
+
+@verb("terminal_drag_selection")
+def step_terminal_drag_selection(ctx: StepContext, args: Any) -> None:
+    selector, direction, modifiers = terminal_selection_args(args)
+    if ctx.dry_run:
+        return
+    box = ctx.page.locator(selector).first.bounding_box()
+    start, end = terminal_selection_points(box, direction)
+    page = ctx.page
+    held: list[str] = []
+    try:
+        for modifier in modifiers:
+            page.keyboard.down(modifier)
+            held.append(modifier)
+        page.mouse.move(**start)
+        page.mouse.down()
+        page.mouse.move(**end, steps=8)
+    finally:
+        page.mouse.up()
+        for modifier in reversed(held):
+            page.keyboard.up(modifier)
+    record_terminal_drag(ctx, {"mode": "browser", "selector": selector, "direction": direction,
+                               "modifiers": modifiers, "box": box, "start": start, "end": end})
