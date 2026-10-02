@@ -28,14 +28,13 @@ export function UpdateDialog() {
 
   const downloading = s.status === "downloading";
   const authorizing = s.status === "authorizing";
-  const updating = downloading || authorizing;
+  const installing = s.status === "installing";
+  const updating = downloading || installing || authorizing;
   const percent = s.progress?.percent ?? null;
-  const installing = updating && percent === 100;
-  const canDownload =
-    s.status === "available" && s.targetStatus !== "checking" && s.targetStatus !== "unavailable";
+  const canDownload = s.status === "available" && s.targetStatus === "ok";
   // Download and authorization must not be dismissed by an accidental
   // click-away or Escape. Their explicit controls own cancellation.
-  const dismissable = !downloading && !authorizing;
+  const dismissable = !updating;
 
   const close = () => {
     if (dismissable) s.closeDialog();
@@ -79,7 +78,7 @@ export function UpdateDialog() {
   // must keep running to completion (losing focus must not dismiss it). The
   // user can keep working — and drag the dialog aside by its title bar — while
   // the background work runs. Result states stay modal.
-  const nonModal = s.status === "checking" || downloading;
+  const nonModal = s.status === "checking" || downloading || installing;
 
   const onTitlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -134,6 +133,7 @@ export function UpdateDialog() {
         aria-label={title}
         aria-modal={nonModal ? undefined : "true"}
         data-testid="update-dialog"
+        data-status={s.status}
         className={`w-[440px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto rounded shadow-lg p-5${nonModal ? " pointer-events-auto" : ""}`}
         style={{
           background: "var(--taomni-bg)",
@@ -235,7 +235,7 @@ export function UpdateDialog() {
             )}
 
             {updating && (
-              <div className="mb-3" data-testid="update-progress">
+              <div className="mb-3" data-testid="update-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined}>
                 <div className="h-2 rounded overflow-hidden" style={{ background: "var(--taomni-card-border)" }}>
                   <div
                     className="h-full"
@@ -307,9 +307,14 @@ export function UpdateDialog() {
               </button>
             </>
           )}
-          {(s.status === "uptodate" || s.status === "checking" || s.status === "downloading") && (
+          {downloading && (
+            <button type="button" className="taomni-btn h-8 px-4" onClick={s.cancelDownload} data-testid="update-cancel-download">
+              {t("common.cancel")}
+            </button>
+          )}
+          {(s.status === "uptodate" || s.status === "checking") && (
             <button type="button" className="taomni-btn h-8 px-4" onClick={s.closeDialog}>
-              {s.status === "downloading" ? t("common.cancel") : t("common.close")}
+              {t("common.close")}
             </button>
           )}
         </div>

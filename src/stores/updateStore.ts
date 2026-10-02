@@ -4,6 +4,7 @@ import {
   checkForUpdate,
   downloadAndInstall,
   installDownloadedUpdate,
+  discardDownloadedUpdate,
   isSocksCapUpgradeAuthorizationRequired,
   isSudoAuthenticationError,
   relaunchApp,
@@ -16,6 +17,7 @@ export type UpdateStatus =
   | "checking"
   | "available"
   | "downloading"
+  | "installing"
   | "authorizing"
   | "ready"
   | "error"
@@ -50,6 +52,7 @@ interface UpdateState {
   check: (opts?: { manual?: boolean }) => Promise<void>;
   setSelectedTarget: (target: string) => Promise<void>;
   startDownload: () => Promise<void>;
+  cancelDownload: () => void;
   authorizeInstall: (sudoPassword: string) => Promise<void>;
   cancelAuthorization: () => void;
   restart: () => Promise<void>;
@@ -60,6 +63,13 @@ interface UpdateState {
 
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
+}
+
+let operationGeneration = 0;
+let activeDownload: AbortController | null = null;
+
+function isTransitioning(status: UpdateStatus): boolean {
+  return status === "downloading" || status === "installing" || status === "authorizing" || status === "ready";
 }
 
 export const useUpdateStore = create<UpdateState>((set, get) => ({
@@ -87,7 +97,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     // — it would fire duplicate network requests and could race the first
     // one's result. A manual re-trigger just re-surfaces the existing
     // "checking…" dialog; an auto/periodic trigger quietly no-ops.
-    if (get().status === "checking") {
+    if (get().status === "checking" || isTransitioning(get().status)) {
       if (manual) set({ dialogOpen: true });
       return;
     }
@@ -95,9 +105,11 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     // right away so the user immediately sees a non-modal "checking…" state
     // instead of staring at nothing until the network round-trip finishes.
     // Startup/periodic checks stay silent (dialogOpen left untouched).
-    set({ status: "checking", manual, error: null, dialogOpen: manual || get().dialogOpen });
+    const generation = ++operationGeneration;
+    set({ status: "checking", manual, error: null, progress: null, targetStatus: "unknown", dialogOpen: manual || get().dialogOpen });
     try {
       const platform = await getUpdaterPlatform();
+      if (generation !== operationGeneration) return;
       set({
         os: platform.os,
         nativeTarget: platform.nativeTarget,
@@ -112,6 +124,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       // to let Tauri auto-detect the installer-specific target (e.g. -deb, -appimage, -nsis, -msi).
       const checkTarget = platform.candidates.length > 1 ? platform.nativeTarget : undefined;
       const found = await checkForUpdate(checkTarget);
+      if (generation !== operationGeneration) return;
       if (!found) {
         set({
           status: "uptodate",
@@ -142,15 +155,18 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
         await get().setSelectedTarget(platform.recommendedTarget);
       }
     } catch (e) {
+      if (generation !== operationGeneration) return;
       set({ status: "error", error: errMsg(e), dialogOpen: manual || get().dialogOpen });
     }
   },
 
   setSelectedTarget: async (target) => {
-    set({ selectedTarget: target, targetStatus: "checking" });
+    if (isTransitioning(get().status)) return;
+    const generation = ++operationGeneration;
+    set({ selectedTarget: target, targetStatus: "checking", error: null });
     try {
       const found = await checkForUpdate(target);
-      if (get().selectedTarget !== target) return; // superseded by a newer pick
+      if (generation !== operationGeneration || get().selectedTarget !== target) return; // superseded by a newer pick
       if (!found) {
         set({ targetStatus: "unavailable" });
       } else {
@@ -162,12 +178,17 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
         });
       }
     } catch (e) {
-      if (get().selectedTarget !== target) return;
+      if (generation !== operationGeneration || get().selectedTarget !== target) return;
       set({ targetStatus: "unavailable", error: errMsg(e) });
     }
   },
 
   startDownload: async () => {
+    if (get().status !== "available" || get().targetStatus !== "ok") return;
+    const generation = ++operationGeneration;
+    const controller = new AbortController();
+    activeDownload = controller;
+    const isCurrent = () => generation === operationGeneration && !controller.signal.aborted;
     const { selectedTarget, candidates } = get();
     set({
       status: "downloading",
@@ -178,25 +199,45 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     });
     try {
       const downloadTarget = candidates.length > 1 ? (selectedTarget ?? undefined) : undefined;
-      await downloadAndInstall(downloadTarget, (p) => set({ progress: p }));
-      set({ status: "ready" });
+      await downloadAndInstall(downloadTarget, (p) => {
+        if (isCurrent()) set({ progress: p });
+      }, {
+        signal: controller.signal,
+        onInstalling: () => { if (isCurrent()) set({ status: "installing" }); },
+      });
+      if (isCurrent()) set({ status: "ready" });
     } catch (e) {
+      if (!isCurrent()) return;
       if (isSocksCapUpgradeAuthorizationRequired(e)) {
         set({ status: "authorizing", authorizationError: null });
       } else {
         set({ status: "error", error: errMsg(e) });
       }
+    } finally {
+      if (activeDownload === controller) activeDownload = null;
     }
   },
 
+  cancelDownload: () => {
+    if (get().status !== "downloading") return;
+    ++operationGeneration;
+    activeDownload?.abort();
+    activeDownload = null;
+    set({ status: "available", progress: null, error: null, dialogOpen: false });
+  },
+
   authorizeInstall: async (sudoPassword) => {
+    if (get().status !== "authorizing" || get().authorizationBusy) return;
+    const generation = ++operationGeneration;
     const { selectedTarget, candidates } = get();
     const downloadTarget = candidates.length > 1 ? (selectedTarget ?? undefined) : undefined;
     set({ authorizationBusy: true, authorizationError: null });
     try {
       await installDownloadedUpdate(downloadTarget, sudoPassword);
+      if (generation !== operationGeneration) return;
       set({ status: "ready", authorizationBusy: false, authorizationError: null });
     } catch (e) {
+      if (generation !== operationGeneration) return;
       if (isSudoAuthenticationError(e)) {
         set({
           status: "authorizing",
@@ -214,12 +255,13 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     }
   },
 
-  cancelAuthorization: () =>
-    set({
-      status: "available",
-      authorizationBusy: false,
-      authorizationError: null,
-    }),
+  cancelAuthorization: () => {
+    if (get().status !== "authorizing" || get().authorizationBusy) return;
+    ++operationGeneration;
+    const { candidates, selectedTarget } = get();
+    void discardDownloadedUpdate(candidates.length > 1 ? (selectedTarget ?? undefined) : undefined);
+    set({ status: "available", authorizationBusy: false, authorizationError: null });
+  },
 
   restart: async () => {
     try {
@@ -230,8 +272,14 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   },
 
   openDialog: () => set({ dialogOpen: true }),
-  closeDialog: () => set({ dialogOpen: false }),
-  reset: () =>
+  closeDialog: () => {
+    if (["downloading", "installing", "authorizing"].includes(get().status)) return;
+    set({ dialogOpen: false });
+  },
+  reset: () => {
+    ++operationGeneration;
+    activeDownload?.abort();
+    activeDownload = null;
     set({
       status: "idle",
       error: null,
@@ -240,5 +288,6 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       authorizationError: null,
       dialogOpen: false,
       targetStatus: "unknown",
-    }),
+    });
+  },
 }));

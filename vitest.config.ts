@@ -15,6 +15,7 @@ export default defineConfig({
     // branch stays compiled out (the mounted gate test installs it explicitly).
     __TAOMNI_QA_SAVE_GATE__: JSON.stringify(false),
     __TAOMNI_QA_COMPLETION_OBSERVATION__: JSON.stringify(false),
+    __TAOMNI_QA_UPDATER__: JSON.stringify(false),
   },
   test: {
     environment: "jsdom",

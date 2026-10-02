@@ -61,6 +61,58 @@ describe("updateService.relaunchApp", () => {
     mocks.close.mockResolvedValue(undefined);
   });
 
+  it("detaches a cancelled download handle from a fresh check and never installs its late bytes", async () => {
+    let deliver: (event: import("@tauri-apps/plugin-updater").DownloadEvent) => void = () => {};
+    let finish = () => {};
+    const old = {
+      ...update,
+      close: vi.fn(async () => undefined),
+      install: vi.fn(async () => undefined),
+      download: vi.fn((callback: (event: import("@tauri-apps/plugin-updater").DownloadEvent) => void) => {
+        deliver = callback;
+        return new Promise<void>((resolve) => { finish = resolve; });
+      }),
+    };
+    const fresh = { ...update, close: vi.fn(async () => undefined), download: vi.fn(async () => undefined), install: vi.fn(async () => undefined) };
+    mocks.check.mockResolvedValueOnce(old).mockResolvedValueOnce(fresh);
+    await checkForUpdate("darwin-aarch64");
+    const controller = new AbortController();
+    const progress = vi.fn();
+    const pending = downloadAndInstall("darwin-aarch64", progress, { signal: controller.signal });
+    const rejection = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    deliver({ event: "Started", data: { contentLength: 100 } });
+    deliver({ event: "Progress", data: { chunkLength: 10 } });
+    controller.abort();
+    await checkForUpdate("darwin-aarch64");
+    expect(old.close).not.toHaveBeenCalled();
+    deliver({ event: "Progress", data: { chunkLength: 90 } });
+    deliver({ event: "Finished" });
+    expect(progress).toHaveBeenCalledTimes(2);
+    await downloadAndInstall("darwin-aarch64", vi.fn());
+    finish();
+    await rejection;
+    expect(old.install).not.toHaveBeenCalled();
+    expect(old.close).toHaveBeenCalledTimes(1);
+    expect(fresh.install).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses the selected target with the application proxy for check and download", async () => {
+    mocks.invoke.mockResolvedValue("http://127.0.0.1:3228");
+    await checkForUpdate("darwin-x86_64");
+    await downloadAndInstall("darwin-x86_64", vi.fn());
+    expect(mocks.check).toHaveBeenCalledWith({ target: "darwin-x86_64", proxy: "http://127.0.0.1:3228" });
+    expect(mocks.check).toHaveBeenCalledTimes(1);
+    expect(mocks.download).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start an already-cancelled download or stop SocksCap", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(downloadAndInstall(undefined, vi.fn(), { signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    expect(mocks.download).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+
   it("gracefully tears down SocksCap before relaunching on Linux", async () => {
     await relaunchApp();
 

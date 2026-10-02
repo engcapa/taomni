@@ -7,6 +7,7 @@ vi.mock("../lib/updateService", () => ({
   checkForUpdate: vi.fn(),
   downloadAndInstall: vi.fn(),
   installDownloadedUpdate: vi.fn(),
+  discardDownloadedUpdate: vi.fn(async () => undefined),
   isSocksCapUpgradeAuthorizationRequired: vi.fn((error: unknown) =>
     String(error).includes("SOCKSCAP_UPDATE_SUDO_REQUIRED:"),
   ),
@@ -39,6 +40,7 @@ const update = (over: Partial<svc.AvailableUpdate> = {}): svc.AvailableUpdate =>
 });
 
 beforeEach(() => {
+  get().reset();
   vi.clearAllMocks();
   useUpdateStore.setState({
     status: "idle",
@@ -189,9 +191,84 @@ describe("updateStore.setSelectedTarget", () => {
 });
 
 describe("updateStore.startDownload", () => {
+  it("ignores the old download after cancel, check and retry, including late progress and completion", async () => {
+    mocked.getUpdaterPlatform.mockResolvedValue(platform());
+    mocked.checkForUpdate.mockResolvedValue(update());
+    const jobs: { progress: (p: svc.DownloadProgress) => void; finish: () => void }[] = [];
+    mocked.downloadAndInstall.mockImplementation((_target, progress) => new Promise<void>((finish) => {
+      jobs.push({ progress, finish });
+    }));
+    await get().check({ manual: true });
+    const first = get().startDownload();
+    jobs[0].progress({ downloaded: 20, total: 100, percent: 20 });
+    get().cancelDownload();
+    expect(get().status).toBe("available");
+    expect(get().progress).toBeNull();
+    await get().check({ manual: true });
+    const second = get().startDownload();
+    jobs[1].progress({ downloaded: 60, total: 100, percent: 60 });
+    jobs[0].progress({ downloaded: 30, total: 100, percent: 30 });
+    expect(get().progress?.percent).toBe(60);
+    jobs[0].finish();
+    await first;
+    expect(get().status).toBe("downloading");
+    jobs[1].progress({ downloaded: 100, total: 100, percent: 100 });
+    jobs[1].finish();
+    await second;
+    expect(get().status).toBe("ready");
+  });
+
+  it("does not dismiss a live download/install/authorization without its explicit action", () => {
+    for (const status of ["downloading", "installing", "authorizing"] as const) {
+      useUpdateStore.setState({ status, dialogOpen: true });
+      get().closeDialog();
+      expect(get().dialogOpen).toBe(true);
+    }
+    useUpdateStore.setState({ status: "ready" });
+    get().closeDialog();
+    expect(get().dialogOpen).toBe(false);
+  });
+
+  it("does not replace an active download with check, target changes or duplicate download", async () => {
+    mocked.getUpdaterPlatform.mockResolvedValue(platform());
+    mocked.checkForUpdate.mockResolvedValue(update());
+    await get().check();
+    let finish = () => {};
+    mocked.downloadAndInstall.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const pending = get().startDownload();
+    await get().check({ manual: true });
+    await get().setSelectedTarget("darwin-x86_64");
+    await get().startDownload();
+    expect(get().dialogOpen).toBe(true);
+    expect(get().status).toBe("downloading");
+    expect(get().selectedTarget).toBe("darwin-aarch64");
+    expect(mocked.downloadAndInstall).toHaveBeenCalledTimes(1);
+    expect(mocked.checkForUpdate).toHaveBeenCalledTimes(1);
+    finish();
+    await pending;
+  });
+
+  it("ignores late failure from a cancelled download and refuses unvalidated packages", async () => {
+    mocked.getUpdaterPlatform.mockResolvedValue(platform());
+    mocked.checkForUpdate.mockResolvedValue(update());
+    await get().check();
+    let fail: (e: Error) => void = () => {};
+    mocked.downloadAndInstall.mockImplementation(() => new Promise<void>((_resolve, reject) => { fail = reject; }));
+    const pending = get().startDownload();
+    get().cancelDownload();
+    fail(new Error("late failure"));
+    await pending;
+    expect(get().status).toBe("available");
+    expect(get().error).toBeNull();
+    useUpdateStore.setState({ targetStatus: "checking" });
+    await get().startDownload();
+    expect(mocked.downloadAndInstall).toHaveBeenCalledTimes(1);
+  });
+
   it("installs the selected target and reports progress, ending ready", async () => {
     useUpdateStore.setState({
       status: "available",
+      targetStatus: "ok",
       selectedTarget: "darwin-aarch64",
       candidates: ["darwin-aarch64", "darwin-x86_64"],
     });
@@ -199,7 +276,7 @@ describe("updateStore.startDownload", () => {
       onProgress({ downloaded: 50, total: 100, percent: 50 });
     });
     await get().startDownload();
-    expect(mocked.downloadAndInstall).toHaveBeenCalledWith("darwin-aarch64", expect.any(Function));
+    expect(mocked.downloadAndInstall).toHaveBeenCalledWith("darwin-aarch64", expect.any(Function), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(get().status).toBe("ready");
     expect(get().progress).toEqual({ downloaded: 50, total: 100, percent: 50 });
   });
@@ -207,6 +284,7 @@ describe("updateStore.startDownload", () => {
   it("installs with undefined target on single-candidate platforms (like Windows/Linux)", async () => {
     useUpdateStore.setState({
       status: "available",
+      targetStatus: "ok",
       selectedTarget: "linux-x86_64",
       candidates: ["linux-x86_64"],
     });
@@ -214,12 +292,13 @@ describe("updateStore.startDownload", () => {
       onProgress({ downloaded: 50, total: 100, percent: 50 });
     });
     await get().startDownload();
-    expect(mocked.downloadAndInstall).toHaveBeenCalledWith(undefined, expect.any(Function));
+    expect(mocked.downloadAndInstall).toHaveBeenCalledWith(undefined, expect.any(Function), expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 
   it("moves to error state when the download fails", async () => {
     useUpdateStore.setState({
       status: "available",
+      targetStatus: "ok",
       selectedTarget: "darwin-aarch64",
       candidates: ["darwin-aarch64", "darwin-x86_64"],
     });
@@ -232,6 +311,7 @@ describe("updateStore.startDownload", () => {
   it("requests sudo authorization and resumes the already-downloaded Linux update", async () => {
     useUpdateStore.setState({
       status: "available",
+      targetStatus: "ok",
       os: "linux",
       selectedTarget: "linux-x86_64",
       candidates: ["linux-x86_64"],

@@ -15,6 +15,54 @@
 
 use serde::Serialize;
 
+#[cfg(all(target_os = "macos", debug_assertions))]
+mod qa;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QaUpdateMetadata {
+    rid: tauri::ResourceId,
+    current_version: String,
+    version: String,
+    body: Option<String>,
+    raw_json: serde_json::Value,
+}
+
+#[derive(Serialize)]
+pub struct QaUpdateCheck {
+    configured: bool,
+    update: Option<QaUpdateMetadata>,
+}
+
+/// QA renderer calls this only in its separately built bundle. Production
+/// launches cannot redirect the updater or its installation path.
+#[tauri::command]
+pub async fn qa_updater_check(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+    target: Option<String>,
+) -> Result<QaUpdateCheck, String> {
+    if !cfg!(debug_assertions) || app.config().identifier != crate::QA_APP_ID {
+        return Err("Updater QA is unavailable in production".into());
+    }
+    #[cfg(all(target_os = "macos", debug_assertions))]
+    {
+        let configured = crate::resolved_app_data_dir(&app)?
+            .join("updater-qa.json")
+            .exists();
+        let update = qa::check(app, webview, target).await?;
+        Ok(QaUpdateCheck { configured, update })
+    }
+    #[cfg(not(all(target_os = "macos", debug_assertions)))]
+    {
+        let _ = (webview, target);
+        Ok(QaUpdateCheck {
+            configured: false,
+            update: None,
+        })
+    }
+}
+
 /// Platform/architecture info used to drive the update-package selector.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

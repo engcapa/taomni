@@ -1046,6 +1046,7 @@ pub fn run() {
             voice::commands::voice_stop_capture,
             voice::commands::voice_stop_and_transcribe,
             update::updater_platform,
+            update::qa_updater_check,
             proxy::get_app_proxy_config,
             proxy::save_app_proxy_config,
             proxy::get_app_proxy_url,

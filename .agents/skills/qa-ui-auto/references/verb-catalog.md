@@ -134,6 +134,24 @@ real JDT LS, Rust IPC or disk effects.
 | `parity005_release` | `fetch \| resolve` | Releases held responses; fails if none is pending. |
 | `parity005_trace` | `{fetch?, resolve?, pending?}` | Asserts exact request counts and saves the read-only event trace in the case report. |
 
+## macOS updater release regression
+
+Native macOS only, with `macos_updater`. Downloads SHA256-pinned, authentically signed
+v0.4.29 ARM/Intel assets, runs the production release manifest generator, and serves
+loopback HTTP to the real updater. Only the disposable report-owned app is replaced.
+
+| Verb | Arguments | Behavior |
+|---|---|---|
+| `native_about` | `null` | macOS QA bridge activates the installed AppKit NSMenu About item; requires enabled real menu and runs its native event/frontend callback. Does not synthesize app state or a command. |
+| `updater_fixture_mode` | `broken \| correct \| slow` | Switches the fixture manifest, not application state. `broken` pairs ARM signature with Intel URL; `correct` retains generated per-arch URLs; `slow` holds first/second streams at 20%/60%. |
+| `updater_release` | `1 \| 2` | Releases one held real HTTP download; does not synthesize IPC progress. |
+| `assert_updater_installed` | `aarch64 \| x86_64` | Independently reads installed executable SHA256, `lipo` architecture and Info.plist version against the authentic archive; retains installed-*.json. |
+| `assert_updater_unchanged` | `null` | Requires the disposable executable to retain its pre-case bytes after rejection/cancellation. |
+| `assert_updater_progress` | `{min, max, seconds?, old_transfer_done?}` | Samples native dialog phase/aria progress, requires monotonic percentages within the bounds, retains raw samples. When `old_transfer_done`, the cancelled HTTP stream must have finished and the app must be unchanged. |
+
+These cases do not establish production relaunch, Rosetta execution or Gatekeeper.
+Cancellation discards late plugin bytes; it does not claim unsupported transport abortion.
+
 ## ED-PARITY-008 / ED-PARITY-009 controlled browser fixtures
 
 Browser-only. `parity008_git` serves two fixture repositories through the stub

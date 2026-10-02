@@ -64,6 +64,7 @@ from . import parity009_ssr
 from . import parity007_extract
 from . import editor_save_race
 from . import mail_server
+from . import macos_updater
 from . import rdp_server_required
 from . import system_rdp_running
 from . import release_build_required
@@ -119,6 +120,7 @@ REGISTRY: dict[str, Fixture] = {
     "parity009_ssr": Fixture("parity009_ssr", parity009_ssr.setup, parity009_ssr.teardown),
     "parity007_extract": Fixture("parity007_extract", parity007_extract.setup, parity007_extract.teardown),
     "mail_server": Fixture("mail_server", mail_server.setup, mail_server.teardown),
+    "macos_updater": Fixture("macos_updater", macos_updater.setup, macos_updater.teardown),
     "rdp_server_required": Fixture("rdp_server_required", rdp_server_required.setup),
     "system_rdp_running": Fixture("system_rdp_running", system_rdp_running.setup),
     "release_build_required": Fixture("release_build_required", release_build_required.setup),

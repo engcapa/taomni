@@ -37,6 +37,14 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(reasons, {('linux', 'browser'), ('linux', 'native'), ('windows', 'browser'),
                                    ('windows', 'native'), ('macos', 'browser')})
 
+    def test_updater_cases_select_only_macos_native_and_real_updater_capability(self):
+        plan = make_plan(args(scope='selected', case_ids='TC-UPDATE-MACOS-001,TC-UPDATE-MACOS-002'))
+        self.assertEqual([e['id'] for e in plan['entries']], ['macos-native'])
+        entry = plan['entries'][0]
+        self.assertEqual(entry['selected_ids'], ['TC-UPDATE-MACOS-001', 'TC-UPDATE-MACOS-002'])
+        self.assertIn('updater', entry['capabilities'])
+        self.assertEqual(plan['gaps'], [])
+
     def test_vnc_fixture_case_requests_the_vnc_service_everywhere(self):
         plan = make_plan(args(scope='selected', case_ids='TC-151'))
         self.assertEqual(len(plan['entries']), 6)
