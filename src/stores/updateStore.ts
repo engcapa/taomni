@@ -272,7 +272,10 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   },
 
   openDialog: () => set({ dialogOpen: true }),
-  closeDialog: () => set({ dialogOpen: false }),
+  closeDialog: () => {
+    if (["downloading", "installing", "authorizing"].includes(get().status)) return;
+    set({ dialogOpen: false });
+  },
   reset: () => {
     ++operationGeneration;
     activeDownload?.abort();

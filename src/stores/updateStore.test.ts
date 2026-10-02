@@ -218,6 +218,17 @@ describe("updateStore.startDownload", () => {
     expect(get().status).toBe("ready");
   });
 
+  it("does not dismiss a live download/install/authorization without its explicit action", () => {
+    for (const status of ["downloading", "installing", "authorizing"] as const) {
+      useUpdateStore.setState({ status, dialogOpen: true });
+      get().closeDialog();
+      expect(get().dialogOpen).toBe(true);
+    }
+    useUpdateStore.setState({ status: "ready" });
+    get().closeDialog();
+    expect(get().dialogOpen).toBe(false);
+  });
+
   it("does not replace an active download with check, target changes or duplicate download", async () => {
     mocked.getUpdaterPlatform.mockResolvedValue(platform());
     mocked.checkForUpdate.mockResolvedValue(update());
