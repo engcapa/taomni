@@ -78,3 +78,42 @@ describe("RdpSettings macOS permissions", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("RdpSettings sound and microphone", () => {
+  beforeEach(() => {
+    mocks.platform = "windows";
+    mocks.probe.mockReset();
+    mocks.probe.mockResolvedValue({
+      permission: "notRequired",
+      controlPermission: "notRequired",
+      displays: [],
+      summary: "ready",
+    });
+  });
+
+  afterEach(() => cleanup());
+
+  it("defaults both on and saves the toggles and the microphone device", async () => {
+    const onChange = vi.fn();
+    render(<RdpSettings config={config} onChange={onChange} />);
+    await waitFor(() => expect(mocks.probe).toHaveBeenCalledWith(false, false));
+
+    const playback = screen.getByTestId("rdp-field-audio-playback") as HTMLInputElement;
+    const microphone = screen.getByTestId("rdp-field-microphone") as HTMLInputElement;
+    expect(playback.checked).toBe(true);
+    expect(microphone.checked).toBe(true);
+
+    fireEvent.click(playback);
+    expect(onChange).toHaveBeenCalledWith({ audioPlayback: false });
+    fireEvent.change(screen.getByTestId("rdp-field-microphone-device"), {
+      target: { value: "CABLE Input" },
+    });
+    expect(onChange).toHaveBeenCalledWith({ microphoneDevice: "CABLE Input" });
+  });
+
+  it("hides the device field when the microphone is off", () => {
+    render(<RdpSettings config={{ ...config, microphone: false }} onChange={vi.fn()} />);
+    expect((screen.getByTestId("rdp-field-microphone") as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByTestId("rdp-field-microphone-device")).not.toBeInTheDocument();
+  });
+});

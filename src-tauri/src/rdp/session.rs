@@ -1776,7 +1776,14 @@ where
                 );
                 return Ok(ActiveOutputFlow::Reactivate);
             }
-            ActiveStageOutput::MultitransportRequest(_) | ActiveStageOutput::AutoDetect(_) => {
+            ActiveStageOutput::AutoDetect(request) => {
+                // RTT probes are answered inside ironrdp-session; the server's
+                // conclusions drive the connection bar's quality indicator.
+                if let Some(text) = network_characteristics_event(&request) {
+                    send_text(out_tx, text);
+                }
+            }
+            ActiveStageOutput::MultitransportRequest(_) => {
                 // Optional RDP transports are not established by this client.
             }
         }
@@ -2045,7 +2052,7 @@ fn cleanup_stale_clipboard_staging() {
     });
 }
 
-fn ensure_private_directory(path: &Path) -> Result<(), String> {
+pub(crate) fn ensure_private_directory(path: &Path) -> Result<(), String> {
     fs::create_dir_all(path)
         .map_err(|error| format!("create private directory '{}': {error}", path.display()))?;
     #[cfg(unix)]
@@ -2058,13 +2065,13 @@ fn ensure_private_directory(path: &Path) -> Result<(), String> {
 }
 
 #[cfg(unix)]
-fn process_is_alive(pid: u32) -> bool {
+pub(crate) fn process_is_alive(pid: u32) -> bool {
     let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
     result == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
 }
 
 #[cfg(not(unix))]
-fn process_is_alive(_pid: u32) -> bool {
+pub(crate) fn process_is_alive(_pid: u32) -> bool {
     // Avoid deleting another process's active transfer on platforms where this
     // module has no inexpensive process-existence probe.
     true
@@ -2189,7 +2196,10 @@ fn next_remote_file_request(
     }
 }
 
-fn remote_clipboard_safe_path(root: &Path, remote_name: &str) -> Result<PathBuf, String> {
+pub(crate) fn remote_clipboard_safe_path(
+    root: &Path,
+    remote_name: &str,
+) -> Result<PathBuf, String> {
     let mut path = root.to_path_buf();
     let mut saw_part = false;
     for part in remote_name.split(['\\', '/']) {
@@ -2209,14 +2219,18 @@ fn remote_clipboard_safe_path(root: &Path, remote_name: &str) -> Result<PathBuf,
     Ok(path)
 }
 
-fn remote_top_level_name(remote_name: &str) -> Option<PathBuf> {
+pub(crate) fn remote_top_level_name(remote_name: &str) -> Option<PathBuf> {
     remote_name
         .split(['\\', '/'])
         .find(|part| !part.trim().is_empty() && *part != "." && *part != "..")
         .map(PathBuf::from)
 }
 
-fn write_remote_file_chunk(path: &Path, position: u64, data: &[u8]) -> Result<(), String> {
+pub(crate) fn write_remote_file_chunk(
+    path: &Path,
+    position: u64,
+    data: &[u8],
+) -> Result<(), String> {
     let mut options = OpenOptions::new();
     options.write(true);
     #[cfg(unix)]
@@ -2316,7 +2330,7 @@ fn collect_clipboard_path(
     Ok(())
 }
 
-fn clipboard_relative_name(root: &Path, path: &Path) -> Result<String, String> {
+pub(crate) fn clipboard_relative_name(root: &Path, path: &Path) -> Result<String, String> {
     let rel = path.strip_prefix(root).unwrap_or(path);
     let name = rel
         .components()
@@ -2338,7 +2352,7 @@ fn clipboard_relative_name(root: &Path, path: &Path) -> Result<String, String> {
     Ok(name)
 }
 
-fn read_clipboard_file_range(
+pub(crate) fn read_clipboard_file_range(
     path: &Path,
     position: u64,
     requested_size: u32,
@@ -2437,6 +2451,15 @@ fn wheel_operations(wheel: PointerWheelEvent) -> Vec<Operation> {
     ]
 }
 
+/// Bitmap codecs offered to the server. Every codec in this list must also be
+/// decodable by ironrdp-session; QOI/QOIZ decoding comes from the `qoi`/`qoiz`
+/// features of the `ironrdp` dependency (see Cargo.toml). The servers RDP
+/// loopback tests guard this pairing against Taomni's own server.
+pub(crate) fn client_bitmap_codecs() -> ironrdp::pdu::rdp::capability_sets::BitmapCodecs {
+    ironrdp::pdu::rdp::capability_sets::client_codecs_capabilities(&["remotefx"])
+        .unwrap_or_default()
+}
+
 fn build_ironrdp_config(cfg: &RdpConnectionSettings) -> connector::Config {
     let mut performance_flags = IronPerformanceFlags::empty();
     if !cfg.options.performance.wallpaper {
@@ -2464,8 +2487,7 @@ fn build_ironrdp_config(cfg: &RdpConnectionSettings) -> connector::Config {
         15 | 16 | 24 | 32 => u32::from(cfg.options.color_depth),
         _ => 32,
     };
-    let codecs = ironrdp::pdu::rdp::capability_sets::client_codecs_capabilities(&["remotefx"])
-        .unwrap_or_default();
+    let codecs = client_bitmap_codecs();
 
     connector::Config {
         credentials: Credentials::UsernamePassword {
@@ -2506,7 +2528,7 @@ fn build_ironrdp_config(cfg: &RdpConnectionSettings) -> connector::Config {
         hardware_id: None,
         license_cache: None::<Arc<dyn connector::LicenseCache>>,
         timezone_info: TimezoneInfo::default(),
-        compression_type: None,
+        compression_type: Some(ironrdp::pdu::rdp::client_info::CompressionType::Rdp61),
         multitransport_flags: None,
     }
 }
@@ -2647,6 +2669,7 @@ fn send_status(out_tx: &SessionOutputSender, stage: &str, detail: &str) {
 }
 
 fn send_error(out_tx: &SessionOutputSender, code: &str, message: &str) {
+    tracing::warn!(code, error = %message, "RDP session failed");
     let retryable = is_retryable_rdp_error(message);
     send_text(
         out_tx,
@@ -2673,11 +2696,56 @@ fn send_text(out_tx: &SessionOutputSender, text: String) {
     let _ = out_tx.send(SessionOutput::Text(text));
 }
 
+/// `{"type":"network", ...}` for a server Network Characteristics Result
+/// (MS-RDPBCGR 2.2.14.1.5); other auto-detect requests carry no result.
+fn network_characteristics_event(
+    request: &ironrdp::pdu::rdp::autodetect::AutoDetectRequest,
+) -> Option<String> {
+    use ironrdp::pdu::rdp::autodetect::AutoDetectRequest;
+    let AutoDetectRequest::NetworkCharacteristicsResult {
+        base_rtt_ms,
+        bandwidth_kbps,
+        average_rtt_ms,
+        ..
+    } = request
+    else {
+        return None;
+    };
+    Some(
+        json!({
+            "type": "network",
+            "baseRttMs": base_rtt_ms,
+            "averageRttMs": average_rtt_ms,
+            "bandwidthKbps": bandwidth_kbps,
+        })
+        .to_string(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::time::Duration;
     use tokio::net::TcpStream;
+
+    #[test]
+    fn network_characteristics_become_a_network_event() {
+        use ironrdp::pdu::rdp::autodetect::{AutoDetectRequest, NETCHAR_RESULT_RTT};
+        let result = AutoDetectRequest::NetworkCharacteristicsResult {
+            sequence_number: 7,
+            request_type: NETCHAR_RESULT_RTT,
+            base_rtt_ms: Some(3),
+            bandwidth_kbps: None,
+            average_rtt_ms: 5,
+        };
+        let event: serde_json::Value =
+            serde_json::from_str(&network_characteristics_event(&result).unwrap()).unwrap();
+        assert_eq!(event["type"], "network");
+        assert_eq!(event["baseRttMs"], 3);
+        assert_eq!(event["averageRttMs"], 5);
+        assert!(event["bandwidthKbps"].is_null());
+        assert!(network_characteristics_event(&AutoDetectRequest::rtt_continuous(1)).is_none());
+    }
 
     /// Live RDP fixtures commonly use a self-signed certificate. Keep the
     /// production default fail-closed, while letting an operator explicitly
@@ -2801,6 +2869,10 @@ mod tests {
 
         assert!(config.enable_server_pointer);
         assert!(!config.pointer_software_rendering);
+        assert_eq!(
+            config.compression_type,
+            Some(ironrdp::pdu::rdp::client_info::CompressionType::Rdp61)
+        );
     }
 
     #[test]

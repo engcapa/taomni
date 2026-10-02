@@ -125,6 +125,10 @@ def main():
                 config["app"]["tooling_java_home"] = os.environ["JAVA_HOME"]
                 if "java25" in entry["capabilities"]:
                     config["app"]["tooling_java25_home"] = os.environ["JAVA25_HOME"]
+            release = entry["mode"] == "native" and "release" in entry["capabilities"]
+            if release:
+                from native_build import qa_binary as release_binary
+                config["app"]["native_binary"] = str(release_binary(release=True))
             if entry["mode"] == "native" and platform.system() == "Windows":
                 driver = shutil.which("msedgedriver.exe")
                 if not driver:
@@ -141,16 +145,18 @@ def main():
                 outcome["stage"] = "build"
                 write_json(args.report / "ci-outcome.json", outcome)
                 build_log = stack.enter_context((args.report / "build.log").open("w", encoding="utf-8"))
-                build = launch(stack, [sys.executable, str(scripts / "native_build.py")],
+                build = launch(stack, [sys.executable, str(scripts / "native_build.py"),
+                                       *(["--release"] if release else [])],
                                stdout=build_log, stderr=subprocess.STDOUT)
                 if build.wait():
                     raise RuntimeError("native build failed; see build.log")
                 from native_build import identity_path, qa_binary
-                (args.report / "build-identity.json").write_bytes(identity_path(qa_binary()).read_bytes())
+                binary = qa_binary(release=release)
+                (args.report / "build-identity.json").write_bytes(identity_path(binary).read_bytes())
                 if platform.system() == "Windows":
                     outcome["stage"] = "native-startup"
                     from qa_ui_auto.native_diagnostics import windows_startup_probe
-                    windows_startup_probe(qa_binary(), args.report)
+                    windows_startup_probe(binary, args.report)
             else:
                 log = stack.enter_context((args.report / "vite.log").open("w", encoding="utf-8"))
                 pnpm = shutil.which("pnpm")

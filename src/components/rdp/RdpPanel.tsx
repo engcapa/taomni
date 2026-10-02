@@ -39,7 +39,10 @@ import {
   rdpCursorToCss,
   rdpTrustCertificate,
   wheelDeltaToRotationUnits,
+  ctrlAltDelSequence,
+  type RdpNetworkInfo,
 } from "../../lib/rdp";
+import { RdpConnectionBar } from "./RdpConnectionBar";
 import { useRdpStore } from "../../stores/rdpStore";
 import type { RdpOptions } from "../../types/rdp";
 import { useT, t as tr } from "../../lib/i18n";
@@ -135,6 +138,10 @@ export default function RdpPanel({
   // attached tabs (detached windows manage their own fullscreen via
   // `detachedWindowControls`). Cosmetic — drives the toolbar icon.
   const [osFullscreen, setOsFullscreen] = useState(false);
+  // Server network characteristics for the full-screen connection bar, and a
+  // counter that reveals the bar again (Ctrl+Alt+Home).
+  const [network, setNetwork] = useState<RdpNetworkInfo | null>(null);
+  const [barReveal, setBarReveal] = useState(0);
 
   const store = useRdpStore();
   const conn = store.connections[tabId];
@@ -337,6 +344,7 @@ export default function RdpPanel({
               case "connected":
                 connectedAtRef.current = Date.now();
                 retryAllowedRef.current = true;
+                setNetwork(null);
                 store.setConnected(tabId, msg.width, msg.height, msg.protocol, msg.server_name);
                 frameBatchRef.current.reset();
                 resizeCanvas(canvasRef.current, msg.width, msg.height);
@@ -353,6 +361,13 @@ export default function RdpPanel({
                 break;
               case "status":
                 store.setStage(tabId, msg.stage);
+                break;
+              case "network":
+                setNetwork({
+                  baseRttMs: msg.baseRttMs ?? null,
+                  averageRttMs: msg.averageRttMs,
+                  bandwidthKbps: msg.bandwidthKbps ?? null,
+                });
                 break;
               case "error":
                 {
@@ -629,9 +644,16 @@ export default function RdpPanel({
 
       // Local view shortcuts intercepted before reaching the remote desktop:
       //   F11 → toggle host-window OS fullscreen
+      //   Ctrl+Alt+Home → show the full-screen connection bar (mstsc)
       if (code === "F11") {
         e.preventDefault();
         if (down && !e.nativeEvent.repeat) toggleOsFullscreen();
+        return;
+      }
+      const fullscreen = detachedWindowControls?.osFullscreen ?? osFullscreen;
+      if (fullscreen && code === "Home" && e.ctrlKey && e.altKey) {
+        e.preventDefault();
+        if (down) setBarReveal((n) => n + 1);
         return;
       }
 
@@ -656,12 +678,27 @@ export default function RdpPanel({
     },
     [
       conn?.status,
+      detachedWindowControls?.osFullscreen,
+      osFullscreen,
       sendBinary,
       syncClipboardForRemotePaste,
       toggleOsFullscreen,
       visible,
     ],
   );
+
+  const sendCtrlAltDel = useCallback(() => {
+    for (const [down, scancode] of ctrlAltDelSequence()) {
+      sendBinary(encodeKey(down, scancode));
+    }
+  }, [sendBinary]);
+
+  const minimizeWindow = useCallback(() => {
+    if (!isTauriRuntime()) return;
+    void getCurrentWindow()
+      .minimize()
+      .catch(() => {});
+  }, []);
 
   const onCompositionEnd = useCallback(
     (e: React.CompositionEvent<HTMLTextAreaElement>) => {
@@ -746,6 +783,26 @@ export default function RdpPanel({
     store.setDisconnected(tabId);
     doConnect();
   }, [clearReconnectTimer, closeAudio, doConnect, store, tabId]);
+
+  // Connection bar "disconnect": end the session without an automatic
+  // reconnect; the tab stays open and Reconnect starts a new session. A
+  // user-chosen disconnect is not an error, so no reason is recorded.
+  const disconnectSession = useCallback(() => {
+    clearReconnectTimer();
+    retryAllowedRef.current = false;
+    const sid = sessionIdRef.current;
+    sessionIdRef.current = null;
+    if (sid) rdpDisconnect(sid).catch(() => {});
+    const currentWs = wsRef.current;
+    wsRef.current = null;
+    currentWs?.close();
+    if (heartbeatRef.current !== null) {
+      window.clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
+    closeAudio();
+    store.setDisconnected(tabId);
+  }, [clearReconnectTimer, closeAudio, store, tabId]);
 
   /* ── Render ──────────────────────────────────────────────────────── */
 
@@ -856,6 +913,17 @@ export default function RdpPanel({
         >
           <RefreshCw size={14} />
         </button>
+        <button
+          type="button"
+          data-testid="rdp-ctrl-alt-del"
+          onClick={sendCtrlAltDel}
+          disabled={status !== "connected"}
+          title={t("rdp.ctrlAltDel")}
+          aria-label={t("rdp.ctrlAltDel")}
+          style={FT_BUTTON_STYLE}
+        >
+          Ctrl+Alt+Del
+        </button>
         {chatToggle && (
           <button
             type="button"
@@ -925,6 +993,21 @@ export default function RdpPanel({
           </>
         )}
       </TabActions>
+
+      {currentFullscreen && visible && status === "connected" && (
+        <RdpConnectionBar
+          title={conn?.serverName || host}
+          network={network}
+          revealSignal={barReveal}
+          onCtrlAltDel={sendCtrlAltDel}
+          onMinimize={minimizeWindow}
+          onRestore={toggleOsFullscreen}
+          onDisconnect={() => {
+            disconnectSession();
+            toggleOsFullscreen();
+          }}
+        />
+      )}
 
       <div
         ref={viewportRef}

@@ -48,6 +48,46 @@ export interface RdpCaptureProbe {
   summary: string;
 }
 
+/** What the Windows built-in Remote Desktop probe recommends (design §4.1). */
+export type SystemRdpRecommendation =
+  | "taomni"
+  | "use-system"
+  | "enable-system"
+  | "needs-admin"
+  | "unknown";
+
+/** Windows built-in Remote Desktop state; `applicable` is false elsewhere. */
+export interface SystemRdpStatus {
+  applicable: boolean;
+  supported?: boolean | null;
+  edition?: string | null;
+  enabled?: boolean | null;
+  serviceRunning?: boolean | null;
+  port?: number | null;
+  portInUse?: boolean | null;
+  nla?: boolean | null;
+  isAdmin?: boolean | null;
+  isServer?: boolean | null;
+  recommendation?: SystemRdpRecommendation | null;
+  errors?: string[];
+}
+
+/**
+ * Port Taomni should use instead of `wanted` when the system Remote Desktop
+ * host already listens there. Mirrors `system_rdp::alternative_port`.
+ */
+export function systemRdpAlternativePort(
+  status: SystemRdpStatus | null | undefined,
+  wanted: number,
+): number | null {
+  if (!status?.applicable) return null;
+  const systemPort = status.port ?? 3389;
+  const effective = wanted === 0 ? 3389 : wanted;
+  const listening = status.enabled === true && status.serviceRunning === true;
+  if (!listening || effective !== systemPort) return null;
+  return systemPort === 3390 ? 3391 : 3390;
+}
+
 export interface RdpConnectionRequest {
   requestId: string;
   peer: string;
@@ -193,6 +233,15 @@ export async function listServerStatuses(): Promise<ServerStatus[]> {
   return invoke<ServerStatus[]>("list_server_statuses", {});
 }
 
+/** Recent log lines kept by the backend, keyed by server type. */
+export async function listServerLogs(): Promise<Partial<Record<ServerType, string[]>>> {
+  return invoke<Partial<Record<ServerType, string[]>>>("list_server_logs", {});
+}
+
+export async function clearServerLog(serverType: ServerType): Promise<void> {
+  await invoke("clear_server_log", { serverType });
+}
+
 export async function probeRdpCapture(
   requestPermission = false,
   requestControlPermission = false,
@@ -201,6 +250,14 @@ export async function probeRdpCapture(
     requestPermission,
     requestControlPermission,
   });
+}
+
+export async function probeSystemRdp(): Promise<SystemRdpStatus> {
+  return invoke<SystemRdpStatus>("probe_system_rdp", {});
+}
+
+export async function openSystemRdpSettings(): Promise<void> {
+  await invoke<void>("open_system_rdp_settings", {});
 }
 
 export async function resolveRdpConnectionRequest(

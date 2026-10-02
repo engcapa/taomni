@@ -1,0 +1,145 @@
+id: TC-RDPS-PERF-02-windows-termservice-baseline
+title: Windows TermService reference - connect time, input-to-frame latency and animation throughput with the same probe scenarios
+description: |
+  V-13 / DEC-04 (docs-feature/rdp-server-parity-design.md §4.7): the system
+  Remote Desktop on the Windows runner is the performance reference for
+  Taomni's RDP server (TC-RDPS-PERF-01). rdp_baseline_required prepares
+  TermService and two disposable accounts. TermService gives each account
+  its own session, so the Tk target from PERF-01 runs inside that session at
+  the same geometry, started by Explorer from the fixture's machine Run
+  entry (Server 2025 ignores client-requested initial programs).
+
+  The first connection of each account creates its session (first logon)
+  and stays connected until the in-session target reports ready (the probe
+  attaches the work directory's launch logs if it never does); the measured
+  connections then reconnect to the running session. The results are
+  reference numbers for the budgets, not a pass verdict on TermService:
+  expectations only guard that measurement happened.
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- performance
+- windows
+- p2
+modes:
+- native
+native_platforms:
+- Windows
+fixtures:
+- rdp_server_required
+- release_build_required
+- rdp_baseline_required
+timeout_sec: 600
+steps:
+- rdp_probe:
+    scenario: connect
+    artifact: baseline-flip-logon
+    timeout_sec: 360
+    args:
+      port: ${env.QA_RDP_BASELINE_PORT}
+      user: ${env.QA_RDP_BASELINE_USER1}
+      password-env: QA_RDP_BASELINE_PASSWORD
+      wait-ready: ${env.QA_RDP_BASELINE_DIR}\flip-state.json
+      wait-ready-connected: true
+      wait-ready-sec: 240
+      connect-timeout-sec: 120
+      first-frame-ms: 120000
+      timeout-sec: 330
+      seconds: 2
+    expect:
+      first_graphics_ms:
+        exists: true
+- rdp_probe:
+    scenario: connect
+    artifact: baseline-connect
+    timeout_sec: 330
+    args:
+      port: ${env.QA_RDP_BASELINE_PORT}
+      user: ${env.QA_RDP_BASELINE_USER1}
+      password-env: QA_RDP_BASELINE_PASSWORD
+      seconds: 2
+    expect:
+      first_graphics_ms:
+        exists: true
+      framebuffer.painted_share:
+        min: 0.95
+- rdp_probe:
+    scenario: latency
+    artifact: baseline-latency
+    timeout_sec: 330
+    args:
+      port: ${env.QA_RDP_BASELINE_PORT}
+      user: ${env.QA_RDP_BASELINE_USER1}
+      password-env: QA_RDP_BASELINE_PASSWORD
+      x: 280
+      y: 240
+      samples: 40
+      warmup: 5
+      timeout-sec: 300
+    expect:
+      timeouts:
+        max: 4
+      latency_ms.count:
+        min: 36
+- rdp_probe:
+    scenario: connect
+    artifact: baseline-animate-logon
+    timeout_sec: 360
+    args:
+      port: ${env.QA_RDP_BASELINE_PORT}
+      user: ${env.QA_RDP_BASELINE_USER2}
+      password-env: QA_RDP_BASELINE_PASSWORD
+      wait-ready: ${env.QA_RDP_BASELINE_DIR}\animate-state.json
+      wait-ready-connected: true
+      wait-ready-sec: 240
+      connect-timeout-sec: 120
+      first-frame-ms: 120000
+      timeout-sec: 330
+      seconds: 2
+    expect:
+      first_graphics_ms:
+        exists: true
+- rdp_probe:
+    scenario: throughput
+    artifact: baseline-throughput
+    timeout_sec: 330
+    args:
+      port: ${env.QA_RDP_BASELINE_PORT}
+      user: ${env.QA_RDP_BASELINE_USER2}
+      password-env: QA_RDP_BASELINE_PASSWORD
+      seconds: 10
+      rect: 40,80,640,360
+      marker: 56,96
+    expect:
+      visible_changes:
+        min: 10
+      marker.frames:
+        min: 100
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: TermService connect time, input-to-frame latency and animation throughput are measured with the PERF-01 probe scenarios and target geometry.
+    actions:
+    - 1
+    - 4
+    checkpoints:
+    - step: 2
+      expectation: Once the in-session flip target reports ready, a reconnect to the warm session reports first_graphics_ms with at least 95% of the framebuffer grid painted.
+    - step: 3
+      expectation: At least 36 of 40 clicks on the in-session flip target produce an observed pixel change.
+    - step: 5
+      expectation: At least 10 visible changes and 100 marker-counted animation frames arrive during 10 s of the in-session animation.
+    results:
+    - 3
+    - 5
+  native:
+  - check: Real Windows TermService sessions, NLA with local accounts and in-session initial programs on the runner.
+    method: automated
+    reason: Only a Windows host provides the system Remote Desktop reference.
+  visual:
+  - check: Not a visual check.
+    method: not-applicable
+    reason: Metrics come from the probe's decoded framebuffer.

@@ -1528,11 +1528,25 @@
 - `[data-testid="rdp-panel"]` — display — F9.7.panel-root
 - `[data-testid="rdp-status"]` — display — F9.7.status
 - `[data-testid="rdp-canvas"]` — display — F9.7.canvas
+- `.rdp-options-form input[type="number"][min="320"]` — interactive [optional] — F9.7.screen-width
+- `[data-testid="session-section-rdp"]` — interactive [optional] — F9.7.options-section
+- `.rdp-options-form input[type="number"][min="200"]` — interactive [optional] — F9.7.screen-height
+- `.rdp-options-form fieldset:first-of-type input[type="checkbox"]` — interactive [optional] — F9.7.nla
 - `[data-testid="rdp-scale-toggle"]` — interactive — F9.7.scale-toggle
 - `[data-testid="rdp-reconnect"]` — interactive — F9.7.reconnect
 - `[data-testid="rdp-chat-toggle"]` — interactive [optional] — F9.7.chat-toggle
 - `[data-testid="rdp-detach"]` — interactive — F9.7.detach
 - `[data-testid="rdp-view-cycle"]` — interactive — F9.7.view-cycle
+- `[data-testid="rdp-ctrl-alt-del"]` — interactive — F9.7.ctrl-alt-del
+- `[data-testid="rdp-connection-bar"]` — display [optional] — F9.7.connection-bar
+- `[data-testid="rdp-bar-hotzone"]` — display [optional] — F9.7.bar-hotzone
+- `[data-testid="rdp-bar-pin"]` — interactive [optional] — F9.7.bar-pin
+- `[data-testid="rdp-bar-quality"]` — display [optional] — F9.7.bar-quality
+- `[data-testid="rdp-bar-title"]` — display [optional] — F9.7.bar-title
+- `[data-testid="rdp-bar-ctrl-alt-del"]` — interactive [optional] — F9.7.bar-ctrl-alt-del
+- `[data-testid="rdp-bar-minimize"]` — interactive [optional] — F9.7.bar-minimize
+- `[data-testid="rdp-bar-restore"]` — interactive [optional] — F9.7.bar-restore
+- `[data-testid="rdp-bar-disconnect"]` — interactive [optional] — F9.7.bar-disconnect
 
 ## servers (F-Servers-1)
 
@@ -1551,6 +1565,35 @@
 - `[data-testid="server-log"]` — display [optional] — F-Servers-1.server-log
 - `[data-testid="server-log-autoscroll"]` — interactive [optional] — F-Servers-1.server-log-autoscroll
 - `[data-testid="server-log-clear"]` — display [optional] — F-Servers-1.server-log-clear
+
+## servers/rdp (F-RdpServer-1)
+
+- `[data-testid="server-field-port"]` — interactive [optional] — F-RdpServer-1.server-field-port
+- `[data-testid="server-field-bind-address"]` — interactive [optional] — F-RdpServer-1.server-field-bind-address
+- `[data-testid="server-field-auto-stop"]` — interactive [optional] — F-RdpServer-1.server-field-auto-stop
+- `[data-testid="server-field-auto-stop-seconds"]` — interactive [optional] — F-RdpServer-1.server-field-auto-stop-seconds
+- `[data-testid="server-field-start-on-launch"]` — interactive [optional] — F-RdpServer-1.server-field-start-on-launch
+- `[data-testid="server-row-rdp-start"]` — interactive [optional] — F-RdpServer-1.server-row-rdp-start
+- `[data-testid="server-row-rdp-stop"]` — interactive [optional] — F-RdpServer-1.server-row-rdp-stop
+- `[data-testid="rdp-field-username"]` — interactive [optional] — F-RdpServer-1.rdp-field-username
+- `[data-testid="rdp-field-password"]` — interactive [optional] — F-RdpServer-1.rdp-field-password
+- `[data-testid="rdp-field-domain"]` — interactive [optional] — F-RdpServer-1.rdp-field-domain
+- `[data-testid="rdp-field-view-only"]` — interactive [optional] — F-RdpServer-1.rdp-field-view-only
+- `[data-testid="rdp-field-control-approval"]` — interactive [optional] — F-RdpServer-1.rdp-field-control-approval
+- `[data-testid="rdp-field-public-bind"]` — interactive [optional] — F-RdpServer-1.rdp-field-public-bind
+- `[data-testid="rdp-field-display"]` — interactive [optional] — F-RdpServer-1.rdp-field-display
+- `[data-testid="rdp-system-card"]` — display [optional] — F-RdpServer-1.rdp-system-card
+- `[data-testid="rdp-system-message"]` — display [optional] — F-RdpServer-1.rdp-system-message
+- `[data-testid="rdp-system-open-settings"]` — interactive [optional] — F-RdpServer-1.rdp-system-open-settings
+- `[data-testid="rdp-system-refresh"]` — interactive [optional] — F-RdpServer-1.rdp-system-refresh
+- `[data-testid="rdp-system-choice"]` — display [optional] — F-RdpServer-1.rdp-system-choice
+- `[data-testid="rdp-system-choice-reset"]` — interactive [optional] — F-RdpServer-1.rdp-system-choice-reset
+- `[data-testid="rdp-field-clipboard-to-client"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-to-client
+- `[data-testid="rdp-field-clipboard-to-server"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-to-server
+- `[data-testid="rdp-field-clipboard-file-max-mb"]` — interactive [optional] — F-RdpServer-1.rdp-field-clipboard-file-max-mb
+- `[data-testid="rdp-field-audio-playback"]` — interactive [optional] — F-RdpServer-1.rdp-field-audio-playback
+- `[data-testid="rdp-field-microphone"]` — interactive [optional] — F-RdpServer-1.rdp-field-microphone
+- `[data-testid="rdp-field-microphone-device"]` — interactive [optional] — F-RdpServer-1.rdp-field-microphone-device
 
 ## sessions (F6.2)
 
@@ -1996,6 +2039,7 @@
 
 - `[data-testid="terminal-pane"]` — interactive — F2.2.terminal-pane
 - `[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea` — interactive — F2.2.terminal-keyboard-target
+- `button[title="Copy (Ctrl+C)"]` — interactive [optional] — F2.2.terminal-selection-copy
 - `[data-testid="attached-sftp-toggle"]` — interactive [optional] — F2.2.attached-sftp-toggle
 - `[data-testid="tab-chat-toggle"]` — interactive [optional] — F2.2.tab-chat-toggle
 - `[data-testid="context-menu"]` — display [optional] — F2.2.context-menu
@@ -2024,12 +2068,15 @@
 - `input[placeholder="Find"]` — interactive [optional] — F4.1.find-input
 - `span:has-text("Match")` — display [optional] — F4.1.find-match-info
 - `role=button[name="Close"]` — interactive [optional] — F4.1.find-close
+  ↳ `xpath=//*[@data-testid='terminal-pane']//button[normalize-space(.)='Close']` — alias
 
 ## terminal/right-menu (F4.2)
 
 - `text="Zoom in"` — interactive [optional] — F4.2.zoom-in
+  ↳ `[data-testid="context-menu-item-zoom-in"]` — alias
 - `text="Zoom out"` — interactive [optional] — F4.2.zoom-out
 - `text="Reset zoom"` — interactive [optional] — F4.2.zoom-reset
+  ↳ `[data-testid="context-menu-item-reset-zoom"]` — alias
 - `[data-testid="context-menu-item-appearance"]` — interactive [optional] — F4.2.appearance
 - `text="Terminal display"` — interactive [optional] — F4.2.terminal-display
 - `[data-testid="context-menu-item-terminal-display"]` — interactive [optional] — F4.2.terminal-display-menu-item

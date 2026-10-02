@@ -1,9 +1,15 @@
+import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, call
 
 from qa_ui_auto.steps import StepContext, StepError
-from qa_ui_auto.steps.mouse import drag_offset, mouse_path_points, step_drag_to, step_mouse_path
+from qa_ui_auto.steps.mouse import (
+    drag_offset, mouse_path_points, step_drag_to, step_mouse_path,
+    step_terminal_drag_selection, terminal_selection_args, terminal_selection_points,
+)
 
 
 class MouseStepsTest(TestCase):
@@ -54,3 +60,75 @@ class MouseStepsTest(TestCase):
         page.wait_for_timeout.assert_called_once_with(50)
         with self.assertRaisesRegex(StepError, "selector"):
             mouse_path_points({"points": [{"dx": 1}]})
+
+    def test_terminal_drag_starts_in_the_gutter_and_reverses_the_same_endpoints(self):
+        box = {"x": 108, "y": 40, "width": 120, "height": 18}
+        forward = terminal_selection_points(box, "forward")
+        self.assertEqual(forward, ({"x": 104, "y": 49}, {"x": 226, "y": 49}))
+        self.assertEqual(terminal_selection_points(box, "reverse"), forward[::-1])
+        with self.assertRaisesRegex(StepError, "layout box"):
+            terminal_selection_points(None, "forward")
+        with self.assertRaisesRegex(StepError, "direction"):
+            terminal_selection_args({"selector": "#hit", "direction": "sideways"})
+        with self.assertRaisesRegex(StepError, "modifiers"):
+            terminal_selection_args({"selector": "#hit", "modifiers": ["Super"]})
+
+    def test_browser_terminal_drag_records_geometry_and_releases_block_modifiers(self):
+        ctx, page, locator = self.context()
+        locator.bounding_box.return_value = {"x": 108, "y": 40, "width": 120, "height": 18}
+        with TemporaryDirectory() as directory:
+            ctx.case_dir = Path(directory)
+            step_terminal_drag_selection(ctx, {"selector": "#hit", "modifiers": ["Control", "Shift"]})
+            record = json.loads((ctx.case_dir / "terminal-selection-drags.json").read_text())[0]
+        self.assertEqual(record["start"], {"x": 104, "y": 49})
+        self.assertEqual(page.mouse.mock_calls, [call.move(x=104, y=49), call.down(),
+                                               call.move(x=226, y=49, steps=8), call.up()])
+        self.assertEqual(page.keyboard.mock_calls, [call.down("Control"), call.down("Shift"),
+                                                  call.up("Shift"), call.up("Control")])
+
+    def test_browser_terminal_drag_releases_inputs_when_pointer_movement_fails(self):
+        ctx, page, _ = self.context()
+        page.mouse.move.side_effect = [None, RuntimeError("pointer failure")]
+        with self.assertRaisesRegex(RuntimeError, "pointer failure"):
+            step_terminal_drag_selection(ctx, {"selector": "#hit", "modifiers": ["Shift"]})
+        page.mouse.up.assert_called_once_with()
+        page.keyboard.up.assert_called_once_with("Shift")
+
+    def native_terminal_context(self, directory: str) -> SimpleNamespace:
+        session = Mock()
+        session.find.return_value = "xterm-element"
+        session.execute.return_value = {
+            "hit": {"x": 108, "y": 40, "width": 120, "height": 18},
+            "origin": {"x": 100, "y": 40, "width": 300, "height": 200},
+        }
+        session.endpoint.return_value = "/session/qa/actions"
+        session.MODIFIER_MAP = {"Control": "\ue009", "Shift": "\ue008"}
+        return SimpleNamespace(session=session, case_dir=Path(directory))
+
+    def test_native_terminal_drag_uses_element_offsets_and_synchronised_modifiers(self):
+        from qa_ui_auto.native_steps import _terminal_drag_selection
+
+        with TemporaryDirectory() as directory:
+            ctx = self.native_terminal_context(directory)
+            _terminal_drag_selection(ctx, {"selector": "#hit", "direction": "reverse",
+                                           "modifiers": ["Control", "Shift"]})
+            actions = ctx.session.request.call_args_list[0].args[2]["actions"]
+        keys, pointer = actions
+        self.assertEqual(len(keys["actions"]), len(pointer["actions"]))
+        self.assertEqual(keys["actions"][:2], [{"type": "keyDown", "value": "\ue009"},
+                                               {"type": "keyDown", "value": "\ue008"}])
+        moves = [a for a in pointer["actions"] if a["type"] == "pointerMove"]
+        self.assertEqual([(m["x"], m["y"]) for m in moves], [(-24, -91), (-146, -91)])
+        self.assertTrue(all(m["origin"] == {"element-6066-11e4-a52e-4f735466cecf": "xterm-element"} for m in moves))
+        ctx.session.find.assert_called_once_with("#hit .xterm", interactive=False)
+        self.assertEqual(ctx.session.request.call_args_list[-1], call("DELETE", "/session/qa/actions"))
+
+    def test_native_terminal_drag_releases_inputs_when_driver_fails(self):
+        from qa_ui_auto.native_steps import _terminal_drag_selection
+
+        with TemporaryDirectory() as directory:
+            ctx = self.native_terminal_context(directory)
+            ctx.session.request.side_effect = [RuntimeError("driver failure"), None]
+            with self.assertRaisesRegex(RuntimeError, "driver failure"):
+                _terminal_drag_selection(ctx, {"selector": "#hit"})
+            self.assertEqual(ctx.session.request.call_args_list[-1], call("DELETE", "/session/qa/actions"))

@@ -1714,7 +1714,7 @@ export const zhCN: DeepPartial<typeof en> = {
     restartForPort: "重启服务器以应用端口更改",
     rdpApprovalTitle: "允许远程控制？",
     rdpApprovalMessage:
-      "RDP 客户端 {peer} 正在请求控制这台 Mac。是否允许此连接注入键盘和鼠标输入？请求将在 {seconds} 秒后失效。",
+      "RDP 客户端 {peer} 正在请求控制这台电脑。是否允许此连接注入键盘和鼠标输入？请求将在 {seconds} 秒后失效。",
     rdpApprovalAllow: "允许控制",
     rdpApprovalDeny: "拒绝",
     fields: {
@@ -1770,6 +1770,19 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpGrantControl: "授予权限……",
       rdpRefreshPermission: "刷新状态",
       rdpControlApproval: "要求本机确认远程控制",
+      rdpClipboardToClient: "剪贴板：本机 → 客户端",
+      rdpClipboardToServer: "剪贴板：客户端 → 本机",
+      rdpClipboardFileMaxMb: "剪贴板文件上限（MB）",
+      rdpClipboardLevel: {
+        off: "关闭",
+        text: "仅文本",
+        rich: "文本、HTML 和图片",
+        all: "全部（含文件）",
+      },
+      rdpAudioPlayback: "在客户端播放本机声音",
+      rdpMicrophone: "重定向客户端麦克风",
+      rdpMicrophoneDevice: "麦克风输出设备",
+      rdpMicrophoneDeviceAuto: "自动检测虚拟声卡",
       optional: "可选",
     },
     notes: {
@@ -1781,6 +1794,10 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpVaultReason: "请解锁凭据保险库，以保护 RDP Server 密码。",
       rdpVaultCancelled: "凭据保险库未解锁，RDP Server 设置未保存。",
       rdpPublicBind: "这会把 RDP 监听器暴露到本机之外；请使用防火墙限制范围，并仅用于可信网络。",
+      rdpClipboardPolicy:
+        "与 Windows 剪贴板重定向策略相同，两个方向分别限制。从客户端复制的文件会暂存到私有临时目录；两个方向都关闭时不提供剪贴板通道。",
+      rdpAudioDevices:
+        "声音取自本机输出（Windows WASAPI 回环、Linux PipeWire、macOS 13+ 经屏幕录制权限）。客户端麦克风在 Linux 上显示为 PipeWire 音源“Taomni RDP Microphone”；在 Windows 和 macOS 上播放到虚拟声卡（VB-CABLE、BlackHole），应用从其录音端录音。没有虚拟声卡时服务器不提供麦克风通道。",
       rdpInsecure:
         "无安全模式意味着流量不加密；若未设置凭据，任何能访问该端口的人都可完全控制本机桌面。请仅在隔离网络中使用。",
       rdpCapLinux:
@@ -1791,7 +1808,7 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpCaptureRequired: "启动服务器前必须授予权限",
       rdpControlGranted: "键盘和鼠标控制已启用",
       rdpControlRequired: "键盘和鼠标控制需要此权限",
-      rdpUnattendedControl: "通过认证的客户端无需本机确认即可控制这台 Mac。",
+      rdpUnattendedControl: "通过认证的客户端无需本机确认即可控制这台电脑。",
       rdpCapWindows:
         "桌面采集：Windows 使用 Windows Graphics Capture（WGC），并提供有界的 GDI 兼容回退。请选择要共享的显示器；键盘和鼠标输入使用原生 SendInput。",
       rdpCapUnknown:
@@ -1800,6 +1817,34 @@ export const zhCN: DeepPartial<typeof en> = {
         "已启用端口转发：客户端可使用 -L（本地）、-R（远程）与 -D（动态 SOCKS）。远程转发若监听非本机回环地址，会在日志中给出警告。",
       sshAuthHint:
         "密码与此处配置值比对（不是操作系统/PAM 账号）。密钥文件支持多行 OpenSSH 公钥（authorized_keys 格式）。主机密钥保存在应用数据目录并跨重启复用。",
+    },
+    systemRdp: {
+      title: "Windows 远程桌面",
+      checking: "正在检测系统远程桌面……",
+      stateRunning: "系统远程桌面已启用，正在端口 {port} 运行（{nla}）。可以直接用 Windows 账号连接本机。",
+      nlaOn: "要求 NLA",
+      nlaOff: "未要求 NLA",
+      stateCanEnable: "系统远程桌面未启用。当前账号可以在“设置 → 系统 → 远程桌面”中开启（需要管理员确认）。",
+      stateNeedsAdmin: "系统远程桌面未启用，开启需要管理员权限。可以改用 Taomni RDP Server。",
+      stateUnsupported: "此 Windows 版本（{edition}）不能作为远程桌面主机，请使用 Taomni RDP Server。",
+      probeFailed: "无法检测系统远程桌面：{error}",
+      refresh: "重新检测",
+      openSettingsAction: "打开系统设置",
+      useSystemAction: "使用系统远程桌面",
+      useTaomniAction: "仍使用 Taomni",
+      dialogTitle: "Windows 远程桌面",
+      useSystemMessage: "系统远程桌面已在端口 {port} 运行。建议直接使用它（用 Windows 账号连接）。仍要启动 Taomni RDP Server 吗？",
+      enableSystemMessage: "系统远程桌面未启用。你可以打开系统设置开启它（需要管理员确认），或者改用 Taomni RDP Server。",
+      needsAdminMessage: "系统远程桌面未启用，开启需要管理员权限。要改用 Taomni RDP Server 吗？",
+      keptSystem: "已保留系统远程桌面，未启动 Taomni RDP Server。",
+      settingsOpened: "已打开系统远程桌面设置；开启后可直接使用系统远程桌面。",
+      cancelled: "已取消启动 Taomni RDP Server。",
+      choseTaomni: "已确认使用 Taomni RDP Server（之后不再询问）。",
+      portMoved: "端口 {from} 已被系统远程桌面占用，Taomni RDP Server 改用端口 {to}。",
+      choiceTaomni: "已选择使用 Taomni RDP Server。",
+      choiceReset: "重新选择",
+      recommendSystem: "建议直接使用系统远程桌面；Taomni RDP Server 适合需要 Taomni 功能或系统不支持的情况。",
+      secureDesktopNote: "Taomni RDP Server 以当前用户运行：无法显示或操作 UAC 提示和锁屏界面（系统远程桌面可以）。",
     },
     types: {
       ssh: { label: "SSH / SFTP", desc: "安全外壳与 SFTP 文件服务器" },
@@ -1953,6 +1998,18 @@ export const zhCN: DeepPartial<typeof en> = {
     certificateTrustConfirm: "信任并重新连接",
     certificateTrustDeclined: "未信任该证书，连接已阻止。",
     imeInput: "远程桌面键盘输入",
+    ctrlAltDel: "发送 Ctrl+Alt+Del",
+    bar: {
+      label: "连接栏",
+      pin: "固定连接栏",
+      unpin: "取消固定连接栏",
+      minimize: "最小化",
+      restore: "向下还原（退出全屏）",
+      disconnect: "断开连接",
+      qualityUnknown: "连接质量：尚未测量",
+      quality: "连接质量 {level}/4 · RTT {rtt} ms",
+      qualityBandwidth: "连接质量 {level}/4 · RTT {rtt} ms · {bandwidth} Mbit/s",
+    },
     options: {
       title: "RDP 选项",
       domain: "域",

@@ -829,8 +829,48 @@ class NativeSession:
         self.request("POST", self.element_path(element, "/click"), {})
         self.press_combo("Mod+a")
         self.press_combo("Backspace")
-        self.type_text(text)
+        password_input = platform.system() == "Linux" and self.execute(
+            f"const el = document.querySelector({json.dumps(selector)});"
+            "return el instanceof HTMLInputElement && el.type === 'password';"
+        ) is True
+        if password_input:
+            # Password authentication requires exact bytes. WebKit has changed
+            # shifted characters after modifier drags, so validate its string
+            # input before allowing the fixture to submit the form.
+            self.request("POST", self.element_path(element, "/value"), {"text": text})
+            check = (
+                f"const el = document.querySelector({json.dumps(selector)});"
+                f"return el instanceof HTMLInputElement && el.value === {json.dumps(text)};"
+            )
+            if self.execute(check) is not True:
+                # The same mapping can affect /value after modifier drags.
+                # Paste through the OS clipboard instead of translating keys.
+                self._paste_linux_password(element, selector, text, check)
+        else:
+            self.type_text(text)
         return f"filled {selector}"
+
+    def _paste_linux_password(self, element: str, selector: str, text: str, check: str) -> None:
+        from qa_ui_auto import host_clipboard
+
+        previous = ""
+        with suppress(RuntimeError):
+            previous = host_clipboard.get_text()
+        try:
+            self.request("POST", self.element_path(element, "/click"), {})
+            self.press_combo("Mod+a")
+            self.press_combo("Backspace")
+            host_clipboard.set_text(text)
+            self.press_combo("Control+v")
+            deadline = time.monotonic() + 5
+            while self.execute(check) is not True:
+                if time.monotonic() >= deadline:
+                    # Do not expose credential bytes in driver diagnostics.
+                    raise WebDriverError(f"password input did not retain the requested value: {selector}")
+                time.sleep(0.05)
+        finally:
+            # Remove the disposable password and retain the prior text payload.
+            host_clipboard.set_text(previous)
 
     def send_keys(self, text: str) -> str:
         keys = {

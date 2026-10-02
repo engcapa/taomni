@@ -55,6 +55,11 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: printf 'qa-ssh-display-before\n'
     submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"]'
+      regex: (?m)^qa\-ssh\-display\-before\r?$
+      timeout_sec: 10
+      attempts: 2
 - wait: 1
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
@@ -85,6 +90,11 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: printf 'qa-ssh-display-after-read-only\n'
     submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"]'
+      regex: (?m)^qa\-ssh\-display\-after\-read\-only\r?$
+      timeout_sec: 10
+      attempts: 2
 - wait: 1
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'

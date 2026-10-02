@@ -190,7 +190,11 @@ def install(capabilities):
         command([sys.executable, "-m", "pip", "install", *VNC_FIXTURE_PACKAGES])
     system = platform.system()
     if system == "Linux":
-        command(["docker", "info", "--format", "{{.ServerVersion}}"])
+        if "xrdp" in capabilities:
+            command(["sudo", "-n", "apt-get", "update"])
+            command(["sudo", "-n", "apt-get", "install", "-y", "xrdp", "xorgxrdp", "openbox"])
+        if set(capabilities) & {"ssh", "mysql"}:
+            command(["docker", "info", "--format", "{{.ServerVersion}}"])
     elif system == "Darwin":
         packages = (["mysql@8.4"] if "mysql" in capabilities else []) + (["openssh"] if "ssh" in capabilities else [])
         if packages:

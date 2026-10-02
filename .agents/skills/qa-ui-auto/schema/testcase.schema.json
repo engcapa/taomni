@@ -87,7 +87,13 @@
           "parity008_git",
           "parity009_ssr",
           "parity007_extract",
-          "mail_server"
+          "mail_server",
+          "rdp_server_required",
+          "system_rdp_running",
+          "release_build_required",
+          "rdp_baseline_required",
+          "rdp_audio_required",
+          "xrdp_server_required"
         ]
       },
       "uniqueItems": true
@@ -340,11 +346,11 @@
         "hover": {
           "$ref": "#/$defs/hover_arg"
         },
-        "mouse_path": {
-          "$ref": "#/$defs/mouse_path_arg"
-        },
         "drag_to": {
           "$ref": "#/$defs/drag_arg"
+        },
+        "terminal_drag_selection": {
+          "$ref": "#/$defs/terminal_drag_selection_arg"
         },
         "fill": {
           "$ref": "#/$defs/fill_arg"
@@ -1237,6 +1243,111 @@
             }
           }
         },
+        "open_route": {
+          "$ref": "#/$defs/open_route_arg"
+        },
+        "host_helper": {
+          "$ref": "#/$defs/host_helper_arg"
+        },
+        "rdp_probe": {
+          "$ref": "#/$defs/rdp_probe_arg"
+        },
+        "rdp_probe_wait": {
+          "$ref": "#/$defs/rdp_probe_wait_arg"
+        },
+        "platform_choice": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "platforms",
+            "dialog",
+            "click"
+          ],
+          "description": "Native-only: on the listed platforms the dialog must appear and `click` answers it; elsewhere it must stay absent.",
+          "properties": {
+            "platforms": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "Linux",
+                  "Windows",
+                  "macOS"
+                ]
+              }
+            },
+            "dialog": {
+              "type": "string",
+              "minLength": 1
+            },
+            "click": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeout_sec": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "absent_sec": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "host_make_tree": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root",
+            "files"
+          ],
+          "description": "Native-only: create a sample tree inside the case directory and record SHA-256 per entry in <root>-tree.json.",
+          "properties": {
+            "root": {
+              "type": "string",
+              "minLength": 1
+            },
+            "files": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "host_clipboard": {
+          "$ref": "#/$defs/host_clipboard_arg"
+        },
+        "assert_json_file": {
+          "$ref": "#/$defs/assert_json_file_arg"
+        },
+        "rdp_canvas_click": {
+          "$ref": "#/$defs/rdp_canvas_click_arg"
+        },
+        "save_text": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "selector",
+            "path"
+          ],
+          "description": "Native-only diagnostics: write an element's text to a file inside the report root.",
+          "properties": {
+            "selector": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "mouse_path": {
+          "$ref": "#/$defs/mouse_path_arg"
+        },
         "seed_clipboard_image": {
           "$ref": "#/$defs/seed_clipboard_image_arg"
         },
@@ -1251,6 +1362,15 @@
         },
         "native_show_image_window": {
           "$ref": "#/$defs/native_show_image_window_arg"
+        },
+        "host_copy_file": {
+          "$ref": "#/$defs/host_copy_file_arg"
+        },
+        "host_mstsc": {
+          "$ref": "#/$defs/host_mstsc_arg"
+        },
+        "rdp_canvas_assert": {
+          "$ref": "#/$defs/rdp_canvas_assert_arg"
         }
       }
     },
@@ -1408,48 +1528,6 @@
     },
     "hover_arg": {
       "$ref": "#/$defs/selector"
-    },
-    "mouse_path_arg": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "points"
-      ],
-      "description": "Move the pointer through element-relative points without clicking: dx/dy are CSS-pixel offsets from the element centre (W3C element origin), steps interpolates intermediate moves, pause_ms rests afterwards.",
-      "properties": {
-        "points": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "selector"
-            ],
-            "properties": {
-              "selector": {
-                "$ref": "#/$defs/selector"
-              },
-              "dx": {
-                "type": "number"
-              },
-              "dy": {
-                "type": "number"
-              },
-              "steps": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 60
-              },
-              "pause_ms": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 5000
-              }
-            }
-          }
-        }
-      }
     },
     "drag_arg": {
       "type": "object",
@@ -2128,6 +2206,20 @@
         }
       }
     },
+    "terminal_drag_selection_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selector"],
+      "properties": {
+        "selector": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["forward", "reverse"], "default": "forward"},
+        "modifiers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"enum": ["Alt", "Control", "Meta", "Shift"]}
+        }
+      }
+    },
     "eval_readonly_arg": {
       "type": "object",
       "additionalProperties": false,
@@ -2185,6 +2277,12 @@
         "contains": {
           "type": "string",
           "description": "Optional: assert that String(result) contains this substring."
+        },
+        "timeout_sec": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Poll the read-only condition until it passes or this timeout expires; zero evaluates once."
         }
       }
     },
@@ -2548,6 +2646,315 @@
         }
       }
     },
+    "rdp_expect": {
+      "type": "object",
+      "description": "Dotted JSON paths -> literal (equals) or {equals|min|max|exists|contains|excludes|length_min}.",
+      "additionalProperties": {}
+    },
+    "open_route_arg": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[?/#]"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "route"
+          ],
+          "properties": {
+            "route": {
+              "type": "string",
+              "pattern": "^[?/#]"
+            }
+          }
+        }
+      ],
+      "description": "Navigate to an app route (browser: base_url+route; native: same-origin navigation of the main WebView)."
+    },
+    "host_helper_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "description": "Native-only: start/stop the stdlib-Tk visual target used by RDP latency/throughput cases.",
+      "properties": {
+        "action": {
+          "enum": [
+            "start",
+            "stop"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "flip",
+            "animate",
+            "photo"
+          ]
+        },
+        "geometry": {
+          "type": "string",
+          "pattern": "^[0-9]+x[0-9]+\\+[0-9]+\\+[0-9]+$"
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pattern": {
+          "type": "boolean"
+        }
+      }
+    },
+    "rdp_probe_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario"
+      ],
+      "description": "Native-only: run one rdp-probe scenario and assert its JSON report.",
+      "properties": {
+        "scenario": {
+          "enum": [
+            "connect",
+            "latency",
+            "throughput",
+            "clipboard-send",
+            "clipboard-receive",
+            "audio-capture",
+            "mic-send",
+            "autodetect",
+            "host-play",
+            "host-record",
+            "image-digest",
+            "image-make"
+          ]
+        },
+        "args": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect": {
+          "$ref": "#/$defs/rdp_expect"
+        },
+        "expect_exit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "background": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "rdp_probe_wait_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect": {
+          "$ref": "#/$defs/rdp_expect"
+        },
+        "expect_exit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "host_clipboard_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "description": "Native-only: set/assert the real OS clipboard with platform tools (PowerShell/.NET, AppKit JXA, xclip).",
+      "properties": {
+        "action": {
+          "enum": [
+            "set",
+            "assert",
+            "clear",
+            "quiet"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "html",
+            "image",
+            "files"
+          ]
+        },
+        "seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "quiet: how long to watch the OS clipboard for changes."
+        },
+        "max_changes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "quiet: most clipboard changes allowed while watching (default 0)."
+        },
+        "text": {
+          "type": "string"
+        },
+        "html": {
+          "type": "string"
+        },
+        "png": {
+          "type": "string"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "equals": {
+          "type": "string"
+        },
+        "contains": {
+          "type": "string"
+        },
+        "png_equals": {
+          "type": "string"
+        },
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "same_tree_as": {
+          "type": "string",
+          "minLength": 1,
+          "description": "files assert: the clipboard entry named like this report-root tree has identical relative paths and SHA-256."
+        }
+      }
+    },
+    "assert_json_file_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "expect"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect": {
+          "$ref": "#/$defs/rdp_expect"
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "rdp_canvas_click_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": 0
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0
+        },
+        "selector": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "mouse_path_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "points"
+      ],
+      "description": "Move the pointer through element-relative points without clicking: dx/dy are CSS-pixel offsets from the element centre (W3C element origin), steps interpolates intermediate moves, pause_ms rests afterwards.",
+      "properties": {
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "properties": {
+              "selector": {
+                "$ref": "#/$defs/selector"
+              },
+              "dx": {
+                "type": "number"
+              },
+              "dy": {
+                "type": "number"
+              },
+              "steps": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 60
+              },
+              "pause_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5000
+              }
+            }
+          }
+        }
+      }
+    },
     "mfa_png_arg": {
       "type": "object",
       "additionalProperties": false,
@@ -2713,6 +3120,140 @@
           }
         }
       ]
+    },
+    "host_copy_file_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from_env_dir",
+        "name",
+        "to"
+      ],
+      "properties": {
+        "from_env_dir": {
+          "type": "string",
+          "pattern": "^QA_RDP_[A-Z0-9_]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect": {
+          "$ref": "#/$defs/rdp_expect"
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "host_mstsc_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "start",
+            "capture",
+            "stop"
+          ]
+        },
+        "port": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "password_env": {
+          "type": "string",
+          "minLength": 1
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 320
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 200
+        },
+        "snapshot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect_pattern": {
+          "type": "boolean"
+        }
+      }
+    },
+    "rdp_canvas_assert_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "points"
+      ],
+      "properties": {
+        "selector": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeout_sec": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y",
+              "rgb"
+            ],
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "rgb": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "tolerance": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 24
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

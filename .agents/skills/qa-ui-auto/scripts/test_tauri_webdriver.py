@@ -251,6 +251,8 @@ class NativeSessionFillTest(TestCase):
         execute_results: list[bool] = [contenteditable]
         if contenteditable:
             execute_results.extend(focus_results or [True])
+        else:
+            execute_results.append(False)
         session.execute = Mock(side_effect=execute_results)
         session.press_combo = Mock(return_value="")
         session.type_text = Mock(return_value="")
@@ -308,6 +310,72 @@ class NativeSessionFillTest(TestCase):
             "POST", "/session/session-1/element/element-1/value", {"text": "Taomni"})
         session.press_combo.assert_not_called()
         session.type_text.assert_not_called()
+
+    def test_linux_password_fill_retains_exact_shifted_punctuation(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, True, True])
+        text = "Qa1_test:@!"
+        with patch("tauri_webdriver.platform.system", return_value="Linux"):
+            result = session.fill('input[type="password"]', text)
+        self.assertEqual(result, 'filled input[type="password"]')
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
+        session.request.assert_has_calls([
+            call("POST", "/session/session-1/element/element-1/click", {}),
+            call("POST", "/session/session-1/element/element-1/value", {"text": text}),
+        ])
+        session.type_text.assert_not_called()
+        self.assertIn('el.value === "Qa1_test:@!"', session.execute.call_args.args[0])
+
+    def test_linux_password_fill_fails_before_submit_without_exposing_secret(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, True, False, False])
+        text = "Qa1_private:@!"
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as set_text, \
+                patch("tauri_webdriver.time.monotonic", side_effect=[0, 6]):
+            with self.assertRaises(WebDriverError) as error:
+                session.fill('input[type="password"]', text)
+        self.assertIn("password input did not retain the requested value", str(error.exception))
+        self.assertNotIn(text, str(error.exception))
+        self.assertEqual(set_text.call_args_list, [call(text), call("previous")])
+        session.type_text.assert_not_called()
+
+    def test_linux_password_fill_recovers_unshifted_input_with_real_clipboard_paste(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, True, False, False, True])
+        text = "Qa1_private:@!"
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="QA-LEFT-GUTTER"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as set_text, \
+                patch("tauri_webdriver.time.sleep") as sleep:
+            session.fill('input[type="password"]', text)
+        self.assertEqual(set_text.call_args_list, [call(text), call("QA-LEFT-GUTTER")])
+        session.press_combo.assert_has_calls([
+            call("Mod+a"), call("Backspace"),
+            call("Mod+a"), call("Backspace"), call("Control+v"),
+        ])
+        sleep.assert_called_once_with(0.05)
+        session.type_text.assert_not_called()
+
+    def test_linux_password_fill_removes_password_from_clipboard_after_paste_failure(self) -> None:
+        session = self.session(False)
+        session.execute = Mock(side_effect=[False, True, False])
+        session.press_combo.side_effect = ["", "", "", "", WebDriverError("paste failed")]
+        text = "Qa1_private:@!"
+        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                patch("qa_ui_auto.host_clipboard.set_text") as set_text:
+            with self.assertRaisesRegex(WebDriverError, "paste failed"):
+                session.fill('input[type="password"]', text)
+        self.assertEqual(set_text.call_args_list, [call(text), call("previous")])
+
+    def test_windows_password_fill_retains_keyboard_input(self) -> None:
+        session = self.session(False)
+        with patch("tauri_webdriver.platform.system", return_value="Windows"):
+            session.fill('input[type="password"]', "Qa1_test:@!")
+        session.type_text.assert_called_once_with("Qa1_test:@!")
+        self.assertFalse(any(c.args[1].endswith('/value') for c in session.request.call_args_list))
 
     def test_type_text_paces_contenteditable_key_transactions(self) -> None:
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))

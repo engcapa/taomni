@@ -104,6 +104,23 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.add("ime")
             if "linux_x11_required" in fixtures:
                 result.add("x11")
+            # RDP server/client cases: the probe and Tk target ship with the
+            # QA build; audio, the Windows TermService baseline and the Linux
+            # xrdp reference server are provisioned by ci_services/ci_rdp.
+            if "rdp_server_required" in fixtures:
+                result.add("rdp")
+            if "rdp_audio_required" in fixtures:
+                result.update({"rdp", "audio"})
+            if "rdp_baseline_required" in fixtures:
+                result.update({"rdp", "rdp-baseline"})
+            if "xrdp_server_required" in fixtures:
+                result.update({"rdp", "xrdp"})
+            if "system_rdp_running" in fixtures:
+                result.add("rdp")
+            # Performance budgets are only meaningful on optimised code; the
+            # whole entry then uses the release QA build.
+            if "release_build_required" in fixtures:
+                result.add("release")
     return sorted(result)
 
 

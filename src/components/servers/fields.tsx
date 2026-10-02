@@ -35,6 +35,8 @@ export interface NumberFieldProps {
   step?: number;
   placeholder?: string;
   disabled?: boolean;
+  /** Stable `data-testid` for the control (QA selectors). */
+  testId?: string;
   width?: number;
 }
 
@@ -47,6 +49,7 @@ export function NumberField({
   step,
   placeholder,
   disabled,
+  testId,
   width = 90,
 }: NumberFieldProps) {
   return (
@@ -54,6 +57,8 @@ export function NumberField({
       <input
         type="number"
         className="taomni-input"
+        data-testid={testId}
+        aria-label={label}
         style={{ width }}
         value={Number.isFinite(value) ? value : ""}
         min={min}
@@ -76,6 +81,8 @@ export interface TextFieldProps {
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** Stable `data-testid` for the control (QA selectors). */
+  testId?: string;
   width?: number | string;
 }
 
@@ -85,6 +92,7 @@ export function TextField({
   onChange,
   placeholder,
   disabled,
+  testId,
   width = "100%",
 }: TextFieldProps) {
   return (
@@ -92,6 +100,8 @@ export function TextField({
       <input
         type="text"
         className="taomni-input"
+        data-testid={testId}
+        aria-label={label}
         style={{ width, maxWidth: "100%" }}
         value={value}
         placeholder={placeholder}
@@ -109,6 +119,8 @@ export interface CheckboxFieldProps {
   value: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
+  /** Stable `data-testid` for the control (QA selectors). */
+  testId?: string;
 }
 
 export function CheckboxField({
@@ -117,6 +129,7 @@ export function CheckboxField({
   value,
   onChange,
   disabled,
+  testId,
 }: CheckboxFieldProps) {
   return (
     <FormRow label={label}>
@@ -124,6 +137,8 @@ export function CheckboxField({
         <input
           type="checkbox"
           className="taomni-checkbox"
+          data-testid={testId}
+          aria-label={checkboxLabel || label}
           checked={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
@@ -147,6 +162,8 @@ export interface SelectFieldProps {
   onChange: (value: string) => void;
   options: SelectOption[];
   disabled?: boolean;
+  /** Stable `data-testid` for the control (QA selectors). */
+  testId?: string;
   width?: number;
 }
 
@@ -156,12 +173,15 @@ export function SelectField({
   onChange,
   options,
   disabled,
+  testId,
   width = 160,
 }: SelectFieldProps) {
   return (
     <FormRow label={label}>
       <select
         className="taomni-input appearance-none"
+        data-testid={testId}
+        aria-label={label}
         style={{ width }}
         value={value}
         disabled={disabled}
@@ -183,6 +203,8 @@ export interface PasswordFieldProps {
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** Stable `data-testid` for the control (QA selectors). */
+  testId?: string;
   width?: number | string;
 }
 
@@ -192,6 +214,7 @@ export function PasswordField({
   onChange,
   placeholder,
   disabled,
+  testId,
   width = 200,
 }: PasswordFieldProps) {
   return (
@@ -199,6 +222,8 @@ export function PasswordField({
       <input
         type="password"
         className="taomni-input"
+        data-testid={testId}
+        aria-label={label}
         style={{ width, maxWidth: "100%" }}
         value={value}
         placeholder={placeholder}
@@ -219,6 +244,8 @@ export interface PathFieldProps {
   browseLabel: string;
   placeholder?: string;
   disabled?: boolean;
+  /** Stable `data-testid` for the control (QA selectors). */
+  testId?: string;
 }
 
 export function PathField({
@@ -229,6 +256,7 @@ export function PathField({
   browseLabel,
   placeholder,
   disabled,
+  testId,
 }: PathFieldProps) {
   const browse = async () => {
     try {
@@ -247,6 +275,8 @@ export function PathField({
       <input
         type="text"
         className="taomni-input"
+        data-testid={testId}
+        aria-label={label}
         style={{ width: 240, maxWidth: "100%" }}
         value={value}
         placeholder={placeholder}
@@ -278,6 +308,8 @@ export interface RadioFieldProps {
   /** Stable name so the radios form a single group. */
   name: string;
   disabled?: boolean;
+  /** Stable `data-testid` for the control (QA selectors). */
+  testId?: string;
 }
 
 export function RadioField({
@@ -287,6 +319,7 @@ export function RadioField({
   options,
   name,
   disabled,
+  testId,
 }: RadioFieldProps) {
   return (
     <FormRow label={label}>
@@ -299,6 +332,7 @@ export function RadioField({
             <input
               type="radio"
               className="taomni-radio"
+              data-testid={testId ? `${testId}-${opt.value}` : undefined}
               name={name}
               value={opt.value}
               checked={value === opt.value}

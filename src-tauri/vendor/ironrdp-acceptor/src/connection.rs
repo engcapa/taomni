@@ -1,0 +1,1104 @@
+use core::mem;
+
+use ironrdp_connector::{
+    ConnectorError, ConnectorErrorExt as _, ConnectorResult, DesktopSize, Sequence, State, Written,
+    encode_x224_packet, general_err, reason_err,
+};
+use ironrdp_core::{WriteBuf, decode};
+use ironrdp_pdu as pdu;
+use ironrdp_pdu::nego::SecurityProtocol;
+use ironrdp_pdu::x224::X224;
+use ironrdp_svc::{StaticChannelSet, SvcServerProcessor};
+use pdu::rdp::capability_sets::CapabilitySet;
+use pdu::rdp::client_info::{ClientInfoFlags, CompressionType, Credentials};
+use pdu::rdp::headers::ShareControlPdu;
+use pdu::rdp::server_error_info::{ErrorInfo, ProtocolIndependentCode, ServerSetErrorInfoPdu};
+use pdu::rdp::server_license::{LicensePdu, LicensingErrorMessage};
+use pdu::{gcc, mcs, nego, rdp};
+use tracing::{debug, warn};
+
+use super::channel_connection::ChannelConnectionSequence;
+use super::finalization::FinalizationSequence;
+use crate::util::{self, wrap_share_data};
+
+const IO_CHANNEL_ID: u16 = 1003;
+const USER_CHANNEL_ID: u16 = 1002;
+
+#[cfg(test)]
+mod compression_tests {
+    use super::*;
+    use pdu::rdp::client_info::{
+        AddressFamily, ClientInfo, ExtendedClientInfo, ExtendedClientOptionalInfo,
+        PerformanceFlags, TimezoneInfo,
+    };
+    use pdu::rdp::headers::{BasicSecurityHeader, BasicSecurityHeaderFlags};
+
+    #[test]
+    fn client_info_compression_survives_tls_hybrid_and_reactivation() {
+        for protocol in [
+            SecurityProtocol::SSL,
+            SecurityProtocol::HYBRID,
+            SecurityProtocol::HYBRID_EX,
+        ] {
+            for compression in [
+                None,
+                Some(CompressionType::K8),
+                Some(CompressionType::K64),
+                Some(CompressionType::Rdp6),
+                Some(CompressionType::Rdp61),
+            ] {
+                let mut acceptor = Acceptor::new(
+                    protocol,
+                    DesktopSize {
+                        width: 640,
+                        height: 480,
+                    },
+                    vec![],
+                    None,
+                );
+                acceptor.state = AcceptorState::SecureSettingsExchange {
+                    protocol,
+                    early_capability: None,
+                    channels: vec![],
+                };
+                let info = rdp::ClientInfoPdu {
+                    security_header: BasicSecurityHeader {
+                        flags: BasicSecurityHeaderFlags::INFO_PKT,
+                    },
+                    client_info: ClientInfo {
+                        credentials: Credentials {
+                            username: "unit".into(),
+                            password: "unit".into(),
+                            domain: None,
+                        },
+                        code_page: 0,
+                        flags: ClientInfoFlags::UNICODE
+                            | if compression.is_some() {
+                                ClientInfoFlags::COMPRESSION
+                            } else {
+                                ClientInfoFlags::empty()
+                            },
+                        compression_type: compression.unwrap_or(CompressionType::Rdp61),
+                        alternate_shell: String::new(),
+                        work_dir: String::new(),
+                        extra_info: ExtendedClientInfo {
+                            address_family: AddressFamily::INET,
+                            address: "127.0.0.1".into(),
+                            dir: "unit".into(),
+                            optional_data: ExtendedClientOptionalInfo::builder()
+                                .timezone(TimezoneInfo::default())
+                                .session_id(0)
+                                .performance_flags(PerformanceFlags::empty())
+                                .build(),
+                        },
+                    },
+                };
+                let bytes = pdu::encode_vec(&info).unwrap();
+                let request = pdu::encode_vec(&X224(mcs::SendDataRequest {
+                    initiator_id: USER_CHANNEL_ID,
+                    channel_id: IO_CHANNEL_ID,
+                    user_data: bytes.into(),
+                }))
+                .unwrap();
+                acceptor.step(&request, &mut WriteBuf::new()).unwrap();
+                assert_eq!(acceptor.client_compression, compression, "{protocol:?}");
+                assert_eq!(
+                    acceptor.received_credentials.is_some(),
+                    protocol == SecurityProtocol::SSL
+                );
+                acceptor.saved_for_reactivation = AcceptorState::CapabilitiesSendServer {
+                    early_capability: None,
+                    channels: vec![],
+                };
+                let mut acceptor = Acceptor::new_deactivation_reactivation(
+                    acceptor,
+                    StaticChannelSet::new(),
+                    DesktopSize {
+                        width: 800,
+                        height: 600,
+                    },
+                )
+                .unwrap();
+                acceptor.state = AcceptorState::Accepted {
+                    channels: vec![],
+                    client_capabilities: vec![],
+                    input_events: vec![],
+                };
+                assert_eq!(
+                    acceptor.get_result().unwrap().client_compression,
+                    compression
+                );
+            }
+        }
+    }
+}
+
+pub struct Acceptor {
+    pub(crate) state: AcceptorState,
+    security: SecurityProtocol,
+    io_channel_id: u16,
+    user_channel_id: u16,
+    message_channel_id: Option<u16>,
+    desktop_size: DesktopSize,
+    keyboard_layout: u32,
+    server_capabilities: Vec<CapabilitySet>,
+    static_channels: StaticChannelSet,
+    saved_for_reactivation: AcceptorState,
+    pub(crate) creds: Option<Credentials>,
+    received_credentials: Option<Credentials>,
+    client_compression: Option<CompressionType>,
+    reactivation: bool,
+    honor_client_desktop_size: bool,
+}
+
+/// Minimum and maximum desktop dimension honored from a client.
+///
+/// A desktop dimension in RDP is a `u16`; [MS-RDPBCGR] caps it at 8192, and
+/// 200 is a conservative floor. A client-requested dimension outside this
+/// range is not honored: the acceptor keeps the server-provided desktop size
+/// rather than treating the request as an error.
+const MIN_DESKTOP_DIM: u16 = 200;
+const MAX_DESKTOP_DIM: u16 = 8192;
+
+/// Returns the client-requested desktop size if both dimensions are within the
+/// protocol-legal range, otherwise `None`.
+fn validate_desktop_size(width: u16, height: u16) -> Option<DesktopSize> {
+    if (MIN_DESKTOP_DIM..=MAX_DESKTOP_DIM).contains(&width)
+        && (MIN_DESKTOP_DIM..=MAX_DESKTOP_DIM).contains(&height)
+    {
+        Some(DesktopSize { width, height })
+    } else {
+        None
+    }
+}
+
+/// Writes `size` into every Bitmap capability set in `capabilities`.
+///
+/// The server advertises its desktop size in the Bitmap capability set of the
+/// Demand Active PDU; this keeps that advertisement in sync with `size`.
+fn set_bitmap_desktop_size(capabilities: &mut [CapabilitySet], size: DesktopSize) {
+    for cap in capabilities.iter_mut() {
+        if let CapabilitySet::Bitmap(cap) = cap {
+            cap.desktop_width = size.width;
+            cap.desktop_height = size.height;
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct AcceptorResult {
+    /// Bulk compression requested in Client Info, including HYBRID connections.
+    pub client_compression: Option<CompressionType>,
+    pub static_channels: StaticChannelSet,
+    pub capabilities: Vec<CapabilitySet>,
+    pub input_events: Vec<Vec<u8>>,
+    pub user_channel_id: u16,
+    pub io_channel_id: u16,
+    /// MCS channel ID of the message channel, present when the client requested
+    /// one via Client Message Channel Data (section 2.2.1.3.7).
+    ///
+    /// Server-initiated PDUs that ride the message channel (network auto-detect
+    /// per section 2.2.14, multitransport bootstrap, heartbeat) are sent on this
+    /// channel. `None` when the client did not request it.
+    pub message_channel_id: Option<u16>,
+    pub reactivation: bool,
+    /// Keyboard layout identifier (KLID) announced by the client in its GCC
+    /// Client Core Data (section 2.2.1.3.2, `keyboardLayout`).
+    ///
+    /// This is the low word of a Windows locale identifier (e.g. `0x0000_0409`
+    /// for US English, `0x0000_040C` for French). `0` when the client did not
+    /// announce one. Servers can use it to pick a server-side keyboard layout
+    /// matching the client without changing any local input state.
+    pub keyboard_layout: u32,
+    /// Credentials received from the client during SecureSettingsExchange.
+    ///
+    /// Present for TLS-mode connections where the client sends credentials
+    /// in the ClientInfoPdu. `None` for CredSSP/Hybrid connections (where
+    /// authentication happens during the CredSSP exchange instead).
+    ///
+    /// Servers that need to validate credentials (e.g., via PAM or LDAP)
+    /// can use this field for post-handshake validation.
+    pub credentials: Option<Credentials>,
+}
+
+impl Acceptor {
+    pub fn new(
+        security: SecurityProtocol,
+        desktop_size: DesktopSize,
+        capabilities: Vec<CapabilitySet>,
+        creds: Option<Credentials>,
+    ) -> Self {
+        Self {
+            security,
+            state: AcceptorState::InitiationWaitRequest,
+            user_channel_id: USER_CHANNEL_ID,
+            io_channel_id: IO_CHANNEL_ID,
+            message_channel_id: None,
+            desktop_size,
+            keyboard_layout: 0,
+            server_capabilities: capabilities,
+            static_channels: StaticChannelSet::new(),
+            saved_for_reactivation: Default::default(),
+            creds,
+            received_credentials: None,
+            client_compression: None,
+            reactivation: false,
+            honor_client_desktop_size: false,
+        }
+    }
+
+    /// Adopt the desktop size requested by the client in its Client Core Data
+    /// instead of the size this acceptor was constructed with.
+    ///
+    /// The client's requested resolution is only carried in the GCC Client
+    /// Core Data of the MCS Connect Initial PDU; the desktop size echoed back
+    /// later in the client's Confirm Active is, per [MS-RDPBCGR] 2.2.1.13.2,
+    /// the value the client copied from the *server's* Demand Active, so it
+    /// cannot be used to discover what the client originally asked for. When
+    /// this is enabled and the client's request is within the protocol-legal
+    /// range, the acceptor negotiates that size from the start (it is written
+    /// into the server's Bitmap capability set before Demand Active is sent),
+    /// avoiding a Deactivation-Reactivation resize round trip.
+    ///
+    /// Disabled by default, preserving the previous behavior of always
+    /// enforcing the server-provided size.
+    ///
+    /// # Precondition
+    ///
+    /// Enabling this only makes sense together with a display handler
+    /// ([`RdpServerDisplay`]) whose `request_initial_size` actually adopts (or
+    /// at least intersects) the size it is given. The acceptor negotiates the
+    /// client's size, but the server still builds its framebuffer/encoder from
+    /// the size the display handler reports; if that handler ignores the
+    /// requested size and returns a fixed, smaller framebuffer, the resulting
+    /// mismatch can cause the client to be dropped. With a fixed-size display
+    /// handler, leave this disabled.
+    ///
+    /// [`RdpServerDisplay`]: <https://docs.rs/ironrdp-server/latest/ironrdp_server/trait.RdpServerDisplay.html>
+    pub fn set_honor_client_desktop_size(&mut self, honor: bool) {
+        self.honor_client_desktop_size = honor;
+    }
+
+    pub fn new_deactivation_reactivation(
+        mut consumed: Acceptor,
+        static_channels: StaticChannelSet,
+        desktop_size: DesktopSize,
+    ) -> ConnectorResult<Self> {
+        let AcceptorState::CapabilitiesSendServer {
+            early_capability,
+            channels,
+        } = consumed.saved_for_reactivation
+        else {
+            return Err(general_err!("invalid acceptor state"));
+        };
+
+        set_bitmap_desktop_size(&mut consumed.server_capabilities, desktop_size);
+        let state = AcceptorState::CapabilitiesSendServer {
+            early_capability,
+            channels: channels.clone(),
+        };
+        let saved_for_reactivation = AcceptorState::CapabilitiesSendServer {
+            early_capability,
+            channels,
+        };
+        Ok(Self {
+            security: consumed.security,
+            state,
+            user_channel_id: consumed.user_channel_id,
+            io_channel_id: consumed.io_channel_id,
+            message_channel_id: consumed.message_channel_id,
+            desktop_size,
+            keyboard_layout: consumed.keyboard_layout,
+            server_capabilities: consumed.server_capabilities,
+            static_channels,
+            saved_for_reactivation,
+            creds: consumed.creds,
+            received_credentials: consumed.received_credentials,
+            client_compression: consumed.client_compression,
+            reactivation: true,
+            honor_client_desktop_size: consumed.honor_client_desktop_size,
+        })
+    }
+
+    pub fn attach_static_channel<T>(&mut self, channel: T)
+    where
+        T: SvcServerProcessor + 'static,
+    {
+        self.static_channels.insert(channel);
+    }
+
+    pub fn reached_security_upgrade(&self) -> Option<SecurityProtocol> {
+        match self.state {
+            AcceptorState::SecurityUpgrade { .. } => Some(self.security),
+            _ => None,
+        }
+    }
+
+    /// # Panics
+    ///
+    /// Panics if state is not [AcceptorState::SecurityUpgrade].
+    pub fn mark_security_upgrade_as_done(&mut self) {
+        assert!(self.reached_security_upgrade().is_some());
+        self.step(&[], &mut WriteBuf::new())
+            .expect("transition to next state");
+        debug_assert!(self.reached_security_upgrade().is_none());
+    }
+
+    pub fn should_perform_credssp(&self) -> bool {
+        matches!(self.state, AcceptorState::Credssp { .. })
+    }
+
+    /// # Panics
+    ///
+    /// Panics if state is not [AcceptorState::Credssp].
+    pub fn mark_credssp_as_done(&mut self) {
+        assert!(self.should_perform_credssp());
+        let res = self
+            .step(&[], &mut WriteBuf::new())
+            .expect("transition to next state");
+        debug_assert!(!self.should_perform_credssp());
+        assert_eq!(res, Written::Nothing);
+    }
+
+    pub fn get_result(&mut self) -> Option<AcceptorResult> {
+        match mem::take(&mut self.state) {
+            AcceptorState::Accepted {
+                channels: _channels, // TODO: what about ChannelDef?
+                client_capabilities,
+                input_events,
+            } => Some(AcceptorResult {
+                client_compression: self.client_compression,
+                static_channels: mem::take(&mut self.static_channels),
+                capabilities: client_capabilities,
+                input_events,
+                user_channel_id: self.user_channel_id,
+                io_channel_id: self.io_channel_id,
+                message_channel_id: self.message_channel_id,
+                keyboard_layout: self.keyboard_layout,
+                reactivation: self.reactivation,
+                credentials: self.received_credentials.take(),
+            }),
+            previous_state => {
+                self.state = previous_state;
+                None
+            }
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+pub enum AcceptorState {
+    #[default]
+    Consumed,
+
+    InitiationWaitRequest,
+    InitiationSendConfirm {
+        requested_protocol: SecurityProtocol,
+    },
+    SecurityUpgrade {
+        requested_protocol: SecurityProtocol,
+        protocol: SecurityProtocol,
+    },
+    Credssp {
+        requested_protocol: SecurityProtocol,
+        protocol: SecurityProtocol,
+    },
+    BasicSettingsWaitInitial {
+        requested_protocol: SecurityProtocol,
+        protocol: SecurityProtocol,
+    },
+    BasicSettingsSendResponse {
+        requested_protocol: SecurityProtocol,
+        protocol: SecurityProtocol,
+        early_capability: Option<gcc::ClientEarlyCapabilityFlags>,
+        channels: Vec<(u16, Option<gcc::ChannelDef>)>,
+    },
+    ChannelConnection {
+        protocol: SecurityProtocol,
+        early_capability: Option<gcc::ClientEarlyCapabilityFlags>,
+        channels: Vec<(u16, gcc::ChannelDef)>,
+        connection: ChannelConnectionSequence,
+    },
+    RdpSecurityCommencement {
+        protocol: SecurityProtocol,
+        early_capability: Option<gcc::ClientEarlyCapabilityFlags>,
+        channels: Vec<(u16, gcc::ChannelDef)>,
+    },
+    SecureSettingsExchange {
+        protocol: SecurityProtocol,
+        early_capability: Option<gcc::ClientEarlyCapabilityFlags>,
+        channels: Vec<(u16, gcc::ChannelDef)>,
+    },
+    LicensingExchange {
+        early_capability: Option<gcc::ClientEarlyCapabilityFlags>,
+        channels: Vec<(u16, gcc::ChannelDef)>,
+    },
+    CapabilitiesSendServer {
+        early_capability: Option<gcc::ClientEarlyCapabilityFlags>,
+        channels: Vec<(u16, gcc::ChannelDef)>,
+    },
+    MonitorLayoutSend {
+        channels: Vec<(u16, gcc::ChannelDef)>,
+    },
+    CapabilitiesWaitConfirm {
+        channels: Vec<(u16, gcc::ChannelDef)>,
+    },
+    ConnectionFinalization {
+        finalization: FinalizationSequence,
+        channels: Vec<(u16, gcc::ChannelDef)>,
+        client_capabilities: Vec<CapabilitySet>,
+    },
+    Accepted {
+        channels: Vec<(u16, gcc::ChannelDef)>,
+        client_capabilities: Vec<CapabilitySet>,
+        input_events: Vec<Vec<u8>>,
+    },
+}
+
+impl State for AcceptorState {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Consumed => "Consumed",
+            Self::InitiationWaitRequest => "InitiationWaitRequest",
+            Self::InitiationSendConfirm { .. } => "InitiationSendConfirm",
+            Self::SecurityUpgrade { .. } => "SecurityUpgrade",
+            Self::Credssp { .. } => "Credssp",
+            Self::BasicSettingsWaitInitial { .. } => "BasicSettingsWaitInitial",
+            Self::BasicSettingsSendResponse { .. } => "BasicSettingsSendResponse",
+            Self::ChannelConnection { .. } => "ChannelConnection",
+            Self::RdpSecurityCommencement { .. } => "RdpSecurityCommencement",
+            Self::SecureSettingsExchange { .. } => "SecureSettingsExchange",
+            Self::LicensingExchange { .. } => "LicensingExchange",
+            Self::CapabilitiesSendServer { .. } => "CapabilitiesSendServer",
+            Self::MonitorLayoutSend { .. } => "MonitorLayoutSend",
+            Self::CapabilitiesWaitConfirm { .. } => "CapabilitiesWaitConfirm",
+            Self::ConnectionFinalization { .. } => "ConnectionFinalization",
+            Self::Accepted { .. } => "Connected",
+        }
+    }
+
+    fn is_terminal(&self) -> bool {
+        matches!(self, Self::Accepted { .. })
+    }
+
+    fn as_any(&self) -> &dyn core::any::Any {
+        self
+    }
+}
+
+impl Sequence for Acceptor {
+    fn next_pdu_hint(&self) -> Option<&dyn pdu::PduHint> {
+        match &self.state {
+            AcceptorState::Consumed => None,
+            AcceptorState::InitiationWaitRequest => Some(&pdu::X224_HINT),
+            AcceptorState::InitiationSendConfirm { .. } => None,
+            AcceptorState::SecurityUpgrade { .. } => None,
+            AcceptorState::Credssp { .. } => None,
+            AcceptorState::BasicSettingsWaitInitial { .. } => Some(&pdu::X224_HINT),
+            AcceptorState::BasicSettingsSendResponse { .. } => None,
+            AcceptorState::ChannelConnection { connection, .. } => connection.next_pdu_hint(),
+            AcceptorState::RdpSecurityCommencement { .. } => None,
+            AcceptorState::SecureSettingsExchange { .. } => Some(&pdu::X224_HINT),
+            AcceptorState::LicensingExchange { .. } => None,
+            AcceptorState::CapabilitiesSendServer { .. } => None,
+            AcceptorState::MonitorLayoutSend { .. } => None,
+            AcceptorState::CapabilitiesWaitConfirm { .. } => Some(&pdu::X224_HINT),
+            AcceptorState::ConnectionFinalization { finalization, .. } => {
+                finalization.next_pdu_hint()
+            }
+            AcceptorState::Accepted { .. } => None,
+        }
+    }
+
+    fn state(&self) -> &dyn State {
+        &self.state
+    }
+
+    fn step(&mut self, input: &[u8], output: &mut WriteBuf) -> ConnectorResult<Written> {
+        let prev_state = mem::take(&mut self.state);
+
+        let (written, next_state) = match prev_state {
+            AcceptorState::InitiationWaitRequest => {
+                let connection_request = decode::<X224<nego::ConnectionRequest>>(input)
+                    .map_err(ConnectorError::decode)
+                    .map(|p| p.0)?;
+
+                debug!(message = ?connection_request, "Received");
+
+                (
+                    Written::Nothing,
+                    AcceptorState::InitiationSendConfirm {
+                        requested_protocol: connection_request.protocol,
+                    },
+                )
+            }
+
+            AcceptorState::InitiationSendConfirm { requested_protocol } => {
+                let protocols = requested_protocol & self.security;
+                let protocol = if protocols.intersects(SecurityProtocol::HYBRID_EX) {
+                    SecurityProtocol::HYBRID_EX
+                } else if protocols.intersects(SecurityProtocol::HYBRID) {
+                    SecurityProtocol::HYBRID
+                } else if protocols.intersects(SecurityProtocol::SSL) {
+                    SecurityProtocol::SSL
+                } else if self.security.is_empty() {
+                    SecurityProtocol::empty()
+                } else {
+                    // No common security protocol. Send RDP_NEG_FAILURE so the client
+                    // gets a well-formed response instead of a TCP reset (MS-RDPBCGR 2.2.1.2.2).
+                    let failure_code = if self.security.intersects(SecurityProtocol::SSL) {
+                        nego::FailureCode::SSL_REQUIRED_BY_SERVER
+                    } else if self
+                        .security
+                        .intersects(SecurityProtocol::HYBRID | SecurityProtocol::HYBRID_EX)
+                    {
+                        nego::FailureCode::HYBRID_REQUIRED_BY_SERVER
+                    } else {
+                        nego::FailureCode::SSL_REQUIRED_BY_SERVER
+                    };
+
+                    let failure = nego::ConnectionConfirm::Failure { code: failure_code };
+
+                    debug!(message = ?failure, "Send");
+
+                    ironrdp_core::encode_buf(&X224(failure), output)
+                        .map_err(ConnectorError::encode)?;
+
+                    return Err(reason_err!(
+                        "security protocol mismatch",
+                        "server requires {:?} but client only offered {:?}",
+                        self.security,
+                        requested_protocol,
+                    ));
+                };
+                let connection_confirm = nego::ConnectionConfirm::Response {
+                    flags: nego::ResponseFlags::EXTENDED_CLIENT_DATA_SUPPORTED,
+                    protocol,
+                };
+
+                debug!(message = ?connection_confirm, "Send");
+
+                let written = ironrdp_core::encode_buf(&X224(connection_confirm), output)
+                    .map_err(ConnectorError::encode)?;
+
+                (
+                    Written::from_size(written)?,
+                    AcceptorState::SecurityUpgrade {
+                        requested_protocol,
+                        protocol,
+                    },
+                )
+            }
+
+            AcceptorState::SecurityUpgrade {
+                requested_protocol,
+                protocol,
+            } => {
+                debug!(?requested_protocol);
+                let next_state = if protocol
+                    .intersects(SecurityProtocol::HYBRID | SecurityProtocol::HYBRID_EX)
+                {
+                    AcceptorState::Credssp {
+                        requested_protocol,
+                        protocol,
+                    }
+                } else {
+                    AcceptorState::BasicSettingsWaitInitial {
+                        requested_protocol,
+                        protocol,
+                    }
+                };
+                (Written::Nothing, next_state)
+            }
+
+            AcceptorState::Credssp {
+                requested_protocol,
+                protocol,
+            } => (
+                Written::Nothing,
+                AcceptorState::BasicSettingsWaitInitial {
+                    requested_protocol,
+                    protocol,
+                },
+            ),
+
+            AcceptorState::BasicSettingsWaitInitial {
+                requested_protocol,
+                protocol,
+            } => {
+                let x224_payload = decode::<X224<pdu::x224::X224Data<'_>>>(input)
+                    .map_err(ConnectorError::decode)
+                    .map(|p| p.0)?;
+                let settings_initial = decode::<mcs::ConnectInitial>(x224_payload.data.as_ref())
+                    .map_err(ConnectorError::decode)?;
+
+                debug!(message = ?settings_initial, "Received");
+
+                let gcc_blocks = settings_initial.conference_create_request.into_gcc_blocks();
+                let early_capability = gcc_blocks.core.optional_data.early_capability_flags;
+                let client_wants_message_channel = gcc_blocks.message_channel.is_some();
+                self.keyboard_layout = gcc_blocks.core.keyboard_layout;
+
+                // Adopt the client's requested desktop size (from its Client
+                // Core Data) before Demand Active is sent, so the session is
+                // negotiated at that size without a Deactivation-Reactivation
+                // resize. See `set_honor_client_desktop_size`.
+                if self.honor_client_desktop_size {
+                    if let Some(client_size) = validate_desktop_size(
+                        gcc_blocks.core.desktop_width,
+                        gcc_blocks.core.desktop_height,
+                    ) {
+                        if client_size != self.desktop_size {
+                            debug!(
+                                requested = ?client_size,
+                                previous = ?self.desktop_size,
+                                "Honoring client-requested desktop size"
+                            );
+                            self.desktop_size = client_size;
+                            set_bitmap_desktop_size(&mut self.server_capabilities, client_size);
+                        }
+                    } else {
+                        debug!(
+                            width = gcc_blocks.core.desktop_width,
+                            height = gcc_blocks.core.desktop_height,
+                            "Client requested an out-of-range desktop size; keeping the server-provided size"
+                        );
+                    }
+                }
+
+                let joined: Vec<_> = gcc_blocks
+                    .network
+                    .map(|network| {
+                        network
+                            .channels
+                            .into_iter()
+                            .map(|c| {
+                                self.static_channels
+                                    .get_by_channel_name(&c.name)
+                                    .map(|(type_id, _)| (type_id, c))
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                #[expect(clippy::arithmetic_side_effects)]
+                // IO channel ID is not big enough for overflowing.
+                let channels: Vec<_> = joined
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, channel)| {
+                        let channel_id =
+                            u16::try_from(i).expect("always in the range") + self.io_channel_id + 1;
+                        if let Some((type_id, c)) = channel {
+                            self.static_channels.attach_channel_id(type_id, channel_id);
+                            (channel_id, Some(c))
+                        } else {
+                            (channel_id, None)
+                        }
+                    })
+                    .collect();
+
+                if client_wants_message_channel {
+                    // Allocate the message channel ID after the I/O channel and
+                    // any static virtual channels. It is advertised in Server
+                    // Message Channel Data and joined alongside the others.
+                    #[expect(clippy::arithmetic_side_effects)]
+                    // IO channel ID is not big enough for overflowing.
+                    let channel_id = u16::try_from(channels.len()).expect("always in the range")
+                        + self.io_channel_id
+                        + 1;
+                    self.message_channel_id = Some(channel_id);
+                }
+
+                (
+                    Written::Nothing,
+                    AcceptorState::BasicSettingsSendResponse {
+                        requested_protocol,
+                        protocol,
+                        early_capability,
+                        channels,
+                    },
+                )
+            }
+
+            AcceptorState::BasicSettingsSendResponse {
+                requested_protocol,
+                protocol,
+                early_capability,
+                channels,
+            } => {
+                let channel_ids: Vec<u16> = channels.iter().map(|&(i, _)| i).collect();
+
+                let skip_channel_join = early_capability.is_some_and(|client| {
+                    client.contains(gcc::ClientEarlyCapabilityFlags::SUPPORT_SKIP_CHANNELJOIN)
+                });
+
+                let server_blocks = create_gcc_blocks(
+                    self.io_channel_id,
+                    channel_ids.clone(),
+                    requested_protocol,
+                    skip_channel_join,
+                    self.message_channel_id,
+                );
+
+                let settings_response = mcs::ConnectResponse {
+                    conference_create_response: gcc::ConferenceCreateResponse::new(
+                        self.user_channel_id,
+                        server_blocks,
+                    )
+                    .map_err(ConnectorError::decode)?,
+                    called_connect_id: 1,
+                    domain_parameters: mcs::DomainParameters::target(),
+                };
+
+                debug!(message = ?settings_response, "Send");
+
+                let written = encode_x224_packet(&settings_response, output)?;
+                let channels = channels
+                    .into_iter()
+                    .filter_map(|(i, c)| c.map(|c| (i, c)))
+                    .collect();
+
+                (
+                    Written::from_size(written)?,
+                    AcceptorState::ChannelConnection {
+                        protocol,
+                        early_capability,
+                        channels,
+                        connection: if skip_channel_join {
+                            ChannelConnectionSequence::skip_channel_join(self.user_channel_id)
+                        } else {
+                            let mut join_channel_ids = channel_ids;
+                            join_channel_ids.extend(self.message_channel_id);
+                            ChannelConnectionSequence::new(
+                                self.user_channel_id,
+                                self.io_channel_id,
+                                join_channel_ids,
+                            )
+                        },
+                    },
+                )
+            }
+
+            AcceptorState::ChannelConnection {
+                protocol,
+                early_capability,
+                channels,
+                mut connection,
+            } => {
+                let written = connection.step(input, output)?;
+                let state = if connection.is_done() {
+                    AcceptorState::RdpSecurityCommencement {
+                        protocol,
+                        early_capability,
+                        channels,
+                    }
+                } else {
+                    AcceptorState::ChannelConnection {
+                        protocol,
+                        early_capability,
+                        channels,
+                        connection,
+                    }
+                };
+
+                (written, state)
+            }
+
+            AcceptorState::RdpSecurityCommencement {
+                protocol,
+                early_capability,
+                channels,
+                ..
+            } => (
+                Written::Nothing,
+                AcceptorState::SecureSettingsExchange {
+                    protocol,
+                    early_capability,
+                    channels,
+                },
+            ),
+
+            AcceptorState::SecureSettingsExchange {
+                protocol,
+                early_capability,
+                channels,
+            } => {
+                let data: X224<mcs::SendDataRequest<'_>> =
+                    decode(input).map_err(ConnectorError::decode)?;
+                let data = data.0;
+                let client_info: rdp::ClientInfoPdu =
+                    decode(data.user_data.as_ref()).map_err(ConnectorError::decode)?;
+
+                debug!(message = ?client_info, "Received");
+
+                self.client_compression = client_info
+                    .client_info
+                    .flags
+                    .contains(ClientInfoFlags::COMPRESSION)
+                    .then_some(client_info.client_info.compression_type);
+
+                if !protocol.intersects(SecurityProtocol::HYBRID | SecurityProtocol::HYBRID_EX) {
+                    let creds = client_info.client_info.credentials;
+
+                    if let Some(expected) = &self.creds {
+                        if expected != &creds {
+                            // FIXME: How authorization should be denied with standard RDP security?
+                            // Since standard RDP security is not a priority, we just send a ServerDeniedConnection ServerSetErrorInfo PDU.
+                            let info = ServerSetErrorInfoPdu(ErrorInfo::ProtocolIndependentCode(
+                                ProtocolIndependentCode::ServerDeniedConnection,
+                            ));
+
+                            debug!(message = ?info, "Send");
+
+                            util::encode_send_data_indication(
+                                self.user_channel_id,
+                                self.io_channel_id,
+                                &info,
+                                output,
+                            )?;
+
+                            return Err(ConnectorError::general("invalid credentials"));
+                        }
+                    }
+
+                    // Store credentials for later retrieval via AcceptorResult.
+                    self.received_credentials = Some(creds);
+                }
+
+                (
+                    Written::Nothing,
+                    AcceptorState::LicensingExchange {
+                        early_capability,
+                        channels,
+                    },
+                )
+            }
+
+            AcceptorState::LicensingExchange {
+                early_capability,
+                channels,
+            } => {
+                let license: LicensePdu = LicensingErrorMessage::new_valid_client()
+                    .map_err(ConnectorError::encode)?
+                    .into();
+
+                debug!(message = ?license, "Send");
+
+                let written = util::encode_send_data_indication(
+                    self.user_channel_id,
+                    self.io_channel_id,
+                    &license,
+                    output,
+                )?;
+
+                self.saved_for_reactivation = AcceptorState::CapabilitiesSendServer {
+                    early_capability,
+                    channels: channels.clone(),
+                };
+
+                (
+                    Written::from_size(written)?,
+                    AcceptorState::CapabilitiesSendServer {
+                        early_capability,
+                        channels,
+                    },
+                )
+            }
+
+            AcceptorState::CapabilitiesSendServer {
+                early_capability,
+                channels,
+            } => {
+                let demand_active = rdp::headers::ShareControlHeader {
+                    share_id: 0,
+                    pdu_source: self.io_channel_id,
+                    share_control_pdu: ShareControlPdu::ServerDemandActive(
+                        rdp::capability_sets::ServerDemandActive {
+                            pdu: rdp::capability_sets::DemandActive {
+                                source_descriptor: "".into(),
+                                capability_sets: self.server_capabilities.clone(),
+                            },
+                        },
+                    ),
+                };
+
+                debug!(message = ?demand_active, "Send");
+
+                let written = util::encode_send_data_indication(
+                    self.user_channel_id,
+                    self.io_channel_id,
+                    &demand_active,
+                    output,
+                )?;
+
+                let layout_flag = gcc::ClientEarlyCapabilityFlags::SUPPORT_MONITOR_LAYOUT_PDU;
+                let next_state = if early_capability.is_some_and(|c| c.contains(layout_flag)) {
+                    AcceptorState::MonitorLayoutSend { channels }
+                } else {
+                    AcceptorState::CapabilitiesWaitConfirm { channels }
+                };
+
+                (Written::from_size(written)?, next_state)
+            }
+
+            AcceptorState::MonitorLayoutSend { channels } => {
+                let monitor_layout = rdp::headers::ShareDataPdu::MonitorLayout(
+                    rdp::finalization_messages::MonitorLayoutPdu {
+                        monitors: vec![gcc::Monitor {
+                            left: 0,
+                            top: 0,
+                            right: i32::from(self.desktop_size.width),
+                            bottom: i32::from(self.desktop_size.height),
+                            flags: gcc::MonitorFlags::PRIMARY,
+                        }],
+                    },
+                );
+
+                debug!(message = ?monitor_layout, "Send");
+
+                let share_data = wrap_share_data(monitor_layout, self.io_channel_id);
+
+                let written = util::encode_send_data_indication(
+                    self.user_channel_id,
+                    self.io_channel_id,
+                    &share_data,
+                    output,
+                )?;
+
+                (
+                    Written::from_size(written)?,
+                    AcceptorState::CapabilitiesWaitConfirm { channels },
+                )
+            }
+
+            AcceptorState::CapabilitiesWaitConfirm { ref channels } => {
+                let message = decode::<X224<mcs::McsMessage<'_>>>(input)
+                    .map_err(ConnectorError::decode)
+                    .map(|p| p.0);
+                let message = match message {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        if self.reactivation {
+                            debug!("Dropping unexpected PDU during reactivation");
+                            self.state = prev_state;
+                            return Ok(Written::Nothing);
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                };
+                match message {
+                    mcs::McsMessage::SendDataRequest(data) => {
+                        let capabilities_confirm =
+                            decode::<rdp::headers::ShareControlHeader>(data.user_data.as_ref())
+                                .map_err(ConnectorError::decode);
+                        let capabilities_confirm = match capabilities_confirm {
+                            Ok(capabilities_confirm) => capabilities_confirm,
+                            Err(e) => {
+                                if self.reactivation {
+                                    debug!("Dropping unexpected PDU during reactivation");
+                                    self.state = prev_state;
+                                    return Ok(Written::Nothing);
+                                } else {
+                                    return Err(e);
+                                }
+                            }
+                        };
+
+                        debug!(message = ?capabilities_confirm, "Received");
+
+                        let ShareControlPdu::ClientConfirmActive(confirm) =
+                            capabilities_confirm.share_control_pdu
+                        else {
+                            return Err(ConnectorError::general("expected client confirm active"));
+                        };
+
+                        (
+                            Written::Nothing,
+                            AcceptorState::ConnectionFinalization {
+                                channels: channels.clone(),
+                                finalization: FinalizationSequence::new(
+                                    self.user_channel_id,
+                                    self.io_channel_id,
+                                ),
+                                client_capabilities: confirm.pdu.capability_sets,
+                            },
+                        )
+                    }
+
+                    mcs::McsMessage::DisconnectProviderUltimatum(ultimatum) => {
+                        return Err(reason_err!(
+                            "received disconnect ultimatum",
+                            "{:?}",
+                            ultimatum.reason
+                        ));
+                    }
+
+                    _ => {
+                        warn!(?message, "Unexpected MCS message received");
+
+                        (Written::Nothing, prev_state)
+                    }
+                }
+            }
+
+            AcceptorState::ConnectionFinalization {
+                mut finalization,
+                channels,
+                client_capabilities,
+            } => {
+                let written = finalization.step(input, output)?;
+
+                let state = if finalization.is_done() {
+                    AcceptorState::Accepted {
+                        channels,
+                        client_capabilities,
+                        input_events: finalization.into_input_events(),
+                    }
+                } else {
+                    AcceptorState::ConnectionFinalization {
+                        finalization,
+                        channels,
+                        client_capabilities,
+                    }
+                };
+
+                (written, state)
+            }
+
+            _ => unreachable!(),
+        };
+
+        self.state = next_state;
+        Ok(written)
+    }
+}
+
+fn create_gcc_blocks(
+    io_channel: u16,
+    channel_ids: Vec<u16>,
+    requested: SecurityProtocol,
+    skip_channel_join: bool,
+    message_channel_id: Option<u16>,
+) -> gcc::ServerGccBlocks {
+    gcc::ServerGccBlocks {
+        core: gcc::ServerCoreData {
+            version: gcc::RdpVersion::V5_PLUS,
+            optional_data: gcc::ServerCoreOptionalData {
+                client_requested_protocols: Some(requested),
+                early_capability_flags: skip_channel_join
+                    .then_some(gcc::ServerEarlyCapabilityFlags::SKIP_CHANNELJOIN_SUPPORTED),
+            },
+        },
+        security: gcc::ServerSecurityData::no_security(),
+        network: gcc::ServerNetworkData {
+            channel_ids,
+            io_channel,
+        },
+        message_channel: message_channel_id.map(|id| gcc::ServerMessageChannelData {
+            mcs_message_channel_id: id,
+        }),
+        multi_transport_channel: None,
+    }
+}

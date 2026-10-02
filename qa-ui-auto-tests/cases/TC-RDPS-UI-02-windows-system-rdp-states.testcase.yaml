@@ -1,0 +1,145 @@
+id: TC-RDPS-UI-02-windows-system-rdp-states
+title: Windows system Remote Desktop states - enable via settings, needs administrator, Home edition and non-Windows
+description: |
+  V-02 (docs-feature/rdp-server-parity-design.md AC-02/AC-03/AC-05). Browser
+  preview stub scenarios: enable-system (admin, disabled) offers "Open
+  system settings" both on the card and in the Start dialog and never starts
+  Taomni from that branch; needs-admin asks before using Taomni and cancel
+  keeps the server stopped; a Home edition starts without any system-RDP
+  prompt; without a scenario (macOS/Linux) the card is absent.
+covers:
+- F-RdpServer-1
+tags:
+- rdp
+- rdp-server
+- servers
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}?servers=main&stubSystemRdp=enable-system
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- wait_for: '[data-testid="rdp-system-card"][data-state="enable-system"]'
+- click: '[data-testid="rdp-system-open-settings"]'
+- eval_readonly:
+    expression: window.__taomniStubSystemRdpSettingsOpened === 1
+- click: '[data-testid="server-row-rdp-start"]'
+- wait_for: '[data-testid="choice-dialog"]'
+- click: '[data-testid="choice-dialog-primary"]'
+- wait_for: '[data-testid="server-row-rdp"][data-status="stopped"]'
+- eval_readonly:
+    expression: window.__taomniStubSystemRdpSettingsOpened === 2
+- assert_not_visible: '[data-testid="vault-setup-dialog"]'
+- open: ${cfg.app.base_url}?servers=main&stubSystemRdp=needs-admin
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- wait_for: '[data-testid="rdp-system-card"][data-state="needs-admin"]'
+- assert_not_visible: '[data-testid="rdp-system-open-settings"]'
+- click: '[data-testid="server-row-rdp-start"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- wait_for: '[data-testid="server-row-rdp"][data-status="stopped"]'
+- assert_not_visible: '[data-testid="vault-setup-dialog"]'
+- open: ${cfg.app.base_url}?servers=main&stubSystemRdp=home
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- wait_for: '[data-testid="rdp-system-card"][data-state="taomni"]'
+- click: '[data-testid="server-row-rdp-start"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- assert_not_visible: '[data-testid="choice-dialog"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- open: ${cfg.app.base_url}?servers=main
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- assert_visible: '[data-testid="rdp-field-username"]'
+- assert_count:
+    selector: '[data-testid="rdp-system-card"]'
+    equal: 0
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: An administrator with Remote Desktop off can open the system settings from the card and from Start, and that branch never starts Taomni.
+    actions:
+    - 5
+    - 7
+    - 9
+    checkpoints:
+    - step: 4
+      expectation: The card is in the enable-system state.
+    - step: 6
+      expectation: The card button invoked the settings command once.
+    - step: 10
+      expectation: The RDP row is stopped after choosing system settings.
+    - step: 11
+      expectation: The dialog button invoked the settings command a second time.
+    - step: 12
+      expectation: No vault prompt (the start was abandoned).
+    results:
+    - 11
+    - 12
+  - id: R2
+    requirement: A non-administrator is asked before using Taomni; cancel keeps the server stopped.
+    actions:
+    - 18
+    - 20
+    checkpoints:
+    - step: 16
+      expectation: The card is in the needs-admin state.
+    - step: 17
+      expectation: No settings button is offered without administrator rights.
+    - step: 21
+      expectation: The RDP row is stopped after cancel.
+    - step: 22
+      expectation: No vault prompt appears.
+    results:
+    - 21
+    - 22
+  - id: R3
+    requirement: A Home edition starts Taomni without a system Remote Desktop prompt.
+    actions:
+    - 27
+    checkpoints:
+    - step: 26
+      expectation: The card explains the edition cannot host Remote Desktop.
+    - step: 28
+      expectation: The start goes straight to the vault prompt.
+    - step: 29
+      expectation: No choice dialog.
+    - step: 30
+      expectation: No confirm dialog.
+    results:
+    - 28
+    - 29
+    - 30
+  - id: R4
+    requirement: Without Windows the card is absent and the RDP form is unchanged.
+    actions:
+    - 33
+    checkpoints:
+    - step: 34
+      expectation: The RDP form renders.
+    - step: 35
+      expectation: No system Remote Desktop card exists.
+    results:
+    - 35
+  native:
+  - check: Real detection and settings launch are not exercised here.
+    method: external
+    reason: Covered natively by TC-RDPS-NAT-06 on the Windows runner.
+  visual:
+  - check: Layout is not compared visually.
+    method: not-applicable
+    reason: Assertions target states and invoked commands.

@@ -417,7 +417,7 @@ impl Drop for SckCapturer {
     }
 }
 
-fn shareable_content() -> anyhow::Result<Retained<SCShareableContent>> {
+pub(crate) fn shareable_content() -> anyhow::Result<Retained<SCShareableContent>> {
     let (sender, receiver) = mpsc::sync_channel(1);
     let completion = RcBlock::new(
         move |content: *mut SCShareableContent, error: *mut NSError| {
@@ -456,7 +456,7 @@ fn shareable_content() -> anyhow::Result<Retained<SCShareableContent>> {
         })?
 }
 
-fn select_display(
+pub(crate) fn select_display(
     content: &SCShareableContent,
     display_id: Option<&str>,
 ) -> anyhow::Result<(Retained<SCDisplay>, u32)> {
@@ -492,7 +492,7 @@ fn select_display(
     Ok((selected, id))
 }
 
-fn start_stream(stream: &SCStream) -> anyhow::Result<()> {
+pub(crate) fn start_stream(stream: &SCStream) -> anyhow::Result<()> {
     let (sender, receiver) = mpsc::sync_channel(1);
     let completion = RcBlock::new(move |error: *mut NSError| {
         let result = if error.is_null() {
@@ -551,7 +551,7 @@ fn update_stream_configuration(
         })?
 }
 
-fn stop_stream(stream: &SCStream) {
+pub(crate) fn stop_stream(stream: &SCStream) {
     let (sender, receiver) = mpsc::sync_channel(1);
     let completion = RcBlock::new(move |_error: *mut NSError| {
         let _ = sender.send(());

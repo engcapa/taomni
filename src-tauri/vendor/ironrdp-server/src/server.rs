@@ -241,6 +241,12 @@ impl CredentialValidator for ExactMatchCredentialValidator {
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct RdpServerOptions {
+    /// Bulk compression is opt-in and negotiated separately for each connection.
+    pub bulk_compression: bool,
+    /// Optional aggregate display encoder counters.
+    pub encoder_stats: Option<Arc<crate::EncoderStats>>,
+    /// Called for each static channel actually joined by the peer.
+    pub channel_observer: Option<Arc<dyn Fn(&str) + Send + Sync>>,
     pub addr: SocketAddr,
     pub security: RdpServerSecurity,
     pub codecs: BitmapCodecs,
@@ -493,6 +499,17 @@ pub struct RdpServer {
     /// so display backends can read a fresh, frame-traffic-independent network
     /// RTT for flow control.
     autodetect_rtt: Arc<AtomicU32>,
+
+    /// Application DVCs added to every connection (for example AUDIO_INPUT).
+    dvc_factory: Option<Box<dyn DvcServerFactory>>,
+}
+
+/// Adds application-defined server dynamic virtual channels to the DRDYNVC
+/// channel of each new connection. The server offers every registered DVC
+/// after the DRDYNVC capability exchange; a client without a matching
+/// listener declines it.
+pub trait DvcServerFactory: Send {
+    fn attach(&self, drdynvc: dvc::DrdynvcServer) -> dvc::DrdynvcServer;
 }
 
 #[derive(Debug)]
@@ -580,7 +597,14 @@ impl RdpServer {
                 handle.store(u32::MAX, Ordering::Relaxed);
                 handle
             },
+            dvc_factory: None,
         }
+    }
+
+    /// Set or clear the factory that adds application DVCs to each
+    /// connection's DRDYNVC channel (see [`DvcServerFactory`]).
+    pub fn set_dvc_factory(&mut self, factory: Option<Box<dyn DvcServerFactory>>) {
+        self.dvc_factory = factory;
     }
 
     pub fn builder() -> builder::RdpServerBuilder<builder::WantsAddr> {
@@ -732,6 +756,11 @@ impl RdpServer {
             dvc
         };
 
+        let dvc = match self.dvc_factory.as_deref() {
+            Some(factory) => factory.attach(dvc),
+            None => dvc,
+        };
+
         acceptor.attach_static_channel(dvc);
     }
 
@@ -832,6 +861,11 @@ impl RdpServer {
         // here also covers backends that share an externally-created Arc via
         // `set_display_suppressed_handle()`.
         self.display_suppressed.store(false, Ordering::Relaxed);
+        // RTT samples and the base RTT describe one client's network path.
+        if self.autodetect.is_some() {
+            self.autodetect = Some(AutoDetectManager::new());
+            self.autodetect_rtt.store(u32::MAX, Ordering::Relaxed);
+        }
 
         let framed = TokioFramed::new(stream);
 
@@ -1132,7 +1166,7 @@ impl RdpServer {
     ) -> Result<(RunState, UpdateEncoder)> {
         if let DisplayUpdate::Resize(desktop_size) = update {
             debug!(?desktop_size, "Display resize");
-            encoder.set_desktop_size(desktop_size);
+            encoder.set_desktop_size(desktop_size)?;
             deactivate_all(io_channel_id, user_channel_id, writer).await?;
             return Ok((RunState::DeactivationReactivation { desktop_size }, encoder));
         }
@@ -1148,7 +1182,7 @@ impl RdpServer {
                 buffer.resize(fragmenter.size_hint(), 0);
             }
 
-            while let Some(len) = fragmenter.next(buffer) {
+            while let Some(len) = encoder_iter.encode_fragment(&mut fragmenter, buffer)? {
                 writer
                     .write_all(&buffer[..len])
                     .await
@@ -1330,6 +1364,16 @@ impl RdpServer {
                             user_channel_id,
                         )?;
                         writer.write_all(&data).await?;
+                        // Periodically tell the client what was measured, as
+                        // Windows does once its detection settles.
+                        if let Some(result) = ad.network_characteristics() {
+                            let data = encode_autodetect_request(
+                                result,
+                                message_channel_id,
+                                user_channel_id,
+                            )?;
+                            writer.write_all(&data).await?;
+                        }
                     }
                 }
             }
@@ -1509,6 +1553,21 @@ impl RdpServer {
 
         self.static_channels = result.static_channels;
         if !result.reactivation {
+            if let Some(observer) = &self.opts.channel_observer {
+                for (type_id, channel) in self.static_channels.iter() {
+                    if self
+                        .static_channels
+                        .get_channel_id_by_type_id(type_id)
+                        .is_some()
+                    {
+                        if let Some(name) = channel.channel_name().as_str() {
+                            observer(name);
+                        }
+                    }
+                }
+            }
+        }
+        if !result.reactivation {
             for (_type_id, channel, channel_id) in self.static_channels.iter_mut() {
                 debug!(?channel, ?channel_id, "Start");
                 let Some(channel_id) = channel_id else {
@@ -1623,7 +1682,14 @@ impl RdpServer {
             update_codecs,
             self.opts.max_request_size,
         )
-        .context("failed to initialize update encoder")?;
+        .context("failed to initialize update encoder")?
+        .with_bulk_compression(
+            self.opts
+                .bulk_compression
+                .then_some(result.client_compression)
+                .flatten(),
+            self.opts.encoder_stats.clone(),
+        )?;
 
         let state = self
             .client_loop(

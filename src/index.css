@@ -1408,6 +1408,12 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
   50% { opacity: 0; }
 }
 
+/* Keep the gutter inside xterm so dragging from it selects the first column.
+   FitAddon accounts for this padding when calculating the terminal width. */
+.terminal-host > .xterm {
+  padding-left: 8px;
+}
+
 .terminal-hide-scrollbar .xterm-viewport {
   scrollbar-width: none;
 }
