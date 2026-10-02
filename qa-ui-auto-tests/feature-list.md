@@ -10138,6 +10138,43 @@ controls:
 - 轻量核心与完整备份都包含 `databases/mfa.db`；自定义范围勾选 MFA 时强制同时包含 `vault.db`（数据密钥在保险库中）。从未使用 MFA 的配置不生成 `mfa.db`。
 - 恢复时替换 `mfa.db` 并为原文件保留安全副本；恢复后若保险库与 `mfa.db` 不匹配，MFA 标签提示并提供清空重建入口。
 
+### 27.4 后台自动备份 ✅
+
+<!-- feature
+id: F-BACKUP-1
+status: done
+area: settings/backup
+components: [BackupSettingsPanel]
+files:
+  - src-tauri/src/backup/scheduler.rs
+  - src-tauri/src/backup/coordination.rs
+  - src-tauri/src/backup/mod.rs
+  - src-tauri/src/backup/policy.rs
+  - src-tauri/src/backup/engine.rs
+  - src/stores/backupStore.ts
+  - src/components/settings/BackupSettingsPanel.tsx
+controls:
+  - id: auto-toggle
+    selector: '[data-testid="backup-auto-toggle"]'
+    kind: interactive
+  - id: frequency
+    selector: '[data-testid="backup-frequency"]'
+    kind: interactive
+  - id: retained-copies
+    selector: '[data-testid="backup-retained-copies"]'
+    kind: interactive
+  - id: last-success
+    selector: '[data-testid="backup-last-success"]'
+    kind: display
+  - id: history-refresh
+    selector: '[data-testid="backup-history-refresh"]'
+    kind: interactive
+-->
+
+- 原生后台在启动时及运行中每分钟检查到期备份；daily/weekly 距上次成功备份满 24 小时/7 天触发，休眠恢复后补做一次当前快照，失败后下次检查重试。`on_exit` 在正常退出前完成备份。
+- 手动与自动备份串行执行，自动备份使用配置范围、目录和保留数量；完成后设置页自动刷新历史和上次成功时间。策略更新保留后台最新时间戳。
+- 共用同一数据目录的实例以系统文件锁协调备份、策略更新、轮转、删除和恢复读取；获得锁后重读策略，daily/weekly 每个到期周期只生成一次。锁在进程退出或崩溃后自动释放。设置页打开期间每 15 秒读取共享历史和策略，显示其他实例的结果。
+
 ---
 
 

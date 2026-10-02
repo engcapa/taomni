@@ -23,6 +23,7 @@ import {
 } from "../../lib/ipc";
 import { relaunchApp } from "../../lib/updateService";
 import type { BackupManifest, BackupScope } from "../../lib/backup";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export function BackupSettingsPanel() {
   const t = useT();
@@ -67,6 +68,34 @@ export function BackupSettingsPanel() {
     void loadAll();
     void refreshVault();
   }, [loadAll, refreshVault]);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: UnlistenFn | undefined;
+    // Tauri events stay within one process. Read shared history and policy
+    // while this panel is open to observe backups made by another instance.
+    const refreshTimer = window.setInterval(() => {
+      if (!disposed) void refreshHistory();
+    }, 15_000);
+    void listen("backup-completed", () => {
+      if (!disposed) void refreshHistory();
+    }).then((stop) => {
+      if (disposed) {
+        stop();
+      } else {
+        unlisten = stop;
+        // Close the gap between the initial load and listener registration.
+        void refreshHistory();
+      }
+    }).catch((error) => {
+      console.error("Failed to listen for backup completion", error);
+    });
+    return () => {
+      disposed = true;
+      window.clearInterval(refreshTimer);
+      unlisten?.();
+    };
+  }, [refreshHistory]);
 
   const effectiveBackupDir = policy?.customBackupDir?.trim() || defaultBackupDir;
   const isCustomDir = Boolean(policy?.customBackupDir?.trim());
@@ -427,6 +456,8 @@ export function BackupSettingsPanel() {
           <div
             role="button"
             tabIndex={0}
+            data-testid="backup-auto-toggle"
+            aria-pressed={policy.autoBackupEnabled}
             className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
               policy.autoBackupEnabled
                 ? "border-[var(--taomni-accent)]/40 bg-[var(--taomni-accent)]/5"
@@ -472,6 +503,7 @@ export function BackupSettingsPanel() {
                   {t("backupSettings.frequencyLabel")}
                 </label>
                 <select
+                  data-testid="backup-frequency"
                   value={policy.frequency}
                   onChange={(e) =>
                     void updatePolicy({
@@ -491,6 +523,7 @@ export function BackupSettingsPanel() {
                   {t("backupSettings.maxCopiesLabel")}
                 </label>
                 <input
+                  data-testid="backup-retained-copies"
                   type="number"
                   min={1}
                   max={30}
@@ -508,7 +541,7 @@ export function BackupSettingsPanel() {
 
           <div className="text-xs text-theme-muted flex items-center justify-between pt-1">
             <span>{t("backupSettings.lastBackupLabel")}:</span>
-            <span className="font-mono">
+            <span data-testid="backup-last-success" className="font-mono">
               {policy.lastBackupAt
                 ? new Date(policy.lastBackupAt).toLocaleString()
                 : t("backupSettings.neverBackedUp")}
@@ -549,6 +582,7 @@ export function BackupSettingsPanel() {
               </h4>
               <button
                 type="button"
+                data-testid="backup-history-refresh"
                 onClick={() => void refreshHistory()}
                 className="p-1 rounded text-theme-muted hover:text-theme-text"
                 title="刷新"

@@ -70,6 +70,7 @@ from . import release_build_required
 from . import rdp_baseline_required
 from . import rdp_audio_required
 from . import xrdp_server_required
+from . import backup_policy
 
 
 class FixtureContext(Protocol):
@@ -87,6 +88,7 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "backup_policy": Fixture("backup_policy", backup_policy.setup),
     "project_tree": Fixture("project_tree", project_tree.setup),
     "reset_db":     Fixture("reset_db",     reset_db.setup,     reset_db.teardown),
     "ssh_required": Fixture("ssh_required", ssh_required.setup),
