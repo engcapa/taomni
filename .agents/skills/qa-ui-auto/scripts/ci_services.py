@@ -233,6 +233,22 @@ class Services:
                 print(f"service cleanup: {type(exc).__name__}", flush=True)
         self.stack.callback(cleanup)
 
+    def cleanup_action(self, label, action):
+        """Register one teardown action that must never fail the entry.
+
+        Setup failures stay fatal: without the fixture the selected cases
+        cannot run. Teardown runs after every case and its receipt is
+        written, so a locked host key, an already removed account or a
+        stopped service is a logged cleanup note, not an infrastructure
+        error for an otherwise green entry.
+        """
+        def cleanup():
+            try:
+                action()
+            except Exception as exc:
+                print(f"service cleanup ({label}): {type(exc).__name__}: {exc}", flush=True)
+        self.stack.callback(cleanup)
+
     def start_process(self, argv, name):
         log = self.stack.enter_context((self.root / f"{name}.log").open("w", encoding="utf-8"))
         process = subprocess.Popen([str(a) for a in argv], stdout=log, stderr=subprocess.STDOUT)
@@ -306,7 +322,7 @@ class Services:
                        "$cred=[PSCredential]::new($env:QA_SERVICE_USER,$pw); "
                        "Start-Process $env:WINDIR\\System32\\cmd.exe -Credential $cred -LoadUserProfile "
                        "-ArgumentList '/c exit 0' -Wait")
-            self.stack.callback(lambda: powershell("Remove-LocalUser -Name $env:QA_SERVICE_USER"))
+            self.cleanup_action("local-ssh-user", lambda: powershell("Remove-LocalUser -Name $env:QA_SERVICE_USER"))
             remote_dir = f"C:/qa-temp-{user}"
             powershell(f"New-Item -ItemType Directory -Force '{remote_dir}' | Out-Null; "
                        f"icacls '{remote_dir}' /grant '{user}:(OI)(CI)F' | Out-Null")
@@ -334,7 +350,10 @@ class Services:
             standard.parent.mkdir(parents=True, exist_ok=True)
             (standard.parent / "logs").mkdir(exist_ok=True)
             previous = standard.read_bytes() if standard.exists() else None
-            self.stack.callback(lambda: standard.write_bytes(previous) if previous is not None else standard.unlink(missing_ok=True))
+            self.cleanup_action(
+                "sshd-config-restore",
+                lambda: standard.write_bytes(previous) if previous is not None else standard.unlink(missing_ok=True),
+            )
             standard.write_text("\n".join(lines + ["SyslogFacility LOCAL0"]) + "\n", encoding="utf-8")
             command(["icacls", str(standard), "/inheritance:r", "/grant:r", "*S-1-5-18:F", "*S-1-5-32-544:F"])
             command(["icacls", str(standard), "/setowner", "*S-1-5-32-544"])
@@ -347,8 +366,8 @@ class Services:
                 log = standard.parent / "logs/sshd.log"
                 if log.is_file():
                     shutil.copy2(log, self.root / "sshd.log")
-            self.stack.callback(collect_windows_logs)
-            self.stack.callback(lambda: powershell("Stop-Service sshd -ErrorAction SilentlyContinue"))
+            self.cleanup_action("sshd-logs", collect_windows_logs)
+            self.cleanup_action("sshd-stop", lambda: powershell("Stop-Service sshd -ErrorAction SilentlyContinue"))
             try:
                 powershell("Start-Service sshd")
             except Exception:
@@ -379,7 +398,7 @@ class Services:
             client.connect("127.0.0.1", port, user, password, timeout=5,
                            banner_timeout=5, auth_timeout=5, allow_agent=False, look_for_keys=False)
         retry(probe)
-        self.stack.callback(client.close)
+        self.cleanup_action("ssh-probe-client", client.close)
         nonce = secrets.token_hex(12)
         _, stdout, stderr = client.exec_command(f"echo {nonce}", timeout=60)
         output = stdout.read().decode(errors="replace")

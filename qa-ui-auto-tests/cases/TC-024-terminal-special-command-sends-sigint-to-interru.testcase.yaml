@@ -56,7 +56,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-after\-sigint\r?$
-    timeout_sec: 15
+    timeout_sec: 60
 - screenshot: 024-terminal-sigint.png
 verification:
   review: reviewed

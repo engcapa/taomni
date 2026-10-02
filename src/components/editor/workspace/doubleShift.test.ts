@@ -52,6 +52,37 @@ describe("createDoubleShiftDetector", () => {
     expect(onTrigger).not.toHaveBeenCalled();
   });
 
+  it("cancels the gesture when a pointer press happens between the taps", () => {
+    const onTrigger = vi.fn();
+    let time = 0;
+    const detector = createDoubleShiftDetector(onTrigger, 400, () => time);
+
+    // Shift+click: the modifier release is not a clean tap.
+    detector.handleKeyDown(shiftDown());
+    detector.handlePointerDown();
+    detector.handleKeyUp(shiftUp());
+    time = 300;
+    detector.handleKeyDown(shiftDown());
+    detector.handleKeyUp(shiftUp());
+
+    expect(onTrigger).not.toHaveBeenCalled();
+  });
+
+  it("still triggers when two clean taps are not interrupted by a press", () => {
+    const onTrigger = vi.fn();
+    let time = 0;
+    const detector = createDoubleShiftDetector(onTrigger, 400, () => time);
+
+    detector.handlePointerDown();
+    detector.handleKeyDown(shiftDown());
+    detector.handleKeyUp(shiftUp());
+    time = 200;
+    detector.handleKeyDown(shiftDown());
+    detector.handleKeyUp(shiftUp());
+
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores ctrl+shift chords", () => {
     const onTrigger = vi.fn();
     const detector = createDoubleShiftDetector(onTrigger, 400, () => 0);

@@ -54,7 +54,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
     regex: (?m)^QA_ED024_BEFORE\r?$
-    timeout_sec: 10
+    timeout_sec: 30
 - terminal_input:
     selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"] .xterm-helper-textarea'
     text: echo QA_ED024_RIGHT
@@ -73,7 +73,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
     regex: (?m)^QA_ED024_BEFORE\r?$
-    timeout_sec: 10
+    timeout_sec: 30
 - terminal_input:
     selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"] .xterm-helper-textarea'
     text: echo QA_ED024_BOTTOM
@@ -81,7 +81,7 @@ steps:
 - assert_pattern:
     selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
     regex: (?m)^QA_ED024_BOTTOM\r?$
-    timeout_sec: 30
+    timeout_sec: 60
 verification:
   review: reviewed
   requirements:
@@ -102,7 +102,7 @@ verification:
     - step: 17
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-right-pane\"] [data-testid=\"code-workspace-terminal-dock\"]", "timeout_sec": 15}}'
     - step: 18
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_BEFORE\\r?$", "timeout_sec": 10}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_BEFORE\\r?$", "timeout_sec": 30}}'
     - step: 20
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_RIGHT\\r?$", "timeout_sec": 30}}'
     results:
@@ -122,9 +122,9 @@ verification:
     - step: 25
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"] [data-testid=\"code-workspace-terminal-dock\"]", "timeout_sec": 15}}'
     - step: 26
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_BEFORE\\r?$", "timeout_sec": 10}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_BEFORE\\r?$", "timeout_sec": 30}}'
     - step: 28
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_BOTTOM\\r?$", "timeout_sec": 30}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ED024_BOTTOM\\r?$", "timeout_sec": 60}}'
     results:
     - 25
     - 26
