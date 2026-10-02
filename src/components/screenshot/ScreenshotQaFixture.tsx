@@ -106,7 +106,9 @@ function PixelFixture({ animated }: { animated: boolean }) {
     if (!root || !canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const width = root.clientWidth;
+    // WebKit's overlay scrollbar can cover pixels without reducing clientWidth.
+    // Keep its entire gutter outside both the drawn canvas and capture region.
+    const width = root.clientWidth - (animated ? 0 : 8);
     const height = animated ? root.clientHeight : ROWS * 48;
     const scale = window.devicePixelRatio || 1;
     canvas.width = Math.round(width * scale);
@@ -141,7 +143,7 @@ function PixelFixture({ animated }: { animated: boolean }) {
     };
   }, [animated]);
   return (
-    <div ref={rootRef} data-testid="screenshot-qa-fixture-ready" style={{ position: "fixed", inset: 0, overflowY: animated ? "hidden" : "scroll", background: "#ffffff", scrollBehavior: "auto" }}>
+    <div ref={rootRef} data-testid="screenshot-qa-fixture-ready" style={{ position: "fixed", inset: 0, paddingRight: animated ? 0 : 8, overflowY: animated ? "hidden" : "scroll", background: "#ffffff", scrollBehavior: "auto" }}>
       <canvas ref={canvasRef} style={{ display: "block" }} />
     </div>
   );

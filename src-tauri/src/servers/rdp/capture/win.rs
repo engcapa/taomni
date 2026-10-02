@@ -1,13 +1,15 @@
 //! Windows console capture for the embedded RDP server.
 //!
 //! The hot path uses xcap's Windows Graphics Capture (WGC) video recorder. It
-//! owns a bounded (zero-capacity) hand-off from the native capture callback, so
-//! a slow RDP encoder can never make native frames accumulate in memory. A GDI
+//! drains the native callback into a latest-frame mailbox. Slow consumers never
+//! block WGC's callback or accumulate stale frames. A GDI
 //! screenshot is retained as a compatibility fallback for sessions where WGC
 //! is unavailable (for example an older build, a remote/locked desktop, or a
 //! driver that rejects the capture session).
 
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use super::{Capturer, Frame};
@@ -35,22 +37,107 @@ struct MonitorKey {
     height: u32,
 }
 
+#[derive(Default)]
+struct FrameMailbox {
+    state: Mutex<MailboxState>,
+    ready: Condvar,
+}
+
+#[derive(Default)]
+struct MailboxState {
+    latest: Option<(xcap::Frame, Instant)>,
+    stopped: bool,
+}
+
+impl FrameMailbox {
+    fn publish(&self, frame: xcap::Frame, captured_at: Instant) -> bool {
+        let Ok(mut state) = self.state.lock() else {
+            return false;
+        };
+        if state.stopped {
+            return false;
+        }
+        state.latest = Some((frame, captured_at));
+        self.ready.notify_one();
+        true
+    }
+
+    fn stop(&self) {
+        if let Ok(mut state) = self.state.lock() {
+            state.stopped = true;
+            state.latest = None;
+        }
+        self.ready.notify_all();
+    }
+
+    fn stopped(&self) -> bool {
+        self.state.lock().map_or(true, |state| state.stopped)
+    }
+
+    fn take(&self, wait: Duration) -> Result<Option<(xcap::Frame, Instant)>, RecvTimeoutError> {
+        let deadline = Instant::now() + wait;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| RecvTimeoutError::Disconnected)?;
+        loop {
+            if state.stopped {
+                return Err(RecvTimeoutError::Disconnected);
+            }
+            if let Some(frame) = state.latest.take() {
+                return Ok(Some(frame));
+            }
+            let now = Instant::now();
+            if now >= deadline {
+                return Ok(None);
+            }
+            (state, _) = self
+                .ready
+                .wait_timeout(state, deadline - now)
+                .map_err(|_| RecvTimeoutError::Disconnected)?;
+        }
+    }
+}
+
+fn pump_frames(frames: Receiver<xcap::Frame>, mailbox: Arc<FrameMailbox>) {
+    // xcap sends through a zero-capacity channel and WGC itself retains two
+    // frames. Always drain that handoff so encoding/pacing cannot pin an old
+    // callback and make successive screen samples hundreds of ms late.
+    while !mailbox.stopped() {
+        match frames.recv_timeout(FRAME_WAIT) {
+            Ok(frame) => {
+                if !mailbox.publish(frame, Instant::now()) {
+                    break;
+                }
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => break,
+        }
+    }
+    mailbox.stop();
+    // Drop the receiver before Close joins any outstanding WGC callback.
+}
+
 enum Backend {
     Recorder {
         recorder: xcap::VideoRecorder,
-        frames: Receiver<xcap::Frame>,
+        mailbox: Arc<FrameMailbox>,
+        pump: JoinHandle<()>,
     },
     Gdi,
 }
 
 impl Backend {
     fn stop(&mut self) {
-        // xcap's WGC callback sends through a zero-capacity channel. Drop the
-        // receiver first so an in-flight callback cannot stay blocked while
-        // Close waits for native capture callbacks to finish.
         let previous = std::mem::replace(self, Self::Gdi);
-        if let Self::Recorder { recorder, frames } = previous {
-            drop(frames);
+        if let Self::Recorder {
+            recorder,
+            mailbox,
+            pump,
+        } = previous
+        {
+            mailbox.stop();
+            let _ = pump.join();
             let _ = recorder.stop();
         }
     }
@@ -204,11 +291,11 @@ impl WindowsCapturer {
     }
 
     fn next_recorder_frame(&mut self, wait: Duration) -> anyhow::Result<Option<Frame>> {
-        let Backend::Recorder { frames, .. } = &mut self.backend else {
+        let Backend::Recorder { mailbox, .. } = &self.backend else {
             return Ok(None);
         };
-        match frames.recv_timeout(wait) {
-            Ok(frame) => {
+        match mailbox.take(wait) {
+            Ok(Some((frame, captured_at))) => {
                 let width = checked_dimension_u32(frame.width)
                     .ok_or_else(|| anyhow::anyhow!("WGC returned an invalid frame width"))?;
                 let height = checked_dimension_u32(frame.height)
@@ -230,9 +317,11 @@ impl WindowsCapturer {
                     .ok_or_else(|| anyhow::anyhow!("Windows frame stride overflow"))?;
                 self.width = width;
                 self.height = height;
-                Ok(Some(Frame::bgra(rgba, 0, 0, width, height, stride)))
+                let mut frame = Frame::bgra(rgba, 0, 0, width, height, stride);
+                frame.captured_at = captured_at;
+                Ok(Some(frame))
             }
-            Err(RecvTimeoutError::Timeout) => Ok(None),
+            Ok(None) | Err(RecvTimeoutError::Timeout) => Ok(None),
             Err(RecvTimeoutError::Disconnected) => {
                 self.restart_recorder();
                 Ok(None)
@@ -456,7 +545,24 @@ fn start_recorder(monitor: &xcap::Monitor) -> anyhow::Result<Backend> {
     recorder
         .start()
         .map_err(|error| anyhow::anyhow!("WGC video recorder start failed: {error}"))?;
-    Ok(Backend::Recorder { recorder, frames })
+    let mailbox = Arc::new(FrameMailbox::default());
+    let target = mailbox.clone();
+    let pump = match std::thread::Builder::new()
+        .name("windows-capture-latest".into())
+        .spawn(move || pump_frames(frames, target))
+    {
+        Ok(pump) => pump,
+        Err(error) => {
+            // Failed spawn drops the moved receiver before stopping callbacks.
+            let _ = recorder.stop();
+            return Err(error.into());
+        }
+    };
+    Ok(Backend::Recorder {
+        recorder,
+        mailbox,
+        pump,
+    })
 }
 
 fn select_monitor(requested: Option<&str>) -> anyhow::Result<(xcap::Monitor, MonitorKey)> {
@@ -551,7 +657,48 @@ pub(crate) fn probe_displays() -> anyhow::Result<Vec<super::CaptureDisplay>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{checked_frame_bytes, rgba_to_bgra};
+    use super::*;
+
+    #[test]
+    fn slow_consumers_receive_only_the_latest_frame_and_its_timestamp() {
+        let mailbox = FrameMailbox::default();
+        let first = Instant::now();
+        let latest = first + Duration::from_millis(300);
+        assert!(mailbox.publish(xcap::Frame::new(1, 1, vec![1; 4]), first));
+        assert!(mailbox.publish(xcap::Frame::new(1, 1, vec![2; 4]), latest));
+        let (frame, at) = mailbox.take(Duration::ZERO).unwrap().unwrap();
+        assert_eq!(frame.raw, vec![2; 4]);
+        assert_eq!(at, latest);
+        assert!(mailbox.take(Duration::ZERO).unwrap().is_none());
+        mailbox.stop();
+        assert!(!mailbox.publish(xcap::Frame::new(1, 1, vec![3; 4]), latest));
+        assert!(matches!(
+            mailbox.take(Duration::ZERO),
+            Err(RecvTimeoutError::Disconnected)
+        ));
+    }
+
+    #[test]
+    fn pump_disconnects_a_blocked_native_producer_on_stop() {
+        let (tx, rx) = std::sync::mpsc::sync_channel(0);
+        let mailbox = Arc::new(FrameMailbox::default());
+        let target = mailbox.clone();
+        let pump = std::thread::spawn(move || pump_frames(rx, target));
+        let producer = std::thread::spawn(move || {
+            for i in 0..100 {
+                if tx.send(xcap::Frame::new(1, 1, vec![i; 4])).is_err() {
+                    return;
+                }
+            }
+        });
+        mailbox.stop();
+        pump.join().unwrap();
+        producer.join().unwrap();
+        assert!(matches!(
+            mailbox.take(Duration::ZERO),
+            Err(RecvTimeoutError::Disconnected)
+        ));
+    }
 
     #[test]
     fn swaps_only_complete_rgba_pixels() {

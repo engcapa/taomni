@@ -17,7 +17,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
 use image::RgbaImage;
@@ -414,6 +414,7 @@ pub struct FrameSource {
     display: DisplayInfo,
     backend: Backend,
     last: Option<RgbaImage>,
+    captured_at: Option<Instant>,
     region: Option<(u32, u32, u32, u32)>,
     #[cfg(target_os = "linux")]
     desktop_origin: (i32, i32),
@@ -452,6 +453,7 @@ impl FrameSource {
             display,
             backend,
             last: None,
+            captured_at: None,
             region: None,
             #[cfg(target_os = "linux")]
             desktop_origin,
@@ -524,6 +526,7 @@ impl FrameSource {
                 display,
                 backend: Backend::OneShot,
                 last: None,
+                captured_at: None,
                 region: None,
             }
         }
@@ -534,10 +537,17 @@ impl FrameSource {
     pub fn poll(&mut self) -> anyhow::Result<Option<&RgbaImage>> {
         let image = match &mut self.backend {
             Backend::Persistent(capturer) => match capturer.poll_frame()? {
-                Some(frame) => Some(self.decode_frame(&frame)?),
+                Some(frame) => {
+                    self.captured_at = Some(frame.captured_at);
+                    Some(self.decode_frame(&frame)?)
+                }
                 None => None,
             },
-            Backend::OneShot => Some(self.decode_one_shot()?),
+            Backend::OneShot => {
+                let image = self.decode_one_shot()?;
+                self.captured_at = Some(Instant::now());
+                Some(image)
+            }
         };
         match image {
             Some(image) => {
@@ -550,15 +560,25 @@ impl FrameSource {
                 let image = match &mut self.backend {
                     Backend::Persistent(capturer) => {
                         let frame = capturer.capture()?;
+                        self.captured_at = Some(frame.captured_at);
                         self.decode_frame(&frame)?
                     }
-                    Backend::OneShot => self.decode_one_shot()?,
+                    Backend::OneShot => {
+                        let image = self.decode_one_shot()?;
+                        self.captured_at = Some(Instant::now());
+                        image
+                    }
                 };
                 self.last = Some(image);
                 Ok(self.last.as_ref())
             }
             None => Ok(None),
         }
+    }
+
+    /// Timestamp of the native pixels, before conversion/resizing/encoding.
+    pub fn captured_at(&self) -> Option<Instant> {
+        self.captured_at
     }
 
     /// Latest frame (new or unchanged).

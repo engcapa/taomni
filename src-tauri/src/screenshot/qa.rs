@@ -50,15 +50,21 @@ fn artifact_dir() -> std::path::PathBuf {
         .join("taomni-qa-artifacts")
 }
 
+fn evidence_path(name: &str) -> std::path::PathBuf {
+    static PROCESS_ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let process = PROCESS_ID.get_or_init(|| uuid::Uuid::new_v4().to_string());
+    artifact_dir().join(format!(
+        "{}-{process}-{}-{name}",
+        platform(),
+        EVAL_ID.fetch_add(1, Ordering::Relaxed)
+    ))
+}
+
 /// Best-effort copy of an output into the CI artifact folder.
 fn keep_artifact(src: &std::path::Path, name: &str) -> Option<String> {
     let dir = artifact_dir();
     std::fs::create_dir_all(&dir).ok()?;
-    let dest = dir.join(format!(
-        "{}-{}-{name}",
-        platform(),
-        EVAL_ID.fetch_add(1, Ordering::Relaxed)
-    ));
+    let dest = evidence_path(name);
     std::fs::copy(src, &dest).ok()?;
     Some(dest.to_string_lossy().into_owned())
 }
@@ -66,11 +72,7 @@ fn keep_artifact(src: &std::path::Path, name: &str) -> Option<String> {
 fn keep_image(image: &RgbaImage, name: &str) -> Option<String> {
     let dir = artifact_dir();
     std::fs::create_dir_all(&dir).ok()?;
-    let dest = dir.join(format!(
-        "{}-{}-{name}",
-        platform(),
-        EVAL_ID.fetch_add(1, Ordering::Relaxed)
-    ));
+    let dest = evidence_path(name);
     image.save(&dest).ok()?;
     Some(dest.to_string_lossy().into_owned())
 }
@@ -263,7 +265,7 @@ async fn open_fixture(
     tokio::time::sleep(Duration::from_millis(700)).await;
     let pos = window.inner_position().context("fixture position")?;
     let size = window.inner_size().context("fixture size")?;
-    let content_width = run_js(&window, "return document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]').clientWidth;", Duration::from_secs(5)).await?.as_f64().context("fixture content width")?;
+    let content_width = run_js(&window, "const root = document.querySelector('[data-testid=\"screenshot-qa-fixture-ready\"]'); return root.querySelector('canvas')?.getBoundingClientRect().width ?? root.clientWidth;", Duration::from_secs(5)).await?.as_f64().context("fixture content width")?;
     let margin = (6.0 * s).round() as u32;
     let rx = (pos.x - display.x).max(0) as u32 + margin;
     let ry = (pos.y - display.y).max(0) as u32 + margin;
@@ -328,11 +330,7 @@ fn source_png(data_url: &str) -> anyhow::Result<RgbaImage> {
 }
 
 fn keep_json(value: &Value, name: &str) -> anyhow::Result<String> {
-    let path = artifact_dir().join(format!(
-        "{}-{}-{name}",
-        platform(),
-        EVAL_ID.fetch_add(1, Ordering::Relaxed)
-    ));
+    let path = evidence_path(name);
     std::fs::create_dir_all(artifact_dir())?;
     std::fs::write(&path, serde_json::to_vec_pretty(value)?)?;
     Ok(path.to_string_lossy().into_owned())
@@ -461,14 +459,23 @@ fn compare_record_original(
     let inspected = super::record::inspect_clip_frames(path, &mut |image, at_ms| {
         let id = qa_oracle::decode_code(image, source_size, 12, 64.0);
         let nonce = qa_oracle::decode_code(image, source_size, 16, 112.0);
-        let original = id.and_then(|id| source.frames.iter().find(|frame| frame.id == id));
+        let original_index =
+            id.and_then(|id| source.frames.iter().position(|frame| frame.id == id));
+        let original = original_index.map(|i| &source.frames[i]);
+        let visible_until = original_index
+            .and_then(|i| source.frames.get(i + 1))
+            .map(|f| f.at_ms);
         let ordered = previous.zip(id).is_none_or(|(last, now)| now >= last);
         let mut comparison = None;
         let matched = if let Some(original) = original {
             let raw = source_png(&original.data_url)?;
             let expected = source_region(source, &raw, expected_size)?;
             let result = qa_oracle::compare(image, &expected, true);
-            let timing = timeline.observe(at_ms, original.at_ms);
+            let timing = timeline.observe(
+                at_ms,
+                original.at_ms,
+                visible_until.unwrap_or(original.at_ms),
+            );
             let passed = result.passed && nonce == Some(source.nonce) && ordered && timing;
             if pairs.len() < 8 {
                 pairs.push((image.clone(), expected.clone()));
@@ -491,7 +498,7 @@ fn compare_record_original(
             keep_image(image, &format!("record-decoded-{}.png", observations.len()))
                 .context("save decoded frame")?;
         observations.push(json!({"decodedFrame":observations.len(),"atMs":at_ms,"sourceId":id,"nonce":nonce,
-            "originalAtMs":original.map(|f|f.at_ms),"ordered":ordered,"matchedOriginal":matched,"comparison":comparison,"actualArtifact":actual_artifact}));
+            "originalAtMs":original.map(|f|f.at_ms),"originalVisibleUntilMs":visible_until,"ordered":ordered,"matchedOriginal":matched,"comparison":comparison,"actualArtifact":actual_artifact}));
         Ok(())
     });
     let checks = keep_json(
@@ -1289,6 +1296,18 @@ mod tests {
             frames: Vec::new(),
             data_url: None,
         }
+    }
+
+    #[test]
+    fn evidence_names_cannot_collide_after_app_restarts_between_cases() {
+        let first = evidence_path("recording.gif");
+        let second = evidence_path("recording.gif");
+        assert_ne!(first, second);
+        let name = first.file_name().unwrap().to_str().unwrap();
+        assert!(name.starts_with(platform()));
+        let process = &name[platform().len() + 1..platform().len() + 37];
+        assert!(uuid::Uuid::parse_str(process).is_ok());
+        assert!(name.ends_with("-recording.gif"));
     }
 
     #[test]

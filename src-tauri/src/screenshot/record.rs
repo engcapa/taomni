@@ -375,7 +375,7 @@ fn capture_loop(
     let _ = ready.send(Ok(()));
 
     let interval = Duration::from_secs_f64(1.0 / fps as f64);
-    let start = Instant::now();
+    let start = source.captured_at().unwrap_or_else(Instant::now);
     let deadline = start + format.max_duration();
     let (out_w, out_h) = output_dims(region.2, region.3, format.max_width());
     let mut queue = FrameQueue::default();
@@ -402,7 +402,11 @@ fn capture_loop(
                 let at_ms = if queue.previous.is_none() {
                     0
                 } else {
-                    start.elapsed().as_millis() as u64
+                    source
+                        .captured_at()
+                        .unwrap_or_else(Instant::now)
+                        .saturating_duration_since(start)
+                        .as_millis() as u64
                 };
                 queue.update(image, at_ms);
             }

@@ -90,14 +90,22 @@ pub struct Timeline {
 }
 
 impl Timeline {
-    pub fn observe(&mut self, clip_ms: u64, original_ms: f64) -> bool {
+    pub fn observe(&mut self, clip_ms: u64, original_ms: f64, visible_until_ms: f64) -> bool {
         let (first_clip, first_original) = *self.first.get_or_insert((clip_ms, original_ms));
-        let drift =
-            ((original_ms - first_original) - clip_ms.saturating_sub(first_clip) as f64).abs();
+        // A drawn image is the original screen state until the next actual
+        // draw, not just at its initial timestamp. A paused fixture must not
+        // misclassify a correctly sampled held frame as delayed playback.
+        let source_ms = first_original + clip_ms.saturating_sub(first_clip) as f64;
+        let drift = (original_ms - source_ms)
+            .max(source_ms - visible_until_ms)
+            .max(0.0);
         self.worst_drift_ms = self.worst_drift_ms.max(drift);
-        let ordered = self.last.is_none_or(|(last_clip, last_original)| {
-            clip_ms >= last_clip && original_ms >= last_original
-        });
+        let ordered = original_ms.is_finite()
+            && visible_until_ms.is_finite()
+            && visible_until_ms >= original_ms
+            && self.last.is_none_or(|(last_clip, last_original)| {
+                clip_ms >= last_clip && original_ms >= last_original
+            });
         if let Some((last_clip, _)) = self.last {
             self.longest_gap_ms = self.longest_gap_ms.max(clip_ms.saturating_sub(last_clip));
         }
@@ -247,29 +255,56 @@ mod tests {
     fn timeline_rejects_static_reversed_sped_up_and_stalled_animation() {
         let mut valid = Timeline::default();
         for i in 0..30 {
-            assert!(valid.observe(i * 100, 1000.0 + i as f64 * 100.0));
+            assert!(valid.observe(
+                i * 100,
+                1000.0 + i as f64 * 100.0,
+                1100.0 + i as f64 * 100.0
+            ));
         }
         assert!(valid.complete(3000));
         let mut repeated = Timeline::default();
         for i in 0..30 {
-            repeated.observe(i * 100, 1000.0);
+            repeated.observe(i * 100, 1000.0, 1100.0);
         }
         assert!(!repeated.complete(3000));
         let mut reverse = Timeline::default();
         for i in 0..30 {
-            reverse.observe(i * 100, 4000.0 - i as f64 * 100.0);
+            reverse.observe(
+                i * 100,
+                4000.0 - i as f64 * 100.0,
+                4100.0 - i as f64 * 100.0,
+            );
         }
         assert!(!reverse.complete(3000));
         let mut fast = Timeline::default();
         for i in 0..30 {
-            fast.observe(i * 100, 1000.0 + i as f64 * 200.0);
+            fast.observe(
+                i * 100,
+                1000.0 + i as f64 * 200.0,
+                1100.0 + i as f64 * 200.0,
+            );
         }
         assert!(!fast.complete(3000));
         let mut stalled = Timeline::default();
-        stalled.observe(0, 1000.0);
-        stalled.observe(900, 1900.0);
-        stalled.observe(1500, 2500.0);
+        stalled.observe(0, 1000.0, 1100.0);
+        stalled.observe(900, 1900.0, 2000.0);
+        stalled.observe(1500, 2500.0, 2600.0);
         assert!(!stalled.complete(3000));
+    }
+
+    #[test]
+    fn held_original_matches_its_real_visibility_interval_but_stale_frame_does_not() {
+        let mut held = Timeline::default();
+        assert!(held.observe(0, 1000.0, 1100.0));
+        assert!(held.observe(100, 1100.0, 1700.0));
+        assert!(held.observe(600, 1100.0, 1700.0));
+        assert!(held.observe(700, 1700.0, 1800.0));
+        assert!(held.observe(900, 1900.0, 2000.0));
+        assert!(held.complete(1000));
+        let mut stale = Timeline::default();
+        assert!(stale.observe(0, 1000.0, 1050.0));
+        assert!(!stale.observe(800, 1400.0, 1450.0));
+        assert!(!stale.complete(1000));
     }
 
     #[test]

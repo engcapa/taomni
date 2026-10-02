@@ -17,7 +17,7 @@ verification:
     requirement: Built-in H264 MP4 records the actual original scene at matching region content, original state order and real playback timing, not merely decodable changing frames.
     actions: [1]
     checkpoints:
-    - {step: 3, expectation: "All H264 samples decode and every frame's complementary id/random nonce maps to an actual retained original PNG; all spatial pixel tiles pass the fixed lossy thresholds. Original states stay ordered, timeline drift <=250ms, no gap/end stall >700ms and source coverage >=70 percent duration. Twelve-frame/four-state and real three-second timing checks still apply; original PNGs, MP4, timeline, per-frame comparisons and difference contact sheet are retained."}
+    - {step: 3, expectation: "All H264 samples decode and every frame's complementary id/random nonce maps to an actual retained original PNG; all spatial pixel tiles pass the fixed lossy thresholds. Original states stay ordered; anchored clip time falls within <=250ms of each actual original visibility interval (draw through next draw), no gap/end stall >700ms and source coverage >=70 percent duration. Twelve-frame/four-state and real three-second timing checks still apply; original PNGs, MP4, timeline, per-frame comparisons and difference contact sheet are retained."}
     results: [3]
   visual:
   - {check: Original scene fidelity, method: automated, reason: "Match every decoded H264 frame to actual drawn originals; pixel tiles/id/nonce/timeline reject incorrect but decodable movies. Original/actual/difference files remain available for review."}
