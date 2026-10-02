@@ -66,6 +66,7 @@ export interface FilePanelSession {
  */
 export interface FilePanelStore {
   sessions: Record<string, FilePanelSession>;
+  listPath: (sessionId: string, side: PaneSide, path: string) => Promise<FileEntry[]>;
   navigate: (sessionId: string, side: PaneSide, path: string) => Promise<void>;
   navigateBack: (sessionId: string, side: PaneSide) => Promise<void>;
   navigateForward: (sessionId: string, side: PaneSide) => Promise<void>;
@@ -80,6 +81,7 @@ export type FilePanelStoreHook = UseBoundStore<StoreApi<FilePanelStore>>;
 
 interface SftpStoreState {
   sessions: Record<string, SftpSessionState>;
+  listPath: FilePanelStore["listPath"];
   attach: (opts: AttachOptions) => Promise<void>;
   reconnect: (sessionId: string) => Promise<void>;
   /**
@@ -519,6 +521,8 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
       return { sessions: next };
     });
   },
+
+  listPath: async (sessionId, side, path) => (await listSide(sessionId, side, path)).entries,
 
   refreshPane: async (sessionId, side) => {
     const session = get().sessions[sessionId];

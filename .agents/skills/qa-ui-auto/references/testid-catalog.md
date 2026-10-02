@@ -2052,10 +2052,15 @@
 ## sftp (F7.5)
 
 - `[data-testid="sftp-local-path"]` — interactive — F7.5.local-path
+  ↳ `input[data-testid="sftp-local-path"]` — alias
 - `[data-testid="sftp-remote-path"]` — interactive — F7.5.remote-path
   ↳ `input[data-testid="sftp-remote-path"]` — alias
 - `[data-testid="sftp-local-path-edit"]` — interactive — F7.5.local-path-edit
 - `[data-testid="sftp-remote-path-edit"]` — interactive — F7.5.remote-path-edit
+- `[data-testid="sftp-local-path-suggestions"]` — display [optional] — F7.5.local-path-suggestions
+- `[data-testid="sftp-remote-path-suggestions"]` — display [optional] — F7.5.remote-path-suggestions
+- `[data-testid="sftp-local-path-suggestions"] [role="option"]` — interactive [optional] — F7.5.local-path-option
+- `[data-testid="sftp-remote-path-suggestions"] [role="option"]` — interactive [optional] — F7.5.remote-path-option
 - `[data-testid="sftp-local-back"]` — interactive — F7.5.local-back
 - `[data-testid="sftp-local-forward"]` — interactive — F7.5.local-forward
 - `[data-testid="sftp-local-up"]` — interactive — F7.5.local-up

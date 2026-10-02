@@ -1,6 +1,9 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ChevronRight, Home, HardDrive, Pencil } from "lucide-react";
 import { useT } from "../../lib/i18n";
+import { cleanPathInput, isWindowsPath } from "../../lib/pathCompletion";
+import type { FileEntry } from "../../lib/sftp";
+import { PathCompletionInput } from "./PathCompletionInput";
 
 interface PathBreadcrumbProps {
   path: string;
@@ -9,6 +12,8 @@ interface PathBreadcrumbProps {
   onSubmit?: (path: string) => void;
   detectWindows?: boolean;
   testId?: string;
+  listDirectory?: (path: string) => Promise<FileEntry[]>;
+  showHidden?: boolean;
 }
 
 export function PathBreadcrumb({
@@ -18,25 +23,19 @@ export function PathBreadcrumb({
   onSubmit,
   detectWindows,
   testId,
+  listDirectory,
+  showHidden,
 }: PathBreadcrumbProps) {
   const t = useT();
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(path);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!editing) setEditValue(path);
   }, [path, editing]);
 
-  useEffect(() => {
-    if (editing) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [editing]);
-
   const isDrivesRoot = path === "\\\\";
-  const isWindows = detectWindows ?? (path.includes("\\") || isDrivesRoot);
+  const isWindows = detectWindows ?? isWindowsPath(path);
   const sep = isWindows ? "\\" : "/";
 
   const segments = useMemo(() => {
@@ -45,11 +44,12 @@ export function PathBreadcrumb({
     if (isDrivesRoot) return [{ label: t("fileBrowser.pathBreadcrumbDrives"), path: "\\\\" }];
     if (isWindows) {
       const drive = path.match(/^([A-Z]):/i)?.[1];
-      const rest = path.slice(drive ? 2 : 0).replace(/\\$/, "");
+      const normalized = path.replace(/\//g, "\\");
+      const rest = normalized.slice(drive ? 2 : 0).replace(/\\$/, "");
       const parts = rest.split("\\").filter(Boolean);
       const result: { label: string; path: string }[] = [];
       if (drive) result.push({ label: `${drive.toUpperCase()}:`, path: `${drive.toUpperCase()}:\\` });
-      let acc = drive ? `${drive.toUpperCase()}:` : "";
+      let acc = drive ? `${drive.toUpperCase()}:` : normalized.startsWith("\\\\") ? "\\" : "";
       for (const part of parts) {
         acc = acc ? `${acc}\\${part}` : part;
         result.push({ label: part, path: acc });
@@ -66,9 +66,9 @@ export function PathBreadcrumb({
     return result;
   }, [path, isWindows, isDrivesRoot, t]);
 
-  const handleEnter = () => {
+  const handleEnter = (value: string) => {
     setEditing(false);
-    const cleaned = editValue.trim().replace(/^['"]|['"]$/g, "");
+    const cleaned = cleanPathInput(value);
     if (cleaned && cleaned !== path) {
       onSubmit?.(cleaned);
     }
@@ -76,22 +76,20 @@ export function PathBreadcrumb({
 
   if (editing) {
     return (
-      <input
-        ref={inputRef}
-        data-testid={testId}
-        aria-label={testId}
-        autoFocus
-        className="taomni-input flex-1 h-6"
+      <PathCompletionInput
+        path={path}
+        testId={testId}
         value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleEnter}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") handleEnter();
-          else if (e.key === "Escape") {
-            setEditValue(path);
-            setEditing(false);
-          }
+        onChange={setEditValue}
+        onCommit={handleEnter}
+        onCancel={() => {
+          setEditValue(path);
+          setEditing(false);
         }}
+        listDirectory={listDirectory}
+        homePath={homePath}
+        detectWindows={detectWindows}
+        showHidden={showHidden}
       />
     );
   }
