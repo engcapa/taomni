@@ -1525,7 +1525,7 @@ describe("TerminalPanel focus behavior", () => {
     try {
       fireEvent.change(input, { target: { value: "marker" } });
       if (action === "Enter") fireEvent.keyDown(input, { key: "Enter" });
-      else fireEvent.click(screen.getByRole("button", { name: action, exact: true }));
+      else fireEvent.click(screen.getByRole("button", { name: action }));
       expect(term.select).toHaveBeenCalledTimes(1);
       const status = screen.getByText(/Match \d\/2/).textContent;
       act(() => vi.advanceTimersByTime(150));
